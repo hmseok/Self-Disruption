@@ -14,7 +14,7 @@ import * as XLSX from 'xlsx'
 // 4탭: 통장 거래 | 카드 거래 | 자동매칭 | 정산 연결
 // ═══════════════════════════════════════════════════════════════
 
-type TabKey = 'bank' | 'card' | 'matching' | 'settlement' | 'sms'
+type TabKey = 'bank' | 'card' | 'matching' | 'settlement' | 'sms' | 'mapping'
 
 interface Transaction {
   id: string
@@ -217,6 +217,15 @@ export default function BankCardPage() {
   const [smsIssuerFilter, setSmsIssuerFilter] = useState<string>('')
   const [smsStats, setSmsStats] = useState<{ status: string; count: number; total: number }[]>([])
 
+  // 매핑 탭 상태
+  const [mappingCards, setMappingCards] = useState<any[]>([])
+  const [mappingBanks, setMappingBanks] = useState<any[]>([])
+  const [mappingCars, setMappingCars] = useState<any[]>([])
+  const [smsAliases, setSmsAliases] = useState<any[]>([])
+  const [mappingLoading, setMappingLoading] = useState(false)
+  const [mappingSub, setMappingSub] = useState<'card' | 'bank'>('card')
+  const [editMapping, setEditMapping] = useState<any>(null)
+
   // ─── 데이터 로드 ─────────────────────────────────────
 
   const loadSummary = useCallback(async () => {
@@ -254,6 +263,44 @@ export default function BankCardPage() {
     }
   }, [smsStatusFilter, smsIssuerFilter])
 
+  const loadMappings = useCallback(async () => {
+    setMappingLoading(true)
+    try {
+      const { json } = await fetchWithAuth('/api/finance/mappings')
+      if (json) {
+        setMappingCards(json.cards || [])
+        setMappingBanks(json.bankAccounts || [])
+        setMappingCars(json.cars || [])
+        setSmsAliases(json.smsAliases || [])
+      }
+    } finally { setMappingLoading(false) }
+  }, [])
+
+  const saveMapping = useCallback(async (data: any) => {
+    await fetchWithAuth('/api/finance/mappings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    })
+    setEditMapping(null)
+    loadMappings()
+  }, [loadMappings])
+
+  const deleteMapping = useCallback(async (id: string, type: string) => {
+    if (!confirm('삭제하시겠습니까?')) return
+    await fetchWithAuth(`/api/finance/mappings?id=${id}&type=${type}`, { method: 'DELETE' })
+    loadMappings()
+  }, [loadMappings])
+
+  // SMS→카드 일괄 연결
+  const runLinkCards = useCallback(async () => {
+    const { json } = await fetchWithAuth('/api/finance/sms/link-cards', { method: 'POST' })
+    if (json) {
+      alert(`연결 완료: 카드 ${json.cardLinked}건, 은행 ${json.bankLinked}건, 거래 생성 ${json.transactionsCreated}건`)
+      loadMappings()
+    }
+  }, [loadMappings])
+
   useEffect(() => {
     setLoading(true)
     Promise.all([loadSummary(), loadTransactions(), loadSettlements()])
@@ -263,7 +310,8 @@ export default function BankCardPage() {
   // SMS 탭 전환 시 로드
   useEffect(() => {
     if (activeTab === 'sms') loadSmsData()
-  }, [activeTab, loadSmsData])
+    if (activeTab === 'mapping') loadMappings()
+  }, [activeTab, loadSmsData, loadMappings])
 
   // 실패 건 재파싱
   const [reparsing, setReparsing] = useState(false)
@@ -503,6 +551,7 @@ export default function BankCardPage() {
     { key: 'matching', label: '자동매칭', count: summary?.transactions.unmatched },
     { key: 'settlement', label: '정산 연결', count: summary?.settlement.total },
     { key: 'sms', label: 'SMS 수집', count: summary?.sms?.total || 0 },
+    { key: 'mapping', label: '매핑 관리' },
   ]
 
   // ── 통계 카드 ─────────────────────────────────────────
@@ -1046,7 +1095,211 @@ export default function BankCardPage() {
             </div>
           </>
         )}
+
+        {/* ──── 매핑 관리 탭 ──── */}
+        {activeTab === 'mapping' && (
+          <>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+              <button onClick={() => setMappingSub('card')} style={{
+                padding: '8px 18px', borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                border: `1px solid ${mappingSub === 'card' ? 'rgba(59,110,181,0.4)' : 'rgba(0,0,0,0.06)'}`,
+                background: mappingSub === 'card' ? 'rgba(191,219,254,0.6)' : 'rgba(255,255,255,0.72)',
+                color: mappingSub === 'card' ? '#1e40af' : '#475569',
+              }}>💳 카드 매핑 ({mappingCards.length})</button>
+              <button onClick={() => setMappingSub('bank')} style={{
+                padding: '8px 18px', borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                border: `1px solid ${mappingSub === 'bank' ? 'rgba(5,150,105,0.4)' : 'rgba(0,0,0,0.06)'}`,
+                background: mappingSub === 'bank' ? 'rgba(167,243,208,0.4)' : 'rgba(255,255,255,0.72)',
+                color: mappingSub === 'bank' ? '#065f46' : '#475569',
+              }}>🏦 통장 매핑 ({mappingBanks.length})</button>
+              <span style={{ flex: 1 }} />
+              <button onClick={runLinkCards} style={{
+                padding: '8px 14px', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                background: 'rgba(191,219,254,0.6)', color: '#1e40af', border: '1px solid rgba(59,110,181,0.3)',
+              }}>🔗 SMS 일괄 연결</button>
+              <button onClick={() => setEditMapping(mappingSub === 'card' ? { type: 'card' } : { type: 'bank' })} style={{
+                padding: '8px 14px', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                background: 'rgba(167,243,208,0.5)', color: '#065f46', border: '1px solid rgba(5,150,105,0.3)',
+              }}>+ 추가</button>
+            </div>
+
+            {/* SMS에서 감지됐지만 미등록된 카드/계좌 알림 */}
+            {(() => {
+              const registeredAliases = new Set([...mappingCards.map((c: any) => c.card_alias), ...mappingBanks.map((b: any) => b.account_alias)])
+              const unregistered = smsAliases.filter((s: any) => !registeredAliases.has(s.card_alias))
+              if (unregistered.length === 0) return null
+              return (
+                <div style={{
+                  padding: '10px 14px', marginBottom: 12, borderRadius: 10,
+                  background: 'rgba(251,191,36,0.12)', border: '1px solid rgba(251,191,36,0.3)',
+                  fontSize: 12, color: '#92400e',
+                }}>
+                  ⚠ SMS에서 감지되었지만 미등록된 카드/계좌가 {unregistered.length}건 있습니다:
+                  {unregistered.map((u: any) => (
+                    <button key={u.card_alias} onClick={() => {
+                      const isBank = (u.card_issuer || '').includes('BANK')
+                      setEditMapping(isBank
+                        ? { type: 'bank', account_alias: u.card_alias, bank_issuer: u.card_issuer }
+                        : { type: 'card', card_alias: u.card_alias, card_issuer: u.card_issuer })
+                    }} style={{
+                      marginLeft: 6, padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 700,
+                      background: '#fff', border: '1px solid rgba(251,191,36,0.5)', cursor: 'pointer', color: '#92400e',
+                    }}>{u.card_alias}</button>
+                  ))}
+                </div>
+              )
+            })()}
+
+            {/* 카드 매핑 테이블 */}
+            {mappingSub === 'card' && (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                  <thead>
+                    <tr style={{ borderBottom: '2px solid rgba(0,0,0,0.08)' }}>
+                      <th style={{ padding: '10px 12px', textAlign: 'left', fontSize: 11, fontWeight: 700 }}>카드 별칭</th>
+                      <th style={{ padding: '10px 12px', textAlign: 'left', fontSize: 11, fontWeight: 700 }}>카드사</th>
+                      <th style={{ padding: '10px 12px', textAlign: 'left', fontSize: 11, fontWeight: 700 }}>소지자</th>
+                      <th style={{ padding: '10px 12px', textAlign: 'left', fontSize: 11, fontWeight: 700 }}>배정 차량</th>
+                      <th style={{ padding: '10px 12px', textAlign: 'center', fontSize: 11, fontWeight: 700 }}>관리</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {mappingCards.map((c: any) => (
+                      <tr key={c.id} style={{ borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
+                        <td style={{ padding: '10px 12px', fontWeight: 600 }}>{c.card_alias || c.card_number || '—'}</td>
+                        <td style={{ padding: '10px 12px' }}>
+                          {c.card_issuer && <span style={{ padding: '2px 8px', borderRadius: 6, background: `${ISSUER_COLOR[c.card_issuer] || '#94a3b8'}22`, color: ISSUER_COLOR[c.card_issuer] || '#94a3b8', fontWeight: 700, fontSize: 11 }}>{ISSUER_LABEL[c.card_issuer] || c.card_issuer}</span>}
+                        </td>
+                        <td style={{ padding: '10px 12px' }}>{c.holder_name || '—'}</td>
+                        <td style={{ padding: '10px 12px' }}>
+                          {c.car_number ? <span style={{ padding: '2px 8px', borderRadius: 6, background: 'rgba(59,130,246,0.1)', color: '#1d4ed8', fontWeight: 600, fontSize: 11 }}>🚗 {c.car_number}</span> : <span style={{ color: '#94a3b8' }}>공용</span>}
+                        </td>
+                        <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                          <button onClick={() => setEditMapping({ type: 'card', id: c.id, card_alias: c.card_alias, card_issuer: c.card_issuer, holder_name: c.holder_name, assigned_car_id: c.assigned_car_id })} style={{ padding: '3px 8px', borderRadius: 6, fontSize: 11, cursor: 'pointer', background: 'rgba(191,219,254,0.5)', border: '1px solid rgba(59,130,246,0.2)', color: '#1e40af', marginRight: 4 }}>수정</button>
+                          <button onClick={() => deleteMapping(c.id, 'card')} style={{ padding: '3px 8px', borderRadius: 6, fontSize: 11, cursor: 'pointer', background: 'rgba(254,202,202,0.5)', border: '1px solid rgba(239,68,68,0.2)', color: '#b91c1c' }}>삭제</button>
+                        </td>
+                      </tr>
+                    ))}
+                    {mappingCards.length === 0 && <tr><td colSpan={5} style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>등록된 카드가 없습니다</td></tr>}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* 통장 매핑 테이블 */}
+            {mappingSub === 'bank' && (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                  <thead>
+                    <tr style={{ borderBottom: '2px solid rgba(0,0,0,0.08)' }}>
+                      <th style={{ padding: '10px 12px', textAlign: 'left', fontSize: 11, fontWeight: 700 }}>계좌 별칭</th>
+                      <th style={{ padding: '10px 12px', textAlign: 'left', fontSize: 11, fontWeight: 700 }}>은행</th>
+                      <th style={{ padding: '10px 12px', textAlign: 'left', fontSize: 11, fontWeight: 700 }}>예금주</th>
+                      <th style={{ padding: '10px 12px', textAlign: 'left', fontSize: 11, fontWeight: 700 }}>배정 차량</th>
+                      <th style={{ padding: '10px 12px', textAlign: 'left', fontSize: 11, fontWeight: 700 }}>용도</th>
+                      <th style={{ padding: '10px 12px', textAlign: 'center', fontSize: 11, fontWeight: 700 }}>관리</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {mappingBanks.map((b: any) => (
+                      <tr key={b.id} style={{ borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
+                        <td style={{ padding: '10px 12px', fontWeight: 600 }}>{b.account_alias}</td>
+                        <td style={{ padding: '10px 12px' }}>
+                          <span style={{ padding: '2px 8px', borderRadius: 6, background: `${ISSUER_COLOR[b.bank_issuer] || '#059669'}22`, color: ISSUER_COLOR[b.bank_issuer] || '#059669', fontWeight: 700, fontSize: 11 }}>{ISSUER_LABEL[b.bank_issuer] || b.bank_name || b.bank_issuer}</span>
+                        </td>
+                        <td style={{ padding: '10px 12px' }}>{b.account_holder || '—'}</td>
+                        <td style={{ padding: '10px 12px' }}>
+                          {b.car_number ? <span style={{ padding: '2px 8px', borderRadius: 6, background: 'rgba(59,130,246,0.1)', color: '#1d4ed8', fontWeight: 600, fontSize: 11 }}>🚗 {b.car_number}</span> : <span style={{ color: '#94a3b8' }}>공용</span>}
+                        </td>
+                        <td style={{ padding: '10px 12px', fontSize: 11 }}>{b.purpose || '—'}</td>
+                        <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                          <button onClick={() => setEditMapping({ type: 'bank', id: b.id, account_alias: b.account_alias, bank_issuer: b.bank_issuer, bank_name: b.bank_name, account_holder: b.account_holder, assigned_car_id: b.assigned_car_id, purpose: b.purpose, memo: b.memo })} style={{ padding: '3px 8px', borderRadius: 6, fontSize: 11, cursor: 'pointer', background: 'rgba(167,243,208,0.5)', border: '1px solid rgba(5,150,105,0.2)', color: '#065f46', marginRight: 4 }}>수정</button>
+                          <button onClick={() => deleteMapping(b.id, 'bank')} style={{ padding: '3px 8px', borderRadius: 6, fontSize: 11, cursor: 'pointer', background: 'rgba(254,202,202,0.5)', border: '1px solid rgba(239,68,68,0.2)', color: '#b91c1c' }}>삭제</button>
+                        </td>
+                      </tr>
+                    ))}
+                    {mappingBanks.length === 0 && <tr><td colSpan={6} style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>등록된 통장이 없습니다</td></tr>}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>
+        )}
+
       </div>
+
+      {/* ═══ 매핑 편집 모달 ═══ */}
+      {editMapping && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+          onMouseDown={(e) => { if (e.target === e.currentTarget) setEditMapping(null) }}>
+          <div style={{ ...GLASS.L4, borderRadius: 16, padding: 24, width: '100%', maxWidth: 420 }}>
+            <h3 style={{ margin: '0 0 16px', fontSize: 15, fontWeight: 700 }}>
+              {editMapping.type === 'card' ? '💳 카드 매핑' : '🏦 통장 매핑'} {editMapping.id ? '수정' : '추가'}
+            </h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {editMapping.type === 'card' ? (
+                <>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>카드 별칭 (SMS 형식)
+                    <input value={editMapping.card_alias || ''} onChange={e => setEditMapping({ ...editMapping, card_alias: e.target.value })}
+                      placeholder="예: KB****8819" style={{ ...GLASS.L1, width: '100%', padding: '8px 12px', borderRadius: 8, fontSize: 13, marginTop: 4 }} />
+                  </label>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>카드사
+                    <select value={editMapping.card_issuer || ''} onChange={e => setEditMapping({ ...editMapping, card_issuer: e.target.value })}
+                      style={{ ...GLASS.L1, width: '100%', padding: '8px 12px', borderRadius: 8, fontSize: 13, marginTop: 4 }}>
+                      <option value="">선택</option>
+                      <option value="KB">KB국민</option><option value="WOORI">우리</option>
+                      <option value="HYUNDAI">현대</option><option value="MYCOMPANY">법인</option>
+                    </select>
+                  </label>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>소지자
+                    <input value={editMapping.holder_name || ''} onChange={e => setEditMapping({ ...editMapping, holder_name: e.target.value })}
+                      style={{ ...GLASS.L1, width: '100%', padding: '8px 12px', borderRadius: 8, fontSize: 13, marginTop: 4 }} />
+                  </label>
+                </>
+              ) : (
+                <>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>계좌 별칭 (SMS 형식)
+                    <input value={editMapping.account_alias || ''} onChange={e => setEditMapping({ ...editMapping, account_alias: e.target.value })}
+                      placeholder="예: 우리은행****8777" style={{ ...GLASS.L1, width: '100%', padding: '8px 12px', borderRadius: 8, fontSize: 13, marginTop: 4 }} />
+                  </label>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>은행
+                    <select value={editMapping.bank_issuer || ''} onChange={e => setEditMapping({ ...editMapping, bank_issuer: e.target.value })}
+                      style={{ ...GLASS.L1, width: '100%', padding: '8px 12px', borderRadius: 8, fontSize: 13, marginTop: 4 }}>
+                      <option value="">선택</option>
+                      <option value="WOORI_BANK">우리은행</option><option value="KB_BANK">국민은행</option>
+                    </select>
+                  </label>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>예금주
+                    <input value={editMapping.account_holder || ''} onChange={e => setEditMapping({ ...editMapping, account_holder: e.target.value })}
+                      style={{ ...GLASS.L1, width: '100%', padding: '8px 12px', borderRadius: 8, fontSize: 13, marginTop: 4 }} />
+                  </label>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>용도
+                    <select value={editMapping.purpose || ''} onChange={e => setEditMapping({ ...editMapping, purpose: e.target.value })}
+                      style={{ ...GLASS.L1, width: '100%', padding: '8px 12px', borderRadius: 8, fontSize: 13, marginTop: 4 }}>
+                      <option value="">미지정</option>
+                      <option value="rent_income">렌트수입</option><option value="operating">운영비</option>
+                      <option value="salary">급여</option><option value="insurance">보험</option>
+                    </select>
+                  </label>
+                </>
+              )}
+              <label style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>배정 차량
+                <select value={editMapping.assigned_car_id || ''} onChange={e => setEditMapping({ ...editMapping, assigned_car_id: e.target.value || null })}
+                  style={{ ...GLASS.L1, width: '100%', padding: '8px 12px', borderRadius: 8, fontSize: 13, marginTop: 4 }}>
+                  <option value="">공용 (미배정)</option>
+                  {mappingCars.map((car: any) => (
+                    <option key={car.id} value={car.id}>{car.number} ({car.brand} {car.model})</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <div style={{ display: 'flex', gap: 8, marginTop: 16, justifyContent: 'flex-end' }}>
+              <button onClick={() => setEditMapping(null)} style={{ padding: '8px 16px', borderRadius: 8, fontSize: 13, cursor: 'pointer', background: '#fff', border: '1px solid rgba(0,0,0,0.1)', color: '#475569' }}>취소</button>
+              <button onClick={() => saveMapping(editMapping)} style={{ padding: '8px 16px', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer', background: COLORS.primary, color: '#fff', border: 'none' }}>저장</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ═══ 엑셀 업로드 모달 ═══ */}
       {showUpload && (
