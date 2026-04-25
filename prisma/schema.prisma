@@ -1186,6 +1186,27 @@ model CardSmsTransaction {
 }
 
 // ============================================================
+// 은행 계좌 매핑 (PHASE 2 — 통장→차량/용도 매핑)
+// ============================================================
+model BankAccountMapping {
+  id              String   @id @default(uuid()) @db.Char(36)
+  account_alias   String   @db.VarChar(64)    // "우리은행****8777"
+  bank_issuer     String   @db.VarChar(16)    // WOORI_BANK, KB_BANK
+  bank_name       String?  @db.VarChar(32)    // "우리은행", "국민은행"
+  account_holder  String?  @db.VarChar(64)    // 예금주
+  assigned_car_id String?  @db.Char(36)       // 전용 차량 (NULL=공용)
+  purpose         String?  @db.VarChar(32)    // rent_income, operating, etc.
+  memo            String?  @db.VarChar(255)
+  status          String   @default("active") @db.VarChar(16)
+  created_at      DateTime @default(now())
+  updated_at      DateTime @default(now()) @updatedAt
+
+  @@unique([account_alias])
+  @@index([assigned_car_id], map: "idx_bank_mappings_car")
+  @@map("bank_account_mappings")
+}
+
+// ============================================================
 // 페이지 권한 (RBAC)
 // ============================================================
 model UserPagePermission {

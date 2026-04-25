@@ -15,8 +15,8 @@ import { parseSms, detectIssuer } from '@/lib/sms-parsers'
 //   1) 토큰 검증 (env SMS_WEBHOOK_TOKEN)
 //   2) raw_hash 계산 → 중복 skip
 //   3) 파서 실행 → 성공 시 parse_status='parsed', 실패 시 'failed'
-//   4) 취소 SMS 라면 같은 금액 승인 건 매칭 (TODO: Phase 2)
-//   5) transactions 테이블로 자동 적재 (TODO: Phase 2 — 우선 SMS만 쌓음)
+//   4) 카드/은행 자동 매칭 → corporate_cards / bank_account_mappings
+//   5) transactions 테이블 자동 적재 + 차량 연결
 //
 // 보안:
 //   · 토큰은 long random string (env 로 주입)
@@ -121,9 +121,76 @@ export async function POST(req: NextRequest) {
     )
   `
 
+  // ── 6. 자동 매칭 + 거래 생성 (PHASE 2) ──────────────────
+  let cardId: string | null = null
+  let carId: string | null = null
+  let transactionId: string | null = null
+
+  if (parsed && parsed.card_alias) {
+    try {
+      // 카드 매칭: card_alias로 corporate_cards 조회
+      const cards = await prisma.$queryRaw<Array<{ id: string; assigned_car_id: string | null }>>`
+        SELECT id, assigned_car_id FROM corporate_cards
+        WHERE card_alias = ${parsed.card_alias} LIMIT 1
+      `
+      if (cards.length > 0) {
+        cardId = cards[0].id
+        carId = cards[0].assigned_car_id
+        // SMS 레코드에 card_id 연결
+        await prisma.$executeRaw`
+          UPDATE card_sms_transactions SET card_id = ${cardId} WHERE id = ${id}
+        `
+      }
+    } catch { /* 카드 미등록 — 정상 */ }
+  }
+
+  // 은행 SMS인 경우 bank_account_mappings 조회
+  if (parsed && !cardId && (parsed.issuer === 'WOORI_BANK' || parsed.issuer === 'KB_BANK') && parsed.card_alias) {
+    try {
+      const bankAccounts = await prisma.$queryRaw<Array<{ id: string; assigned_car_id: string | null; purpose: string | null }>>`
+        SELECT id, assigned_car_id, purpose FROM bank_account_mappings
+        WHERE account_alias = ${parsed.card_alias} LIMIT 1
+      `
+      if (bankAccounts.length > 0) {
+        carId = bankAccounts[0].assigned_car_id
+      }
+    } catch { /* 테이블 미생성 또는 미등록 — 정상 */ }
+  }
+
+  // 거래(transactions) 자동 생성
+  if (parsed && parsed.amount) {
+    try {
+      const txDate = parsed.txAt || receivedAt
+      const txType = (parsed.type === 'deposit') ? 'income' : 'expense'
+      transactionId = randomUUID()
+
+      await prisma.$executeRaw`
+        INSERT INTO transactions (
+          id, transaction_date, type, amount, description, client_name,
+          card_company, imported_from, related_type, related_id,
+          status, created_at, updated_at
+        ) VALUES (
+          ${transactionId}, ${txDate}, ${txType}, ${parsed.amount},
+          ${parsed.merchant || parsed.issuer}, ${parsed.holder || ''},
+          ${parsed.issuer}, 'sms',
+          ${carId ? 'car' : null}, ${carId},
+          'completed', NOW(), NOW()
+        )
+      `
+      // SMS 레코드에 transaction_id 연결
+      await prisma.$executeRaw`
+        UPDATE card_sms_transactions SET transaction_id = ${transactionId} WHERE id = ${id}
+      `
+    } catch (e) {
+      // 거래 생성 실패해도 SMS 저장은 유지
+      transactionId = null
+    }
+  }
+
   return NextResponse.json({
     status: parseStatus,
     id,
+    linked: { cardId, carId, transactionId },
     parsed: parsed ? {
       issuer: parsed.issuer,
       type: parsed.type,
