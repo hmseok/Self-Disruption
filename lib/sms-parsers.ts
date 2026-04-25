@@ -1,19 +1,21 @@
 // ═══════════════════════════════════════════════════════════
-// 카드사 SMS 파서 — KB국민 / 우리 / 현대
+// 카드사 SMS 파서 v2 — 실제 수신 데이터 기반 (2026-04-25)
 //
-// 입력: { from: 발신번호, text: SMS 본문 }
-// 출력: { issuer, type, holder, card_alias, amount, merchant, installment, txAt }
+// 입력: { from: 발신번호, text: SMS 본문 (전처리 완료) }
+// 출력: ParsedSms | null
 //
-// 포맷 예시:
-//   [KB국민] 홍길동 4/21 14:32 CU편의점 3,500원 일시불 승인
-//   [우리카드] 홍*동 04/21 14:32 스타벅스 5,200원 일시불승인 카드번호****1234
-//   [현대카드M] 홍길동 04/21 14:32 / 3,500원 / CU편의점 / 일시불
+// ※ 실제 수신된 SMS 포맷:
+//   KB: "KB국민카드 8819(기업) 04/21 11:37 13,500원 지에스25 풍납한가람 잔여559,033원"
+//   KB: "[KB국민] 홍길동 4/21 14:32 CU편의점 3,500원 일시불 승인"
+//   우리: "우리 04/24 16:00 *8287 승인 15,000원 주유소 일시불"
+//   법인: "[MY COMPANY] 승인 7109 석호민님 9,000원 일시불 더벤티문정점 잔여한도3,422,272원"
 //
-// ※ 카드사가 포맷 바꾸면 여기만 고치면 됨.
-//    파싱 실패 시 null 반환 → webhook 에서 parse_status='failed' 로 저장.
+// ※ 웹훅(route.ts)에서 전처리 완료 후 이 파서가 호출됨:
+//   ① "보낸사람 : 번호 이름:" 접두어 제거
+//   ② "[Web발신]" 제거
 // ═══════════════════════════════════════════════════════════
 
-export type CardIssuer = 'KB' | 'WOORI' | 'HYUNDAI' | 'UNKNOWN'
+export type CardIssuer = 'KB' | 'WOORI' | 'HYUNDAI' | 'MYCOMPANY' | 'UNKNOWN'
 export type SmsTxType = 'approved' | 'canceled'
 
 export type ParsedSms = {
@@ -28,11 +30,10 @@ export type ParsedSms = {
 }
 
 // ── 발신번호로 카드사 식별 ─────────────────────────────────
-// (카드사가 번호 바꾸면 여기만 수정)
 const SENDER_MAP: Array<{ issuer: CardIssuer; patterns: RegExp[] }> = [
   { issuer: 'KB',       patterns: [/15884000/, /15447000/, /18006699/] },
   { issuer: 'WOORI',    patterns: [/15881688/, /15888000/, /15889955/] },
-  { issuer: 'HYUNDAI',  patterns: [/16445000/, /15447100/, /15881688/] },
+  { issuer: 'HYUNDAI',  patterns: [/16445000/, /15447100/] },
 ]
 
 export function detectIssuer(sender: string | null, text: string): CardIssuer {
@@ -40,16 +41,12 @@ export function detectIssuer(sender: string | null, text: string): CardIssuer {
   for (const { issuer, patterns } of SENDER_MAP) {
     if (patterns.some(p => p.test(s))) return issuer
   }
-  // 본문 prefix fallback
+  // 본문 키워드 fallback
+  if (/\[MY COMPANY\]/.test(text)) return 'MYCOMPANY'
   if (/\[KB국민/.test(text) || /KB국민카드/.test(text)) return 'KB'
-  if (/\[우리카드/.test(text) || /우리카드/.test(text)) return 'WOORI'
+  if (/\[우리카드/.test(text) || /우리카드/.test(text) || /^우리\s+\d/.test(text)) return 'WOORI'
   if (/\[현대카드/.test(text) || /현대카드/.test(text)) return 'HYUNDAI'
   return 'UNKNOWN'
-}
-
-// ── 취소 SMS 식별 ─────────────────────────────────────────
-function isCancelSms(text: string): boolean {
-  return /취소|승인취소|거래취소/.test(text) && !/승인\s*$/.test(text.trim())
 }
 
 // ── 공통: 금액 파싱 ───────────────────────────────────────
@@ -57,10 +54,10 @@ function parseAmount(text: string): number | null {
   const m = text.match(/([\d,]+)\s*원/)
   if (!m) return null
   const n = Number(m[1].replace(/,/g, ''))
-  return Number.isFinite(n) ? n : null
+  return Number.isFinite(n) && n > 0 ? n : null
 }
 
-// ── 공통: 날짜/시간 파싱 (MM/DD HH:MM 또는 MM-DD HH:MM) ────
+// ── 공통: 날짜/시간 파싱 ─────────────────────────────────
 function parseDateTime(text: string, year = new Date().getFullYear()): Date | null {
   const m = text.match(/(\d{1,2})[./-](\d{1,2})\s+(\d{1,2}):(\d{2})/)
   if (!m) return null
@@ -69,105 +66,35 @@ function parseDateTime(text: string, year = new Date().getFullYear()): Date | nu
   return Number.isFinite(d.getTime()) ? d : null
 }
 
-// ── KB국민카드 파서 ────────────────────────────────────────
-// 포맷 A: [KB국민] 홍길동 4/21 14:32 CU편의점 3,500원 일시불 승인
-// 포맷 B: KB국민카드 8819(기업) 홍길동 04/21 14:32 CU편의점 3,500원 일시불 승인
-//         (웹훅에서 [Web발신] 제거 후 도착하는 포맷)
+// ── 취소 감지 ────────────────────────────────────────────
+function isCancelSms(text: string): boolean {
+  return /취소|승인취소|거래취소/.test(text) && !/승인\s*$/.test(text.trim())
+}
+
+// ═══════════════════════════════════════════════════════════
+// KB국민카드 파서
+// ═══════════════════════════════════════════════════════════
+// 포맷 1: [KB국민] 홍길동 4/21 14:32 CU편의점 3,500원 일시불 승인
+//         → [카드사] 이름 날짜 가맹점 금액 할부 승인
+// 포맷 2: KB국민카드 8819(기업) 04/21 11:37 13,500원 지에스25 풍납한가람 잔여559,033원
+//         → 카드사 카드번호(타입) 날짜 금액 가맹점 잔여한도
+//         ※ 이름 없음, 금액이 가맹점 앞에 옴
 function parseKB(text: string): ParsedSms | null {
-  // 포맷 A: [KB국민] 또는 [KB국민카드]
+  const canceled = isCancelSms(text)
+
+  // 포맷 1: [KB국민] 이름 날짜 가맹점 금액
   let m = text.match(
     /\[KB국민(?:카드)?\]\s*([^\s]+)\s+(\d{1,2}[./-]\d{1,2}\s+\d{1,2}:\d{2})\s+(.+?)\s+([\d,]+)\s*원\s*([^\n]*)/
   )
-
-  // 포맷 B: KB국민카드 XXXX(기업) 홍길동 ... or KB국민카드 홍길동 ...
-  if (!m) {
-    m = text.match(
-      /KB국민카드\s*(?:\d{4}(?:\([^)]*\))?\s+)?([^\s]+)\s+(\d{1,2}[./-]\d{1,2}\s+\d{1,2}:\d{2})\s+(.+?)\s+([\d,]+)\s*원\s*([^\n]*)/
-    )
-  }
-
-  if (!m) return null
-  const [, holder, dt, merchant, amtStr, tail] = m
-
-  const canceled = /취소/.test(tail)
-  const installMatch = tail.match(/(일시불|\d+개월)/)
-
-  // 카드 별칭: [Web발신] 포맷의 "KB국민카드 8819" 또는 기존 "카드번호****1234"
-  let aliasMatch = text.match(/KB국민카드\s*(\d{4})/)
-  if (!aliasMatch) aliasMatch = text.match(/(?:카드번호|카드)\s*\**(\d{4})/)
-
-  return {
-    issuer: 'KB',
-    type: canceled ? 'canceled' : 'approved',
-    holder: holder.trim() || null,
-    card_alias: aliasMatch ? `KB****${aliasMatch[1]}` : null,
-    amount: Number(amtStr.replace(/,/g, '')),
-    merchant: merchant.trim() || null,
-    installment: installMatch ? installMatch[1] : null,
-    txAt: parseDateTime(dt),
-  }
-}
-
-// ── 우리카드 파서 ────────────────────────────────────────
-// 포맷 A: [우리카드] 홍*동 04/21 14:32 스타벅스 5,200원 일시불승인 카드****1234
-// 포맷 B: 우리카드 XXXX 홍*동 04/21 14:32 스타벅스 5,200원 일시불승인
-function parseWoori(text: string): ParsedSms | null {
-  // 포맷 A: [우리카드]
-  let m = text.match(
-    /\[우리카드\]\s*([^\s]+)\s+(\d{1,2}[./-]\d{1,2}\s+\d{1,2}:\d{2})\s+(.+?)\s+([\d,]+)\s*원\s*([^\n]*)/
-  )
-
-  // 포맷 B: 우리카드 XXXX 또는 우리카드 홍*동
-  if (!m) {
-    m = text.match(
-      /우리카드\s*(?:\d{4}(?:\([^)]*\))?\s+)?([^\s]+)\s+(\d{1,2}[./-]\d{1,2}\s+\d{1,2}:\d{2})\s+(.+?)\s+([\d,]+)\s*원\s*([^\n]*)/
-    )
-  }
-
-  if (!m) return null
-  const [, holder, dt, merchant, amtStr, tail] = m
-
-  const canceled = /취소/.test(tail)
-  const installMatch = tail.match(/(일시불|\d+개월)/)
-  let aliasMatch = text.match(/우리카드\s*(\d{4})/)
-  if (!aliasMatch) aliasMatch = text.match(/(?:카드|카드번호)\s*\**(\d{4})/)
-
-  return {
-    issuer: 'WOORI',
-    type: canceled ? 'canceled' : 'approved',
-    holder: holder.trim() || null,
-    card_alias: aliasMatch ? `우리****${aliasMatch[1]}` : null,
-    amount: Number(amtStr.replace(/,/g, '')),
-    merchant: merchant.trim() || null,
-    installment: installMatch ? installMatch[1] : null,
-    txAt: parseDateTime(dt),
-  }
-}
-
-// ── 현대카드 파서 ────────────────────────────────────────
-// 포맷 A1: [현대카드M] 홍길동 04/21 14:32 / 3,500원 / CU편의점 / 일시불 (슬래시 구분)
-// 포맷 A2: [현대카드] 홍길동 04/21 14:32 CU편의점 3,500원 일시불 승인 (공백 구분)
-// 포맷 B:  현대카드M XXXX 홍길동 04/21 14:32 CU편의점 3,500원 일시불 승인
-function parseHyundai(text: string): ParsedSms | null {
-  // ── 슬래시 구분 포맷 (포맷 A1) ──
-  let m = text.match(
-    /(?:\[현대카드[^\]]*\]|현대카드[A-Za-z0-9]*(?:\s+\d{4}(?:\([^)]*\))?)?)\s*([^\s]+)\s+(\d{1,2}[./-]\d{1,2}\s+\d{1,2}:\d{2})\s*\/\s*([\d,]+)\s*원\s*\/\s*(.+?)\s*\/\s*([^\n\/]+)/
-  )
   if (m) {
-    const [, holder, dt, amtStr, merchant, instOrStatus] = m
-    const canceled = /취소/.test(instOrStatus) || /취소/.test(text)
-    const installMatch = instOrStatus.match(/(일시불|\d+개월)/)
-    let alias = '현대'
-    const bracketAlias = text.match(/\[현대카드([A-Za-z0-9]*)\]/)
-    const plainAlias = text.match(/현대카드([A-Za-z0-9]+)/)
-    if (bracketAlias && bracketAlias[1]) alias = `현대${bracketAlias[1]}`
-    else if (plainAlias && plainAlias[1]) alias = `현대${plainAlias[1]}`
-
+    const [, holder, dt, merchant, amtStr, tail] = m
+    const installMatch = (tail || text).match(/(일시불|\d+개월)/)
+    let aliasMatch = text.match(/(?:카드번호|카드)\s*\**(\d{4})/)
     return {
-      issuer: 'HYUNDAI',
+      issuer: 'KB',
       type: canceled ? 'canceled' : 'approved',
       holder: holder.trim() || null,
-      card_alias: alias,
+      card_alias: aliasMatch ? `KB****${aliasMatch[1]}` : null,
       amount: Number(amtStr.replace(/,/g, '')),
       merchant: merchant.trim() || null,
       installment: installMatch ? installMatch[1] : null,
@@ -175,46 +102,239 @@ function parseHyundai(text: string): ParsedSms | null {
     }
   }
 
-  // ── 공백 구분 포맷 (포맷 A2 + B) ──
-  // A2: [현대카드M] 홍길동 ...
+  // 포맷 2: KB국민카드 8819(기업) 04/21 11:37 13,500원 가맹점 잔여...
+  // ※ 이름 없이 카드번호 바로 뒤에 날짜, 금액이 가맹점 앞
   m = text.match(
-    /\[현대카드[^\]]*\]\s*([^\s]+)\s+(\d{1,2}[./-]\d{1,2}\s+\d{1,2}:\d{2})\s+(.+?)\s+([\d,]+)\s*원\s*([^\n]*)/
+    /KB국민카드\s*(\d{4})(?:\([^)]*\))?\s+(\d{1,2}[./-]\d{1,2}\s+\d{1,2}:\d{2})\s+([\d,]+)\s*원\s+(.+?)(?:\s+잔여|$)/
   )
-  // B: 현대카드M XXXX(기업) 홍길동 ... or 현대카드 홍길동 ...
-  if (!m) {
-    m = text.match(
-      /현대카드[A-Za-z0-9]*\s*(?:\d{4}(?:\([^)]*\))?\s+)?([^\s]+)\s+(\d{1,2}[./-]\d{1,2}\s+\d{1,2}:\d{2})\s+(.+?)\s+([\d,]+)\s*원\s*([^\n]*)/
-    )
+  if (m) {
+    const [, cardNum, dt, amtStr, merchantRaw] = m
+    const installMatch = text.match(/(일시불|\d+개월)/)
+    return {
+      issuer: 'KB',
+      type: canceled ? 'canceled' : 'approved',
+      holder: null,
+      card_alias: `KB****${cardNum}`,
+      amount: Number(amtStr.replace(/,/g, '')),
+      merchant: merchantRaw.replace(/\s*(일시불|\d+개월)\s*/g, '').trim() || null,
+      installment: installMatch ? installMatch[1] : null,
+      txAt: parseDateTime(dt),
+    }
   }
-  if (!m) return null
-  const [, holder, dt, merchant, amtStr, tail] = m
-  const canceled = /취소/.test(tail)
-  const installMatch = tail.match(/(일시불|\d+개월)/)
-  let alias = '현대'
-  const bracketAlias = text.match(/\[현대카드([A-Za-z0-9]*)\]/)
-  const plainAlias = text.match(/현대카드([A-Za-z0-9]+)/)
-  if (bracketAlias && bracketAlias[1]) alias = `현대${bracketAlias[1]}`
-  else if (plainAlias && plainAlias[1]) alias = `현대${plainAlias[1]}`
 
+  // 포맷 3: KB국민카드 8819(기업) 홍길동 04/21 14:32 가맹점 금액 (이름 있는 변형)
+  m = text.match(
+    /KB국민카드\s*(?:\d{4}(?:\([^)]*\))?\s+)?([^\d\s][^\s]*)\s+(\d{1,2}[./-]\d{1,2}\s+\d{1,2}:\d{2})\s+(.+?)\s+([\d,]+)\s*원\s*([^\n]*)/
+  )
+  if (m) {
+    const [, holder, dt, merchant, amtStr, tail] = m
+    const installMatch = (tail || text).match(/(일시불|\d+개월)/)
+    const aliasMatch = text.match(/KB국민카드\s*(\d{4})/)
+    return {
+      issuer: 'KB',
+      type: canceled ? 'canceled' : 'approved',
+      holder: holder.trim() || null,
+      card_alias: aliasMatch ? `KB****${aliasMatch[1]}` : null,
+      amount: Number(amtStr.replace(/,/g, '')),
+      merchant: merchant.trim() || null,
+      installment: installMatch ? installMatch[1] : null,
+      txAt: parseDateTime(dt),
+    }
+  }
+
+  return null
+}
+
+// ═══════════════════════════════════════════════════════════
+// 우리카드 파서
+// ═══════════════════════════════════════════════════════════
+// 포맷 1: [우리카드] 홍*동 04/21 14:32 스타벅스 5,200원 일시불승인 카드****1234
+// 포맷 2: 우리 04/24 16:00 *8287 승인 15,000원 주유소 일시불
+//         → "우리" + 날짜 + *카드끝자리 + 승인 + 금액 + 가맹점
+function parseWoori(text: string): ParsedSms | null {
+  const canceled = isCancelSms(text)
+
+  // 포맷 1: [우리카드] 이름 날짜 가맹점 금액
+  let m = text.match(
+    /\[우리카드\]\s*([^\s]+)\s+(\d{1,2}[./-]\d{1,2}\s+\d{1,2}:\d{2})\s+(.+?)\s+([\d,]+)\s*원\s*([^\n]*)/
+  )
+  if (m) {
+    const [, holder, dt, merchant, amtStr, tail] = m
+    const installMatch = (tail || text).match(/(일시불|\d+개월)/)
+    let aliasMatch = text.match(/(?:카드|카드번호)\s*\**(\d{4})/)
+    return {
+      issuer: 'WOORI',
+      type: canceled ? 'canceled' : 'approved',
+      holder: holder.trim() || null,
+      card_alias: aliasMatch ? `우리****${aliasMatch[1]}` : null,
+      amount: Number(amtStr.replace(/,/g, '')),
+      merchant: merchant.trim() || null,
+      installment: installMatch ? installMatch[1] : null,
+      txAt: parseDateTime(dt),
+    }
+  }
+
+  // 포맷 2: 우리 04/24 16:00 *8287 승인 15,000원 가맹점...
+  m = text.match(
+    /우리\s+(\d{1,2}[./-]\d{1,2}\s+\d{1,2}:\d{2})\s+\*(\d{4})\s+(?:승인|사용)\s+([\d,]+)\s*원\s+(.+?)(?:\s+잔여|(?:\s+일시불|\s+\d+개월)|$)/
+  )
+  if (m) {
+    const [, dt, cardNum, amtStr, merchantRaw] = m
+    const installMatch = text.match(/(일시불|\d+개월)/)
+    return {
+      issuer: 'WOORI',
+      type: canceled ? 'canceled' : 'approved',
+      holder: null,
+      card_alias: `우리****${cardNum}`,
+      amount: Number(amtStr.replace(/,/g, '')),
+      merchant: merchantRaw.trim() || null,
+      installment: installMatch ? installMatch[1] : null,
+      txAt: parseDateTime(dt),
+    }
+  }
+
+  // 포맷 2 변형: 금액이 가맹점 앞에 오는 경우
+  m = text.match(
+    /우리\s+(\d{1,2}[./-]\d{1,2}\s+\d{1,2}:\d{2})\s+\*(\d{4})\s+([\d,]+)\s*원\s+(?:승인|사용)\s+(.+?)(?:\s+잔여|(?:\s+일시불|\s+\d+개월)|$)/
+  )
+  if (m) {
+    const [, dt, cardNum, amtStr, merchantRaw] = m
+    const installMatch = text.match(/(일시불|\d+개월)/)
+    return {
+      issuer: 'WOORI',
+      type: canceled ? 'canceled' : 'approved',
+      holder: null,
+      card_alias: `우리****${cardNum}`,
+      amount: Number(amtStr.replace(/,/g, '')),
+      merchant: merchantRaw.trim() || null,
+      installment: installMatch ? installMatch[1] : null,
+      txAt: parseDateTime(dt),
+    }
+  }
+
+  // 포맷 3: 우리카드 XXXX 이름 날짜 가맹점 금액
+  m = text.match(
+    /우리카드\s*(?:\d{4}(?:\([^)]*\))?\s+)?([^\d\s][^\s]*)\s+(\d{1,2}[./-]\d{1,2}\s+\d{1,2}:\d{2})\s+(.+?)\s+([\d,]+)\s*원\s*([^\n]*)/
+  )
+  if (m) {
+    const [, holder, dt, merchant, amtStr, tail] = m
+    const installMatch = (tail || text).match(/(일시불|\d+개월)/)
+    const aliasMatch = text.match(/우리카드\s*(\d{4})/)
+    return {
+      issuer: 'WOORI',
+      type: canceled ? 'canceled' : 'approved',
+      holder: holder.trim() || null,
+      card_alias: aliasMatch ? `우리****${aliasMatch[1]}` : null,
+      amount: Number(amtStr.replace(/,/g, '')),
+      merchant: merchant.trim() || null,
+      installment: installMatch ? installMatch[1] : null,
+      txAt: parseDateTime(dt),
+    }
+  }
+
+  return null
+}
+
+// ═══════════════════════════════════════════════════════════
+// 현대카드 파서
+// ═══════════════════════════════════════════════════════════
+function parseHyundai(text: string): ParsedSms | null {
+  const canceled = isCancelSms(text)
+
+  // 슬래시 구분: [현대카드M] 이름 날짜 / 금액 / 가맹점 / 할부
+  let m = text.match(
+    /(?:\[현대카드[^\]]*\]|현대카드[A-Za-z0-9]*(?:\s+\d{4}(?:\([^)]*\))?)?)\s*([^\s]+)\s+(\d{1,2}[./-]\d{1,2}\s+\d{1,2}:\d{2})\s*\/\s*([\d,]+)\s*원\s*\/\s*(.+?)\s*\/\s*([^\n\/]+)/
+  )
+  if (m) {
+    const [, holder, dt, amtStr, merchant, instOrStatus] = m
+    const installMatch = instOrStatus.match(/(일시불|\d+개월)/)
+    const aliasMatch = text.match(/현대카드([A-Za-z0-9]+)/) || text.match(/\[현대카드([A-Za-z0-9]*)\]/)
+    return {
+      issuer: 'HYUNDAI',
+      type: (canceled || /취소/.test(instOrStatus)) ? 'canceled' : 'approved',
+      holder: holder.trim() || null,
+      card_alias: aliasMatch && aliasMatch[1] ? `현대${aliasMatch[1]}` : '현대',
+      amount: Number(amtStr.replace(/,/g, '')),
+      merchant: merchant.trim() || null,
+      installment: installMatch ? installMatch[1] : null,
+      txAt: parseDateTime(dt),
+    }
+  }
+
+  // 공백 구분: [현대카드] 이름 날짜 가맹점 금액 or 현대카드 XXXX 이름 ...
+  m = text.match(
+    /(?:\[현대카드[^\]]*\]|현대카드[A-Za-z0-9]*(?:\s+\d{4}(?:\([^)]*\))?)?)\s*([^\d\s][^\s]*)\s+(\d{1,2}[./-]\d{1,2}\s+\d{1,2}:\d{2})\s+(.+?)\s+([\d,]+)\s*원\s*([^\n]*)/
+  )
+  if (m) {
+    const [, holder, dt, merchant, amtStr, tail] = m
+    const installMatch = (tail || text).match(/(일시불|\d+개월)/)
+    const aliasMatch = text.match(/현대카드([A-Za-z0-9]+)/) || text.match(/\[현대카드([A-Za-z0-9]*)\]/)
+    return {
+      issuer: 'HYUNDAI',
+      type: canceled ? 'canceled' : 'approved',
+      holder: holder.trim() || null,
+      card_alias: aliasMatch && aliasMatch[1] ? `현대${aliasMatch[1]}` : '현대',
+      amount: Number(amtStr.replace(/,/g, '')),
+      merchant: merchant.trim() || null,
+      installment: installMatch ? installMatch[1] : null,
+      txAt: parseDateTime(dt),
+    }
+  }
+
+  return null
+}
+
+// ═══════════════════════════════════════════════════════════
+// [MY COMPANY] 법인카드 파서
+// ═══════════════════════════════════════════════════════════
+// 포맷: [MY COMPANY] 승인 7109 석호민님 9,000원 일시불 더벤티문정점 잔여한도3,422,272원
+function parseMyCompany(text: string): ParsedSms | null {
+  const canceled = isCancelSms(text)
+
+  const m = text.match(
+    /\[MY COMPANY\]\s*(?:승인|사용|결제)\s+(\d{4})\s+([^\s]+?)님?\s+([\d,]+)\s*원\s+(일시불|\d+개월)\s+(.+?)(?:\s+잔여한도|$)/
+  )
+  if (!m) {
+    // 포맷 변형: 금액 뒤에 할부 없이 바로 가맹점
+    const m2 = text.match(
+      /\[MY COMPANY\]\s*(?:승인|사용|결제)\s+(\d{4})\s+([^\s]+?)님?\s+([\d,]+)\s*원\s+(.+?)(?:\s+잔여한도|$)/
+    )
+    if (!m2) return null
+    const [, cardNum, holder, amtStr, merchantRaw] = m2
+    const installMatch = text.match(/(일시불|\d+개월)/)
+    return {
+      issuer: 'MYCOMPANY',
+      type: canceled ? 'canceled' : 'approved',
+      holder: holder.replace(/님$/, '').trim() || null,
+      card_alias: `법인****${cardNum}`,
+      amount: Number(amtStr.replace(/,/g, '')),
+      merchant: merchantRaw.replace(/\s*(일시불|\d+개월)\s*/g, '').trim() || null,
+      installment: installMatch ? installMatch[1] : null,
+      txAt: null, // 이 포맷에는 날짜가 없음 — received_at 사용
+    }
+  }
+
+  const [, cardNum, holder, amtStr, installment, merchant] = m
   return {
-    issuer: 'HYUNDAI',
+    issuer: 'MYCOMPANY',
     type: canceled ? 'canceled' : 'approved',
-    holder: holder.trim() || null,
-    card_alias: alias,
+    holder: holder.replace(/님$/, '').trim() || null,
+    card_alias: `법인****${cardNum}`,
     amount: Number(amtStr.replace(/,/g, '')),
     merchant: merchant.trim() || null,
-    installment: installMatch ? installMatch[1] : null,
-    txAt: parseDateTime(dt),
+    installment,
+    txAt: null,
   }
 }
 
-// ── 라우터 ────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════
+// 라우터
+// ═══════════════════════════════════════════════════════════
 export function parseSms(sender: string | null, text: string): ParsedSms | null {
   const issuer = detectIssuer(sender, text)
   if (issuer === 'UNKNOWN') return null
 
-  // 취소 전용 패턴 감지 (금액/가맹점 없는 단순 취소 알림)
-  // 예: [KB국민] 홍길동 4/21 14:32 3,500원 승인취소
+  // 취소 전용 패턴 (금액만 있는 단순 취소)
   if (isCancelSms(text)) {
     const amt = parseAmount(text)
     const dt = parseDateTime(text)
@@ -233,9 +353,10 @@ export function parseSms(sender: string | null, text: string): ParsedSms | null 
   }
 
   switch (issuer) {
-    case 'KB':      return parseKB(text)
-    case 'WOORI':   return parseWoori(text)
-    case 'HYUNDAI': return parseHyundai(text)
-    default:        return null
+    case 'KB':        return parseKB(text)
+    case 'WOORI':     return parseWoori(text)
+    case 'HYUNDAI':   return parseHyundai(text)
+    case 'MYCOMPANY': return parseMyCompany(text)
+    default:          return null
   }
 }

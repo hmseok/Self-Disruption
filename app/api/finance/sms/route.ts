@@ -97,15 +97,17 @@ export async function POST(req: NextRequest) {
     let text = (row.raw_text || '').trim()
     let sender = row.sender || ''
 
-    // 웹훅 전처리 재적용: "보낸사람 :" 제거
+    // 웹훅 전처리 재적용
+    // 1) "보낸사람 : 번호" 제거
     const prefixMatch = text.match(/^보낸사람\s*:\s*([\d+\-\s]+)\s*/)
     if (prefixMatch) {
       if (!sender) sender = prefixMatch[1].replace(/[\s\-]/g, '')
       text = text.slice(prefixMatch[0].length).trim()
     }
-
-    // [Web발신] 제거
-    text = text.replace(/^\[Web발신\]\s*/, '')
+    // 2) "이름: " 접두어 제거 (영문/한글)
+    text = text.replace(/^[A-Za-z가-힣\s]+:\s*/, '')
+    // 3) [Web발신] 제거 (위치 무관)
+    text = text.replace(/\[Web발신\]\s*/g, '').trim()
 
     const issuer = detectIssuer(sender || null, text)
     const parsed = parseSms(sender || null, text)
@@ -129,10 +131,20 @@ export async function POST(req: NextRequest) {
         WHERE id = ${row.id}
       `
       fixed++
+    } else if (issuer === 'UNKNOWN') {
+      // 카드/은행 SMS가 아닌 일반 문자 → ignored 처리
+      await prisma.$executeRaw`
+        UPDATE card_sms_transactions SET
+          parse_status = 'ignored',
+          parse_error = 'non-financial SMS',
+          updated_at = CURRENT_TIMESTAMP
+        WHERE id = ${row.id}
+      `
     }
   }
 
-  return NextResponse.json({ ok: true, total: failedRows.length, fixed })
+  const ignored = failedRows.length - fixed
+  return NextResponse.json({ ok: true, total: failedRows.length, fixed, ignored })
 }
 
 // ── PATCH: 수동 파싱 결과 반영 ──────────────────────

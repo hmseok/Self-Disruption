@@ -88,8 +88,8 @@ interface SmsRow {
   installment: string | null
 }
 
-const ISSUER_LABEL: Record<string, string> = { KB: 'KB국민', WOORI: '우리', HYUNDAI: '현대' }
-const ISSUER_COLOR: Record<string, string> = { KB: '#fbbf24', WOORI: '#3b82f6', HYUNDAI: '#ef4444' }
+const ISSUER_LABEL: Record<string, string> = { KB: 'KB국민', WOORI: '우리', HYUNDAI: '현대', MYCOMPANY: '법인' }
+const ISSUER_COLOR: Record<string, string> = { KB: '#fbbf24', WOORI: '#3b82f6', HYUNDAI: '#ef4444', MYCOMPANY: '#8b5cf6' }
 
 // ─── 헬퍼 ───────────────────────────────────────────────
 
@@ -953,14 +953,14 @@ export default function BankCardPage() {
 
             {/* SMS 필터 */}
             <div style={{ display: 'flex', gap: 8, marginBottom: 12, marginTop: 8, flexWrap: 'wrap' }}>
-              {['', 'parsed', 'failed'].map(s => (
+              {['', 'parsed', 'failed', 'ignored'].map(s => (
                 <button key={s || 'all'} onClick={() => setSmsStatusFilter(s)} style={{
                   padding: '6px 14px', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: 'pointer',
                   border: `1px solid ${smsStatusFilter === s ? 'rgba(59,110,181,0.4)' : 'rgba(0,0,0,0.06)'}`,
                   background: smsStatusFilter === s ? 'rgba(191,219,254,0.6)' : 'rgba(255,255,255,0.72)',
                   color: '#1e293b',
                 }}>
-                  {s === '' ? '상태 전체' : s === 'parsed' ? '✅ 성공' : '❌ 실패'}
+                  {s === '' ? '상태 전체' : s === 'parsed' ? '✅ 성공' : s === 'failed' ? '❌ 실패' : '🔇 무시'}
                 </button>
               ))}
               <span style={{ width: 8 }} />
@@ -1018,6 +1018,7 @@ export default function BankCardPage() {
                       <td style={{ padding: '10px 12px' }}>
                         {r.parse_status === 'parsed' && <span style={{ padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 700, background: 'rgba(167,243,208,0.5)', color: '#059669' }}>✅</span>}
                         {r.parse_status === 'failed' && <span style={{ padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 700, background: 'rgba(254,202,202,0.5)', color: '#dc2626' }}>❌</span>}
+                        {r.parse_status === 'ignored' && <span style={{ padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 700, background: 'rgba(226,232,240,0.7)', color: '#94a3b8' }}>🔇</span>}
                         {r.parse_status === 'pending' && <span style={{ padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 700, background: 'rgba(226,232,240,0.7)', color: '#64748b' }}>⏳</span>}
                       </td>
                       <td style={{ padding: '10px 12px', color: '#1e293b' }}>{r.received_at ? String(r.received_at).slice(0, 16).replace('T', ' ') : '—'}</td>

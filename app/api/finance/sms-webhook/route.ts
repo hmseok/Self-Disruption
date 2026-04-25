@@ -52,16 +52,18 @@ export async function POST(req: NextRequest) {
   }
 
   // SMS Forwarder 앱 메시지 형식 전처리:
-  // 1) "보낸사람 : 01050349550 [Web발신] KB국민카드..." → "[Web발신] KB국민카드..."
-  // 2) "보낸사람 : 01050349550\n[KB국민] 홍길동..." → "[KB국민] 홍길동..."
+  // 1) "보낸사람 : 01050349550 homin seok: [Web발신]..." → 발신번호 추출 + 접두어 제거
   const prefixMatch = text.match(/^보낸사람\s*:\s*([\d+\-\s]+)\s*/)
   if (prefixMatch) {
     if (!from) from = prefixMatch[1].replace(/[\s\-]/g, '')
     text = text.slice(prefixMatch[0].length).trim()
   }
 
-  // 3) [Web발신] 접두어 제거 → "KB국민카드 8819(기업) 홍길동..."
-  text = text.replace(/^\[Web발신\]\s*/, '')
+  // 2) "homin seok: [Web발신]..." → 이름: 접두어 제거 (영문/한글 이름 뒤 콜론)
+  text = text.replace(/^[A-Za-z가-힣\s]+:\s*/, '')
+
+  // 3) [Web발신] 제거 (위치 무관)
+  text = text.replace(/\[Web발신\]\s*/g, '').trim()
 
   let receivedAt = new Date()
   try {
@@ -95,8 +97,8 @@ export async function POST(req: NextRequest) {
   const parsed = parseSms(from || null, text)
 
   const id = randomUUID()
-  const parseStatus = parsed ? 'parsed' : 'failed'
-  const parseError = parsed ? null : 'parser returned null — unknown format'
+  const parseStatus = parsed ? 'parsed' : (issuer === 'UNKNOWN' ? 'ignored' : 'failed')
+  const parseError = parsed ? null : (issuer === 'UNKNOWN' ? 'non-financial SMS' : 'parser returned null — unknown format')
 
   // ── 5. DB 적재 ───────────────────────────────────────
   await prisma.$executeRaw`
