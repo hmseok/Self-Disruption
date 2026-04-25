@@ -1,22 +1,28 @@
 // ═══════════════════════════════════════════════════════════
-// 카드사 SMS 파서 v2 — 실제 수신 데이터 기반 (2026-04-25)
+// 카드/은행 SMS 파서 v3 — 카드 + 은행 통합 (2026-04-25)
 //
 // 입력: { from: 발신번호, text: SMS 본문 (전처리 완료) }
 // 출력: ParsedSms | null
 //
 // ※ 실제 수신된 SMS 포맷:
-//   KB: "KB국민카드 8819(기업) 04/21 11:37 13,500원 지에스25 풍납한가람 잔여559,033원"
-//   KB: "[KB국민] 홍길동 4/21 14:32 CU편의점 3,500원 일시불 승인"
-//   우리: "우리 04/24 16:00 *8287 승인 15,000원 주유소 일시불"
-//   법인: "[MY COMPANY] 승인 7109 석호민님 9,000원 일시불 더벤티문정점 잔여한도3,422,272원"
+//   KB카드: "KB국민카드 8819(기업) 04/21 11:37 13,500원 지에스25 풍납한가람 잔여559,033원"
+//   KB카드: "[KB국민] 홍길동 4/21 14:32 CU편의점 3,500원 일시불 승인"
+//   우리카드: "우리 04/24 16:00 *8287 승인 15,000원 주유소 일시불"
+//   법인카드: "[MY COMPANY] 승인 7109 석호민님 9,000원 일시불 더벤티문정점 잔여한도3,422,272원"
+//   우리은행: "우리 04/24 16:00 *828777 출금 1,400원 잔액 123,456원"
+//   우리은행: "우리 04/24 16:00 *828777 입금 50,000원 잔액 173,456원"
+//
+// ※ 은행 vs 카드 구분:
+//   - *XXXX (4자리) + 승인/사용 → 카드
+//   - *XXXXXX (5자리+) + 출금/입금 → 은행
 //
 // ※ 웹훅(route.ts)에서 전처리 완료 후 이 파서가 호출됨:
 //   ① "보낸사람 : 번호 이름:" 접두어 제거
 //   ② "[Web발신]" 제거
 // ═══════════════════════════════════════════════════════════
 
-export type CardIssuer = 'KB' | 'WOORI' | 'HYUNDAI' | 'MYCOMPANY' | 'UNKNOWN'
-export type SmsTxType = 'approved' | 'canceled'
+export type CardIssuer = 'KB' | 'WOORI' | 'HYUNDAI' | 'MYCOMPANY' | 'WOORI_BANK' | 'KB_BANK' | 'UNKNOWN'
+export type SmsTxType = 'approved' | 'canceled' | 'deposit' | 'withdrawal'
 
 export type ParsedSms = {
   issuer: CardIssuer
@@ -38,6 +44,17 @@ const SENDER_MAP: Array<{ issuer: CardIssuer; patterns: RegExp[] }> = [
 
 export function detectIssuer(sender: string | null, text: string): CardIssuer {
   const s = (sender || '').replace(/[^0-9]/g, '')
+
+  // ── 은행 SMS 먼저 감지 (출금/입금 키워드 + 계좌번호 5자리 이상) ──
+  if (/(?:출금|입금)/.test(text)) {
+    // "우리 MM/DD HH:MM *XXXXXX 출금/입금" 패턴 (계좌번호 5자리+)
+    if (/^우리\s+\d/.test(text) && /\*\d{5,}/.test(text)) return 'WOORI_BANK'
+    if (/\[우리은행\]|우리은행/.test(text)) return 'WOORI_BANK'
+    // KB은행: [KB] 또는 국민은행 + 입출금
+    if (/\[KB\]|\[국민은행\]|국민은행/.test(text)) return 'KB_BANK'
+  }
+
+  // ── 카드 발신번호 매칭 ──
   for (const { issuer, patterns } of SENDER_MAP) {
     if (patterns.some(p => p.test(s))) return issuer
   }
@@ -46,6 +63,11 @@ export function detectIssuer(sender: string | null, text: string): CardIssuer {
   if (/\[KB국민/.test(text) || /KB국민카드/.test(text)) return 'KB'
   if (/\[우리카드/.test(text) || /우리카드/.test(text) || /^우리\s+\d/.test(text)) return 'WOORI'
   if (/\[현대카드/.test(text) || /현대카드/.test(text)) return 'HYUNDAI'
+
+  // ── 은행 키워드 fallback (출금/입금 없이 은행명만 있는 경우) ──
+  if (/\[우리은행\]|우리은행/.test(text)) return 'WOORI_BANK'
+  if (/\[국민은행\]|국민은행/.test(text)) return 'KB_BANK'
+
   return 'UNKNOWN'
 }
 
@@ -328,6 +350,101 @@ function parseMyCompany(text: string): ParsedSms | null {
 }
 
 // ═══════════════════════════════════════════════════════════
+// 우리은행 파서
+// ═══════════════════════════════════════════════════════════
+// 실제 수신 포맷: 우리 04/24 16:00 *828777 출금 1,400원 잔액 123,456원
+//   → "우리" + 날짜 + *계좌끝번호(5~6자리) + 출금|입금 + 금액 + 잔액
+function parseWooriBank(text: string): ParsedSms | null {
+  // 패턴: 우리 MM/DD HH:MM *XXXXXX 출금|입금 금액원 (잔액...)
+  let m = text.match(
+    /우리\s+(\d{1,2}[./-]\d{1,2}\s+\d{1,2}:\d{2})\s+\*(\d{5,})\s+(출금|입금)\s+([\d,]+)\s*원/
+  )
+  if (m) {
+    const [, dt, acctNum, txType, amtStr] = m
+    const balanceMatch = text.match(/잔액\s*([\d,]+)\s*원/)
+    return {
+      issuer: 'WOORI_BANK',
+      type: txType === '입금' ? 'deposit' : 'withdrawal',
+      holder: null,
+      card_alias: `우리은행****${acctNum.slice(-4)}`,
+      amount: Number(amtStr.replace(/,/g, '')),
+      merchant: balanceMatch ? `잔액 ${balanceMatch[1]}원` : null,
+      installment: null,
+      txAt: parseDateTime(dt),
+    }
+  }
+
+  // [우리은행] 형식 fallback
+  m = text.match(
+    /(?:\[우리은행\]|우리은행)\s*(.+?)?\s*(\d{1,2}[./-]\d{1,2}\s+\d{1,2}:\d{2})\s+(출금|입금)\s+([\d,]+)\s*원/
+  )
+  if (m) {
+    const [, holderRaw, dt, txType, amtStr] = m
+    const balanceMatch = text.match(/잔액\s*([\d,]+)\s*원/)
+    return {
+      issuer: 'WOORI_BANK',
+      type: txType === '입금' ? 'deposit' : 'withdrawal',
+      holder: holderRaw?.trim() || null,
+      card_alias: null,
+      amount: Number(amtStr.replace(/,/g, '')),
+      merchant: balanceMatch ? `잔액 ${balanceMatch[1]}원` : null,
+      installment: null,
+      txAt: parseDateTime(dt),
+    }
+  }
+
+  return null
+}
+
+// ═══════════════════════════════════════════════════════════
+// KB은행(국민은행) 파서
+// ═══════════════════════════════════════════════════════════
+// 예상 포맷: [KB] 출금 50,000원 04/25 14:30 *1234567 잔액 500,000원
+// ※ 실제 데이터 도착 시 포맷 확인 후 수정 필요
+function parseKBBank(text: string): ParsedSms | null {
+  // 패턴 1: [KB] 또는 국민은행 + 출금/입금
+  const m = text.match(
+    /(?:\[KB\]|\[국민은행\]|국민은행)\s*(출금|입금)\s+([\d,]+)\s*원\s+(\d{1,2}[./-]\d{1,2}\s+\d{1,2}:\d{2})/
+  )
+  if (m) {
+    const [, txType, amtStr, dt] = m
+    const acctMatch = text.match(/\*(\d{4,})/)
+    const balanceMatch = text.match(/잔액\s*([\d,]+)\s*원/)
+    return {
+      issuer: 'KB_BANK',
+      type: txType === '입금' ? 'deposit' : 'withdrawal',
+      holder: null,
+      card_alias: acctMatch ? `국민은행****${acctMatch[1].slice(-4)}` : null,
+      amount: Number(amtStr.replace(/,/g, '')),
+      merchant: balanceMatch ? `잔액 ${balanceMatch[1]}원` : null,
+      installment: null,
+      txAt: parseDateTime(dt),
+    }
+  }
+
+  // 패턴 2: 날짜 먼저 오는 포맷
+  const m2 = text.match(
+    /(?:\[KB\]|\[국민은행\]|국민은행)\s*(\d{1,2}[./-]\d{1,2}\s+\d{1,2}:\d{2})\s+\*(\d{4,})\s+(출금|입금)\s+([\d,]+)\s*원/
+  )
+  if (m2) {
+    const [, dt, acctNum, txType, amtStr] = m2
+    const balanceMatch = text.match(/잔액\s*([\d,]+)\s*원/)
+    return {
+      issuer: 'KB_BANK',
+      type: txType === '입금' ? 'deposit' : 'withdrawal',
+      holder: null,
+      card_alias: `국민은행****${acctNum.slice(-4)}`,
+      amount: Number(amtStr.replace(/,/g, '')),
+      merchant: balanceMatch ? `잔액 ${balanceMatch[1]}원` : null,
+      installment: null,
+      txAt: parseDateTime(dt),
+    }
+  }
+
+  return null
+}
+
+// ═══════════════════════════════════════════════════════════
 // 라우터
 // ═══════════════════════════════════════════════════════════
 export function parseSms(sender: string | null, text: string): ParsedSms | null {
@@ -353,10 +470,12 @@ export function parseSms(sender: string | null, text: string): ParsedSms | null 
   }
 
   switch (issuer) {
-    case 'KB':        return parseKB(text)
-    case 'WOORI':     return parseWoori(text)
-    case 'HYUNDAI':   return parseHyundai(text)
-    case 'MYCOMPANY': return parseMyCompany(text)
-    default:          return null
+    case 'KB':          return parseKB(text)
+    case 'WOORI':       return parseWoori(text)
+    case 'HYUNDAI':     return parseHyundai(text)
+    case 'MYCOMPANY':   return parseMyCompany(text)
+    case 'WOORI_BANK':  return parseWooriBank(text)
+    case 'KB_BANK':     return parseKBBank(text)
+    default:            return null
   }
 }

@@ -81,15 +81,15 @@ interface SmsRow {
   parse_error: string | null
   card_issuer: 'KB' | 'WOORI' | 'HYUNDAI' | null
   holder_name: string | null
-  transaction_type: 'approved' | 'canceled'
+  transaction_type: 'approved' | 'canceled' | 'deposit' | 'withdrawal'
   transaction_at: string | null
   amount: number | null
   merchant: string | null
   installment: string | null
 }
 
-const ISSUER_LABEL: Record<string, string> = { KB: 'KB국민', WOORI: '우리', HYUNDAI: '현대', MYCOMPANY: '법인' }
-const ISSUER_COLOR: Record<string, string> = { KB: '#fbbf24', WOORI: '#3b82f6', HYUNDAI: '#ef4444', MYCOMPANY: '#8b5cf6' }
+const ISSUER_LABEL: Record<string, string> = { KB: 'KB국민', WOORI: '우리', HYUNDAI: '현대', MYCOMPANY: '법인', WOORI_BANK: '우리은행', KB_BANK: '국민은행' }
+const ISSUER_COLOR: Record<string, string> = { KB: '#fbbf24', WOORI: '#3b82f6', HYUNDAI: '#ef4444', MYCOMPANY: '#8b5cf6', WOORI_BANK: '#059669', KB_BANK: '#d97706' }
 
 // ─── 헬퍼 ───────────────────────────────────────────────
 
@@ -964,7 +964,7 @@ export default function BankCardPage() {
                 </button>
               ))}
               <span style={{ width: 8 }} />
-              {['', 'KB', 'WOORI', 'HYUNDAI'].map(i => (
+              {['', 'KB', 'WOORI', 'HYUNDAI', 'MYCOMPANY', 'WOORI_BANK', 'KB_BANK'].map(i => (
                 <button key={i || 'all'} onClick={() => setSmsIssuerFilter(i)} style={{
                   padding: '6px 14px', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: 'pointer',
                   border: `1px solid ${smsIssuerFilter === i ? 'rgba(59,110,181,0.4)' : 'rgba(0,0,0,0.06)'}`,
@@ -1031,10 +1031,10 @@ export default function BankCardPage() {
                       </td>
                       <td style={{ padding: '10px 12px', color: '#1e293b' }}>{r.holder_name || '—'}</td>
                       <td style={{ padding: '10px 12px', color: '#1e293b' }}>{r.merchant || '—'}</td>
-                      <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: r.transaction_type === 'canceled' ? '#ef4444' : '#1e293b' }}>
-                        {r.amount != null ? `${r.transaction_type === 'canceled' ? '-' : ''}${Number(r.amount).toLocaleString()}` : '—'}
+                      <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: r.transaction_type === 'canceled' || r.transaction_type === 'withdrawal' ? '#ef4444' : r.transaction_type === 'deposit' ? '#059669' : '#1e293b' }}>
+                        {r.amount != null ? `${r.transaction_type === 'canceled' || r.transaction_type === 'withdrawal' ? '-' : r.transaction_type === 'deposit' ? '+' : ''}${Number(r.amount).toLocaleString()}` : '—'}
                       </td>
-                      <td style={{ padding: '10px 12px', color: '#1e293b' }}>{r.transaction_type === 'canceled' ? '취소' : r.installment || '일시불'}</td>
+                      <td style={{ padding: '10px 12px', color: '#1e293b' }}>{r.transaction_type === 'canceled' ? '취소' : r.transaction_type === 'deposit' ? '입금' : r.transaction_type === 'withdrawal' ? '출금' : r.installment || '일시불'}</td>
                       <td style={{ padding: '10px 12px', maxWidth: 300, color: '#64748b', fontSize: 11 }}>
                         <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.raw_text}>{r.raw_text}</div>
                         {r.parse_error && <div style={{ color: '#ef4444', fontSize: 10, marginTop: 2 }}>⚠ {r.parse_error}</div>}
