@@ -46,14 +46,22 @@ PHASE 1 (수집) → PHASE 2 (1차 분류) → PHASE 3 (2·3차 분류) → PHAS
 
 | 항목 | 상태 | 설명 |
 |------|------|------|
-| **카드별 매핑** | 🔲 설계 필요 | 카드 A → 12가3456 전용, 카드 B → 공용(2차 분류로) |
-| **통장별 매핑** | 🔲 설계 필요 | A통장 → 렌트수입, B통장 → 운영비 |
-| **자동 분류 완료** | 🔲 설계 필요 | 전용카드 → 즉시 확정, 전용통장 → 즉시 확정 |
+| **카드별 매핑 (백엔드)** | ✅ 구현됨 | corporate_cards.card_alias + assigned_car_id |
+| **통장별 매핑 (백엔드)** | ✅ 구현됨 | bank_account_mappings 테이블 생성 |
+| **SMS→카드 자동 매칭** | ✅ 구현됨 | 웹훅에서 파싱 성공 시 즉시 매칭 |
+| **SMS→거래 자동 생성** | ✅ 구현됨 | 매칭 시 transactions 테이블에 자동 적재 |
+| **카드/통장 매핑 UI** | 🔲 미구현 | 관리자가 카드→차량, 통장→차량/용도 설정하는 화면 |
+| **마이그레이션 실행** | ⚠️ 배포 후 | POST /api/finance/migrate 호출 필요 |
 
-### 핵심 설계 포인트
-- 카드/통장 → 차량 매핑 테이블 필요 (card_alias → car_id or '공용')
-- 전용 카드/통장은 1차에서 바로 차량에 확정 배정
-- 공용 카드/통장은 PHASE 3으로 넘어감
+### 구현된 구조
+- `corporate_cards.card_alias` (KB****8819 등) → `assigned_car_id` 로 차량 매핑
+- `bank_account_mappings.account_alias` (우리은행****8777 등) → `assigned_car_id` + `purpose`
+- SMS 웹훅: 파싱 성공 → corporate_cards 매칭 → transactions 자동 생성 + 차량 연결
+- link-cards API: 기존 미연결 건 일괄 재매칭용
+
+### 남은 작업
+- 카드/통장 매핑 관리 UI (기존 /finance/cards 페이지 확장)
+- corporate_cards에 실제 카드 등록 + card_alias 설정 필요
 
 ---
 
@@ -115,16 +123,19 @@ PHASE 1 (수집) → PHASE 2 (1차 분류) → PHASE 3 (2·3차 분류) → PHAS
 ## 직전 완료 작업
 
 - PHASE 1 전체 완료 (2026-04-25)
-- SMS 파서 v3: 카드 4사 + 은행 2행 통합
-- 실패 건 재파싱 → 10건 중 6건 parsed, 4건 ignored, 0건 failed
-- 활성 로드맵 시스템 도입 (이 파일)
+- PHASE 2 백엔드 완료 (2026-04-25)
+  - SMS 웹훅 자동 매칭 + 거래 생성
+  - bank_account_mappings 테이블
+  - link-cards API 재작성
+  - 마이그레이션 API
 
-## 다음 작업
+## 다음 작업 (우선순위 순)
 
-→ **PHASE 2: 1차 자동분류** 설계 + 구현
-  - 카드/통장 → 차량 매핑 테이블 설계
-  - 매핑 관리 UI
-  - SMS parsed → 자동 매핑 적용
+1. **배포 후 마이그레이션 실행**: POST /api/finance/migrate
+2. **PHASE 2 UI**: 카드/통장 → 차량 매핑 관리 화면
+3. **PHASE 3**: 공용카드 세부 분류 (규칙 기반 → AI → 수동)
+4. **PHASE 4**: 차량별 손익 집계 + 투자 정산
+5. **PHASE 5**: 투자자 리포트
 
 ---
 
