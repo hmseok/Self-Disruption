@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { verifyUser } from '@/lib/auth-server'
 import { prisma } from '@/lib/prisma'
 import { createHash } from 'crypto'
+import { resolveClientName } from '@/lib/client-name-aliases'
 
 function serialize<T>(data: T): T {
   return JSON.parse(JSON.stringify(data, (_, v) => typeof v === 'bigint' ? v.toString() : v))
@@ -80,7 +81,7 @@ export async function POST(request: NextRequest) {
           txType,
           finalAmount,
           description,
-          row.counterpart || row.client_name || null,
+          await resolveClientName(row.counterpart || row.client_name || '') || null,
           source === 'excel_bank' ? (row.bank_name || '기타은행') : null,
           source === 'excel_card' ? (row.card_company || null) : null,
           source,

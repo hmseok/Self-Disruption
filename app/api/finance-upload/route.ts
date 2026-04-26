@@ -9,6 +9,7 @@ function serialize<T>(data: T): T {
 const ALLOWED_TABLES = [
   'cars',
   'classification_queue',
+  'client_name_aliases',
   'contracts',
   'corporate_cards',
   'expected_payment_schedules',

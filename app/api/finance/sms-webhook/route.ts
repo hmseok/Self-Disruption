@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { createHash, randomUUID } from 'crypto'
 import { parseSms, detectIssuer } from '@/lib/sms-parsers'
 import { classifyByRules } from '@/lib/transaction-classifier'
+import { resolveClientName } from '@/lib/client-name-aliases'
 
 // ═══════════════════════════════════════════════════════════
 // SMS 웹훅 — 안드로이드 공기계 SMS Forwarder 수신 엔드포인트
@@ -184,7 +185,7 @@ export async function POST(req: NextRequest) {
           category, status, created_at, updated_at
         ) VALUES (
           ${transactionId}, ${txDate}, ${txType}, ${parsed.amount},
-          ${parsed.merchant || parsed.issuer}, ${parsed.holder || ''},
+          ${parsed.merchant || parsed.issuer}, ${await resolveClientName(parsed.holder || '')},
           ${parsed.issuer}, 'sms',
           ${carId ? 'car' : null}, ${carId},
           ${ruleResult && ruleResult.tier === 'auto' ? ruleResult.category : null},

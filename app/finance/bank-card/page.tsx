@@ -200,6 +200,18 @@ export default function BankCardPage() {
   const [uploading, setUploading] = useState(false)
   const [uploadResult, setUploadResult] = useState<any>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+  // 복수 파일 지원
+  const [uploadFiles, setUploadFiles] = useState<{ name: string; rows: any[]; columns: Record<string, string>; result?: any }[]>([])
+  const [currentFileIndex, setCurrentFileIndex] = useState(0)
+
+  // 인라인 수정
+  const [editingTx, setEditingTx] = useState<{ id: string; field: string; value: string } | null>(null)
+  // 거래 분리 모달
+  const [splitTarget, setSplitTarget] = useState<Transaction | null>(null)
+  const [splitItems, setSplitItems] = useState<{ amount: string; description: string; client_name: string }[]>([])
+  const [splitting, setSplitting] = useState(false)
+  // 별칭 등록 제안
+  const [aliasPrompt, setAliasPrompt] = useState<{ bankName: string; actualName: string } | null>(null)
 
   // 매칭 모달
   const [showMatchModal, setShowMatchModal] = useState(false)
@@ -389,83 +401,187 @@ export default function BankCardPage() {
   // ─── 엑셀 업로드 ────────────────────────────────────
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setUploadFileName(file.name)
+    const files = e.target.files
+    if (!files || files.length === 0) return
 
-    const reader = new FileReader()
-    reader.onload = (ev) => {
-      const data = ev.target?.result
-      const wb = XLSX.read(data, { type: 'binary' })
-      const ws = wb.Sheets[wb.SheetNames[0]]
-      const rows: any[] = XLSX.utils.sheet_to_json(ws, { defval: '' })
+    const patterns = uploadSource === 'excel_bank' ? BANK_COL_PATTERNS : CARD_COL_PATTERNS
+    const parsed: typeof uploadFiles = []
+    let loaded = 0
 
-      if (rows.length === 0) return
+    Array.from(files).forEach((file) => {
+      const reader = new FileReader()
+      reader.onload = (ev) => {
+        const data = ev.target?.result
+        const wb = XLSX.read(data, { type: 'binary' })
+        const ws = wb.Sheets[wb.SheetNames[0]]
+        const rows: any[] = XLSX.utils.sheet_to_json(ws, { defval: '' })
 
-      // 컬럼 자동 매핑
-      const headers = Object.keys(rows[0])
-      const patterns = uploadSource === 'excel_bank' ? BANK_COL_PATTERNS : CARD_COL_PATTERNS
-      const mapping: Record<string, string> = {}
-      for (const h of headers) {
-        const matched = matchColumn(h, patterns)
-        if (matched) mapping[h] = matched
+        if (rows.length > 0) {
+          const headers = Object.keys(rows[0])
+          const mapping: Record<string, string> = {}
+          for (const h of headers) {
+            const matched = matchColumn(h, patterns)
+            if (matched) mapping[h] = matched
+          }
+          parsed.push({ name: file.name, rows, columns: mapping })
+        }
+
+        loaded++
+        if (loaded === files.length) {
+          // 모든 파일 로드 완료
+          setUploadFiles(parsed)
+          setCurrentFileIndex(0)
+          if (parsed.length > 0) {
+            setUploadFileName(parsed.length === 1 ? parsed[0].name : `${parsed.length}개 파일 선택됨`)
+            setUploadColumns(parsed[0].columns)
+            setUploadPreview(parsed[0].rows.slice(0, 50))
+          }
+          setUploadResult(null)
+        }
       }
+      reader.readAsBinaryString(file)
+    })
 
-      setUploadColumns(mapping)
-      setUploadPreview(rows.slice(0, 50))
-      setUploadResult(null)
-    }
-    reader.readAsBinaryString(file)
+    // input 초기화 (같은 파일 재선택 허용)
+    e.target.value = ''
+  }
+
+  const switchFilePreview = (idx: number) => {
+    if (idx < 0 || idx >= uploadFiles.length) return
+    setCurrentFileIndex(idx)
+    setUploadColumns(uploadFiles[idx].columns)
+    setUploadPreview(uploadFiles[idx].rows.slice(0, 50))
   }
 
   const handleUpload = async () => {
-    if (uploadPreview.length === 0) return
+    const filesToUpload = uploadFiles.length > 0 ? uploadFiles : uploadPreview.length > 0 ? [{ name: uploadFileName, rows: uploadPreview, columns: uploadColumns }] : []
+    if (filesToUpload.length === 0) return
     setUploading(true)
 
     const isBankSource = uploadSource === 'excel_bank'
-    const reverse: Record<string, string> = {}
-    for (const [header, field] of Object.entries(uploadColumns)) {
-      reverse[field] = header
+    const allResults: { name: string; inserted: number; skipped: number; errors: string[] }[] = []
+
+    for (let fi = 0; fi < filesToUpload.length; fi++) {
+      const file = filesToUpload[fi]
+      const reverse: Record<string, string> = {}
+      for (const [header, field] of Object.entries(file.columns)) {
+        reverse[field] = header
+      }
+
+      const mapped = file.rows.map(row => {
+        if (isBankSource) {
+          const deposit = safeNum(row[reverse.deposit])
+          const withdrawal = safeNum(row[reverse.withdrawal])
+          return {
+            date: row[reverse.date] || '',
+            description: row[reverse.description] || '',
+            deposit: deposit || undefined,
+            withdrawal: withdrawal || undefined,
+            amount: deposit || withdrawal,
+            type: deposit ? 'income' : 'expense',
+            balance: safeNum(row[reverse.balance]) || undefined,
+            counterpart: row[reverse.counterpart] || '',
+            bank_name: '은행',
+          }
+        } else {
+          return {
+            date: row[reverse.date] || '',
+            description: row[reverse.merchant] || '',
+            amount: safeNum(row[reverse.amount]),
+            type: 'expense',
+            card_company: row[reverse.cardCompany] || '',
+            client_name: row[reverse.holder] || '',
+          }
+        }
+      })
+
+      const batchId = `${uploadSource}_${Date.now()}_${fi}`
+      const { json } = await fetchWithAuth('/api/finance/transactions/import', {
+        method: 'POST',
+        body: { rows: mapped, source: uploadSource, batchId },
+      })
+
+      const res = json?.data || json || {}
+      allResults.push({
+        name: file.name,
+        inserted: res.inserted || 0,
+        skipped: res.skipped || 0,
+        errors: res.errors || [],
+      })
     }
 
-    const mapped = uploadPreview.map(row => {
-      if (isBankSource) {
-        const deposit = safeNum(row[reverse.deposit])
-        const withdrawal = safeNum(row[reverse.withdrawal])
-        return {
-          date: row[reverse.date] || '',
-          description: row[reverse.description] || '',
-          deposit: deposit || undefined,
-          withdrawal: withdrawal || undefined,
-          amount: deposit || withdrawal,
-          type: deposit ? 'income' : 'expense',
-          balance: safeNum(row[reverse.balance]) || undefined,
-          counterpart: row[reverse.counterpart] || '',
-          bank_name: '은행',
-        }
-      } else {
-        return {
-          date: row[reverse.date] || '',
-          description: row[reverse.merchant] || '',
-          amount: safeNum(row[reverse.amount]),
-          type: 'expense',
-          card_company: row[reverse.cardCompany] || '',
-          client_name: row[reverse.holder] || '',
-        }
-      }
-    })
-
-    const batchId = `${uploadSource}_${Date.now()}`
-    const { json } = await fetchWithAuth('/api/finance/transactions/import', {
-      method: 'POST',
-      body: { rows: mapped, source: uploadSource, batchId },
-    })
-
-    setUploadResult(json?.data || json)
+    // 합산 결과
+    const totalInserted = allResults.reduce((s, r) => s + r.inserted, 0)
+    const totalSkipped = allResults.reduce((s, r) => s + r.skipped, 0)
+    const allErrors = allResults.flatMap(r => r.errors)
+    setUploadResult({ inserted: totalInserted, skipped: totalSkipped, errors: allErrors, files: allResults })
     setUploading(false)
 
     // 리로드
     await Promise.all([loadSummary(), loadTransactions()])
+  }
+
+  // ─── 인라인 수정 (거래처명, 금액 등) ─────────────────
+  const saveInlineEdit = async () => {
+    if (!editingTx) return
+    const { id, field, value } = editingTx
+    await fetchWithAuth(`/api/finance-upload?table=transactions&id=${id}`, {
+      method: 'PATCH',
+      body: { [field]: value },
+    })
+    setEditingTx(null)
+    await loadTransactions()
+  }
+
+  const handleInlineEdit = (tx: Transaction, field: string, value: string) => {
+    setEditingTx({ id: tx.id, field, value })
+  }
+
+  // ─── 별칭 등록 ──────────────────────────────────────
+  const saveAlias = async () => {
+    if (!aliasPrompt) return
+    await fetchWithAuth('/api/finance-upload?table=client_name_aliases', {
+      method: 'POST',
+      body: {
+        id: crypto.randomUUID(),
+        bank_name: aliasPrompt.bankName,
+        actual_name: aliasPrompt.actualName,
+        status: 'active',
+      },
+    })
+    setAliasPrompt(null)
+  }
+
+  // ─── 거래 분리 ──────────────────────────────────────
+  const openSplitModal = (tx: Transaction) => {
+    setSplitTarget(tx)
+    setSplitItems([
+      { amount: String(tx.amount), description: tx.description || '', client_name: tx.client_name || '' },
+      { amount: '0', description: '', client_name: '' },
+    ])
+  }
+
+  const handleSplit = async () => {
+    if (!splitTarget || splitItems.length < 2) return
+    setSplitting(true)
+    const { json } = await fetchWithAuth('/api/finance/transactions/split', {
+      method: 'POST',
+      body: {
+        transactionId: splitTarget.id,
+        splits: splitItems.map(s => ({
+          amount: Number(s.amount) || 0,
+          description: s.description,
+          client_name: s.client_name,
+        })),
+      },
+    })
+    setSplitting(false)
+    if (json?.ok) {
+      setSplitTarget(null)
+      await loadTransactions()
+    } else {
+      alert(json?.error || '분리 실패')
+    }
   }
 
   // ─── 자동매칭 ────────────────────────────────────────
@@ -570,7 +686,35 @@ export default function BankCardPage() {
   const bankColumns: TableColumn<Transaction>[] = [
     { key: 'date', label: '날짜', width: 100, render: (r) => <span style={{ fontSize: 13, color: COLORS.textSecondary }}>{fmtDate(r.transaction_date)}</span> },
     { key: 'desc', label: '적요', render: (r) => <span style={{ fontSize: 13, fontWeight: 500 }}>{r.description || '-'}</span> },
-    { key: 'counterpart', label: '거래처', width: 120, render: (r) => <span style={{ fontSize: 13 }}>{r.client_name || '-'}</span>, hideOnMobile: true },
+    { key: 'counterpart', label: '거래처', width: 140, render: (r) =>
+      editingTx?.id === r.id && editingTx.field === 'client_name' ? (
+        <input
+          autoFocus
+          defaultValue={editingTx.value}
+          onChange={(e) => setEditingTx({ ...editingTx, value: e.target.value })}
+          onBlur={() => {
+            if (editingTx.value !== (r.client_name || '')) {
+              saveInlineEdit()
+              // 별칭 등록 제안
+              if (r.client_name && editingTx.value && r.client_name !== editingTx.value) {
+                setAliasPrompt({ bankName: r.client_name, actualName: editingTx.value })
+              }
+            } else {
+              setEditingTx(null)
+            }
+          }}
+          onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); if (e.key === 'Escape') setEditingTx(null) }}
+          style={{ ...GLASS.L1, width: '100%', border: `1px solid ${COLORS.primary}`, borderRadius: 6, padding: '2px 6px', fontSize: 13, outline: 'none' }}
+        />
+      ) : (
+        <span
+          onClick={() => handleInlineEdit(r, 'client_name', r.client_name || '')}
+          style={{ fontSize: 13, cursor: 'pointer', borderBottom: `1px dashed ${COLORS.borderSubtle}`, paddingBottom: 1 }}
+          title="클릭하여 수정"
+        >{r.client_name || '-'}</span>
+      ),
+      hideOnMobile: true
+    },
     { key: 'deposit', label: '입금', width: 110, align: 'right', render: (r) =>
       r.type === 'income' ? <span style={{ color: COLORS.income, fontWeight: 600, fontSize: 13 }}>+{nf(r.amount)}</span> : <span style={{ color: COLORS.textMuted }}>-</span>
     },
@@ -584,6 +728,13 @@ export default function BankCardPage() {
     { key: 'status', label: '상태', width: 80, align: 'center', render: (r) =>
       <MatchBadge matched={!!r.related_type && !!r.related_id} />
     },
+    { key: 'actions', label: '', width: 40, align: 'center', render: (r) => (
+      <button
+        onClick={(e) => { e.stopPropagation(); openSplitModal(r) }}
+        title="거래 분리"
+        style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, padding: 2, color: COLORS.textMuted }}
+      >✂️</button>
+    ), hideOnMobile: true },
   ]
 
   const bankMobile: MobileCardConfig<Transaction> = {
@@ -1342,12 +1493,34 @@ export default function BankCardPage() {
             }}
             onClick={() => fileRef.current?.click()}
             >
-              <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: 'none' }} onChange={handleFileSelect} />
+              <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" multiple style={{ display: 'none' }} onChange={handleFileSelect} />
               <div style={{ fontSize: 32, marginBottom: 8 }}>📁</div>
               <div style={{ fontSize: 13, color: COLORS.textSecondary }}>
-                {uploadFileName ? uploadFileName : '클릭하여 엑셀 파일 선택 (.xlsx, .xls, .csv)'}
+                {uploadFileName ? uploadFileName : '클릭하여 엑셀 파일 선택 (.xlsx, .xls, .csv) — 복수 선택 가능'}
               </div>
             </div>
+
+            {/* 파일 탭 (복수 파일 시) */}
+            {uploadFiles.length > 1 && (
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
+                {uploadFiles.map((f, i) => (
+                  <button
+                    key={i}
+                    onClick={() => switchFilePreview(i)}
+                    style={{
+                      padding: '4px 12px', borderRadius: 8, fontSize: 12, cursor: 'pointer',
+                      border: `1px solid ${i === currentFileIndex ? COLORS.primary : COLORS.borderSubtle}`,
+                      background: i === currentFileIndex ? COLORS.primary : 'rgba(255,255,255,0.6)',
+                      color: i === currentFileIndex ? '#fff' : COLORS.textSecondary,
+                      fontWeight: i === currentFileIndex ? 600 : 400,
+                    }}
+                  >
+                    {f.name} ({f.rows.length}행)
+                    {f.result && <span style={{ marginLeft: 4 }}>✅</span>}
+                  </button>
+                ))}
+              </div>
+            )}
 
             {/* 컬럼 매핑 표시 */}
             {Object.keys(uploadColumns).length > 0 && (
@@ -1403,8 +1576,17 @@ export default function BankCardPage() {
                 border: `1px solid ${uploadResult.inserted > 0 ? COLORS.borderGreen : COLORS.borderAmber}`,
               }}>
                 <div style={{ fontSize: 13, fontWeight: 600 }}>
-                  ✅ {uploadResult.inserted}건 저장 완료 / {uploadResult.skipped}건 중복 스킵
+                  ✅ 총 {uploadResult.inserted}건 저장 완료 / {uploadResult.skipped}건 중복 스킵
                 </div>
+                {uploadResult.files?.length > 1 && (
+                  <div style={{ marginTop: 6 }}>
+                    {uploadResult.files.map((f: any, i: number) => (
+                      <div key={i} style={{ fontSize: 12, color: COLORS.textSecondary, marginTop: 2 }}>
+                        📄 {f.name}: {f.inserted}건 저장 / {f.skipped}건 스킵
+                      </div>
+                    ))}
+                  </div>
+                )}
                 {uploadResult.errors?.length > 0 && (
                   <div style={{ fontSize: 12, color: COLORS.danger, marginTop: 4 }}>
                     오류: {uploadResult.errors.join(', ')}
@@ -1421,7 +1603,7 @@ export default function BankCardPage() {
               >
                 닫기
               </button>
-              {uploadPreview.length > 0 && !uploadResult && (
+              {(uploadPreview.length > 0 || uploadFiles.length > 0) && !uploadResult && (
                 <button
                   onClick={handleUpload}
                   disabled={uploading}
@@ -1431,7 +1613,7 @@ export default function BankCardPage() {
                     color: '#fff', border: 'none', cursor: uploading ? 'wait' : 'pointer',
                   }}
                 >
-                  {uploading ? '저장 중...' : `${uploadPreview.length}건 저장`}
+                  {uploading ? '저장 중...' : uploadFiles.length > 1 ? `${uploadFiles.length}개 파일 (${uploadFiles.reduce((s, f) => s + f.rows.length, 0)}건) 저장` : `${uploadPreview.length}건 저장`}
                 </button>
               )}
             </div>
@@ -1512,6 +1694,130 @@ export default function BankCardPage() {
                 ))}
               </div>
             )}
+          </div>
+        </div>
+      )}
+      {/* ═══ 거래 분리 모달 ═══ */}
+      {splitTarget && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 1000,
+          background: 'rgba(0,0,0,0.3)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: 16,
+        }}
+        onClick={() => setSplitTarget(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              ...GLASS.L4,
+              borderRadius: 16,
+              boxShadow: '0 8px 32px rgba(0,0,0,0.08)',
+              width: '100%', maxWidth: 560,
+              padding: 24,
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>✂️ 거래 분리</h2>
+              <button onClick={() => setSplitTarget(null)} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: COLORS.textMuted }}>✕</button>
+            </div>
+
+            <div style={{ padding: 12, borderRadius: 8, background: COLORS.bgBlue, marginBottom: 16, fontSize: 13 }}>
+              <strong>원본:</strong> {fmtDate(splitTarget.transaction_date)} · {splitTarget.description} · {splitTarget.client_name || '-'} · {splitTarget.type === 'income' ? '+' : '-'}{nf(splitTarget.amount)}원
+            </div>
+
+            {splitItems.map((item, i) => (
+              <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
+                <span style={{ fontSize: 12, color: COLORS.textMuted, width: 20 }}>{i + 1}</span>
+                <input
+                  placeholder="금액"
+                  value={item.amount}
+                  onChange={(e) => { const next = [...splitItems]; next[i].amount = e.target.value; setSplitItems(next) }}
+                  style={{ ...GLASS.L1, flex: '0 0 100px', borderRadius: 6, padding: '6px 8px', fontSize: 13, border: `1px solid ${COLORS.borderSubtle}` }}
+                />
+                <input
+                  placeholder="적요"
+                  value={item.description}
+                  onChange={(e) => { const next = [...splitItems]; next[i].description = e.target.value; setSplitItems(next) }}
+                  style={{ ...GLASS.L1, flex: 1, borderRadius: 6, padding: '6px 8px', fontSize: 13, border: `1px solid ${COLORS.borderSubtle}` }}
+                />
+                <input
+                  placeholder="거래처"
+                  value={item.client_name}
+                  onChange={(e) => { const next = [...splitItems]; next[i].client_name = e.target.value; setSplitItems(next) }}
+                  style={{ ...GLASS.L1, flex: '0 0 100px', borderRadius: 6, padding: '6px 8px', fontSize: 13, border: `1px solid ${COLORS.borderSubtle}` }}
+                />
+                {splitItems.length > 2 && (
+                  <button
+                    onClick={() => setSplitItems(splitItems.filter((_, j) => j !== i))}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: COLORS.danger, fontSize: 16 }}
+                  >✕</button>
+                )}
+              </div>
+            ))}
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 }}>
+              <div>
+                <button
+                  onClick={() => setSplitItems([...splitItems, { amount: '0', description: '', client_name: '' }])}
+                  style={{ ...BTN.md, background: 'rgba(59,130,246,0.1)', color: COLORS.primary, border: 'none', cursor: 'pointer', fontSize: 12 }}
+                >
+                  + 항목 추가
+                </button>
+                <span style={{ marginLeft: 12, fontSize: 12, color: (() => {
+                  const total = splitItems.reduce((s, it) => s + (Number(it.amount) || 0), 0)
+                  return Math.abs(total - splitTarget.amount) <= 1 ? COLORS.success : COLORS.danger
+                })() }}>
+                  합계: {splitItems.reduce((s, it) => s + (Number(it.amount) || 0), 0).toLocaleString()}원
+                  {' '}/ 원본: {nf(splitTarget.amount)}원
+                </span>
+              </div>
+              <button
+                onClick={handleSplit}
+                disabled={splitting}
+                style={{
+                  ...BTN.md,
+                  background: splitting ? COLORS.textMuted : COLORS.primary,
+                  color: '#fff', border: 'none', cursor: splitting ? 'wait' : 'pointer',
+                }}
+              >
+                {splitting ? '분리 중...' : '분리 실행'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ 별칭 등록 제안 토스트 ═══ */}
+      {aliasPrompt && (
+        <div style={{
+          position: 'fixed', bottom: 24, right: 24, zIndex: 1100,
+          ...GLASS.L4,
+          borderRadius: 12,
+          boxShadow: '0 4px 20px rgba(0,0,0,0.12)',
+          padding: 16, maxWidth: 360,
+          border: `1px solid ${COLORS.borderGreen}`,
+        }}>
+          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>
+            💡 별칭으로 등록할까요?
+          </div>
+          <div style={{ fontSize: 12, color: COLORS.textSecondary, marginBottom: 12 }}>
+            &quot;{aliasPrompt.bankName}&quot; → &quot;{aliasPrompt.actualName}&quot;
+            <br />등록하면 이후 같은 이름이 자동 변환됩니다.
+          </div>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <button
+              onClick={() => setAliasPrompt(null)}
+              style={{ ...BTN.md, background: '#fff', color: COLORS.textSecondary, border: `1px solid ${COLORS.borderSubtle}`, cursor: 'pointer', fontSize: 12 }}
+            >
+              아니요
+            </button>
+            <button
+              onClick={saveAlias}
+              style={{ ...BTN.md, background: COLORS.success, color: '#fff', border: 'none', cursor: 'pointer', fontSize: 12 }}
+            >
+              등록
+            </button>
           </div>
         </div>
       )}
