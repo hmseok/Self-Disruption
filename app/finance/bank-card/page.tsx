@@ -111,18 +111,71 @@ const BANK_COL_PATTERNS: Record<string, string[]> = {
 }
 
 const CARD_COL_PATTERNS: Record<string, string[]> = {
-  date: ['이용일', '이용일자', '거래일', '승인일', 'date'],
-  merchant: ['가맹점', '이용가맹점', '이용처', 'merchant', '가맹점명'],
-  amount: ['이용금액', '금액', '승인금액', 'amount', '이용금액(원)'],
-  cardCompany: ['카드사', '카드명', 'card', '카드종류'],
-  cardNumber: ['카드번호', 'card_number', '카드번호(뒷4자리)'],
-  holder: ['사용자', '소지자', '이름', 'holder'],
+  date: ['이용일', '이용일자', '승인일', '승인일자', 'date'],
+  merchant: ['가맹점명', '이용가맹점', '이용처', 'merchant'],
+  amount: ['이용금액', '승인금액', 'amount', '이용금액(원)'],
+  cardCompany: ['카드사', '카드명', '카드종류'],
+  cardNumber: ['카드번호', 'card_number'],
+  holder: ['사용자', '소지자', 'holder'],
 }
 
 function matchColumn(header: string, patterns: Record<string, string[]>): string | null {
   const h = header.replace(/\s/g, '').toLowerCase()
+  // 1차: 정확히 일치
+  for (const [key, pats] of Object.entries(patterns)) {
+    if (pats.some(p => h === p.replace(/\s/g, '').toLowerCase())) return key
+  }
+  // 2차: 포함 (단, 이미 1차에서 매칭된 필드는 제외)
   for (const [key, pats] of Object.entries(patterns)) {
     if (pats.some(p => h.includes(p.replace(/\s/g, '').toLowerCase()))) return key
+  }
+  return null
+}
+
+/**
+ * 파일 컬럼 헤더가 통장/카드 중 어느 쪽에 더 맞는지 자동 판별
+ * 반환: 'bank' | 'card' | 'unknown'
+ */
+function detectFileType(headers: string[]): 'bank' | 'card' | 'unknown' {
+  let bankScore = 0
+  let cardScore = 0
+  for (const h of headers) {
+    if (matchColumn(h, BANK_COL_PATTERNS)) bankScore++
+    if (matchColumn(h, CARD_COL_PATTERNS)) cardScore++
+  }
+  if (bankScore >= 2 && bankScore > cardScore) return 'bank'
+  if (cardScore >= 2 && cardScore > bankScore) return 'card'
+  if (bankScore >= 2) return 'bank'
+  if (cardScore >= 2) return 'card'
+  return 'unknown'
+}
+
+/**
+ * 은행/카드 엑셀 파일의 실제 데이터 헤더 행을 자동 감지
+ * 우리은행 등: 상단에 계좌번호, 조회기간 등 메타 행이 있고 실제 헤더는 아래에 있음
+ * raw 2D 배열에서 패턴 매칭이 2개 이상인 행을 헤더로 인식
+ */
+function findHeaderRow(
+  ws: XLSX.WorkSheet,
+  patterns: Record<string, string[]>
+): { headerRowIdx: number; headers: string[] } | null {
+  const range = XLSX.utils.decode_range(ws['!ref'] || 'A1')
+  for (let r = range.s.r; r <= Math.min(range.e.r, 20); r++) {
+    const cells: string[] = []
+    for (let c = range.s.c; c <= range.e.c; c++) {
+      const addr = XLSX.utils.encode_cell({ r, c })
+      const cell = ws[addr]
+      cells.push(cell ? String(cell.v || '').trim() : '')
+    }
+    // 이 행에서 패턴 매칭되는 컬럼 수 확인
+    let matchCount = 0
+    for (const cell of cells) {
+      if (cell && matchColumn(cell, patterns)) matchCount++
+    }
+    // 2개 이상 매칭되면 헤더 행으로 인식
+    if (matchCount >= 2) {
+      return { headerRowIdx: r, headers: cells.filter(c => c !== '') }
+    }
   }
   return null
 }
@@ -212,6 +265,8 @@ export default function BankCardPage() {
   const [splitting, setSplitting] = useState(false)
   // 별칭 등록 제안
   const [aliasPrompt, setAliasPrompt] = useState<{ bankName: string; actualName: string } | null>(null)
+  // 파일 필터링 경고
+  const [skippedFiles, setSkippedFiles] = useState<string[]>([])
 
   // 매칭 모달
   const [showMatchModal, setShowMatchModal] = useState(false)
@@ -406,35 +461,67 @@ export default function BankCardPage() {
 
     const fileArr = Array.from(files)
     const patterns = uploadSource === 'excel_bank' ? BANK_COL_PATTERNS : CARD_COL_PATTERNS
+    const expectedType = uploadSource === 'excel_bank' ? 'bank' : 'card'
 
     // input 초기화 (같은 파일 재선택 허용)
     e.target.value = ''
+    setSkippedFiles([])
 
     // Promise 기반으로 모든 파일 읽기
     Promise.all(
       fileArr.map(
         (file) =>
-          new Promise<{ name: string; rows: any[]; columns: Record<string, string> } | null>((resolve) => {
+          new Promise<{ name: string; rows: any[]; columns: Record<string, string>; skipped?: boolean } | null>((resolve) => {
             const reader = new FileReader()
             reader.onload = (ev) => {
               try {
                 const data = new Uint8Array(ev.target?.result as ArrayBuffer)
                 const wb = XLSX.read(data, { type: 'array' })
                 const ws = wb.Sheets[wb.SheetNames[0]]
-                const rows: any[] = XLSX.utils.sheet_to_json(ws, { defval: '' })
+
+                // 양쪽 패턴 모두 시도하여 헤더 행 감지
+                const detectedTarget = findHeaderRow(ws, patterns)
+                const detectedOther = findHeaderRow(ws, expectedType === 'bank' ? CARD_COL_PATTERNS : BANK_COL_PATTERNS)
+
+                // !ref를 변경하기 전에 복사
+                const origRef = ws['!ref']
+
+                let rows: any[]
+                if (detectedTarget && detectedTarget.headerRowIdx > 0) {
+                  const range = XLSX.utils.decode_range(ws['!ref'] || 'A1')
+                  range.s.r = detectedTarget.headerRowIdx
+                  ws['!ref'] = XLSX.utils.encode_range(range)
+                  rows = XLSX.utils.sheet_to_json(ws, { defval: '' })
+                  ws['!ref'] = origRef // 복원
+                } else {
+                  rows = XLSX.utils.sheet_to_json(ws, { defval: '' })
+                }
 
                 if (rows.length === 0) {
-                  console.warn(`[파일 업로드] ${file.name}: 행 없음`)
                   resolve(null)
                   return
                 }
 
+                // 파일 타입 자동 판별 → 소스와 불일치 시 스킵
                 const headers = Object.keys(rows[0])
+                const fileType = detectFileType(headers)
+                if (fileType !== 'unknown' && fileType !== expectedType) {
+                  console.warn(`[파일 업로드] ${file.name}: ${expectedType} 모드인데 ${fileType} 파일 → 스킵`)
+                  resolve({ name: file.name, rows: [], columns: {}, skipped: true })
+                  return
+                }
+
                 const mapping: Record<string, string> = {}
+                const usedFields = new Set<string>()
                 for (const h of headers) {
                   const matched = matchColumn(h, patterns)
-                  if (matched) mapping[h] = matched
+                  // 같은 필드에 중복 매핑 방지 (첫 번째만 사용)
+                  if (matched && !usedFields.has(matched)) {
+                    mapping[h] = matched
+                    usedFields.add(matched)
+                  }
                 }
+
                 resolve({ name: file.name, rows, columns: mapping })
               } catch (err) {
                 console.error(`[파일 업로드] ${file.name} 파싱 오류:`, err)
@@ -449,16 +536,24 @@ export default function BankCardPage() {
           })
       )
     ).then((results) => {
-      const parsed = results.filter((r): r is NonNullable<typeof r> => r !== null)
+      const allResults = results.filter((r): r is NonNullable<typeof r> => r !== null)
+      const skipped = allResults.filter(r => r.skipped).map(r => r.name)
+      const parsed = allResults.filter(r => !r.skipped && r.rows.length > 0)
+
+      setSkippedFiles(skipped)
       setUploadFiles(parsed)
       setCurrentFileIndex(0)
       setUploadResult(null)
       if (parsed.length > 0) {
-        setUploadFileName(parsed.length === 1 ? parsed[0].name : `${parsed.length}개 파일 선택됨`)
+        setUploadFileName(
+          skipped.length > 0
+            ? `${parsed.length}개 파일 선택됨 (${skipped.length}개 제외)`
+            : parsed.length === 1 ? parsed[0].name : `${parsed.length}개 파일 선택됨`
+        )
         setUploadColumns(parsed[0].columns)
         setUploadPreview(parsed[0].rows.slice(0, 50))
       } else {
-        setUploadFileName('')
+        setUploadFileName(skipped.length > 0 ? '해당 유형 파일 없음' : '')
         setUploadColumns({})
         setUploadPreview([])
       }
@@ -954,7 +1049,7 @@ export default function BankCardPage() {
               onFilterChange={setBankFilter}
               trailing={
                 <button
-                  onClick={() => { setUploadSource('excel_bank'); setShowUpload(true); setUploadPreview([]); setUploadResult(null) }}
+                  onClick={() => { setUploadSource('excel_bank'); setShowUpload(true); setUploadPreview([]); setUploadResult(null); setUploadFiles([]); setUploadFileName(''); setUploadColumns({}); setSkippedFiles([]) }}
                   style={{ ...BTN.sm, background: COLORS.primary, color: '#fff', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
                 >
                   📤 엑셀 업로드
@@ -991,7 +1086,7 @@ export default function BankCardPage() {
               trailing={
                 <div style={{ display: 'flex', gap: 6 }}>
                   <button
-                    onClick={() => { setUploadSource('excel_card'); setShowUpload(true); setUploadPreview([]); setUploadResult(null) }}
+                    onClick={() => { setUploadSource('excel_card'); setShowUpload(true); setUploadPreview([]); setUploadResult(null); setUploadFiles([]); setUploadFileName(''); setUploadColumns({}); setSkippedFiles([]) }}
                     style={{ ...BTN.sm, background: COLORS.primary, color: '#fff', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
                   >
                     📤 엑셀 업로드
@@ -1518,6 +1613,17 @@ export default function BankCardPage() {
                 {uploadFileName ? uploadFileName : '클릭하여 엑셀 파일 선택 (.xlsx, .xls, .csv) — 복수 선택 가능'}
               </div>
             </div>
+
+            {/* 스킵된 파일 경고 */}
+            {skippedFiles.length > 0 && (
+              <div style={{
+                padding: '8px 12px', borderRadius: 8, marginBottom: 12,
+                background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.3)',
+                fontSize: 12, color: '#92400e',
+              }}>
+                ⚠️ {uploadSource === 'excel_bank' ? '카드' : '통장'} 파일 {skippedFiles.length}개 자동 제외: {skippedFiles.join(', ')}
+              </div>
+            )}
 
             {/* 파일 탭 (복수 파일 시) */}
             {uploadFiles.length > 1 && (
