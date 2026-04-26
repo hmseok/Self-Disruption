@@ -31,18 +31,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '올바른 소스를 지정하세요 (excel_bank / excel_card)' }, { status: 400 })
     }
 
-    // 중복 검사용: 기존 거래의 해시 목록 가져오기
-    const existingHashes = new Set<string>()
+    // 중복 검사용: 기존 거래의 해시 → 건수 맵
+    const existingHashCounts = new Map<string, number>()
     const existing = await prisma.$queryRawUnsafe<any[]>(
-      `SELECT transaction_date, amount, description FROM transactions WHERE deleted_at IS NULL AND imported_from = ?`,
+      `SELECT transaction_date, amount, description, client_name FROM transactions WHERE deleted_at IS NULL AND imported_from = ?`,
       source
     )
     for (const e of existing) {
+      // transaction_date가 Date 객체일 수 있으므로 문자열로 변환
+      const dateStr = e.transaction_date instanceof Date
+        ? e.transaction_date.toISOString()
+        : String(e.transaction_date || '')
       const hash = createHash('sha256')
-        .update(`${e.transaction_date}|${Number(e.amount)}|${e.description || ''}`)
+        .update(`${dateStr}|${Number(e.amount)}|${e.description || ''}|${e.client_name || ''}`)
         .digest('hex')
-      existingHashes.add(hash)
+      existingHashCounts.set(hash, (existingHashCounts.get(hash) || 0) + 1)
     }
+    const uploadHashCounts = new Map<string, number>()
 
     let inserted = 0
     let skipped = 0
@@ -60,17 +65,22 @@ export async function POST(request: NextRequest) {
         const finalAmount = row.deposit ? Math.abs(Number(row.deposit)) : row.withdrawal ? Math.abs(Number(row.withdrawal)) : Math.abs(amount)
         const txType = row.type || (row.deposit ? 'income' : 'expense')
         const description = row.description || row.memo || ''
-        const txDate = row.date || row.transaction_date || new Date().toISOString().slice(0, 10)
+        const rawDate = row.date || row.transaction_date || ''
+        const txDate = rawDate || new Date().toISOString().slice(0, 10)
 
-        // 중복 해시 체크
+        // 중복 해시: 날짜+시분초 전체 + 금액 + 적요 + 거래처 (시분초 포함으로 정확도 향상)
+        const clientName = row.counterpart || row.client_name || ''
         const hash = createHash('sha256')
-          .update(`${txDate}|${finalAmount}|${description}`)
+          .update(`${rawDate}|${finalAmount}|${description}|${clientName}`)
           .digest('hex')
-        if (existingHashes.has(hash)) {
+        const existingCount = existingHashCounts.get(hash) || 0
+        const uploadCount = uploadHashCounts.get(hash) || 0
+        uploadHashCounts.set(hash, uploadCount + 1)
+        if (uploadCount < existingCount) {
+          // DB에 이미 이 해시가 existingCount건 있고, 아직 그 수만큼 스킵 안 했으면 스킵
           skipped++
           continue
         }
-        existingHashes.add(hash)
 
         const id = crypto.randomUUID()
         await prisma.$executeRawUnsafe(
