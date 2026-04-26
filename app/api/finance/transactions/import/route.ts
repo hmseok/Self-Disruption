@@ -56,16 +56,24 @@ export async function POST(request: NextRequest) {
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i]
       try {
+        // 합계행/메타행 필터 ("총 N건", 날짜가 아닌 값)
+        const rawDateField = row.date || row.transaction_date || ''
+        if (typeof rawDateField === 'string' && (rawDateField.includes('총 ') || rawDateField.includes('건'))) {
+          continue // 합계행 스킵 (카운트 안 함)
+        }
+
+        const deposit = Math.abs(Number(String(row.deposit || '0').replace(/[,\s원]/g, '')) || 0)
+        const withdrawal = Math.abs(Number(String(row.withdrawal || '0').replace(/[,\s원]/g, '')) || 0)
         const amount = Number(row.amount || 0)
-        if (amount === 0 && !row.deposit && !row.withdrawal) {
+        if (deposit === 0 && withdrawal === 0 && amount === 0) {
           skipped++
           continue
         }
 
-        const finalAmount = row.deposit ? Math.abs(Number(row.deposit)) : row.withdrawal ? Math.abs(Number(row.withdrawal)) : Math.abs(amount)
-        const txType = row.type || (row.deposit ? 'income' : 'expense')
+        const finalAmount = deposit || withdrawal || Math.abs(amount)
+        const txType = row.type || (deposit > 0 ? 'income' : 'expense')
         const description = row.description || row.memo || ''
-        const rawDate = row.date || row.transaction_date || ''
+        const rawDate = rawDateField
         const txDate = rawDate || new Date().toISOString().slice(0, 10)
 
         // 중복 해시: 날짜+시분초 전체 + 금액 + 적요 + 거래처 (시분초 포함으로 정확도 향상)

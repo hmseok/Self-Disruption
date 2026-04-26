@@ -102,12 +102,12 @@ const fmtDate = (d: string | null) => {
 
 // 엑셀 컬럼 자동 인식
 const BANK_COL_PATTERNS: Record<string, string[]> = {
-  date: ['거래일', '거래일자', '일자', 'date', '날짜'],
-  description: ['적요', '거래내용', '내용', '메모', 'description', '비고'],
-  deposit: ['입금', '입금액', '입금금액', 'credit', 'deposit', '입금(원)'],
-  withdrawal: ['출금', '출금액', '출금금액', 'debit', 'withdrawal', '출금(원)', '지급액'],
-  balance: ['잔액', '거래후잔액', 'balance', '잔액(원)'],
-  counterpart: ['거래처', '상대방', '이체인', 'payee', '보내는분', '받는분'],
+  date: ['거래일시', '거래일', '거래일자', '일자', 'date', '날짜'],
+  description: ['적요', '거래내용', '내용', 'description', '비고'],
+  deposit: ['입금(원)', '입금', '입금액', '입금금액', 'credit', 'deposit'],
+  withdrawal: ['지급(원)', '출금(원)', '출금', '출금액', '출금금액', 'debit', 'withdrawal', '지급액'],
+  balance: ['거래후잔액(원)', '거래후 잔액(원)', '잔액', '거래후잔액', 'balance', '잔액(원)'],
+  counterpart: ['기재내용', '거래처', '상대방', '이체인', 'payee', '보내는분', '받는분'],
 }
 
 const CARD_COL_PATTERNS: Record<string, string[]> = {
