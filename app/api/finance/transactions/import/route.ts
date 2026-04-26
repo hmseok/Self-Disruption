@@ -74,8 +74,8 @@ export async function POST(request: NextRequest) {
 
         const id = crypto.randomUUID()
         await prisma.$executeRawUnsafe(
-          `INSERT INTO transactions (id, transaction_date, type, amount, description, client_name, bank_name, card_company, imported_from, balance_after, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+          `INSERT INTO transactions (id, transaction_date, type, amount, description, client_name, bank_name, card_company, imported_from, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
           id,
           txDate,
           txType,
@@ -85,7 +85,6 @@ export async function POST(request: NextRequest) {
           source === 'excel_bank' ? (row.bank_name || '기타은행') : null,
           source === 'excel_card' ? (row.card_company || null) : null,
           source,
-          row.balance != null ? Number(row.balance) : null,
         )
         inserted++
       } catch (err: any) {
