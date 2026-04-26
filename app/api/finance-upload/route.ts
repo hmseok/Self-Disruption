@@ -52,8 +52,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ data: serialize(data[0] || null), error: null })
     }
 
-    // Default list
-    const data = await prisma.$queryRawUnsafe<any[]>(`SELECT * FROM ${table} LIMIT 1000`)
+    // Default list — soft-delete된 행 제외
+    const hasDeletedAt = ['transactions', 'contracts'].includes(table)
+    const data = await prisma.$queryRawUnsafe<any[]>(
+      `SELECT * FROM ${table}${hasDeletedAt ? ' WHERE deleted_at IS NULL' : ''} ORDER BY created_at DESC LIMIT 1000`
+    )
     return NextResponse.json({ data: serialize(data), error: null })
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
