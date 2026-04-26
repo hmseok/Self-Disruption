@@ -33,25 +33,28 @@ export async function POST(request: NextRequest) {
       LIMIT 2000
     `)
 
-    // 2. 정산 지급내역 로드 (매칭 대상)
+    // 2. 정산 지급내역 로드 (매칭 대상) — 테이블 미존재 시 빈 배열
     const settlements = await prisma.$queryRawUnsafe<any[]>(`
       SELECT id, settlement_month, contract_id, contract_type, recipient_name,
              due_amount, bank_name, account_number, status
       FROM settlement_ledger
       WHERE status = 'pending'
-    `)
+    `).catch(() => [])
 
-    // 3. 계약 정보 로드 (매칭 대상)
-    const contracts = await prisma.$queryRawUnsafe<any[]>(`
+    // 3. 계약 정보 로드 (매칭 대상) — 개별 쿼리 후 합치기 (테이블 미존재 방지)
+    const jiipContracts = await prisma.$queryRawUnsafe<any[]>(`
       SELECT id, 'jiip' AS ctype, client_name, monthly_amount, contract_start, contract_end
       FROM jiip_contracts WHERE status = 'active'
-      UNION ALL
+    `).catch(() => [])
+    const investContracts = await prisma.$queryRawUnsafe<any[]>(`
       SELECT id, 'invest' AS ctype, investor_name AS client_name, monthly_return AS monthly_amount, start_date AS contract_start, end_date AS contract_end
       FROM general_investments WHERE status = 'active'
-      UNION ALL
+    `).catch(() => [])
+    const loanContracts = await prisma.$queryRawUnsafe<any[]>(`
       SELECT id, 'loan_out' AS ctype, borrower_name AS client_name, monthly_interest AS monthly_amount, start_date AS contract_start, end_date AS contract_end
       FROM loans_out WHERE status != 'closed'
-    `)
+    `).catch(() => [])
+    const contracts = [...jiipContracts, ...investContracts, ...loanContracts]
 
     // 4. 차량 정보 로드 (AI 매칭 컨텍스트)
     const cars = await prisma.$queryRawUnsafe<any[]>(`
