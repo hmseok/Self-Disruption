@@ -19,8 +19,8 @@ export async function GET(request: NextRequest) {
     const txStats = await prisma.$queryRawUnsafe<any[]>(`
       SELECT
         COUNT(*) AS total,
-        SUM(CASE WHEN imported_from = 'excel_bank' OR bank_name IS NOT NULL THEN 1 ELSE 0 END) AS bank_count,
-        SUM(CASE WHEN imported_from IN ('excel_card','sms') OR card_company IS NOT NULL THEN 1 ELSE 0 END) AS card_count,
+        SUM(CASE WHEN imported_from LIKE 'excel_bank%' THEN 1 ELSE 0 END) AS bank_count,
+        SUM(CASE WHEN imported_from LIKE 'excel_card%' OR imported_from = 'sms' THEN 1 ELSE 0 END) AS card_count,
         SUM(CASE WHEN related_type IS NOT NULL AND related_id IS NOT NULL THEN 1 ELSE 0 END) AS matched_count,
         SUM(CASE WHEN related_type IS NULL OR related_id IS NULL THEN 1 ELSE 0 END) AS unmatched_count,
         COALESCE(SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END), 0) AS total_income,

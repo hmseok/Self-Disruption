@@ -404,46 +404,65 @@ export default function BankCardPage() {
     const files = e.target.files
     if (!files || files.length === 0) return
 
+    const fileArr = Array.from(files)
     const patterns = uploadSource === 'excel_bank' ? BANK_COL_PATTERNS : CARD_COL_PATTERNS
-    const parsed: typeof uploadFiles = []
-    let loaded = 0
-
-    Array.from(files).forEach((file) => {
-      const reader = new FileReader()
-      reader.onload = (ev) => {
-        const data = ev.target?.result
-        const wb = XLSX.read(data, { type: 'binary' })
-        const ws = wb.Sheets[wb.SheetNames[0]]
-        const rows: any[] = XLSX.utils.sheet_to_json(ws, { defval: '' })
-
-        if (rows.length > 0) {
-          const headers = Object.keys(rows[0])
-          const mapping: Record<string, string> = {}
-          for (const h of headers) {
-            const matched = matchColumn(h, patterns)
-            if (matched) mapping[h] = matched
-          }
-          parsed.push({ name: file.name, rows, columns: mapping })
-        }
-
-        loaded++
-        if (loaded === files.length) {
-          // 모든 파일 로드 완료
-          setUploadFiles(parsed)
-          setCurrentFileIndex(0)
-          if (parsed.length > 0) {
-            setUploadFileName(parsed.length === 1 ? parsed[0].name : `${parsed.length}개 파일 선택됨`)
-            setUploadColumns(parsed[0].columns)
-            setUploadPreview(parsed[0].rows.slice(0, 50))
-          }
-          setUploadResult(null)
-        }
-      }
-      reader.readAsBinaryString(file)
-    })
 
     // input 초기화 (같은 파일 재선택 허용)
     e.target.value = ''
+
+    // Promise 기반으로 모든 파일 읽기
+    Promise.all(
+      fileArr.map(
+        (file) =>
+          new Promise<{ name: string; rows: any[]; columns: Record<string, string> } | null>((resolve) => {
+            const reader = new FileReader()
+            reader.onload = (ev) => {
+              try {
+                const data = new Uint8Array(ev.target?.result as ArrayBuffer)
+                const wb = XLSX.read(data, { type: 'array' })
+                const ws = wb.Sheets[wb.SheetNames[0]]
+                const rows: any[] = XLSX.utils.sheet_to_json(ws, { defval: '' })
+
+                if (rows.length === 0) {
+                  console.warn(`[파일 업로드] ${file.name}: 행 없음`)
+                  resolve(null)
+                  return
+                }
+
+                const headers = Object.keys(rows[0])
+                const mapping: Record<string, string> = {}
+                for (const h of headers) {
+                  const matched = matchColumn(h, patterns)
+                  if (matched) mapping[h] = matched
+                }
+                resolve({ name: file.name, rows, columns: mapping })
+              } catch (err) {
+                console.error(`[파일 업로드] ${file.name} 파싱 오류:`, err)
+                resolve(null)
+              }
+            }
+            reader.onerror = () => {
+              console.error(`[파일 업로드] ${file.name} 읽기 실패`)
+              resolve(null)
+            }
+            reader.readAsArrayBuffer(file)
+          })
+      )
+    ).then((results) => {
+      const parsed = results.filter((r): r is NonNullable<typeof r> => r !== null)
+      setUploadFiles(parsed)
+      setCurrentFileIndex(0)
+      setUploadResult(null)
+      if (parsed.length > 0) {
+        setUploadFileName(parsed.length === 1 ? parsed[0].name : `${parsed.length}개 파일 선택됨`)
+        setUploadColumns(parsed[0].columns)
+        setUploadPreview(parsed[0].rows.slice(0, 50))
+      } else {
+        setUploadFileName('')
+        setUploadColumns({})
+        setUploadPreview([])
+      }
+    })
   }
 
   const switchFilePreview = (idx: number) => {
