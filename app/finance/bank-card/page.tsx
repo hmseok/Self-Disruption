@@ -481,8 +481,15 @@ export default function BankCardPage() {
                 const ws = wb.Sheets[wb.SheetNames[0]]
 
                 // 양쪽 패턴 모두 시도하여 헤더 행 감지
+                const otherPatterns = expectedType === 'bank' ? CARD_COL_PATTERNS : BANK_COL_PATTERNS
                 const detectedTarget = findHeaderRow(ws, patterns)
-                const detectedOther = findHeaderRow(ws, expectedType === 'bank' ? CARD_COL_PATTERNS : BANK_COL_PATTERNS)
+                const detectedOther = findHeaderRow(ws, otherPatterns)
+
+                // 상대편 패턴에서만 헤더를 찾으면 → 파일 타입 불일치 (즉시 스킵)
+                if (!detectedTarget && detectedOther) {
+                  resolve({ name: file.name, rows: [], columns: {}, skipped: true })
+                  return
+                }
 
                 // !ref를 변경하기 전에 복사
                 const origRef = ws['!ref']
@@ -507,7 +514,6 @@ export default function BankCardPage() {
                 const headers = Object.keys(rows[0])
                 const fileType = detectFileType(headers)
                 if (fileType !== 'unknown' && fileType !== expectedType) {
-                  console.warn(`[파일 업로드] ${file.name}: ${expectedType} 모드인데 ${fileType} 파일 → 스킵`)
                   resolve({ name: file.name, rows: [], columns: {}, skipped: true })
                   return
                 }
