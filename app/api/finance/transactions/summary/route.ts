@@ -29,24 +29,30 @@ export async function GET(request: NextRequest) {
       WHERE deleted_at IS NULL
     `)
 
-    // 정산 통계
-    const settlementStats = await prisma.$queryRawUnsafe<any[]>(`
-      SELECT
-        COUNT(*) AS total,
-        SUM(CASE WHEN status = 'matched' OR status = 'confirmed' OR status = 'paid' THEN 1 ELSE 0 END) AS linked_count,
-        SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) AS unlinked_count,
-        COALESCE(SUM(due_amount), 0) AS total_amount
-      FROM settlement_ledger
-    `)
+    // 정산 통계 (테이블 없을 수 있음)
+    let settlementStats: any[] = [{}]
+    try {
+      settlementStats = await prisma.$queryRawUnsafe<any[]>(`
+        SELECT
+          COUNT(*) AS total,
+          SUM(CASE WHEN status = 'matched' OR status = 'confirmed' OR status = 'paid' THEN 1 ELSE 0 END) AS linked_count,
+          SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) AS unlinked_count,
+          COALESCE(SUM(due_amount), 0) AS total_amount
+        FROM settlement_ledger
+      `)
+    } catch { /* 테이블 미존재 시 무시 */ }
 
-    // SMS 미연결 카드 거래 수
-    const smsStats = await prisma.$queryRawUnsafe<any[]>(`
-      SELECT
-        COUNT(*) AS total,
-        SUM(CASE WHEN card_id IS NOT NULL THEN 1 ELSE 0 END) AS linked,
-        SUM(CASE WHEN card_id IS NULL THEN 1 ELSE 0 END) AS unlinked
-      FROM card_sms_transactions
-    `)
+    // SMS 미연결 카드 거래 수 (테이블 없을 수 있음)
+    let smsStats: any[] = [{}]
+    try {
+      smsStats = await prisma.$queryRawUnsafe<any[]>(`
+        SELECT
+          COUNT(*) AS total,
+          SUM(CASE WHEN card_id IS NOT NULL THEN 1 ELSE 0 END) AS linked,
+          SUM(CASE WHEN card_id IS NULL THEN 1 ELSE 0 END) AS unlinked
+        FROM card_sms_transactions
+      `)
+    } catch { /* 테이블 미존재 시 무시 */ }
 
     const tx = txStats[0] || {}
     const st = settlementStats[0] || {}
