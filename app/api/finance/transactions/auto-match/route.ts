@@ -146,10 +146,12 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // ═══ 2차: Gemini AI 매칭 ═══
+    // ═══ 2차: Gemini AI 매칭 ═══ (타임아웃 방지: 최대 300건씩 처리)
+    const aiLimit = Math.min(body.aiLimit || 300, 600)
     let aiMatchCount = 0
-    if (useAI && GEMINI_API_KEY && unmatchedAfterRules.length > 0) {
-      const aiResults = await matchWithGemini(unmatchedAfterRules, settlements, contracts, cars, employees, corpCards)
+    const aiTargets = unmatchedAfterRules.slice(0, aiLimit)
+    if (useAI && GEMINI_API_KEY && aiTargets.length > 0) {
+      const aiResults = await matchWithGemini(aiTargets, settlements, contracts, cars, employees, corpCards)
 
       for (const ai of aiResults) {
         const result = {
@@ -180,7 +182,9 @@ export async function POST(request: NextRequest) {
         autoConfirmed: matched.length,
         ruleMatched: results.filter(r => r.matchMethod === 'rule').length,
         aiMatched: aiMatchCount,
-        unmatchedRemaining: unmatchedAfterRules.length - aiMatchCount,
+        unmatchedRemaining: unmatched.length - results.length,
+        aiProcessed: aiTargets.length,
+        aiTotal: unmatchedAfterRules.length,
         results: results.slice(0, 500),
       }),
       error: null,
