@@ -279,6 +279,13 @@ export default function BankCardPage() {
   const [matching, setMatching] = useState(false)
   const [selectedMatches, setSelectedMatches] = useState<Set<string>>(new Set())
 
+  // 그룹 분류
+  const [groupData, setGroupData] = useState<any>(null)
+  const [groupLoading, setGroupLoading] = useState(false)
+  const [groupFilter, setGroupFilter] = useState<'all' | 'suggested' | 'unclassified'>('all')
+  const [groupCategoryEdits, setGroupCategoryEdits] = useState<Record<string, string>>({})
+  const [groupConfirming, setGroupConfirming] = useState<Set<string>>(new Set())
+
   // SMS 탭 상태
   const [smsRows, setSmsRows] = useState<SmsRow[]>([])
   const [smsLoading, setSmsLoading] = useState(false)
@@ -803,6 +810,82 @@ export default function BankCardPage() {
     setMatchResults(prev => prev.filter(r => !selectedMatches.has(r.transactionId)))
   }
 
+  // ─── 거래처 그룹 분류 ─────────────────────────────────
+
+  const loadGroupClassify = async () => {
+    setGroupLoading(true)
+    const { json } = await fetchWithAuth('/api/finance/transactions/group-classify', {
+      method: 'POST',
+      body: { type: 'all', limit: 5000 },
+    })
+    if (json?.data) {
+      setGroupData(json.data)
+      // 추천 카테고리를 기본값으로 설정
+      const edits: Record<string, string> = {}
+      for (const g of json.data.groups || []) {
+        if (g.suggestedCategory) edits[g.merchantKey] = g.suggestedCategory
+      }
+      setGroupCategoryEdits(edits)
+    }
+    setGroupLoading(false)
+  }
+
+  const confirmGroupCategory = async (group: any) => {
+    const category = groupCategoryEdits[group.merchantKey]
+    if (!category) { alert('카테고리를 선택해주세요'); return }
+
+    setGroupConfirming(prev => new Set([...prev, group.merchantKey]))
+    const { json } = await fetchWithAuth('/api/finance/transactions/group-classify', {
+      method: 'PATCH',
+      body: {
+        transactionIds: group.transactionIds,
+        category,
+        saveAsRule: true,
+        merchantName: group.merchantName,
+      },
+    })
+    setGroupConfirming(prev => { const s = new Set(prev); s.delete(group.merchantKey); return s })
+
+    if (json?.data?.updated) {
+      // 그룹 목록에서 제거
+      setGroupData((prev: any) => prev ? {
+        ...prev,
+        totalUnclassified: prev.totalUnclassified - group.count,
+        groupCount: prev.groupCount - 1,
+        groups: prev.groups.filter((g: any) => g.merchantKey !== group.merchantKey),
+      } : prev)
+    }
+  }
+
+  const confirmAllSuggested = async () => {
+    if (!groupData?.groups) return
+    const suggested = groupData.groups.filter((g: any) => g.suggestedCategory && g.suggestedConfidence >= 80)
+    if (suggested.length === 0) { alert('자동 확정 가능한 그룹이 없습니다'); return }
+
+    setGroupLoading(true)
+    let totalUpdated = 0
+    for (const group of suggested) {
+      const category = groupCategoryEdits[group.merchantKey] || group.suggestedCategory
+      const { json } = await fetchWithAuth('/api/finance/transactions/group-classify', {
+        method: 'PATCH',
+        body: { transactionIds: group.transactionIds, category, saveAsRule: true, merchantName: group.merchantName },
+      })
+      totalUpdated += json?.data?.updated || 0
+    }
+    setGroupLoading(false)
+    alert(`${totalUpdated}건 일괄 분류 완료`)
+    await loadGroupClassify()
+    await Promise.all([loadSummary(), loadTransactions()])
+  }
+
+  const filteredGroups = useMemo(() => {
+    if (!groupData?.groups) return []
+    let list = groupData.groups
+    if (groupFilter === 'suggested') list = list.filter((g: any) => g.suggestedCategory)
+    if (groupFilter === 'unclassified') list = list.filter((g: any) => !g.suggestedCategory)
+    return list
+  }, [groupData, groupFilter])
+
   // ─── 수동매칭 (정산 탭) ──────────────────────────────
 
   const openMatchCandidates = async (settlementId: string) => {
@@ -1180,10 +1263,10 @@ export default function BankCardPage() {
           </>
         )}
 
-        {/* ──── 자동매칭 탭 ──── */}
+        {/* ──── 자동매��� + 그룹분류 탭 ──── */}
         {activeTab === 'matching' && (
           <>
-            {/* 매칭 제어판 */}
+            {/* 상단 제어판: 자동매칭 + 그룹분류 */}
             <div style={{
               ...GLASS.L3,
               border: `1px solid ${COLORS.borderBlue}`,
@@ -1194,47 +1277,179 @@ export default function BankCardPage() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
                 <div>
                   <div style={{ fontSize: 14, fontWeight: 600, color: COLORS.textPrimary, marginBottom: 4 }}>
-                    미매칭 거래: {nf(summary?.transactions.unmatched || 0)}건
-                    <span style={{ marginLeft: 12, color: COLORS.textSecondary, fontWeight: 400 }}>
-                      매칭률: {summary?.transactions.total ? Math.round((summary.transactions.matched / summary.transactions.total) * 100) : 0}%
-                    </span>
+                    미분류 ���래: {nf(groupData?.totalUnclassified || summary?.transactions.unmatched || 0)}건
+                    {groupData && (
+                      <span style={{ marginLeft: 12, color: COLORS.textSecondary, fontWeight: 400 }}>
+                        {groupData.groupCount}개 거래처 그룹 · 추천 {groupData.withSuggestion}개
+                      </span>
+                    )}
                   </div>
                   <div style={{ fontSize: 12, color: COLORS.textMuted }}>
-                    1차 규칙 기반 (금액+날짜+이름) → 2차 <span style={{ color: '#7c3aed', fontWeight: 600 }}>Gemini AI</span> 매칭 (운영비·직원·차량 자동분류)
+                    거래처별 그룹 분류 — 같은 가맹점 거래를 한 번에 카테고리 지정
                   </div>
                 </div>
-                <div style={{ display: 'flex', gap: 8 }}>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   <button
-                    onClick={() => runAutoMatch(false)}
-                    disabled={matching}
+                    onClick={loadGroupClassify}
+                    disabled={groupLoading}
                     style={{
                       ...BTN.md,
-                      background: matching ? COLORS.textMuted : COLORS.primary,
-                      color: '#fff', border: 'none', cursor: matching ? 'wait' : 'pointer',
-                      display: 'flex', alignItems: 'center', gap: 6,
+                      background: groupLoading ? COLORS.textMuted : COLORS.primary,
+                      color: '#fff', border: 'none', cursor: groupLoading ? 'wait' : 'pointer',
                     }}
                   >
-                    {matching ? '분석 중...' : '🔄 자동매칭 실행'}
+                    {groupLoading ? '분석 중...' : '📊 그룹 분류 로드'}
                   </button>
-                  {matchResults.length > 0 && (
+                  {groupData && groupData.groups.filter((g: any) => g.suggestedCategory && g.suggestedConfidence >= 80).length > 0 && (
                     <button
-                      onClick={() => runAutoMatch(true)}
-                      disabled={matching}
+                      onClick={confirmAllSuggested}
+                      disabled={groupLoading}
                       style={{
                         ...BTN.md,
                         background: COLORS.success, color: '#fff', border: 'none', cursor: 'pointer',
                       }}
                     >
-                      ⚡ 75%+ 일괄 확인
+                      ⚡ 추천 80%+ 일괄 확정 ({groupData.groups.filter((g: any) => g.suggestedCategory && g.suggestedConfidence >= 80).length}그룹)
                     </button>
                   )}
+                  <button
+                    onClick={() => runAutoMatch(false)}
+                    disabled={matching}
+                    style={{
+                      ...BTN.md,
+                      background: '#fff', color: COLORS.primary, border: `1px solid ${COLORS.borderBlue}`,
+                      cursor: matching ? 'wait' : 'pointer',
+                    }}
+                  >
+                    {matching ? '분석 중...' : '🔗 정산 매칭'}
+                  </button>
                 </div>
               </div>
             </div>
 
-            {/* 매칭 결과 */}
+            {/* 그룹 필��� */}
+            {groupData && (
+              <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
+                {([
+                  { key: 'all', label: `전체 (${groupData.groupCount})` },
+                  { key: 'suggested', label: `추천 있음 (${groupData.withSuggestion})` },
+                  { key: 'unclassified', label: `추천 없음 (${groupData.groupCount - groupData.withSuggestion})` },
+                ] as const).map(f => (
+                  <button
+                    key={f.key}
+                    onClick={() => setGroupFilter(f.key)}
+                    style={{
+                      ...BTN.sm,
+                      background: groupFilter === f.key ? COLORS.primary : '#fff',
+                      color: groupFilter === f.key ? '#fff' : COLORS.textSecondary,
+                      border: `1px solid ${groupFilter === f.key ? COLORS.primary : COLORS.borderSubtle}`,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* 그룹 분류 카드 목록 */}
+            {groupData && filteredGroups.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {filteredGroups.slice(0, 100).map((group: any) => {
+                  const isConfirming = groupConfirming.has(group.merchantKey)
+                  const selectedCat = groupCategoryEdits[group.merchantKey] || ''
+                  return (
+                    <div
+                      key={group.merchantKey}
+                      style={{
+                        ...GLASS.L4,
+                        border: `1px solid ${group.suggestedCategory ? 'rgba(34,197,94,0.3)' : COLORS.borderSubtle}`,
+                        borderRadius: 10,
+                        padding: '12px 16px',
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 8 }}>
+                        {/* 왼쪽: 거래처 정보 */}
+                        <div style={{ flex: 1, minWidth: 200 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                            <span style={{ fontSize: 14, fontWeight: 600, color: COLORS.textPrimary }}>{group.merchantName}</span>
+                            <span style={{
+                              ...pillStyle(group.type === 'income' ? 'green' : 'red'),
+                              fontSize: 11, padding: '1px 8px',
+                            }}>
+                              {group.type === 'income' ? '수입' : '지출'}
+                            </span>
+                            <span style={{ fontSize: 12, color: COLORS.textMuted, fontWeight: 600 }}>
+                              {group.count}건
+                            </span>
+                          </div>
+                          <div style={{ fontSize: 12, color: COLORS.textSecondary, marginBottom: 2 }}>
+                            총 {nf(group.totalAmount)}원 · 평��� {nf(group.avgAmount)}원
+                          </div>
+                          <div style={{ fontSize: 11, color: COLORS.textMuted }}>
+                            {group.dateRange.first} ~ {group.dateRange.last}
+                            {group.sampleDescriptions.length > 0 && (
+                              <span style={{ marginLeft: 8 }}>
+                                적요: {group.sampleDescriptions.slice(0, 2).join(', ')}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        {/* 오른쪽: 카테고리 선택 + 확인 */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                          {group.suggestedCategory && (
+                            <span style={{ fontSize: 11, color: '#16a34a', fontWeight: 500 }}>
+                              추천: {group.suggestedCategory} ({group.suggestedConfidence}%)
+                            </span>
+                          )}
+                          <select
+                            value={selectedCat}
+                            onChange={(e) => setGroupCategoryEdits(prev => ({ ...prev, [group.merchantKey]: e.target.value }))}
+                            style={{
+                              ...GLASS.L1,
+                              border: `1px solid ${COLORS.borderSubtle}`,
+                              borderRadius: 6, padding: '4px 8px', fontSize: 12,
+                              color: COLORS.textPrimary, minWidth: 140, cursor: 'pointer',
+                            }}
+                          >
+                            <option value="">카테고리 선택...</option>
+                            {(groupData.categories || []).map((cat: string) => (
+                              <option key={cat} value={cat}>{cat}</option>
+                            ))}
+                          </select>
+                          <button
+                            onClick={() => confirmGroupCategory(group)}
+                            disabled={!selectedCat || isConfirming}
+                            style={{
+                              ...BTN.sm,
+                              background: !selectedCat ? COLORS.textMuted : COLORS.success,
+                              color: '#fff', border: 'none',
+                              cursor: !selectedCat || isConfirming ? 'not-allowed' : 'pointer',
+                              opacity: !selectedCat ? 0.5 : 1,
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {isConfirming ? '...' : `✓ ${group.count}건 확정`}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+                {filteredGroups.length > 100 && (
+                  <div style={{ textAlign: 'center', fontSize: 12, color: COLORS.textMuted, padding: 12 }}>
+                    + {filteredGroups.length - 100}개 그룹 더 있음
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* 기존 자동매칭 결과 (정산 매칭) */}
             {matchResults.length > 0 && (
               <>
+                <div style={{ marginTop: 16, marginBottom: 8, fontSize: 13, fontWeight: 600, color: COLORS.textSecondary }}>
+                  정산/계약 매칭 결과 ({matchResults.length}건)
+                </div>
                 <DcToolbar
                   search={search}
                   onSearchChange={setSearch}
@@ -1245,7 +1460,7 @@ export default function BankCardPage() {
                         onClick={confirmSelectedMatches}
                         style={{ ...BTN.sm, background: COLORS.success, color: '#fff', border: 'none', cursor: 'pointer' }}
                       >
-                        ✓ {selectedMatches.size}건 매칭 확인
+                        ✓ {selectedMatches.size}건 매칭 확���
                       </button>
                     ) : (
                       <button
@@ -1271,15 +1486,15 @@ export default function BankCardPage() {
               </>
             )}
 
-            {matchResults.length === 0 && !matching && (
+            {!groupData && matchResults.length === 0 && !matching && !groupLoading && (
               <div style={{
                 textAlign: 'center', padding: '60px 20px',
                 color: COLORS.textMuted, fontSize: 14,
               }}>
-                <div style={{ fontSize: 40, marginBottom: 12 }}>🔗</div>
-                <div>[자동매칭 실행] 버튼을 클릭하여 매칭을 시작하세요</div>
+                <div style={{ fontSize: 40, marginBottom: 12 }}>📊</div>
+                <div>[그룹 분류 로드]를 클릭하여 거래처별 카테고리를 일괄 지정하세요</div>
                 <div style={{ fontSize: 12, marginTop: 8 }}>
-                  미매칭 {nf(summary?.transactions.unmatched || 0)}건의 거래를 정산/계약과 자동 연결합니다
+                  미분류 {nf(summary?.transactions.unmatched || 0)}건의 거래를 거래처별로 묶어 한 번에 분류합니다
                 </div>
               </div>
             )}
