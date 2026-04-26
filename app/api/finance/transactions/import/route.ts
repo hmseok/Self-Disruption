@@ -136,3 +136,29 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
 }
+
+/**
+ * DELETE /api/finance/transactions/import?source=excel_bank
+ * 특정 소스의 거래 전체 삭제 (soft delete)
+ */
+export async function DELETE(request: NextRequest) {
+  try {
+    const user = await verifyUser(request)
+    if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
+
+    const { searchParams } = request.nextUrl
+    const source = searchParams.get('source')
+    if (!source || !['excel_bank', 'excel_card', 'sms'].includes(source)) {
+      return NextResponse.json({ error: '올바른 source 필요 (excel_bank / excel_card / sms)' }, { status: 400 })
+    }
+
+    const result = await prisma.$executeRawUnsafe(
+      `UPDATE transactions SET deleted_at = NOW() WHERE imported_from = ? AND deleted_at IS NULL`,
+      source
+    )
+
+    return NextResponse.json({ ok: true, deleted: Number(result) })
+  } catch (e: any) {
+    return NextResponse.json({ error: e.message }, { status: 500 })
+  }
+}
