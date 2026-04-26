@@ -115,8 +115,9 @@ const CARD_COL_PATTERNS: Record<string, string[]> = {
   merchant: ['가맹점명', '이용가맹점', '이용처', 'merchant'],
   amount: ['이용금액', '승인금액', 'amount', '이용금액(원)'],
   cardCompany: ['카드사', '카드명', '카드종류'],
-  cardNumber: ['카드번호', 'card_number'],
+  cardNumber: ['카드번호', 'card_number', '이용카드'],
   holder: ['사용자', '소지자', 'holder'],
+  approvalNo: ['승인번호'],
 }
 
 function matchColumn(header: string, patterns: Record<string, string[]>): string | null {
