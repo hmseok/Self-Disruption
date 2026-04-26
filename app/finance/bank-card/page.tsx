@@ -472,7 +472,7 @@ export default function BankCardPage() {
     Promise.all(
       fileArr.map(
         (file) =>
-          new Promise<{ name: string; rows: any[]; columns: Record<string, string>; skipped?: boolean } | null>((resolve) => {
+          new Promise<{ name: string; rows: any[]; columns: Record<string, string>; skipped?: boolean; year?: string } | null>((resolve) => {
             const reader = new FileReader()
             reader.onload = (ev) => {
               try {
@@ -493,6 +493,23 @@ export default function BankCardPage() {
 
                 // !ref를 변경하기 전에 복사
                 const origRef = ws['!ref']
+
+                // 메타데이터 행에서 기간(연도) 추출 (report 파일용)
+                let extractedYear = ''
+                if (detectedTarget && detectedTarget.headerRowIdx > 0) {
+                  const rng = XLSX.utils.decode_range(ws['!ref'] || 'A1')
+                  for (let r = 0; r < detectedTarget.headerRowIdx && !extractedYear; r++) {
+                    for (let c = rng.s.c; c <= rng.e.c; c++) {
+                      const cell = ws[XLSX.utils.encode_cell({ r, c })]
+                      if (cell) {
+                        const v = String(cell.v || '')
+                        // "2025.11.01 ~ 2025.11.30" 패턴에서 시작 연도 추출
+                        const m = v.match(/(\d{4})\.\d{2}\.\d{2}\s*~\s*(\d{4})\.\d{2}\.\d{2}/)
+                        if (m) { extractedYear = m[1]; break }
+                      }
+                    }
+                  }
+                }
 
                 let rows: any[]
                 if (detectedTarget && detectedTarget.headerRowIdx > 0) {
@@ -529,7 +546,7 @@ export default function BankCardPage() {
                   }
                 }
 
-                resolve({ name: file.name, rows, columns: mapping })
+                resolve({ name: file.name, rows, columns: mapping, year: extractedYear || undefined })
               } catch (err) {
                 console.error(`[파일 업로드] ${file.name} 파싱 오류:`, err)
                 resolve(null)
@@ -589,12 +606,31 @@ export default function BankCardPage() {
         reverse[field] = header
       }
 
+      // 날짜 정규화: 다양한 엑셀 포맷 → MySQL DATETIME 호환
+      const normalizeDate = (raw: string, fileYear?: string): string => {
+        if (!raw) return ''
+        const s = String(raw).trim()
+        // 1) YYYY.MM.DD HH:mm:ss → YYYY-MM-DD HH:mm:ss
+        const full = s.match(/^(\d{4})[.\-/](\d{1,2})[.\-/](\d{1,2})\s+(\d{2}:\d{2}(:\d{2})?)$/)
+        if (full) return `${full[1]}-${full[2].padStart(2,'0')}-${full[3].padStart(2,'0')} ${full[4]}${full[5] ? '' : ':00'}`
+        // 2) YYYY.MM.DD → YYYY-MM-DD
+        const dateOnly = s.match(/^(\d{4})[.\-/](\d{1,2})[.\-/](\d{1,2})$/)
+        if (dateOnly) return `${dateOnly[1]}-${dateOnly[2].padStart(2,'0')}-${dateOnly[3].padStart(2,'0')}`
+        // 3) MM.DD HH:mm (연도 없음, report 파일) → 파일 메타데이터의 연도 사용
+        const short = s.match(/^(\d{1,2})[.\-/](\d{1,2})\s+(\d{2}:\d{2})$/)
+        if (short) {
+          const year = fileYear || String(new Date().getFullYear())
+          return `${year}-${short[1].padStart(2,'0')}-${short[2].padStart(2,'0')} ${short[3]}:00`
+        }
+        return s
+      }
+
       const mapped = file.rows.map(row => {
         if (isBankSource) {
           const deposit = safeNum(row[reverse.deposit])
           const withdrawal = safeNum(row[reverse.withdrawal])
           return {
-            date: row[reverse.date] || '',
+            date: normalizeDate(row[reverse.date] || ''),
             description: row[reverse.description] || '',
             deposit: deposit || undefined,
             withdrawal: withdrawal || undefined,
@@ -605,8 +641,15 @@ export default function BankCardPage() {
             bank_name: '은행',
           }
         } else {
+          // 승인내역조회: 날짜+시간 분리 컬럼 처리
+          let dateVal = row[reverse.date] || ''
+          // "승인시간" 같은 별도 시간 컬럼이 있으면 합치기
+          const timeCol = Object.keys(row).find(k => /승인시간|이용시간|시간/.test(k))
+          if (timeCol && row[timeCol] && !/\d{2}:\d{2}/.test(String(dateVal))) {
+            dateVal = `${dateVal} ${row[timeCol]}`
+          }
           return {
-            date: row[reverse.date] || '',
+            date: normalizeDate(String(dateVal), (file as any).year),
             description: row[reverse.merchant] || '',
             amount: safeNum(row[reverse.amount]),
             type: 'expense',

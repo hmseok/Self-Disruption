@@ -8,6 +8,28 @@ function serialize<T>(data: T): T {
   return JSON.parse(JSON.stringify(data, (_, v) => typeof v === 'bigint' ? v.toString() : v))
 }
 
+/** 날짜 정규화: 다양한 형식 → MySQL DATETIME 호환 */
+function normalizeDate(raw: string): string {
+  if (!raw) return ''
+  const s = String(raw).trim()
+  // YYYY.MM.DD HH:mm:ss → YYYY-MM-DD HH:mm:ss
+  const full = s.match(/^(\d{4})[.\-/](\d{1,2})[.\-/](\d{1,2})\s+(\d{2}:\d{2}(:\d{2})?)$/)
+  if (full) return `${full[1]}-${full[2].padStart(2,'0')}-${full[3].padStart(2,'0')} ${full[4]}${full[5] ? '' : ':00'}`
+  // YYYY.MM.DD → YYYY-MM-DD
+  const dateOnly = s.match(/^(\d{4})[.\-/](\d{1,2})[.\-/](\d{1,2})$/)
+  if (dateOnly) return `${dateOnly[1]}-${dateOnly[2].padStart(2,'0')}-${dateOnly[3].padStart(2,'0')}`
+  // MM.DD HH:mm (연도 없음) → 현재 연도 사용
+  const short = s.match(/^(\d{1,2})[.\-/](\d{1,2})\s+(\d{2}:\d{2})$/)
+  if (short) {
+    const month = parseInt(short[1])
+    const now = new Date()
+    let year = now.getFullYear()
+    if (month > now.getMonth() + 1 + 3) year-- // 현재 월보다 3개월 이상 뒤면 전년
+    return `${year}-${short[1].padStart(2,'0')}-${short[2].padStart(2,'0')} ${short[3]}:00`
+  }
+  return s
+}
+
 /**
  * POST /api/finance/transactions/import
  * 엑셀 파싱 데이터 일괄 저장 (통장/카드 공통)
@@ -74,7 +96,7 @@ export async function POST(request: NextRequest) {
         const txType = row.type || (deposit > 0 ? 'income' : 'expense')
         const description = row.description || row.memo || ''
         const rawDate = rawDateField
-        const txDate = rawDate || new Date().toISOString().slice(0, 10)
+        const txDate = normalizeDate(rawDate) || new Date().toISOString().slice(0, 10)
 
         // 중복 해시: 날짜+시분초 전체 + 금액 + 적요 + 거래처 (시분초 포함으로 정확도 향상)
         const clientName = row.counterpart || row.client_name || ''
