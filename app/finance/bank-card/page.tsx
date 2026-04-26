@@ -252,6 +252,7 @@ export default function BankCardPage() {
   const [uploadColumns, setUploadColumns] = useState<Record<string, string>>({})
   const [uploadFileName, setUploadFileName] = useState('')
   const [uploading, setUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState('')
   const [uploadResult, setUploadResult] = useState<any>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   // 복수 파일 지원
@@ -659,18 +660,34 @@ export default function BankCardPage() {
         }
       })
 
-      const batchId = `${uploadSource}_${Date.now()}_${fi}`
-      const { json } = await fetchWithAuth('/api/finance/transactions/import', {
-        method: 'POST',
-        body: { rows: mapped, source: uploadSource, batchId },
-      })
+      // 대용량 파일 → 4000건씩 배치 분할 전송 (서버 5000건 제한 대응)
+      const BATCH_SIZE = 4000
+      let fileInserted = 0
+      let fileSkipped = 0
+      const fileErrors: string[] = []
+      const batchBase = `${uploadSource}_${Date.now()}_${fi}`
 
-      const res = json?.data || json || {}
+      const totalBatches = Math.ceil(mapped.length / BATCH_SIZE)
+      for (let bi = 0; bi < mapped.length; bi += BATCH_SIZE) {
+        const batchNum = Math.floor(bi / BATCH_SIZE) + 1
+        if (totalBatches > 1) setUploadProgress(`${file.name}: 배치 ${batchNum}/${totalBatches} 전송 중...`)
+        const chunk = mapped.slice(bi, bi + BATCH_SIZE)
+        const batchId = mapped.length > BATCH_SIZE ? `${batchBase}_b${Math.floor(bi / BATCH_SIZE)}` : batchBase
+        const { json } = await fetchWithAuth('/api/finance/transactions/import', {
+          method: 'POST',
+          body: { rows: chunk, source: uploadSource, batchId },
+        })
+        const res = json?.data || json || {}
+        fileInserted += res.inserted || 0
+        fileSkipped += res.skipped || 0
+        if (res.errors) fileErrors.push(...res.errors)
+      }
+
       allResults.push({
         name: file.name,
-        inserted: res.inserted || 0,
-        skipped: res.skipped || 0,
-        errors: res.errors || [],
+        inserted: fileInserted,
+        skipped: fileSkipped,
+        errors: fileErrors,
       })
     }
 
@@ -680,6 +697,7 @@ export default function BankCardPage() {
     const allErrors = allResults.flatMap(r => r.errors)
     setUploadResult({ inserted: totalInserted, skipped: totalSkipped, errors: allErrors, files: allResults })
     setUploading(false)
+    setUploadProgress('')
 
     // 리로드
     await Promise.all([loadSummary(), loadTransactions()])
@@ -1788,7 +1806,10 @@ export default function BankCardPage() {
                     color: '#fff', border: 'none', cursor: uploading ? 'wait' : 'pointer',
                   }}
                 >
-                  {uploading ? '저장 중...' : uploadFiles.length > 1 ? `${uploadFiles.length}개 파일 (${uploadFiles.reduce((s, f) => s + f.rows.length, 0)}건) 저장` : `${uploadPreview.length}건 저장`}
+                  {uploading ? (uploadProgress || '저장 중...') : (() => {
+                    const totalRows = uploadFiles.length > 0 ? uploadFiles.reduce((s, f) => s + f.rows.length, 0) : uploadPreview.length
+                    return uploadFiles.length > 1 ? `${uploadFiles.length}개 파일 (${totalRows.toLocaleString()}건) 저장` : `${totalRows.toLocaleString()}건 저장`
+                  })()}
                 </button>
               )}
             </div>
