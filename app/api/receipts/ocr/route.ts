@@ -147,7 +147,14 @@ async function analyzeWithGemini(base64Image: string, mimeType: string): Promise
   if (!response.ok) {
     const errText = await response.text()
     console.error('Gemini API 에러:', response.status, errText)
-    throw new Error(`Gemini API ${response.status}`)
+    // 사용자에게 유용한 에러 메시지 추출
+    let detail = ''
+    try {
+      const errJson = JSON.parse(errText)
+      detail = errJson?.error?.message || ''
+    } catch { detail = errText.slice(0, 200) }
+    if (detail.includes('API key not valid')) detail = 'API 키가 유효하지 않습니다. Cloud Run 환경변수의 GEMINI_API_KEY를 확인하세요.'
+    throw new Error(`Gemini API ${response.status}: ${detail}`)
   }
 
   const result = await response.json()

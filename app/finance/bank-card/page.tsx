@@ -2008,6 +2008,77 @@ export default function BankCardPage() {
                 padding: '8px 14px', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: 'pointer',
                 background: 'rgba(167,243,208,0.5)', color: '#065f46', border: '1px solid rgba(5,150,105,0.3)',
               }}>+ 추가</button>
+              <label style={{
+                padding: '8px 14px', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                background: 'rgba(251,191,36,0.2)', color: '#92400e', border: '1px solid rgba(251,191,36,0.4)',
+                display: 'inline-flex', alignItems: 'center', gap: 4,
+              }}>
+                📤 엑셀 업로드
+                <input type="file" accept=".xlsx,.xls,.csv" style={{ display: 'none' }} onChange={async (e) => {
+                  const file = e.target.files?.[0]
+                  if (!file) return
+                  e.target.value = '' // reset
+                  try {
+                    const XLSX = await import('xlsx')
+                    const buf = await file.arrayBuffer()
+                    const wb = XLSX.read(buf, { type: 'array' })
+                    const ws = wb.Sheets[wb.SheetNames[0]]
+                    const rows: any[] = XLSX.utils.sheet_to_json(ws, { defval: '' })
+                    if (rows.length === 0) { alert('데이터가 없습니다.'); return }
+
+                    // 컬럼 자동 감지
+                    const keys = Object.keys(rows[0])
+                    const isCard = mappingSub === 'card'
+
+                    // 카드: 카드번호/별칭, 카드사, 소지자
+                    // 통장: 계좌번호/별칭, 은행, 예금주, 용도
+                    const findCol = (patterns: string[]) => keys.find(k => patterns.some(p => k.includes(p))) || ''
+
+                    let items: any[] = []
+                    if (isCard) {
+                      const aliasCol = findCol(['카드번호', '카드', '별칭', 'card', 'number'])
+                      const issuerCol = findCol(['카드사', '발급사', 'issuer', '사'])
+                      const holderCol = findCol(['소지자', '이름', '성명', 'holder', '사용자'])
+                      if (!aliasCol) { alert(`카드번호/별칭 컬럼을 찾을 수 없습니다.\n컬럼: ${keys.join(', ')}`); return }
+                      items = rows.filter(r => r[aliasCol]).map(r => ({
+                        type: 'card',
+                        card_alias: String(r[aliasCol]).trim(),
+                        card_issuer: issuerCol ? String(r[issuerCol]).trim() : '',
+                        holder_name: holderCol ? String(r[holderCol]).trim() : '',
+                      }))
+                    } else {
+                      const aliasCol = findCol(['계좌번호', '계좌', '별칭', 'account', 'number'])
+                      const bankCol = findCol(['은행', 'bank', '은행명'])
+                      const holderCol = findCol(['예금주', '이름', '성명', 'holder', '소유자'])
+                      const purposeCol = findCol(['용도', 'purpose', '구분'])
+                      if (!aliasCol) { alert(`계좌번호/별칭 컬럼을 찾을 수 없습니다.\n컬럼: ${keys.join(', ')}`); return }
+                      items = rows.filter(r => r[aliasCol]).map(r => ({
+                        type: 'bank',
+                        account_alias: String(r[aliasCol]).trim(),
+                        bank_issuer: bankCol ? String(r[bankCol]).trim() : '',
+                        bank_name: bankCol ? String(r[bankCol]).trim() : '',
+                        account_holder: holderCol ? String(r[holderCol]).trim() : '',
+                        purpose: purposeCol ? String(r[purposeCol]).trim() : '',
+                      }))
+                    }
+
+                    if (items.length === 0) { alert('유효한 데이터가 없습니다.'); return }
+                    if (!confirm(`${isCard ? '카드' : '통장'} ${items.length}건을 등록하시겠습니까?\n\n예시: ${JSON.stringify(items[0]).slice(0, 120)}...`)) return
+
+                    let ok = 0, fail = 0
+                    for (const item of items) {
+                      try {
+                        await fetchWithAuth('/api/finance/mappings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(item) })
+                        ok++
+                      } catch { fail++ }
+                    }
+                    alert(`등록 완료: 성공 ${ok}건${fail > 0 ? `, 실패 ${fail}건` : ''}`)
+                    loadMappings()
+                  } catch (err: any) {
+                    alert('엑셀 파싱 오류: ' + err.message)
+                  }
+                }} />
+              </label>
             </div>
 
             {/* SMS에서 감지됐지만 미등록된 카드/계좌 알림 */}
