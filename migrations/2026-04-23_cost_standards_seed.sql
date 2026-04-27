@@ -5,8 +5,19 @@
 --   3) 빈 값 row 생성 (market/our 모두 NULL — UI/AI 에서 순차 채움)
 -- ============================================================
 
+-- 0) 재실행 안전화 — 클래스 중복 사전 정리
+--    (UNIQUE KEY 가 NULL 컬럼 포함이라 MySQL 에서 dedupe 보장 못 함)
+DELETE s1 FROM cost_standards_scope s1
+INNER JOIN cost_standards_scope s2
+  ON s1.scope_type = 'class' AND s2.scope_type = 'class'
+ AND s1.vehicle_class = s2.vehicle_class
+ AND s1.fuel_type     = s2.fuel_type
+ AND s1.id > s2.id;
+
 -- ─── 1) 클래스 스코프 (중위권 기본 8 × 5 = 40 rows) ───
-INSERT INTO cost_standards_scope
+--   주의: brand/model 이 NULL 이라 MySQL UNIQUE KEY (NULL≠NULL) 비교상
+--         재실행 시 중복 발생 → INSERT IGNORE + 사전 dedupe 필수
+INSERT IGNORE INTO cost_standards_scope
   (scope_type, vehicle_class, fuel_type, display_label, sort_order, is_active)
 VALUES
   ('class','경형',      '가솔린',     '경형 / 가솔린',        10, 1),
@@ -41,8 +52,7 @@ VALUES
   ('class','RV',        '가솔린',     'RV / 가솔린',          80, 1),
   ('class','RV',        '디젤',       'RV / 디젤',            81, 1),
   ('class','RV',        '하이브리드', 'RV / 하이브리드',      82, 1),
-  ('class','RV',        '전기',       'RV / 전기',            83, 1)
-ON DUPLICATE KEY UPDATE display_label = VALUES(display_label);
+  ('class','RV',        '전기',       'RV / 전기',            83, 1);
 
 
 -- ─── 2) 모델 스코프 — 상/하위권 자동 선별 ───
@@ -60,7 +70,7 @@ SELECT
   1
 FROM vehicle_market_price vmp
 JOIN (
-  SELECT vehicle_class, fuel_type, AVG(base_price) AS avg_price
+  SELECT vehicle_class, fuel_type, AVG(market_price) AS avg_price
     FROM vehicle_market_price
    WHERE is_active = 1
    GROUP BY vehicle_class, fuel_type
@@ -68,8 +78,8 @@ JOIN (
   ON avg_tbl.vehicle_class = vmp.vehicle_class
  AND avg_tbl.fuel_type     = vmp.fuel_type
 WHERE vmp.is_active = 1
-  AND (vmp.base_price > avg_tbl.avg_price * 1.25
-    OR vmp.base_price < avg_tbl.avg_price * 0.75)
+  AND (vmp.market_price > avg_tbl.avg_price * 1.25
+    OR vmp.market_price < avg_tbl.avg_price * 0.75)
 GROUP BY vmp.brand, vmp.model, vmp.fuel_type
 ON DUPLICATE KEY UPDATE display_label = VALUES(display_label);
 
