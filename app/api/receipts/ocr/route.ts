@@ -122,39 +122,49 @@ async function analyzeWithGemini(base64Image: string, mimeType: string): Promise
 - 감자탕/삼겹살/고기집/회식 → 회식비
 - 기타 → 기타`
 
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{
-        parts: [
-          { text: prompt },
-          {
-            inline_data: {
-              mime_type: mimeType || 'image/jpeg',
-              data: base64Image,
-            }
+  const requestBody = JSON.stringify({
+    contents: [{
+      parts: [
+        { text: prompt },
+        {
+          inline_data: {
+            mime_type: mimeType || 'image/jpeg',
+            data: base64Image,
           }
-        ]
-      }],
-      generationConfig: {
-        temperature: 0.1,
-        maxOutputTokens: 8192,
-      },
-    }),
+        }
+      ]
+    }],
+    generationConfig: {
+      temperature: 0.1,
+      maxOutputTokens: 8192,
+    },
   })
 
-  if (!response.ok) {
-    const errText = await response.text()
-    console.error('Gemini API 에러:', response.status, errText)
-    // 사용자에게 유용한 에러 메시지 추출
+  // 429 rate limit 재시도 (최대 3회, 지수 백오프)
+  let response: Response | null = null
+  for (let attempt = 0; attempt < 3; attempt++) {
+    response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: requestBody,
+    })
+    if (response.status !== 429) break
+    const waitSec = (attempt + 1) * 5 // 5초, 10초, 15초
+    console.warn(`Gemini 429 rate limit, ${waitSec}초 후 재시도 (${attempt + 1}/3)`)
+    await new Promise(r => setTimeout(r, waitSec * 1000))
+  }
+
+  if (!response || !response.ok) {
+    const errText = response ? await response.text() : 'No response'
+    console.error('Gemini API 에러:', response?.status, errText)
     let detail = ''
     try {
       const errJson = JSON.parse(errText)
       detail = errJson?.error?.message || ''
     } catch { detail = errText.slice(0, 200) }
     if (detail.includes('API key not valid')) detail = 'API 키가 유효하지 않습니다. Cloud Run 환경변수의 GEMINI_API_KEY를 확인하세요.'
-    throw new Error(`Gemini API ${response.status}: ${detail}`)
+    if (response?.status === 429) detail = 'Gemini API 요청 한도 초과. 잠시 후 다시 시도하세요.'
+    throw new Error(`Gemini API ${response?.status}: ${detail}`)
   }
 
   const result = await response.json()

@@ -292,6 +292,8 @@ export default function ReceiptsPage() {
     const failReasons = new Set<string>()
 
     for (let i = 0; i < unique.length; i++) {
+      // 2번째 이미지부터 3초 딜레이 (Gemini rate limit 방지)
+      if (i > 0) await new Promise(r => setTimeout(r, 3000))
       setUploadQueue(prev => prev.map((q, idx) => idx === i ? { ...q, status: 'uploading' } : q))
 
       try {
