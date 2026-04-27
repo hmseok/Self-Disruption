@@ -283,6 +283,8 @@ export default function BankCardPage() {
   const [groupData, setGroupData] = useState<any>(null)
   const [groupLoading, setGroupLoading] = useState(false)
   const [groupFilter, setGroupFilter] = useState<'all' | 'suggested' | 'unclassified'>('all')
+  const [groupSourceFilter, setGroupSourceFilter] = useState<'all' | 'excel_bank' | 'excel_card' | 'sms'>('all')
+  const [groupTypeFilter, setGroupTypeFilter] = useState<'all' | 'income' | 'expense'>('all')
   const [groupCategoryEdits, setGroupCategoryEdits] = useState<Record<string, string>>({})
   const [groupConfirming, setGroupConfirming] = useState<Set<string>>(new Set())
 
@@ -816,7 +818,7 @@ export default function BankCardPage() {
     setGroupLoading(true)
     const { json } = await fetchWithAuth('/api/finance/transactions/group-classify', {
       method: 'POST',
-      body: { type: 'all', limit: 5000 },
+      body: { type: 'all', source: 'all', limit: 8000 },
     })
     if (json?.data) {
       setGroupData(json.data)
@@ -880,11 +882,13 @@ export default function BankCardPage() {
 
   const filteredGroups = useMemo(() => {
     if (!groupData?.groups) return []
-    let list = groupData.groups
-    if (groupFilter === 'suggested') list = list.filter((g: any) => g.suggestedCategory)
-    if (groupFilter === 'unclassified') list = list.filter((g: any) => !g.suggestedCategory)
+    let list = groupData.groups as any[]
+    if (groupFilter === 'suggested') list = list.filter(g => g.suggestedCategory)
+    if (groupFilter === 'unclassified') list = list.filter(g => !g.suggestedCategory)
+    if (groupSourceFilter !== 'all') list = list.filter(g => g.source === groupSourceFilter)
+    if (groupTypeFilter !== 'all') list = list.filter(g => g.type === groupTypeFilter)
     return list
-  }, [groupData, groupFilter])
+  }, [groupData, groupFilter, groupSourceFilter, groupTypeFilter])
 
   // ─── 수동매칭 (정산 탭) ──────────────────────────────
 
@@ -1266,7 +1270,7 @@ export default function BankCardPage() {
         {/* ──── 자동매칭 + 그룹분류 탭 ──── */}
         {activeTab === 'matching' && (
           <>
-            {/* 상단 제어판: 자동매칭 + 그룹분류 */}
+            {/* 상단 제어판 */}
             <div style={{
               ...GLASS.L3,
               border: `1px solid ${COLORS.borderBlue}`,
@@ -1280,13 +1284,23 @@ export default function BankCardPage() {
                     미분류 거래: {nf(groupData?.totalUnclassified || summary?.transactions.unmatched || 0)}건
                     {groupData && (
                       <span style={{ marginLeft: 12, color: COLORS.textSecondary, fontWeight: 400 }}>
-                        {groupData.groupCount}개 거래처 그룹 · 추천 {groupData.withSuggestion}개
+                        {groupData.groupCount}개 그룹 · 추천 {groupData.withSuggestion}개
                       </span>
                     )}
                   </div>
-                  <div style={{ fontSize: 12, color: COLORS.textMuted }}>
-                    거래처별 그룹 분류 — 같은 가맹점 거래를 한 번에 카테고리 지정
-                  </div>
+                  {groupData?.sourceCounts && (
+                    <div style={{ fontSize: 12, color: COLORS.textMuted, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                      {groupData.sourceCounts.excel_bank > 0 && <span>통장 {nf(groupData.sourceCounts.excel_bank)}</span>}
+                      {groupData.sourceCounts.excel_card > 0 && <span>카드 {nf(groupData.sourceCounts.excel_card)}</span>}
+                      {groupData.sourceCounts.sms > 0 && <span>SMS {nf(groupData.sourceCounts.sms)}</span>}
+                      {groupData.sourceCounts.other > 0 && <span>기타 {nf(groupData.sourceCounts.other)}</span>}
+                    </div>
+                  )}
+                  {!groupData && (
+                    <div style={{ fontSize: 12, color: COLORS.textMuted }}>
+                      거래처별 그룹 분류 — 같은 가맹점/적요의 거래를 한 번에 카테고리 지정
+                    </div>
+                  )}
                 </div>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   <button
@@ -1298,7 +1312,7 @@ export default function BankCardPage() {
                       color: '#fff', border: 'none', cursor: groupLoading ? 'wait' : 'pointer',
                     }}
                   >
-                    {groupLoading ? '분석 중...' : '📊 그룹 분류 로드'}
+                    {groupLoading ? '분석 중...' : groupData ? '🔄 새로고침' : '📊 그룹 분류 로드'}
                   </button>
                   {groupData && groupData.groups.filter((g: any) => g.suggestedCategory && g.suggestedConfidence >= 80).length > 0 && (
                     <button
@@ -1309,7 +1323,7 @@ export default function BankCardPage() {
                         background: COLORS.success, color: '#fff', border: 'none', cursor: 'pointer',
                       }}
                     >
-                      ⚡ 추천 80%+ 일괄 확정 ({groupData.groups.filter((g: any) => g.suggestedCategory && g.suggestedConfidence >= 80).length}그룹)
+                      ⚡ 추천 일괄 확정 ({groupData.groups.filter((g: any) => g.suggestedCategory && g.suggestedConfidence >= 80).length}그룹)
                     </button>
                   )}
                   <button
@@ -1327,95 +1341,203 @@ export default function BankCardPage() {
               </div>
             </div>
 
-            {/* 그룹 필터 */}
+            {/* 필터 바: 소스 + 유형 + 추천 상태 */}
             {groupData && (
-              <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
-                {([
-                  { key: 'all', label: `전체 (${groupData.groupCount})` },
-                  { key: 'suggested', label: `추천 있음 (${groupData.withSuggestion})` },
-                  { key: 'unclassified', label: `추천 없음 (${groupData.groupCount - groupData.withSuggestion})` },
-                ] as const).map(f => (
-                  <button
-                    key={f.key}
-                    onClick={() => setGroupFilter(f.key)}
-                    style={{
-                      ...BTN.sm,
-                      background: groupFilter === f.key ? COLORS.primary : '#fff',
-                      color: groupFilter === f.key ? '#fff' : COLORS.textSecondary,
-                      border: `1px solid ${groupFilter === f.key ? COLORS.primary : COLORS.borderSubtle}`,
-                      cursor: 'pointer',
-                    }}
-                  >
-                    {f.label}
-                  </button>
-                ))}
+              <div style={{ display: 'flex', gap: 16, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+                {/* 소스 필터 */}
+                <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                  <span style={{ fontSize: 11, color: COLORS.textMuted, marginRight: 4 }}>소스:</span>
+                  {([
+                    { key: 'all', label: '전체' },
+                    ...(groupData.sourceCounts?.excel_bank > 0 ? [{ key: 'excel_bank', label: '통장' }] : []),
+                    ...(groupData.sourceCounts?.excel_card > 0 ? [{ key: 'excel_card', label: '카드' }] : []),
+                    ...(groupData.sourceCounts?.sms > 0 ? [{ key: 'sms', label: 'SMS' }] : []),
+                  ] as { key: typeof groupSourceFilter; label: string }[]).map(f => (
+                    <button
+                      key={f.key}
+                      onClick={() => setGroupSourceFilter(f.key)}
+                      style={{
+                        ...BTN.sm, padding: '2px 10px', fontSize: 11,
+                        background: groupSourceFilter === f.key ? COLORS.primary : '#fff',
+                        color: groupSourceFilter === f.key ? '#fff' : COLORS.textSecondary,
+                        border: `1px solid ${groupSourceFilter === f.key ? COLORS.primary : COLORS.borderSubtle}`,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+                {/* 유형 필터 */}
+                <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                  <span style={{ fontSize: 11, color: COLORS.textMuted, marginRight: 4 }}>유형:</span>
+                  {([
+                    { key: 'all' as const, label: '전체' },
+                    { key: 'expense' as const, label: '지출' },
+                    { key: 'income' as const, label: '수입' },
+                  ]).map(f => (
+                    <button
+                      key={f.key}
+                      onClick={() => setGroupTypeFilter(f.key)}
+                      style={{
+                        ...BTN.sm, padding: '2px 10px', fontSize: 11,
+                        background: groupTypeFilter === f.key ? COLORS.primary : '#fff',
+                        color: groupTypeFilter === f.key ? '#fff' : COLORS.textSecondary,
+                        border: `1px solid ${groupTypeFilter === f.key ? COLORS.primary : COLORS.borderSubtle}`,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+                {/* 추천 상태 필터 */}
+                <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                  <span style={{ fontSize: 11, color: COLORS.textMuted, marginRight: 4 }}>추천:</span>
+                  {([
+                    { key: 'all' as const, label: '전체' },
+                    { key: 'suggested' as const, label: '추천 있음' },
+                    { key: 'unclassified' as const, label: '미추천' },
+                  ]).map(f => (
+                    <button
+                      key={f.key}
+                      onClick={() => setGroupFilter(f.key)}
+                      style={{
+                        ...BTN.sm, padding: '2px 10px', fontSize: 11,
+                        background: groupFilter === f.key ? COLORS.primary : '#fff',
+                        color: groupFilter === f.key ? '#fff' : COLORS.textSecondary,
+                        border: `1px solid ${groupFilter === f.key ? COLORS.primary : COLORS.borderSubtle}`,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+                {/* 필터 결과 건수 */}
+                <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 'auto' }}>
+                  {filteredGroups.length}개 그룹 · {filteredGroups.reduce((s: number, g: any) => s + g.count, 0).toLocaleString()}건
+                </span>
               </div>
             )}
 
             {/* 그룹 분류 카드 목록 */}
             {groupData && filteredGroups.length > 0 && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {filteredGroups.slice(0, 100).map((group: any) => {
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {filteredGroups.slice(0, 150).map((group: any) => {
                   const isConfirming = groupConfirming.has(group.merchantKey)
                   const selectedCat = groupCategoryEdits[group.merchantKey] || ''
+                  const srcColor = group.source === 'excel_bank' ? '#2563eb' : group.source === 'excel_card' ? '#7c3aed' : group.source === 'sms' ? '#059669' : '#6b7280'
                   return (
                     <div
                       key={group.merchantKey}
                       style={{
                         ...GLASS.L4,
-                        border: `1px solid ${group.suggestedCategory ? 'rgba(34,197,94,0.3)' : COLORS.borderSubtle}`,
+                        border: `1px solid ${group.suggestedCategory ? 'rgba(34,197,94,0.25)' : COLORS.borderSubtle}`,
                         borderRadius: 10,
-                        padding: '12px 16px',
+                        padding: '10px 14px',
                       }}
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 8 }}>
                         {/* 왼쪽: 거래처 정보 */}
-                        <div style={{ flex: 1, minWidth: 200 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                            <span style={{ fontSize: 14, fontWeight: 600, color: COLORS.textPrimary }}>{group.merchantName}</span>
+                        <div style={{ flex: 1, minWidth: 220 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3, flexWrap: 'wrap' }}>
+                            {/* 소스 뱃지 */}
+                            <span style={{
+                              fontSize: 10, fontWeight: 600, color: srcColor,
+                              background: `${srcColor}12`, border: `1px solid ${srcColor}30`,
+                              borderRadius: 4, padding: '1px 6px', lineHeight: '16px',
+                            }}>
+                              {group.sourceLabel}
+                            </span>
+                            {/* 수입/지출 뱃지 */}
                             <span style={{
                               ...pillStyle(group.type === 'income' ? 'success' : 'danger'),
-                              fontSize: 11, padding: '1px 8px',
+                              fontSize: 10, padding: '1px 6px',
                             }}>
                               {group.type === 'income' ? '수입' : '지출'}
                             </span>
-                            <span style={{ fontSize: 12, color: COLORS.textMuted, fontWeight: 600 }}>
+                            {/* 거래처명 */}
+                            <span style={{ fontSize: 13, fontWeight: 600, color: COLORS.textPrimary }}>
+                              {group.merchantName}
+                            </span>
+                            <span style={{ fontSize: 12, color: COLORS.textMuted }}>
                               {group.count}건
                             </span>
                           </div>
                           <div style={{ fontSize: 12, color: COLORS.textSecondary, marginBottom: 2 }}>
                             총 {nf(group.totalAmount)}원 · 평균 {nf(group.avgAmount)}원
+                            {group.bankName && <span style={{ marginLeft: 8, color: COLORS.textMuted }}>({group.bankName})</span>}
+                            {group.cardCompany && <span style={{ marginLeft: 8, color: COLORS.textMuted }}>({group.cardCompany})</span>}
                           </div>
                           <div style={{ fontSize: 11, color: COLORS.textMuted }}>
-                            {group.dateRange.first} ~ {group.dateRange.last}
+                            {group.dateRange.first}{group.dateRange.last && group.dateRange.last !== group.dateRange.first ? ` ~ ${group.dateRange.last}` : ''}
                             {group.sampleDescriptions.length > 0 && (
                               <span style={{ marginLeft: 8 }}>
                                 적요: {group.sampleDescriptions.slice(0, 2).join(', ')}
                               </span>
                             )}
+                            {group.sampleClientNames.length > 0 && group.merchantName !== group.sampleClientNames[0] && (
+                              <span style={{ marginLeft: 8 }}>
+                                거래처: {group.sampleClientNames.slice(0, 2).join(', ')}
+                              </span>
+                            )}
                           </div>
+                          {/* 추천 카테고리 표시 */}
+                          {group.suggestedCategory && (
+                            <div style={{ fontSize: 11, color: '#16a34a', fontWeight: 500, marginTop: 2 }}>
+                              추천: {group.suggestedCategory} ({group.suggestedConfidence}%)
+                            </div>
+                          )}
                         </div>
                         {/* 오른쪽: 카테고리 선택 + 확인 */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-                          {group.suggestedCategory && (
-                            <span style={{ fontSize: 11, color: '#16a34a', fontWeight: 500 }}>
-                              추천: {group.suggestedCategory} ({group.suggestedConfidence}%)
-                            </span>
-                          )}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
                           <select
                             value={selectedCat}
                             onChange={(e) => setGroupCategoryEdits(prev => ({ ...prev, [group.merchantKey]: e.target.value }))}
                             style={{
                               ...GLASS.L1,
                               border: `1px solid ${COLORS.borderSubtle}`,
-                              borderRadius: 6, padding: '4px 8px', fontSize: 12,
-                              color: COLORS.textPrimary, minWidth: 140, cursor: 'pointer',
+                              borderRadius: 6, padding: '5px 8px', fontSize: 12,
+                              color: COLORS.textPrimary, minWidth: 150, cursor: 'pointer',
                             }}
                           >
                             <option value="">카테고리 선택...</option>
-                            {(groupData.categories || []).map((cat: string) => (
-                              <option key={cat} value={cat}>{cat}</option>
-                            ))}
+                            <optgroup label="수입">
+                              {(groupData.categories || []).filter((c: string) =>
+                                ['렌트/운송수입','지입 관리비/수수료','투자원금 입금','지입 초기비용/보증금','렌터카 보증금(입금)','대출 실행(입금)','이자/잡이익','보험금 수령','매각/처분수입','기타수입'].includes(c)
+                              ).map((cat: string) => (
+                                <option key={cat} value={cat}>{cat}</option>
+                              ))}
+                            </optgroup>
+                            <optgroup label="지출 - 차량">
+                              {(groupData.categories || []).filter((c: string) =>
+                                ['유류비','정비/수리비','차량보험료','자동차세/공과금','차량할부/리스료','화물공제/적재물보험'].includes(c)
+                              ).map((cat: string) => (
+                                <option key={cat} value={cat}>{cat}</option>
+                              ))}
+                            </optgroup>
+                            <optgroup label="지출 - 인건비">
+                              {(groupData.categories || []).filter((c: string) =>
+                                ['급여(정규직)','일용직급여','용역비(3.3%)','4대보험(회사부담)'].includes(c)
+                              ).map((cat: string) => (
+                                <option key={cat} value={cat}>{cat}</option>
+                              ))}
+                            </optgroup>
+                            <optgroup label="지출 - 세금/금융">
+                              {(groupData.categories || []).filter((c: string) =>
+                                ['원천세/부가세','법인세/지방세','세금/공과금','이자비용(대출/투자)','원금상환','수수료/카드수수료'].includes(c)
+                              ).map((cat: string) => (
+                                <option key={cat} value={cat}>{cat}</option>
+                              ))}
+                            </optgroup>
+                            <optgroup label="지출 - 운영/관리">
+                              {(groupData.categories || []).filter((c: string) =>
+                                ['지입 수익배분금(출금)','임차료/사무실','통신비','소모품/사무용품','복리후생(식대)','접대비','여비교통비','교육/훈련비','광고/마케팅','보험료(일반)','수선/유지비','전기/수도/가스','도서/신문','경비/보안','쇼핑/온라인구매','기타'].includes(c)
+                              ).map((cat: string) => (
+                                <option key={cat} value={cat}>{cat}</option>
+                              ))}
+                            </optgroup>
                           </select>
                           <button
                             onClick={() => confirmGroupCategory(group)}
@@ -1436,11 +1558,17 @@ export default function BankCardPage() {
                     </div>
                   )
                 })}
-                {filteredGroups.length > 100 && (
+                {filteredGroups.length > 150 && (
                   <div style={{ textAlign: 'center', fontSize: 12, color: COLORS.textMuted, padding: 12 }}>
-                    + {filteredGroups.length - 100}개 그룹 더 있음
+                    + {filteredGroups.length - 150}개 그룹 더 있음 (필터를 사용하세요)
                   </div>
                 )}
+              </div>
+            )}
+
+            {groupData && filteredGroups.length === 0 && (
+              <div style={{ textAlign: 'center', padding: '40px 20px', color: COLORS.textMuted, fontSize: 13 }}>
+                현재 필터 조건에 맞는 그룹이 없습니다
               </div>
             )}
 
@@ -1494,7 +1622,7 @@ export default function BankCardPage() {
                 <div style={{ fontSize: 40, marginBottom: 12 }}>📊</div>
                 <div>[그룹 분류 로드]를 클릭하여 거래처별 카테고리를 일괄 지정하세요</div>
                 <div style={{ fontSize: 12, marginTop: 8 }}>
-                  미분류 {nf(summary?.transactions.unmatched || 0)}건의 거래를 거래처별로 묶어 한 번에 분류합니다
+                  미분류 {nf(summary?.transactions.unmatched || 0)}건을 거래처 + 소스별로 세분화하여 일괄 분류합니다
                 </div>
               </div>
             )}
