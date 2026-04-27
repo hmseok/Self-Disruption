@@ -1374,7 +1374,7 @@ export default function BankCardPage() {
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                             <span style={{ fontSize: 14, fontWeight: 600, color: COLORS.textPrimary }}>{group.merchantName}</span>
                             <span style={{
-                              ...pillStyle(group.type === 'income' ? 'green' : 'red'),
+                              ...pillStyle(group.type === 'income' ? 'success' : 'danger'),
                               fontSize: 11, padding: '1px 8px',
                             }}>
                               {group.type === 'income' ? '수입' : '지출'}
