@@ -1263,7 +1263,7 @@ export default function BankCardPage() {
           </>
         )}
 
-        {/* ──── 자동매��� + 그룹분류 탭 ──── */}
+        {/* ──── 자동매칭 + 그룹분류 탭 ──── */}
         {activeTab === 'matching' && (
           <>
             {/* 상단 제어판: 자동매칭 + 그룹분류 */}
@@ -1277,7 +1277,7 @@ export default function BankCardPage() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
                 <div>
                   <div style={{ fontSize: 14, fontWeight: 600, color: COLORS.textPrimary, marginBottom: 4 }}>
-                    미분류 ���래: {nf(groupData?.totalUnclassified || summary?.transactions.unmatched || 0)}건
+                    미분류 거래: {nf(groupData?.totalUnclassified || summary?.transactions.unmatched || 0)}건
                     {groupData && (
                       <span style={{ marginLeft: 12, color: COLORS.textSecondary, fontWeight: 400 }}>
                         {groupData.groupCount}개 거래처 그룹 · 추천 {groupData.withSuggestion}개
@@ -1327,7 +1327,7 @@ export default function BankCardPage() {
               </div>
             </div>
 
-            {/* 그룹 필��� */}
+            {/* 그룹 필터 */}
             {groupData && (
               <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
                 {([
@@ -1384,7 +1384,7 @@ export default function BankCardPage() {
                             </span>
                           </div>
                           <div style={{ fontSize: 12, color: COLORS.textSecondary, marginBottom: 2 }}>
-                            총 {nf(group.totalAmount)}원 · 평��� {nf(group.avgAmount)}원
+                            총 {nf(group.totalAmount)}원 · 평균 {nf(group.avgAmount)}원
                           </div>
                           <div style={{ fontSize: 11, color: COLORS.textMuted }}>
                             {group.dateRange.first} ~ {group.dateRange.last}
@@ -1460,7 +1460,7 @@ export default function BankCardPage() {
                         onClick={confirmSelectedMatches}
                         style={{ ...BTN.sm, background: COLORS.success, color: '#fff', border: 'none', cursor: 'pointer' }}
                       >
-                        ✓ {selectedMatches.size}건 매칭 확���
+                        ✓ {selectedMatches.size}건 매칭 확인
                       </button>
                     ) : (
                       <button
