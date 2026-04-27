@@ -182,12 +182,14 @@ function findHeaderRow(
       cells.push(cell ? String(cell.v || '').trim() : '')
     }
     // 이 행에서 패턴 매칭되는 컬럼 수 확인
+    // 합계행 오인식 방지: 셀 길이 30자 이하인 것만 카운트
+    // (예: "출금합계 : 644,247,505" 같은 합계값은 실제 헤더가 아님)
     let matchCount = 0
     for (const cell of cells) {
-      if (cell && matchColumn(cell, patterns)) matchCount++
+      if (cell && cell.length <= 30 && matchColumn(cell, patterns)) matchCount++
     }
-    // 2개 이상 매칭되면 헤더 행으로 인식
-    if (matchCount >= 2) {
+    // 3개 이상 매칭되면 헤더 행으로 인식 (2개는 합계행 오인식 위험)
+    if (matchCount >= 3) {
       return { headerRowIdx: r, headers: cells.filter(c => c !== '') }
     }
   }
@@ -1331,12 +1333,22 @@ export default function BankCardPage() {
               activeFilter={bankFilter}
               onFilterChange={setBankFilter}
               trailing={
-                <button
-                  onClick={() => { setUploadSource('excel_bank'); setShowUpload(true); setUploadPreview([]); setUploadResult(null); setUploadFiles([]); setUploadFileName(''); setUploadColumns({}); setSkippedFiles([]) }}
-                  style={{ ...BTN.sm, background: COLORS.primary, color: '#fff', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
-                >
-                  📤 엑셀 업로드
-                </button>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button
+                    onClick={() => { setUploadSource('excel_bank'); setShowUpload(true); setUploadPreview([]); setUploadResult(null); setUploadFiles([]); setUploadFileName(''); setUploadColumns({}); setSkippedFiles([]) }}
+                    style={{ ...BTN.sm, background: COLORS.primary, color: '#fff', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+                  >
+                    📤 엑셀 업로드
+                  </button>
+                  {summary && summary.transactions.bank > 0 && (
+                    <button
+                      onClick={() => deleteAndReupload('excel_bank')}
+                      style={{ ...BTN.sm, background: '#fff', color: COLORS.danger, border: `1px solid rgba(239,68,68,0.3)`, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+                    >
+                      🗑 통장 전체삭제
+                    </button>
+                  )}
+                </div>
               }
             />
             <NeuDataTable
@@ -1380,6 +1392,14 @@ export default function BankCardPage() {
                   >
                     📱 SMS 연결
                   </button>
+                  {summary && summary.transactions.card > 0 && (
+                    <button
+                      onClick={() => deleteAndReupload('excel_card')}
+                      style={{ ...BTN.sm, background: '#fff', color: COLORS.danger, border: `1px solid rgba(239,68,68,0.3)`, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+                    >
+                      🗑 카드 전체삭제
+                    </button>
+                  )}
                 </div>
               }
             />

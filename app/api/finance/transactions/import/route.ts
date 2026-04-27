@@ -133,9 +133,11 @@ export async function POST(request: NextRequest) {
           if (r && r.confidence >= 60) autoCategory = r.category
         }
 
+        const balanceAfter = row.balance != null ? Number(row.balance) || null : null
+
         await prisma.$executeRawUnsafe(
-          `INSERT INTO transactions (id, transaction_date, type, amount, description, client_name, bank_name, card_company, imported_from, category, final_category, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+          `INSERT INTO transactions (id, transaction_date, type, amount, description, client_name, bank_name, card_company, imported_from, category, final_category, balance_after, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
           id,
           txDate,
           txType,
@@ -147,6 +149,7 @@ export async function POST(request: NextRequest) {
           source,
           autoCategory,
           autoCategory,
+          balanceAfter,
         )
         inserted++
       } catch (err: any) {

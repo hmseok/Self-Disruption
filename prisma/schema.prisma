@@ -415,6 +415,7 @@ model Transaction {
   ai_matched_type  String?
   ai_matched_id    String?   @db.Char(36)
   final_category   String?
+  balance_after    Decimal?  @db.Decimal(15, 0)
   imported_from    String?
   codef_org_code   String?
   raw_data         Json?

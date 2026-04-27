@@ -140,16 +140,28 @@ async function analyzeWithGemini(base64Image: string, mimeType: string): Promise
     },
   })
 
-  // 429 rate limit 재시도 (최대 3회, 지수 백오프)
+  // 429 rate limit 재시도 (최대 3회, 지수 백오프) + 타임아웃 45초
   let response: Response | null = null
   for (let attempt = 0; attempt < 3; attempt++) {
-    response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: requestBody,
-    })
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 45000) // 45초 타임아웃
+    try {
+      response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: requestBody,
+        signal: controller.signal,
+      })
+    } catch (fetchErr: any) {
+      clearTimeout(timeoutId)
+      if (fetchErr.name === 'AbortError') {
+        throw new Error('Gemini API 응답 시간 초과 (45초). 이미지 크기를 줄이거나 다시 시도해주세요.')
+      }
+      throw fetchErr
+    }
+    clearTimeout(timeoutId)
     if (response.status !== 429) break
-    const waitSec = (attempt + 1) * 5 // 5초, 10초, 15초
+    const waitSec = (attempt + 1) * 3 // 3초, 6초, 9초 (기존 5/10/15 → 단축)
     console.warn(`Gemini 429 rate limit, ${waitSec}초 후 재시도 (${attempt + 1}/3)`)
     await new Promise(r => setTimeout(r, waitSec * 1000))
   }
@@ -362,7 +374,8 @@ export async function POST(request: NextRequest) {
   } catch (e: any) {
     console.error('영수증 분석 오류:', e.message)
     return NextResponse.json({
-      success: true,
+      success: false,
+      error: e.message,
       receipt_url: '',
       ocr_parsed: {},
       ocr_parsed_items: [],
@@ -371,6 +384,6 @@ export async function POST(request: NextRequest) {
       is_multi: false,
       item_count: 0,
       fail_reason: `서버 처리 오류: ${e.message}`,
-    })
+    }, { status: 500 })
   }
 }

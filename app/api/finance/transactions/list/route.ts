@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
     const whereClause = conditions.join(' AND ')
     const data = await prisma.$queryRawUnsafe<any[]>(
       `SELECT id, transaction_date, type, amount, description, client_name,
-              bank_name, card_company, imported_from, category, final_category
+              bank_name, card_company, imported_from, category, final_category, balance_after
        FROM transactions
        WHERE ${whereClause}
        ORDER BY transaction_date DESC

@@ -292,8 +292,8 @@ export default function ReceiptsPage() {
     const failReasons = new Set<string>()
 
     for (let i = 0; i < unique.length; i++) {
-      // 2번째 이미지부터 3초 딜레이 (Gemini rate limit 방지)
-      if (i > 0) await new Promise(r => setTimeout(r, 3000))
+      // 2번째 이미지부터 1초 딜레이 (Gemini 2.0 Flash는 10,000 RPM이므로 충분)
+      if (i > 0) await new Promise(r => setTimeout(r, 1000))
       setUploadQueue(prev => prev.map((q, idx) => idx === i ? { ...q, status: 'uploading' } : q))
 
       try {
@@ -305,6 +305,14 @@ export default function ReceiptsPage() {
           body: formData,
         })
         const ocrJson = await ocrRes.json()
+
+        // 서버 에러 응답 처리
+        if (!ocrRes.ok || ocrJson.success === false) {
+          failedCount++
+          failReasons.add(ocrJson.fail_reason || ocrJson.error || `서버 오류 (${ocrRes.status})`)
+          setUploadQueue(prev => prev.map((q, idx) => idx === i ? { ...q, status: 'done' } : q))
+          continue
+        }
 
         const receiptUrl = ocrJson.receipt_url || ''
         const ocrItems: any[] = ocrJson.ocr_parsed_items || (ocrJson.ocr_parsed ? [ocrJson.ocr_parsed] : [])
