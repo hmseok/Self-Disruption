@@ -19,7 +19,12 @@ export async function GET(request: NextRequest) {
       `
       const monthSet = new Set<string>()
       allDates?.forEach(row => {
-        if (row.expense_date) monthSet.add(String(row.expense_date).slice(0, 7))
+        if (row.expense_date) {
+          const d = row.expense_date instanceof Date
+            ? row.expense_date.toISOString().slice(0, 7)
+            : String(row.expense_date).slice(0, 10).replace(/(\d{4}).(\d{2}).*/, '$1-$2')
+          if (/^\d{4}-\d{2}$/.test(d)) monthSet.add(d)
+        }
       })
       return NextResponse.json({ months: Array.from(monthSet).sort((a, b) => b.localeCompare(a)) })
     }

@@ -79,14 +79,17 @@ async function analyzeWithGemini(base64Image: string, mimeType: string): Promise
   const model = process.env.GEMINI_MODEL || 'gemini-2.0-flash'
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
 
-  const prompt = `이 이미지는 한국의 영수증, 카드전표, 또는 카드 사용내역 캡처입니다.
+  const prompt = `이 이미지는 한국의 영수증, 카드전표, 또는 **카드앱/은행앱 사용내역 스크린샷** 중 하나입니다.
 
 ## 중요 규칙
 - 이미지에 거래가 1건이면 JSON 객체 1개를, 여러 건이면 JSON 배열로 반환하세요.
 - 마크다운 코드블록(백틱) 없이 순수 JSON만 응답하세요.
-- 마이너스(-) 금액이나 "가승인" 항목도 포함하세요.
+- 마이너스(-) 금액이나 "가승인" 항목도 포함하세요. "가승인취소"는 제외.
 - 날짜에 년도가 보이지 않으면 "MM-DD" 형식으로만 반환하세요 (년도 추측 금지).
 - 미래 날짜는 절대 사용하지 마세요. 오늘은 ${new Date().toISOString().slice(0, 10)}입니다.
+- **카드앱 스크린샷**: "IBK컴퍼니카드7957" 같은 텍스트에서 뒤 4자리(7957)를 card_last4로 추출하세요.
+- 금액에 "원" 표시나 콤마는 제거하고 숫자만 넣으세요.
+- 동일 이미지에 여러 거래가 목록으로 보이면 **반드시 배열**로 모든 건을 추출하세요.
 
 ## 단건 형식 (영수증 1장)
 {
@@ -102,20 +105,21 @@ async function analyzeWithGemini(base64Image: string, mimeType: string): Promise
   "total_before_tax": 공급가액(숫자, 없으면 0)
 }
 
-## 다건 형식 (카드내역 캡처 등)
+## 다건 형식 (카드앱 사용내역 캡처 등)
 [
-  {"merchant": "...", "amount": ..., "date": "...", "card_last4": "...", "item_name": "...", "category": "...", "items": [], "payment_method": "카드", "tax": 0, "total_before_tax": 0},
+  {"merchant": "테슬라코리아", "amount": 150000, "date": "2026-04-15", "card_last4": "7957", "item_name": "충전", "category": "충전", "items": [], "payment_method": "카드", "tax": 0, "total_before_tax": 0},
   ...
 ]
 
 ## 카테고리 판단 기준
-- 식당/카페/음식점 → 식비
-- 주유소 → 주유비
-- 주차장 → 주차비
-- 택시/버스 → 교통비
-- 전기충전 → 충전
-- 우체국/택배 → 택배비
-- 술집/룸/유흥 → 접대
+- 식당/카페/음식점/더벤티/스타벅스/이디야/투썸 → 식비
+- 주유소/SK에너지/GS칼텍스/현대오일뱅크 → 주유비
+- 주차장/파킹 → 주차비
+- 택시/카카오T/버스/지하철 → 교통비
+- 전기충전/테슬라/차지인프라 → 충전
+- 우체국/CJ대한통운/한진택배 → 택배비
+- 술집/룸/유흥/노래방 → 접대
+- 감자탕/삼겹살/고기집/회식 → 회식비
 - 기타 → 기타`
 
   const response = await fetch(url, {

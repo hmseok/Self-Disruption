@@ -341,17 +341,12 @@ export default function ReceiptsPage() {
             }
           })
 
+        // AI가 아무것도 추출 못한 경우 → 저장하지 않고 실패 처리
         if (itemsToSave.length === 0) {
-          itemsToSave.push({
-            expense_date: new Date().toISOString().slice(0, 10),
-            card_number: '',
-            category: '기타',
-            merchant: '',
-            item_name: '',
-            customer_team: '',
-            amount: 0,
-            receipt_url: receiptUrl,
-          })
+          failedCount++
+          if (!ocrJson.fail_reason) failReasons.add('이미지에서 거래 내역을 인식하지 못했습니다. 이미지 품질을 확인해주세요.')
+          setUploadQueue(prev => prev.map((q, idx) => idx === i ? { ...q, status: 'error' } : q))
+          continue
         }
 
         const saveRes = await fetch('/api/receipts', {
@@ -835,10 +830,12 @@ export default function ReceiptsPage() {
   ]
 
   // ── DcToolbar 월 필터탭 ──
-  const monthFilters: FilterItem[] = allMonths.map(m => ({
-    key: m,
-    label: `${parseInt(m.split('-')[1])}월`,
-  }))
+  const monthFilters: FilterItem[] = allMonths
+    .filter(m => /^\d{4}-\d{2}$/.test(m))
+    .map(m => ({
+      key: m,
+      label: `${parseInt(m.split('-')[1])}월`,
+    }))
 
   return (
     <div className="page-bg">
