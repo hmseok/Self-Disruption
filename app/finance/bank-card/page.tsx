@@ -66,8 +66,16 @@ interface MatchResult {
   autoConfirm: boolean
 }
 
+interface CategoryBreakdown {
+  category: string
+  type: string
+  count: number
+  totalAmount: number
+}
+
 interface Summary {
-  transactions: { total: number; bank: number; card: number; matched: number; unmatched: number; totalIncome: number; totalExpense: number }
+  transactions: { total: number; bank: number; card: number; matched: number; unmatched: number; classified: number; unclassified: number; totalIncome: number; totalExpense: number }
+  categoryBreakdown: CategoryBreakdown[]
   settlement: { total: number; linked: number; unlinked: number; totalAmount: number }
   sms: { total: number; linked: number; unlinked: number }
 }
@@ -288,6 +296,12 @@ export default function BankCardPage() {
   const [groupTypeFilter, setGroupTypeFilter] = useState<'all' | 'income' | 'expense'>('all')
   const [groupCategoryEdits, setGroupCategoryEdits] = useState<Record<string, string>>({})
   const [groupConfirming, setGroupConfirming] = useState<Set<string>>(new Set())
+
+  // 분류 검수 탭 상태
+  const [reviewCategory, setReviewCategory] = useState<string | null>(null)
+  const [reviewItems, setReviewItems] = useState<any[]>([])
+  const [reviewLoading, setReviewLoading] = useState(false)
+  const [reviewTypeFilter, setReviewTypeFilter] = useState<'all' | 'income' | 'expense'>('all')
 
   // SMS 탭 상태
   const [smsRows, setSmsRows] = useState<SmsRow[]>([])
@@ -819,6 +833,26 @@ export default function BankCardPage() {
 
   // ─── 거래처 그룹 분류 ─────────────────────────────────
 
+  // ── 분류 검수: 카테고리별 거래 목록 조회 ──
+  const loadReviewItems = async (category: string) => {
+    setReviewCategory(category)
+    setReviewLoading(true)
+    setReviewItems([])
+    const { json } = await fetchWithAuth(`/api/finance/transactions/list?category=${encodeURIComponent(category)}&limit=200`)
+    if (json?.data) setReviewItems(json.data)
+    setReviewLoading(false)
+  }
+
+  // 분류 검수에서 카테고리 변경
+  const changeItemCategory = async (id: string, newCategory: string) => {
+    await fetchWithAuth('/api/finance/transactions/group-classify', {
+      method: 'PATCH',
+      body: { transactionIds: [id], category: newCategory },
+    })
+    setReviewItems(prev => prev.filter(i => i.id !== id))
+    loadSummary() // 통계 갱신
+  }
+
   const loadGroupClassify = async () => {
     setGroupLoading(true)
     const { json } = await fetchWithAuth('/api/finance/transactions/group-classify', {
@@ -938,7 +972,8 @@ export default function BankCardPage() {
   const tabs = [
     { key: 'bank', label: '통장 거래', count: summary?.transactions.bank },
     { key: 'card', label: '카드 거래', count: summary?.transactions.card },
-    { key: 'matching', label: '자동매칭', count: summary?.transactions.unmatched },
+    { key: 'classify', label: '분류 검수', count: summary?.transactions.classified },
+    { key: 'matching', label: '미분류', count: summary?.transactions.unclassified },
     { key: 'settlement', label: '정산 연결', count: summary?.settlement.total },
     { key: 'sms', label: 'SMS 수집', count: summary?.sms?.total || 0 },
     { key: 'mapping', label: '매핑 관리' },
@@ -950,9 +985,9 @@ export default function BankCardPage() {
     { label: '전체 거래', value: nf(summary.transactions.total), tint: 'blue', icon: '📊' },
     { label: '통장', value: nf(summary.transactions.bank), tint: 'green', icon: '🏦' },
     { label: '카드', value: nf(summary.transactions.card), tint: 'purple', icon: '💳' },
-    { label: '매칭완료', value: nf(summary.transactions.matched), tint: 'green', icon: '✓',
-      subValue: summary.transactions.total > 0 ? `${Math.round(summary.transactions.matched / summary.transactions.total * 100)}%` : '0%', subTone: 'up' as const },
-    { label: '미매칭', value: nf(summary.transactions.unmatched), tint: 'amber', icon: '⚠' },
+    { label: '분류완료', value: nf(summary.transactions.classified), tint: 'green', icon: '✓',
+      subValue: summary.transactions.total > 0 ? `${Math.round(summary.transactions.classified / summary.transactions.total * 100)}%` : '0%', subTone: 'up' as const },
+    { label: '미분류', value: nf(summary.transactions.unclassified), tint: summary.transactions.unclassified > 0 ? 'amber' : 'green', icon: summary.transactions.unclassified > 0 ? '⚠' : '✓' },
   ] : []
 
   // ── 통장 거래 탭 ──────────────────────────────────────
@@ -1272,7 +1307,178 @@ export default function BankCardPage() {
           </>
         )}
 
-        {/* ──── 자동매칭 + 그룹분류 탭 ──── */}
+        {/* ──── 분류 검수 탭 ──── */}
+        {activeTab === 'classify' && (
+          <>
+            {/* 카테고리별 요약 카드 */}
+            {summary?.categoryBreakdown && (() => {
+              // 카테고리별 집계: 수입/지출 합산
+              const catMap = new Map<string, { count: number; income: number; expense: number; incomeAmt: number; expenseAmt: number }>()
+              for (const row of summary.categoryBreakdown) {
+                const key = row.category
+                if (!catMap.has(key)) catMap.set(key, { count: 0, income: 0, expense: 0, incomeAmt: 0, expenseAmt: 0 })
+                const m = catMap.get(key)!
+                m.count += row.count
+                if (row.type === 'income') { m.income += row.count; m.incomeAmt += row.totalAmount }
+                else { m.expense += row.count; m.expenseAmt += row.totalAmount }
+              }
+              const catList = Array.from(catMap.entries())
+                .map(([cat, v]) => ({ category: cat, ...v }))
+                .filter(c => reviewTypeFilter === 'all' || (reviewTypeFilter === 'income' ? c.income > 0 : c.expense > 0))
+                .sort((a, b) => b.count - a.count)
+
+              return (
+                <div>
+                  {/* 헤더 */}
+                  <div style={{
+                    ...GLASS.L3, border: `1px solid ${COLORS.borderBlue}`,
+                    borderRadius: 12, padding: '14px 20px', marginBottom: 12,
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                      <div>
+                        <div style={{ fontSize: 14, fontWeight: 600, color: COLORS.textPrimary }}>
+                          분류 검수 — {catList.length}개 카테고리 · {catList.reduce((s, c) => s + c.count, 0).toLocaleString()}건
+                        </div>
+                        <div style={{ fontSize: 12, color: COLORS.textMuted, marginTop: 2 }}>
+                          카테고리를 클릭하면 해당 거래 목록을 확인하고 수정할 수 있습니다
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: 4 }}>
+                        {(['all', 'expense', 'income'] as const).map(f => (
+                          <button key={f} onClick={() => setReviewTypeFilter(f)}
+                            style={{
+                              ...BTN.sm, padding: '3px 10px', fontSize: 11,
+                              background: reviewTypeFilter === f ? COLORS.primary : '#fff',
+                              color: reviewTypeFilter === f ? '#fff' : COLORS.textSecondary,
+                              border: `1px solid ${reviewTypeFilter === f ? COLORS.primary : COLORS.borderSubtle}`,
+                              cursor: 'pointer',
+                            }}>
+                            {f === 'all' ? '전체' : f === 'income' ? '수입' : '지출'}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 카테고리 카드 목록 */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 8 }}>
+                    {catList.map(cat => {
+                      const isSelected = reviewCategory === cat.category
+                      const totalAmt = cat.incomeAmt + cat.expenseAmt
+                      return (
+                        <div key={cat.category}
+                          onClick={() => loadReviewItems(cat.category)}
+                          style={{
+                            ...GLASS.L4,
+                            border: `1px solid ${isSelected ? COLORS.primary : COLORS.borderSubtle}`,
+                            borderRadius: 10, padding: '12px 16px', cursor: 'pointer',
+                            transition: 'border-color 0.15s',
+                            ...(isSelected ? { boxShadow: `0 0 0 2px ${COLORS.primary}30` } : {}),
+                          }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                            <span style={{ fontSize: 13, fontWeight: 600, color: COLORS.textPrimary }}>
+                              {cat.category}
+                            </span>
+                            <span style={{ fontSize: 12, fontWeight: 700, color: COLORS.primary }}>
+                              {cat.count.toLocaleString()}건
+                            </span>
+                          </div>
+                          <div style={{ display: 'flex', gap: 12, fontSize: 11, color: COLORS.textSecondary }}>
+                            {cat.income > 0 && <span style={{ color: '#2563eb' }}>수입 {cat.income}건 ({nf(cat.incomeAmt)}원)</span>}
+                            {cat.expense > 0 && <span style={{ color: '#dc2626' }}>지출 {cat.expense}건 ({nf(cat.expenseAmt)}원)</span>}
+                          </div>
+                          <div style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 2 }}>
+                            합계 {nf(totalAmt)}원
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+
+                  {/* 선택된 카테고리의 거래 목록 */}
+                  {reviewCategory && (
+                    <div style={{ marginTop: 16 }}>
+                      <div style={{
+                        ...GLASS.L3, border: `1px solid ${COLORS.borderBlue}`,
+                        borderRadius: 12, padding: '12px 16px', marginBottom: 8,
+                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                      }}>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: COLORS.textPrimary }}>
+                          「{reviewCategory}」 거래 목록 ({reviewItems.length}건)
+                        </span>
+                        <button onClick={() => { setReviewCategory(null); setReviewItems([]) }}
+                          style={{ ...BTN.sm, background: '#fff', color: COLORS.textSecondary, border: `1px solid ${COLORS.borderSubtle}`, cursor: 'pointer' }}>
+                          닫기
+                        </button>
+                      </div>
+                      {reviewLoading && <div style={{ textAlign: 'center', padding: 20, color: COLORS.textMuted }}>불러오는 중...</div>}
+                      {!reviewLoading && reviewItems.length > 0 && (
+                        <div style={{ ...GLASS.L4, border: `1px solid ${COLORS.borderSubtle}`, borderRadius: 10, overflow: 'auto' }}>
+                          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                            <thead>
+                              <tr style={{ background: 'rgba(0,0,0,0.02)' }}>
+                                <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, color: COLORS.textSecondary }}>날짜</th>
+                                <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, color: COLORS.textSecondary }}>유형</th>
+                                <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, color: COLORS.textSecondary }}>거래처</th>
+                                <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, color: COLORS.textSecondary }}>적요</th>
+                                <th style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 600, color: COLORS.textSecondary }}>금액</th>
+                                <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, color: COLORS.textSecondary }}>소스</th>
+                                <th style={{ padding: '8px 10px', textAlign: 'center', fontWeight: 600, color: COLORS.textSecondary }}>변경</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {reviewItems.map((item: any) => {
+                                const srcLabel = item.imported_from === 'excel_bank' ? '통장' : item.imported_from === 'excel_card' ? '카드' : item.imported_from === 'sms' ? 'SMS' : '기타'
+                                return (
+                                  <tr key={item.id} style={{ borderTop: '1px solid rgba(0,0,0,0.04)' }}>
+                                    <td style={{ padding: '6px 10px', color: COLORS.textPrimary, whiteSpace: 'nowrap' }}>
+                                      {item.transaction_date ? String(item.transaction_date instanceof Date ? item.transaction_date.toISOString() : item.transaction_date).slice(0, 10) : '-'}
+                                    </td>
+                                    <td style={{ padding: '6px 10px' }}>
+                                      <span style={{ ...pillStyle(item.type === 'income' ? 'success' : 'danger'), fontSize: 10, padding: '1px 6px' }}>
+                                        {item.type === 'income' ? '수입' : '지출'}
+                                      </span>
+                                    </td>
+                                    <td style={{ padding: '6px 10px', color: COLORS.textPrimary, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                      {item.client_name || '-'}
+                                    </td>
+                                    <td style={{ padding: '6px 10px', color: COLORS.textSecondary, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                      {item.description || '-'}
+                                    </td>
+                                    <td style={{ padding: '6px 10px', textAlign: 'right', fontWeight: 600, color: item.type === 'income' ? '#2563eb' : COLORS.textPrimary }}>
+                                      {nf(Math.abs(Number(item.amount || 0)))}
+                                    </td>
+                                    <td style={{ padding: '6px 10px', color: COLORS.textMuted, fontSize: 11 }}>{srcLabel}</td>
+                                    <td style={{ padding: '6px 10px', textAlign: 'center' }}>
+                                      <select
+                                        defaultValue=""
+                                        onChange={(e) => { if (e.target.value) changeItemCategory(item.id, e.target.value); e.target.value = '' }}
+                                        style={{ fontSize: 10, padding: '2px 4px', border: `1px solid ${COLORS.borderSubtle}`, borderRadius: 4, color: COLORS.textMuted, cursor: 'pointer' }}>
+                                        <option value="">이동</option>
+                                        {(summary?.categoryBreakdown || []).map((c: any) => c.category).filter((v: string, i: number, a: string[]) => a.indexOf(v) === i && v !== reviewCategory).map((cat: string) => (
+                                          <option key={cat} value={cat}>{cat}</option>
+                                        ))}
+                                      </select>
+                                    </td>
+                                  </tr>
+                                )
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                      {!reviewLoading && reviewItems.length === 0 && (
+                        <div style={{ textAlign: 'center', padding: 20, color: COLORS.textMuted, fontSize: 13 }}>거래 내역이 없습니다</div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )
+            })()}
+          </>
+        )}
+
+        {/* ──── 미분류 + 그룹분류 탭 ──── */}
         {activeTab === 'matching' && (
           <>
             {/* 상단 제어판 */}
@@ -1286,7 +1492,7 @@ export default function BankCardPage() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
                 <div>
                   <div style={{ fontSize: 14, fontWeight: 600, color: COLORS.textPrimary, marginBottom: 4 }}>
-                    미분류 거래: {nf(groupData?.totalUnclassified || summary?.transactions.unmatched || 0)}건
+                    미분류 거래: {nf(groupData?.totalUnclassified || summary?.transactions.unclassified || 0)}건
                     {groupData && (
                       <span style={{ marginLeft: 12, color: COLORS.textSecondary, fontWeight: 400 }}>
                         {groupData.groupCount}개 그룹 · 추천 {groupData.withSuggestion}개
