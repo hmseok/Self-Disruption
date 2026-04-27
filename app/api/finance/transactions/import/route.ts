@@ -3,6 +3,7 @@ import { verifyUser } from '@/lib/auth-server'
 import { prisma } from '@/lib/prisma'
 import { createHash } from 'crypto'
 import { resolveClientName } from '@/lib/client-name-aliases'
+import { classifyByRules } from '@/lib/transaction-classifier'
 
 function serialize<T>(data: T): T {
   return JSON.parse(JSON.stringify(data, (_, v) => typeof v === 'bigint' ? v.toString() : v))
@@ -113,18 +114,39 @@ export async function POST(request: NextRequest) {
         }
 
         const id = crypto.randomUUID()
+        const resolvedClient = await resolveClientName(row.counterpart || row.client_name || '') || null
+
+        // 업로드 시 자동 분류 시도 (client_name → description → 결합)
+        let autoCategory: string | null = null
+        const txTypeForClassify = txType as 'income' | 'expense'
+        if (resolvedClient) {
+          const r = classifyByRules(resolvedClient, txTypeForClassify)
+          if (r && r.confidence >= 60) autoCategory = r.category
+        }
+        if (!autoCategory && description) {
+          const r = classifyByRules(description, txTypeForClassify)
+          if (r && r.confidence >= 60) autoCategory = r.category
+        }
+        if (!autoCategory && (resolvedClient || description)) {
+          const combined = `${resolvedClient || ''} ${description}`.trim()
+          const r = classifyByRules(combined, txTypeForClassify)
+          if (r && r.confidence >= 60) autoCategory = r.category
+        }
+
         await prisma.$executeRawUnsafe(
-          `INSERT INTO transactions (id, transaction_date, type, amount, description, client_name, bank_name, card_company, imported_from, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+          `INSERT INTO transactions (id, transaction_date, type, amount, description, client_name, bank_name, card_company, imported_from, category, final_category, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
           id,
           txDate,
           txType,
           finalAmount,
           description,
-          await resolveClientName(row.counterpart || row.client_name || '') || null,
+          resolvedClient,
           source === 'excel_bank' ? (row.bank_name || '기타은행') : null,
           source === 'excel_card' ? (row.card_company || null) : null,
           source,
+          autoCategory,
+          autoCategory,
         )
         inserted++
       } catch (err: any) {

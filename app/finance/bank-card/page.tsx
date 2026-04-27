@@ -297,6 +297,10 @@ export default function BankCardPage() {
   const [groupCategoryEdits, setGroupCategoryEdits] = useState<Record<string, string>>({})
   const [groupConfirming, setGroupConfirming] = useState<Set<string>>(new Set())
 
+  // 자동 분류
+  const [autoClassifying, setAutoClassifying] = useState(false)
+  const [autoClassifyResult, setAutoClassifyResult] = useState<any>(null)
+
   // 분류 검수 탭 상태
   const [reviewCategory, setReviewCategory] = useState<string | null>(null)
   const [reviewItems, setReviewItems] = useState<any[]>([])
@@ -919,6 +923,44 @@ export default function BankCardPage() {
     await Promise.all([loadSummary(), loadTransactions()])
   }
 
+  // ── 자동 분류 실행 ──
+  const runAutoClassify = async (dryRun = false) => {
+    setAutoClassifying(true)
+    setAutoClassifyResult(null)
+    try {
+      const { json } = await fetchWithAuth('/api/finance/transactions/auto-classify', {
+        method: 'POST',
+        body: { minConfidence: 60, dryRun },
+      })
+      if (json?.data) {
+        setAutoClassifyResult(json.data)
+        if (!dryRun && json.data.updated > 0) {
+          // 분류 완료 → 데이터 새로고침
+          await Promise.all([loadSummary(), loadTransactions()])
+          // 그룹 데이터 리셋 (다시 로드 필요)
+          setGroupData(null)
+        }
+      }
+    } catch (e: any) {
+      alert(`자동 분류 오류: ${e.message}`)
+    } finally {
+      setAutoClassifying(false)
+    }
+  }
+
+  // ── 은행 데이터 삭제 + 재업로드 안내 ──
+  const deleteAndReupload = async (source: 'excel_bank' | 'excel_card') => {
+    const label = source === 'excel_bank' ? '통장' : '카드'
+    if (!confirm(`기존 ${label} 거래 데이터를 모두 삭제합니다.\n삭제 후 엑셀 파일을 다시 업로드하면 개선된 컬럼 매핑으로 거래처/적요가 정상 입력됩니다.\n\n진행하시겠습니까?`)) return
+    const { json } = await fetchWithAuth(`/api/finance/transactions/import?source=${source}`, { method: 'DELETE' })
+    if (json?.ok) {
+      alert(`${label} 거래 ${json.deleted}건 삭제 완료.\n이제 엑셀 파일을 다시 업로드하세요.`)
+      await Promise.all([loadSummary(), loadTransactions()])
+      setGroupData(null)
+      setAutoClassifyResult(null)
+    }
+  }
+
   const filteredGroups = useMemo(() => {
     if (!groupData?.groups) return []
     let list = groupData.groups as any[]
@@ -1481,6 +1523,121 @@ export default function BankCardPage() {
         {/* ──── 미분류 + 그룹분류 탭 ──── */}
         {activeTab === 'matching' && (
           <>
+            {/* 데이터 품질 안내 배너 */}
+            {summary && summary.transactions.unclassified > 0 && summary.transactions.classified === 0 && !autoClassifyResult && (
+              <div style={{
+                ...GLASS.L3,
+                border: `1px solid rgba(245,158,11,0.4)`,
+                borderRadius: 12,
+                padding: '14px 18px',
+                marginBottom: 12,
+                background: 'rgba(255,251,235,0.85)',
+              }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#92400e', marginBottom: 6 }}>
+                  데이터 품질 안내
+                </div>
+                <div style={{ fontSize: 12, color: '#78350f', lineHeight: 1.7 }}>
+                  현재 {nf(summary.transactions.unclassified)}건의 거래가 미분류 상태입니다.
+                  은행 엑셀의 거래처/적요 필드가 비어있으면 자동 분류가 어렵습니다.
+                </div>
+                <div style={{ fontSize: 12, color: '#78350f', lineHeight: 1.7, marginTop: 4 }}>
+                  <b>권장 순서:</b> 1) 자동 분류 실행 → 2) 분류 가능한 건 먼저 처리 → 3) 남은 건은 그룹별 수동 분류
+                </div>
+                <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+                  <button
+                    onClick={() => runAutoClassify(false)}
+                    disabled={autoClassifying}
+                    style={{
+                      ...BTN.md,
+                      background: '#f59e0b', color: '#fff', border: 'none',
+                      cursor: autoClassifying ? 'wait' : 'pointer', fontWeight: 600,
+                    }}
+                  >
+                    {autoClassifying ? '분류 중...' : '⚡ 자동 분류 실행'}
+                  </button>
+                  {summary.transactions.bank > 5000 && (
+                    <button
+                      onClick={() => deleteAndReupload('excel_bank')}
+                      style={{
+                        ...BTN.md,
+                        background: '#fff', color: '#92400e', border: `1px solid rgba(245,158,11,0.4)`,
+                        cursor: 'pointer', fontSize: 12,
+                      }}
+                    >
+                      🔄 통장 데이터 삭제 후 재업로드
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* 자동 분류 결과 요약 */}
+            {autoClassifyResult && (
+              <div style={{
+                ...GLASS.L3,
+                border: `1px solid ${autoClassifyResult.classified > 0 ? 'rgba(34,197,94,0.4)' : 'rgba(245,158,11,0.4)'}`,
+                borderRadius: 12,
+                padding: '14px 18px',
+                marginBottom: 12,
+                background: autoClassifyResult.classified > 0 ? 'rgba(240,253,244,0.85)' : 'rgba(255,251,235,0.85)',
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: autoClassifyResult.classified > 0 ? '#166534' : '#92400e', marginBottom: 4 }}>
+                      자동 분류 결과: {nf(autoClassifyResult.updated || autoClassifyResult.classified)}건 분류 완료
+                    </div>
+                    <div style={{ fontSize: 12, color: COLORS.textSecondary, lineHeight: 1.7 }}>
+                      전체 {nf(autoClassifyResult.totalScanned)}건 스캔 →
+                      분류 {nf(autoClassifyResult.classified)}건 (거래처 {autoClassifyResult.matchMethodStats?.client_name || 0} + 적요 {autoClassifyResult.matchMethodStats?.description || 0} + 결합 {autoClassifyResult.matchMethodStats?.combined || 0})
+                      · 미분류 {nf(autoClassifyResult.skipped)}건
+                    </div>
+                    {autoClassifyResult.breakdown?.length > 0 && (
+                      <div style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 4, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        {autoClassifyResult.breakdown.slice(0, 8).map((b: any) => (
+                          <span key={b.category} style={{
+                            background: 'rgba(59,130,246,0.08)',
+                            border: '1px solid rgba(59,130,246,0.15)',
+                            borderRadius: 4, padding: '1px 6px',
+                          }}>
+                            {b.category} ({b.count})
+                          </span>
+                        ))}
+                        {autoClassifyResult.breakdown.length > 8 && (
+                          <span>외 {autoClassifyResult.breakdown.length - 8}개</span>
+                        )}
+                      </div>
+                    )}
+                    {autoClassifyResult.amountPatterns?.length > 0 && (
+                      <div style={{ fontSize: 11, color: '#92400e', marginTop: 6 }}>
+                        반복 금액 패턴 {autoClassifyResult.amountPatterns.length}개 발견 (그룹 분류에서 확인 가능)
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    {autoClassifyResult.skipped > 0 && (
+                      <button
+                        onClick={loadGroupClassify}
+                        disabled={groupLoading}
+                        style={{
+                          ...BTN.md,
+                          background: COLORS.primary, color: '#fff', border: 'none',
+                          cursor: 'pointer', fontSize: 12,
+                        }}
+                      >
+                        📊 남은 {nf(autoClassifyResult.skipped)}건 그룹 분류
+                      </button>
+                    )}
+                    <button
+                      onClick={() => setAutoClassifyResult(null)}
+                      style={{ ...BTN.sm, background: '#fff', color: COLORS.textMuted, border: `1px solid ${COLORS.borderSubtle}`, cursor: 'pointer', fontSize: 11 }}
+                    >
+                      닫기
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* 상단 제어판 */}
             <div style={{
               ...GLASS.L3,
@@ -1507,13 +1664,25 @@ export default function BankCardPage() {
                       {groupData.sourceCounts.other > 0 && <span>기타 {nf(groupData.sourceCounts.other)}</span>}
                     </div>
                   )}
-                  {!groupData && (
+                  {!groupData && !autoClassifyResult && (
                     <div style={{ fontSize: 12, color: COLORS.textMuted }}>
-                      거래처별 그룹 분류 — 같은 가맹점/적요의 거래를 한 번에 카테고리 지정
+                      1단계: 자동 분류로 키워드 매칭 가능한 건 먼저 처리 → 2단계: 나머지를 그룹별로 수동 분류
                     </div>
                   )}
                 </div>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <button
+                    onClick={() => runAutoClassify(false)}
+                    disabled={autoClassifying}
+                    style={{
+                      ...BTN.md,
+                      background: autoClassifying ? COLORS.textMuted : '#f59e0b',
+                      color: '#fff', border: 'none', cursor: autoClassifying ? 'wait' : 'pointer',
+                      fontWeight: 600,
+                    }}
+                  >
+                    {autoClassifying ? '분류 중...' : '⚡ 자동 분류'}
+                  </button>
                   <button
                     onClick={loadGroupClassify}
                     disabled={groupLoading}
@@ -1825,15 +1994,31 @@ export default function BankCardPage() {
               </>
             )}
 
-            {!groupData && matchResults.length === 0 && !matching && !groupLoading && (
+            {!groupData && matchResults.length === 0 && !matching && !groupLoading && !autoClassifyResult && (
               <div style={{
                 textAlign: 'center', padding: '60px 20px',
                 color: COLORS.textMuted, fontSize: 14,
               }}>
                 <div style={{ fontSize: 40, marginBottom: 12 }}>📊</div>
-                <div>[그룹 분류 로드]를 클릭하여 거래처별 카테고리를 일괄 지정하세요</div>
-                <div style={{ fontSize: 12, marginTop: 8 }}>
-                  미분류 {nf(summary?.transactions.unmatched || 0)}건을 거래처 + 소스별로 세분화하여 일괄 분류합니다
+                <div style={{ marginBottom: 8 }}>
+                  <b>[⚡ 자동 분류]</b>를 먼저 실행하세요 — 키워드 매칭으로 분류 가능한 건을 한 번에 처리합니다
+                </div>
+                <div style={{ fontSize: 12, color: COLORS.textMuted }}>
+                  이후 남은 미분류 건은 [📊 그룹 분류 로드]로 거래처별 수동 분류가 가능합니다
+                </div>
+                <div style={{ marginTop: 16 }}>
+                  <button
+                    onClick={() => runAutoClassify(false)}
+                    disabled={autoClassifying}
+                    style={{
+                      ...BTN.md, padding: '10px 28px',
+                      background: '#f59e0b', color: '#fff', border: 'none',
+                      cursor: autoClassifying ? 'wait' : 'pointer',
+                      fontWeight: 600, fontSize: 14,
+                    }}
+                  >
+                    {autoClassifying ? '분류 중...' : '⚡ 자동 분류 실행'}
+                  </button>
                 </div>
               </div>
             )}
