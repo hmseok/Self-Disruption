@@ -108,25 +108,29 @@ const fmtDate = (d: string | null) => {
   return s
 }
 
-// 엑셀 컬럼 자동 인식
+// 엑셀 컬럼 자동 인식 — 은행/카드사별 다양한 포맷 지원
 const BANK_COL_PATTERNS: Record<string, string[]> = {
-  date: ['거래일시', '거래일', '거래일자', '일자', 'date', '날짜'],
-  description: ['적요', '거래내용', '내용', 'description', '비고'],
-  deposit: ['입금(원)', '입금', '입금액', '입금금액', 'credit', 'deposit'],
-  withdrawal: ['지급(원)', '출금(원)', '출금', '출금액', '출금금액', 'debit', 'withdrawal', '지급액'],
-  balance: ['거래후잔액(원)', '거래후 잔액(원)', '잔액', '거래후잔액', 'balance', '잔액(원)'],
-  counterpart: ['기재내용', '거래처', '상대방', '이체인', 'payee', '보내는분', '받는분', '보낸분/받는분', '보낸분', '입금인'],
-  memo: ['내 통장 표시', '메모', '비고', '통장표시', '통장메모'],
+  date: ['거래일시', '거래일', '거래일자', '일자', 'date', '날짜', '거래 일시', '거래 일자'],
+  description: ['적요', '거래내용', '내용', 'description', '비고', '거래유형', '거래 내용', '거래구분'],
+  deposit: ['입금(원)', '입금', '입금액', '입금금액', 'credit', 'deposit', '입금 금액', '입금(원)', '입금 (원)'],
+  withdrawal: ['지급(원)', '출금(원)', '출금', '출금액', '출금금액', 'debit', 'withdrawal', '지급액', '지급 금액', '지급(원)', '지급 (원)', '출금 금액'],
+  balance: ['거래후잔액(원)', '거래후 잔액(원)', '잔액', '거래후잔액', 'balance', '잔액(원)', '거래 후 잔액', '거래후 잔액', '잔액 (원)'],
+  counterpart: ['기재내용', '거래처', '상대방', '이체인', 'payee', '보내는분', '받는분', '보낸분/받는분', '보낸분', '입금인', '기재 내용', '거래상대', '상대계좌', '메모/수취인'],
+  memo: ['내 통장 표시', '메모', '비고', '통장표시', '통장메모', '내통장표시', '내 통장표시', '적요2', '취급점'],
 }
 
 const CARD_COL_PATTERNS: Record<string, string[]> = {
-  date: ['이용일', '이용일자', '승인일', '승인일자', 'date'],
-  merchant: ['가맹점명', '이용가맹점', '이용처', 'merchant'],
-  amount: ['이용금액', '승인금액', 'amount', '이용금액(원)'],
-  cardCompany: ['카드사', '카드명', '카드종류'],
-  cardNumber: ['카드번호', 'card_number', '이용카드'],
-  holder: ['사용자', '소지자', 'holder'],
-  approvalNo: ['승인번호'],
+  date: ['이용일', '이용일자', '승인일', '승인일자', 'date', '이용 일자', '거래일'],
+  merchant: ['가맹점명', '이용가맹점', '이용처', 'merchant', '이용가맹점명', '이용 가맹점명', '이용 가맹점', '가맹점'],
+  amount: ['이용금액', '승인금액', 'amount', '이용금액(원)', '이용 금액', '승인 금액', '결제금액'],
+  cardCompany: ['카드사', '카드명', '카드종류', '구분'],
+  cardNumber: ['카드번호', 'card_number', '이용카드', '카드 번호', '이용 카드'],
+  holder: ['사용자', '소지자', 'holder', '이용자'],
+  approvalNo: ['승인번호', '승인 번호'],
+  cancelAmount: ['취소금액', '취소 금액'],
+  installment: ['할부개월', '할부 개월', '할부'],
+  businessNo: ['사업자번호', '사업자 번호'],
+  salesType: ['매출구분', '매출 구분'],
 }
 
 function matchColumn(header: string, patterns: Record<string, string[]>): string | null {
@@ -427,7 +431,7 @@ export default function BankCardPage() {
 
   const bankTransactions = useMemo(() => {
     let data = transactions.filter(t =>
-      t.imported_from === 'excel_bank' || t.bank_name || (!t.card_company && !t.imported_from?.includes('card') && !t.imported_from?.includes('sms'))
+      t.imported_from === 'excel_bank' || t.imported_from === 'sms_bank' || t.bank_name || (!t.card_company && !t.imported_from?.includes('card') && t.imported_from !== 'sms')
     )
     if (bankFilter === 'income') data = data.filter(t => t.type === 'income')
     else if (bankFilter === 'expense') data = data.filter(t => t.type === 'expense')
@@ -566,14 +570,36 @@ export default function BankCardPage() {
 
                 const mapping: Record<string, string> = {}
                 const usedFields = new Set<string>()
+                const unmappedHeaders: string[] = []
                 for (const h of headers) {
                   const matched = matchColumn(h, patterns)
                   // 같은 필드에 중복 매핑 방지 (첫 번째만 사용)
                   if (matched && !usedFields.has(matched)) {
                     mapping[h] = matched
                     usedFields.add(matched)
+                  } else if (!matched) {
+                    unmappedHeaders.push(h)
                   }
                 }
+
+                // 디버그: 매핑 결과와 첫 행 데이터 출력
+                console.group(`[엑셀 파싱] ${file.name}`)
+                console.log('헤더 행 위치:', detectedTarget?.headerRowIdx ?? 0)
+                console.log('원본 헤더:', headers)
+                console.log('매핑 결과:', mapping)
+                console.log('미매핑 컬럼:', unmappedHeaders)
+                if (rows.length > 0) {
+                  console.log('첫 행 원본 데이터:', rows[0])
+                  // 매핑된 필드별 값 출력
+                  const reverse: Record<string, string> = {}
+                  for (const [header, field] of Object.entries(mapping)) reverse[field] = header
+                  const fieldValues: Record<string, any> = {}
+                  for (const [field, header] of Object.entries(reverse)) {
+                    fieldValues[`${field} (← "${header}")`] = rows[0][header]
+                  }
+                  console.log('매핑된 필드 값:', fieldValues)
+                }
+                console.groupEnd()
 
                 resolve({ name: file.name, rows, columns: mapping, year: extractedYear || undefined })
               } catch (err) {
@@ -654,14 +680,34 @@ export default function BankCardPage() {
         return s
       }
 
-      const mapped = file.rows.map(row => {
+      // 디버그: reverse 매핑 출력
+      console.log(`[업로드] 파일: ${file.name}, reverse 매핑:`, reverse)
+      if (file.rows.length > 0) {
+        console.log(`[업로드] 첫 행 키:`, Object.keys(file.rows[0]))
+        console.log(`[업로드] 첫 행 값:`, file.rows[0])
+        // 각 필드가 어떤 값을 가져오는지 확인
+        const debugFields: Record<string, any> = {}
+        for (const [field, header] of Object.entries(reverse)) {
+          debugFields[field] = { header, value: file.rows[0][header], type: typeof file.rows[0][header] }
+        }
+        console.log(`[업로드] 필드별 매핑 값:`, debugFields)
+      }
+
+      const mapped = file.rows.map((row, rowIdx) => {
         if (isBankSource) {
           const deposit = safeNum(row[reverse.deposit])
           const withdrawal = safeNum(row[reverse.withdrawal])
-          const rawDesc = row[reverse.description] || ''
-          const rawMemo = row[reverse.memo] || ''
+          const rawDesc = String(row[reverse.description] ?? '')
+          const rawMemo = String(row[reverse.memo] ?? '')
+          const rawCounterpart = String(row[reverse.counterpart] ?? '')
           // description 보강: 적요가 일반적이면 메모(통장표시) 정보 추가
           const description = rawMemo ? (rawDesc ? `${rawDesc} [${rawMemo}]` : rawMemo) : rawDesc
+
+          // 디버그: 첫 5행 데이터 로그
+          if (rowIdx < 3) {
+            console.log(`[업로드 행 ${rowIdx}]`, { rawDesc, rawMemo, rawCounterpart, deposit, withdrawal, description })
+          }
+
           return {
             date: normalizeDate(row[reverse.date] || ''),
             description,
@@ -670,7 +716,7 @@ export default function BankCardPage() {
             amount: deposit || withdrawal,
             type: deposit ? 'income' : 'expense',
             balance: safeNum(row[reverse.balance]) || undefined,
-            counterpart: row[reverse.counterpart] || '',
+            counterpart: rawCounterpart,
             bank_name: '우리은행',
           }
         } else {
@@ -2536,6 +2582,48 @@ export default function BankCardPage() {
                     </span>
                   ))}
                 </div>
+                {/* 미매핑 필수 컬럼 경고 */}
+                {(() => {
+                  const mappedFields = new Set(Object.values(uploadColumns))
+                  const requiredBank = [
+                    { field: 'date', label: '날짜' },
+                    { field: 'description', label: '적요' },
+                    { field: 'counterpart', label: '거래처/기재내용' },
+                    { field: 'deposit', label: '입금' },
+                    { field: 'withdrawal', label: '출금' },
+                  ]
+                  const requiredCard = [
+                    { field: 'date', label: '날짜' },
+                    { field: 'merchant', label: '가맹점' },
+                    { field: 'amount', label: '금액' },
+                  ]
+                  const required = uploadSource === 'excel_bank' ? requiredBank : requiredCard
+                  const missing = required.filter(r => !mappedFields.has(r.field))
+                  if (missing.length === 0) return null
+                  return (
+                    <div style={{
+                      marginTop: 8, padding: '8px 12px', borderRadius: 8,
+                      background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)',
+                      fontSize: 12, color: '#991b1b',
+                    }}>
+                      ⚠️ 미매핑 필수 컬럼: {missing.map(m => m.label).join(', ')}
+                      <div style={{ fontSize: 11, color: '#7f1d1d', marginTop: 2 }}>
+                        이 컬럼들이 엑셀에 있는데 매핑되지 않았다면, 엑셀 헤더명을 확인해주세요.
+                        브라우저 콘솔(F12)에서 상세 매핑 정보를 확인할 수 있습니다.
+                      </div>
+                    </div>
+                  )
+                })()}
+                {/* 미매핑된 헤더 표시 */}
+                {uploadPreview.length > 0 && (() => {
+                  const unmapped = Object.keys(uploadPreview[0]).filter(h => !uploadColumns[h])
+                  if (unmapped.length === 0) return null
+                  return (
+                    <div style={{ marginTop: 6, fontSize: 11, color: COLORS.textMuted }}>
+                      인식 안 된 컬럼: {unmapped.map(h => `"${h}"`).join(', ')}
+                    </div>
+                  )
+                })()}
               </div>
             )}
 
@@ -2543,16 +2631,21 @@ export default function BankCardPage() {
             {uploadPreview.length > 0 && (
               <div style={{ marginBottom: 16 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>
-                  미리보기 ({uploadPreview.length}행)
+                  미리보기 ({uploadPreview.length}행) — 매핑된 컬럼은 <span style={{ color: COLORS.success }}>초록색</span>으로 표시
                 </div>
-                <div style={{ overflowX: 'auto', maxHeight: 200, borderRadius: 8, border: `1px solid ${COLORS.borderSubtle}` }}>
+                <div style={{ overflowX: 'auto', maxHeight: 220, borderRadius: 8, border: `1px solid ${COLORS.borderSubtle}` }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
                     <thead>
-                      <tr style={{ background: 'rgba(0,0,0,0.03)' }}>
-                        {Object.keys(uploadPreview[0]).slice(0, 6).map(h => (
-                          <th key={h} style={{ padding: '6px 8px', textAlign: 'left', fontWeight: 600, borderBottom: `1px solid ${COLORS.borderSubtle}` }}>
+                      <tr style={{ background: 'rgba(0,0,0,0.03)', position: 'sticky', top: 0 }}>
+                        {Object.keys(uploadPreview[0]).map(h => (
+                          <th key={h} style={{
+                            padding: '6px 8px', textAlign: 'left', fontWeight: 600,
+                            borderBottom: `1px solid ${COLORS.borderSubtle}`,
+                            whiteSpace: 'nowrap',
+                            background: uploadColumns[h] ? 'rgba(34,197,94,0.08)' : 'rgba(0,0,0,0.03)',
+                          }}>
                             {h}
-                            {uploadColumns[h] && <span style={{ color: COLORS.success, marginLeft: 4 }}>({uploadColumns[h]})</span>}
+                            {uploadColumns[h] && <span style={{ color: COLORS.success, marginLeft: 4, fontSize: 10 }}>→{uploadColumns[h]}</span>}
                           </th>
                         ))}
                       </tr>
@@ -2560,8 +2653,14 @@ export default function BankCardPage() {
                     <tbody>
                       {uploadPreview.slice(0, 10).map((row, i) => (
                         <tr key={i} style={{ borderBottom: `1px solid ${COLORS.borderFaint}` }}>
-                          {Object.values(row).slice(0, 6).map((val: any, j) => (
-                            <td key={j} style={{ padding: '4px 8px' }}>{String(val || '')}</td>
+                          {Object.keys(uploadPreview[0]).map((h, j) => (
+                            <td key={j} style={{
+                              padding: '4px 8px', whiteSpace: 'nowrap', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis',
+                              background: uploadColumns[h] ? 'rgba(34,197,94,0.03)' : 'transparent',
+                              fontWeight: uploadColumns[h] ? 500 : 400,
+                            }}>
+                              {String(row[h] ?? '')}
+                            </td>
                           ))}
                         </tr>
                       ))}

@@ -78,15 +78,27 @@ export async function POST(request: NextRequest) {
         const txId = randomUUID()
         const txDate = sms.transaction_at || new Date()
 
+        // 은행 SMS vs 카드 SMS 구분하여 imported_from 설정
+        const isBank = (sms.card_issuer || '').includes('BANK')
+        const importedFrom = isBank ? 'sms_bank' : 'sms'
+
+        // 은행 SMS: merchant에 "잔액 X원"이 들어있으면 빈 문자열로 처리
+        let merchantDesc = sms.merchant || ''
+        if (isBank && /^잔액\s/.test(merchantDesc)) {
+          merchantDesc = '' // 잔액 알림은 description으로 쓰지 않음
+        }
+        const bankName = isBank ? (sms.card_issuer || '') : null
+        const cardCompany = isBank ? null : (sms.card_issuer || '')
+
         await prisma.$executeRaw`
           INSERT INTO transactions (
             id, transaction_date, type, amount, description, client_name,
-            card_company, imported_from, related_type, related_id,
+            bank_name, card_company, imported_from, related_type, related_id,
             status, created_at, updated_at
           ) VALUES (
             ${txId}, ${txDate}, ${txType}, ${Number(sms.amount)},
-            ${sms.merchant || sms.card_issuer || ''}, ${sms.holder_name || ''},
-            ${sms.card_issuer || ''}, 'sms',
+            ${merchantDesc}, ${sms.holder_name || ''},
+            ${bankName}, ${cardCompany}, ${importedFrom},
             ${carId ? 'car' : null}, ${carId},
             'completed', NOW(), NOW()
           )
