@@ -310,12 +310,12 @@ export async function POST(request: NextRequest) {
     const base64 = buffer.toString('base64')
     const ext = file.name.split('.').pop() || 'jpg'
 
-    // 1. TODO: Phase 4 - migrate to Google Cloud Storage
+    // 이미지 크기 로그 (디버그)
+    const fileSizeKB = Math.round(buffer.length / 1024)
+    const base64SizeKB = Math.round(base64.length / 1024)
+    console.log(`📸 영수증 이미지: ${file.name} (${fileSizeKB}KB, base64: ${base64SizeKB}KB, type: ${file.type})`)
+
     let receiptUrl = ''
-    // const bucketName = 'receipts'
-    // const fileName = `${user.id}/${Date.now()}.${ext}`
-    // Google Cloud Storage upload would go here
-    console.log('Receipt image received but storage migration pending:', file.name)
 
     // 2. AI 분석: Gemini 우선, 실패 시 CLOVA OCR 폴백
     let parsedItems: ParsedReceipt[] = []

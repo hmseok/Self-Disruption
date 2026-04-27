@@ -291,19 +291,61 @@ export default function ReceiptsPage() {
     let failedCount = 0
     const failReasons = new Set<string>()
 
+    // 이미지 리사이징 (큰 스크린샷 → 최대 1200px 폭, JPEG 80% 압축)
+    const resizeImage = (file: File, maxW = 1200): Promise<File> => new Promise((resolve) => {
+      if (file.size < 300_000) { resolve(file); return } // 300KB 미만은 그대로
+      const img = new Image()
+      img.onload = () => {
+        if (img.width <= maxW) { resolve(file); return }
+        const scale = maxW / img.width
+        const canvas = document.createElement('canvas')
+        canvas.width = maxW
+        canvas.height = Math.round(img.height * scale)
+        const ctx = canvas.getContext('2d')!
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+        canvas.toBlob((blob) => {
+          if (blob && blob.size < file.size) {
+            resolve(new File([blob], file.name.replace(/\.\w+$/, '.jpg'), { type: 'image/jpeg' }))
+          } else {
+            resolve(file) // 리사이즈해도 더 크면 원본
+          }
+        }, 'image/jpeg', 0.80)
+      }
+      img.onerror = () => resolve(file)
+      img.src = URL.createObjectURL(file)
+    })
+
     for (let i = 0; i < unique.length; i++) {
       // 2번째 이미지부터 1초 딜레이 (Gemini 2.0 Flash는 10,000 RPM이므로 충분)
       if (i > 0) await new Promise(r => setTimeout(r, 1000))
       setUploadQueue(prev => prev.map((q, idx) => idx === i ? { ...q, status: 'uploading' } : q))
 
       try {
+        // 큰 이미지는 리사이징하여 전송 속도 + Gemini 처리 속도 향상
+        const resized = await resizeImage(unique[i])
         const formData = new FormData()
-        formData.append('file', unique[i])
-        const ocrRes = await fetch('/api/receipts/ocr', {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${token}` },
-          body: formData,
-        })
+        formData.append('file', resized)
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 60000) // 60초 클라이언트 타임아웃
+        let ocrRes: Response
+        try {
+          ocrRes = await fetch('/api/receipts/ocr', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}` },
+            body: formData,
+            signal: controller.signal,
+          })
+        } catch (fetchErr: any) {
+          clearTimeout(timeoutId)
+          if (fetchErr.name === 'AbortError') {
+            failedCount++
+            failReasons.add('AI 분석 시간 초과 (60초). 이미지를 1장씩 다시 시도해주세요.')
+            setUploadQueue(prev => prev.map((q, idx) => idx === i ? { ...q, status: 'error' } : q))
+            continue
+          }
+          throw fetchErr
+        }
+        clearTimeout(timeoutId)
         const ocrJson = await ocrRes.json()
 
         // 서버 에러 응답 처리
