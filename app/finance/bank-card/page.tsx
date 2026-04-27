@@ -107,7 +107,8 @@ const BANK_COL_PATTERNS: Record<string, string[]> = {
   deposit: ['입금(원)', '입금', '입금액', '입금금액', 'credit', 'deposit'],
   withdrawal: ['지급(원)', '출금(원)', '출금', '출금액', '출금금액', 'debit', 'withdrawal', '지급액'],
   balance: ['거래후잔액(원)', '거래후 잔액(원)', '잔액', '거래후잔액', 'balance', '잔액(원)'],
-  counterpart: ['기재내용', '거래처', '상대방', '이체인', 'payee', '보내는분', '받는분'],
+  counterpart: ['기재내용', '거래처', '상대방', '이체인', 'payee', '보내는분', '받는분', '보낸분/받는분', '보낸분', '입금인'],
+  memo: ['내 통장 표시', '메모', '비고', '통장표시', '통장메모'],
 }
 
 const CARD_COL_PATTERNS: Record<string, string[]> = {
@@ -639,16 +640,20 @@ export default function BankCardPage() {
         if (isBankSource) {
           const deposit = safeNum(row[reverse.deposit])
           const withdrawal = safeNum(row[reverse.withdrawal])
+          const rawDesc = row[reverse.description] || ''
+          const rawMemo = row[reverse.memo] || ''
+          // description 보강: 적요가 일반적이면 메모(통장표시) 정보 추가
+          const description = rawMemo ? (rawDesc ? `${rawDesc} [${rawMemo}]` : rawMemo) : rawDesc
           return {
             date: normalizeDate(row[reverse.date] || ''),
-            description: row[reverse.description] || '',
+            description,
             deposit: deposit || undefined,
             withdrawal: withdrawal || undefined,
             amount: deposit || withdrawal,
             type: deposit ? 'income' : 'expense',
             balance: safeNum(row[reverse.balance]) || undefined,
             counterpart: row[reverse.counterpart] || '',
-            bank_name: '은행',
+            bank_name: '우리은행',
           }
         } else {
           // 승인내역조회: 날짜+시간 분리 컬럼 처리
