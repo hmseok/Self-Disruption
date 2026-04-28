@@ -121,6 +121,12 @@ export default function ReceiptsPage() {
   const [bulkItemName, setBulkItemName] = useState('')
   const [bulkCustomerTeam, setBulkCustomerTeam] = useState('')
 
+  // 마지막 일괄수정 스냅샷 (되돌리기용)
+  const [lastBulk, setLastBulk] = useState<{
+    snapshots: Array<{ id: string; prev: { category?: string; item_name?: string; customer_team?: string } }>
+    ts: number
+  } | null>(null)
+
   // 인라인 수정
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editForm, setEditForm] = useState<Partial<ExpenseItem>>({})
@@ -233,22 +239,70 @@ export default function ReceiptsPage() {
     setTimeout(refreshAfterDelete, 100)
   }
 
-  // ── 일괄 수정 (구분/품명/고객명) ──
+  // ── 일괄 수정 (구분/품명/고객명) — 필터된 화면 항목 한정 + 되돌리기용 스냅샷 ──
   const handleBulkUpdate = async (updates: { category?: string; item_name?: string; customer_team?: string }) => {
     if (selectedIds.size === 0) return
+    // 필터된 화면(allDisplayItems)에 보이는 + 선택된 항목 교집합만 대상
+    const visibleSelectedIds = allDisplayItems
+      .filter(i => i.id && selectedIds.has(i.id))
+      .map(i => i.id!)
+    if (visibleSelectedIds.length === 0) {
+      alert('현재 화면에 선택된 항목이 없습니다.\n다른 월/카테고리 필터에서 선택된 항목은 적용되지 않아요.')
+      return
+    }
+
+    // 직전 값 스냅샷 (되돌리기용) — items + justUploaded 전체에서 검색
+    const allRows = [...items, ...justUploaded]
+    const snapshots = visibleSelectedIds.map(id => {
+      const cur = allRows.find(r => r.id === id)
+      const prev: any = {}
+      if (updates.category !== undefined) prev.category = cur?.category || ''
+      if (updates.item_name !== undefined) prev.item_name = cur?.item_name || ''
+      if (updates.customer_team !== undefined) prev.customer_team = cur?.customer_team || ''
+      return { id: id!, prev }
+    })
+
     const token = await getToken()
     try {
       const res = await fetch('/api/receipts', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ ids: Array.from(selectedIds), updates }),
+        body: JSON.stringify({ ids: visibleSelectedIds, updates }),
       })
       if (res.ok) {
-        // 로컬 상태 업데이트
-        setItems(prev => prev.map(i => selectedIds.has(i.id || '') ? { ...i, ...updates } : i))
-        setJustUploaded(prev => prev.map(i => selectedIds.has(i.id || '') ? { ...i, ...updates } : i))
+        const targetSet = new Set(visibleSelectedIds)
+        setItems(prev => prev.map(i => targetSet.has(i.id || '') ? { ...i, ...updates } : i))
+        setJustUploaded(prev => prev.map(i => targetSet.has(i.id || '') ? { ...i, ...updates } : i))
+        setLastBulk({ snapshots, ts: Date.now() })
       }
     } catch (e) { console.error(e) }
+  }
+
+  // ── 일괄 수정 되돌리기 ──
+  const handleUndoBulk = async () => {
+    if (!lastBulk) return
+    const token = await getToken()
+    // 스냅샷의 prev 값 별로 그룹핑해서 PATCH (값이 같은 ids 묶음)
+    const groups = new Map<string, { ids: string[]; updates: any }>()
+    for (const s of lastBulk.snapshots) {
+      const key = JSON.stringify(s.prev)
+      if (!groups.has(key)) groups.set(key, { ids: [], updates: s.prev })
+      groups.get(key)!.ids.push(s.id)
+    }
+    try {
+      for (const { ids, updates } of groups.values()) {
+        await fetch('/api/receipts', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ ids, updates }),
+        })
+      }
+      // 로컬 상태 복원
+      const restoreMap = new Map(lastBulk.snapshots.map(s => [s.id, s.prev]))
+      setItems(prev => prev.map(i => restoreMap.has(i.id || '') ? { ...i, ...restoreMap.get(i.id || '') } : i))
+      setJustUploaded(prev => prev.map(i => restoreMap.has(i.id || '') ? { ...i, ...restoreMap.get(i.id || '') } : i))
+      setLastBulk(null)
+    } catch (e) { console.error(e); alert('되돌리기 실패') }
   }
 
   // ── 전체 선택/해제 (현재 화면에 보이는 항목만) ──
@@ -1113,6 +1167,31 @@ export default function ReceiptsPage() {
           }
         />
 
+      {/* ── 일괄수정 직후 되돌리기 토스트 ── */}
+      {lastBulk && (
+        <div style={{
+          position: 'fixed', bottom: 24, right: 24, zIndex: 1000,
+          background: '#1e293b', color: '#fff', borderRadius: 12,
+          padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 12,
+          boxShadow: '0 8px 24px rgba(0,0,0,0.18)', fontSize: 13,
+        }}>
+          <span>✓ {lastBulk.snapshots.length}건 변경됨</span>
+          <button
+            onClick={handleUndoBulk}
+            style={{
+              padding: '5px 12px', fontSize: 12, fontWeight: 700,
+              borderRadius: 8, border: '1px solid #475569',
+              background: 'rgba(255,255,255,0.10)', color: '#fff',
+              cursor: 'pointer',
+            }}
+          >↩ 되돌리기</button>
+          <button
+            onClick={() => setLastBulk(null)}
+            style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: 16 }}
+          >✕</button>
+        </div>
+      )}
+
       {/* ── 카테고리별 칩 (클릭 시 해당 카테고리만 필터) ── */}
       {Object.keys(categoryTotals).length > 0 && (
         <div style={{ display: 'flex', gap: isMobile ? 6 : 8, flexWrap: 'wrap', marginBottom: 16, width: '100%', boxSizing: 'border-box' }}>
@@ -1209,8 +1288,10 @@ export default function ReceiptsPage() {
                 if (bulkItemName) updates.item_name = bulkItemName
                 if (bulkCustomerTeam) updates.customer_team = bulkCustomerTeam
                 if (Object.keys(updates).length === 0) { alert('변경할 항목을 입력해주세요'); return }
+                // 화면(필터된 + 선택된) 교집합 카운트로 메시지 표시
+                const visibleSelected = allDisplayItems.filter(i => i.id && selectedIds.has(i.id)).length
                 const msg = [
-                  `${selectedIds.size}건`,
+                  `${visibleSelected}건 (현재 화면)`,
                   bulkCategory ? `구분→${bulkCategory}` : '',
                   bulkItemName ? `품명→${bulkItemName}` : '',
                   bulkCustomerTeam ? `고객명→${bulkCustomerTeam}` : '',
