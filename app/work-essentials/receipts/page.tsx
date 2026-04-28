@@ -814,8 +814,12 @@ export default function ReceiptsPage() {
         </td>
         <td style={{ padding: '10px 10px', color: '#64748b', fontSize: 12 }}>{item.item_name || '-'}</td>
         <td style={{ padding: '10px 10px', color: '#64748b', fontSize: 11 }}>{item.customer_team || '-'}</td>
-        <td style={{ padding: '10px 10px', textAlign: 'right', fontWeight: 700, color: item.amount ? '#0c4a6e' : '#ef4444', whiteSpace: 'nowrap', fontSize: 13 }}>
-          {item.amount ? `${fmt(item.amount)}원` : '미입력'}
+        <td style={{
+          padding: '10px 10px', textAlign: 'right', fontWeight: 700,
+          color: !item.amount ? '#94a3b8' : Number(item.amount) < 0 ? '#dc2626' : '#0c4a6e',
+          whiteSpace: 'nowrap', fontSize: 13,
+        }}>
+          {!item.amount ? '미입력' : Number(item.amount) < 0 ? `취소 ${fmt(Math.abs(Number(item.amount)))}원` : `${fmt(item.amount)}원`}
         </td>
         <td style={{ padding: '10px 8px', textAlign: 'center' }}>
           {item.receipt_url ? (
@@ -933,8 +937,11 @@ export default function ReceiptsPage() {
 
         {/* 금액 + 영수증 + 삭제 */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontWeight: 700, fontSize: 13, color: item.amount ? '#0c4a6e' : '#ef4444' }}>
-            {item.amount ? `${fmt(item.amount)}원` : '미입력'}
+          <span style={{
+            fontWeight: 700, fontSize: 13,
+            color: !item.amount ? '#94a3b8' : Number(item.amount) < 0 ? '#dc2626' : '#0c4a6e',
+          }}>
+            {!item.amount ? '미입력' : Number(item.amount) < 0 ? `취소 ${fmt(Math.abs(Number(item.amount)))}원` : `${fmt(item.amount)}원`}
           </span>
           <div style={{ display: 'flex', gap: 4 }}>
             {item.receipt_url && (
