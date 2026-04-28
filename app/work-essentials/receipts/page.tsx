@@ -680,7 +680,15 @@ export default function ReceiptsPage() {
       const res = await fetch(`/api/receipts/download?month=${selectedMonth}${effectiveCompanyId ? `&company_id=${effectiveCompanyId}` : ''}`, {
         headers: { Authorization: `Bearer ${token}` },
       })
-      if (!res.ok) throw new Error()
+      if (!res.ok) {
+        // 서버 응답 본문에 실제 에러 메시지 (cwd 등) 포함 — 그대로 노출
+        let detail = `${res.status} ${res.statusText}`
+        try {
+          const j = await res.json()
+          if (j.error) detail = j.error
+        } catch { /* 응답이 JSON 아님 (xlsx 바이너리 등) */ }
+        throw new Error(detail)
+      }
       const blob = await res.blob()
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
@@ -691,7 +699,10 @@ export default function ReceiptsPage() {
       a.click()
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
-    } catch { alert('다운로드에 실패했습니다.') }
+    } catch (e: any) {
+      console.error('다운로드 실패:', e)
+      alert(`다운로드에 실패했습니다.\n\n[원인]\n${e.message || '알 수 없는 오류'}`)
+    }
   }
 
   // ── 월 목록: 데이터가 있는 월만 + 현재월 항상 포함 ──
@@ -965,7 +976,7 @@ export default function ReceiptsPage() {
   ]
 
   const statActions: ActionButton[] = [
-    { label: '엑셀 다운로드', onClick: handleDownloadXlsx, variant: 'secondary', icon: '📥' },
+    { label: '라이드(주)제출양식', onClick: handleDownloadXlsx, variant: 'secondary', icon: '📥' },
     { label: '영수증 업로드', onClick: () => fileRef.current?.click(), variant: 'primary', icon: '+' },
   ]
 

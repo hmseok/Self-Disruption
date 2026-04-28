@@ -3,112 +3,59 @@ import { verifyUser } from '@/lib/auth-server'
 import { prisma } from '@/lib/prisma'
 import * as path from 'path'
 import * as fs from 'fs'
+import ExcelJS from 'exceljs'
 
-// JSZip is available as ExcelJS dependency
-const JSZip = require('jszip')
+// ============================================================
+// 영수증 월별 엑셀 다운로드 — ExcelJS 기반
+//   양식: public/templates/expense_report_template.xlsx
+//   대상 시트: "법인 지출내역서"
+//     A2 = "(  N  )월 지출 합계 내역"
+//     G2 = SUM (총합계)
+//     5행~ : 데이터
+//       A=날짜  B=카드번호  C=구분  D=사용처  E=품명  F=고객명/팀원  G=금액  H=영수증
+// ============================================================
 
-/** JS Date → Excel serial number (1900 date system, UTC to avoid timezone issues) */
-function dateToExcelSerial(dateStr: string): number {
-  // Use UTC to avoid historical timezone offset differences (e.g. KST LMT vs modern KST)
-  const parts = dateStr.split('-')
-  const d = Date.UTC(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]))
-  const epoch = Date.UTC(1899, 11, 30) // Dec 30, 1899 UTC
-  return Math.floor((d - epoch) / 86400000)
+function toNum(v: any): number {
+  if (v === null || v === undefined) return 0
+  if (typeof v === 'number') return Number.isFinite(v) ? v : 0
+  if (typeof v === 'string') return parseInt(v.replace(/[^0-9-]/g, ''), 10) || 0
+  if (typeof v === 'object') return Number(String(v)) || 0
+  return Number(v) || 0
 }
 
-/** Escape XML special characters */
-function escXml(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;')
+function fmtDate(d: any): string {
+  if (!d) return ''
+  if (d instanceof Date) return d.toISOString().slice(0, 10)
+  return String(d).slice(0, 10)
 }
 
-/** Build a single data row XML (rows 5-34) */
-function buildRowXml(rowNum: number, item: any): string {
-  const cells: string[] = []
-  const r = rowNum
-
-  // A: date (Excel serial number) — style 74
-  if (item.expense_date) {
-    const serial = dateToExcelSerial(item.expense_date)
-    cells.push(`<c r="A${r}" s="74"><v>${serial}</v></c>`)
-  } else {
-    cells.push(`<c r="A${r}" s="74"/>`)
+function findTemplatePath(): string | null {
+  const candidates = [
+    path.join(process.cwd(), 'public', 'templates', 'expense_report_template.xlsx'),
+    path.join(process.cwd(), '.next', 'standalone', 'public', 'templates', 'expense_report_template.xlsx'),
+    path.join(process.cwd(), '..', 'public', 'templates', 'expense_report_template.xlsx'),
+  ]
+  for (const p of candidates) {
+    try { if (fs.existsSync(p)) return p } catch { /* skip */ }
   }
-
-  // B: card_number (inline string) — style 70
-  if (item.card_number) {
-    cells.push(`<c r="B${r}" s="70" t="inlineStr"><is><t>${escXml(item.card_number)}</t></is></c>`)
-  } else {
-    cells.push(`<c r="B${r}" s="70"/>`)
-  }
-
-  // C: category — style 64
-  if (item.category) {
-    cells.push(`<c r="C${r}" s="64" t="inlineStr"><is><t>${escXml(item.category)}</t></is></c>`)
-  } else {
-    cells.push(`<c r="C${r}" s="64"/>`)
-  }
-
-  // D: merchant — style 64
-  if (item.merchant) {
-    cells.push(`<c r="D${r}" s="64" t="inlineStr"><is><t>${escXml(item.merchant)}</t></is></c>`)
-  } else {
-    cells.push(`<c r="D${r}" s="64"/>`)
-  }
-
-  // E: item_name — style 64
-  if (item.item_name) {
-    cells.push(`<c r="E${r}" s="64" t="inlineStr"><is><t>${escXml(item.item_name)}</t></is></c>`)
-  } else {
-    cells.push(`<c r="E${r}" s="64"/>`)
-  }
-
-  // F: customer_team — style 59
-  if (item.customer_team) {
-    cells.push(`<c r="F${r}" s="59" t="inlineStr"><is><t>${escXml(item.customer_team)}</t></is></c>`)
-  } else {
-    cells.push(`<c r="F${r}" s="59"/>`)
-  }
-
-  // G: amount (number) — style 66
-  // Prisma raw 에서 DECIMAL 은 string/Decimal 로 옴 → 숫자로 강제 변환
-  let amount: any = item.amount
-  if (amount === null || amount === undefined) amount = 0
-  else if (typeof amount === 'string') amount = parseInt(amount.replace(/,/g, ''), 10) || 0
-  else if (typeof amount === 'object') amount = Number(String(amount)) || 0  // Decimal 객체
-  else if (typeof amount !== 'number') amount = Number(amount) || 0
-  cells.push(`<c r="G${r}" s="66"><v>${amount}</v></c>`)
-
-  // H: receipt — style 72 (empty)
-  cells.push(`<c r="H${r}" s="72"/>`)
-
-  return `<row r="${r}" spans="1:8">${cells.join('')}</row>`
-}
-
-/** Build an empty row XML for unused rows */
-function buildEmptyRowXml(rowNum: number): string {
-  return `<row r="${rowNum}" spans="1:8"><c r="A${rowNum}" s="74"/><c r="B${rowNum}" s="70"/><c r="C${rowNum}" s="64"/><c r="D${rowNum}" s="64"/><c r="E${rowNum}" s="64"/><c r="F${rowNum}" s="59"/><c r="G${rowNum}" s="66"/><c r="H${rowNum}" s="72"/></row>`
+  return null
 }
 
 export async function GET(request: NextRequest) {
-  const user = await verifyUser(request)
-  if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
-
-  const { searchParams } = request.nextUrl
-  const month = searchParams.get('month') // YYYY-MM
-
-  if (!month) return NextResponse.json({ error: 'month 파라미터 필요' }, { status: 400 })
-
   try {
+    const user = await verifyUser(request)
+    if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
+
+    const month = request.nextUrl.searchParams.get('month')
+    if (!month || !/^\d{4}-\d{2}$/.test(month)) {
+      return NextResponse.json({ error: 'month 파라미터(YYYY-MM) 필요' }, { status: 400 })
+    }
+    const monthNum = parseInt(month.split('-')[1])
+
     // 데이터 조회
     const start = `${month}-01`
     const endDate = new Date(parseInt(month.split('-')[0]), parseInt(month.split('-')[1]), 0)
     const end = `${month}-${String(endDate.getDate()).padStart(2, '0')}`
-
     const items = await prisma.$queryRaw<any[]>`
       SELECT * FROM expense_receipts
       WHERE user_id = ${user.id}
@@ -117,132 +64,84 @@ export async function GET(request: NextRequest) {
       ORDER BY expense_date ASC
     `
 
-    // ── JSZip으로 템플릿 xlsx 직접 수정 ──
-    // Cloud Run standalone build 에서는 cwd 가 /app 이지만 public 은 정적으로 카피되지 않을 수 있어
-    // 후보 경로 여러 개 시도
-    const candidates = [
-      path.join(process.cwd(), 'public', 'templates', 'expense_report_template.xlsx'),
-      path.join(process.cwd(), '.next', 'standalone', 'public', 'templates', 'expense_report_template.xlsx'),
-      path.join(process.cwd(), '..', 'public', 'templates', 'expense_report_template.xlsx'),
-    ]
-    let templatePath = ''
-    for (const p of candidates) {
-      if (fs.existsSync(p)) { templatePath = p; break }
-    }
+    // 템플릿 로드
+    const templatePath = findTemplatePath()
     if (!templatePath) {
-      console.error('템플릿 파일 후보 모두 없음:', candidates)
-      return NextResponse.json({ error: `템플릿 파일을 찾을 수 없습니다. cwd=${process.cwd()}` }, { status: 500 })
-    }
-    const templateBuf = fs.readFileSync(templatePath)
-    const zip = await JSZip.loadAsync(templateBuf)
-
-    // sheet3.xml = "법인 지출내역서"
-    const sheetFile = zip.file('xl/worksheets/sheet3.xml')
-    if (!sheetFile) {
-      return NextResponse.json({ error: '시트 파일 없음' }, { status: 500 })
-    }
-    let sheetXml: string = await sheetFile.async('string')
-
-    const monthNum = parseInt(month.split('-')[1])
-    const dataItems = items || [] // 제한 없음 — 전체 데이터
-    const dataCount = dataItems.length
-    const lastDataRow = Math.max(34, 4 + dataCount) // 최소 30행 유지 (템플릿 호환)
-
-    // 1) A2 셀 업데이트: 월 번호 변경 (inline string으로 교체)
-    sheetXml = sheetXml.replace(
-      /<c r="A2"[^/]*(?:\/>|>.*?<\/c>)/,
-      `<c r="A2" s="83" t="inlineStr"><is><t>(  ${monthNum}  )월 지출 합계 내역</t></is></c>`
-    )
-
-    // 2) 데이터 행 교체 — 기존 템플릿 행(5~34) 제거 후 동적 생성
-    // Remove existing template rows 5-34
-    for (let r = 5; r <= 34; r++) {
-      const rowRegex = new RegExp(`<row r="${r}"[^>]*>.*?</row>`, 's')
-      sheetXml = sheetXml.replace(rowRegex, `__ROW_${r}__`)
+      return NextResponse.json(
+        { error: `템플릿 파일을 찾을 수 없습니다 (cwd=${process.cwd()})` },
+        { status: 500 },
+      )
     }
 
-    // Build new rows (5 ~ lastDataRow)
-    const newRows: string[] = []
-    for (let i = 0; i < Math.max(30, dataCount); i++) {
-      const rowNum = 5 + i
-      if (i < dataCount) {
-        newRows.push(buildRowXml(rowNum, dataItems[i]))
-      } else {
-        newRows.push(buildEmptyRowXml(rowNum))
+    const wb = new ExcelJS.Workbook()
+    await wb.xlsx.readFile(templatePath)
+    const ws = wb.getWorksheet('법인 지출내역서')
+    if (!ws) {
+      return NextResponse.json(
+        { error: '템플릿에 "법인 지출내역서" 시트가 없습니다' },
+        { status: 500 },
+      )
+    }
+
+    // A2: 월 표시 (머지 영역이라 셀 자체에 값만 셋)
+    ws.getCell('A2').value = `(  ${monthNum}  )월 지출 합계 내역`
+
+    // 5행~ : 기존 데이터(예시) 제거 후 새로 입력
+    //   템플릿엔 2월 예시 데이터가 있을 수 있으므로 5~41행 클리어
+    const DATA_START_ROW = 5
+    const DATA_END_ROW = Math.max(41, DATA_START_ROW + items.length + 5)
+    for (let r = DATA_START_ROW; r <= DATA_END_ROW; r++) {
+      for (let c = 1; c <= 8; c++) {
+        const cell = ws.getCell(r, c)
+        cell.value = null
       }
     }
 
-    // Replace template placeholders (rows 5-34)
-    for (let r = 5; r <= 34; r++) {
-      const idx = r - 5
-      sheetXml = sheetXml.replace(`__ROW_${r}__`, newRows[idx])
-    }
-
-    // Insert extra rows (35+) if data exceeds 30 items
-    if (dataCount > 30) {
-      const extraRowsXml = newRows.slice(30).join('')
-      // Insert before </sheetData>
-      sheetXml = sheetXml.replace('</sheetData>', extraRowsXml + '</sheetData>')
-    }
-
-    // 2-b) dimension 태그 업데이트 (Excel이 전체 데이터 영역 인식하도록)
-    sheetXml = sheetXml.replace(
-      /<dimension ref="[^"]*"\/>/,
-      `<dimension ref="A1:H${lastDataRow}"/>`
-    )
-
-    // 3) G2 셀: SUM 공식 + 서버에서 계산한 값 설정 (동적 범위)
-    let totalAmount = 0
-    for (const item of dataItems) {
-      let amt: any = item.amount
-      if (amt === null || amt === undefined) amt = 0
-      else if (typeof amt === 'string') amt = parseInt(amt.replace(/,/g, ''), 10) || 0
-      else if (typeof amt === 'object') amt = Number(String(amt)) || 0
-      else if (typeof amt !== 'number') amt = Number(amt) || 0
-      totalAmount += amt
-    }
-    sheetXml = sheetXml.replace(
-      /<c r="G2"[^>]*>[\s\S]*?<\/c>/,
-      `<c r="G2" s="84"><f>SUM(G5:G${lastDataRow})</f><v>${totalAmount}</v></c>`
-    )
-
-    // Update the sheet in zip
-    zip.file('xl/worksheets/sheet3.xml', sheetXml)
-
-    // 4) workbook.xml의 Print_Area 업데이트 (파란 테두리 범위)
-    const wbFile = zip.file('xl/workbook.xml')
-    if (wbFile) {
-      let wbXml: string = await wbFile.async('string')
-      // 기존 Print_Area '$A$1:$H$34' → '$A$1:$H${lastDataRow}'
-      const oldPrintArea = "'법인 지출내역서'!$A$1:$H$34"
-      const newPrintArea = `'법인 지출내역서'!$A$1:$H$${lastDataRow}`
-      wbXml = wbXml.replace(oldPrintArea, newPrintArea)
-      zip.file('xl/workbook.xml', wbXml)
-    }
-
-    // 5) calcChain.xml 제거 → Excel이 열 때 수식 자동 재계산
-    if (zip.file('xl/calcChain.xml')) {
-      zip.remove('xl/calcChain.xml')
-    }
-
-    // Generate output buffer
-    const outputBuf = await zip.generateAsync({
-      type: 'nodebuffer',
-      compression: 'DEFLATE',
-      compressionOptions: { level: 6 },
+    // 데이터 입력
+    items.forEach((it, idx) => {
+      const r = DATA_START_ROW + idx
+      ws.getCell(r, 1).value = it.expense_date instanceof Date ? it.expense_date : (fmtDate(it.expense_date) || null)
+      if (ws.getCell(r, 1).value && typeof ws.getCell(r, 1).value === 'string') {
+        // YYYY-MM-DD 문자열을 Date 로
+        const parts = String(ws.getCell(r, 1).value).split('-')
+        if (parts.length === 3) ws.getCell(r, 1).value = new Date(+parts[0], +parts[1] - 1, +parts[2])
+      }
+      ws.getCell(r, 1).numFmt = 'yyyy-mm-dd'
+      ws.getCell(r, 2).value = it.card_number || ''
+      ws.getCell(r, 3).value = it.category || ''
+      ws.getCell(r, 4).value = it.merchant || ''
+      ws.getCell(r, 5).value = it.item_name || ''
+      ws.getCell(r, 6).value = it.customer_team || ''
+      const amt = toNum(it.amount)
+      ws.getCell(r, 7).value = amt
+      ws.getCell(r, 7).numFmt = '#,##0'
+      // H 열 (영수증) 비워둠
     })
 
-    // 파일명: 법인카드 사용내역서 (X월분).xlsx
-    const fileName = encodeURIComponent(`법인카드 사용내역서 (${monthNum}월분).xlsx`)
+    // G2: SUM 공식 + 계산값 (Excel 열 시 자동 재계산도 되도록 공식 유지)
+    const lastRow = DATA_START_ROW + items.length - 1
+    if (items.length > 0) {
+      ws.getCell('G2').value = { formula: `SUM(G${DATA_START_ROW}:G${Math.max(lastRow, 41)})` } as any
+    } else {
+      ws.getCell('G2').value = 0
+    }
+    ws.getCell('G2').numFmt = '#,##0'
 
-    return new NextResponse(outputBuf, {
+    // 출력
+    const buf = await wb.xlsx.writeBuffer()
+    const fileName = encodeURIComponent(`라이드(주)제출양식 (${monthNum}월분).xlsx`)
+    return new NextResponse(buf as any, {
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         'Content-Disposition': `attachment; filename*=UTF-8''${fileName}`,
+        'Content-Length': String((buf as any).byteLength ?? (buf as any).length),
       },
     })
   } catch (err: any) {
-    console.error('Excel 생성 실패:', err.message || err)
-    return NextResponse.json({ error: 'Excel 생성 실패: ' + (err.message || '') }, { status: 500 })
+    console.error('영수증 엑셀 생성 실패:', err)
+    return NextResponse.json(
+      { error: `엑셀 생성 실패: ${err.message || String(err)}` },
+      { status: 500 },
+    )
   }
 }
