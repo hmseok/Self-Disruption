@@ -309,6 +309,16 @@ export default function BankCardPage() {
   // 자동 분류
   const [autoClassifying, setAutoClassifying] = useState(false)
   const [autoClassifyResult, setAutoClassifyResult] = useState<any>(null)
+  // AI 일괄 분류 진행률 (batch loop)
+  const [aiProgress, setAiProgress] = useState<{
+    running: boolean
+    total: number
+    processed: number
+    applied: number
+    below: number
+    distribution: Record<string, number>
+    lastError?: string
+  } | null>(null)
 
   // 분류 검수 탭 상태
   const [reviewCategory, setReviewCategory] = useState<string | null>(null)
@@ -1013,33 +1023,94 @@ export default function BankCardPage() {
     await Promise.all([loadSummary(), loadTransactions()])
   }
 
-  // ── AI 일괄 분류 실행 ──
+  // ── AI 일괄 분류 실행 (batch 단위 반복 호출) ──
   const runAiClassify = async () => {
-    if (!confirm('Gemini AI로 미분류 거래를 일괄 분류합니다.\n\n· 신뢰도 ≥70% 만 자동 적용\n· 미만은 검토 큐에 남음\n· 1~3분 소요\n\n계속할까요?')) return
+    if (!confirm('Gemini AI로 미분류 거래를 일괄 분류합니다.\n\n· 50건씩 batch 처리 (배치당 약 10~20초)\n· 신뢰도 ≥70% 만 자동 적용\n· 미만은 검토 큐에 남음\n· 진행 중에도 닫지 마세요\n\n계속할까요?')) return
     setAutoClassifying(true)
+    setAiProgress({ running: true, total: 0, processed: 0, applied: 0, below: 0, distribution: {} })
+
+    let totalApplied = 0
+    let totalBelow = 0
+    let totalProcessed = 0
+    let cumulativeDist: Record<string, number> = {}
+    let initialTotal = 0
+    let lastError: string | undefined
+    const MAX_BATCHES = 50  // 안전 한도 (50 × 50건 = 2500건)
+    let batches = 0
+
     try {
-      const { ok, json } = await fetchWithAuth('/api/finance/transactions/auto-classify-ai', {
-        method: 'POST',
-        body: { batchSize: 50, minConfidence: 70, limit: 800 },
-      })
-      if (!ok) {
-        alert(`AI 분류 실패: ${json?.error || '알 수 없는 오류'}`)
-        return
+      while (batches < MAX_BATCHES) {
+        batches++
+        const { ok, status, json } = await fetchWithAuth('/api/finance/transactions/auto-classify-ai', {
+          method: 'POST',
+          body: { batchSize: 50, minConfidence: 70 },
+        })
+        if (!ok) {
+          // status, error 둘 다 표시 — "알 수 없는 오류" 방지
+          lastError = `HTTP ${status} — ${json?.error || JSON.stringify(json).slice(0, 200) || '응답 없음 (타임아웃 가능)'}`
+          break
+        }
+        const total = Number(json.total_unclassified || 0)
+        if (initialTotal === 0) initialTotal = total
+
+        // 미분류 자체가 없는 경우
+        if (total === 0) {
+          break
+        }
+
+        const procThis = Number(json.processed_this_batch || 0)
+        const appliedThis = Number(json.applied_high_confidence || 0)
+        const belowThis = Number(json.below_threshold || 0)
+
+        totalProcessed += procThis
+        totalApplied += appliedThis
+        totalBelow += belowThis
+        for (const [k, v] of Object.entries(json.distribution || {})) {
+          cumulativeDist[k] = (cumulativeDist[k] || 0) + Number(v || 0)
+        }
+
+        setAiProgress({
+          running: true,
+          total: initialTotal,
+          processed: totalProcessed,
+          applied: totalApplied,
+          below: totalBelow,
+          distribution: { ...cumulativeDist },
+        })
+
+        // 이 batch에서 한 건도 처리 못했으면 무한루프 방지로 중단
+        if (procThis === 0) {
+          lastError = 'AI가 빈 응답을 반환했습니다. 잠시 후 다시 시도하세요.'
+          break
+        }
+        // 남은 건이 0이거나, AI가 처리 못한 건이 남으면 중단
+        if (Number(json.remaining || 0) === 0) break
+
+        // batch 사이 대기 (rate limit 완화)
+        await new Promise(r => setTimeout(r, 800))
       }
-      const dist = Object.entries(json.distribution || {}).sort((a:any,b:any) => b[1]-a[1])
-        .map(([k,v]) => `  ${v}건  ${k}`).join('\n')
+
+      // 최종 알림
+      const dist = Object.entries(cumulativeDist).sort((a: any, b: any) => b[1] - a[1])
+        .slice(0, 15)
+        .map(([k, v]) => `  ${v}건  ${k}`).join('\n')
       alert(
-        `✓ AI 분류 완료\n\n` +
-        `· 미분류 처리: ${json.total_unclassified}건\n` +
-        `· AI 응답: ${json.ai_responses}건\n` +
-        `· 자동 적용: ${json.applied_high_confidence}건 (신뢰도 ≥${json.min_confidence}%)\n` +
-        `· 검토 필요: ${json.below_threshold}건\n\n` +
-        (dist ? `[카테고리별]\n${dist}` : '')
+        `✓ AI 일괄 분류 종료\n\n` +
+        `· 시작 시 미분류: ${initialTotal.toLocaleString()}건\n` +
+        `· 처리 batch 수: ${batches}\n` +
+        `· AI 처리 건수: ${totalProcessed.toLocaleString()}건\n` +
+        `· 자동 적용 (≥70%): ${totalApplied.toLocaleString()}건\n` +
+        `· 검토 필요 (<70%): ${totalBelow.toLocaleString()}건\n` +
+        (dist ? `\n[카테고리별 상위 15]\n${dist}\n` : '') +
+        (lastError ? `\n⚠ 중단 사유: ${lastError}` : '')
       )
       await Promise.all([loadSummary(), loadTransactions()])
       setGroupData(null)
+      setAiProgress(prev => prev ? { ...prev, running: false, lastError } : null)
     } catch (e: any) {
-      alert(`AI 분류 오류: ${e.message}`)
+      console.error('[runAiClassify]', e)
+      alert(`AI 분류 오류: ${e?.message || String(e)}`)
+      setAiProgress(prev => prev ? { ...prev, running: false, lastError: e?.message || String(e) } : null)
     } finally {
       setAutoClassifying(false)
     }
@@ -1590,6 +1661,48 @@ export default function BankCardPage() {
                         ))}
                       </div>
                     </div>
+
+                    {/* AI 일괄 분류 진행률 */}
+                    {aiProgress && (
+                      <div style={{
+                        marginTop: 10, padding: '10px 12px',
+                        background: aiProgress.running ? 'rgba(168,85,247,0.08)' : 'rgba(34,197,94,0.08)',
+                        border: `1px solid ${aiProgress.running ? 'rgba(168,85,247,0.3)' : 'rgba(34,197,94,0.3)'}`,
+                        borderRadius: 8, fontSize: 12, color: COLORS.textSecondary,
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                          <div style={{ fontWeight: 600, color: aiProgress.running ? '#7e22ce' : '#15803d' }}>
+                            {aiProgress.running ? '🤖 AI 분류 진행 중...' : '✓ AI 분류 종료'}
+                            {aiProgress.total > 0 && (
+                              <> — {aiProgress.processed.toLocaleString()} / {aiProgress.total.toLocaleString()}건
+                                {' '}({Math.round((aiProgress.processed / aiProgress.total) * 100)}%)
+                              </>
+                            )}
+                          </div>
+                          <div style={{ display: 'flex', gap: 12 }}>
+                            <span>자동 적용: <b style={{ color: '#15803d' }}>{aiProgress.applied.toLocaleString()}</b></span>
+                            <span>검토 필요: <b style={{ color: '#d97706' }}>{aiProgress.below.toLocaleString()}</b></span>
+                          </div>
+                        </div>
+                        {aiProgress.total > 0 && (
+                          <div style={{
+                            marginTop: 6, height: 4, background: 'rgba(0,0,0,0.05)', borderRadius: 2, overflow: 'hidden',
+                          }}>
+                            <div style={{
+                              width: `${Math.min(100, (aiProgress.processed / aiProgress.total) * 100)}%`,
+                              height: '100%',
+                              background: aiProgress.running ? 'linear-gradient(90deg, #a855f7, #7e22ce)' : '#22c55e',
+                              transition: 'width 0.3s ease',
+                            }} />
+                          </div>
+                        )}
+                        {aiProgress.lastError && !aiProgress.running && (
+                          <div style={{ marginTop: 6, color: '#dc2626', fontSize: 11 }}>
+                            ⚠ {aiProgress.lastError}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   {/* 카테고리 카드 목록 */}
