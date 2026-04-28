@@ -2386,12 +2386,23 @@ export default function BankCardPage() {
                         <td style={{ padding: '10px 12px', textAlign: 'center' }}>
                           <button onClick={() => setEditMapping({
                             type: 'card', id: c.id,
+                            card_number: c.card_number,
                             card_alias: c.card_alias, card_issuer: c.card_issuer,
                             holder_name: c.holder_name, assigned_car_id: c.assigned_car_id,
                             assigned_employee_id: c.assigned_employee_id,
                             status: c.status || 'active',
                             card_type: c.card_type || '법인신용',
                             card_holder_type: c.card_holder_type || '무기명',
+                            valid_thru: c.valid_thru || '',
+                            issued_at: c.issued_at ? String(c.issued_at).slice(0,10) : '',
+                            expires_at: c.expires_at ? String(c.expires_at).slice(0,10) : '',
+                            payment_bank: c.payment_bank || '',
+                            payment_account: c.payment_account || '',
+                            payment_day: c.payment_day || '',
+                            monthly_limit: c.monthly_limit || '',
+                            previous_card_number: c.previous_card_number || '',
+                            department: c.department || '',
+                            memo: c.memo || '',
                           })} style={{ padding: '3px 8px', borderRadius: 6, fontSize: 11, cursor: 'pointer', background: 'rgba(191,219,254,0.5)', border: '1px solid rgba(59,130,246,0.2)', color: '#1e40af', marginRight: 4 }}>수정</button>
                           <button onClick={() => deleteMapping(c.id, 'card')} style={{ padding: '3px 8px', borderRadius: 6, fontSize: 11, cursor: 'pointer', background: 'rgba(254,202,202,0.5)', border: '1px solid rgba(239,68,68,0.2)', color: '#b91c1c' }}>삭제</button>
                         </td>
@@ -2449,7 +2460,7 @@ export default function BankCardPage() {
       {editMapping && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
           onMouseDown={(e) => { if (e.target === e.currentTarget) setEditMapping(null) }}>
-          <div style={{ ...GLASS.L4, borderRadius: 16, padding: 24, width: '100%', maxWidth: 420 }}>
+          <div style={{ ...GLASS.L4, borderRadius: 16, padding: 24, width: '100%', maxWidth: 560, maxHeight: '90vh', overflowY: 'auto' }}>
             <h3 style={{ margin: '0 0 16px', fontSize: 15, fontWeight: 700 }}>
               {editMapping.type === 'card' ? '💳 카드 매핑' : '🏦 통장 매핑'} {editMapping.id ? '수정' : '추가'}
             </h3>
@@ -2500,9 +2511,61 @@ export default function BankCardPage() {
                       </select>
                     </label>
                   </div>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>소지자/사용자
-                    <input value={editMapping.holder_name || ''} onChange={e => setEditMapping({ ...editMapping, holder_name: e.target.value })}
-                      placeholder="예: 석호민, 공용 (탁송팀)" style={{ ...GLASS.L1, width: '100%', padding: '8px 12px', borderRadius: 8, fontSize: 13, marginTop: 4 }} />
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>소지자/사용자
+                      <input value={editMapping.holder_name || ''} onChange={e => setEditMapping({ ...editMapping, holder_name: e.target.value })}
+                        placeholder="예: 석호민" style={{ ...GLASS.L1, width: '100%', padding: '8px 12px', borderRadius: 8, fontSize: 13, marginTop: 4 }} />
+                    </label>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>부서
+                      <input value={editMapping.department || ''} onChange={e => setEditMapping({ ...editMapping, department: e.target.value })}
+                        placeholder="예: 탁송팀" style={{ ...GLASS.L1, width: '100%', padding: '8px 12px', borderRadius: 8, fontSize: 13, marginTop: 4 }} />
+                    </label>
+                  </div>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>카드번호
+                    <input value={editMapping.card_number || ''} onChange={e => setEditMapping({ ...editMapping, card_number: e.target.value })}
+                      placeholder="예: 9410-4992-9322-4829 (마스킹 시 ****-****-****-XXXX)" style={{ ...GLASS.L1, width: '100%', padding: '8px 12px', borderRadius: 8, fontSize: 13, marginTop: 4, fontFamily: 'monospace' }} />
+                  </label>
+                  {/* ── 발급/만료 ── */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>발급일
+                      <input type="date" value={editMapping.issued_at || ''} onChange={e => setEditMapping({ ...editMapping, issued_at: e.target.value })}
+                        style={{ ...GLASS.L1, width: '100%', padding: '8px 12px', borderRadius: 8, fontSize: 13, marginTop: 4 }} />
+                    </label>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>만료일
+                      <input type="date" value={editMapping.expires_at || ''} onChange={e => setEditMapping({ ...editMapping, expires_at: e.target.value })}
+                        style={{ ...GLASS.L1, width: '100%', padding: '8px 12px', borderRadius: 8, fontSize: 13, marginTop: 4 }} />
+                    </label>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>유효기간(MM/YY)
+                      <input value={editMapping.valid_thru || ''} onChange={e => setEditMapping({ ...editMapping, valid_thru: e.target.value })}
+                        placeholder="08/30" style={{ ...GLASS.L1, width: '100%', padding: '8px 12px', borderRadius: 8, fontSize: 13, marginTop: 4 }} />
+                    </label>
+                  </div>
+                  {/* ── 결제 정보 ── */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr 80px', gap: 10 }}>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>결제 은행
+                      <input value={editMapping.payment_bank || ''} onChange={e => setEditMapping({ ...editMapping, payment_bank: e.target.value })}
+                        placeholder="우리은행" style={{ ...GLASS.L1, width: '100%', padding: '8px 12px', borderRadius: 8, fontSize: 13, marginTop: 4 }} />
+                    </label>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>결제 계좌번호
+                      <input value={editMapping.payment_account || ''} onChange={e => setEditMapping({ ...editMapping, payment_account: e.target.value })}
+                        placeholder="1005504828777" style={{ ...GLASS.L1, width: '100%', padding: '8px 12px', borderRadius: 8, fontSize: 13, marginTop: 4, fontFamily: 'monospace' }} />
+                    </label>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>결제일
+                      <input type="number" min={1} max={31} value={editMapping.payment_day || ''} onChange={e => setEditMapping({ ...editMapping, payment_day: e.target.value ? Number(e.target.value) : null })}
+                        placeholder="25" style={{ ...GLASS.L1, width: '100%', padding: '8px 12px', borderRadius: 8, fontSize: 13, marginTop: 4 }} />
+                    </label>
+                  </div>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>월 한도 (원)
+                    <input type="number" value={editMapping.monthly_limit || ''} onChange={e => setEditMapping({ ...editMapping, monthly_limit: e.target.value ? Number(e.target.value) : null })}
+                      placeholder="13000000" style={{ ...GLASS.L1, width: '100%', padding: '8px 12px', borderRadius: 8, fontSize: 13, marginTop: 4 }} />
+                  </label>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>직전 카드번호 (갱신 추적)
+                    <input value={editMapping.previous_card_number || ''} onChange={e => setEditMapping({ ...editMapping, previous_card_number: e.target.value })}
+                      placeholder="이전 카드 번호 — 갱신 시 추적용" style={{ ...GLASS.L1, width: '100%', padding: '8px 12px', borderRadius: 8, fontSize: 13, marginTop: 4, fontFamily: 'monospace' }} />
+                  </label>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>메모
+                    <textarea value={editMapping.memo || ''} onChange={e => setEditMapping({ ...editMapping, memo: e.target.value })}
+                      placeholder="자유 메모 (사용 제한 / 특이사항 등)" rows={2} style={{ ...GLASS.L1, width: '100%', padding: '8px 12px', borderRadius: 8, fontSize: 13, marginTop: 4, resize: 'vertical', fontFamily: 'inherit' }} />
                   </label>
                 </>
               ) : (

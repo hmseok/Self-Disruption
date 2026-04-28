@@ -21,10 +21,13 @@ export async function GET(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   try {
-  // 법인카드 목록 (차량 정보 JOIN)
+  // 법인카드 목록 (차량 정보 JOIN) — 확장 메타 포함
   const cards = await prisma.$queryRaw<any[]>`
     SELECT c.id, c.card_number, c.card_alias, c.card_issuer, c.holder_name,
            c.assigned_car_id, c.assigned_employee_id, c.status,
+           c.card_type, c.card_holder_type, c.valid_thru, c.issued_at, c.expires_at,
+           c.payment_bank, c.payment_account, c.payment_day, c.monthly_limit,
+           c.previous_card_number, c.department, c.memo,
            car.number AS car_number, CONCAT_WS(' ', car.brand, car.model) AS car_model
     FROM corporate_cards c
     LEFT JOIN cars car ON c.assigned_car_id = car.id
@@ -76,14 +79,17 @@ export async function POST(req: NextRequest) {
   const body = await req.json()
   const { type, id, card_alias, card_issuer, holder_name, assigned_car_id,
           assigned_employee_id, status, card_type, card_holder_type,
-          card_number,
+          card_number, valid_thru, issued_at, expires_at,
+          payment_bank, payment_account, payment_day, monthly_limit,
+          previous_card_number, department, memo: cardMemo,
           account_alias, bank_issuer, bank_name, account_holder, purpose, memo } = body
 
   if (type === 'card') {
     if (id) {
-      // 수정 — 신규 메타필드(status/card_type/card_holder_type/assigned_employee_id) 포함
+      // 수정 — 전체 메타필드
       await prisma.$executeRaw`
         UPDATE corporate_cards SET
+          card_number = ${card_number || null},
           card_alias = ${card_alias || null},
           card_issuer = ${card_issuer || null},
           holder_name = ${holder_name || null},
@@ -92,17 +98,38 @@ export async function POST(req: NextRequest) {
           status = ${status || 'active'},
           card_type = ${card_type || null},
           card_holder_type = ${card_holder_type || null},
+          valid_thru = ${valid_thru || null},
+          issued_at = ${issued_at || null},
+          expires_at = ${expires_at || null},
+          payment_bank = ${payment_bank || null},
+          payment_account = ${payment_account || null},
+          payment_day = ${payment_day || null},
+          monthly_limit = ${monthly_limit || null},
+          previous_card_number = ${previous_card_number || null},
+          department = ${department || null},
+          memo = ${cardMemo || null},
           updated_at = NOW()
         WHERE id = ${id}
       `
     } else {
-      // 새 카드 등록
+      // 새 카드 등록 — 전체 필드
       await prisma.$executeRaw`
-        INSERT INTO corporate_cards (id, card_number, card_alias, card_issuer, holder_name,
-          assigned_car_id, assigned_employee_id, status, card_type, card_holder_type, created_at, updated_at)
-        VALUES (${randomUUID()}, ${card_number || null}, ${card_alias}, ${card_issuer || null}, ${holder_name || null},
+        INSERT INTO corporate_cards (
+          id, card_number, card_alias, card_issuer, holder_name,
+          assigned_car_id, assigned_employee_id, status, card_type, card_holder_type,
+          valid_thru, issued_at, expires_at,
+          payment_bank, payment_account, payment_day, monthly_limit,
+          previous_card_number, department, memo,
+          created_at, updated_at
+        ) VALUES (
+          ${randomUUID()}, ${card_number || null}, ${card_alias}, ${card_issuer || null}, ${holder_name || null},
           ${assigned_car_id || null}, ${assigned_employee_id || null}, ${status || 'active'},
-          ${card_type || '법인신용'}, ${card_holder_type || '무기명'}, NOW(), NOW())
+          ${card_type || '법인신용'}, ${card_holder_type || '무기명'},
+          ${valid_thru || null}, ${issued_at || null}, ${expires_at || null},
+          ${payment_bank || null}, ${payment_account || null}, ${payment_day || null}, ${monthly_limit || null},
+          ${previous_card_number || null}, ${department || null}, ${cardMemo || null},
+          NOW(), NOW()
+        )
       `
     }
   } else if (type === 'bank') {
