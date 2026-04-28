@@ -457,7 +457,7 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
             {/* 직장인필수 */}
             <div className="mb-3">
               <div className="px-3 mb-1">
-                <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">직장인필수</span>
+                <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">Employee of Ride Inc.</span>
               </div>
               <div className="space-y-0.5">
                 {WORK_ESSENTIALS_MENUS.map(item => (

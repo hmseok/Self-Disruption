@@ -34,7 +34,7 @@ const GROUP_LABELS: Record<string, string> = {
   vehicle: '차량관리',
   sales: '영업/계약',
   finance: '재무/경영',
-  work: '직장인필수',
+  work: 'Employee of Ride Inc.',
   settings: '설정',
 }
 

@@ -58,13 +58,13 @@ function fixDate(dateStr?: string): string | undefined {
 }
 
 function normalizeReceiptItem(raw: any): ParsedReceipt {
-  // amount 정규화 — 0 / NaN / 음수 모두 undefined 로 정규화 (다운스트림 필터에서 제외)
+  // amount 정규화 — 0 / NaN 만 undefined, 음수(승인취소)는 통과
   let amt: number | undefined
-  if (typeof raw.amount === 'number' && Number.isFinite(raw.amount) && raw.amount > 0) {
+  if (typeof raw.amount === 'number' && Number.isFinite(raw.amount) && raw.amount !== 0) {
     amt = raw.amount
   } else if (raw.amount !== null && raw.amount !== undefined) {
     const parsed = parseInt(String(raw.amount).replace(/[^0-9-]/g, ''))
-    amt = Number.isFinite(parsed) && parsed > 0 ? parsed : undefined
+    amt = Number.isFinite(parsed) && parsed !== 0 ? parsed : undefined
   }
   return {
     merchant: raw.merchant || undefined,
@@ -94,7 +94,7 @@ async function analyzeWithGemini(base64Image: string, mimeType: string): Promise
 ## 중요 규칙
 - 이미지에 거래가 1건이면 JSON 객체 1개를, 여러 건이면 JSON 배열로 반환하세요.
 - 마크다운 코드블록(백틱) 없이 순수 JSON만 응답하세요.
-- **승인취소 / 가승인취소 / 취소 표시가 있는 거래는 결과에서 완전히 제외**하세요. 같은 가맹점 같은 일자에 +금액과 -금액이 짝지어 있으면 둘 다 제외 (가승인 후 취소된 거래).
+- **승인 거래와 승인취소(가승인취소 / 취소) 거래 모두 결과에 포함**하세요. 회계 정합성을 위해 +금액과 -금액 모두 저장합니다.
 - 날짜에 년도가 보이지 않으면 "MM-DD" 형식으로만 반환하세요 (년도 추측 금지).
 - 미래 날짜는 절대 사용하지 마세요. 오늘은 ${new Date().toISOString().slice(0, 10)}입니다.
 - **카드앱 스크린샷**: "IBK컴퍼니카드7957" 같은 텍스트에서 뒤 4자리(7957)를 card_last4로 추출하세요.
@@ -211,17 +211,19 @@ async function analyzeWithGemini(base64Image: string, mimeType: string): Promise
   try {
     const parsed = JSON.parse(cleaned)
 
-    // 배열인 경우 → 다건 처리
+    // 배열인 경우 → 다건 처리. amount 0 만 제외 (음수=승인취소는 저장)
     if (Array.isArray(parsed)) {
-      const items = parsed.map(normalizeReceiptItem).filter(item => item.amount && item.amount > 0)
+      const items = parsed
+        .map(normalizeReceiptItem)
+        .filter(item => typeof item.amount === 'number' && item.amount !== 0)
       console.log(`✅ Gemini 다건 분석 성공: ${items.length}건`)
       return { items, isMulti: true }
     }
 
-    // 단건 객체 — 0/음수/NaN 인 경우 빈 배열 반환 (저장 안 됨)
+    // 단건 객체 — amount 누락/0 만 빈 배열, 음수는 통과
     const item = normalizeReceiptItem(parsed)
     console.log('✅ Gemini 단건 분석 성공:', JSON.stringify(item).slice(0, 200))
-    if (!item.amount || item.amount <= 0) {
+    if (typeof item.amount !== 'number' || item.amount === 0) {
       console.warn('⚠️ amount 누락/0 → 영수증 저장 제외')
       return { items: [], isMulti: false }
     }

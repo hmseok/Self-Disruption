@@ -32,7 +32,7 @@ const PAGE_GROUPS = [
   { id: 'vehicle', label: '차량관리' },
   { id: 'sales', label: '영업/계약' },
   { id: 'finance', label: '재무/경영' },
-  { id: 'work', label: '직장인필수' },
+  { id: 'work', label: 'Employee of Ride Inc.' },
   { id: 'settings', label: '설정' },
 ]
 
