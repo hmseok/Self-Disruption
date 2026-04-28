@@ -140,9 +140,10 @@ async function analyzeWithGemini(base64Image: string, mimeType: string): Promise
     },
   })
 
-  // 429 rate limit 재시도 (최대 3회, 지수 백오프) + 타임아웃 45초
+  // 429 rate limit 재시도 — Retry-After 헤더 우선, 최대 2회만 재시도 후 폴백
+  //   (앱 전체에서 30+ 라우트가 같은 키 공유 → 한도 회복까지 길게 기다리는 건 무의미)
   let response: Response | null = null
-  for (let attempt = 0; attempt < 3; attempt++) {
+  for (let attempt = 0; attempt < 2; attempt++) {
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), 45000) // 45초 타임아웃
     try {
@@ -161,8 +162,13 @@ async function analyzeWithGemini(base64Image: string, mimeType: string): Promise
     }
     clearTimeout(timeoutId)
     if (response.status !== 429) break
-    const waitSec = (attempt + 1) * 3 // 3초, 6초, 9초 (기존 5/10/15 → 단축)
-    console.warn(`Gemini 429 rate limit, ${waitSec}초 후 재시도 (${attempt + 1}/3)`)
+    // Retry-After 헤더(초) 우선, 없으면 5/15초
+    const retryAfterHeader = response.headers.get('retry-after')
+    const headerSec = retryAfterHeader ? parseInt(retryAfterHeader, 10) : NaN
+    const waitSec = !isNaN(headerSec) && headerSec > 0
+      ? Math.min(headerSec, 30) // 최대 30초로 캡
+      : (attempt === 0 ? 5 : 15)
+    console.warn(`Gemini 429, ${waitSec}초 대기 후 재시도 (${attempt + 1}/2)`)
     await new Promise(r => setTimeout(r, waitSec * 1000))
   }
 
@@ -175,7 +181,10 @@ async function analyzeWithGemini(base64Image: string, mimeType: string): Promise
       detail = errJson?.error?.message || ''
     } catch { detail = errText.slice(0, 200) }
     if (detail.includes('API key not valid')) detail = 'API 키가 유효하지 않습니다. Cloud Run 환경변수의 GEMINI_API_KEY를 확인하세요.'
-    if (response?.status === 429) detail = 'Gemini API 요청 한도 초과. 잠시 후 다시 시도하세요.'
+    // 429 는 prefix RATE_LIMIT 으로 표시 — 클라이언트가 큐 일시정지에 사용
+    if (response?.status === 429) {
+      throw new Error('RATE_LIMIT:Gemini API 요청 한도 초과. 5분 후 다시 시도하세요.')
+    }
     throw new Error(`Gemini API ${response?.status}: ${detail}`)
   }
 
@@ -322,6 +331,7 @@ export async function POST(request: NextRequest) {
     let ocrEngine = 'none'
     let isMulti = false
     let failReason: string | undefined
+    let rateLimited = false
 
     // 2-1. Gemini Vision API 시도
     const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_GEMINI_API_KEY
@@ -338,7 +348,13 @@ export async function POST(request: NextRequest) {
           failReason = 'Gemini가 응답했으나 영수증 데이터를 추출하지 못했습니다 (이미지 품질 확인 필요).'
         }
       } catch (e: any) {
-        failReason = `Gemini API 오류: ${e.message}`
+        // RATE_LIMIT prefix 면 별도 분기 — 클라이언트에 명시적 시그널
+        if (typeof e.message === 'string' && e.message.startsWith('RATE_LIMIT:')) {
+          rateLimited = true
+          failReason = e.message.replace('RATE_LIMIT:', '')
+        } else {
+          failReason = `Gemini API 오류: ${e.message}`
+        }
         console.warn('⚠️ Gemini 분석 실패, CLOVA 폴백 시도:', e.message)
       }
     }
@@ -370,6 +386,7 @@ export async function POST(request: NextRequest) {
       is_multi: isMulti,
       item_count: parsedItems.length,
       fail_reason: failReason,
+      rate_limited: rateLimited,                 // 429: 클라이언트가 큐 일시정지
     })
   } catch (e: any) {
     console.error('영수증 분석 오류:', e.message)

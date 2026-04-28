@@ -315,9 +315,18 @@ export default function ReceiptsPage() {
       img.src = URL.createObjectURL(file)
     })
 
+    let rateLimitHit = false
     for (let i = 0; i < unique.length; i++) {
-      // 2번째 이미지부터 1초 딜레이 (Gemini 2.0 Flash는 10,000 RPM이므로 충분)
-      if (i > 0) await new Promise(r => setTimeout(r, 1000))
+      // 2번째 이미지부터 5초 딜레이 (앱 전체에서 Gemini 키 공유 → 한도 보호)
+      if (i > 0) await new Promise(r => setTimeout(r, 5000))
+
+      // 앞 파일에서 429 한 번 떴으면 나머지는 즉시 실패 처리
+      if (rateLimitHit) {
+        failedCount++
+        failReasons.add('Gemini API 요청 한도 초과로 큐 중단. 5분 후 다시 시도해주세요.')
+        setUploadQueue(prev => prev.map((q, idx) => idx === i ? { ...q, status: 'error' } : q))
+        continue
+      }
       setUploadQueue(prev => prev.map((q, idx) => idx === i ? { ...q, status: 'uploading' } : q))
 
       try {
@@ -353,6 +362,15 @@ export default function ReceiptsPage() {
           failedCount++
           failReasons.add(ocrJson.fail_reason || ocrJson.error || `서버 오류 (${ocrRes.status})`)
           setUploadQueue(prev => prev.map((q, idx) => idx === i ? { ...q, status: 'done' } : q))
+          continue
+        }
+
+        // 429 한도 초과 감지 → 큐 일시정지 시그널
+        if (ocrJson.rate_limited) {
+          rateLimitHit = true
+          failedCount++
+          failReasons.add(ocrJson.fail_reason || 'Gemini API 한도 초과')
+          setUploadQueue(prev => prev.map((q, idx) => idx === i ? { ...q, status: 'error' } : q))
           continue
         }
 
@@ -482,9 +500,17 @@ export default function ReceiptsPage() {
       fetchDataMonths()
     } else if (unique.length > 0) {
       const reasonLines = Array.from(failReasons)
+      const isRateLimit = rateLimitHit || reasonLines.some(r => r.includes('한도') || r.includes('429'))
+      const header = isRateLimit
+        ? `⏸️ Gemini API 한도 초과로 분석이 중단됐습니다 (${unique.length}건)`
+        : `업로드한 ${unique.length}건의 분석 결과가 없습니다.`
+      const advice = isRateLimit
+        ? '\n\n💡 5분 후 1~2장씩 나눠서 다시 시도해주세요.'
+        : ''
       const msg = [
-        `업로드한 ${unique.length}건의 분석 결과가 없습니다.`,
+        header,
         reasonLines.length > 0 ? `\n[원인]\n${reasonLines.join('\n')}` : '\n서버 로그를 확인해주세요.',
+        advice,
       ].join('')
       setTimeout(() => alert(msg), 300)
     }
