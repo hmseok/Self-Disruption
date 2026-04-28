@@ -148,9 +148,18 @@ export async function POST(req: NextRequest) {
         WHERE id = ${id}
       `
     } else {
+      // UPSERT: 같은 별칭이 있으면 자동 업데이트 (중복 에러 방지)
       await prisma.$executeRaw`
         INSERT INTO bank_account_mappings (id, account_alias, bank_issuer, bank_name, account_holder, assigned_car_id, purpose, memo, status, created_at, updated_at)
         VALUES (${randomUUID()}, ${account_alias}, ${bank_issuer || ''}, ${bank_name || null}, ${account_holder || null}, ${assigned_car_id || null}, ${purpose || null}, ${memo || null}, 'active', NOW(), NOW())
+        ON DUPLICATE KEY UPDATE
+          bank_issuer = VALUES(bank_issuer),
+          bank_name = VALUES(bank_name),
+          account_holder = VALUES(account_holder),
+          assigned_car_id = VALUES(assigned_car_id),
+          purpose = VALUES(purpose),
+          memo = VALUES(memo),
+          updated_at = NOW()
       `
     }
   }

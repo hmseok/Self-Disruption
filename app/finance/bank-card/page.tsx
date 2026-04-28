@@ -2636,13 +2636,30 @@ export default function BankCardPage() {
                     <input value={editMapping.account_holder || ''} onChange={e => setEditMapping({ ...editMapping, account_holder: e.target.value })}
                       style={{ ...GLASS.L1, width: '100%', padding: '8px 12px', borderRadius: 8, fontSize: 13, marginTop: 4 }} />
                   </label>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>용도
-                    <select value={editMapping.purpose || ''} onChange={e => setEditMapping({ ...editMapping, purpose: e.target.value })}
-                      style={{ ...GLASS.L1, width: '100%', padding: '8px 12px', borderRadius: 8, fontSize: 13, marginTop: 4 }}>
-                      <option value="">미지정</option>
-                      <option value="rent_income">렌트수입</option><option value="operating">운영비</option>
-                      <option value="salary">급여</option><option value="insurance">보험</option>
-                    </select>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>용도 (자유 입력 + 추천)
+                    <input list="bank-purpose-list" value={editMapping.purpose || ''} onChange={e => setEditMapping({ ...editMapping, purpose: e.target.value })}
+                      placeholder="렌트수입 / 운영비 / 타이어 / 충전기 시설유지보수 ..."
+                      style={{ ...GLASS.L1, width: '100%', padding: '8px 12px', borderRadius: 8, fontSize: 13, marginTop: 4 }} />
+                    <datalist id="bank-purpose-list">
+                      <option value="렌트수입" />
+                      <option value="운영비" />
+                      <option value="법인카드 결제계좌" />
+                      <option value="급여" />
+                      <option value="보험" />
+                      <option value="정비" />
+                      <option value="타이어" />
+                      <option value="충전기 시설유지보수" />
+                      <option value="주유" />
+                      <option value="통신비" />
+                      <option value="임대료" />
+                      <option value="사무용품" />
+                      <option value="기타" />
+                    </datalist>
+                  </label>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>메모
+                    <textarea value={editMapping.memo || ''} onChange={e => setEditMapping({ ...editMapping, memo: e.target.value })}
+                      rows={2} placeholder="자유 메모"
+                      style={{ ...GLASS.L1, width: '100%', padding: '8px 12px', borderRadius: 8, fontSize: 13, marginTop: 4, resize: 'vertical', fontFamily: 'inherit' }} />
                   </label>
                 </>
               )}
