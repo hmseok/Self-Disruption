@@ -176,8 +176,27 @@ function parseKB(text: string): ParsedSms | null {
 function parseWoori(text: string): ParsedSms | null {
   const canceled = isCancelSms(text)
 
-  // 포맷 1: [우리카드] 이름 날짜 가맹점 금액
+  // 포맷 0 (실제 수신): ● 우리카드 이용안내 우리(4331)승인 법인 김*수님 4,795원 일시불 04/27 17:02 에스케이 일렉링크 누적329,111원
   let m = text.match(
+    /우리\((\d{4})\)(?:승인|취소|사용)\s+(?:법인\s+)?([^\d\s][^\s]*?)님\s+([\d,]+)\s*원\s*(일시불|\d+개월)?\s*(\d{1,2}[./-]\d{1,2}\s+\d{1,2}:\d{2})\s+(.+?)(?:\s+(?:잔여|누적)|$)/
+  )
+  if (m) {
+    const [, cardNum, holder, amtStr, install, dt, merchantRaw] = m
+    const isCancel = canceled || /\(\d{4}\)취소/.test(text)
+    return {
+      issuer: 'WOORI',
+      type: isCancel ? 'canceled' : 'approved',
+      holder: holder.trim() || null,
+      card_alias: `우리****${cardNum}`,
+      amount: Number(amtStr.replace(/,/g, '')),
+      merchant: merchantRaw.trim() || null,
+      installment: install || null,
+      txAt: parseDateTime(dt),
+    }
+  }
+
+  // 포맷 1: [우리카드] 이름 날짜 가맹점 금액
+  m = text.match(
     /\[우리카드\]\s*([^\s]+)\s+(\d{1,2}[./-]\d{1,2}\s+\d{1,2}:\d{2})\s+(.+?)\s+([\d,]+)\s*원\s*([^\n]*)/
   )
   if (m) {
@@ -447,7 +466,14 @@ function parseKBBank(text: string): ParsedSms | null {
 // ═══════════════════════════════════════════════════════════
 // 라우터
 // ═══════════════════════════════════════════════════════════
-export function parseSms(sender: string | null, text: string): ParsedSms | null {
+export function parseSms(sender: string | null, rawText: string): ParsedSms | null {
+  // ── 텍스트 정규화: 줄바꿈/탭/다중공백 → 단일공백 ──
+  // (실제 SMS는 줄바꿈으로 들어오는데 기존 파서는 한 줄 가정)
+  const text = rawText
+    .replace(/[\r\n\t]+/g, ' ')
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+
   const issuer = detectIssuer(sender, text)
   if (issuer === 'UNKNOWN') return null
 
