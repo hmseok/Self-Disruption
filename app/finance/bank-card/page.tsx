@@ -2874,31 +2874,40 @@ export default function BankCardPage() {
                 <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>
                   미리보기 ({uploadPreview.length}행) — 매핑된 컬럼은 <span style={{ color: COLORS.success }}>초록색</span>으로 표시
                 </div>
-                <div style={{ overflowX: 'auto', maxHeight: 220, borderRadius: 8, border: `1px solid ${COLORS.borderSubtle}` }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: 280, borderRadius: 8, border: `1px solid ${COLORS.borderSubtle}`, background: '#fff' }}>
+                  <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, fontSize: 12 }}>
                     <thead>
-                      <tr style={{ background: 'rgba(0,0,0,0.03)', position: 'sticky', top: 0 }}>
+                      <tr>
                         {Object.keys(uploadPreview[0]).map(h => (
                           <th key={h} style={{
-                            padding: '6px 8px', textAlign: 'left', fontWeight: 600,
-                            borderBottom: `1px solid ${COLORS.borderSubtle}`,
+                            padding: '8px 10px', textAlign: 'left', fontWeight: 700,
+                            borderBottom: `2px solid ${COLORS.borderSubtle}`,
                             whiteSpace: 'nowrap',
-                            background: uploadColumns[h] ? 'rgba(34,197,94,0.08)' : 'rgba(0,0,0,0.03)',
+                            background: uploadColumns[h] ? 'rgba(34,197,94,0.12)' : '#f8fafc',
+                            position: 'sticky', top: 0, zIndex: 2,
+                            verticalAlign: 'top',
                           }}>
-                            {h}
-                            {uploadColumns[h] && <span style={{ color: COLORS.success, marginLeft: 4, fontSize: 10 }}>→{uploadColumns[h]}</span>}
+                            <div style={{ color: '#1e293b', fontSize: 12, fontWeight: 700 }}>{h}</div>
+                            {uploadColumns[h] && (
+                              <div style={{ color: COLORS.success, fontSize: 10, marginTop: 2, fontWeight: 600 }}>
+                                → {uploadColumns[h]}
+                              </div>
+                            )}
                           </th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
                       {uploadPreview.slice(0, 10).map((row, i) => (
-                        <tr key={i} style={{ borderBottom: `1px solid ${COLORS.borderFaint}` }}>
+                        <tr key={i} style={{ borderBottom: `1px solid ${COLORS.borderFaint}`, background: '#fff' }}>
                           {Object.keys(uploadPreview[0]).map((h, j) => (
                             <td key={j} style={{
-                              padding: '4px 8px', whiteSpace: 'nowrap', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis',
-                              background: uploadColumns[h] ? 'rgba(34,197,94,0.03)' : 'transparent',
+                              padding: '6px 10px', whiteSpace: 'nowrap', maxWidth: 200,
+                              overflow: 'hidden', textOverflow: 'ellipsis',
+                              background: uploadColumns[h] ? 'rgba(34,197,94,0.04)' : '#fff',
                               fontWeight: uploadColumns[h] ? 500 : 400,
+                              borderBottom: `1px solid ${COLORS.borderFaint}`,
+                              color: '#334155',
                             }}>
                               {String(row[h] ?? '')}
                             </td>
