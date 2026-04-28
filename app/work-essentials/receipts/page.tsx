@@ -16,7 +16,12 @@ const CATEGORIES = [
   '교통비', '사무용품', '택배비', '기타',
 ]
 
-const fmt = (n: number) => n.toLocaleString()
+// MySQL DECIMAL → Prisma raw 에서 string 으로 와서 string.toLocaleString() 은 콤마 안 붙음.
+// Number 래핑으로 강제 변환.
+const fmt = (n: number | string) => {
+  const num = typeof n === 'number' ? n : Number(n)
+  return Number.isFinite(num) ? num.toLocaleString() : '0'
+}
 const fmtDate = (d: string) => d ? d.slice(0, 10) : '-'
 const getCurrentMonth = () => {
   const d = new Date()

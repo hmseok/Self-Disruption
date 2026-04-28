@@ -75,10 +75,12 @@ function buildRowXml(rowNum: number, item: any): string {
   }
 
   // G: amount (number) — style 66
-  let amount = item.amount || 0
-  if (typeof amount === 'string') {
-    amount = parseInt(amount.replace(/,/g, ''), 10) || 0
-  }
+  // Prisma raw 에서 DECIMAL 은 string/Decimal 로 옴 → 숫자로 강제 변환
+  let amount: any = item.amount
+  if (amount === null || amount === undefined) amount = 0
+  else if (typeof amount === 'string') amount = parseInt(amount.replace(/,/g, ''), 10) || 0
+  else if (typeof amount === 'object') amount = Number(String(amount)) || 0  // Decimal 객체
+  else if (typeof amount !== 'number') amount = Number(amount) || 0
   cells.push(`<c r="G${r}" s="66"><v>${amount}</v></c>`)
 
   // H: receipt — style 72 (empty)
@@ -101,26 +103,36 @@ export async function GET(request: NextRequest) {
 
   if (!month) return NextResponse.json({ error: 'month 파라미터 필요' }, { status: 400 })
 
-  // 데이터 조회
-  const start = `${month}-01`
-  const endDate = new Date(parseInt(month.split('-')[0]), parseInt(month.split('-')[1]), 0)
-  const end = `${month}-${String(endDate.getDate()).padStart(2, '0')}`
-
-  const items = await prisma.$queryRaw<any[]>`
-    SELECT * FROM expense_receipts
-    WHERE user_id = ${user.id}
-    AND expense_date >= ${start}
-    AND expense_date <= ${end}
-    ORDER BY expense_date ASC
-  `
-
-  // ── JSZip으로 템플릿 xlsx 직접 수정 ──
-  const templatePath = path.join(process.cwd(), 'public', 'templates', 'expense_report_template.xlsx')
-  if (!fs.existsSync(templatePath)) {
-    return NextResponse.json({ error: '템플릿 파일 없음' }, { status: 500 })
-  }
-
   try {
+    // 데이터 조회
+    const start = `${month}-01`
+    const endDate = new Date(parseInt(month.split('-')[0]), parseInt(month.split('-')[1]), 0)
+    const end = `${month}-${String(endDate.getDate()).padStart(2, '0')}`
+
+    const items = await prisma.$queryRaw<any[]>`
+      SELECT * FROM expense_receipts
+      WHERE user_id = ${user.id}
+      AND expense_date >= ${start}
+      AND expense_date <= ${end}
+      ORDER BY expense_date ASC
+    `
+
+    // ── JSZip으로 템플릿 xlsx 직접 수정 ──
+    // Cloud Run standalone build 에서는 cwd 가 /app 이지만 public 은 정적으로 카피되지 않을 수 있어
+    // 후보 경로 여러 개 시도
+    const candidates = [
+      path.join(process.cwd(), 'public', 'templates', 'expense_report_template.xlsx'),
+      path.join(process.cwd(), '.next', 'standalone', 'public', 'templates', 'expense_report_template.xlsx'),
+      path.join(process.cwd(), '..', 'public', 'templates', 'expense_report_template.xlsx'),
+    ]
+    let templatePath = ''
+    for (const p of candidates) {
+      if (fs.existsSync(p)) { templatePath = p; break }
+    }
+    if (!templatePath) {
+      console.error('템플릿 파일 후보 모두 없음:', candidates)
+      return NextResponse.json({ error: `템플릿 파일을 찾을 수 없습니다. cwd=${process.cwd()}` }, { status: 500 })
+    }
     const templateBuf = fs.readFileSync(templatePath)
     const zip = await JSZip.loadAsync(templateBuf)
 
@@ -182,8 +194,11 @@ export async function GET(request: NextRequest) {
     // 3) G2 셀: SUM 공식 + 서버에서 계산한 값 설정 (동적 범위)
     let totalAmount = 0
     for (const item of dataItems) {
-      let amt = item.amount || 0
-      if (typeof amt === 'string') amt = parseInt(amt.replace(/,/g, ''), 10) || 0
+      let amt: any = item.amount
+      if (amt === null || amt === undefined) amt = 0
+      else if (typeof amt === 'string') amt = parseInt(amt.replace(/,/g, ''), 10) || 0
+      else if (typeof amt === 'object') amt = Number(String(amt)) || 0
+      else if (typeof amt !== 'number') amt = Number(amt) || 0
       totalAmount += amt
     }
     sheetXml = sheetXml.replace(
