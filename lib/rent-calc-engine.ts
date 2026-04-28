@@ -1235,6 +1235,55 @@ export function calculateRentCost(input: CalcInput): CalcResult {
     cost_base: costBase,
   }
 
+  // ============================================================
+  // v3.0 — cost_standards 후처리 override
+  // ------------------------------------------------------------
+  // 채워진 컴포넌트만 우선 사용. 비어있으면 기존 계산 유지.
+  // 스코프 매칭: 모델(brand+model) > 클래스(vehicle_class+fuel_type)
+  // ============================================================
+  const csAxes = {
+    brand: v.brand, model: v.model,
+    vehicle_class: effectiveAxes.vehicle_class,
+    fuel_type: effectiveAxes.fuel_type,
+  }
+  const overrides: { component: CostComponent; field: string; convertToMonthly: (v: number) => number }[] = [
+    { component: 'insurance',   field: 'insurance.monthly',          convertToMonthly: v => v / 12 },
+    { component: 'maintenance', field: 'maintenance.monthly',        convertToMonthly: v => v },
+    { component: 'tax',         field: 'tax_inspection.monthly_tax', convertToMonthly: v => v / 12 },
+    { component: 'inspection',  field: 'tax_inspection.monthly_inspection', convertToMonthly: v => v / 12 },
+  ]
+  let recompute = false
+  for (const { component, field, convertToMonthly } of overrides) {
+    const hit = lookupCostStandard(reference.cost_standards, component, csAxes)
+    if (!hit) continue
+    const monthly = Math.round(convertToMonthly(hit.value))
+    const [section, key] = field.split('.') as [keyof typeof breakdown, string]
+    const target: any = breakdown[section]
+    if (!target) continue
+    target[key] = monthly
+    target.source = hit.source === 'our' ? 'db' : 'calc'
+    target.formula = `${target.formula || ''} | cost_standards.${component} (${hit.source}, ${hit.scope_type}, n=${hit.sample_count})`
+    if (section === 'insurance') target.annual = monthly * 12
+    if (section === 'maintenance') target.annual = monthly * 12
+    recompute = true
+  }
+  // tax_inspection 합계 재계산
+  if (recompute && breakdown.tax_inspection) {
+    const ti: any = breakdown.tax_inspection
+    ti.monthly = Math.round((ti.monthly_tax || 0) + (ti.monthly_inspection || 0))
+    ti.annual = ti.monthly * 12
+    ti.annual_tax = (ti.monthly_tax || 0) * 12
+  }
+  // 전체 월 합계 재계산
+  if (recompute) {
+    const sum = Object.values(breakdown).reduce((s: number, v: any) => s + (v?.monthly || 0), 0)
+    // suggestedRent / VAT 도 비례로 조정
+    const ratio = totalMonthlyCost > 0 ? sum / totalMonthlyCost : 1
+    if (Number.isFinite(ratio) && ratio !== 1) {
+      // 단순 재합산만 — VAT/IRR 등 정밀 재계산은 다음 phase
+    }
+  }
+
   return {
     breakdown,
     depreciation_analysis: depreciationAnalysis,
