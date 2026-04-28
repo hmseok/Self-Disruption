@@ -21,20 +21,37 @@ export async function GET(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   try {
-  // 법인카드 목록 (차량 정보 JOIN) — 확장 메타 포함
-  const cards = await prisma.$queryRaw<any[]>`
-    SELECT c.id, c.card_number, c.card_alias, c.card_issuer, c.holder_name,
-           c.assigned_car_id, c.assigned_employee_id, c.status,
-           c.card_type, c.card_holder_type, c.valid_thru, c.issued_at, c.expires_at,
-           c.payment_bank, c.payment_account, c.payment_day, c.monthly_limit,
-           c.previous_card_number, c.department, c.memo,
-           car.number AS car_number, CONCAT_WS(' ', car.brand, car.model) AS car_model
-    FROM corporate_cards c
-    LEFT JOIN cars car ON c.assigned_car_id = car.id
-    ORDER BY c.created_at DESC
-  `
+  // 법인카드 목록 (차량 정보 JOIN) — 확장 메타 포함, COLLATE 강제
+  let cards: any[] = []
+  try {
+    cards = await prisma.$queryRaw<any[]>`
+      SELECT c.id, c.card_number, c.card_alias, c.card_issuer, c.holder_name,
+             c.assigned_car_id, c.assigned_employee_id, c.status,
+             c.card_type, c.card_holder_type, c.valid_thru, c.issued_at, c.expires_at,
+             c.payment_bank, c.payment_account, c.payment_day, c.monthly_limit,
+             c.previous_card_number, c.department, c.memo,
+             car.number AS car_number, CONCAT_WS(' ', car.brand, car.model) AS car_model
+      FROM corporate_cards c
+      LEFT JOIN cars car ON c.assigned_car_id COLLATE utf8mb4_unicode_ci = car.id COLLATE utf8mb4_unicode_ci
+      ORDER BY c.created_at DESC
+    `
+  } catch (e: any) {
+    console.error('[mappings GET] cards JOIN 실패, fallback:', e.message)
+    cards = await prisma.$queryRaw<any[]>`
+      SELECT id, card_number, card_alias, card_issuer, holder_name,
+             assigned_car_id, assigned_employee_id, status,
+             card_type, card_holder_type, valid_thru, issued_at, expires_at,
+             payment_bank, payment_account, payment_day, monthly_limit,
+             previous_card_number, department, memo,
+             NULL AS car_number, NULL AS car_model
+      FROM corporate_cards
+      ORDER BY created_at DESC
+    `
+  }
 
   // 은행계좌 매핑 (차량 정보 JOIN)
+  // ※ bank_account_mappings.assigned_car_id 와 cars.id 의 collation 이 다를 수 있어
+  //    JOIN 비교에 COLLATE 강제 (utf8mb4_unicode_ci 통일)
   let bankAccounts: any[] = []
   try {
     bankAccounts = await prisma.$queryRaw<any[]>`
@@ -42,10 +59,22 @@ export async function GET(req: NextRequest) {
              b.assigned_car_id, b.purpose, b.memo, b.status,
              car.number AS car_number, CONCAT_WS(' ', car.brand, car.model) AS car_model
       FROM bank_account_mappings b
-      LEFT JOIN cars car ON b.assigned_car_id = car.id
+      LEFT JOIN cars car ON b.assigned_car_id COLLATE utf8mb4_unicode_ci = car.id COLLATE utf8mb4_unicode_ci
       ORDER BY b.created_at DESC
     `
-  } catch { /* 테이블 미존재 */ }
+  } catch (e: any) {
+    console.error('[mappings GET] bankAccounts 쿼리 실패:', e.message)
+    // 폴백: JOIN 없이 단순 SELECT
+    try {
+      bankAccounts = await prisma.$queryRaw<any[]>`
+        SELECT id, account_alias, bank_issuer, bank_name, account_holder,
+               assigned_car_id, purpose, memo, status,
+               NULL AS car_number, NULL AS car_model
+        FROM bank_account_mappings
+        ORDER BY created_at DESC
+      `
+    } catch (e2) { /* 테이블 미존재 */ }
+  }
 
   // 차량 목록 (드롭다운용)
   const cars = await prisma.$queryRaw<any[]>`
