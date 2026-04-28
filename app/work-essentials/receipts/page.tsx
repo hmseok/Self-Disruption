@@ -401,8 +401,12 @@ export default function ReceiptsPage() {
         if (ocrJson.fail_reason) failReasons.add(ocrJson.fail_reason)
 
         // 각 OCR 항목을 DB에 저장할 아이템으로 변환
+        // amount 가 string 으로 올 수도 있어 Number 변환 후 양수만 통과
         const itemsToSave = ocrItems
-          .filter((ocr: any) => ocr.amount && ocr.amount !== 0)
+          .filter((ocr: any) => {
+            const a = Number(ocr.amount)
+            return Number.isFinite(a) && a > 0
+          })
           .map((ocr: any) => {
             // 카드번호 자동 매칭
             let matchedCardNumber = ''
