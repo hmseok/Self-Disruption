@@ -182,6 +182,14 @@ export interface CalcInput {
     }
     /** v2.1 신규 — 외부시세 (vehicle_market_price, optional) */
     vehicle_market_prices?: any[]
+    /**
+     * v3.0 신규 — 통합 원가 기준 (cost_standards_value)
+     * 비어있거나 특정 컴포넌트 NULL 이면 기존 reference.* 로 fallback
+     * 채워진 항목은 우선 사용 (운영학습 결과 + 시장 데이터 반영)
+     *
+     * 형태: [{ scope_type, vehicle_class, fuel_type, brand, model, component, unit, market_value, our_value, sample_count }]
+     */
+    cost_standards?: any[]
   }
 
   // ── BusinessRules ──
@@ -299,6 +307,75 @@ export interface CalcResult {
 function n(val: any, fallback: number = 0): number {
   const num = Number(val)
   return isNaN(num) || !isFinite(num) || Math.abs(num) >= 1e15 ? fallback : num
+}
+
+// ============================================================
+// v3.0 — cost_standards 룩업 헬퍼
+// ------------------------------------------------------------
+// 점진적 전환: cost_standards_value 에 채워진 컴포넌트만 우선 사용,
+//             없으면 기존 reference.* 로 fallback (비파괴)
+//
+// 우선순위:
+//   1. 모델 스코프 (brand+model 정확 매칭)
+//   2. 클래스 스코프 (vehicle_class+fuel_type 정확 매칭)
+//   3. 둘 다 없거나 our_value/market_value 모두 NULL → null 반환 (호출자가 fallback)
+//
+// 값 선택:
+//   - our_value 가 있으면 우선 (운영학습 결과)
+//   - 없으면 market_value (시장 데이터)
+//   - 둘 다 없으면 null
+// ============================================================
+export type CostComponent =
+  | 'insurance' | 'maintenance' | 'tax' | 'inspection'
+  | 'finance_rate' | 'registration' | 'fuel_cost' | 'parking' | 'extras'
+
+export interface CostStandardLookup {
+  value: number               // monthly/annual/percent/fixed (해당 컴포넌트 단위)
+  source: 'our' | 'market'    // 어디서 왔는지 (감사추적)
+  unit: string                // 'monthly' | 'annual' | 'percent' | 'fixed'
+  scope_type: 'model' | 'class'
+  sample_count: number        // 우리원가 신뢰도 지표
+}
+
+export function lookupCostStandard(
+  costStandards: any[] | undefined,
+  component: CostComponent,
+  axes: { brand?: string | null; model?: string | null; vehicle_class?: string | null; fuel_type?: string | null },
+): CostStandardLookup | null {
+  if (!costStandards || costStandards.length === 0) return null
+
+  const matches = costStandards.filter(r => r.component === component)
+  if (matches.length === 0) return null
+
+  // 1. 모델 정확 매칭 (brand+model)
+  const modelHit = matches.find(r =>
+    r.scope_type === 'model'
+    && r.brand && r.model && axes.brand && axes.model
+    && r.brand === axes.brand && r.model === axes.model
+  )
+
+  // 2. 클래스 정확 매칭 (vehicle_class+fuel_type)
+  const classHit = matches.find(r =>
+    r.scope_type === 'class'
+    && r.vehicle_class === axes.vehicle_class
+    && r.fuel_type === axes.fuel_type
+  )
+
+  const row = modelHit || classHit
+  if (!row) return null
+
+  const our = row.our_value !== null && row.our_value !== undefined ? Number(row.our_value) : null
+  const market = row.market_value !== null && row.market_value !== undefined ? Number(row.market_value) : null
+  const value = our != null ? our : market
+  if (value == null) return null
+
+  return {
+    value,
+    source: our != null ? 'our' : 'market',
+    unit: row.unit,
+    scope_type: row.scope_type,
+    sample_count: Number(row.sample_count || 0),
+  }
 }
 
 // ============================================================
