@@ -85,6 +85,32 @@ export default function CostStandardsTab() {
 
   useEffect(() => { load() }, [])
 
+  async function runRollup() {
+    if (!confirm('운영 실적(operational_actuals) 최근 12개월 데이터로 우리원가를 일괄 갱신합니다.\n\n계속할까요?')) return
+    try {
+      const headers = await getAuthHeader()
+      const res = await fetch('/api/cost-standards/rollup?months=12', {
+        method: 'POST',
+        headers,
+      })
+      const json = await res.json()
+      if (!res.ok) {
+        alert(`롤업 실패: ${json.error || res.status}`)
+        return
+      }
+      alert(
+        `✓ 롤업 완료\n\n` +
+        `· 그룹 수: ${json.actuals_groups}\n` +
+        `· 업데이트: ${json.updated}건\n` +
+        `· 알림: ${json.notifications}건\n\n` +
+        (json.message ? json.message : '우리원가가 실적 평균으로 갱신되었습니다.')
+      )
+      await load()
+    } catch (e: any) {
+      alert(`롤업 오류: ${e.message}`)
+    }
+  }
+
   async function saveValue(scopeId: string, component: Component, field: 'market_value' | 'our_value', value: string) {
     try {
       setSaving(true)
@@ -157,6 +183,16 @@ export default function CostStandardsTab() {
             outline: 'none',
           }}
         />
+
+        {/* 운영학습 롤업 트리거 */}
+        <button
+          onClick={runRollup}
+          style={{
+            padding: '8px 12px', fontSize: 11, fontWeight: 700, borderRadius: 8,
+            border: '1px solid rgba(34,197,94,0.3)', background: 'rgba(34,197,94,0.08)',
+            color: '#15803d', cursor: 'pointer',
+          }}
+        >🔄 운영실적 → 우리원가 갱신</button>
 
         {/* 리스트 */}
         <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
