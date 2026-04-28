@@ -105,6 +105,16 @@ export default function ReceiptsPage() {
   // 검색
   const [searchQuery, setSearchQuery] = useState('')
 
+  // 카테고리 필터 + 정렬
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
+  type SortKey = 'expense_date' | 'card_number' | 'category' | 'merchant' | 'item_name' | 'customer_team' | 'amount'
+  const [sortKey, setSortKey] = useState<SortKey>('expense_date')
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
+  const toggleSort = (key: SortKey) => {
+    if (sortKey === key) setSortOrder(o => o === 'asc' ? 'desc' : 'asc')
+    else { setSortKey(key); setSortOrder(key === 'amount' || key === 'expense_date' ? 'desc' : 'asc') }
+  }
+
   // 선택 + 일괄수정
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkCategory, setBulkCategory] = useState('')
@@ -625,9 +635,10 @@ export default function ReceiptsPage() {
     setEditingId(null)
   }
 
-  // ── 합계 + 검색 ──
+  // ── 합계 + 검색 + 카테고리 필터 + 정렬 ──
   const allRawItems = [...items, ...justUploaded.filter(j => !items.some(i => i.id === j.id))]
-  const allDisplayItems = searchQuery.trim()
+  // 1) 검색 필터
+  const afterSearch = searchQuery.trim()
     ? allRawItems.filter(i => {
         const q = searchQuery.toLowerCase()
         return (
@@ -641,11 +652,25 @@ export default function ReceiptsPage() {
         )
       })
     : allRawItems
-  const totalAmount = allDisplayItems.reduce((s, i) => s + (Number(i.amount) || 0), 0)
-  const categoryTotals = allDisplayItems.reduce<Record<string, number>>((acc, i) => {
+  // 2) 카테고리 칩 합계는 필터 *전* 데이터로 (그래야 다른 카테고리 칩 계속 보임)
+  const categoryTotals = afterSearch.reduce<Record<string, number>>((acc, i) => {
     if (i.category) acc[i.category] = (acc[i.category] || 0) + (Number(i.amount) || 0)
     return acc
   }, {})
+  // 3) 카테고리 필터 적용
+  const afterCategory = selectedCategory
+    ? afterSearch.filter(i => i.category === selectedCategory)
+    : afterSearch
+  // 4) 정렬
+  const allDisplayItems = [...afterCategory].sort((a, b) => {
+    const av = a[sortKey] ?? ''
+    const bv = b[sortKey] ?? ''
+    let cmp: number
+    if (sortKey === 'amount') cmp = (Number(av) || 0) - (Number(bv) || 0)
+    else cmp = String(av).localeCompare(String(bv), 'ko')
+    return sortOrder === 'asc' ? cmp : -cmp
+  })
+  const totalAmount = allDisplayItems.reduce((s, i) => s + (Number(i.amount) || 0), 0)
   const incompleteCount = allDisplayItems.filter(i => i._incomplete).length
 
   // ── xlsx 다운로드 ──
@@ -1070,15 +1095,42 @@ export default function ReceiptsPage() {
           }
         />
 
-      {/* ── 카테고리별 칩 ── */}
+      {/* ── 카테고리별 칩 (클릭 시 해당 카테고리만 필터) ── */}
       {Object.keys(categoryTotals).length > 0 && (
         <div style={{ display: 'flex', gap: isMobile ? 6 : 8, flexWrap: 'wrap', marginBottom: 16, width: '100%', boxSizing: 'border-box' }}>
-          {Object.entries(categoryTotals).sort((a, b) => b[1] - a[1]).map(([cat, total]) => (
-            <div key={cat} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: isMobile ? '4px 8px' : '5px 12px', display: 'flex', alignItems: 'center', gap: 4 }}>
-              <span style={{ fontSize: isMobile ? 11 : 12, color: '#475569', fontWeight: 600 }}>{cat}</span>
-              <span style={{ fontSize: isMobile ? 11 : 13, fontWeight: 700, color: '#1e293b' }}>{fmt(total)}원</span>
-            </div>
-          ))}
+          {/* 전체 칩 */}
+          <button
+            onClick={() => setSelectedCategory(null)}
+            style={{
+              background: selectedCategory === null ? '#3b6eb5' : '#f8fafc',
+              border: `1px solid ${selectedCategory === null ? '#3b6eb5' : '#e2e8f0'}`,
+              borderRadius: 8, padding: isMobile ? '4px 8px' : '5px 12px',
+              display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer',
+            }}
+          >
+            <span style={{ fontSize: isMobile ? 11 : 12, color: selectedCategory === null ? '#fff' : '#475569', fontWeight: 700 }}>전체</span>
+            <span style={{ fontSize: isMobile ? 11 : 13, fontWeight: 700, color: selectedCategory === null ? '#fff' : '#1e293b' }}>
+              {fmt(Object.values(categoryTotals).reduce((s, v) => s + v, 0))}원
+            </span>
+          </button>
+          {Object.entries(categoryTotals).sort((a, b) => b[1] - a[1]).map(([cat, total]) => {
+            const active = selectedCategory === cat
+            return (
+              <button
+                key={cat}
+                onClick={() => setSelectedCategory(active ? null : cat)}
+                style={{
+                  background: active ? '#3b6eb5' : '#f8fafc',
+                  border: `1px solid ${active ? '#3b6eb5' : '#e2e8f0'}`,
+                  borderRadius: 8, padding: isMobile ? '4px 8px' : '5px 12px',
+                  display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer',
+                }}
+              >
+                <span style={{ fontSize: isMobile ? 11 : 12, color: active ? '#fff' : '#475569', fontWeight: 600 }}>{cat}</span>
+                <span style={{ fontSize: isMobile ? 11 : 13, fontWeight: 700, color: active ? '#fff' : '#1e293b' }}>{fmt(total)}원</span>
+              </button>
+            )
+          })}
         </div>
       )}
 
@@ -1242,10 +1294,46 @@ export default function ReceiptsPage() {
                       style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#3b6eb5' }}
                     />
                   </th>
-                  {['날짜', '카드번호', '구분', '사용처', '품명', '고객명/팀원'].map(h => (
-                    <th key={h} style={{ padding: '12px 10px', textAlign: 'left', fontWeight: 700, color: '#475569', whiteSpace: 'nowrap', fontSize: 12 }}>{h}</th>
-                  ))}
-                  <th style={{ padding: '12px 10px', textAlign: 'right', fontWeight: 700, color: '#475569', whiteSpace: 'nowrap', fontSize: 12 }}>금액</th>
+                  {([
+                    ['날짜', 'expense_date'],
+                    ['카드번호', 'card_number'],
+                    ['구분', 'category'],
+                    ['사용처', 'merchant'],
+                    ['품명', 'item_name'],
+                    ['고객명/팀원', 'customer_team'],
+                  ] as Array<[string, SortKey]>).map(([label, key]) => {
+                    const active = sortKey === key
+                    return (
+                      <th
+                        key={label}
+                        onClick={() => toggleSort(key)}
+                        style={{
+                          padding: '12px 10px', textAlign: 'left', fontWeight: 700,
+                          color: active ? '#3b6eb5' : '#475569',
+                          whiteSpace: 'nowrap', fontSize: 12, cursor: 'pointer',
+                          userSelect: 'none',
+                        }}
+                      >
+                        {label}
+                        <span style={{ marginLeft: 4, opacity: active ? 1 : 0.3 }}>
+                          {active ? (sortOrder === 'asc' ? '▲' : '▼') : '↕'}
+                        </span>
+                      </th>
+                    )
+                  })}
+                  <th
+                    onClick={() => toggleSort('amount')}
+                    style={{
+                      padding: '12px 10px', textAlign: 'right', fontWeight: 700,
+                      color: sortKey === 'amount' ? '#3b6eb5' : '#475569',
+                      whiteSpace: 'nowrap', fontSize: 12, cursor: 'pointer', userSelect: 'none',
+                    }}
+                  >
+                    금액
+                    <span style={{ marginLeft: 4, opacity: sortKey === 'amount' ? 1 : 0.3 }}>
+                      {sortKey === 'amount' ? (sortOrder === 'asc' ? '▲' : '▼') : '↕'}
+                    </span>
+                  </th>
                   <th style={{ padding: '12px 8px', textAlign: 'center', fontWeight: 700, color: '#475569', fontSize: 12 }}>영수증</th>
                   <th style={{ width: 36 }}></th>
                 </tr>
