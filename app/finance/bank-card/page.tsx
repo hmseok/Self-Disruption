@@ -990,7 +990,39 @@ export default function BankCardPage() {
     await Promise.all([loadSummary(), loadTransactions()])
   }
 
-  // ── 자동 분류 실행 ──
+  // ── AI 일괄 분류 실행 ──
+  const runAiClassify = async () => {
+    if (!confirm('Gemini AI로 미분류 거래를 일괄 분류합니다.\n\n· 신뢰도 ≥70% 만 자동 적용\n· 미만은 검토 큐에 남음\n· 1~3분 소요\n\n계속할까요?')) return
+    setAutoClassifying(true)
+    try {
+      const { ok, json } = await fetchWithAuth('/api/finance/transactions/auto-classify-ai', {
+        method: 'POST',
+        body: { batchSize: 50, minConfidence: 70, limit: 800 },
+      })
+      if (!ok) {
+        alert(`AI 분류 실패: ${json?.error || '알 수 없는 오류'}`)
+        return
+      }
+      const dist = Object.entries(json.distribution || {}).sort((a:any,b:any) => b[1]-a[1])
+        .map(([k,v]) => `  ${v}건  ${k}`).join('\n')
+      alert(
+        `✓ AI 분류 완료\n\n` +
+        `· 미분류 처리: ${json.total_unclassified}건\n` +
+        `· AI 응답: ${json.ai_responses}건\n` +
+        `· 자동 적용: ${json.applied_high_confidence}건 (신뢰도 ≥${json.min_confidence}%)\n` +
+        `· 검토 필요: ${json.below_threshold}건\n\n` +
+        (dist ? `[카테고리별]\n${dist}` : '')
+      )
+      await Promise.all([loadSummary(), loadTransactions()])
+      setGroupData(null)
+    } catch (e: any) {
+      alert(`AI 분류 오류: ${e.message}`)
+    } finally {
+      setAutoClassifying(false)
+    }
+  }
+
+  // ── 자동 분류 실행 (룰 기반) ──
   const runAutoClassify = async (dryRun = false) => {
     setAutoClassifying(true)
     setAutoClassifyResult(null)
@@ -1499,7 +1531,28 @@ export default function BankCardPage() {
                           카테고리를 클릭하면 해당 거래 목록을 확인하고 수정할 수 있습니다
                         </div>
                       </div>
-                      <div style={{ display: 'flex', gap: 4 }}>
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                        <button
+                          onClick={() => runAutoClassify(false)}
+                          disabled={autoClassifying}
+                          style={{
+                            ...BTN.sm, padding: '5px 12px', fontSize: 11, fontWeight: 700,
+                            background: 'rgba(34,197,94,0.1)', color: '#15803d',
+                            border: '1px solid rgba(34,197,94,0.35)',
+                            cursor: autoClassifying ? 'wait' : 'pointer', opacity: autoClassifying ? 0.6 : 1,
+                          }}
+                        >📐 룰 분류</button>
+                        <button
+                          onClick={runAiClassify}
+                          disabled={autoClassifying}
+                          style={{
+                            ...BTN.sm, padding: '5px 12px', fontSize: 11, fontWeight: 700,
+                            background: 'rgba(168,85,247,0.1)', color: '#7e22ce',
+                            border: '1px solid rgba(168,85,247,0.35)',
+                            cursor: autoClassifying ? 'wait' : 'pointer', opacity: autoClassifying ? 0.6 : 1,
+                          }}
+                        >🤖 AI 일괄 분류</button>
+                        <span style={{ width: 1, height: 18, background: 'rgba(0,0,0,0.08)', margin: '0 4px' }} />
                         {(['all', 'expense', 'income'] as const).map(f => (
                           <button key={f} onClick={() => setReviewTypeFilter(f)}
                             style={{
