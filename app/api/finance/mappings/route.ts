@@ -75,25 +75,34 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json()
   const { type, id, card_alias, card_issuer, holder_name, assigned_car_id,
+          assigned_employee_id, status, card_type, card_holder_type,
+          card_number,
           account_alias, bank_issuer, bank_name, account_holder, purpose, memo } = body
 
   if (type === 'card') {
     if (id) {
-      // 수정
+      // 수정 — 신규 메타필드(status/card_type/card_holder_type/assigned_employee_id) 포함
       await prisma.$executeRaw`
         UPDATE corporate_cards SET
           card_alias = ${card_alias || null},
           card_issuer = ${card_issuer || null},
           holder_name = ${holder_name || null},
           assigned_car_id = ${assigned_car_id || null},
+          assigned_employee_id = ${assigned_employee_id || null},
+          status = ${status || 'active'},
+          card_type = ${card_type || null},
+          card_holder_type = ${card_holder_type || null},
           updated_at = NOW()
         WHERE id = ${id}
       `
     } else {
       // 새 카드 등록
       await prisma.$executeRaw`
-        INSERT INTO corporate_cards (id, card_alias, card_issuer, holder_name, assigned_car_id, status, created_at, updated_at)
-        VALUES (${randomUUID()}, ${card_alias}, ${card_issuer || null}, ${holder_name || null}, ${assigned_car_id || null}, 'active', NOW(), NOW())
+        INSERT INTO corporate_cards (id, card_number, card_alias, card_issuer, holder_name,
+          assigned_car_id, assigned_employee_id, status, card_type, card_holder_type, created_at, updated_at)
+        VALUES (${randomUUID()}, ${card_number || null}, ${card_alias}, ${card_issuer || null}, ${holder_name || null},
+          ${assigned_car_id || null}, ${assigned_employee_id || null}, ${status || 'active'},
+          ${card_type || '법인신용'}, ${card_holder_type || '무기명'}, NOW(), NOW())
       `
     }
   } else if (type === 'bank') {

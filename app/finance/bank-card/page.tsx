@@ -2384,7 +2384,15 @@ export default function BankCardPage() {
                           {c.car_number ? <span style={{ padding: '2px 8px', borderRadius: 6, background: 'rgba(59,130,246,0.1)', color: '#1d4ed8', fontWeight: 600, fontSize: 11 }}>🚗 {c.car_number}</span> : <span style={{ color: '#94a3b8' }}>공용</span>}
                         </td>
                         <td style={{ padding: '10px 12px', textAlign: 'center' }}>
-                          <button onClick={() => setEditMapping({ type: 'card', id: c.id, card_alias: c.card_alias, card_issuer: c.card_issuer, holder_name: c.holder_name, assigned_car_id: c.assigned_car_id })} style={{ padding: '3px 8px', borderRadius: 6, fontSize: 11, cursor: 'pointer', background: 'rgba(191,219,254,0.5)', border: '1px solid rgba(59,130,246,0.2)', color: '#1e40af', marginRight: 4 }}>수정</button>
+                          <button onClick={() => setEditMapping({
+                            type: 'card', id: c.id,
+                            card_alias: c.card_alias, card_issuer: c.card_issuer,
+                            holder_name: c.holder_name, assigned_car_id: c.assigned_car_id,
+                            assigned_employee_id: c.assigned_employee_id,
+                            status: c.status || 'active',
+                            card_type: c.card_type || '법인신용',
+                            card_holder_type: c.card_holder_type || '무기명',
+                          })} style={{ padding: '3px 8px', borderRadius: 6, fontSize: 11, cursor: 'pointer', background: 'rgba(191,219,254,0.5)', border: '1px solid rgba(59,130,246,0.2)', color: '#1e40af', marginRight: 4 }}>수정</button>
                           <button onClick={() => deleteMapping(c.id, 'card')} style={{ padding: '3px 8px', borderRadius: 6, fontSize: 11, cursor: 'pointer', background: 'rgba(254,202,202,0.5)', border: '1px solid rgba(239,68,68,0.2)', color: '#b91c1c' }}>삭제</button>
                         </td>
                       </tr>
@@ -2448,21 +2456,53 @@ export default function BankCardPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {editMapping.type === 'card' ? (
                 <>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>카드 별칭 (SMS 형식)
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>카드 별칭
                     <input value={editMapping.card_alias || ''} onChange={e => setEditMapping({ ...editMapping, card_alias: e.target.value })}
-                      placeholder="예: KB****8819" style={{ ...GLASS.L1, width: '100%', padding: '8px 12px', borderRadius: 8, fontSize: 13, marginTop: 4 }} />
+                      placeholder="예: KB국민-8819" style={{ ...GLASS.L1, width: '100%', padding: '8px 12px', borderRadius: 8, fontSize: 13, marginTop: 4 }} />
                   </label>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>카드사
-                    <select value={editMapping.card_issuer || ''} onChange={e => setEditMapping({ ...editMapping, card_issuer: e.target.value })}
-                      style={{ ...GLASS.L1, width: '100%', padding: '8px 12px', borderRadius: 8, fontSize: 13, marginTop: 4 }}>
-                      <option value="">선택</option>
-                      <option value="KB">KB국민</option><option value="WOORI">우리</option>
-                      <option value="HYUNDAI">현대</option><option value="MYCOMPANY">법인</option>
-                    </select>
-                  </label>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>소지자
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>카드사
+                      <select value={editMapping.card_issuer || ''} onChange={e => setEditMapping({ ...editMapping, card_issuer: e.target.value })}
+                        style={{ ...GLASS.L1, width: '100%', padding: '8px 12px', borderRadius: 8, fontSize: 13, marginTop: 4 }}>
+                        <option value="">선택</option>
+                        <option value="KB국민">KB국민</option><option value="우리">우리</option>
+                        <option value="현대">현대</option><option value="신한">신한</option>
+                        <option value="삼성">삼성</option><option value="롯데">롯데</option>
+                        <option value="하나">하나</option><option value="IBK">IBK</option>
+                        <option value="법인">법인(자체)</option>
+                      </select>
+                    </label>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>상태
+                      <select value={editMapping.status || 'active'} onChange={e => setEditMapping({ ...editMapping, status: e.target.value })}
+                        style={{ ...GLASS.L1, width: '100%', padding: '8px 12px', borderRadius: 8, fontSize: 13, marginTop: 4 }}>
+                        <option value="active">✓ 사용중</option>
+                        <option value="canceled">🚫 해지</option>
+                        <option value="suspended">⏸ 정지</option>
+                      </select>
+                    </label>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>카드 종류
+                      <select value={editMapping.card_type || '법인신용'} onChange={e => setEditMapping({ ...editMapping, card_type: e.target.value })}
+                        style={{ ...GLASS.L1, width: '100%', padding: '8px 12px', borderRadius: 8, fontSize: 13, marginTop: 4 }}>
+                        <option value="법인신용">법인신용</option>
+                        <option value="법인체크">법인체크</option>
+                        <option value="하이패스">하이패스</option>
+                        <option value="주유">주유</option>
+                        <option value="기타">기타</option>
+                      </select>
+                    </label>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>기명/무기명
+                      <select value={editMapping.card_holder_type || '무기명'} onChange={e => setEditMapping({ ...editMapping, card_holder_type: e.target.value })}
+                        style={{ ...GLASS.L1, width: '100%', padding: '8px 12px', borderRadius: 8, fontSize: 13, marginTop: 4 }}>
+                        <option value="무기명">무기명</option>
+                        <option value="기명">기명</option>
+                      </select>
+                    </label>
+                  </div>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>소지자/사용자
                     <input value={editMapping.holder_name || ''} onChange={e => setEditMapping({ ...editMapping, holder_name: e.target.value })}
-                      style={{ ...GLASS.L1, width: '100%', padding: '8px 12px', borderRadius: 8, fontSize: 13, marginTop: 4 }} />
+                      placeholder="예: 석호민, 공용 (탁송팀)" style={{ ...GLASS.L1, width: '100%', padding: '8px 12px', borderRadius: 8, fontSize: 13, marginTop: 4 }} />
                   </label>
                 </>
               ) : (
