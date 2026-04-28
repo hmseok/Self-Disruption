@@ -137,7 +137,7 @@ function useRefTables(): RefTables & { error: string | null } {
   useEffect(() => {
     ;(async () => {
       try {
-        const [rules, cars, depRates, depAdj, depDb, ins, maint, tax, fin, reg, inspC, inspS, insBase, insOwn, vmp, presets] = await Promise.all([
+        const [rules, cars, depRates, depAdj, depDb, ins, maint, tax, fin, reg, inspC, inspS, insBase, insOwn, vmp, presets, costStd] = await Promise.all([
           apiGet('/api/business-rules'),
           apiGet('/api/cars'),
           apiGet('/api/pricing-standards?table=depreciation_rates'),
@@ -154,7 +154,29 @@ function useRefTables(): RefTables & { error: string | null } {
           apiGet('/api/pricing-standards?table=insurance_own_vehicle_rate'),
           apiGet('/api/pricing-standards?table=vehicle_market_price'),
           apiGet('/api/pricing-standards?table=sales_presets'),
+          // v3.0 통합 원가 기준 — 비어있어도 기존 reference 로 fallback (비파괴)
+          apiGet('/api/cost-standards?view=tree').catch(() => ({ data: [] })),
         ])
+
+        // cost_standards: tree → flat (한 row 당 하나의 component 값)
+        const costStdFlat: any[] = []
+        for (const scope of (costStd?.data || [])) {
+          for (const v of (scope.values || [])) {
+            costStdFlat.push({
+              scope_id: scope.id,
+              scope_type: scope.scope_type,
+              vehicle_class: scope.vehicle_class,
+              fuel_type: scope.fuel_type,
+              brand: scope.brand,
+              model: scope.model,
+              component: v.component,
+              unit: v.unit,
+              market_value: v.market_value,
+              our_value: v.our_value,
+              sample_count: v.sample_count || 0,
+            })
+          }
+        }
 
         const ruleMap: Record<string, number> = {}
         for (const r of rules.data || []) {
@@ -182,6 +204,7 @@ function useRefTables(): RefTables & { error: string | null } {
           insOwn: insOwn.data || [],
           vmp: vmp.data || [],
           presets: (presets.data || []).map(normalizePreset),
+          costStd: costStdFlat,
         })
       } catch (e: any) {
         setError(e?.message || '기준표 로딩 실패')
@@ -350,6 +373,7 @@ function buildCalcInput(f: Form, r: RefTables): CalcInput {
       finance_rates: r.fin,
       maintenance_costs: r.maint,
       vehicle_market_prices: r.vmp,
+      cost_standards: r.costStd || [],   // v3.0 — 채워진 컴포넌트만 우선 사용
     },
     rules: R,
   }
