@@ -291,15 +291,22 @@ export default function ReceiptsPage() {
     let failedCount = 0
     const failReasons = new Set<string>()
 
-    // 이미지 리사이징 (큰 스크린샷 → 최대 1200px 폭, JPEG 80% 압축)
-    const resizeImage = (file: File, maxW = 1200): Promise<File> => new Promise((resolve) => {
-      if (file.size < 300_000) { resolve(file); return } // 300KB 미만은 그대로
+    // 이미지 리사이징 — OCR 가독성 유지하면서 최대한 작게
+    //   영수증/카드앱 캡처는 텍스트가 명확하므로 1000px@70% 충분
+    const resizeImage = (file: File, maxW = 1000, quality = 0.7): Promise<File> => new Promise((resolve) => {
+      // 200KB 미만이면 굳이 리사이즈 X (이미 작음)
+      if (file.size < 200_000) { resolve(file); return }
       const img = new Image()
+      const objectUrl = URL.createObjectURL(file)
+      // 안전장치: 5초 안에 onload/onerror 안 뜨면 원본 사용
+      const safetyTimer = setTimeout(() => { URL.revokeObjectURL(objectUrl); resolve(file) }, 5000)
       img.onload = () => {
-        if (img.width <= maxW) { resolve(file); return }
-        const scale = maxW / img.width
+        clearTimeout(safetyTimer)
+        URL.revokeObjectURL(objectUrl)
+        const targetW = Math.min(img.width, maxW)
+        const scale = targetW / img.width
         const canvas = document.createElement('canvas')
-        canvas.width = maxW
+        canvas.width = targetW
         canvas.height = Math.round(img.height * scale)
         const ctx = canvas.getContext('2d')!
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
@@ -307,25 +314,28 @@ export default function ReceiptsPage() {
           if (blob && blob.size < file.size) {
             resolve(new File([blob], file.name.replace(/\.\w+$/, '.jpg'), { type: 'image/jpeg' }))
           } else {
-            resolve(file) // 리사이즈해도 더 크면 원본
+            resolve(file) // 압축이 효과 없으면 원본
           }
-        }, 'image/jpeg', 0.80)
+        }, 'image/jpeg', quality)
       }
-      img.onerror = () => resolve(file)
-      img.src = URL.createObjectURL(file)
+      img.onerror = () => {
+        clearTimeout(safetyTimer)
+        URL.revokeObjectURL(objectUrl)
+        resolve(file)
+      }
+      img.src = objectUrl
     })
 
     let rateLimitHit = false
-    for (let i = 0; i < unique.length; i++) {
-      // 2번째 이미지부터 5초 딜레이 (앱 전체에서 Gemini 키 공유 → 한도 보호)
-      if (i > 0) await new Promise(r => setTimeout(r, 5000))
+    const CONCURRENCY = 2 // 동시 2건 처리 — Gemini 토큰 한도 안 깨고 약 2배 단축
 
-      // 앞 파일에서 429 한 번 떴으면 나머지는 즉시 실패 처리
+    const processOne = async (i: number) => {
+      // 앞 슬롯에서 429 한 번 떴으면 나머지는 즉시 실패 처리
       if (rateLimitHit) {
         failedCount++
         failReasons.add('Gemini API 요청 한도 초과로 큐 중단. 5분 후 다시 시도해주세요.')
         setUploadQueue(prev => prev.map((q, idx) => idx === i ? { ...q, status: 'error' } : q))
-        continue
+        return
       }
       setUploadQueue(prev => prev.map((q, idx) => idx === i ? { ...q, status: 'uploading' } : q))
 
@@ -350,7 +360,7 @@ export default function ReceiptsPage() {
             failedCount++
             failReasons.add('AI 분석 시간 초과 (60초). 이미지를 1장씩 다시 시도해주세요.')
             setUploadQueue(prev => prev.map((q, idx) => idx === i ? { ...q, status: 'error' } : q))
-            continue
+            return
           }
           throw fetchErr
         }
@@ -362,7 +372,7 @@ export default function ReceiptsPage() {
           failedCount++
           failReasons.add(ocrJson.fail_reason || ocrJson.error || `서버 오류 (${ocrRes.status})`)
           setUploadQueue(prev => prev.map((q, idx) => idx === i ? { ...q, status: 'done' } : q))
-          continue
+          return
         }
 
         // 429 한도 초과 감지 → 큐 일시정지 시그널
@@ -371,7 +381,7 @@ export default function ReceiptsPage() {
           failedCount++
           failReasons.add(ocrJson.fail_reason || 'Gemini API 한도 초과')
           setUploadQueue(prev => prev.map((q, idx) => idx === i ? { ...q, status: 'error' } : q))
-          continue
+          return
         }
 
         const receiptUrl = ocrJson.receipt_url || ''
@@ -416,7 +426,7 @@ export default function ReceiptsPage() {
           failedCount++
           if (!ocrJson.fail_reason) failReasons.add('이미지에서 거래 내역을 인식하지 못했습니다. 이미지 품질을 확인해주세요.')
           setUploadQueue(prev => prev.map((q, idx) => idx === i ? { ...q, status: 'error' } : q))
-          continue
+          return
         }
 
         const saveRes = await fetch('/api/receipts', {
@@ -450,6 +460,17 @@ export default function ReceiptsPage() {
         setUploadQueue(prev => prev.map((q, idx) => idx === i ? { ...q, status: 'error' } : q))
       }
     }
+
+    // ── Worker pool: CONCURRENCY 만큼 슬롯이 nextIdx 증가시키며 작업 픽업 ──
+    let nextIdx = 0
+    const worker = async () => {
+      while (true) {
+        const i = nextIdx++
+        if (i >= unique.length) return
+        await processOne(i)
+      }
+    }
+    await Promise.all(Array.from({ length: CONCURRENCY }, () => worker()))
 
     if (newItems.length > 0) {
       // 월별 카운트

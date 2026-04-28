@@ -76,7 +76,9 @@ async function analyzeWithGemini(base64Image: string, mimeType: string): Promise
   const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_GEMINI_API_KEY
   if (!apiKey) throw new Error('GEMINI_API_KEY 미설정')
 
-  const model = process.env.GEMINI_MODEL || 'gemini-2.0-flash'
+  // 2.5 Flash: 2.0 와 동일 가격대인데 추론 정확도/속도 모두 향상.
+  // 2026-04 기준 GA. 환경변수로 다운그레이드 가능.
+  const model = process.env.GEMINI_MODEL_OCR || process.env.GEMINI_MODEL || 'gemini-2.5-flash'
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
 
   const prompt = `이 이미지는 한국의 영수증, 카드전표, 또는 **카드앱/은행앱 사용내역 스크린샷** 중 하나입니다.
