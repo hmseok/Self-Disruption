@@ -374,20 +374,20 @@ function parseMyCompany(text: string): ParsedSms | null {
 // 실제 수신 포맷: 우리 04/24 16:00 *828777 출금 1,400원 잔액 123,456원
 //   → "우리" + 날짜 + *계좌끝번호(5~6자리) + 출금|입금 + 금액 + 잔액
 function parseWooriBank(text: string): ParsedSms | null {
-  // 패턴: 우리 MM/DD HH:MM *XXXXXX 출금|입금 금액원 (잔액...)
+  // 패턴: 우리 MM/DD HH:MM *XXXXXX 출금|입금 금액원 [거래처] [잔액 ...원]
+  // 예: 우리 04/28 16:38 *883582 출금 294,400원 (주)딜러타이어 잔액 12,699,362원
   let m = text.match(
-    /우리\s+(\d{1,2}[./-]\d{1,2}\s+\d{1,2}:\d{2})\s+\*(\d{5,})\s+(출금|입금)\s+([\d,]+)\s*원/
+    /우리\s+(\d{1,2}[./-]\d{1,2}\s+\d{1,2}:\d{2})\s+\*(\d{5,})\s+(출금|입금)\s+([\d,]+)\s*원\s*(.*?)(?:\s*잔액\s*[\d,]+\s*원)?\s*$/
   )
   if (m) {
-    const [, dt, acctNum, txType, amtStr] = m
-    const balanceMatch = text.match(/잔액\s*([\d,]+)\s*원/)
+    const [, dt, acctNum, txType, amtStr, counterpartyRaw] = m
     return {
       issuer: 'WOORI_BANK',
       type: txType === '입금' ? 'deposit' : 'withdrawal',
       holder: null,
       card_alias: `우리은행****${acctNum.slice(-4)}`,
       amount: Number(amtStr.replace(/,/g, '')),
-      merchant: balanceMatch ? `잔액 ${balanceMatch[1]}원` : null,
+      merchant: counterpartyRaw?.trim() || null,  // 거래처 (적요)
       installment: null,
       txAt: parseDateTime(dt),
     }

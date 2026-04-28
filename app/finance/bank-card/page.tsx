@@ -1170,12 +1170,41 @@ export default function BankCardPage() {
 
   const cardColumns: TableColumn<Transaction>[] = [
     { key: 'date', label: '날짜', width: 100, render: (r) => <span style={{ fontSize: 13, color: COLORS.textSecondary }}>{fmtDate(r.transaction_date)}</span> },
-    { key: 'company', label: '카드사', width: 80, render: (r) => <span style={{ fontSize: 12, fontWeight: 600, color: COLORS.primary }}>{r.card_company || '-'}</span> },
+    { key: 'card', label: '카드', width: 140, render: (r: any) => {
+      // sms_card_alias 있으면 끝4자리 추출, 없으면 card_company
+      const alias = r.sms_card_alias || r.matched_card_alias || ''
+      const last4 = alias.match(/(\d{4})\s*$/)?.[1]
+      return (
+        <div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: COLORS.primary }}>
+            {r.card_company || '-'}{last4 ? ` ${last4}` : ''}
+          </div>
+          {alias && <div style={{ fontSize: 10, color: '#94a3b8' }}>{alias}</div>}
+        </div>
+      )
+    }},
     { key: 'merchant', label: '가맹점', render: (r) => <span style={{ fontSize: 13, fontWeight: 500 }}>{r.description || '-'}</span> },
     { key: 'amount', label: '금액', width: 110, align: 'right', render: (r) =>
       <span style={{ fontWeight: 600, fontSize: 13, color: COLORS.expense }}>{nf(r.amount)}원</span>
     },
-    { key: 'user', label: '사용자', width: 100, render: (r) => <span style={{ fontSize: 12 }}>{r.client_name || '-'}</span>, hideOnMobile: true },
+    { key: 'matched', label: '매칭', width: 140, render: (r: any) => {
+      // 차량 매칭 우선, 없으면 직원
+      if (r.matched_car_number) {
+        return (
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: '#1e40af' }}>🚗 {r.matched_car_number}</div>
+            {r.matched_car_model && <div style={{ fontSize: 10, color: '#94a3b8' }}>{r.matched_car_model}</div>}
+          </div>
+        )
+      }
+      if (r.matched_holder_name && r.matched_holder_name !== '공용 (탁송팀)') {
+        return <span style={{ fontSize: 12, color: '#7c3aed' }}>👤 {r.matched_holder_name}</span>
+      }
+      if (r.client_name) {
+        return <span style={{ fontSize: 12, color: '#475569' }}>{r.client_name}</span>
+      }
+      return <span style={{ fontSize: 11, color: '#cbd5e1' }}>—</span>
+    }, hideOnMobile: true },
     { key: 'source', label: '출처', width: 70, align: 'center', render: (r) =>
       <span style={{ fontSize: 11, padding: '1px 6px', borderRadius: 4, background: r.imported_from === 'sms' ? COLORS.bgGreen : COLORS.bgBlue, color: r.imported_from === 'sms' ? COLORS.success : COLORS.info }}>
         {r.imported_from === 'sms' ? 'SMS' : '엑셀'}

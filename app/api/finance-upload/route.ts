@@ -52,6 +52,30 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ data: serialize(data[0] || null), error: null })
     }
 
+    // transactions: 카드 매칭 정보 (card_alias + 매칭된 차량/직원) JOIN
+    if (table === 'transactions') {
+      const data = await prisma.$queryRawUnsafe<any[]>(`
+        SELECT
+          t.*,
+          sms.card_alias        AS sms_card_alias,
+          sms.card_id           AS sms_card_id,
+          cc.card_alias         AS matched_card_alias,
+          cc.holder_name        AS matched_holder_name,
+          cc.assigned_employee_id AS matched_employee_id,
+          cc.assigned_car_id    AS matched_car_id,
+          car.number            AS matched_car_number,
+          CONCAT_WS(' ', car.brand, car.model) AS matched_car_model
+        FROM transactions t
+        LEFT JOIN card_sms_transactions sms ON sms.transaction_id COLLATE utf8mb4_unicode_ci = t.id COLLATE utf8mb4_unicode_ci
+        LEFT JOIN corporate_cards cc       ON cc.id COLLATE utf8mb4_unicode_ci = sms.card_id COLLATE utf8mb4_unicode_ci
+        LEFT JOIN cars car                 ON car.id COLLATE utf8mb4_unicode_ci = cc.assigned_car_id COLLATE utf8mb4_unicode_ci
+        WHERE t.deleted_at IS NULL
+        ORDER BY t.created_at DESC
+        LIMIT 1000
+      `)
+      return NextResponse.json({ data: serialize(data), error: null })
+    }
+
     // Default list — soft-delete된 행 제외
     const hasDeletedAt = ['transactions', 'contracts'].includes(table)
     const data = await prisma.$queryRawUnsafe<any[]>(
