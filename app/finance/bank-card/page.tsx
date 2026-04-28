@@ -2626,10 +2626,31 @@ export default function BankCardPage() {
                       placeholder="예: 우리은행****8777" style={{ ...GLASS.L1, width: '100%', padding: '8px 12px', borderRadius: 8, fontSize: 13, marginTop: 4 }} />
                   </label>
                   <label style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>은행
-                    <select value={editMapping.bank_issuer || ''} onChange={e => setEditMapping({ ...editMapping, bank_issuer: e.target.value })}
+                    <select value={editMapping.bank_issuer || ''} onChange={e => {
+                      const issuer = e.target.value
+                      // bank_issuer 코드 → bank_name 한국어 자동 매핑
+                      const nameMap: Record<string, string> = {
+                        WOORI_BANK: '우리은행', KB_BANK: '국민은행', SHINHAN_BANK: '신한은행',
+                        HANA_BANK: '하나은행', NH_BANK: '농협', IBK_BANK: '기업은행',
+                        SC_BANK: 'SC제일은행', KAKAO_BANK: '카카오뱅크', TOSS_BANK: '토스뱅크',
+                        SAEMAUL: '새마을금고', POST: '우체국', K_BANK: '케이뱅크',
+                      }
+                      setEditMapping({ ...editMapping, bank_issuer: issuer, bank_name: nameMap[issuer] || editMapping.bank_name || '' })
+                    }}
                       style={{ ...GLASS.L1, width: '100%', padding: '8px 12px', borderRadius: 8, fontSize: 13, marginTop: 4 }}>
                       <option value="">선택</option>
-                      <option value="WOORI_BANK">우리은행</option><option value="KB_BANK">국민은행</option>
+                      <option value="WOORI_BANK">우리은행</option>
+                      <option value="KB_BANK">국민은행</option>
+                      <option value="SHINHAN_BANK">신한은행</option>
+                      <option value="HANA_BANK">하나은행</option>
+                      <option value="NH_BANK">농협</option>
+                      <option value="IBK_BANK">기업은행</option>
+                      <option value="SC_BANK">SC제일은행</option>
+                      <option value="KAKAO_BANK">카카오뱅크</option>
+                      <option value="TOSS_BANK">토스뱅크</option>
+                      <option value="K_BANK">케이뱅크</option>
+                      <option value="SAEMAUL">새마을금고</option>
+                      <option value="POST">우체국</option>
                     </select>
                   </label>
                   <label style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>예금주
