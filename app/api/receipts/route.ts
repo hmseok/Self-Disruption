@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import crypto from 'crypto'
 import { verifyUser } from '@/lib/auth-server'
 import { prisma } from '@/lib/prisma'
 
@@ -122,6 +123,7 @@ export async function POST(request: NextRequest) {
 
     const makeInsertData = (withMemo: boolean) => newItems.map(item => {
       const row: Record<string, any> = {
+        id: crypto.randomUUID(),  // CHAR(36) PK 컬럼 (auto-gen 안 됨)
         user_id: user.id,
         user_name: user.employee_name || '',
         expense_date: item.expense_date,
@@ -146,22 +148,17 @@ export async function POST(request: NextRequest) {
       for (const row of insertData) {
         await prisma.$executeRaw`
           INSERT INTO expense_receipts (
-            user_id, user_name, expense_date, card_number, category, merchant,
+            id, user_id, user_name, expense_date, card_number, category, merchant,
             item_name, customer_team, amount, receipt_url, memo, created_at, updated_at
           ) VALUES (
-            ${row.user_id}, ${row.user_name}, ${row.expense_date}, ${row.card_number},
+            ${row.id}, ${row.user_id}, ${row.user_name}, ${row.expense_date}, ${row.card_number},
             ${row.category}, ${row.merchant}, ${row.item_name}, ${row.customer_team},
             ${row.amount}, ${row.receipt_url}, ${row.memo || ''}, NOW(), NOW()
           )
         `
-        // Re-fetch inserted row
+        // 방금 INSERT한 row를 id로 정확히 조회 (날짜+가맹점+금액 매칭은 동일 거래 시 실수 위험)
         const result = await prisma.$queryRaw<any[]>`
-          SELECT * FROM expense_receipts
-          WHERE user_id = ${row.user_id}
-          AND expense_date = ${row.expense_date}
-          AND merchant = ${row.merchant}
-          AND amount = ${row.amount}
-          ORDER BY created_at DESC LIMIT 1
+          SELECT * FROM expense_receipts WHERE id = ${row.id} LIMIT 1
         `
         if (result[0]) data.push(result[0])
       }
@@ -173,21 +170,16 @@ export async function POST(request: NextRequest) {
         for (const row of insertDataNoMemo) {
           await prisma.$executeRaw`
             INSERT INTO expense_receipts (
-              user_id, user_name, expense_date, card_number, category, merchant,
+              id, user_id, user_name, expense_date, card_number, category, merchant,
               item_name, customer_team, amount, receipt_url, created_at, updated_at
             ) VALUES (
-              ${row.user_id}, ${row.user_name}, ${row.expense_date}, ${row.card_number},
+              ${row.id}, ${row.user_id}, ${row.user_name}, ${row.expense_date}, ${row.card_number},
               ${row.category}, ${row.merchant}, ${row.item_name}, ${row.customer_team},
               ${row.amount}, ${row.receipt_url}, NOW(), NOW()
             )
           `
           const result = await prisma.$queryRaw<any[]>`
-            SELECT * FROM expense_receipts
-            WHERE user_id = ${row.user_id}
-            AND expense_date = ${row.expense_date}
-            AND merchant = ${row.merchant}
-            AND amount = ${row.amount}
-            ORDER BY created_at DESC LIMIT 1
+            SELECT * FROM expense_receipts WHERE id = ${row.id} LIMIT 1
           `
           if (result[0]) data.push(result[0])
         }
