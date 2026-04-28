@@ -464,20 +464,25 @@ export default function BankCardPage() {
   // ─── 필터링 ──────────────────────────────────────────
 
   // 통장 vs 카드 구분 헬퍼
-  // - card_company 가 'WOORI_BANK', 'KB_BANK' 처럼 _BANK 로 끝나면 → 통장
-  // - card_company 가 'KB', 'WOORI', 'HYUNDAI', 'MYCOMPANY' 등이면 → 카드
+  // ★ 서버(/api/finance/transactions/summary)와 동일한 prefix 매칭 사용:
+  //   bank  = imported_from LIKE 'excel_bank%' OR = 'sms_bank'
+  //   card  = imported_from LIKE 'excel_card%' OR = 'sms'
+  // 실제 batch_id는 'excel_bank_20260427_1701234567890' 형식이므로 startsWith 매칭 필수
   const isBankTx = (t: any) => {
-    if (t.imported_from === 'excel_bank' || t.imported_from === 'sms_bank') return true
+    const imp = String(t.imported_from || '')
+    if (imp.startsWith('excel_bank') || imp === 'sms_bank') return true
     if (t.bank_name) return true
-    if (t.card_company && /_BANK$/i.test(t.card_company)) return true   // ★ SMS 통장 (WOORI_BANK 등)
-    if (!t.card_company && !t.imported_from?.includes('card') && t.imported_from !== 'sms') return true
+    if (t.card_company && /_BANK$/i.test(t.card_company)) return true   // SMS 통장 (WOORI_BANK 등)
+    // imported_from 없는 수동 입력 — card 단서가 없으면 통장으로
+    if (!imp && !t.card_company) return true
     return false
   }
   const isCardTx = (t: any) => {
     if (isBankTx(t)) return false
-    if (t.imported_from === 'excel_card') return true
+    const imp = String(t.imported_from || '')
+    if (imp.startsWith('excel_card')) return true
+    if (imp === 'sms' && t.card_company) return true
     if (t.card_company && !/_BANK$/i.test(t.card_company)) return true
-    if (t.imported_from === 'sms' && t.card_company) return true
     return false
   }
 
@@ -1025,7 +1030,7 @@ export default function BankCardPage() {
 
   // ── AI 일괄 분류 실행 (batch 단위 반복 호출) ──
   const runAiClassify = async () => {
-    if (!confirm('Gemini AI로 미분류 거래를 일괄 분류합니다.\n\n· 50건씩 batch 처리 (배치당 약 10~20초)\n· 신뢰도 ≥70% 만 자동 적용\n· 미만은 검토 큐에 남음\n· 진행 중에도 닫지 마세요\n\n계속할까요?')) return
+    if (!confirm('Gemini AI로 미분류 거래를 일괄 분류합니다.\n\n· 30건씩 batch 처리 (배치당 약 10~30초)\n· 신뢰도 ≥70% 만 자동 적용\n· 미만은 검토 큐에 남음\n· 진행 중에도 닫지 마세요\n\n계속할까요?')) return
     setAutoClassifying(true)
     setAiProgress({ running: true, total: 0, processed: 0, applied: 0, below: 0, distribution: {} })
 
@@ -1043,7 +1048,7 @@ export default function BankCardPage() {
         batches++
         const { ok, status, json } = await fetchWithAuth('/api/finance/transactions/auto-classify-ai', {
           method: 'POST',
-          body: { batchSize: 50, minConfidence: 70 },
+          body: { batchSize: 30, minConfidence: 70 },
         })
         if (!ok) {
           // status, error 둘 다 표시 — "알 수 없는 오류" 방지

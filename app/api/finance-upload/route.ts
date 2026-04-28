@@ -71,7 +71,7 @@ export async function GET(request: NextRequest) {
         LEFT JOIN cars car                 ON car.id COLLATE utf8mb4_unicode_ci = cc.assigned_car_id COLLATE utf8mb4_unicode_ci
         WHERE t.deleted_at IS NULL
         ORDER BY t.created_at DESC
-        LIMIT 1000
+        LIMIT 5000
       `)
       return NextResponse.json({ data: serialize(data), error: null })
     }
