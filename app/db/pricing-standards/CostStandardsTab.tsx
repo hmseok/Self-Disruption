@@ -85,6 +85,33 @@ export default function CostStandardsTab() {
 
   useEffect(() => { load() }, [])
 
+  async function runMarketSync(scopeId?: string) {
+    const target = scopeId ? '선택된 스코프 1개' : '전체 활성 스코프'
+    if (!confirm(`Gemini AI로 ${target}의 시장 평균 원가를 조회해서 시장원가를 갱신합니다.\n\n${scopeId ? '약 5~10초' : '전체는 1~2분 소요'} 걸려요.\n\n계속할까요?`)) return
+    try {
+      const headers = await getAuthHeader()
+      const res = await fetch('/api/cost-standards/market-sync', {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify(scopeId ? { scope_id: scopeId } : { all: true }),
+      })
+      const json = await res.json()
+      if (!res.ok) {
+        alert(`시장 조회 실패: ${json.error || res.status}`)
+        return
+      }
+      alert(
+        `✓ 시장 조회 완료\n\n` +
+        `· 처리 스코프: ${json.processed}\n` +
+        `· 성공: ${json.success}\n` +
+        `· 갱신된 컴포넌트: ${json.total_components_updated}건`
+      )
+      await load()
+    } catch (e: any) {
+      alert(`시장 조회 오류: ${e.message}`)
+    }
+  }
+
   async function runRollup() {
     if (!confirm('운영 실적(operational_actuals) 최근 12개월 데이터로 우리원가를 일괄 갱신합니다.\n\n계속할까요?')) return
     try {
@@ -192,7 +219,17 @@ export default function CostStandardsTab() {
             border: '1px solid rgba(34,197,94,0.3)', background: 'rgba(34,197,94,0.08)',
             color: '#15803d', cursor: 'pointer',
           }}
-        >🔄 운영실적 → 우리원가 갱신</button>
+        >🔄 운영실적 → 우리원가</button>
+
+        {/* Gemini 시장조회 (전체) */}
+        <button
+          onClick={() => runMarketSync()}
+          style={{
+            padding: '8px 12px', fontSize: 11, fontWeight: 700, borderRadius: 8,
+            border: '1px solid rgba(168,85,247,0.3)', background: 'rgba(168,85,247,0.08)',
+            color: '#7e22ce', cursor: 'pointer',
+          }}
+        >🌐 시장원가 일괄 갱신</button>
 
         {/* 리스트 */}
         <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -255,7 +292,17 @@ export default function CostStandardsTab() {
                 </div>
                 <div className="text-lg font-bold text-slate-800">{selected.display_label}</div>
               </div>
-              {saving && <div className="text-xs text-blue-500">저장 중...</div>}
+              <div className="flex items-center gap-2">
+                {saving && <div className="text-xs text-blue-500">저장 중...</div>}
+                <button
+                  onClick={() => runMarketSync(selected.id)}
+                  style={{
+                    padding: '6px 10px', fontSize: 11, fontWeight: 700, borderRadius: 8,
+                    border: '1px solid rgba(168,85,247,0.3)', background: 'rgba(168,85,247,0.08)',
+                    color: '#7e22ce', cursor: 'pointer',
+                  }}
+                >🌐 이 스코프 시장조회</button>
+              </div>
             </div>
 
             {/* 6컴포넌트 테이블 */}
