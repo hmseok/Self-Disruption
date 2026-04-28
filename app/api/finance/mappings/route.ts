@@ -3,6 +3,11 @@ import { verifyUser } from '@/lib/auth-server'
 import { prisma } from '@/lib/prisma'
 import { randomUUID } from 'crypto'
 
+// BigInt / Decimal 객체 → 문자열로 정규화 (NextResponse.json 직렬화 실패 방지)
+function serialize<T>(d: T): T {
+  return JSON.parse(JSON.stringify(d, (_, v) => typeof v === 'bigint' ? v.toString() : v))
+}
+
 // ═══════════════════════════════════════════════════════════
 // 카드/통장 → 차량 매핑 관리 API (PHASE 2)
 //
@@ -15,6 +20,7 @@ export async function GET(req: NextRequest) {
   const user = await verifyUser(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  try {
   // 법인카드 목록 (차량 정보 JOIN)
   const cards = await prisma.$queryRaw<any[]>`
     SELECT c.id, c.card_number, c.card_alias, c.card_issuer, c.holder_name,
@@ -51,12 +57,16 @@ export async function GET(req: NextRequest) {
     ORDER BY card_issuer, card_alias
   `
 
-  return NextResponse.json({
-    cards: cards.map((c: any) => ({ ...c })),
-    bankAccounts: bankAccounts.map((b: any) => ({ ...b })),
-    cars: cars.map((c: any) => ({ ...c })),
-    smsAliases: smsAliases.map((s: any) => ({ ...s })),
-  })
+  return NextResponse.json(serialize({
+    cards,
+    bankAccounts,
+    cars,
+    smsAliases,
+  }))
+  } catch (e: any) {
+    console.error('[mappings GET] 실패:', e)
+    return NextResponse.json({ error: e.message || '조회 실패', cards: [], bankAccounts: [], cars: [], smsAliases: [] }, { status: 500 })
+  }
 }
 
 export async function POST(req: NextRequest) {
