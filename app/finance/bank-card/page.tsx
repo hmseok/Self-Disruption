@@ -380,13 +380,32 @@ export default function BankCardPage() {
   }, [])
 
   const saveMapping = useCallback(async (data: any) => {
-    await fetchWithAuth('/api/finance/mappings', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    })
-    setEditMapping(null)
-    loadMappings()
+    // 필수 필드 사전 체크
+    if (data.type === 'bank' && !data.account_alias) {
+      alert('계좌 별칭을 입력해주세요')
+      return
+    }
+    if (data.type === 'card' && !data.card_alias) {
+      alert('카드 별칭을 입력해주세요')
+      return
+    }
+    try {
+      const { ok, status, json } = await fetchWithAuth('/api/finance/mappings', {
+        method: 'POST',
+        body: data,  // fetchWithAuth 가 자동 JSON.stringify
+      })
+      if (!ok || (json && json.error)) {
+        const detail = json?.error || `서버 오류 (${status})`
+        console.error('[saveMapping] 실패:', detail, data)
+        alert(`저장 실패: ${detail}`)
+        return
+      }
+      setEditMapping(null)
+      loadMappings()
+    } catch (e: any) {
+      console.error('[saveMapping] 예외:', e)
+      alert(`저장 실패: ${e.message || '알 수 없는 오류'}`)
+    }
   }, [loadMappings])
 
   const deleteMapping = useCallback(async (id: string, type: string) => {

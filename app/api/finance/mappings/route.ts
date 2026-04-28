@@ -76,6 +76,7 @@ export async function POST(req: NextRequest) {
   const user = await verifyUser(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  try {
   const body = await req.json()
   const { type, id, card_alias, card_issuer, holder_name, assigned_car_id,
           assigned_employee_id, status, card_type, card_holder_type,
@@ -155,6 +156,10 @@ export async function POST(req: NextRequest) {
   }
 
   return NextResponse.json({ ok: true })
+  } catch (e: any) {
+    console.error('[mappings POST] 실패:', e)
+    return NextResponse.json({ error: e.message || '저장 실패' }, { status: 500 })
+  }
 }
 
 export async function DELETE(req: NextRequest) {
