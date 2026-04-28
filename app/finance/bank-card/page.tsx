@@ -450,10 +450,26 @@ export default function BankCardPage() {
 
   // ─── 필터링 ──────────────────────────────────────────
 
+  // 통장 vs 카드 구분 헬퍼
+  // - card_company 가 'WOORI_BANK', 'KB_BANK' 처럼 _BANK 로 끝나면 → 통장
+  // - card_company 가 'KB', 'WOORI', 'HYUNDAI', 'MYCOMPANY' 등이면 → 카드
+  const isBankTx = (t: any) => {
+    if (t.imported_from === 'excel_bank' || t.imported_from === 'sms_bank') return true
+    if (t.bank_name) return true
+    if (t.card_company && /_BANK$/i.test(t.card_company)) return true   // ★ SMS 통장 (WOORI_BANK 등)
+    if (!t.card_company && !t.imported_from?.includes('card') && t.imported_from !== 'sms') return true
+    return false
+  }
+  const isCardTx = (t: any) => {
+    if (isBankTx(t)) return false
+    if (t.imported_from === 'excel_card') return true
+    if (t.card_company && !/_BANK$/i.test(t.card_company)) return true
+    if (t.imported_from === 'sms' && t.card_company) return true
+    return false
+  }
+
   const bankTransactions = useMemo(() => {
-    let data = transactions.filter(t =>
-      t.imported_from === 'excel_bank' || t.imported_from === 'sms_bank' || t.bank_name || (!t.card_company && !t.imported_from?.includes('card') && t.imported_from !== 'sms')
-    )
+    let data = transactions.filter(isBankTx)
     if (bankFilter === 'income') data = data.filter(t => t.type === 'income')
     else if (bankFilter === 'expense') data = data.filter(t => t.type === 'expense')
     if (search) {
@@ -461,19 +477,23 @@ export default function BankCardPage() {
       data = data.filter(t =>
         (t.description || '').toLowerCase().includes(q) ||
         (t.client_name || '').toLowerCase().includes(q) ||
-        (t.bank_name || '').toLowerCase().includes(q)
+        (t.bank_name || '').toLowerCase().includes(q) ||
+        (t.card_company || '').toLowerCase().includes(q)
       )
     }
     return data
   }, [transactions, bankFilter, search])
 
   const cardTransactions = useMemo(() => {
-    let data = transactions.filter(t =>
-      t.imported_from === 'excel_card' || t.imported_from === 'sms' || t.card_company
-    )
+    let data = transactions.filter(isCardTx)
     if (cardFilter !== 'all') {
+      // 카드사 정확 매칭 — 'kb' → 'KB' (KB_BANK 제외)
       const q = cardFilter.toLowerCase()
-      data = data.filter(t => (t.card_company || '').toLowerCase().includes(q))
+      data = data.filter(t => {
+        const cc = (t.card_company || '').toLowerCase()
+        if (/_bank$/.test(cc)) return false
+        return cc === q || cc.startsWith(q)
+      })
     }
     if (search) {
       const q = search.toLowerCase()
