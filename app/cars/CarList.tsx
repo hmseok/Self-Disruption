@@ -26,19 +26,26 @@ async function getAuthHeader(): Promise<Record<string, string>> {
 type Car = {
   id: string
   number: string
+  vin?: string
   brand: string
   model: string
   trim?: string
   year: string
   fuel: string
   status: string
-  purchase_price?: number
+  purchase_price?: number | string
   is_used?: boolean
   purchase_mileage?: number
   mileage?: number
   is_commercial?: boolean
   ownership_type?: string
+  registration_image_url?: string
   created_at: string
+  // 보강: 통계 (서버 응답 추가 필드)
+  has_insurance?: boolean
+  has_loan?: boolean
+  insurance_count?: number
+  loan_count?: number
 }
 
 export default function CarListPage() {
@@ -137,10 +144,33 @@ export default function CarListPage() {
   // ── NeuDataTable 컬럼 ──
   const columns: TableColumn<Car>[] = [
     {
+      key: 'thumb',
+      label: '등록증',
+      align: 'center',
+      width: 60,
+      render: (car) => car.registration_image_url ? (
+        car.registration_image_url.endsWith('.pdf') ? (
+          <span title="등록증 PDF 등록됨" style={{ fontSize: 18 }}>📄</span>
+        ) : (
+          <img src={car.registration_image_url} alt="" loading="lazy"
+            style={{ width: 36, height: 24, objectFit: 'cover', borderRadius: 4, border: '1px solid #e2e8f0' }} />
+        )
+      ) : (
+        <span title="등록증 미등록" style={{ fontSize: 14, color: '#cbd5e1' }}>—</span>
+      ),
+    },
+    {
       key: 'number',
       label: '차량번호',
       render: (car) => (
-        <span style={{ fontWeight: 900, fontSize: 15, color: '#0f2440' }}>{car.number}</span>
+        <div>
+          <div style={{ fontWeight: 900, fontSize: 15, color: '#0f2440' }}>{car.number || '-'}</div>
+          {car.vin && (
+            <div style={{ fontSize: 10, color: '#64748b', fontFamily: 'monospace', marginTop: 2 }} title={`차대번호: ${car.vin}`}>
+              VIN ···{String(car.vin).slice(-6)}
+            </div>
+          )}
+        </div>
       ),
     },
     {
@@ -189,6 +219,32 @@ export default function CarListPage() {
       align: 'center',
       render: (car) => (
         <span className={`si-badge ${statusBadge(car.status)}`}>{statusLabel(car.status)}</span>
+      ),
+    },
+    {
+      key: 'coverage',
+      label: '관리',
+      align: 'center',
+      width: 120,
+      render: (car) => (
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 4, fontSize: 10 }}>
+          <span title={car.has_insurance ? '보험 등록됨' : '보험 미등록'}
+            style={{
+              padding: '1px 6px', borderRadius: 4, fontWeight: 700,
+              background: car.has_insurance ? 'rgba(16,185,129,0.12)' : 'rgba(148,163,184,0.12)',
+              color: car.has_insurance ? '#059669' : '#94a3b8',
+            }}>
+            🛡 {car.has_insurance ? 'OK' : '—'}
+          </span>
+          <span title={car.has_loan ? '대출 등록됨' : '대출 없음'}
+            style={{
+              padding: '1px 6px', borderRadius: 4, fontWeight: 700,
+              background: car.has_loan ? 'rgba(245,158,11,0.12)' : 'rgba(148,163,184,0.12)',
+              color: car.has_loan ? '#b45309' : '#94a3b8',
+            }}>
+            💰 {car.has_loan ? 'OK' : '—'}
+          </span>
+        </div>
       ),
     },
     {

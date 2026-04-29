@@ -58,6 +58,45 @@ export async function GET(request: NextRequest) {
       `
     }
 
+    // 보험/대출 보유 여부 — /cars 목록 컬럼 표시용
+    if (cars.length > 0) {
+      try {
+        const carIds = cars.map((c: any) => c.id)
+        const placeholders = carIds.map(() => '?').join(',')
+
+        // 보험: insurance_vehicle_allocations 에 car_id 있는 것
+        const insRows = await prisma.$queryRawUnsafe<Array<{ car_id: string; cnt: number | bigint }>>(
+          `SELECT car_id, COUNT(*) AS cnt
+             FROM insurance_vehicle_allocations
+            WHERE car_id IN (${placeholders})
+            GROUP BY car_id`,
+          ...carIds
+        )
+        const insMap = new Map(insRows.map(r => [r.car_id, Number(r.cnt)]))
+
+        // 대출: loans 에 car_id 있는 것
+        const loanRows = await prisma.$queryRawUnsafe<Array<{ car_id: string; cnt: number | bigint }>>(
+          `SELECT car_id, COUNT(*) AS cnt
+             FROM loans
+            WHERE car_id IN (${placeholders})
+            GROUP BY car_id`,
+          ...carIds
+        )
+        const loanMap = new Map(loanRows.map(r => [r.car_id, Number(r.cnt)]))
+
+        cars = cars.map((c: any) => ({
+          ...c,
+          insurance_count: insMap.get(c.id) || 0,
+          has_insurance: (insMap.get(c.id) || 0) > 0,
+          loan_count: loanMap.get(c.id) || 0,
+          has_loan: (loanMap.get(c.id) || 0) > 0,
+        }))
+      } catch (e: any) {
+        // 테이블 없거나 collation 이슈면 무시 — 기본 데이터는 반환
+        console.warn('[GET /api/cars] 보험/대출 카운트 실패:', e?.message)
+      }
+    }
+
     return NextResponse.json({ data: serialize(cars), error: null })
   } catch (error: any) {
     console.error('[GET /api/cars]', error)
