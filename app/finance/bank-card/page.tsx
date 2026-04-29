@@ -1083,12 +1083,19 @@ export default function BankCardPage() {
           distribution: { ...cumulativeDist },
         })
 
-        // 이 batch에서 한 건도 처리 못했으면 무한루프 방지로 중단
-        if (procThis === 0) {
-          lastError = 'AI가 빈 응답을 반환했습니다. 잠시 후 다시 시도하세요.'
+        // ★ 핵심 안전망: DB UPDATE가 한 건도 안 일어났으면 즉시 break
+        //   → 같은 미분류 row가 다음 batch에서 또 fetch되어 토큰 무한 소모되는 사고 방지
+        if (appliedThis + belowThis === 0) {
+          const dbg = json?.gemini_debug || {}
+          lastError =
+            `Gemini 응답 0건 · finishReason=${dbg.finishReason || 'n/a'}` +
+            (dbg.usage ? ` · usage=${JSON.stringify(dbg.usage).slice(0, 120)}` : '') +
+            (dbg.rawTextSample ? `\nraw: ${String(dbg.rawTextSample).slice(0, 200)}` : '')
           break
         }
-        // 남은 건이 0이거나, AI가 처리 못한 건이 남으면 중단
+        // 한 건도 fetch 안된 경우 (미분류 0)
+        if (procThis === 0) break
+        // 남은 건이 0이면 종료
         if (Number(json.remaining || 0) === 0) break
 
         // batch 사이 대기 (rate limit 완화)

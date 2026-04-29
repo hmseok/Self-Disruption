@@ -48,7 +48,10 @@ interface UnclassifiedRow {
   transaction_date: Date | string
 }
 
-async function classifyBatch(rows: UnclassifiedRow[]): Promise<Array<{ id: string; category: string; confidence: number; reason: string }>> {
+async function classifyBatch(rows: UnclassifiedRow[]): Promise<{
+  results: Array<{ id: string; category: string; confidence: number; reason: string }>
+  debug: { rawTextSample: string; finishReason: string | null; usage: any }
+}> {
   const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_GEMINI_API_KEY
   if (!apiKey) throw new Error('GEMINI_API_KEY 환경변수가 설정되지 않았습니다')
   const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash'
@@ -96,7 +99,14 @@ confidence 는 0~100. 매우 확실한 경우만 ≥85, 추정이면 60~75, 불�
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.1, maxOutputTokens: 4096 },
+        generationConfig: {
+          temperature: 0.1,
+          maxOutputTokens: 8192,
+          // ★ 2.5-flash thinking 모드 비활성 — thinking이 토큰 다 소진해서 실제 응답이 비는 문제 방지
+          thinkingConfig: { thinkingBudget: 0 },
+          // 강제로 JSON 형식 응답
+          responseMimeType: 'application/json',
+        },
       }),
       signal: ctrl.signal,
     })
@@ -112,21 +122,27 @@ confidence 는 0~100. 매우 확실한 경우만 ≥85, 추정이면 60~75, 불�
     throw new Error(`Gemini ${res.status}: ${errText.slice(0, 300)}`)
   }
   const json = await res.json()
-  let text: string = json?.candidates?.[0]?.content?.parts?.[0]?.text || ''
-  text = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '')
+  // 2.5-flash 응답: parts 배열 안에 thinking + text 가 분리될 수 있음 → 모두 합침
+  const parts: any[] = json?.candidates?.[0]?.content?.parts || []
+  let text: string = parts.map((p: any) => p?.text || '').join('').trim()
+  const finishReason: string | null = json?.candidates?.[0]?.finishReason || null
+  const usage: any = json?.usageMetadata || null
+  const rawTextSample = text.slice(0, 300)
+
+  text = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '')
   const arrMatch = text.match(/\[[\s\S]*\]/)
   if (!arrMatch) {
-    console.warn('[auto-classify-ai] Gemini 응답에 JSON 배열 없음:', text.slice(0, 200))
-    return []
+    console.warn('[auto-classify-ai] Gemini 응답에 JSON 배열 없음. finishReason=', finishReason, 'usage=', usage, 'text=', rawTextSample)
+    return { results: [], debug: { rawTextSample, finishReason, usage } }
   }
   let parsed: Array<{ n: number; category: string; confidence: number; reason: string }>
   try {
     parsed = JSON.parse(arrMatch[0])
   } catch (e: any) {
     console.warn('[auto-classify-ai] JSON 파싱 실패:', arrMatch[0].slice(0, 200))
-    return []
+    return { results: [], debug: { rawTextSample, finishReason, usage } }
   }
-  return parsed
+  const results = parsed
     .filter(p => p && typeof p.n === 'number' && p.n >= 1 && p.n <= rows.length && p.category)
     .map(p => ({
       id: rows[p.n - 1].id,
@@ -134,6 +150,7 @@ confidence 는 0~100. 매우 확실한 경우만 ≥85, 추정이면 60~75, 불�
       confidence: Number(p.confidence) || 0,
       reason: String(p.reason || ''),
     }))
+  return { results, debug: { rawTextSample, finishReason, usage } }
 }
 
 export async function POST(request: NextRequest) {
@@ -182,8 +199,11 @@ export async function POST(request: NextRequest) {
     `)
 
     let aiResults: Array<{ id: string; category: string; confidence: number; reason: string }> = []
+    let aiDebug: any = null
     try {
-      aiResults = await classifyBatch(rows)
+      const out = await classifyBatch(rows)
+      aiResults = out.results
+      aiDebug = out.debug
     } catch (e: any) {
       console.error('[auto-classify-ai] Gemini 분류 실패:', e?.message)
       return NextResponse.json({
@@ -289,6 +309,8 @@ export async function POST(request: NextRequest) {
       min_confidence: minConfidence,
       distribution,
       sample: aiResults.slice(0, 5),
+      // 디버그: Gemini 응답 finishReason/raw 샘플 — 0건일 때 원인 파악용
+      gemini_debug: aiDebug,
     })
   } catch (e: any) {
     console.error('[auto-classify-ai] 예외:', e)
