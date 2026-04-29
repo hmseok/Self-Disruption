@@ -1136,6 +1136,51 @@ export default function BankCardPage() {
     }
   }
 
+  // 💰 대출 자동 매칭
+  const runLoanMatch = async (dryRun = false) => {
+    setAutoClassifying(true)
+    try {
+      const { ok, status, json } = await fetchWithAuth('/api/finance/transactions/auto-match-loan', {
+        method: 'POST',
+        body: { dryRun, dateTolerance: 3, amountTolerance: 1 },
+      })
+      if (!ok) { alert(`대출 매칭 실패: HTTP ${status} — ${json?.error}`); return }
+      alert(
+        `${dryRun ? '🔍 대출 매칭 dry-run' : '✓ 대출 매칭 완료'}\n\n` +
+        `· 후보: ${(json.total_candidates || 0).toLocaleString()}건\n` +
+        `· 매칭 성공: ${(dryRun ? json.planned : json.applied || 0).toLocaleString()}건\n` +
+        `· 차량 분배 생성: ${(json.allocation_created || 0).toLocaleString()}건\n` +
+        `· 미매칭: ${(json.skipped_no_match || 0).toLocaleString()}건\n` +
+        `· 모호: ${(json.skipped_ambiguous || 0).toLocaleString()}건`
+      )
+      if (!dryRun) {
+        await Promise.all([loadSummary(), loadTransactions()])
+        if (reviewCategory) await loadReviewItems(reviewCategory)
+      }
+    } catch (e: any) { alert(`대출 매칭 오류: ${e?.message}`) }
+    finally { setAutoClassifying(false) }
+  }
+
+  // 🔧 정비 자동 매칭 (maintenance_records 자동 등록)
+  const runMaintenanceMatch = async (dryRun = false) => {
+    setAutoClassifying(true)
+    try {
+      const { ok, status, json } = await fetchWithAuth('/api/finance/transactions/auto-match-maintenance', {
+        method: 'POST',
+        body: { dryRun },
+      })
+      if (!ok) { alert(`정비 매칭 실패: HTTP ${status} — ${json?.error}`); return }
+      alert(
+        `${dryRun ? '🔍 정비 매칭 dry-run' : '✓ 정비 매칭 완료'}\n\n` +
+        `· 후보: ${(json.total_candidates || 0).toLocaleString()}건\n` +
+        `· 정비 등록: ${(dryRun ? json.planned : json.applied || 0).toLocaleString()}건\n` +
+        `· 이미 등록됨: ${(json.skipped_already || 0).toLocaleString()}건\n` +
+        `· 차량 미매칭 (skip): ${(json.skipped_no_car || 0).toLocaleString()}건`
+      )
+    } catch (e: any) { alert(`정비 매칭 오류: ${e?.message}`) }
+    finally { setAutoClassifying(false) }
+  }
+
   // 🛡 보험 자동 매칭 (수동 트리거)
   const runInsuranceMatch = async (dryRun = false) => {
     setAutoClassifying(true)
@@ -1840,6 +1885,28 @@ export default function BankCardPage() {
                             cursor: autoClassifying ? 'wait' : 'pointer', opacity: autoClassifying ? 0.6 : 1,
                           }}
                         >🛡 보험 매칭</button>
+                        <button
+                          onClick={() => runLoanMatch(false)}
+                          disabled={autoClassifying}
+                          title="대출 월불입 거래를 loans 와 자동 매칭"
+                          style={{
+                            ...BTN.sm, padding: '5px 12px', fontSize: 11, fontWeight: 700,
+                            background: 'rgba(245,158,11,0.1)', color: '#b45309',
+                            border: '1px solid rgba(245,158,11,0.35)',
+                            cursor: autoClassifying ? 'wait' : 'pointer', opacity: autoClassifying ? 0.6 : 1,
+                          }}
+                        >💰 대출 매칭</button>
+                        <button
+                          onClick={() => runMaintenanceMatch(false)}
+                          disabled={autoClassifying}
+                          title="정비/수리 거래를 maintenance_records 에 자동 등록"
+                          style={{
+                            ...BTN.sm, padding: '5px 12px', fontSize: 11, fontWeight: 700,
+                            background: 'rgba(99,102,241,0.1)', color: '#4338ca',
+                            border: '1px solid rgba(99,102,241,0.35)',
+                            cursor: autoClassifying ? 'wait' : 'pointer', opacity: autoClassifying ? 0.6 : 1,
+                          }}
+                        >🔧 정비 매칭</button>
                         <span style={{ width: 1, height: 18, background: 'rgba(0,0,0,0.08)', margin: '0 4px' }} />
                         {(['all', 'expense', 'income'] as const).map(f => (
                           <button key={f} onClick={() => setReviewTypeFilter(f)}
