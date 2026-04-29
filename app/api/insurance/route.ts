@@ -192,6 +192,21 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // ── 중복 방지: design_number 기준 ──
+    if (contract.design_number) {
+      const existing = await prisma.$queryRawUnsafe<Array<{ id: string }>>(
+        `SELECT id FROM insurance_contracts WHERE design_number = ? LIMIT 1`,
+        contract.design_number
+      )
+      if (existing[0]) {
+        return NextResponse.json({
+          error: `이미 등록된 청약서 (설계번호: ${contract.design_number})`,
+          duplicate: true,
+          existing_id: existing[0].id,
+        }, { status: 409 })
+      }
+    }
+
     const contractId = randomUUID()
 
     // ── 1. insurance_contracts ──
@@ -228,16 +243,62 @@ export async function POST(request: NextRequest) {
       } catch { /* memo 컬럼 없음 — 마이그레이션 미적용 시 정상 */ }
     }
 
-    // ── 2. insurance_vehicle_allocations ──
+    // ── 2. insurance_vehicle_allocations + 차량 자동 매칭 ──
+    // 매칭 우선순위:
+    //   1) a.car_id 직접 지정
+    //   2) cars.vin === a.vin
+    //   3) cars.brand+model fuzzy ↔ a.vehicle_label (단일 일치만, ex: "EV6 소형A" ↔ cars.brand="EV6")
+    // 매칭 성공 + cars.vin 비어있으면 a.vin 으로 자동 백필
     for (const a of allocations) {
-      // car_id 미지정 + VIN 있으면 cars 자동 매칭 시도
       let resolvedCarId = a.car_id || null
+      let matchedBy: 'direct' | 'vin' | 'label' | null = a.car_id ? 'direct' : null
+
+      // (2) VIN 매칭
       if (!resolvedCarId && a.vin) {
         const matched = await prisma.$queryRawUnsafe<Array<{ id: string }>>(
           `SELECT id FROM cars WHERE vin = ? LIMIT 1`, a.vin
         )
-        if (matched[0]) resolvedCarId = matched[0].id
+        if (matched[0]) { resolvedCarId = matched[0].id; matchedBy = 'vin' }
       }
+
+      // (3) vehicle_label fuzzy 매칭 (VIN 매칭 실패 시)
+      //     a.vehicle_label 예: "EV6 소형A", "아이오닉5 소형A", "TESLA Model Y 중형"
+      //     keyword 추출: 첫 번째 의미있는 단어 (브랜드/모델 추정)
+      if (!resolvedCarId && a.vehicle_label) {
+        const label = String(a.vehicle_label).trim()
+        // 첫 단어 추출 (한영 모두 지원)
+        const tokens = label.split(/[\s/,()-]+/).filter(t => t.length >= 2)
+        if (tokens.length > 0) {
+          const key = tokens[0]  // ex: "EV6", "아이오닉5", "TESLA"
+          const candidates = await prisma.$queryRawUnsafe<Array<{ id: string; vin: string | null }>>(
+            `SELECT id, vin FROM cars
+              WHERE status != 'deleted'
+                AND (vin IS NULL OR vin = '' OR vin = ?)
+                AND (brand LIKE ? OR model LIKE ? OR CONCAT_WS(' ', brand, model) LIKE ?)
+              LIMIT 5`,
+            a.vin || '__none__', `%${key}%`, `%${key}%`, `%${key}%`
+          )
+          // 단일 일치만 자동 채택 (모호 시 미매칭 유지)
+          if (candidates.length === 1) {
+            resolvedCarId = candidates[0].id
+            matchedBy = 'label'
+          }
+        }
+      }
+
+      // VIN 자동 백필 — 매칭된 차량의 vin이 비어있으면 채움
+      if (resolvedCarId && a.vin) {
+        try {
+          await prisma.$executeRawUnsafe(
+            `UPDATE cars SET vin = ?, updated_at = NOW()
+              WHERE id = ? AND (vin IS NULL OR vin = '')`,
+            a.vin, resolvedCarId
+          )
+        } catch (e: any) {
+          console.warn('[insurance POST] cars.vin 백필 실패:', e?.message)
+        }
+      }
+      void matchedBy  // 향후 응답에 노출 가능
       const ratio = a.ratio ?? (Number(a.premium_amount) / Number(contract.total_premium))
       await prisma.$executeRawUnsafe(
         `INSERT INTO insurance_vehicle_allocations (

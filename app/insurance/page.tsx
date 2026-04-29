@@ -51,6 +51,7 @@ export default function InsurancePage() {
     processed: number
     autoSaved: number
     reviewNeeded: number
+    duplicates: number
     failed: number
     failures: Array<{ name: string; reason: string }>
   }>(null)
@@ -164,7 +165,7 @@ export default function InsurancePage() {
     }
   }
 
-  const saveExtracted = async (extracted: any, confidence: number, fileName: string): Promise<{ ok: boolean; error?: string; auto: boolean }> => {
+  const saveExtracted = async (extracted: any, confidence: number, fileName: string): Promise<{ ok: boolean; error?: string; auto: boolean; duplicate?: boolean }> => {
     const allocations = (extracted.vehicles || []).map((v: any) => {
       const matched = cars.find(c => c.vin === v.vin)
       return {
@@ -199,8 +200,14 @@ export default function InsurancePage() {
       schedules,
     }
     try {
-      const { ok, json } = await fetchWithAuth('/api/insurance', { method: 'POST', body })
-      if (!ok) return { ok: false, error: json?.error || '저장 실패', auto: false }
+      const { ok, status, json } = await fetchWithAuth('/api/insurance', { method: 'POST', body })
+      if (!ok) {
+        // 409 중복은 실패가 아닌 별도 카운트
+        if (status === 409 && json?.duplicate) {
+          return { ok: false, error: '중복 (이미 등록된 청약서)', auto: false, duplicate: true }
+        }
+        return { ok: false, error: json?.error || '저장 실패', auto: false }
+      }
       return { ok: true, auto: confidence >= 85 }
     } catch (e: any) {
       return { ok: false, error: e?.message || String(e), auto: false }
@@ -232,11 +239,12 @@ export default function InsurancePage() {
 
     let autoSaved = 0
     let reviewNeeded = 0
+    let duplicates = 0
     let failed = 0
     const failures: Array<{ name: string; reason: string }> = []
     stopRef.current.stop = false
 
-    setBulkProgress({ running: true, total, processed: 0, autoSaved, reviewNeeded, failed, failures: [] })
+    setBulkProgress({ running: true, total, processed: 0, autoSaved, reviewNeeded, duplicates, failed, failures: [] })
 
     // 첫 파일 (이미 OCR 완료) 저장
     const c1 = Number(firstResult.confidence) || 0
@@ -245,11 +253,12 @@ export default function InsurancePage() {
       failed++
     } else {
       const sv = await saveExtracted(firstResult.extracted, c1, files[0].name)
-      if (!sv.ok) { failures.push({ name: files[0].name, reason: sv.error || '저장 실패' }); failed++ }
+      if (sv.duplicate) { duplicates++ }
+      else if (!sv.ok) { failures.push({ name: files[0].name, reason: sv.error || '저장 실패' }); failed++ }
       else if (sv.auto) autoSaved++
       else reviewNeeded++
     }
-    setBulkProgress({ running: true, total, processed: 1, autoSaved, reviewNeeded, failed, failures: [...failures] })
+    setBulkProgress({ running: true, total, processed: 1, autoSaved, reviewNeeded, duplicates, failed, failures: [...failures] })
 
     // 나머지 파일 — 병렬 3개씩
     const remaining = files.slice(1)
@@ -264,6 +273,7 @@ export default function InsurancePage() {
         const conf = r.confidence || 0
         if (conf < 70) { failures.push({ name: file.name, reason: `신뢰도 ${conf}% < 70%` }); failed++; return }
         const sv = await saveExtracted(r.extracted, conf, file.name)
+        if (sv.duplicate) { duplicates++; return }
         if (!sv.ok) { failures.push({ name: file.name, reason: sv.error || '저장 실패' }); failed++; return }
         if (sv.auto) autoSaved++
         else reviewNeeded++
@@ -272,11 +282,11 @@ export default function InsurancePage() {
         running: !stopRef.current.stop,
         total,
         processed: 1 + Math.min(i + BATCH_SIZE, remaining.length),
-        autoSaved, reviewNeeded, failed, failures: [...failures],
+        autoSaved, reviewNeeded, duplicates, failed, failures: [...failures],
       })
     }
 
-    setBulkProgress(prev => prev ? { ...prev, running: false, autoSaved, reviewNeeded, failed, failures: [...failures] } : null)
+    setBulkProgress(prev => prev ? { ...prev, running: false, autoSaved, reviewNeeded, duplicates, failed, failures: [...failures] } : null)
     await loadList()
   }
 
@@ -552,9 +562,10 @@ export default function InsurancePage() {
               transition: 'width 0.3s',
             }} />
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, gap: 8 }}>
-            <span>자동 저장 <b style={{ color: '#15803d' }}>{bulkProgress.autoSaved}</b></span>
-            <span>검토 필요 <b style={{ color: '#d97706' }}>{bulkProgress.reviewNeeded}</b></span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, gap: 8, flexWrap: 'wrap' }}>
+            <span>자동 <b style={{ color: '#15803d' }}>{bulkProgress.autoSaved}</b></span>
+            <span>검토 <b style={{ color: '#d97706' }}>{bulkProgress.reviewNeeded}</b></span>
+            <span>중복 <b style={{ color: '#6366f1' }}>{bulkProgress.duplicates}</b></span>
             <span>실패 <b style={{ color: '#dc2626' }}>{bulkProgress.failed}</b></span>
           </div>
           {bulkProgress.running && (
