@@ -8,7 +8,20 @@ function serialize<T>(data: T): T {
   ))
 }
 
-// ★ FMI ERP 기본 모듈 — v3 3그룹 구조 (코드가 유일한 소스 of truth)
+// ═══════════════════════════════════════════════════════════════════
+// ⚠️ 사이드바 메뉴 추가 가이드 — 4곳 동기화 필수
+// ═══════════════════════════════════════════════════════════════════
+// 새 메뉴 추가 시 다음 4곳 모두 갱신 필수 (한 곳이라도 누락되면 사이드바 표시 X)
+//
+//   1. ⬇️  여기 (DEFAULT_MODULES) 에 entry 추가
+//   2. app/components/auth/ClientLayout.tsx HIDDEN_PATHS 에서 제거 확인
+//   3. app/components/auth/ClientLayout.tsx PATH_TO_GROUP 에 그룹 매핑 추가
+//   4. (선택) ClientLayout NAME_OVERRIDES 에 표시 이름 (없으면 아래 name 사용)
+//
+// ClientLayout 마운트 시 console.warn 로 누락 자동 감지 (개발 환경)
+// ═══════════════════════════════════════════════════════════════════
+
+// FMI ERP 기본 모듈 — v3 3그룹 구조 (코드가 유일한 소스 of truth)
 // HIDDEN_PATHS에 해당하는 경로는 제거 완료 (ClientLayout에서 이중 필터 방지)
 const DEFAULT_MODULES = [
   // ── 차량관리 (vehicle) ──

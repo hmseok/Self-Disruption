@@ -37,6 +37,20 @@ const Icons: any = {
 // 메뉴 설정
 // ============================================
 
+// ═══════════════════════════════════════════════════════════════════
+// ⚠️ 사이드바 메뉴 추가 가이드 — 4곳 동기화 필수
+// ═══════════════════════════════════════════════════════════════════
+// 새 메뉴를 추가하려면 다음 4곳을 모두 갱신해야 사이드바에 표시됩니다.
+// 한 곳이라도 누락되면 사이드바에서 사라집니다.
+//
+//   1. /api/system_modules/route.ts → DEFAULT_MODULES 에 entry 추가
+//   2. ClientLayout HIDDEN_PATHS 에서 제거 확인 (없어야 함)
+//   3. ClientLayout PATH_TO_GROUP 에 path → group 매핑 추가
+//   4. (선택) ClientLayout NAME_OVERRIDES 에 표시 이름 (없으면 system_modules.name 사용)
+//
+// 정합성 검증: ClientLayout 마운트 시 console.warn 로 누락 자동 감지 (아래)
+// ═══════════════════════════════════════════════════════════════════
+
 // 동적 메뉴 → 그룹 매핑 (v3 — HIDDEN_PATHS에 해당하는 dead 항목 제거)
 const PATH_TO_GROUP: Record<string, string> = {
   // ── 차량관리 ──
@@ -48,6 +62,9 @@ const PATH_TO_GROUP: Record<string, string> = {
   // ── 재무 ──
   '/finance/bank-card': 'finance', '/loans': 'finance',
   '/finance/cost-analysis': 'finance',
+  '/finance/classify': 'finance',
+  '/finance/investor': 'finance',
+  '/finance/sms': 'finance',
   '/insurance': 'finance',
   '/finance/fleet': 'vehicle',
   // ── 관리 ──
@@ -70,6 +87,9 @@ const NAME_OVERRIDES: Record<string, string> = {
   // 재무 그룹
   '/finance/bank-card': '통장/카드 관리',
   '/finance/cost-analysis': '원가 분석',
+  '/finance/classify': '거래 분류',
+  '/finance/investor': '투자자 정산',
+  '/finance/sms': 'SMS 수집',
   '/loans': '대출 관리',
   '/insurance': '🛡 보험 관리',
   // 차량관리 그룹
@@ -106,7 +126,7 @@ const HIDDEN_PATHS = new Set([
   '/finance/uploads',        // → /finance/bank-card 엑셀 업로드로 통합
   '/finance/codef',          // → /finance/bank-card 자동수집으로 통합
   '/finance/cards',          // → /finance/bank-card 카드 거래 탭으로 통합
-  '/finance/sms',            // → /finance/bank-card SMS 연결로 통합
+  // '/finance/sms',         // 2026-04-29 활성화 — system_modules에 등록되어 있고 페이지 실재
   '/finance/openbanking',    // → /finance/bank-card 통장 탭으로 통합
   '/db/lotte',               // → 미사용 (경쟁사 벤치마크)
   '/admin/code-master',      // → 미사용 (기초코드)
@@ -248,6 +268,21 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
         if (res.ok) {
           const json = await res.json()
           const data = Array.isArray(json) ? json : (json.data || [])
+
+          // ── 정합성 자가 검증: 4곳 동기화 누락 자동 감지 ──
+          if (typeof window !== 'undefined' && (process.env.NODE_ENV !== 'production' || (window as any).__DEBUG_SIDEBAR__)) {
+            const conflicts = data.filter((m: any) => HIDDEN_PATHS.has(m.path))
+            const missingGroup = data.filter((m: any) => !HIDDEN_PATHS.has(m.path) && !PATH_TO_GROUP[m.path])
+            if (conflicts.length > 0) {
+              console.warn('[Sidebar 정합성] system_modules ↔ HIDDEN_PATHS 충돌:',
+                conflicts.map((c: any) => c.path))
+            }
+            if (missingGroup.length > 0) {
+              console.warn('[Sidebar 정합성] PATH_TO_GROUP 매핑 누락 → 사이드바 미표시:',
+                missingGroup.map((m: any) => m.path))
+            }
+          }
+
           const seen = new Set<string>()
           const allMenus = data
             .filter((item: any) => {
