@@ -12,6 +12,18 @@
 -- 롤백: 본 파일 하단의 ROLLBACK 섹션 참조
 -- ═══════════════════════════════════════════════════════════════════
 
+-- ── (0) cars.vin 컬럼 추가 — 청약서 차대번호 매칭용 ────────────
+-- 신차/중고차는 차량번호(plate)가 없거나 변경될 수 있어 VIN으로 1:1 식별
+ALTER TABLE cars
+  ADD COLUMN IF NOT EXISTS vin VARCHAR(17) NULL
+    COMMENT '차대번호 (Vehicle Identification Number, 17자리)';
+
+-- VIN 인덱스 (DROP/CREATE 패턴 — IF NOT EXISTS 미지원 환경 대응)
+SET @idx_exists := (SELECT COUNT(*) FROM information_schema.statistics
+                    WHERE table_schema = DATABASE() AND table_name = 'cars' AND index_name = 'idx_cars_vin');
+SET @sql := IF(@idx_exists = 0, 'CREATE INDEX idx_cars_vin ON cars(vin)', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
 -- ── (1) insurance_contracts 컬럼 확장 ────────────────────────────
 ALTER TABLE insurance_contracts
   ADD COLUMN IF NOT EXISTS contract_type VARCHAR(32) NULL DEFAULT 'individual'
@@ -22,13 +34,19 @@ ALTER TABLE insurance_contracts
   ADD COLUMN IF NOT EXISTS document_url VARCHAR(500) NULL
     COMMENT '청약서 이미지/PDF URL',
   ADD COLUMN IF NOT EXISTS ocr_confidence DECIMAL(5,2) NULL
-    COMMENT 'OCR 추출 신뢰도 (0~100, NULL=수동입력)';
+    COMMENT 'OCR 추출 신뢰도 (0~100, NULL=수동입력)',
+  ADD COLUMN IF NOT EXISTS design_number VARCHAR(64) NULL
+    COMMENT 'KRMA 설계번호 등 외부 보험사 식별번호',
+  ADD COLUMN IF NOT EXISTS vehicle_class VARCHAR(64) NULL
+    COMMENT '청약서상 차종 (EV6 소형A, 아이오닉5 소형A 등)';
 
 -- ── (2) insurance_vehicle_allocations ──────────────────────────────
 CREATE TABLE IF NOT EXISTS insurance_vehicle_allocations (
   id              CHAR(36)     NOT NULL PRIMARY KEY,
   contract_id     CHAR(36)     NOT NULL COMMENT 'insurance_contracts.id',
-  car_id          CHAR(36)     NOT NULL COMMENT 'cars.id',
+  car_id          CHAR(36)     NULL COMMENT 'cars.id (VIN 매칭 안된 경우 NULL 허용)',
+  vin             VARCHAR(17)  NULL COMMENT '차대번호 (cars 미매칭 시 보존용)',
+  vehicle_label   VARCHAR(128) NULL COMMENT '청약서 표기 (EV6 소형A 등)',
   premium_amount  DECIMAL(12,0) NOT NULL DEFAULT 0
     COMMENT '차량당 분담 보험료',
   ratio           DECIMAL(5,4) NULL
@@ -39,9 +57,9 @@ CREATE TABLE IF NOT EXISTS insurance_vehicle_allocations (
   updated_at      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   KEY idx_iva_contract (contract_id),
   KEY idx_iva_car (car_id),
-  UNIQUE KEY uniq_iva_contract_car (contract_id, car_id)
+  KEY idx_iva_vin (vin)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-  COMMENT='보험계약-차량 분담 매핑';
+  COMMENT='보험계약-차량 분담 매핑 (VIN 우선 매칭, 미매칭 보존)';
 
 -- ── (3) insurance_payment_schedule ──────────────────────────────────
 CREATE TABLE IF NOT EXISTS insurance_payment_schedule (
