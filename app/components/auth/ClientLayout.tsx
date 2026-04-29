@@ -48,6 +48,7 @@ const PATH_TO_GROUP: Record<string, string> = {
   // ── 재무 ──
   '/finance/bank-card': 'finance', '/loans': 'finance',
   '/finance/cost-analysis': 'finance',
+  '/insurance': 'finance',
   '/finance/fleet': 'vehicle',
   // ── 관리 ──
   '/admin/payroll': 'admin',
@@ -70,6 +71,7 @@ const NAME_OVERRIDES: Record<string, string> = {
   '/finance/bank-card': '통장/카드 관리',
   '/finance/cost-analysis': '원가 분석',
   '/loans': '대출 관리',
+  '/insurance': '🛡 보험 관리',
   // 차량관리 그룹
   '/finance/fleet': '차량 수익',
   // 관리 그룹
