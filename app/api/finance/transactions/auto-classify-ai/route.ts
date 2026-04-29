@@ -165,11 +165,13 @@ export async function POST(request: NextRequest) {
     const dryRun = body.dryRun === true
 
     // 미분류 총 개수 (진행률 표시용)
+    // ★ AI가 이미 한 번 시도한 row(final_category에 [AI 추정 N%] 표시됨)는 제외 — 재호출 차단
     const totalRow = await prisma.$queryRawUnsafe<Array<{ cnt: bigint | number }>>(`
       SELECT COUNT(*) AS cnt
         FROM transactions
        WHERE deleted_at IS NULL
          AND (category IS NULL OR category = '' OR category = '미분류')
+         AND (final_category IS NULL OR final_category NOT LIKE '[AI 추정%')
     `)
     const totalUnclassified = Number(totalRow?.[0]?.cnt || 0)
 
@@ -189,11 +191,13 @@ export async function POST(request: NextRequest) {
     }
 
     // 한 batch만 가져오기
+    // ★ AI가 이미 시도한 row 제외 — 검토필요(<70%) row가 다음 batch에서 재fetch되는 토큰 낭비 방지
     const rows = await prisma.$queryRawUnsafe<UnclassifiedRow[]>(`
       SELECT id, type, client_name, description, card_company, bank_name, amount, transaction_date
         FROM transactions
        WHERE deleted_at IS NULL
          AND (category IS NULL OR category = '' OR category = '미분류')
+         AND (final_category IS NULL OR final_category NOT LIKE '[AI 추정%')
        ORDER BY transaction_date DESC
        LIMIT ${batchSize}
     `)
