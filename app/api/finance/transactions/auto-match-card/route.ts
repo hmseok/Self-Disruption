@@ -28,7 +28,48 @@ export async function POST(request: NextRequest) {
     const dryRun = body.dryRun === true
     const batchId: string | null = typeof body.batchId === 'string' ? body.batchId : null
 
+    // ── Phase 0: 공용 거래 정리 (매칭 해제 + 카테고리 셋팅) ──
+    //   client_name='공용' 인 거래는 특정 차량에 귀속되면 안 됨
+    //   → 잘못 매칭된 row의 related_type/related_id 해제
+    //   → 카테고리를 '공용카드사용'으로 통일
+    let gongyongCarUnlinked = 0
+    let gongyongCategorized = 0
+    {
+      // 카운트 (dryRun 응답용)
+      const carUnlinkRow = await prisma.$queryRawUnsafe<Array<{ cnt: bigint | number }>>(`
+        SELECT COUNT(*) AS cnt FROM transactions
+         WHERE deleted_at IS NULL AND client_name = '공용' AND related_type = 'car'
+      `)
+      gongyongCarUnlinked = Number(carUnlinkRow?.[0]?.cnt || 0)
+
+      const categorizeRow = await prisma.$queryRawUnsafe<Array<{ cnt: bigint | number }>>(`
+        SELECT COUNT(*) AS cnt FROM transactions
+         WHERE deleted_at IS NULL AND client_name = '공용'
+           AND (category IS NULL OR category = '' OR category != '공용카드사용')
+      `)
+      gongyongCategorized = Number(categorizeRow?.[0]?.cnt || 0)
+
+      if (!dryRun) {
+        if (gongyongCarUnlinked > 0) {
+          await prisma.$executeRawUnsafe(`
+            UPDATE transactions
+               SET related_type = NULL, related_id = NULL, updated_at = NOW()
+             WHERE deleted_at IS NULL AND client_name = '공용' AND related_type = 'car'
+          `)
+        }
+        if (gongyongCategorized > 0) {
+          await prisma.$executeRawUnsafe(`
+            UPDATE transactions
+               SET category = '공용카드사용', final_category = '공용카드사용', updated_at = NOW()
+             WHERE deleted_at IS NULL AND client_name = '공용'
+               AND (category IS NULL OR category = '' OR category != '공용카드사용')
+          `)
+        }
+      }
+    }
+
     // 1) 매칭 안된 Excel 카드 거래 가져오기 (raw_data 에 card_last4 있는 것만)
+    //    ★ 공용 거래는 매칭 대상에서 제외 (Phase 0에서 별도 처리됨)
     let candidatesSql = `
       SELECT id,
              JSON_UNQUOTE(JSON_EXTRACT(raw_data, '$.card_last4')) AS card_last4,
@@ -43,6 +84,7 @@ export async function POST(request: NextRequest) {
          AND raw_data IS NOT NULL
          AND JSON_EXTRACT(raw_data, '$.card_last4') IS NOT NULL
          AND (related_id IS NULL OR related_type IS NULL OR related_type != 'car')
+         AND (client_name IS NULL OR client_name != '공용')
     `
     const params: any[] = []
     if (batchId) {
@@ -60,11 +102,14 @@ export async function POST(request: NextRequest) {
     if (candidates.length === 0) {
       return NextResponse.json({
         ok: true,
+        dry_run: dryRun,
         total_unmatched: 0,
         matched: 0,
         skipped_no_match: 0,
         skipped_ambiguous: 0,
         skipped_no_car: 0,
+        gongyong_car_unlinked: gongyongCarUnlinked,
+        gongyong_categorized: gongyongCategorized,
         message: '매칭 대상 없음 (Excel 카드 거래 + card_last4 + 미매칭)',
       })
     }
@@ -192,6 +237,8 @@ export async function POST(request: NextRequest) {
       skipped_no_match: skipNoMatch,
       skipped_ambiguous: skipAmbiguous,
       skipped_no_car: skipNoCar,
+      gongyong_car_unlinked: gongyongCarUnlinked,
+      gongyong_categorized: gongyongCategorized,
       distribution,
       skip_examples: skipExamples,
       sample: plans.slice(0, 5).map(p => ({

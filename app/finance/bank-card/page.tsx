@@ -1088,13 +1088,17 @@ export default function BankCardPage() {
       }
       const dist = Object.entries(json.distribution || {}).sort((a: any, b: any) => b[1] - a[1])
         .map(([k, v]) => `  ${v}건  ${k}`).join('\n')
+      const gongyongMsg = (json.gongyong_car_unlinked || json.gongyong_categorized)
+        ? `\n[공용 거래 정리]\n· 차량 매칭 해제: ${(json.gongyong_car_unlinked || 0).toLocaleString()}건\n· 카테고리 자동 설정 (공용카드사용): ${(json.gongyong_categorized || 0).toLocaleString()}건\n`
+        : ''
       alert(
         `${dryRun ? '🔍 차량 매칭 dry-run' : '✓ 차량 매칭 완료'}\n\n` +
-        `· 매칭 대상: ${json.total_unmatched.toLocaleString()}건\n` +
-        `· 매칭 성공: ${(dryRun ? json.planned : json.applied).toLocaleString()}건\n` +
-        `· 미매칭 (last4 일치 없음): ${json.skipped_no_match.toLocaleString()}건\n` +
-        `· 미매칭 (차량 미배정): ${json.skipped_no_car.toLocaleString()}건\n` +
-        `· 모호 (last4 충돌): ${json.skipped_ambiguous.toLocaleString()}건\n` +
+        `· 매칭 대상: ${(json.total_unmatched || 0).toLocaleString()}건\n` +
+        `· 매칭 성공: ${(dryRun ? json.planned : json.applied || 0).toLocaleString()}건\n` +
+        `· 미매칭 (last4 일치 없음): ${(json.skipped_no_match || 0).toLocaleString()}건\n` +
+        `· 미매칭 (차량 미배정): ${(json.skipped_no_car || 0).toLocaleString()}건\n` +
+        `· 모호 (last4 충돌): ${(json.skipped_ambiguous || 0).toLocaleString()}건\n` +
+        gongyongMsg +
         (dist ? `\n[차량별]\n${dist}` : '')
       )
       if (!dryRun) {
