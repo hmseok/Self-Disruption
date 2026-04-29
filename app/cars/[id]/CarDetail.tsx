@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import PnlTab from './PnlTab'
 import CarSettlementTab from './CarSettlementTab'
+import { COLORS, GLASS, BTN, pillStyle } from '@/app/utils/ui-tokens'
 
 async function getAuthHeader(): Promise<Record<string, string>> {
   try {
@@ -601,11 +602,24 @@ export default function CarDetailPage() {
           <div>
             <h2 className="text-2xl font-black text-gray-900 flex items-center gap-2">
               차량 상세 정보
-              <span className={`text-xs px-2 py-1 rounded-lg border font-bold ${car.status === '운행중' ? 'bg-green-100 text-green-600 border-green-200' : 'bg-gray-100 text-gray-500'}`}>
-                {car.status}
-              </span>
+              {(() => {
+                const map: Record<string, { label: string; tone: 'success' | 'warning' | 'danger' | 'neutral' }> = {
+                  available:   { label: '대기',     tone: 'neutral' },
+                  rented:      { label: '대여중',   tone: 'success' },
+                  maintenance: { label: '정비/사고', tone: 'warning' },
+                  returned:    { label: '반납',     tone: 'neutral' },
+                  sold:        { label: '매각',     tone: 'danger' },
+                  retired:     { label: '폐기',     tone: 'danger' },
+                }
+                const meta = map[car.status] || { label: car.status || '미설정', tone: 'neutral' as const }
+                return (
+                  <span style={{ ...pillStyle(meta.tone), fontSize: 11, padding: '3px 10px' }}>
+                    {meta.label}
+                  </span>
+                )
+              })()}
             </h2>
-            <p className="text-gray-500 font-medium text-sm mt-0.5">관리번호: {car.id} / {car.brand} {car.model}</p>
+            <p className="text-gray-500 font-medium text-sm mt-0.5">관리번호: {car.id?.slice(0, 8)} / {car.brand} {car.model}</p>
           </div>
         </div>
         <div className="flex gap-2">
@@ -617,53 +631,86 @@ export default function CarDetailPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* 좌측: 요약 정보 카드 */}
-        <div className="lg:col-span-4 space-y-6 lg:sticky lg:top-6 lg:self-start">
-           <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-3xl p-6 text-white shadow-xl relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-gray-50 rounded-full -mr-10 -mt-10 blur-2xl"></div>
-              <div className="flex justify-between items-start mb-8">
-                <div>
-                   <p className="text-gray-400 text-xs font-bold mb-1">Vehicle No.</p>
-                   <div className="bg-white text-black px-4 py-2 rounded-lg border-2 border-black inline-block shadow-lg">
-                      <span className="text-2xl font-black tracking-widest">{car.number}</span>
-                   </div>
-                </div>
+        {/* 좌측: 요약 정보 카드 — Soft Ice Glass v4 */}
+        <div className="lg:col-span-4 space-y-4 lg:sticky lg:top-6 lg:self-start">
+          {/* === Hero — 차량번호판 클래식 톤 === */}
+          <div style={{
+            ...GLASS.L3, border: `1px solid ${COLORS.borderBlue}`,
+            borderRadius: 16, padding: 20,
+          }}>
+            {/* 차량번호 강조 박스 */}
+            <div style={{ textAlign: 'center', marginBottom: 16 }}>
+              <p style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSecondary, marginBottom: 8, letterSpacing: 1 }}>
+                차량번호
+              </p>
+              <div style={{
+                display: 'inline-block', padding: '10px 24px', borderRadius: 10,
+                background: '#fff', border: `2.5px solid ${COLORS.textPrimary}`,
+                fontSize: 26, fontWeight: 900, letterSpacing: 3,
+                color: COLORS.textPrimary, boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+              }}>
+                {car.number || '미등록'}
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                 <div className="bg-gray-100 p-4 rounded-2xl backdrop-blur-sm">
-                    <p className="text-gray-400 text-xs font-bold">모델명</p>
-                    <p className="text-lg font-bold truncate">{car.brand} {car.model}</p>
-                 </div>
-                 <div className="bg-gray-100 p-4 rounded-2xl backdrop-blur-sm">
-                    <p className="text-gray-400 text-xs font-bold">주행거리</p>
-                    <p className="text-lg font-bold">{Number(car.mileage || 0).toLocaleString()} km</p>
-                 </div>
-              </div>
-              {/* 신차/중고차 구분 */}
-              <div className="mt-4 flex items-center gap-3">
-                <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                  car.is_used ? 'bg-orange-500/20 text-orange-300' : 'bg-blue-500/20 text-blue-300'
-                }`}>
-                  {car.is_used ? '🔄 중고차' : '🆕 신차'}
-                </span>
-                {car.is_used && car.purchase_mileage > 0 && (
-                  <span className="text-xs text-gray-400">
-                    구입시 주행거리: <b className="text-white">{Number(car.purchase_mileage || 0).toLocaleString()}km</b>
-                  </span>
+              {car.vin && (
+                <p style={{ fontSize: 10, color: COLORS.textMuted, marginTop: 6, fontFamily: 'monospace' }}>
+                  VIN {car.vin}
+                </p>
+              )}
+            </div>
+
+            {/* 차종 / 주행거리 2열 */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              <div style={{ ...GLASS.L4, padding: 12, borderRadius: 10 }}>
+                <p style={{ fontSize: 11, fontWeight: 600, color: COLORS.textSecondary, marginBottom: 4 }}>차종</p>
+                <p style={{ fontSize: 14, fontWeight: 700, color: COLORS.textPrimary, lineHeight: 1.3 }}>
+                  {car.brand || '-'} {car.model || ''}
+                </p>
+                {car.trim && (
+                  <p style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 2 }}>{car.trim}</p>
                 )}
               </div>
-           </div>
+              <div style={{ ...GLASS.L4, padding: 12, borderRadius: 10 }}>
+                <p style={{ fontSize: 11, fontWeight: 600, color: COLORS.textSecondary, marginBottom: 4 }}>주행거리</p>
+                <p style={{ fontSize: 14, fontWeight: 700, color: COLORS.textPrimary }}>
+                  {Number(car.mileage || 0).toLocaleString()} <span style={{ fontSize: 11, color: COLORS.textSecondary }}>km</span>
+                </p>
+              </div>
+            </div>
 
-           <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-200">
-             <div>
-                <label className="text-xs font-bold text-gray-400">현재 차고지</label>
-                <input className="w-full font-bold border-b py-2 mt-1 focus:outline-none focus:border-steel-500 text-sm"
-                  value={car.location || ''}
-                  onChange={e => handleChange('location', e.target.value)}
-                  placeholder="위치 정보 입력"
-                />
-             </div>
-           </div>
+            {/* 신차/중고 + 구입시 주행 (중고일 때만) */}
+            <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <span style={{ ...pillStyle(car.is_used ? 'warning' : 'info'), fontSize: 11, padding: '2px 10px' }}>
+                {car.is_used ? '🔄 중고차' : '🆕 신차'}
+              </span>
+              {car.is_used && Number(car.purchase_mileage) > 0 && (
+                <span style={{ fontSize: 11, color: COLORS.textSecondary }}>
+                  구입 시 <b style={{ color: COLORS.textPrimary }}>{Number(car.purchase_mileage).toLocaleString()}km</b>
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* === 현재 차고지 === */}
+          <div style={{
+            ...GLASS.L3, border: `1px solid ${COLORS.borderSubtle}`,
+            borderRadius: 12, padding: 16,
+          }}>
+            <label style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSecondary, display: 'block', marginBottom: 6 }}>
+              📍 현재 차고지
+            </label>
+            <input
+              value={car.location || ''}
+              onChange={e => handleChange('location', e.target.value)}
+              placeholder="위치 정보 입력"
+              style={{
+                width: '100%', padding: '8px 12px', borderRadius: 8,
+                fontSize: 13, fontWeight: 600,
+                color: COLORS.textPrimary,
+                background: 'rgba(255,255,255,0.7)',
+                border: `1px solid ${COLORS.borderSubtle}`,
+              }}
+            />
+          </div>
 
            {/* 취득 요약 — Number 캐스팅 의무 (Prisma Decimal → string 반환 이슈) */}
            {(Number(car.purchase_price || 0) > 0) && (() => {
@@ -677,82 +724,141 @@ export default function CarDetailPage() {
              const initial = rt + ba + df + pf + af + oc
              const total = pp + initial
              return (
-               <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-200">
-                 <p className="text-xs font-bold text-gray-400 mb-3">💰 취득 요약</p>
-                 <div className="space-y-2">
-                   <div className="flex justify-between items-center">
-                     <span className="text-xs text-gray-500">구매가</span>
-                     <span className="text-sm font-bold text-gray-800">{pp.toLocaleString()}원</span>
+               <div style={{
+                 ...GLASS.L3, border: `1px solid ${COLORS.borderAmber}`,
+                 borderRadius: 12, padding: 16,
+               }}>
+                 <p style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSecondary, marginBottom: 10 }}>
+                   💰 취득 요약
+                 </p>
+                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                     <span style={{ fontSize: 12, color: COLORS.textSecondary }}>구매가</span>
+                     <span style={{ fontSize: 13, fontWeight: 700, color: COLORS.textPrimary }}>{pp.toLocaleString()}원</span>
                    </div>
                    {initial > 0 && (
-                     <div className="flex justify-between items-center">
-                       <span className="text-xs text-gray-500">초기비용</span>
-                       <span className="text-sm font-bold text-gray-800">{initial.toLocaleString()}원</span>
+                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                       <span style={{ fontSize: 12, color: COLORS.textSecondary }}>초기비용</span>
+                       <span style={{ fontSize: 13, fontWeight: 700, color: COLORS.textPrimary }}>{initial.toLocaleString()}원</span>
                      </div>
                    )}
-                   <div className="border-t pt-2 flex justify-between items-center">
-                     <span className="text-xs font-bold text-gray-600">총 취득원가</span>
-                     <span className="text-sm font-black text-blue-600">{total.toLocaleString()}원</span>
+                   <div style={{
+                     borderTop: `1px solid ${COLORS.borderSubtle}`, paddingTop: 8, marginTop: 4,
+                     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                   }}>
+                     <span style={{ fontSize: 12, fontWeight: 700, color: COLORS.textPrimary }}>총 취득원가</span>
+                     <span style={{ fontSize: 14, fontWeight: 900, color: COLORS.primary }}>{total.toLocaleString()}원</span>
                    </div>
                  </div>
                </div>
              )
            })()}
 
-           {/* 보험 · 대출 · 투자 요약 */}
-           <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-200">
-             <p className="text-xs font-bold text-gray-400 mb-3">📋 관리 현황</p>
-             <div className="space-y-3">
+           {/* 관리 현황 — Glass L3 + 색상 톤 통일 */}
+           <div style={{
+             ...GLASS.L3, border: `1px solid ${COLORS.borderGreen}`,
+             borderRadius: 12, padding: 16,
+           }}>
+             <p style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSecondary, marginBottom: 10 }}>
+               📋 관리 현황
+             </p>
+             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                {/* 보험 */}
-               <button onClick={() => setActiveTab('insurance')} className="w-full flex items-center justify-between hover:bg-gray-50 rounded-lg p-2 -mx-2 transition-colors">
-                 <div className="flex items-center gap-2">
-                   <span className="text-base">🛡️</span>
-                   <span className="text-xs font-medium text-gray-600">보험</span>
+               <button
+                 onClick={() => setActiveTab('insurance')}
+                 style={{
+                   display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                   padding: '8px 10px', borderRadius: 8, border: 'none',
+                   background: 'transparent', cursor: 'pointer', transition: 'background 0.15s',
+                 }}
+                 onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(0,0,0,0.04)'}
+                 onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
+                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                   <span style={{ fontSize: 14 }}>🛡️</span>
+                   <span style={{ fontSize: 12, fontWeight: 600, color: COLORS.textPrimary }}>보험</span>
                  </div>
                  {summary.activeInsurance ? (
-                   <div className="text-right">
-                     <span className="text-xs font-bold text-green-600">{summary.activeInsurance.company}</span>
-                     <p className="text-[10px] text-gray-400">~{summary.activeInsurance.end_date}</p>
+                   <div style={{ textAlign: 'right' }}>
+                     <span style={{ fontSize: 12, fontWeight: 700, color: COLORS.success }}>
+                       {summary.activeInsurance.insurance_company || summary.activeInsurance.company}
+                     </span>
+                     {summary.activeInsurance.end_date && (
+                       <p style={{ fontSize: 10, color: COLORS.textMuted, margin: 0 }}>
+                         ~{String(summary.activeInsurance.end_date).slice(0, 10)}
+                       </p>
+                     )}
                    </div>
                  ) : (
-                   <span className="text-xs text-gray-400">{summary.insuranceCount > 0 ? '만료됨' : '미등록'}</span>
+                   <span style={{ fontSize: 12, color: COLORS.textMuted }}>
+                     {summary.insuranceCount > 0 ? '만료됨' : '미등록'}
+                   </span>
                  )}
                </button>
 
                {/* 대출 */}
-               <button onClick={() => setActiveTab('finance')} className="w-full flex items-center justify-between hover:bg-gray-50 rounded-lg p-2 -mx-2 transition-colors">
-                 <div className="flex items-center gap-2">
-                   <span className="text-base">💳</span>
-                   <span className="text-xs font-medium text-gray-600">대출/금융</span>
+               <button
+                 onClick={() => setActiveTab('finance')}
+                 style={{
+                   display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                   padding: '8px 10px', borderRadius: 8, border: 'none',
+                   background: 'transparent', cursor: 'pointer', transition: 'background 0.15s',
+                 }}
+                 onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(0,0,0,0.04)'}
+                 onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
+                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                   <span style={{ fontSize: 14 }}>💰</span>
+                   <span style={{ fontSize: 12, fontWeight: 600, color: COLORS.textPrimary }}>대출/금융</span>
                  </div>
                  {summary.loanCount > 0 ? (
-                   <span className="text-xs font-bold text-gray-800">{summary.loanCount}건 · {summary.totalLoanAmount.toLocaleString()}원</span>
+                   <span style={{ fontSize: 12, fontWeight: 700, color: COLORS.textPrimary }}>
+                     {summary.loanCount}건 · {summary.totalLoanAmount.toLocaleString()}원
+                   </span>
                  ) : (
-                   <span className="text-xs text-gray-400">없음</span>
+                   <span style={{ fontSize: 12, color: COLORS.textMuted }}>없음</span>
                  )}
                </button>
 
                {/* 투자 */}
-               <button onClick={() => setActiveTab('invest')} className="w-full flex items-center justify-between hover:bg-gray-50 rounded-lg p-2 -mx-2 transition-colors">
-                 <div className="flex items-center gap-2">
-                   <span className="text-base">📈</span>
-                   <span className="text-xs font-medium text-gray-600">투자</span>
+               <button
+                 onClick={() => setActiveTab('invest')}
+                 style={{
+                   display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                   padding: '8px 10px', borderRadius: 8, border: 'none',
+                   background: 'transparent', cursor: 'pointer', transition: 'background 0.15s',
+                 }}
+                 onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(0,0,0,0.04)'}
+                 onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
+                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                   <span style={{ fontSize: 14 }}>📈</span>
+                   <span style={{ fontSize: 12, fontWeight: 600, color: COLORS.textPrimary }}>투자</span>
                  </div>
                  {summary.investCount > 0 ? (
-                   <span className="text-xs font-bold text-gray-800">{summary.investCount}건 · {summary.totalInvestAmount.toLocaleString()}원</span>
+                   <span style={{ fontSize: 12, fontWeight: 700, color: COLORS.textPrimary }}>
+                     {summary.investCount}건 · {summary.totalInvestAmount.toLocaleString()}원
+                   </span>
                  ) : (
-                   <span className="text-xs text-gray-400">없음</span>
+                   <span style={{ fontSize: 12, color: COLORS.textMuted }}>없음</span>
                  )}
                </button>
 
-               {/* 지입 */}
-               <button onClick={() => setActiveTab('jiip')} className="w-full flex items-center justify-between hover:bg-gray-50 rounded-lg p-2 -mx-2 transition-colors">
-                 <div className="flex items-center gap-2">
-                   <span className="text-base">🤝</span>
-                   <span className="text-xs font-medium text-gray-600">소유구분</span>
+               {/* 소유 구분 */}
+               <button
+                 onClick={() => setActiveTab('jiip')}
+                 style={{
+                   display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                   padding: '8px 10px', borderRadius: 8, border: 'none',
+                   background: 'transparent', cursor: 'pointer', transition: 'background 0.15s',
+                 }}
+                 onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(0,0,0,0.04)'}
+                 onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
+                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                   <span style={{ fontSize: 14 }}>🤝</span>
+                   <span style={{ fontSize: 12, fontWeight: 600, color: COLORS.textPrimary }}>소유구분</span>
                  </div>
-                 <span className="text-xs font-bold text-gray-800">
-                   {car.ownership_type === 'company' ? '자사 보유' : car.ownership_type === 'consignment' ? '지입' : car.ownership_type === 'leased_in' ? '임차' : '미설정'}
+                 <span style={{ fontSize: 12, fontWeight: 700, color: COLORS.textPrimary }}>
+                   {car.ownership_type === 'company' ? '자사 보유' :
+                    car.ownership_type === 'consignment' ? '지입' :
+                    car.ownership_type === 'leased_in' ? '임차' : '미설정'}
                  </span>
                </button>
              </div>
