@@ -306,6 +306,9 @@ export default function BankCardPage() {
   const [groupCategoryEdits, setGroupCategoryEdits] = useState<Record<string, string>>({})
   const [groupConfirming, setGroupConfirming] = useState<Set<string>>(new Set())
 
+  // 차량 목록 (분류 검수에서 차량 매칭 변경 dropdown 용)
+  const [cars, setCars] = useState<Array<{ id: string; number: string; brand?: string; model?: string }>>([])
+
   // 자동 분류
   const [autoClassifying, setAutoClassifying] = useState(false)
   const [autoClassifyResult, setAutoClassifyResult] = useState<any>(null)
@@ -363,6 +366,19 @@ export default function BankCardPage() {
   const loadSettlements = useCallback(async () => {
     const { json } = await fetchWithAuth('/api/settlement/ledger')
     if (json?.data) setSettlements(json.data)
+  }, [])
+
+  // 차량 목록 — 분류 검수 차량 매칭 dropdown 용
+  const loadCars = useCallback(async () => {
+    const { json } = await fetchWithAuth('/api/finance-upload?table=cars')
+    if (json?.data) {
+      setCars(json.data.map((c: any) => ({
+        id: c.id,
+        number: c.number || '',
+        brand: c.brand || '',
+        model: c.model || '',
+      })))
+    }
   }, [])
 
   const loadSmsData = useCallback(async () => {
@@ -438,9 +454,9 @@ export default function BankCardPage() {
 
   useEffect(() => {
     setLoading(true)
-    Promise.all([loadSummary(), loadTransactions(), loadSettlements()])
+    Promise.all([loadSummary(), loadTransactions(), loadSettlements(), loadCars()])
       .finally(() => setLoading(false))
-  }, [loadSummary, loadTransactions, loadSettlements])
+  }, [loadSummary, loadTransactions, loadSettlements, loadCars])
 
   // SMS 탭 전환 시 로드
   useEffect(() => {
@@ -786,6 +802,14 @@ export default function BankCardPage() {
           if (timeCol && row[timeCol] && !/\d{2}:\d{2}/.test(String(dateVal))) {
             dateVal = `${dateVal} ${row[timeCol]}`
           }
+          // ★ 카드번호에서 끝 4자리 추출 — 차량 자동 매칭용
+          //   "1234-5678-9012-9876" → "9876"
+          //   "1234-56**-****-9876" → "9876"
+          //   "9876" → "9876"
+          //   카드번호 컬럼 없거나 추출 실패 시 null
+          const rawCardNum = String(row[reverse.cardNumber] || '').trim()
+          const last4Match = rawCardNum.replace(/[^0-9*]/g, '').match(/(\d{4})$/)
+          const cardLast4 = last4Match ? last4Match[1] : null
           return {
             date: normalizeDate(String(dateVal), (file as any).year),
             description: row[reverse.merchant] || '',
@@ -793,6 +817,7 @@ export default function BankCardPage() {
             type: 'expense',
             card_company: row[reverse.cardCompany] || '',
             client_name: row[reverse.holder] || '',
+            card_last4: cardLast4,  // 서버 측에서 raw_data.card_last4 로 저장
           }
         }
       })
@@ -832,7 +857,23 @@ export default function BankCardPage() {
     const totalInserted = allResults.reduce((s, r) => s + r.inserted, 0)
     const totalSkipped = allResults.reduce((s, r) => s + r.skipped, 0)
     const allErrors = allResults.flatMap(r => r.errors)
-    setUploadResult({ inserted: totalInserted, skipped: totalSkipped, errors: allErrors, files: allResults })
+
+    // ★ Excel 카드 업로드 후 차량 자동 매칭 호출
+    let matchInfo: any = null
+    if (uploadSource === 'excel_card' && totalInserted > 0) {
+      setUploadProgress('차량 자동 매칭 중...')
+      try {
+        const { ok, json } = await fetchWithAuth('/api/finance/transactions/auto-match-card', {
+          method: 'POST',
+          body: { dryRun: false },
+        })
+        if (ok) matchInfo = json
+      } catch (e: any) {
+        console.warn('[차량 자동 매칭]', e?.message)
+      }
+    }
+
+    setUploadResult({ inserted: totalInserted, skipped: totalSkipped, errors: allErrors, files: allResults, match: matchInfo })
     setUploading(false)
     setUploadProgress('')
 
@@ -962,6 +1003,32 @@ export default function BankCardPage() {
     loadSummary() // 통계 갱신
   }
 
+  // 분류 검수에서 차량 매칭 변경 (사용자 수정)
+  const changeItemCar = async (id: string, carId: string) => {
+    if (!carId) {
+      // 매칭 해제
+      await fetchWithAuth(`/api/finance-upload?table=transactions&id=${id}`, {
+        method: 'PATCH',
+        body: { related_type: null, related_id: null },
+      })
+    } else {
+      await fetchWithAuth(`/api/finance-upload?table=transactions&id=${id}`, {
+        method: 'PATCH',
+        body: { related_type: 'car', related_id: carId },
+      })
+    }
+    // 인메모리 갱신 — 즉시 UI 반영
+    const car = cars.find(c => c.id === carId)
+    setReviewItems(prev => prev.map(i => i.id === id ? {
+      ...i,
+      related_type: carId ? 'car' : null,
+      related_id: carId || null,
+      matched_car_id: carId || null,
+      matched_car_number: car?.number || null,
+      matched_car_model: car ? `${car.brand} ${car.model}`.trim() : null,
+    } : i))
+  }
+
   const loadGroupClassify = async () => {
     setGroupLoading(true)
     const { json } = await fetchWithAuth('/api/finance/transactions/group-classify', {
@@ -1004,6 +1071,40 @@ export default function BankCardPage() {
         groupCount: prev.groupCount - 1,
         groups: prev.groups.filter((g: any) => g.merchantKey !== group.merchantKey),
       } : prev)
+    }
+  }
+
+  // 🔗 차량 자동 매칭 (수동 트리거) — 기존 거래에 대해 last4 → 차량 매칭 일괄 실행
+  const runCarMatch = async (dryRun = false) => {
+    setAutoClassifying(true)
+    try {
+      const { ok, status, json } = await fetchWithAuth('/api/finance/transactions/auto-match-card', {
+        method: 'POST',
+        body: { dryRun },
+      })
+      if (!ok) {
+        alert(`차량 매칭 실패: HTTP ${status} — ${json?.error || '응답 없음'}`)
+        return
+      }
+      const dist = Object.entries(json.distribution || {}).sort((a: any, b: any) => b[1] - a[1])
+        .map(([k, v]) => `  ${v}건  ${k}`).join('\n')
+      alert(
+        `${dryRun ? '🔍 차량 매칭 dry-run' : '✓ 차량 매칭 완료'}\n\n` +
+        `· 매칭 대상: ${json.total_unmatched.toLocaleString()}건\n` +
+        `· 매칭 성공: ${(dryRun ? json.planned : json.applied).toLocaleString()}건\n` +
+        `· 미매칭 (last4 일치 없음): ${json.skipped_no_match.toLocaleString()}건\n` +
+        `· 미매칭 (차량 미배정): ${json.skipped_no_car.toLocaleString()}건\n` +
+        `· 모호 (last4 충돌): ${json.skipped_ambiguous.toLocaleString()}건\n` +
+        (dist ? `\n[차량별]\n${dist}` : '')
+      )
+      if (!dryRun) {
+        await Promise.all([loadSummary(), loadTransactions()])
+        if (reviewCategory) await loadReviewItems(reviewCategory)
+      }
+    } catch (e: any) {
+      alert(`차량 매칭 오류: ${e?.message || String(e)}`)
+    } finally {
+      setAutoClassifying(false)
     }
   }
 
@@ -1658,6 +1759,17 @@ export default function BankCardPage() {
                             cursor: autoClassifying ? 'wait' : 'pointer', opacity: autoClassifying ? 0.6 : 1,
                           }}
                         >🤖 AI 일괄 분류</button>
+                        <button
+                          onClick={() => runCarMatch(false)}
+                          disabled={autoClassifying}
+                          title="Excel 카드 거래 last4 → corporate_cards.card_number 매칭하여 차량 자동 할당"
+                          style={{
+                            ...BTN.sm, padding: '5px 12px', fontSize: 11, fontWeight: 700,
+                            background: 'rgba(59,130,246,0.1)', color: '#1d4ed8',
+                            border: '1px solid rgba(59,130,246,0.35)',
+                            cursor: autoClassifying ? 'wait' : 'pointer', opacity: autoClassifying ? 0.6 : 1,
+                          }}
+                        >🔗 차량 매칭</button>
                         <span style={{ width: 1, height: 18, background: 'rgba(0,0,0,0.08)', margin: '0 4px' }} />
                         {(['all', 'expense', 'income'] as const).map(f => (
                           <button key={f} onClick={() => setReviewTypeFilter(f)}
@@ -1790,14 +1902,24 @@ export default function BankCardPage() {
                                     <tbody>
                                       {reviewItems.map((item: any) => {
                                         const srcLabel = String(item.imported_from || '').startsWith('excel_bank') ? '통장' : String(item.imported_from || '').startsWith('excel_card') ? '카드' : item.imported_from === 'sms' ? 'SMS' : item.imported_from === 'sms_bank' ? 'SMS통장' : '기타'
-                                        // 매칭 정보: corporate_cards JOIN 결과 (assigned_car_id, holder_name 등)
-                                        const matchLabel = item.matched_car_number
-                                          ? `🚗 ${item.matched_car_number}${item.matched_car_model ? ` (${item.matched_car_model})` : ''}`
+                                        // 매칭 우선순위: 직접(related_id) > SMS(card_sms_transactions)
+                                        const directCarNumber = item.matched_car_number || null
+                                        const directCarModel = item.matched_car_model || null
+                                        const smsCarNumber = item.matched_car_number_sms || null
+                                        const smsCarModel = item.matched_car_model_sms || null
+                                        const carNumber = directCarNumber || smsCarNumber
+                                        const carModel = directCarModel || smsCarModel
+                                        const isDirectMatch = !!directCarNumber
+                                        const matchLabel = carNumber
+                                          ? `🚗 ${carNumber}${carModel ? ` (${carModel})` : ''}${isDirectMatch ? '' : ' [SMS]'}`
                                           : item.matched_holder_name
                                           ? `👤 ${item.matched_holder_name}`
                                           : item.matched_card_alias
                                           ? `💳 ${item.matched_card_alias}`
+                                          : item.card_last4
+                                          ? `❓ last4=${item.card_last4} (미매칭)`
                                           : '-'
+                                        const currentCarId = item.matched_car_id || (isDirectMatch ? item.related_id : null) || ''
                                         return (
                                           <tr key={item.id} style={{ borderTop: '1px solid rgba(0,0,0,0.04)' }}>
                                             <td style={{ padding: '6px 10px', color: COLORS.textPrimary, whiteSpace: 'nowrap' }}>
@@ -1818,9 +1940,22 @@ export default function BankCardPage() {
                                               {nf(Math.abs(Number(item.amount || 0)))}
                                             </td>
                                             <td style={{ padding: '6px 10px', color: COLORS.textMuted, fontSize: 11 }}>{srcLabel}</td>
-                                            <td style={{ padding: '6px 10px', color: matchLabel === '-' ? COLORS.textMuted : COLORS.textPrimary, fontSize: 11, maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-                                                title={matchLabel}>
-                                              {matchLabel}
+                                            <td style={{ padding: '6px 10px', fontSize: 11, maxWidth: 200 }}>
+                                              <div style={{ color: matchLabel === '-' ? COLORS.textMuted : COLORS.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 2 }} title={matchLabel}>
+                                                {matchLabel}
+                                              </div>
+                                              {/* 차량 변경 dropdown — 사용자가 직접 매칭 수정 */}
+                                              <select
+                                                value={currentCarId}
+                                                onChange={(e) => changeItemCar(item.id, e.target.value)}
+                                                style={{ fontSize: 10, padding: '1px 4px', border: `1px solid ${COLORS.borderSubtle}`, borderRadius: 4, color: COLORS.textSecondary, cursor: 'pointer', maxWidth: 180 }}>
+                                                <option value="">— 차량 매칭 변경 —</option>
+                                                {cars.map(c => (
+                                                  <option key={c.id} value={c.id}>
+                                                    {c.number}{c.brand || c.model ? ` (${c.brand || ''} ${c.model || ''})`.trim() : ''}
+                                                  </option>
+                                                ))}
+                                              </select>
                                             </td>
                                             <td style={{ padding: '6px 10px', textAlign: 'center' }}>
                                               <select

@@ -135,9 +135,20 @@ export async function POST(request: NextRequest) {
 
         const balanceAfter = row.balance != null ? Number(row.balance) || null : null
 
+        // ★ Excel 카드 거래의 카드번호 끝 4자리 → raw_data.card_last4 저장
+        //   추후 /api/finance/transactions/auto-match-card 에서 corporate_cards.card_number 와 매칭하여
+        //   transactions.related_type='car', related_id=car_id 자동 할당
+        let rawDataJson: string | null = null
+        if (source === 'excel_card' && row.card_last4) {
+          const last4 = String(row.card_last4).replace(/\D/g, '').slice(-4)
+          if (last4.length === 4) {
+            rawDataJson = JSON.stringify({ card_last4: last4 })
+          }
+        }
+
         await prisma.$executeRawUnsafe(
-          `INSERT INTO transactions (id, transaction_date, type, amount, description, client_name, bank_name, card_company, imported_from, category, final_category, balance_after, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+          `INSERT INTO transactions (id, transaction_date, type, amount, description, client_name, bank_name, card_company, imported_from, category, final_category, balance_after, raw_data, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
           id,
           txDate,
           txType,
@@ -150,6 +161,7 @@ export async function POST(request: NextRequest) {
           autoCategory,
           autoCategory,
           balanceAfter,
+          rawDataJson,
         )
         inserted++
       } catch (err: any) {

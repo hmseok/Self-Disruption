@@ -48,22 +48,33 @@ export async function GET(request: NextRequest) {
                                         .replace(/^\(category /, '(t.category ')
                                         .replace(/^type =/, 't.type =')
                                         .replace(/^imported_from =/, 't.imported_from =')).join(' AND ')
+    // 매칭 정보: 두 경로
+    //   (1) SMS 경유: t.id ↔ card_sms_transactions.transaction_id ↔ corporate_cards ↔ cars
+    //   (2) 직접 매칭: t.related_id 가 car.id (Excel 카드 last4 자동 매칭 결과)
+    // 응답에는 두 경로의 결과를 모두 포함, UI에서 우선순위 결정 (직접 > SMS)
     const data = await prisma.$queryRawUnsafe<any[]>(
       `SELECT
          t.id, t.transaction_date, t.type, t.amount, t.description, t.client_name,
          t.bank_name, t.card_company, t.imported_from, t.category, t.final_category, t.balance_after,
+         t.related_type, t.related_id,
+         JSON_UNQUOTE(JSON_EXTRACT(t.raw_data, '$.card_last4')) AS card_last4,
          sms.card_alias        AS sms_card_alias,
          sms.card_id           AS sms_card_id,
          cc.card_alias         AS matched_card_alias,
          cc.holder_name        AS matched_holder_name,
          cc.assigned_employee_id AS matched_employee_id,
-         cc.assigned_car_id    AS matched_car_id,
-         car.number            AS matched_car_number,
-         CONCAT_WS(' ', car.brand, car.model) AS matched_car_model
+         cc.assigned_car_id    AS matched_car_id_sms,
+         car.number            AS matched_car_number_sms,
+         CONCAT_WS(' ', car.brand, car.model) AS matched_car_model_sms,
+         car_direct.id         AS matched_car_id,
+         car_direct.number     AS matched_car_number,
+         CONCAT_WS(' ', car_direct.brand, car_direct.model) AS matched_car_model
        FROM transactions t
        LEFT JOIN card_sms_transactions sms ON sms.transaction_id COLLATE utf8mb4_unicode_ci = t.id COLLATE utf8mb4_unicode_ci
        LEFT JOIN corporate_cards cc       ON cc.id COLLATE utf8mb4_unicode_ci = sms.card_id COLLATE utf8mb4_unicode_ci
        LEFT JOIN cars car                 ON car.id COLLATE utf8mb4_unicode_ci = cc.assigned_car_id COLLATE utf8mb4_unicode_ci
+       LEFT JOIN cars car_direct          ON car_direct.id COLLATE utf8mb4_unicode_ci = t.related_id COLLATE utf8mb4_unicode_ci
+                                          AND t.related_type = 'car'
        WHERE ${whereTx}
        ORDER BY t.transaction_date DESC
        LIMIT ?`,
