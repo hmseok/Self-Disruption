@@ -391,7 +391,7 @@ function InvestInlineTab({ carId }: { carId: string }) {
       ) : (
         investments.map((inv: any) => {
           const monthlyInterest = inv.invest_amount && inv.interest_rate
-            ? Math.round(inv.invest_amount * inv.interest_rate / 100 / 12)
+            ? Math.round(Number(inv.invest_amount) * Number(inv.interest_rate) / 100 / 12)
             : 0
           const isActive = inv.status === 'active'
           return (
@@ -489,9 +489,9 @@ export default function CarDetailPage() {
           insuranceCount: ins.length,
           activeInsurance: activeIns || null,
           loanCount: loanList.length,
-          totalLoanAmount: loanList.reduce((s: number, l: any) => s + (l.total_amount || 0), 0),
+          totalLoanAmount: loanList.reduce((s: number, l: any) => s + (Number(l.total_amount) || 0), 0),
           investCount: invList.length,
-          totalInvestAmount: invList.reduce((s: number, i: any) => s + (i.invest_amount || 0), 0),
+          totalInvestAmount: invList.reduce((s: number, i: any) => s + (Number(i.invest_amount) || 0), 0),
         })
       } catch (e) { console.error('[CarDetail summary]', e) }
     }
