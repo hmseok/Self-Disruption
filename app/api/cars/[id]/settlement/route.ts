@@ -26,14 +26,29 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const endDate = `${month}-${String(lastDay).padStart(2, '0')}`
     const past12Start = `${year - 1}-${String(monthNum).padStart(2, '0')}-01`
 
-    const [txData, queueData, jiipData, investData, loanData, allSettleData, carTxHistData, investTxDepositsData] = await Promise.all([
-      // 당월 거래내역
+    const [txData, allocTxData, queueData, jiipData, investData, loanData, allSettleData, carTxHistData, allocHistData, investTxDepositsData] = await Promise.all([
+      // 당월 거래내역 (단일 매칭)
       prisma.$queryRawUnsafe<any[]>(
         `SELECT id, transaction_date, type, category, client_name, description, amount, payment_method, related_type, related_id
          FROM transactions
          WHERE related_type = 'car' AND related_id = ?
            AND transaction_date >= ? AND transaction_date <= ?
          ORDER BY transaction_date DESC`,
+        String(carId), startDate, endDate
+      ),
+      // 당월 N:N 분배 거래 (보험 단체 등)
+      prisma.$queryRawUnsafe<any[]>(
+        `SELECT t.id, t.transaction_date, t.type, t.category, t.client_name, t.description,
+                tva.amount AS amount, t.payment_method,
+                tva.source_type, tva.source_ref_id, tva.note AS allocation_note,
+                'allocation' AS _kind
+           FROM transaction_vehicle_allocations tva
+           JOIN transactions t ON t.id = tva.transaction_id
+          WHERE tva.car_id = ?
+            AND t.transaction_date >= ? AND t.transaction_date <= ?
+            AND t.deleted_at IS NULL
+            AND (t.related_type IS NULL OR t.related_type != 'car')
+          ORDER BY t.transaction_date DESC`,
         String(carId), startDate, endDate
       ),
       // classification_queue
@@ -69,12 +84,23 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
            AND transaction_date >= ?`,
         past12Start
       ),
-      // 차량 거래 히스토리 (월별 수입/비용 계산용)
+      // 차량 거래 히스토리 (월별 수입/비용 계산용 — 단일 매칭)
       prisma.$queryRawUnsafe<any[]>(
         `SELECT type, amount, transaction_date, category
          FROM transactions
          WHERE related_type = 'car' AND related_id = ?
            AND transaction_date >= ?`,
+        String(carId), past12Start
+      ),
+      // 차량 거래 히스토리 (월별 — N:N 분배)
+      prisma.$queryRawUnsafe<any[]>(
+        `SELECT t.type AS type, tva.amount AS amount, t.transaction_date AS transaction_date, t.category AS category
+           FROM transaction_vehicle_allocations tva
+           JOIN transactions t ON t.id = tva.transaction_id
+          WHERE tva.car_id = ?
+            AND t.transaction_date >= ?
+            AND t.deleted_at IS NULL
+            AND (t.related_type IS NULL OR t.related_type != 'car')`,
         String(carId), past12Start
       ),
       // 투자 관련 통장 거래 내역
@@ -89,12 +115,14 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     return NextResponse.json({
       data: serialize({
         transactions: txData,
+        transactionAllocations: allocTxData,         // N:N 분배 (보험 단체 등)
         classificationQueue: queueData,
         jiipContracts: jiipData,
         investments: investData,
         loans: loanData,
         allSettlements: allSettleData,
         carTxHistory: carTxHistData,
+        carTxHistoryAllocations: allocHistData,       // 12개월 분배 히스토리
         investTxDeposits: investTxDepositsData,
       }),
       error: null,

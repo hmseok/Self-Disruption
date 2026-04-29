@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
     SELECT id, number, brand, model FROM cars WHERE status != 'deleted' ORDER BY number
   `
 
-  // 해당 월 전체 차량 거래
+  // 해당 월 전체 차량 거래 (단일 매칭 — related_type='car')
   const txData = await prisma.$queryRawUnsafe<Array<{
     related_id: string
     type: string
@@ -56,6 +56,26 @@ export async function GET(req: NextRequest) {
      WHERE related_type = 'car'
        AND transaction_date >= ? AND transaction_date <= ?
        AND deleted_at IS NULL`,
+    startDate, endDate
+  )
+
+  // 해당 월 N:N 분배 거래 (transaction_vehicle_allocations — 보험 단체 등)
+  // ★ 중복 카운트 방지: 거래의 related_type != 'car' 인 것만 (이미 위에서 카운트된 단일 매칭 제외)
+  const allocData = await prisma.$queryRawUnsafe<Array<{
+    car_id: string
+    type: string
+    amount: number
+    category: string | null
+  }>>(
+    `SELECT tva.car_id AS car_id,
+            t.type AS type,
+            tva.amount AS amount,
+            t.category AS category
+       FROM transaction_vehicle_allocations tva
+       JOIN transactions t ON t.id = tva.transaction_id
+      WHERE t.transaction_date >= ? AND t.transaction_date <= ?
+        AND t.deleted_at IS NULL
+        AND (t.related_type IS NULL OR t.related_type != 'car')`,
     startDate, endDate
   )
 
@@ -83,6 +103,24 @@ export async function GET(req: NextRequest) {
     const cat = tx.category || '미분류'
 
     if (tx.type === 'income') {
+      pnl.revenue += amount
+    } else {
+      pnl.expense += amount
+    }
+
+    pnl.categories[cat] = (pnl.categories[cat] || 0) + amount
+    pnl.transactionCount++
+  }
+
+  // N:N 분배 합산 (보험 분담 등)
+  for (const alloc of allocData) {
+    const pnl = pnlMap.get(alloc.car_id)
+    if (!pnl) continue
+
+    const amount = Math.abs(Number(alloc.amount) || 0)
+    const cat = alloc.category || '미분류'
+
+    if (alloc.type === 'income') {
       pnl.revenue += amount
     } else {
       pnl.expense += amount
