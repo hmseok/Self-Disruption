@@ -41,13 +41,31 @@ export async function GET(request: NextRequest) {
 
     params.push(limit)
 
-    const whereClause = conditions.join(' AND ')
+    // ★ corporate_cards / cars JOIN — SMS 기반 카드 매칭이 된 row 의 차량/직원/카드 별칭 노출
+    //   (Excel 카드 거래는 card_sms_transactions 에 없어서 매칭 안됨 — 별도 매칭 로직 필요)
+    const whereTx = conditions.map(c => c.replace(/\bdeleted_at\b/, 't.deleted_at')
+                                        .replace(/^category =/, 't.category =')
+                                        .replace(/^\(category /, '(t.category ')
+                                        .replace(/^type =/, 't.type =')
+                                        .replace(/^imported_from =/, 't.imported_from =')).join(' AND ')
     const data = await prisma.$queryRawUnsafe<any[]>(
-      `SELECT id, transaction_date, type, amount, description, client_name,
-              bank_name, card_company, imported_from, category, final_category, balance_after
-       FROM transactions
-       WHERE ${whereClause}
-       ORDER BY transaction_date DESC
+      `SELECT
+         t.id, t.transaction_date, t.type, t.amount, t.description, t.client_name,
+         t.bank_name, t.card_company, t.imported_from, t.category, t.final_category, t.balance_after,
+         sms.card_alias        AS sms_card_alias,
+         sms.card_id           AS sms_card_id,
+         cc.card_alias         AS matched_card_alias,
+         cc.holder_name        AS matched_holder_name,
+         cc.assigned_employee_id AS matched_employee_id,
+         cc.assigned_car_id    AS matched_car_id,
+         car.number            AS matched_car_number,
+         CONCAT_WS(' ', car.brand, car.model) AS matched_car_model
+       FROM transactions t
+       LEFT JOIN card_sms_transactions sms ON sms.transaction_id COLLATE utf8mb4_unicode_ci = t.id COLLATE utf8mb4_unicode_ci
+       LEFT JOIN corporate_cards cc       ON cc.id COLLATE utf8mb4_unicode_ci = sms.card_id COLLATE utf8mb4_unicode_ci
+       LEFT JOIN cars car                 ON car.id COLLATE utf8mb4_unicode_ci = cc.assigned_car_id COLLATE utf8mb4_unicode_ci
+       WHERE ${whereTx}
+       ORDER BY t.transaction_date DESC
        LIMIT ?`,
       ...params
     )

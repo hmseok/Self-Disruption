@@ -1717,118 +1717,138 @@ export default function BankCardPage() {
                     )}
                   </div>
 
-                  {/* 카테고리 카드 목록 */}
+                  {/* 카테고리 카드 목록 — 클릭 시 인라인 확장 (선택된 카드 행 바로 아래에 상세 패널) */}
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 8 }}>
                     {catList.map(cat => {
                       const isSelected = reviewCategory === cat.category
                       const totalAmt = cat.incomeAmt + cat.expenseAmt
                       return (
-                        <div key={cat.category}
-                          onClick={() => loadReviewItems(cat.category)}
-                          style={{
-                            ...GLASS.L4,
-                            border: `1px solid ${isSelected ? COLORS.primary : COLORS.borderSubtle}`,
-                            borderRadius: 10, padding: '12px 16px', cursor: 'pointer',
-                            transition: 'border-color 0.15s',
-                            ...(isSelected ? { boxShadow: `0 0 0 2px ${COLORS.primary}30` } : {}),
-                          }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                            <span style={{ fontSize: 13, fontWeight: 600, color: COLORS.textPrimary }}>
-                              {cat.category}
-                            </span>
-                            <span style={{ fontSize: 12, fontWeight: 700, color: COLORS.primary }}>
-                              {cat.count.toLocaleString()}건
-                            </span>
+                        <React.Fragment key={cat.category}>
+                          <div
+                            onClick={() => isSelected ? (setReviewCategory(null), setReviewItems([])) : loadReviewItems(cat.category)}
+                            style={{
+                              ...GLASS.L4,
+                              border: `1px solid ${isSelected ? COLORS.primary : COLORS.borderSubtle}`,
+                              borderRadius: 10, padding: '12px 16px', cursor: 'pointer',
+                              transition: 'border-color 0.15s, box-shadow 0.15s',
+                              ...(isSelected ? { boxShadow: `0 0 0 2px ${COLORS.primary}30` } : {}),
+                            }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                              <span style={{ fontSize: 13, fontWeight: 600, color: COLORS.textPrimary }}>
+                                {isSelected && '▼ '}{cat.category}
+                              </span>
+                              <span style={{ fontSize: 12, fontWeight: 700, color: COLORS.primary }}>
+                                {cat.count.toLocaleString()}건
+                              </span>
+                            </div>
+                            <div style={{ display: 'flex', gap: 12, fontSize: 11, color: COLORS.textSecondary }}>
+                              {cat.income > 0 && <span style={{ color: '#2563eb' }}>수입 {cat.income}건 ({nf(cat.incomeAmt)}원)</span>}
+                              {cat.expense > 0 && <span style={{ color: '#dc2626' }}>지출 {cat.expense}건 ({nf(cat.expenseAmt)}원)</span>}
+                            </div>
+                            <div style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 2 }}>
+                              합계 {nf(totalAmt)}원
+                            </div>
                           </div>
-                          <div style={{ display: 'flex', gap: 12, fontSize: 11, color: COLORS.textSecondary }}>
-                            {cat.income > 0 && <span style={{ color: '#2563eb' }}>수입 {cat.income}건 ({nf(cat.incomeAmt)}원)</span>}
-                            {cat.expense > 0 && <span style={{ color: '#dc2626' }}>지출 {cat.expense}건 ({nf(cat.expenseAmt)}원)</span>}
-                          </div>
-                          <div style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 2 }}>
-                            합계 {nf(totalAmt)}원
-                          </div>
-                        </div>
+
+                          {/* 선택된 카드 바로 아래 인라인 상세 패널 (전체 너비 span) */}
+                          {isSelected && (
+                            <div style={{
+                              gridColumn: '1 / -1',
+                              ...GLASS.L3,
+                              border: `1px solid ${COLORS.borderBlue}`,
+                              borderRadius: 12, padding: 12,
+                              marginTop: 4, marginBottom: 4,
+                            }}>
+                              <div style={{
+                                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                                marginBottom: 10, paddingBottom: 8, borderBottom: '1px solid rgba(0,0,0,0.06)',
+                              }}>
+                                <span style={{ fontSize: 13, fontWeight: 600, color: COLORS.textPrimary }}>
+                                  「{cat.category}」 거래 목록 ({reviewItems.length}건)
+                                </span>
+                                <button onClick={(e) => { e.stopPropagation(); setReviewCategory(null); setReviewItems([]) }}
+                                  style={{ ...BTN.sm, background: '#fff', color: COLORS.textSecondary, border: `1px solid ${COLORS.borderSubtle}`, cursor: 'pointer' }}>
+                                  닫기 ×
+                                </button>
+                              </div>
+                              {reviewLoading && <div style={{ textAlign: 'center', padding: 20, color: COLORS.textMuted }}>불러오는 중...</div>}
+                              {!reviewLoading && reviewItems.length > 0 && (
+                                <div style={{ ...GLASS.L4, border: `1px solid ${COLORS.borderSubtle}`, borderRadius: 10, overflow: 'auto', maxHeight: 480 }}>
+                                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                                    <thead style={{ position: 'sticky', top: 0, background: 'rgba(255,255,255,0.95)', zIndex: 1 }}>
+                                      <tr style={{ background: 'rgba(0,0,0,0.02)' }}>
+                                        <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, color: COLORS.textSecondary }}>날짜</th>
+                                        <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, color: COLORS.textSecondary }}>유형</th>
+                                        <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, color: COLORS.textSecondary }}>거래처</th>
+                                        <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, color: COLORS.textSecondary }}>적요</th>
+                                        <th style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 600, color: COLORS.textSecondary }}>금액</th>
+                                        <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, color: COLORS.textSecondary }}>소스</th>
+                                        <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, color: COLORS.textSecondary }}>매칭</th>
+                                        <th style={{ padding: '8px 10px', textAlign: 'center', fontWeight: 600, color: COLORS.textSecondary }}>변경</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {reviewItems.map((item: any) => {
+                                        const srcLabel = String(item.imported_from || '').startsWith('excel_bank') ? '통장' : String(item.imported_from || '').startsWith('excel_card') ? '카드' : item.imported_from === 'sms' ? 'SMS' : item.imported_from === 'sms_bank' ? 'SMS통장' : '기타'
+                                        // 매칭 정보: corporate_cards JOIN 결과 (assigned_car_id, holder_name 등)
+                                        const matchLabel = item.matched_car_number
+                                          ? `🚗 ${item.matched_car_number}${item.matched_car_model ? ` (${item.matched_car_model})` : ''}`
+                                          : item.matched_holder_name
+                                          ? `👤 ${item.matched_holder_name}`
+                                          : item.matched_card_alias
+                                          ? `💳 ${item.matched_card_alias}`
+                                          : '-'
+                                        return (
+                                          <tr key={item.id} style={{ borderTop: '1px solid rgba(0,0,0,0.04)' }}>
+                                            <td style={{ padding: '6px 10px', color: COLORS.textPrimary, whiteSpace: 'nowrap' }}>
+                                              {item.transaction_date ? String(item.transaction_date instanceof Date ? item.transaction_date.toISOString() : item.transaction_date).slice(0, 10) : '-'}
+                                            </td>
+                                            <td style={{ padding: '6px 10px' }}>
+                                              <span style={{ ...pillStyle(item.type === 'income' ? 'success' : 'danger'), fontSize: 10, padding: '1px 6px' }}>
+                                                {item.type === 'income' ? '수입' : '지출'}
+                                              </span>
+                                            </td>
+                                            <td style={{ padding: '6px 10px', color: COLORS.textPrimary, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                              {item.client_name || '-'}
+                                            </td>
+                                            <td style={{ padding: '6px 10px', color: COLORS.textSecondary, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                              {item.description || '-'}
+                                            </td>
+                                            <td style={{ padding: '6px 10px', textAlign: 'right', fontWeight: 600, color: item.type === 'income' ? '#2563eb' : COLORS.textPrimary }}>
+                                              {nf(Math.abs(Number(item.amount || 0)))}
+                                            </td>
+                                            <td style={{ padding: '6px 10px', color: COLORS.textMuted, fontSize: 11 }}>{srcLabel}</td>
+                                            <td style={{ padding: '6px 10px', color: matchLabel === '-' ? COLORS.textMuted : COLORS.textPrimary, fontSize: 11, maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                                                title={matchLabel}>
+                                              {matchLabel}
+                                            </td>
+                                            <td style={{ padding: '6px 10px', textAlign: 'center' }}>
+                                              <select
+                                                defaultValue=""
+                                                onChange={(e) => { if (e.target.value) changeItemCategory(item.id, e.target.value); e.target.value = '' }}
+                                                style={{ fontSize: 10, padding: '2px 4px', border: `1px solid ${COLORS.borderSubtle}`, borderRadius: 4, color: COLORS.textMuted, cursor: 'pointer' }}>
+                                                <option value="">이동</option>
+                                                {(summary?.categoryBreakdown || []).map((c: any) => c.category).filter((v: string, i: number, a: string[]) => a.indexOf(v) === i && v !== reviewCategory).map((c2: string) => (
+                                                  <option key={c2} value={c2}>{c2}</option>
+                                                ))}
+                                              </select>
+                                            </td>
+                                          </tr>
+                                        )
+                                      })}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              )}
+                              {!reviewLoading && reviewItems.length === 0 && (
+                                <div style={{ textAlign: 'center', padding: 20, color: COLORS.textMuted, fontSize: 13 }}>거래 내역이 없습니다</div>
+                              )}
+                            </div>
+                          )}
+                        </React.Fragment>
                       )
                     })}
                   </div>
-
-                  {/* 선택된 카테고리의 거래 목록 */}
-                  {reviewCategory && (
-                    <div style={{ marginTop: 16 }}>
-                      <div style={{
-                        ...GLASS.L3, border: `1px solid ${COLORS.borderBlue}`,
-                        borderRadius: 12, padding: '12px 16px', marginBottom: 8,
-                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                      }}>
-                        <span style={{ fontSize: 13, fontWeight: 600, color: COLORS.textPrimary }}>
-                          「{reviewCategory}」 거래 목록 ({reviewItems.length}건)
-                        </span>
-                        <button onClick={() => { setReviewCategory(null); setReviewItems([]) }}
-                          style={{ ...BTN.sm, background: '#fff', color: COLORS.textSecondary, border: `1px solid ${COLORS.borderSubtle}`, cursor: 'pointer' }}>
-                          닫기
-                        </button>
-                      </div>
-                      {reviewLoading && <div style={{ textAlign: 'center', padding: 20, color: COLORS.textMuted }}>불러오는 중...</div>}
-                      {!reviewLoading && reviewItems.length > 0 && (
-                        <div style={{ ...GLASS.L4, border: `1px solid ${COLORS.borderSubtle}`, borderRadius: 10, overflow: 'auto' }}>
-                          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-                            <thead>
-                              <tr style={{ background: 'rgba(0,0,0,0.02)' }}>
-                                <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, color: COLORS.textSecondary }}>날짜</th>
-                                <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, color: COLORS.textSecondary }}>유형</th>
-                                <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, color: COLORS.textSecondary }}>거래처</th>
-                                <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, color: COLORS.textSecondary }}>적요</th>
-                                <th style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 600, color: COLORS.textSecondary }}>금액</th>
-                                <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, color: COLORS.textSecondary }}>소스</th>
-                                <th style={{ padding: '8px 10px', textAlign: 'center', fontWeight: 600, color: COLORS.textSecondary }}>변경</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {reviewItems.map((item: any) => {
-                                const srcLabel = item.imported_from === 'excel_bank' ? '통장' : item.imported_from === 'excel_card' ? '카드' : item.imported_from === 'sms' ? 'SMS' : '기타'
-                                return (
-                                  <tr key={item.id} style={{ borderTop: '1px solid rgba(0,0,0,0.04)' }}>
-                                    <td style={{ padding: '6px 10px', color: COLORS.textPrimary, whiteSpace: 'nowrap' }}>
-                                      {item.transaction_date ? String(item.transaction_date instanceof Date ? item.transaction_date.toISOString() : item.transaction_date).slice(0, 10) : '-'}
-                                    </td>
-                                    <td style={{ padding: '6px 10px' }}>
-                                      <span style={{ ...pillStyle(item.type === 'income' ? 'success' : 'danger'), fontSize: 10, padding: '1px 6px' }}>
-                                        {item.type === 'income' ? '수입' : '지출'}
-                                      </span>
-                                    </td>
-                                    <td style={{ padding: '6px 10px', color: COLORS.textPrimary, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                      {item.client_name || '-'}
-                                    </td>
-                                    <td style={{ padding: '6px 10px', color: COLORS.textSecondary, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                      {item.description || '-'}
-                                    </td>
-                                    <td style={{ padding: '6px 10px', textAlign: 'right', fontWeight: 600, color: item.type === 'income' ? '#2563eb' : COLORS.textPrimary }}>
-                                      {nf(Math.abs(Number(item.amount || 0)))}
-                                    </td>
-                                    <td style={{ padding: '6px 10px', color: COLORS.textMuted, fontSize: 11 }}>{srcLabel}</td>
-                                    <td style={{ padding: '6px 10px', textAlign: 'center' }}>
-                                      <select
-                                        defaultValue=""
-                                        onChange={(e) => { if (e.target.value) changeItemCategory(item.id, e.target.value); e.target.value = '' }}
-                                        style={{ fontSize: 10, padding: '2px 4px', border: `1px solid ${COLORS.borderSubtle}`, borderRadius: 4, color: COLORS.textMuted, cursor: 'pointer' }}>
-                                        <option value="">이동</option>
-                                        {(summary?.categoryBreakdown || []).map((c: any) => c.category).filter((v: string, i: number, a: string[]) => a.indexOf(v) === i && v !== reviewCategory).map((cat: string) => (
-                                          <option key={cat} value={cat}>{cat}</option>
-                                        ))}
-                                      </select>
-                                    </td>
-                                  </tr>
-                                )
-                              })}
-                            </tbody>
-                          </table>
-                        </div>
-                      )}
-                      {!reviewLoading && reviewItems.length === 0 && (
-                        <div style={{ textAlign: 'center', padding: 20, color: COLORS.textMuted, fontSize: 13 }}>거래 내역이 없습니다</div>
-                      )}
-                    </div>
-                  )}
                 </div>
               )
             })()}
