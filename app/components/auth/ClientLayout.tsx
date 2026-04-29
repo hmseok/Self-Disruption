@@ -83,7 +83,7 @@ const HIDDEN_PATHS = new Set([
   '/invest',                 // 삭제됨
   '/accidents',              // 삭제됨
   '/rental',                 // 삭제됨
-  '/insurance',              // 삭제됨
+  // '/insurance',           // 2026-04-29 부활 — 보험 청약서 기반 다중 차량 분배 시스템
   '/claims/accident-mgmt',   // 삭제됨
   '/claims/billing-mgmt',    // 삭제됨
   '/claims/intake', '/claims/investigation',
