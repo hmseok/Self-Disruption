@@ -20,21 +20,23 @@ export async function GET(req: NextRequest) {
     const type = searchParams.get('type') || ''
     const category = searchParams.get('category') || ''
 
-    let data = await prisma.$queryRaw<any[]>`
-      SELECT * FROM common_codes
-      WHERE 1=1
-      ${type ? Prisma.raw(`AND group_code = '${type}'`) : Prisma.empty}
-      ${category ? Prisma.raw(`AND code = '${category}'`) : Prisma.empty}
-      ORDER BY group_code, sort_order, code
-    `
-
-    return NextResponse.json({
-      data: serialize(data),
-      error: null
-    })
+    try {
+      const data = await prisma.$queryRaw<any[]>`
+        SELECT * FROM common_codes
+        WHERE 1=1
+        ${type ? Prisma.raw(`AND group_code = '${type}'`) : Prisma.empty}
+        ${category ? Prisma.raw(`AND code = '${category}'`) : Prisma.empty}
+        ORDER BY group_code, sort_order, code
+      `
+      return NextResponse.json({ data: serialize(data), error: null })
+    } catch (e: any) {
+      // 테이블 미존재/컬럼 문제 시 graceful — 빈 배열 (UI 폼 로딩 깨짐 방지)
+      console.warn('[GET /api/codes] common_codes 조회 실패:', e?.message)
+      return NextResponse.json({ data: [], error: null })
+    }
   } catch (error: any) {
     console.error('GET /api/codes:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ data: [], error: error.message }, { status: 200 })
   }
 }
 
