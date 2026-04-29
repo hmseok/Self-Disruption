@@ -109,8 +109,10 @@ export async function GET(request: NextRequest) {
     const list = await prisma.$queryRawUnsafe<any[]>(
       `SELECT id, insurance_company, policy_number, design_number, vehicle_class,
               start_date, end_date, total_premium, contract_type, payment_type,
-              installment_count, document_url, created_at,
+              installment_count, document_url, ocr_confidence, created_at,
               (SELECT COUNT(*) FROM insurance_vehicle_allocations WHERE contract_id = ic.id) AS vehicle_count,
+              (SELECT COUNT(*) FROM insurance_vehicle_allocations
+                WHERE contract_id = ic.id AND car_id IS NULL) AS unmatched_count,
               (SELECT due_date FROM insurance_payment_schedule
                  WHERE contract_id = ic.id AND status = 'pending'
                  ORDER BY due_date ASC LIMIT 1) AS next_due_date,

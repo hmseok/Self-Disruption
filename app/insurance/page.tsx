@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { COLORS, GLASS, BTN, pillStyle } from '@/app/utils/ui-tokens'
 import { fetchWithAuth } from '@/app/utils/finance-upload'
 
@@ -42,6 +42,24 @@ export default function InsurancePage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [prefilledData, setPrefilledData] = useState<any>(null)
   const [ocrLoading, setOcrLoading] = useState(false)
+  const [showReviewOnly, setShowReviewOnly] = useState(false)
+
+  // 대량 OCR 상태
+  const [bulkProgress, setBulkProgress] = useState<null | {
+    running: boolean
+    total: number
+    processed: number
+    autoSaved: number
+    reviewNeeded: number
+    failed: number
+    failures: Array<{ name: string; reason: string }>
+  }>(null)
+  const [bulkDryRun, setBulkDryRun] = useState<null | {
+    files: File[]
+    firstResult: any
+    firstFileName: string
+  }>(null)
+  const stopRef = useRef({ stop: false })
 
   const loadList = useCallback(async () => {
     setLoading(true)
@@ -128,6 +146,143 @@ export default function InsurancePage() {
     }
   }
 
+  // ── 대량 OCR (옵션 C) ──
+  // 1) 첫 파일 dry-run → 사용자 확인 → 나머지 일괄 처리
+  // 2) 신뢰도 분기: ≥85 자동 저장 / 70~84 자동 저장 + 노란 플래그 / <70 실패 큐
+  const callOcr = async (file: File): Promise<{ ok: boolean; extracted?: any; confidence?: number; error?: string }> => {
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      const { getAuthHeader } = await import('@/app/utils/finance-upload')
+      const headers = await getAuthHeader()
+      const res = await fetch('/api/insurance/ocr', { method: 'POST', headers: headers as any, body: formData })
+      const json = await res.json()
+      if (!res.ok || !json.ok) return { ok: false, error: json?.error || `HTTP ${res.status}` }
+      return { ok: true, extracted: json.extracted, confidence: Number(json.confidence) || 0 }
+    } catch (e: any) {
+      return { ok: false, error: e?.message || String(e) }
+    }
+  }
+
+  const saveExtracted = async (extracted: any, confidence: number, fileName: string): Promise<{ ok: boolean; error?: string; auto: boolean }> => {
+    const allocations = (extracted.vehicles || []).map((v: any) => {
+      const matched = cars.find(c => c.vin === v.vin)
+      return {
+        car_id: matched?.id || null,
+        vin: v.vin || null,
+        vehicle_label: v.vehicle_label || null,
+        premium_amount: Number(v.premium) || 0,
+        coverage_note: v.coverage_note || null,
+      }
+    })
+    const schedules = (extracted.schedules || []).map((s: any) => ({
+      installment_no: Number(s.installment_no),
+      due_date: s.due_date,
+      amount: Number(s.amount) || 0,
+    }))
+    const body = {
+      contract: {
+        insurance_company: extracted.insurance_company || '',
+        policy_number: extracted.policy_number || '',
+        design_number: extracted.design_number || '',
+        vehicle_class: extracted.vehicle_class || '',
+        start_date: extracted.start_date || '',
+        end_date: extracted.end_date || '',
+        total_premium: Number(extracted.total_premium) || 0,
+        contract_type: extracted.contract_type === 'fleet' ? 'fleet' : 'individual',
+        payment_type: extracted.payment_type === 'installment' ? 'installment' : 'lump',
+        installment_count: Number(extracted.installment_count) || 1,
+        ocr_confidence: confidence,
+        memo: `일괄 OCR (신뢰도 ${confidence}%) — ${fileName}`,
+      },
+      allocations,
+      schedules,
+    }
+    try {
+      const { ok, json } = await fetchWithAuth('/api/insurance', { method: 'POST', body })
+      if (!ok) return { ok: false, error: json?.error || '저장 실패', auto: false }
+      return { ok: true, auto: confidence >= 85 }
+    } catch (e: any) {
+      return { ok: false, error: e?.message || String(e), auto: false }
+    }
+  }
+
+  const handleBulkUpload = async (rawFiles: FileList) => {
+    const files = Array.from(rawFiles)
+    if (files.length === 0) return
+    if (files.length > 50) { alert(`최대 50장 (선택: ${files.length}장)`); return }
+
+    // 첫 파일 dry-run
+    setOcrLoading(true)
+    const r1 = await callOcr(files[0])
+    setOcrLoading(false)
+
+    if (!r1.ok) {
+      alert(`첫 번째 파일 OCR 실패: ${r1.error}\n\n일괄 처리를 시작하지 않습니다.\n파일 형식을 확인해 주세요.`)
+      return
+    }
+    setBulkDryRun({ files, firstResult: { extracted: r1.extracted, confidence: r1.confidence }, firstFileName: files[0].name })
+  }
+
+  const proceedBulk = async () => {
+    if (!bulkDryRun) return
+    const { files, firstResult } = bulkDryRun
+    const total = files.length
+    setBulkDryRun(null)
+
+    let autoSaved = 0
+    let reviewNeeded = 0
+    let failed = 0
+    const failures: Array<{ name: string; reason: string }> = []
+    stopRef.current.stop = false
+
+    setBulkProgress({ running: true, total, processed: 0, autoSaved, reviewNeeded, failed, failures: [] })
+
+    // 첫 파일 (이미 OCR 완료) 저장
+    const c1 = Number(firstResult.confidence) || 0
+    if (c1 < 70) {
+      failures.push({ name: files[0].name, reason: `신뢰도 ${c1}% < 70% (실패 큐)` })
+      failed++
+    } else {
+      const sv = await saveExtracted(firstResult.extracted, c1, files[0].name)
+      if (!sv.ok) { failures.push({ name: files[0].name, reason: sv.error || '저장 실패' }); failed++ }
+      else if (sv.auto) autoSaved++
+      else reviewNeeded++
+    }
+    setBulkProgress({ running: true, total, processed: 1, autoSaved, reviewNeeded, failed, failures: [...failures] })
+
+    // 나머지 파일 — 병렬 3개씩
+    const remaining = files.slice(1)
+    const BATCH_SIZE = 3
+    for (let i = 0; i < remaining.length; i += BATCH_SIZE) {
+      if (stopRef.current.stop) break
+      const batch = remaining.slice(i, i + BATCH_SIZE)
+      await Promise.all(batch.map(async (file) => {
+        if (stopRef.current.stop) return
+        const r = await callOcr(file)
+        if (!r.ok) { failures.push({ name: file.name, reason: r.error || 'OCR 실패' }); failed++; return }
+        const conf = r.confidence || 0
+        if (conf < 70) { failures.push({ name: file.name, reason: `신뢰도 ${conf}% < 70%` }); failed++; return }
+        const sv = await saveExtracted(r.extracted, conf, file.name)
+        if (!sv.ok) { failures.push({ name: file.name, reason: sv.error || '저장 실패' }); failed++; return }
+        if (sv.auto) autoSaved++
+        else reviewNeeded++
+      }))
+      setBulkProgress({
+        running: !stopRef.current.stop,
+        total,
+        processed: 1 + Math.min(i + BATCH_SIZE, remaining.length),
+        autoSaved, reviewNeeded, failed, failures: [...failures],
+      })
+    }
+
+    setBulkProgress(prev => prev ? { ...prev, running: false, autoSaved, reviewNeeded, failed, failures: [...failures] } : null)
+    await loadList()
+  }
+
+  const cancelBulk = () => { stopRef.current.stop = true }
+  const dismissBulkProgress = () => setBulkProgress(null)
+
   const remove = async (id: string, label: string) => {
     if (!confirm(`「${label}」 보험계약을 삭제할까요?\n분담 정보 + 납입 스케줄도 모두 삭제됩니다.`)) return
     const { ok, json } = await fetchWithAuth(`/api/insurance?id=${id}`, { method: 'DELETE' })
@@ -177,7 +332,12 @@ export default function InsurancePage() {
       </div>
 
       {/* 액션 버튼 */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 12, justifyContent: 'flex-end' }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 12, justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: COLORS.textSecondary, cursor: 'pointer' }}>
+          <input type="checkbox" checked={showReviewOnly} onChange={e => setShowReviewOnly(e.target.checked)} />
+          검토 필요만 보기 (신뢰도 &lt;85% 또는 차량 미매칭)
+        </label>
+        <div style={{ display: 'flex', gap: 8 }}>
         <button onClick={openNew} style={{
           ...BTN.sm, padding: '8px 16px', fontSize: 13, fontWeight: 700,
           background: COLORS.primary, color: '#fff', border: 'none', cursor: 'pointer',
@@ -188,11 +348,11 @@ export default function InsurancePage() {
           ...BTN.sm, padding: '8px 16px', fontSize: 13, fontWeight: 700,
           background: 'rgba(168,85,247,0.1)', color: '#7e22ce',
           border: '1px solid rgba(168,85,247,0.35)',
-          cursor: ocrLoading ? 'wait' : 'pointer',
-          opacity: ocrLoading ? 0.6 : 1, display: 'inline-block',
+          cursor: (ocrLoading || bulkProgress?.running) ? 'wait' : 'pointer',
+          opacity: (ocrLoading || bulkProgress?.running) ? 0.6 : 1, display: 'inline-block',
         }}>
           {ocrLoading ? '🤖 OCR 분석 중...' : '📤 청약서 OCR'}
-          <input type="file" accept="application/pdf,image/*" disabled={ocrLoading}
+          <input type="file" accept="application/pdf,image/*" disabled={ocrLoading || !!bulkProgress?.running}
             style={{ display: 'none' }}
             onChange={(e) => {
               const f = e.target.files?.[0]
@@ -201,6 +361,24 @@ export default function InsurancePage() {
             }}
           />
         </label>
+        <label style={{
+          ...BTN.sm, padding: '8px 16px', fontSize: 13, fontWeight: 700,
+          background: 'rgba(236,72,153,0.1)', color: '#be185d',
+          border: '1px solid rgba(236,72,153,0.35)',
+          cursor: (ocrLoading || bulkProgress?.running) ? 'wait' : 'pointer',
+          opacity: (ocrLoading || bulkProgress?.running) ? 0.6 : 1, display: 'inline-block',
+        }}>
+          📂 일괄 OCR (~50장)
+          <input type="file" accept="application/pdf,image/*" multiple disabled={ocrLoading || !!bulkProgress?.running}
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const fs = e.target.files
+              if (fs && fs.length > 0) handleBulkUpload(fs)
+              e.target.value = ''
+            }}
+          />
+        </label>
+        </div>
       </div>
 
       {/* 목록 */}
@@ -223,15 +401,33 @@ export default function InsurancePage() {
               </tr>
             </thead>
             <tbody>
-              {list.map((row: any) => {
+              {list
+                .filter((row: any) => {
+                  if (!showReviewOnly) return true
+                  const conf = row.ocr_confidence != null ? Number(row.ocr_confidence) : null
+                  const lowConfidence = conf !== null && conf < 85
+                  const hasUnmatched = Number(row.unmatched_count || 0) > 0
+                  return lowConfidence || hasUnmatched
+                })
+                .map((row: any) => {
                 const today = new Date().toISOString().slice(0, 10)
                 const isExpired = row.end_date && String(row.end_date).slice(0, 10) < today
                 const isExpiringSoon = !isExpired && row.end_date && new Date(row.end_date).getTime() - Date.now() < 30 * 86400 * 1000
+                const conf = row.ocr_confidence != null ? Number(row.ocr_confidence) : null
+                const needsReview = (conf !== null && conf < 85) || Number(row.unmatched_count || 0) > 0
                 return (
-                  <tr key={row.id} style={{ borderTop: '1px solid rgba(0,0,0,0.04)', cursor: 'pointer' }}
+                  <tr key={row.id} style={{
+                    borderTop: '1px solid rgba(0,0,0,0.04)', cursor: 'pointer',
+                    background: needsReview ? 'rgba(245,158,11,0.06)' : undefined,
+                  }}
                       onClick={() => openEdit(row.id)}>
                     <td style={{ padding: '10px 12px', fontWeight: 600, color: COLORS.textPrimary }}>
                       {row.insurance_company}
+                      {needsReview && (
+                        <span style={{ marginLeft: 6, ...pillStyle('warning'), fontSize: 10, padding: '1px 6px' }}>
+                          {conf !== null && conf < 85 ? `검토 ${conf}%` : '차량 미매칭'}
+                        </span>
+                      )}
                     </td>
                     <td style={{ padding: '10px 12px', color: COLORS.textSecondary, fontFamily: 'monospace', fontSize: 11 }}>
                       {row.policy_number || row.design_number || '-'}
@@ -291,6 +487,99 @@ export default function InsurancePage() {
           onClose={() => { setShowModal(false); setEditingId(null); setPrefilledData(null) }}
           onSaved={() => { setShowModal(false); setEditingId(null); setPrefilledData(null); loadList() }}
         />
+      )}
+
+      {/* Bulk OCR — Dry-run 확인 모달 */}
+      {bulkDryRun && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1200, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div style={{ ...GLASS.L4, borderRadius: 16, padding: 24, maxWidth: 720, width: '100%', maxHeight: '85vh', overflow: 'auto' }}>
+            <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>🔍 첫 파일 OCR 결과 — 진행 확인</h3>
+            <div style={{ fontSize: 12, color: COLORS.textSecondary, marginBottom: 12 }}>
+              파일: <b>{bulkDryRun.firstFileName}</b> &nbsp;·&nbsp;
+              총 <b>{bulkDryRun.files.length}장</b> 선택됨 (이 1장은 이미 처리됨, 나머지 {bulkDryRun.files.length - 1}장 진행 예정)
+            </div>
+            <div style={{ ...GLASS.L3, padding: 12, borderRadius: 10, marginBottom: 12, fontSize: 12 }}>
+              <div><b>신뢰도:</b> {bulkDryRun.firstResult.confidence}%</div>
+              <div><b>보험사:</b> {bulkDryRun.firstResult.extracted?.insurance_company || '-'}</div>
+              <div><b>설계번호:</b> {bulkDryRun.firstResult.extracted?.design_number || '-'}</div>
+              <div><b>차종:</b> {bulkDryRun.firstResult.extracted?.vehicle_class || '-'}</div>
+              <div><b>기간:</b> {bulkDryRun.firstResult.extracted?.start_date} ~ {bulkDryRun.firstResult.extracted?.end_date}</div>
+              <div><b>총 보험료:</b> {nf(bulkDryRun.firstResult.extracted?.total_premium)}원</div>
+              <div><b>차량:</b> {(bulkDryRun.firstResult.extracted?.vehicles || []).length}대</div>
+              <div><b>분납:</b> {(bulkDryRun.firstResult.extracted?.schedules || []).length}회</div>
+            </div>
+            <div style={{ fontSize: 11, color: COLORS.textMuted, marginBottom: 16 }}>
+              · 신뢰도 ≥85% → 자동 저장<br />
+              · 70~84% → 자동 저장 (검토 필요 노란 플래그)<br />
+              · &lt;70% → 실패 큐 (수동 처리)<br />
+              · 병렬 3건씩 처리, 중지 가능
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button onClick={() => setBulkDryRun(null)} style={{ padding: '8px 16px', borderRadius: 8, fontSize: 13, background: '#fff', border: `1px solid ${COLORS.borderSubtle}`, color: COLORS.textSecondary, cursor: 'pointer' }}>
+                취소
+              </button>
+              <button onClick={proceedBulk} style={{ padding: '8px 18px', borderRadius: 8, fontSize: 13, fontWeight: 700, background: '#be185d', color: '#fff', border: 'none', cursor: 'pointer' }}>
+                {bulkDryRun.files.length}장 일괄 처리 시작
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk OCR 진행 패널 */}
+      {bulkProgress && (
+        <div style={{
+          position: 'fixed', bottom: 20, right: 20, zIndex: 1100,
+          ...GLASS.L4, borderRadius: 12,
+          border: `1px solid ${bulkProgress.running ? 'rgba(236,72,153,0.4)' : 'rgba(34,197,94,0.4)'}`,
+          padding: 16, minWidth: 320, maxWidth: 400, boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <strong style={{ fontSize: 13, color: bulkProgress.running ? '#be185d' : '#15803d' }}>
+              {bulkProgress.running
+                ? `🤖 OCR 처리 중... ${bulkProgress.processed}/${bulkProgress.total}`
+                : `✓ OCR 완료 — ${bulkProgress.processed}/${bulkProgress.total}`}
+            </strong>
+            {!bulkProgress.running && (
+              <button onClick={dismissBulkProgress} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18 }}>×</button>
+            )}
+          </div>
+          <div style={{ height: 6, background: 'rgba(0,0,0,0.05)', borderRadius: 3, overflow: 'hidden', marginBottom: 8 }}>
+            <div style={{
+              width: `${(bulkProgress.processed / Math.max(1, bulkProgress.total)) * 100}%`,
+              height: '100%',
+              background: bulkProgress.running ? 'linear-gradient(90deg, #ec4899, #be185d)' : '#22c55e',
+              transition: 'width 0.3s',
+            }} />
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, gap: 8 }}>
+            <span>자동 저장 <b style={{ color: '#15803d' }}>{bulkProgress.autoSaved}</b></span>
+            <span>검토 필요 <b style={{ color: '#d97706' }}>{bulkProgress.reviewNeeded}</b></span>
+            <span>실패 <b style={{ color: '#dc2626' }}>{bulkProgress.failed}</b></span>
+          </div>
+          {bulkProgress.running && (
+            <button onClick={cancelBulk} style={{
+              width: '100%', marginTop: 8, padding: '6px', fontSize: 12, fontWeight: 600,
+              background: '#fff', border: `1px solid ${COLORS.borderSubtle}`,
+              color: COLORS.textSecondary, borderRadius: 6, cursor: 'pointer',
+            }}>중지</button>
+          )}
+          {!bulkProgress.running && bulkProgress.failures.length > 0 && (
+            <details style={{ marginTop: 10, fontSize: 11 }}>
+              <summary style={{ cursor: 'pointer', color: '#dc2626', fontWeight: 600 }}>
+                실패 {bulkProgress.failures.length}건 보기
+              </summary>
+              <div style={{ maxHeight: 200, overflow: 'auto', marginTop: 6, padding: 6, background: 'rgba(239,68,68,0.05)', borderRadius: 6 }}>
+                {bulkProgress.failures.map((f, i) => (
+                  <div key={i} style={{ marginBottom: 4 }}>
+                    <div style={{ fontWeight: 600, color: COLORS.textPrimary }}>{f.name}</div>
+                    <div style={{ color: COLORS.textMuted, fontSize: 10 }}>{f.reason}</div>
+                  </div>
+                ))}
+              </div>
+            </details>
+          )}
+        </div>
       )}
     </div>
   )
