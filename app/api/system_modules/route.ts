@@ -30,6 +30,7 @@ const DEFAULT_MODULES = [
   { id: 'mod-investor', name: '투자자 정산', path: '/finance/investor', icon_key: 'Money', sort_order: 33 },
   { id: 'mod-sms', name: 'SMS 수집', path: '/finance/sms', icon_key: 'Doc', sort_order: 34 },
   { id: 'mod-loans', name: '대출 관리', path: '/loans', icon_key: 'Money', sort_order: 35 },
+  { id: 'mod-insurance', name: '보험 관리', path: '/insurance', icon_key: 'Money', sort_order: 36 },
   // ── 관리 (admin) ──
   { id: 'mod-payroll', name: '급여 관리', path: '/admin/payroll', icon_key: 'Money', sort_order: 40 },
 ]
