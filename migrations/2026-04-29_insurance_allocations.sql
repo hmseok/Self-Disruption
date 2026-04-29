@@ -1,44 +1,86 @@
 -- ═══════════════════════════════════════════════════════════════════
 -- 보험 청약서 기반 다중 차량 분배 시스템
--- 2026-04-29
+-- 2026-04-29 (MySQL 8 호환 — information_schema 체크 + dynamic SQL)
 --
 -- 추가 사항:
---   1) insurance_contracts 컬럼 확장 — 계약형태/납입방식/회차/문서URL/OCR신뢰도
---   2) insurance_vehicle_allocations — 보험계약 ↔ 차량 N:N 분담
---   3) insurance_payment_schedule — 납입 회차 (일시납/분할납)
---   4) transaction_vehicle_allocations — 거래 ↔ 차량 N:N 범용 분배
+--   1) cars.vin (VIN 컬럼 + 인덱스)
+--   2) insurance_contracts 5개 컬럼 확장
+--   3) insurance_vehicle_allocations (신규)
+--   4) insurance_payment_schedule (신규)
+--   5) transaction_vehicle_allocations (신규)
 --
--- 기존 데이터 영향: 없음 (모두 신규 컬럼/테이블, IF NOT EXISTS 방어)
--- 롤백: 본 파일 하단의 ROLLBACK 섹션 참조
+-- MySQL 호환성 노트:
+--   ALTER TABLE ADD COLUMN IF NOT EXISTS — MySQL 미지원 (MariaDB만)
+--   → information_schema.columns 체크 + PREPARE/EXECUTE 패턴 사용
+--
+-- 롤백: 본 파일 하단 ROLLBACK 섹션 참조
 -- ═══════════════════════════════════════════════════════════════════
 
--- ── (0) cars.vin 컬럼 추가 — 청약서 차대번호 매칭용 ────────────
--- 신차/중고차는 차량번호(plate)가 없거나 변경될 수 있어 VIN으로 1:1 식별
-ALTER TABLE cars
-  ADD COLUMN IF NOT EXISTS vin VARCHAR(17) NULL
-    COMMENT '차대번호 (Vehicle Identification Number, 17자리)';
+-- ── (0) cars.vin 컬럼 추가 ───────────────────────────────────────
+SET @c := (SELECT COUNT(*) FROM information_schema.columns
+           WHERE table_schema=DATABASE() AND table_name='cars' AND column_name='vin');
+SET @s := IF(@c=0,
+  'ALTER TABLE cars ADD COLUMN vin VARCHAR(17) NULL COMMENT "차대번호 (VIN, 17자리)"',
+  'SELECT "cars.vin already exists" AS msg');
+PREPARE stmt FROM @s; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
--- VIN 인덱스 (DROP/CREATE 패턴 — IF NOT EXISTS 미지원 환경 대응)
-SET @idx_exists := (SELECT COUNT(*) FROM information_schema.statistics
-                    WHERE table_schema = DATABASE() AND table_name = 'cars' AND index_name = 'idx_cars_vin');
-SET @sql := IF(@idx_exists = 0, 'CREATE INDEX idx_cars_vin ON cars(vin)', 'SELECT 1');
-PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+-- cars.vin 인덱스
+SET @i := (SELECT COUNT(*) FROM information_schema.statistics
+           WHERE table_schema=DATABASE() AND table_name='cars' AND index_name='idx_cars_vin');
+SET @s := IF(@i=0,
+  'CREATE INDEX idx_cars_vin ON cars(vin)',
+  'SELECT "idx_cars_vin already exists" AS msg');
+PREPARE stmt FROM @s; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
--- ── (1) insurance_contracts 컬럼 확장 ────────────────────────────
-ALTER TABLE insurance_contracts
-  ADD COLUMN IF NOT EXISTS contract_type VARCHAR(32) NULL DEFAULT 'individual'
-    COMMENT 'individual=차량별 / fleet=단체',
-  ADD COLUMN IF NOT EXISTS payment_type VARCHAR(16) NULL DEFAULT 'lump'
-    COMMENT 'lump=일시납 / installment=분할납',
-  ADD COLUMN IF NOT EXISTS installment_count INT NULL DEFAULT 1,
-  ADD COLUMN IF NOT EXISTS document_url VARCHAR(500) NULL
-    COMMENT '청약서 이미지/PDF URL',
-  ADD COLUMN IF NOT EXISTS ocr_confidence DECIMAL(5,2) NULL
-    COMMENT 'OCR 추출 신뢰도 (0~100, NULL=수동입력)',
-  ADD COLUMN IF NOT EXISTS design_number VARCHAR(64) NULL
-    COMMENT 'KRMA 설계번호 등 외부 보험사 식별번호',
-  ADD COLUMN IF NOT EXISTS vehicle_class VARCHAR(64) NULL
-    COMMENT '청약서상 차종 (EV6 소형A, 아이오닉5 소형A 등)';
+-- ── (1) insurance_contracts 컬럼 확장 (5개) ──────────────────────
+SET @c := (SELECT COUNT(*) FROM information_schema.columns
+           WHERE table_schema=DATABASE() AND table_name='insurance_contracts' AND column_name='contract_type');
+SET @s := IF(@c=0,
+  'ALTER TABLE insurance_contracts ADD COLUMN contract_type VARCHAR(32) NULL DEFAULT "individual" COMMENT "individual=차량별/fleet=단체"',
+  'SELECT "contract_type exists" AS msg');
+PREPARE stmt FROM @s; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @c := (SELECT COUNT(*) FROM information_schema.columns
+           WHERE table_schema=DATABASE() AND table_name='insurance_contracts' AND column_name='payment_type');
+SET @s := IF(@c=0,
+  'ALTER TABLE insurance_contracts ADD COLUMN payment_type VARCHAR(16) NULL DEFAULT "lump" COMMENT "lump=일시납/installment=분할납"',
+  'SELECT "payment_type exists" AS msg');
+PREPARE stmt FROM @s; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @c := (SELECT COUNT(*) FROM information_schema.columns
+           WHERE table_schema=DATABASE() AND table_name='insurance_contracts' AND column_name='installment_count');
+SET @s := IF(@c=0,
+  'ALTER TABLE insurance_contracts ADD COLUMN installment_count INT NULL DEFAULT 1',
+  'SELECT "installment_count exists" AS msg');
+PREPARE stmt FROM @s; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @c := (SELECT COUNT(*) FROM information_schema.columns
+           WHERE table_schema=DATABASE() AND table_name='insurance_contracts' AND column_name='document_url');
+SET @s := IF(@c=0,
+  'ALTER TABLE insurance_contracts ADD COLUMN document_url VARCHAR(500) NULL COMMENT "청약서 이미지/PDF URL"',
+  'SELECT "document_url exists" AS msg');
+PREPARE stmt FROM @s; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @c := (SELECT COUNT(*) FROM information_schema.columns
+           WHERE table_schema=DATABASE() AND table_name='insurance_contracts' AND column_name='ocr_confidence');
+SET @s := IF(@c=0,
+  'ALTER TABLE insurance_contracts ADD COLUMN ocr_confidence DECIMAL(5,2) NULL COMMENT "OCR 추출 신뢰도 (0~100)"',
+  'SELECT "ocr_confidence exists" AS msg');
+PREPARE stmt FROM @s; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @c := (SELECT COUNT(*) FROM information_schema.columns
+           WHERE table_schema=DATABASE() AND table_name='insurance_contracts' AND column_name='design_number');
+SET @s := IF(@c=0,
+  'ALTER TABLE insurance_contracts ADD COLUMN design_number VARCHAR(64) NULL COMMENT "KRMA 설계번호 등 외부 보험사 식별번호"',
+  'SELECT "design_number exists" AS msg');
+PREPARE stmt FROM @s; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @c := (SELECT COUNT(*) FROM information_schema.columns
+           WHERE table_schema=DATABASE() AND table_name='insurance_contracts' AND column_name='vehicle_class');
+SET @s := IF(@c=0,
+  'ALTER TABLE insurance_contracts ADD COLUMN vehicle_class VARCHAR(64) NULL COMMENT "청약서상 차종 (EV6 소형A 등)"',
+  'SELECT "vehicle_class exists" AS msg');
+PREPARE stmt FROM @s; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 -- ── (2) insurance_vehicle_allocations ──────────────────────────────
 CREATE TABLE IF NOT EXISTS insurance_vehicle_allocations (
@@ -108,9 +150,12 @@ CREATE TABLE IF NOT EXISTS transaction_vehicle_allocations (
 -- DROP TABLE IF EXISTS transaction_vehicle_allocations;
 -- DROP TABLE IF EXISTS insurance_payment_schedule;
 -- DROP TABLE IF EXISTS insurance_vehicle_allocations;
--- ALTER TABLE insurance_contracts
---   DROP COLUMN IF EXISTS contract_type,
---   DROP COLUMN IF EXISTS payment_type,
---   DROP COLUMN IF EXISTS installment_count,
---   DROP COLUMN IF EXISTS document_url,
---   DROP COLUMN IF EXISTS ocr_confidence;
+-- ALTER TABLE insurance_contracts DROP COLUMN vehicle_class;
+-- ALTER TABLE insurance_contracts DROP COLUMN design_number;
+-- ALTER TABLE insurance_contracts DROP COLUMN ocr_confidence;
+-- ALTER TABLE insurance_contracts DROP COLUMN document_url;
+-- ALTER TABLE insurance_contracts DROP COLUMN installment_count;
+-- ALTER TABLE insurance_contracts DROP COLUMN payment_type;
+-- ALTER TABLE insurance_contracts DROP COLUMN contract_type;
+-- DROP INDEX idx_cars_vin ON cars;
+-- ALTER TABLE cars DROP COLUMN vin;
