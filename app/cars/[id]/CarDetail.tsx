@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import PnlTab from './PnlTab'
 import CarSettlementTab from './CarSettlementTab'
@@ -102,6 +102,130 @@ function InsuranceInlineTab({ carId, onNavigate }: { carId: string; onNavigate: 
   )
 }
 
+// ── 등록증 인라인 탭 (2026-04-29 — /registration 통합) ──
+function RegistrationInlineTab({ carId, car, onUpdate }: { carId: string; car: any; onUpdate: () => void }) {
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [uploading, setUploading] = useState(false)
+  const [ocrResult, setOcrResult] = useState<any>(null)
+
+  const upload = async (file: File) => {
+    setUploading(true)
+    setOcrResult(null)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      const headers = await getAuthHeader()
+      // OCR 호출
+      const ocrRes = await fetch('/api/ocr-registration', { method: 'POST', headers: headers as any, body: formData })
+      const ocrJson = await ocrRes.json()
+      if (!ocrRes.ok) {
+        alert(`OCR 실패: ${ocrJson?.error || ocrRes.status}`)
+        return
+      }
+      setOcrResult(ocrJson)
+
+      // 이미지 업로드 (별도 엔드포인트 — registration_image_url 저장)
+      // 여기서는 OCR 결과만 표시하고, 사용자가 [차량 정보 업데이트] 누르면 PATCH
+    } catch (e: any) {
+      alert(`OCR 오류: ${e?.message || String(e)}`)
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  const applyOcr = async () => {
+    if (!ocrResult) return
+    if (!confirm('OCR 추출 결과를 차량 정보에 적용할까요?')) return
+    try {
+      const headers = await getAuthHeader()
+      const body: any = {}
+      if (ocrResult.brand) body.brand = ocrResult.brand
+      if (ocrResult.model_name || ocrResult.model) body.model = ocrResult.model_name || ocrResult.model
+      if (ocrResult.year) body.year = ocrResult.year
+      if (ocrResult.vin) body.vin = ocrResult.vin
+      if (ocrResult.number) body.number = ocrResult.number
+      const res = await fetch(`/api/cars/${carId}`, {
+        method: 'PATCH',
+        headers: { ...(headers as any), 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      if (res.ok) {
+        alert('차량 정보 업데이트 완료')
+        setOcrResult(null)
+        onUpdate()
+      } else {
+        const j = await res.json().catch(() => ({}))
+        alert(`업데이트 실패: ${j?.error || res.status}`)
+      }
+    } catch (e: any) {
+      alert(`업데이트 오류: ${e?.message || String(e)}`)
+    }
+  }
+
+  return (
+    <div className="animate-fade-in space-y-4">
+      {/* 등록증 이미지 표시 */}
+      <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-bold text-gray-800 flex items-center gap-2">📄 차량 등록증</h3>
+          <button onClick={() => fileInputRef.current?.click()} disabled={uploading}
+            className="px-4 py-2 bg-blue-500 text-white rounded-lg font-bold hover:bg-blue-600 disabled:opacity-50">
+            {uploading ? '🤖 OCR 분석 중...' : '📤 등록증 업로드/교체'}
+          </button>
+          <input ref={fileInputRef} type="file" accept="image/*,application/pdf" disabled={uploading}
+            className="hidden"
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) upload(f); e.target.value = '' }}
+          />
+        </div>
+        {car?.registration_image_url ? (
+          car.registration_image_url.endsWith('.pdf') ? (
+            <iframe src={car.registration_image_url} style={{ width: '100%', height: 480, border: 0 }} />
+          ) : (
+            <img src={car.registration_image_url} alt="등록증" style={{ maxWidth: '100%', maxHeight: 480, objectFit: 'contain' }} />
+          )
+        ) : (
+          <div className="text-center py-12 text-gray-400">
+            <div className="text-5xl mb-3">📄</div>
+            <p>등록된 차량 등록증이 없습니다</p>
+            <p className="text-sm mt-1">상단 [등록증 업로드] 버튼으로 추가하세요</p>
+          </div>
+        )}
+      </div>
+
+      {/* OCR 결과 미리보기 + 적용 */}
+      {ocrResult && (
+        <div className="bg-blue-50 p-5 rounded-2xl border border-blue-200">
+          <h4 className="font-bold text-blue-900 mb-3">🤖 OCR 추출 결과</h4>
+          <div className="grid grid-cols-2 gap-3 text-sm mb-4">
+            {[
+              ['브랜드', ocrResult.brand],
+              ['모델', ocrResult.model_name || ocrResult.model],
+              ['연식', ocrResult.year],
+              ['차량번호', ocrResult.number],
+              ['차대번호 (VIN)', ocrResult.vin],
+            ].filter(([_, v]) => v).map(([k, v]) => (
+              <div key={k as string}>
+                <p className="text-xs text-gray-500">{k}</p>
+                <p className="font-bold text-gray-800">{v as string}</p>
+              </div>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <button onClick={applyOcr}
+              className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg font-bold hover:bg-blue-600">
+              차량 정보에 적용
+            </button>
+            <button onClick={() => setOcrResult(null)}
+              className="px-4 py-2 bg-white text-gray-600 border border-gray-300 rounded-lg font-bold hover:bg-gray-50">
+              취소
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── 투자 인라인 탭 ──────────────────────────
 function InvestInlineTab({ carId }: { carId: string }) {
   const [investments, setInvestments] = useState<any[]>([])
@@ -197,21 +321,20 @@ export default function CarDetailPage() {
     finance_name: '', type: '할부', total_amount: 0, monthly_payment: 0, payment_date: 25, start_date: '', end_date: ''
   })
 
-  // 1. 차량 기본 데이터 불러오기
-  useEffect(() => {
+  // 1. 차량 기본 데이터 불러오기 (재사용 가능하도록 useCallback)
+  const fetchCar = useCallback(async () => {
     if (!carId) return
-    const fetchCar = async () => {
-      try {
-        const headers = await getAuthHeader()
-        const res = await fetch(`/api/cars/${carId}`, { headers })
-        if (!res.ok) { alert('차량 정보를 불러오지 못했습니다.'); router.push('/cars'); return }
-        const json = await res.json()
-        setCar(json.data)
-      } catch (e) { alert('차량 정보를 불러오지 못했습니다.'); router.push('/cars') }
-      setLoading(false)
-    }
-    fetchCar()
+    try {
+      const headers = await getAuthHeader()
+      const res = await fetch(`/api/cars/${carId}`, { headers })
+      if (!res.ok) { alert('차량 정보를 불러오지 못했습니다.'); router.push('/cars'); return }
+      const json = await res.json()
+      setCar(json.data)
+    } catch (e) { alert('차량 정보를 불러오지 못했습니다.'); router.push('/cars') }
+    setLoading(false)
   }, [carId, router])
+
+  useEffect(() => { fetchCar() }, [fetchCar])
 
   // 1-b. 좌측 요약 데이터 로드
   useEffect(() => {
@@ -498,13 +621,14 @@ export default function CarDetailPage() {
         {/* 우측: 탭 메뉴 및 상세 내용 */}
         <div className="lg:col-span-8 bg-white rounded-3xl shadow-sm border border-gray-200 min-h-[600px] flex flex-col">
           <div className="flex border-b border-gray-100 overflow-x-auto">
-            {['basic', 'pnl', 'settlement', 'insurance', 'finance', 'jiip', 'invest'].map((tab) => (
+            {['basic', 'registration', 'pnl', 'settlement', 'insurance', 'finance', 'jiip', 'invest'].map((tab) => (
               <button key={tab} onClick={() => setActiveTab(tab)}
                 className={`flex-1 py-5 font-bold capitalize transition-all border-b-2 whitespace-nowrap px-4 ${
                   activeTab === tab ? 'text-steel-600 border-steel-600 bg-steel-50/30' : 'text-gray-400 border-transparent hover:text-gray-600'
                 }`}
               >
                 {tab === 'basic' && '📋 기본 정보'}
+                {tab === 'registration' && '📄 등록증'}
                 {tab === 'pnl' && '📊 손익'}
                 {tab === 'settlement' && '💳 수익/정산'}
                 {tab === 'insurance' && '🛡️ 보험 이력'}
@@ -684,6 +808,11 @@ export default function CarDetailPage() {
                    </button>
                  </div>
                </div>
+             )}
+
+             {/* 📄 등록증 탭 */}
+             {activeTab === 'registration' && (
+               <RegistrationInlineTab carId={carId!} car={car} onUpdate={() => fetchCar()} />
              )}
 
              {/* 🛡️ 보험 이력 탭 */}

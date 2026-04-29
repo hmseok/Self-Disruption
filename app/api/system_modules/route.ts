@@ -21,29 +21,34 @@ function serialize<T>(data: T): T {
 // ClientLayout 마운트 시 console.warn 로 누락 자동 감지 (개발 환경)
 // ═══════════════════════════════════════════════════════════════════
 
-// FMI ERP 기본 모듈 — v3 3그룹 구조 (코드가 유일한 소스 of truth)
+// FMI ERP 기본 모듈 — v5 5그룹 구조 (자산/운영/재무/영업/관리)
 // HIDDEN_PATHS에 해당하는 경로는 제거 완료 (ClientLayout에서 이중 필터 방지)
+// sort_order: 자산 1~9 / 운영 10~19 / 재무 20~29 / 영업 30~39 / 관리 40~49
 const DEFAULT_MODULES = [
-  // ── 차량관리 (vehicle) ──
-  { id: 'mod-cars', name: '차량 관리', path: '/cars', icon_key: 'Car', sort_order: 1 },
-  { id: 'mod-reg', name: '차량 등록증', path: '/registration', icon_key: 'Doc', sort_order: 2 },
-  { id: 'mod-ops', name: '차량운영', path: '/operations', icon_key: 'Wrench', sort_order: 5 },
-  { id: 'mod-intake', name: '접수/오더', path: '/operations/intake', icon_key: 'Clipboard', sort_order: 6 },
-  { id: 'mod-maint', name: '정비/유지보수', path: '/maintenance', icon_key: 'WrenchScrewdriver', sort_order: 7 },
-  { id: 'mod-fleet-fin', name: '차량 수익', path: '/finance/fleet', icon_key: 'Chart', sort_order: 8 },
+  // ── 자산 (asset) ──
+  { id: 'mod-cars',      name: '차량',  path: '/cars',     icon_key: 'Car',   sort_order: 1 },
+  { id: 'mod-loans',     name: '대출',  path: '/loans',    icon_key: 'Money', sort_order: 2 },
+  { id: 'mod-insurance', name: '보험',  path: '/insurance', icon_key: 'Money', sort_order: 3 },
+
+  // ── 운영 (operation) ──
+  { id: 'mod-maint',  name: '정비',       path: '/maintenance',       icon_key: 'WrenchScrewdriver', sort_order: 10 },
+  { id: 'mod-ops',    name: '차량 일정',  path: '/operations',        icon_key: 'Wrench',            sort_order: 11 },
+  { id: 'mod-intake', name: '접수/오더',  path: '/operations/intake', icon_key: 'Clipboard',         sort_order: 12 },
+
+  // ── 재무 (finance) ── 통장 진입점 + 손익/정산/투자
+  { id: 'mod-bank-card',     name: '통장/카드',  path: '/finance/bank-card',     icon_key: 'Money', sort_order: 20 },
+  { id: 'mod-fleet-fin',     name: '차량 손익',  path: '/finance/fleet',         icon_key: 'Chart', sort_order: 21 },
+  { id: 'mod-settlement',    name: '정산/수금',  path: '/finance/settlement',    icon_key: 'Chart', sort_order: 22 },
+  { id: 'mod-investor',      name: '투자자 정산', path: '/finance/investor',      icon_key: 'Money', sort_order: 23 },
+  { id: 'mod-cost-analysis', name: '원가 분석',  path: '/finance/cost-analysis', icon_key: 'Chart', sort_order: 24 },
+  { id: 'mod-classify',      name: '거래 분류',  path: '/finance/classify',      icon_key: 'Chart', sort_order: 25 },
+  { id: 'mod-sms',           name: 'SMS 수집',   path: '/finance/sms',           icon_key: 'Doc',   sort_order: 26 },
+
   // ── 영업/계약 (sales) ──
-  { id: 'mod-quotes', name: '견적 관리', path: '/quotes', icon_key: 'Doc', sort_order: 20 },
-  { id: 'mod-operational-learning', name: '운영학습', path: '/quotes/operational-learning', icon_key: 'Chart', sort_order: 21 },
-  { id: 'mod-contracts', name: '계약/고객', path: '/contracts', icon_key: 'Doc', sort_order: 22 },
-  { id: 'mod-settlement', name: '정산/수금', path: '/finance/settlement', icon_key: 'Chart', sort_order: 23 },
-  // ── 재무 (finance) ──
-  { id: 'mod-bank-card', name: '통장/카드 관리', path: '/finance/bank-card', icon_key: 'Money', sort_order: 30 },
-  { id: 'mod-cost-analysis', name: '원가 분석', path: '/finance/cost-analysis', icon_key: 'Chart', sort_order: 31 },
-  { id: 'mod-classify', name: '거래 분류', path: '/finance/classify', icon_key: 'Chart', sort_order: 32 },
-  { id: 'mod-investor', name: '투자자 정산', path: '/finance/investor', icon_key: 'Money', sort_order: 33 },
-  { id: 'mod-sms', name: 'SMS 수집', path: '/finance/sms', icon_key: 'Doc', sort_order: 34 },
-  { id: 'mod-loans', name: '대출 관리', path: '/loans', icon_key: 'Money', sort_order: 35 },
-  { id: 'mod-insurance', name: '보험 관리', path: '/insurance', icon_key: 'Money', sort_order: 36 },
+  { id: 'mod-quotes',                  name: '견적 관리', path: '/quotes',                      icon_key: 'Doc',   sort_order: 30 },
+  { id: 'mod-operational-learning',    name: '운영학습',  path: '/quotes/operational-learning', icon_key: 'Chart', sort_order: 31 },
+  { id: 'mod-contracts',               name: '계약/고객', path: '/contracts',                   icon_key: 'Doc',   sort_order: 32 },
+
   // ── 관리 (admin) ──
   { id: 'mod-payroll', name: '급여 관리', path: '/admin/payroll', icon_key: 'Money', sort_order: 40 },
 ]
