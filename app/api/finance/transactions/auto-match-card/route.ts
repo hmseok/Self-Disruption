@@ -5,12 +5,21 @@ import { prisma } from '@/lib/prisma'
 // ============================================================
 // /api/finance/transactions/auto-match-card
 //
-// Excel 업로드된 카드 거래를 corporate_cards 의 카드번호 끝 4자리와 매칭하여
+// Excel 업로드된 카드 거래를 corporate_cards last4 와 매칭하여
 // transactions.related_type='car', related_id=assigned_car_id 자동 할당
 //
-// 매칭 키:
-//   transactions.raw_data.card_last4 (Excel 업로드 시 저장)
-//   ↔ corporate_cards.card_number 끝 4자리 (전체 번호 등록 가정)
+// [시나리오 1 — 공용 카드도 차량별 비용 귀속]
+// 공용(탁송팀) 카드라도 매핑 관리에서 특정 차량에 배정되어 있다면
+// 그 차량으로 매칭. holder_name='공용'이지만 실제 비용은 차량별로 귀속.
+//
+// 매칭 키 (우선순위):
+//   1) corporate_cards.card_number 끝 4자리
+//   2) (card_number 비어있으면) card_alias 끝 4자리 — "KB국민-4829" → "4829"
+//
+// 매칭 후 처리:
+//   - related_type='car', related_id=assigned_car_id 셋팅
+//   - 거래가 잘못 '공용카드사용' 카테고리로 분류되어 있던 경우
+//     category=NULL, final_category=NULL 로 reset → 사용자가 룰/AI 분류 재실행 가능
 //
 // POST body: { dryRun?: false, batchId?: string (해당 batch만) }
 // ============================================================
@@ -18,6 +27,15 @@ import { prisma } from '@/lib/prisma'
 export const maxDuration = 120
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
+
+/** 카드의 last4 후보 — card_number 우선, 비었으면 card_alias 끝 숫자 4자리 */
+function deriveLast4(card: { card_number: string | null; card_alias: string | null }): string | null {
+  const numDigits = String(card.card_number || '').replace(/\D/g, '')
+  if (numDigits.length >= 4) return numDigits.slice(-4)
+  const aliasDigits = String(card.card_alias || '').replace(/\D/g, '')
+  if (aliasDigits.length >= 4) return aliasDigits.slice(-4)
+  return null
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -28,54 +46,33 @@ export async function POST(request: NextRequest) {
     const dryRun = body.dryRun === true
     const batchId: string | null = typeof body.batchId === 'string' ? body.batchId : null
 
-    // ── Phase 0: 공용 거래 정리 (매칭 해제 + 카테고리 셋팅) ──
-    //   client_name='공용' 인 거래는 특정 차량에 귀속되면 안 됨
-    //   → 잘못 매칭된 row의 related_type/related_id 해제
-    //   → 카테고리를 '공용카드사용'으로 통일
-    let gongyongCarUnlinked = 0
-    let gongyongCategorized = 0
-    {
-      // 카운트 (dryRun 응답용)
-      const carUnlinkRow = await prisma.$queryRawUnsafe<Array<{ cnt: bigint | number }>>(`
-        SELECT COUNT(*) AS cnt FROM transactions
-         WHERE deleted_at IS NULL AND client_name = '공용' AND related_type = 'car'
-      `)
-      gongyongCarUnlinked = Number(carUnlinkRow?.[0]?.cnt || 0)
+    // ── 1) corporate_cards 미리 로드 + last4 인덱싱 ──
+    const cards = await prisma.$queryRawUnsafe<Array<{
+      id: string; card_number: string | null; card_alias: string | null;
+      holder_name: string | null; assigned_car_id: string | null;
+    }>>(`
+      SELECT id, card_number, card_alias, holder_name, assigned_car_id
+        FROM corporate_cards
+    `)
 
-      const categorizeRow = await prisma.$queryRawUnsafe<Array<{ cnt: bigint | number }>>(`
-        SELECT COUNT(*) AS cnt FROM transactions
-         WHERE deleted_at IS NULL AND client_name = '공용'
-           AND (category IS NULL OR category = '' OR category != '공용카드사용')
-      `)
-      gongyongCategorized = Number(categorizeRow?.[0]?.cnt || 0)
-
-      if (!dryRun) {
-        if (gongyongCarUnlinked > 0) {
-          await prisma.$executeRawUnsafe(`
-            UPDATE transactions
-               SET related_type = NULL, related_id = NULL, updated_at = NOW()
-             WHERE deleted_at IS NULL AND client_name = '공용' AND related_type = 'car'
-          `)
-        }
-        if (gongyongCategorized > 0) {
-          await prisma.$executeRawUnsafe(`
-            UPDATE transactions
-               SET category = '공용카드사용', final_category = '공용카드사용', updated_at = NOW()
-             WHERE deleted_at IS NULL AND client_name = '공용'
-               AND (category IS NULL OR category = '' OR category != '공용카드사용')
-          `)
-        }
-      }
+    // last4 → 매칭되는 card 배열 (card_number 우선, 없으면 card_alias 끝 4자리)
+    const last4Map = new Map<string, typeof cards>()
+    for (const c of cards) {
+      const last4 = deriveLast4(c)
+      if (!last4) continue
+      if (!last4Map.has(last4)) last4Map.set(last4, [])
+      last4Map.get(last4)!.push(c)
     }
 
-    // 1) 매칭 안된 Excel 카드 거래 가져오기 (raw_data 에 card_last4 있는 것만)
-    //    ★ 공용 거래는 매칭 대상에서 제외 (Phase 0에서 별도 처리됨)
+    // ── 2) 매칭 안된 Excel 카드 거래 가져오기 (공용 포함) ──
     let candidatesSql = `
       SELECT id,
              JSON_UNQUOTE(JSON_EXTRACT(raw_data, '$.card_last4')) AS card_last4,
              card_company,
              client_name,
              description,
+             category,
+             final_category,
              transaction_date,
              amount
         FROM transactions
@@ -84,7 +81,6 @@ export async function POST(request: NextRequest) {
          AND raw_data IS NOT NULL
          AND JSON_EXTRACT(raw_data, '$.card_last4') IS NOT NULL
          AND (related_id IS NULL OR related_type IS NULL OR related_type != 'car')
-         AND (client_name IS NULL OR client_name != '공용')
     `
     const params: any[] = []
     if (batchId) {
@@ -96,6 +92,7 @@ export async function POST(request: NextRequest) {
     const candidates = await prisma.$queryRawUnsafe<Array<{
       id: string; card_last4: string; card_company: string | null;
       client_name: string | null; description: string | null;
+      category: string | null; final_category: string | null;
       transaction_date: any; amount: any;
     }>>(candidatesSql, ...params)
 
@@ -104,51 +101,30 @@ export async function POST(request: NextRequest) {
         ok: true,
         dry_run: dryRun,
         total_unmatched: 0,
-        matched: 0,
+        planned: 0,
+        applied: 0,
         skipped_no_match: 0,
         skipped_ambiguous: 0,
         skipped_no_car: 0,
-        gongyong_car_unlinked: gongyongCarUnlinked,
-        gongyong_categorized: gongyongCategorized,
+        category_reset: 0,
         message: '매칭 대상 없음 (Excel 카드 거래 + card_last4 + 미매칭)',
       })
     }
 
-    // 2) corporate_cards 테이블에서 last4 → card 매핑 미리 만들기
-    //    card_number 형식: "1234-5678-9012-9876" 또는 "9876" 등
-    //    숫자만 추출 후 끝 4자리 비교
-    const cards = await prisma.$queryRawUnsafe<Array<{
-      id: string; card_number: string | null;
-      card_alias: string | null; holder_name: string | null;
-      assigned_car_id: string | null;
-    }>>(`
-      SELECT id, card_number, card_alias, holder_name, assigned_car_id
-        FROM corporate_cards
-       WHERE card_number IS NOT NULL AND card_number != ''
-    `)
-
-    // last4 → 매칭되는 card 배열
-    const last4Map = new Map<string, typeof cards>()
-    for (const c of cards) {
-      const digits = String(c.card_number || '').replace(/\D/g, '')
-      if (digits.length < 4) continue
-      const last4 = digits.slice(-4)
-      if (!last4Map.has(last4)) last4Map.set(last4, [])
-      last4Map.get(last4)!.push(c)
-    }
-
-    // 3) 후보별로 매칭 시도
+    // ── 3) 후보별 매칭 시도 ──
     interface MatchPlan {
       tx_id: string
       card_id: string
       car_id: string
       card_alias: string | null
       holder_name: string | null
+      need_category_reset: boolean  // 공용카드사용으로 잘못 분류된 거 reset 대상
     }
     const plans: MatchPlan[] = []
-    let skipNoMatch = 0  // last4 일치하는 카드 없음
-    let skipAmbiguous = 0 // last4 일치 카드가 2장 이상
-    let skipNoCar = 0    // last4 일치하는 카드는 있지만 assigned_car_id 가 없음
+    let skipNoMatch = 0
+    let skipAmbiguous = 0
+    let skipNoCar = 0
+    const gongyongIdsToCategorize: string[] = [] // 카드는 매칭됐지만 차량 없음 → 진짜 공용
     const skipExamples: Array<{ reason: string; tx_id: string; card_last4: string; merchant?: string | null }> = []
 
     for (const tx of candidates) {
@@ -161,27 +137,34 @@ export async function POST(request: NextRequest) {
       // 차량 배정된 카드만 필터
       const withCar = matches.filter(m => m.assigned_car_id)
       if (withCar.length === 0) {
+        // 카드는 등록되어 있지만 차량 미배정
+        // → 공용 거래라면 '공용카드사용' 카테고리 후보 (진짜 공용)
         skipNoCar++
+        if (tx.client_name === '공용' && tx.category !== '공용카드사용') {
+          gongyongIdsToCategorize.push(tx.id)
+        }
         if (skipExamples.length < 10) skipExamples.push({ reason: 'no_car', tx_id: tx.id, card_last4: tx.card_last4 })
         continue
       }
       if (withCar.length > 1) {
-        // 같은 last4 카드가 차량별로 여러 장 → 모호 (사용자가 직접 선택해야)
         skipAmbiguous++
         if (skipExamples.length < 10) skipExamples.push({ reason: 'ambiguous', tx_id: tx.id, card_last4: tx.card_last4 })
         continue
       }
       const card = withCar[0]
+      // 거래가 잘못 '공용카드사용' 카테고리로 분류된 경우 reset 대상으로 표시
+      const needCategoryReset = (tx.category === '공용카드사용' || tx.final_category === '공용카드사용')
       plans.push({
         tx_id: tx.id,
         card_id: card.id,
         car_id: card.assigned_car_id!,
         card_alias: card.card_alias,
         holder_name: card.holder_name,
+        need_category_reset: needCategoryReset,
       })
     }
 
-    // 4) 차량/카드 정보 조회 (응답용)
+    // ── 4) 차량/카드 정보 조회 (응답용) ──
     const carIds = Array.from(new Set(plans.map(p => p.car_id)))
     let carMeta: Record<string, { number: string; brand: string; model: string }> = {}
     if (carIds.length > 0) {
@@ -193,7 +176,7 @@ export async function POST(request: NextRequest) {
       carMeta = Object.fromEntries(carRows.map(r => [r.id, { number: r.number || '', brand: r.brand || '', model: r.model || '' }]))
     }
 
-    // 5) 매칭별 distribution (어느 차량에 몇건 붙을지)
+    // ── 5) distribution ──
     const distribution: Record<string, number> = {}
     for (const p of plans) {
       const meta = carMeta[p.car_id]
@@ -201,31 +184,76 @@ export async function POST(request: NextRequest) {
       distribution[key] = (distribution[key] || 0) + 1
     }
 
-    // 6) 실제 적용 (dryRun=false 일 때만)
+    // ── 6) 실제 적용 ──
     let applied = 0
-    if (!dryRun && plans.length > 0) {
-      // bulk UPDATE — 차량별로 묶어서 처리
-      const byCarId = new Map<string, string[]>() // car_id → tx_ids
+    let categoryReset = 0
+    let gongyongCategorized = 0
+
+    if (!dryRun) {
+      // (a) 차량별 bulk UPDATE — related_type/id 셋팅 + 필요 시 카테고리 reset
+      const byCarId = new Map<string, { resetIds: string[]; keepIds: string[] }>()
       for (const p of plans) {
-        if (!byCarId.has(p.car_id)) byCarId.set(p.car_id, [])
-        byCarId.get(p.car_id)!.push(p.tx_id)
+        if (!byCarId.has(p.car_id)) byCarId.set(p.car_id, { resetIds: [], keepIds: [] })
+        const bucket = byCarId.get(p.car_id)!
+        if (p.need_category_reset) bucket.resetIds.push(p.tx_id)
+        else bucket.keepIds.push(p.tx_id)
       }
-      for (const [carId, txIds] of byCarId.entries()) {
-        const ph = txIds.map(() => '?').join(',')
+      for (const [carId, { resetIds, keepIds }] of byCarId.entries()) {
+        // category 유지하는 그룹
+        if (keepIds.length > 0) {
+          const ph = keepIds.map(() => '?').join(',')
+          try {
+            await prisma.$executeRawUnsafe(
+              `UPDATE transactions
+                 SET related_type = 'car', related_id = ?, updated_at = NOW()
+               WHERE id IN (${ph})`,
+              carId, ...keepIds
+            )
+            applied += keepIds.length
+          } catch (e: any) {
+            console.error('[auto-match-card] UPDATE keep 실패:', carId, e?.message)
+          }
+        }
+        // category reset 대상 — 차량 매칭 + category/final_category NULL
+        if (resetIds.length > 0) {
+          const ph = resetIds.map(() => '?').join(',')
+          try {
+            await prisma.$executeRawUnsafe(
+              `UPDATE transactions
+                 SET related_type = 'car', related_id = ?,
+                     category = NULL, final_category = NULL,
+                     updated_at = NOW()
+               WHERE id IN (${ph})`,
+              carId, ...resetIds
+            )
+            applied += resetIds.length
+            categoryReset += resetIds.length
+          } catch (e: any) {
+            console.error('[auto-match-card] UPDATE reset 실패:', carId, e?.message)
+          }
+        }
+      }
+
+      // (b) 진짜 공용 (카드 매칭 됐지만 차량 미배정) → 공용카드사용 카테고리
+      if (gongyongIdsToCategorize.length > 0) {
+        const ph = gongyongIdsToCategorize.map(() => '?').join(',')
         try {
           await prisma.$executeRawUnsafe(
             `UPDATE transactions
-               SET related_type = 'car',
-                   related_id = ?,
+               SET category = '공용카드사용', final_category = '공용카드사용',
                    updated_at = NOW()
              WHERE id IN (${ph})`,
-            carId, ...txIds
+            ...gongyongIdsToCategorize
           )
-          applied += txIds.length
+          gongyongCategorized = gongyongIdsToCategorize.length
         } catch (e: any) {
-          console.error('[auto-match-card] UPDATE 실패:', carId, e?.message)
+          console.error('[auto-match-card] 공용 카테고리 UPDATE 실패:', e?.message)
         }
       }
+    } else {
+      // dryRun: 카운트만
+      categoryReset = plans.filter(p => p.need_category_reset).length
+      gongyongCategorized = gongyongIdsToCategorize.length
     }
 
     return NextResponse.json({
@@ -237,8 +265,8 @@ export async function POST(request: NextRequest) {
       skipped_no_match: skipNoMatch,
       skipped_ambiguous: skipAmbiguous,
       skipped_no_car: skipNoCar,
-      gongyong_car_unlinked: gongyongCarUnlinked,
-      gongyong_categorized: gongyongCategorized,
+      category_reset: categoryReset,           // 공용카드사용 → 차량 매칭으로 카테고리 reset됨 (재분류 필요)
+      gongyong_categorized: gongyongCategorized, // 진짜 공용 (차량 미배정 카드) → 공용카드사용
       distribution,
       skip_examples: skipExamples,
       sample: plans.slice(0, 5).map(p => ({
@@ -247,6 +275,7 @@ export async function POST(request: NextRequest) {
         car: carMeta[p.car_id] || null,
         card_alias: p.card_alias,
         holder_name: p.holder_name,
+        category_reset: p.need_category_reset,
       })),
     })
   } catch (e: any) {

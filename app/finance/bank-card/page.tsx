@@ -1108,8 +1108,11 @@ export default function BankCardPage() {
       }
       const dist = Object.entries(json.distribution || {}).sort((a: any, b: any) => b[1] - a[1])
         .map(([k, v]) => `  ${v}건  ${k}`).join('\n')
-      const gongyongMsg = (json.gongyong_car_unlinked || json.gongyong_categorized)
-        ? `\n[공용 거래 정리]\n· 차량 매칭 해제: ${(json.gongyong_car_unlinked || 0).toLocaleString()}건\n· 카테고리 자동 설정 (공용카드사용): ${(json.gongyong_categorized || 0).toLocaleString()}건\n`
+      const resetMsg = json.category_reset
+        ? `\n[카테고리 재분류 필요]\n· '공용카드사용'으로 잘못 분류됐던 ${(json.category_reset || 0).toLocaleString()}건이 차량 매칭됨\n  → 카테고리 reset됨, 룰 분류/AI 분류 다시 실행하세요\n`
+        : ''
+      const gongyongMsg = json.gongyong_categorized
+        ? `\n[진짜 공용 (차량 미배정 카드)]\n· '공용카드사용' 카테고리로 자동 설정: ${(json.gongyong_categorized || 0).toLocaleString()}건\n`
         : ''
       alert(
         `${dryRun ? '🔍 차량 매칭 dry-run' : '✓ 차량 매칭 완료'}\n\n` +
@@ -1118,6 +1121,7 @@ export default function BankCardPage() {
         `· 미매칭 (last4 일치 없음): ${(json.skipped_no_match || 0).toLocaleString()}건\n` +
         `· 미매칭 (차량 미배정): ${(json.skipped_no_car || 0).toLocaleString()}건\n` +
         `· 모호 (last4 충돌): ${(json.skipped_ambiguous || 0).toLocaleString()}건\n` +
+        resetMsg +
         gongyongMsg +
         (dist ? `\n[차량별]\n${dist}` : '')
       )
