@@ -4,12 +4,16 @@ steps:
     args: ['pull', 'gcr.io/$PROJECT_ID/self-disruption:latest']
     allowFailure: true
 
-  # Docker 이미지 빌드 (이전 이미지를 캐시로 활용)
+  # Docker 이미지 빌드 (BuildKit 활성 + 이전 이미지 캐시 + inline cache)
   - name: 'gcr.io/cloud-builders/docker'
+    env:
+      - 'DOCKER_BUILDKIT=1'
     args:
       - 'build'
       - '--cache-from'
       - 'gcr.io/$PROJECT_ID/self-disruption:latest'
+      - '--build-arg'
+      - 'BUILDKIT_INLINE_CACHE=1'
       - '-t'
       - 'gcr.io/$PROJECT_ID/self-disruption:$_TAG'
       - '-t'
@@ -47,6 +51,10 @@ images:
 
 options:
   logging: CLOUD_LOGGING_ONLY
+  # ★ 빌드 머신 업그레이드: E2_MEDIUM(기본, 1 vCPU 4GB) → E2_HIGHCPU_8 (8 vCPU 8GB)
+  #   효과: next build / npm ci 단계가 4~5배 빠름 (병렬 컴파일)
+  #   비용: 빌드당 약 $0.003 → $0.006 (월 ~$1 추가 예상)
+  machineType: 'E2_HIGHCPU_8'
 
 substitutions:
   _TAG: 'manual'

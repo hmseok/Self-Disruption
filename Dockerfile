@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1.6
 FROM node:20-alpine AS base
 
 FROM base AS deps
@@ -5,7 +6,11 @@ RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
 COPY package.json package-lock.json ./
-RUN npm ci
+# BuildKit cache mount: ~/.npm 디렉터리를 빌드 간 영속화
+# --prefer-offline: 캐시 우선 사용 (있는 패키지는 네트워크 안 탐)
+# --no-audit / --no-fund: 보안감사 / 후원안내 스킵 (프롬프트 시간 절약)
+RUN --mount=type=cache,target=/root/.npm,sharing=locked \
+    npm ci --prefer-offline --no-audit --no-fund
 
 FROM base AS builder
 WORKDIR /app
