@@ -1136,6 +1136,38 @@ export default function BankCardPage() {
     }
   }
 
+  // 🔮 풀 자동 매칭 — 차량/보험/대출/정비/지입/투자/급여 순차 실행
+  const runFullAutoMatch = async () => {
+    if (!confirm('통장 거래 전체 풀 자동 매칭을 실행합니다.\n\n순차: 차량 → 보험 → 대출 → 정비 → 지입 → 투자 → 급여\n약 30~60초 소요, 중간 정지 불가\n\n계속할까요?')) return
+    setAutoClassifying(true)
+    const results: string[] = []
+    try {
+      const calls: { name: string; url: string; body?: any }[] = [
+        { name: '차량(last4)',  url: '/api/finance/transactions/auto-match-card' },
+        { name: '보험',          url: '/api/finance/transactions/auto-match-insurance', body: { dateTolerance: 7 } },
+        { name: '대출',          url: '/api/finance/transactions/auto-match-loan',     body: { dateTolerance: 3 } },
+        { name: '정비 등록',     url: '/api/finance/transactions/auto-match-maintenance' },
+        { name: '지입',          url: '/api/finance/transactions/auto-match-monthly', body: { type: 'jiip', dateTolerance: 3 } },
+        { name: '투자(이자)',    url: '/api/finance/transactions/auto-match-monthly', body: { type: 'invest', dateTolerance: 3 } },
+        { name: '급여',          url: '/api/finance/transactions/auto-match-monthly', body: { type: 'salary', dateTolerance: 3 } },
+      ]
+      for (const c of calls) {
+        try {
+          const { ok, status, json } = await fetchWithAuth(c.url, { method: 'POST', body: c.body || {} })
+          if (!ok) { results.push(`❌ ${c.name}: HTTP ${status}`); continue }
+          const applied = json.applied ?? json.applied_high_confidence ?? 0
+          const total = json.total_candidates ?? json.total_unmatched ?? 0
+          results.push(`✓ ${c.name}: ${applied}/${total}건 매칭`)
+        } catch (e: any) {
+          results.push(`❌ ${c.name}: ${e?.message?.slice(0, 60)}`)
+        }
+      }
+      alert(`✓ 풀 자동 매칭 완료\n\n${results.join('\n')}`)
+      await Promise.all([loadSummary(), loadTransactions()])
+      if (reviewCategory) await loadReviewItems(reviewCategory)
+    } finally { setAutoClassifying(false) }
+  }
+
   // 💰 대출 자동 매칭
   const runLoanMatch = async (dryRun = false) => {
     setAutoClassifying(true)
@@ -1907,6 +1939,18 @@ export default function BankCardPage() {
                             cursor: autoClassifying ? 'wait' : 'pointer', opacity: autoClassifying ? 0.6 : 1,
                           }}
                         >🔧 정비 매칭</button>
+                        <button
+                          onClick={runFullAutoMatch}
+                          disabled={autoClassifying}
+                          title="차량/보험/대출/정비/지입/투자/급여 — 모든 자동 매칭 순차 실행"
+                          style={{
+                            ...BTN.sm, padding: '5px 14px', fontSize: 11, fontWeight: 700,
+                            background: 'linear-gradient(90deg, rgba(236,72,153,0.15), rgba(99,102,241,0.15))',
+                            color: '#7c3aed',
+                            border: '1px solid rgba(124,58,237,0.4)',
+                            cursor: autoClassifying ? 'wait' : 'pointer', opacity: autoClassifying ? 0.6 : 1,
+                          }}
+                        >🔮 풀 자동 매칭</button>
                         <span style={{ width: 1, height: 18, background: 'rgba(0,0,0,0.08)', margin: '0 4px' }} />
                         {(['all', 'expense', 'income'] as const).map(f => (
                           <button key={f} onClick={() => setReviewTypeFilter(f)}
