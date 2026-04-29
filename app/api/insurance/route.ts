@@ -195,13 +195,15 @@ export async function POST(request: NextRequest) {
     const contractId = randomUUID()
 
     // ── 1. insurance_contracts ──
+    // memo 컬럼은 마이그레이션 별도 적용 필요 (2026-04-29_insurance_memo_column.sql)
+    // 미적용 시에도 동작하도록 INSERT 컬럼에서 제외
     await prisma.$executeRawUnsafe(
       `INSERT INTO insurance_contracts (
          id, insurance_company, policy_number, design_number, vehicle_class,
          start_date, end_date, total_premium, contract_type, payment_type,
-         installment_count, document_url, ocr_confidence, memo,
+         installment_count, document_url, ocr_confidence,
          created_at, updated_at
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
       contractId,
       contract.insurance_company,
       contract.policy_number || null,
@@ -214,9 +216,17 @@ export async function POST(request: NextRequest) {
       contract.payment_type || 'lump',
       contract.installment_count || 1,
       contract.document_url || null,
-      contract.ocr_confidence ?? null,
-      contract.memo || null
+      contract.ocr_confidence ?? null
     )
+    // memo 별도 UPDATE 시도 (컬럼 없으면 silent skip)
+    if (contract.memo) {
+      try {
+        await prisma.$executeRawUnsafe(
+          `UPDATE insurance_contracts SET memo = ? WHERE id = ?`,
+          contract.memo, contractId
+        )
+      } catch { /* memo 컬럼 없음 — 마이그레이션 미적용 시 정상 */ }
+    }
 
     // ── 2. insurance_vehicle_allocations ──
     for (const a of allocations) {
@@ -279,9 +289,14 @@ export async function PATCH(request: NextRequest) {
     const { contract, allocations, schedules } = body
 
     // 계약 정보 수정
+    // ★ 컬럼 화이트리스트로 제한 — 미존재 컬럼(memo 등) 에러 방지
     if (contract) {
-      const SAFE_COL = /^[a-zA-Z_][a-zA-Z0-9_]*$/
-      const entries = Object.entries(contract).filter(([k]) => SAFE_COL.test(k))
+      const ALLOWED_COLS = new Set([
+        'insurance_company', 'policy_number', 'design_number', 'vehicle_class',
+        'start_date', 'end_date', 'total_premium', 'contract_type', 'payment_type',
+        'installment_count', 'document_url', 'ocr_confidence',
+      ])
+      const entries = Object.entries(contract).filter(([k]) => ALLOWED_COLS.has(k))
       if (entries.length > 0) {
         const setClause = entries.map(([k]) => `\`${k}\` = ?`).join(', ')
         const values = entries.map(([, v]) => v as any)
@@ -289,6 +304,15 @@ export async function PATCH(request: NextRequest) {
           `UPDATE insurance_contracts SET ${setClause}, updated_at = NOW() WHERE id = ?`,
           ...values, id
         )
+      }
+      // memo 별도 처리 (컬럼 없으면 silent skip)
+      if (typeof contract.memo === 'string' || contract.memo === null) {
+        try {
+          await prisma.$executeRawUnsafe(
+            `UPDATE insurance_contracts SET memo = ? WHERE id = ?`,
+            contract.memo, id
+          )
+        } catch { /* memo 컬럼 없음 — 정상 */ }
       }
     }
 
