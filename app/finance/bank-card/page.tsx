@@ -1136,6 +1136,37 @@ export default function BankCardPage() {
     }
   }
 
+  // 🛡 보험 자동 매칭 (수동 트리거)
+  const runInsuranceMatch = async (dryRun = false) => {
+    setAutoClassifying(true)
+    try {
+      const { ok, status, json } = await fetchWithAuth('/api/finance/transactions/auto-match-insurance', {
+        method: 'POST',
+        body: { dryRun, dateTolerance: 7 },
+      })
+      if (!ok) {
+        alert(`보험 매칭 실패: HTTP ${status} — ${json?.error || '응답 없음'}`)
+        return
+      }
+      alert(
+        `${dryRun ? '🔍 보험 매칭 dry-run' : '✓ 보험 매칭 완료'}\n\n` +
+        `· 매칭 대상: ${(json.total_candidates || 0).toLocaleString()}건\n` +
+        `· 매칭 성공: ${(dryRun ? json.planned : json.applied || 0).toLocaleString()}건\n` +
+        `· 차량 분담 생성: ${(json.allocation_created || 0).toLocaleString()}건\n` +
+        `· 미매칭 (스케줄 없음): ${(json.skipped_no_schedule || 0).toLocaleString()}건\n` +
+        `· 모호 (후보 다수): ${(json.skipped_ambiguous || 0).toLocaleString()}건`
+      )
+      if (!dryRun) {
+        await Promise.all([loadSummary(), loadTransactions()])
+        if (reviewCategory) await loadReviewItems(reviewCategory)
+      }
+    } catch (e: any) {
+      alert(`보험 매칭 오류: ${e?.message || String(e)}`)
+    } finally {
+      setAutoClassifying(false)
+    }
+  }
+
   const confirmAllSuggested = async () => {
     if (!groupData?.groups) return
     const suggested = groupData.groups.filter((g: any) => g.suggestedCategory && g.suggestedConfidence >= 80)
@@ -1798,6 +1829,17 @@ export default function BankCardPage() {
                             cursor: autoClassifying ? 'wait' : 'pointer', opacity: autoClassifying ? 0.6 : 1,
                           }}
                         >🔗 차량 매칭</button>
+                        <button
+                          onClick={() => runInsuranceMatch(false)}
+                          disabled={autoClassifying}
+                          title="보험성 거래를 등록된 보험계약 스케줄과 자동 매칭"
+                          style={{
+                            ...BTN.sm, padding: '5px 12px', fontSize: 11, fontWeight: 700,
+                            background: 'rgba(16,185,129,0.1)', color: '#047857',
+                            border: '1px solid rgba(16,185,129,0.35)',
+                            cursor: autoClassifying ? 'wait' : 'pointer', opacity: autoClassifying ? 0.6 : 1,
+                          }}
+                        >🛡 보험 매칭</button>
                         <span style={{ width: 1, height: 18, background: 'rgba(0,0,0,0.08)', margin: '0 4px' }} />
                         {(['all', 'expense', 'income'] as const).map(f => (
                           <button key={f} onClick={() => setReviewTypeFilter(f)}
