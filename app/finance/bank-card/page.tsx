@@ -827,6 +827,8 @@ export default function BankCardPage() {
       let fileInserted = 0
       let fileSkipped = 0
       const fileErrors: string[] = []
+      // skip 사유 누적 — 사용자에게 어떤 행이 왜 빠졌는지 표시
+      const fileSkipBreakdown = { no_date: 0, invalid_date: 0, no_amount: 0, meta_row: 0, duplicate: 0 }
       const batchBase = `${uploadSource}_${Date.now()}_${fi}`
 
       const totalBatches = Math.ceil(mapped.length / BATCH_SIZE)
@@ -843,6 +845,13 @@ export default function BankCardPage() {
         fileInserted += res.inserted || 0
         fileSkipped += res.skipped || 0
         if (res.errors) fileErrors.push(...res.errors)
+        if (res.skipBreakdown) {
+          fileSkipBreakdown.no_date += res.skipBreakdown.no_date || 0
+          fileSkipBreakdown.invalid_date += res.skipBreakdown.invalid_date || 0
+          fileSkipBreakdown.no_amount += res.skipBreakdown.no_amount || 0
+          fileSkipBreakdown.meta_row += res.skipBreakdown.meta_row || 0
+          fileSkipBreakdown.duplicate += res.skipBreakdown.duplicate || 0
+        }
       }
 
       allResults.push({
@@ -850,13 +859,24 @@ export default function BankCardPage() {
         inserted: fileInserted,
         skipped: fileSkipped,
         errors: fileErrors,
-      })
+        skipBreakdown: fileSkipBreakdown,
+      } as any)
     }
 
     // 합산 결과
     const totalInserted = allResults.reduce((s, r) => s + r.inserted, 0)
     const totalSkipped = allResults.reduce((s, r) => s + r.skipped, 0)
     const allErrors = allResults.flatMap(r => r.errors)
+    // skip 사유별 합산 — 업로드 결과 모달에 표시
+    const totalSkipBreakdown = allResults.reduce((acc: any, r: any) => {
+      const sb = r.skipBreakdown || {}
+      acc.no_date += sb.no_date || 0
+      acc.invalid_date += sb.invalid_date || 0
+      acc.no_amount += sb.no_amount || 0
+      acc.meta_row += sb.meta_row || 0
+      acc.duplicate += sb.duplicate || 0
+      return acc
+    }, { no_date: 0, invalid_date: 0, no_amount: 0, meta_row: 0, duplicate: 0 })
 
     // ★ Excel 카드 업로드 후 차량 자동 매칭 호출
     let matchInfo: any = null
@@ -873,7 +893,7 @@ export default function BankCardPage() {
       }
     }
 
-    setUploadResult({ inserted: totalInserted, skipped: totalSkipped, errors: allErrors, files: allResults, match: matchInfo })
+    setUploadResult({ inserted: totalInserted, skipped: totalSkipped, errors: allErrors, files: allResults, match: matchInfo, skipBreakdown: totalSkipBreakdown })
     setUploading(false)
     setUploadProgress('')
 
@@ -3337,8 +3357,21 @@ export default function BankCardPage() {
                 border: `1px solid ${uploadResult.inserted > 0 ? COLORS.borderGreen : COLORS.borderAmber}`,
               }}>
                 <div style={{ fontSize: 13, fontWeight: 600 }}>
-                  ✅ 총 {uploadResult.inserted}건 저장 완료 / {uploadResult.skipped}건 중복 스킵
+                  ✅ 총 {uploadResult.inserted}건 저장 완료 / {uploadResult.skipped}건 스킵
                 </div>
+                {/* skip 사유 상세 표시 — 사용자가 어떤 행이 왜 빠졌는지 확인 */}
+                {uploadResult.skipBreakdown && uploadResult.skipped > 0 && (
+                  <div style={{ marginTop: 6, padding: '6px 8px', background: 'rgba(255,255,255,0.5)', borderRadius: 6, fontSize: 12 }}>
+                    <div style={{ color: COLORS.textSecondary, fontWeight: 600, marginBottom: 2 }}>📊 스킵 사유</div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, color: COLORS.textSecondary }}>
+                      {uploadResult.skipBreakdown.duplicate > 0 && <span>중복: {uploadResult.skipBreakdown.duplicate}건</span>}
+                      {uploadResult.skipBreakdown.no_date > 0 && <span style={{ color: '#d97706' }}>날짜 없음(총합/메타 행): {uploadResult.skipBreakdown.no_date}건</span>}
+                      {uploadResult.skipBreakdown.invalid_date > 0 && <span style={{ color: '#d97706' }}>날짜 형식 오류: {uploadResult.skipBreakdown.invalid_date}건</span>}
+                      {uploadResult.skipBreakdown.meta_row > 0 && <span style={{ color: '#d97706' }}>합계/소계 행: {uploadResult.skipBreakdown.meta_row}건</span>}
+                      {uploadResult.skipBreakdown.no_amount > 0 && <span>금액 0: {uploadResult.skipBreakdown.no_amount}건</span>}
+                    </div>
+                  </div>
+                )}
                 {uploadResult.files?.length > 1 && (
                   <div style={{ marginTop: 6 }}>
                     {uploadResult.files.map((f: any, i: number) => (
@@ -3346,6 +3379,25 @@ export default function BankCardPage() {
                         📄 {f.name}: {f.inserted}건 저장 / {f.skipped}건 스킵
                       </div>
                     ))}
+                  </div>
+                )}
+                {/* 차량 자동 매칭 결과 (Excel 카드 업로드 시) */}
+                {uploadResult.match && (
+                  <div style={{ marginTop: 6, padding: '6px 8px', background: 'rgba(59,130,246,0.08)', borderRadius: 6, fontSize: 12 }}>
+                    <div style={{ color: '#1d4ed8', fontWeight: 600, marginBottom: 2 }}>🔗 차량 자동 매칭</div>
+                    <div style={{ color: COLORS.textSecondary }}>
+                      매칭 성공 {(uploadResult.match.applied || 0).toLocaleString()}건
+                      {' / '}
+                      미매칭(last4 없음) {(uploadResult.match.skipped_no_match || 0).toLocaleString()}건
+                      {' / '}
+                      미매칭(차량 미배정) {(uploadResult.match.skipped_no_car || 0).toLocaleString()}건
+                      {(uploadResult.match.skipped_ambiguous > 0) && ` / 모호 ${uploadResult.match.skipped_ambiguous}건`}
+                    </div>
+                    {(uploadResult.match.gongyong_car_unlinked > 0 || uploadResult.match.gongyong_categorized > 0) && (
+                      <div style={{ color: COLORS.textMuted, fontSize: 11, marginTop: 2 }}>
+                        공용 정리: 매칭 해제 {uploadResult.match.gongyong_car_unlinked || 0}건, 분류 {uploadResult.match.gongyong_categorized || 0}건
+                      </div>
+                    )}
                   </div>
                 )}
                 {uploadResult.errors?.length > 0 && (

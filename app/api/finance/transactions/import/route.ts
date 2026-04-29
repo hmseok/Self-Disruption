@@ -75,20 +75,61 @@ export async function POST(request: NextRequest) {
     let inserted = 0
     let skipped = 0
     const errors: string[] = []
+    // ★ skip 사유별 카운트 — 사용자가 어떤 행이 왜 빠졌는지 확인 가능
+    const skipBreakdown = {
+      no_date: 0,        // 날짜 컬럼 비어있음 (총합/메타 행)
+      invalid_date: 0,   // 날짜 형식 인식 안됨
+      no_amount: 0,      // 금액 0 또는 없음
+      meta_row: 0,       // '총합/합계/소계' 키워드
+      duplicate: 0,      // 중복 해시
+    }
+    // 메타 행 키워드 — 정확 매칭만 (부분 포함 X)
+    // 새 카드사가 새 패턴 만들면 여기 추가
+    const META_KEYWORDS = /^(총합|합계|소계|총합계|총계|청구합계|청구금액|결제예정금액|결제예정|이월잔액|차월이월|전월이월|당월합계|월합계|연합계|기간합계|누계|잔액)$/
+    const PARTIAL_META = /^총\s*\d+\s*건/  // "총 N건" 패턴
+    // 유효한 날짜 형식 (Excel에서 들어올 가능성 있는 모든 포맷)
+    const VALID_DATE = /^\d{4}[\-./]\d{1,2}[\-./]\d{1,2}([\sT]\d{1,2}:\d{2}(:\d{2})?)?$|^\d{1,2}[\-./]\d{1,2}\s+\d{2}:\d{2}/
 
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i]
       try {
-        // 합계행/메타행 필터 ("총 N건", 날짜가 아닌 값)
+        // ── 검증 1: 날짜 ──────────────────────────────
         const rawDateField = row.date || row.transaction_date || ''
-        if (typeof rawDateField === 'string' && (rawDateField.includes('총 ') || rawDateField.includes('건'))) {
-          continue // 합계행 스킵 (카운트 안 함)
+        const dateStr = String(rawDateField).trim()
+
+        // 1-A) 날짜 비어있는 행 skip — 총합/메타 행
+        if (!dateStr) {
+          skipBreakdown.no_date++
+          skipped++
+          continue
+        }
+        // 1-B) "총 N건" 패턴 (날짜 컬럼에 메타 텍스트)
+        if (dateStr.includes('총 ') || PARTIAL_META.test(dateStr)) {
+          skipBreakdown.meta_row++
+          skipped++
+          continue
+        }
+        // 1-C) 날짜 형식 검증 — 정규식으로 사전 차단
+        if (!VALID_DATE.test(dateStr)) {
+          skipBreakdown.invalid_date++
+          skipped++
+          continue
         }
 
+        // ── 검증 2: 메타 키워드 (모든 셀 전수검사, 정확 매칭) ──
+        const rowValuesStr = Object.values(row).map((v: any) => String(v || '').trim())
+        if (rowValuesStr.some(v => META_KEYWORDS.test(v) || PARTIAL_META.test(v))) {
+          skipBreakdown.meta_row++
+          skipped++
+          continue
+        }
+
+        // ── 검증 3: 금액 ──────────────────────────────
         const deposit = Math.abs(Number(String(row.deposit || '0').replace(/[,\s원]/g, '')) || 0)
         const withdrawal = Math.abs(Number(String(row.withdrawal || '0').replace(/[,\s원]/g, '')) || 0)
         const amount = Number(row.amount || 0)
         if (deposit === 0 && withdrawal === 0 && amount === 0) {
+          skipBreakdown.no_amount++
           skipped++
           continue
         }
@@ -97,7 +138,14 @@ export async function POST(request: NextRequest) {
         const txType = row.type || (deposit > 0 ? 'income' : 'expense')
         const description = row.description || row.memo || ''
         const rawDate = rawDateField
-        const txDate = normalizeDate(rawDate) || new Date().toISOString().slice(0, 10)
+        // ★ 날짜 fallback NOW() 제거 — 정규화 실패 시 무조건 skip
+        //   (이전엔 오늘 날짜로 fallback해서 메타 행이 오늘자 거래로 오염되던 버그)
+        const txDate = normalizeDate(rawDate)
+        if (!txDate || !/^\d{4}-\d{2}-\d{2}/.test(txDate)) {
+          skipBreakdown.invalid_date++
+          skipped++
+          continue
+        }
 
         // 중복 해시: 날짜+시분초 전체 + 금액 + 적요 + 거래처 (시분초 포함으로 정확도 향상)
         const clientName = row.counterpart || row.client_name || ''
@@ -109,6 +157,7 @@ export async function POST(request: NextRequest) {
         uploadHashCounts.set(hash, uploadCount + 1)
         if (uploadCount < existingCount) {
           // DB에 이미 이 해시가 existingCount건 있고, 아직 그 수만큼 스킵 안 했으면 스킵
+          skipBreakdown.duplicate++
           skipped++
           continue
         }
@@ -187,7 +236,12 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({
-      data: { inserted, skipped, errors: errors.slice(0, 5) },
+      data: {
+        inserted,
+        skipped,
+        skipBreakdown,  // { no_date, invalid_date, no_amount, meta_row, duplicate }
+        errors: errors.slice(0, 5),
+      },
       error: errors.length > 0 ? `${errors.length}건 오류 발생` : null,
     })
   } catch (e: any) {
