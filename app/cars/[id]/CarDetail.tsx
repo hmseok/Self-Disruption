@@ -133,11 +133,13 @@ function InsuranceInlineTab({ carId, onNavigate }: { carId: string; onNavigate: 
   )
 }
 
-// ── 등록증 인라인 탭 (2026-04-29 — /registration 통합) ──
+// ── 등록증 인라인 탭 (2026-04-29 — /registration 통합, 다중 등록 지원) ──
 function RegistrationInlineTab({ carId, car, onUpdate }: { carId: string; car: any; onUpdate: () => void }) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
   const [ocrResult, setOcrResult] = useState<any>(null)
+  // 다중 업로드 진행 상태
+  const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number; results: Array<{ name: string; status: 'ok' | 'fail'; msg?: string }> } | null>(null)
 
   const upload = async (file: File) => {
     setUploading(true)
@@ -146,7 +148,6 @@ function RegistrationInlineTab({ carId, car, onUpdate }: { carId: string; car: a
       const formData = new FormData()
       formData.append('file', file)
       const headers = await getAuthHeader()
-      // OCR 호출
       const ocrRes = await fetch('/api/ocr-registration', { method: 'POST', headers: headers as any, body: formData })
       const ocrJson = await ocrRes.json()
       if (!ocrRes.ok) {
@@ -154,13 +155,71 @@ function RegistrationInlineTab({ carId, car, onUpdate }: { carId: string; car: a
         return
       }
       setOcrResult(ocrJson)
-
-      // 이미지 업로드 (별도 엔드포인트 — registration_image_url 저장)
-      // 여기서는 OCR 결과만 표시하고, 사용자가 [차량 정보 업데이트] 누르면 PATCH
     } catch (e: any) {
       alert(`OCR 오류: ${e?.message || String(e)}`)
     } finally {
       setUploading(false)
+    }
+  }
+
+  // 다중 등록증 일괄 OCR — 새 차량 등록 (cars POST) 또는 같은 차량 갱신
+  const bulkUpload = async (files: FileList) => {
+    const arr = Array.from(files)
+    if (arr.length === 0) return
+    if (arr.length > 30) { alert(`최대 30장 (선택: ${arr.length})`); return }
+    if (!confirm(`${arr.length}장의 등록증을 일괄 OCR 처리합니다.\n\n· 차량번호가 일치하는 기존 차량이 있으면 정보 업데이트\n· 없으면 새 차량 자동 등록\n\n계속할까요?`)) return
+
+    setBulkProgress({ done: 0, total: arr.length, results: [] })
+    const results: Array<{ name: string; status: 'ok' | 'fail'; msg?: string }> = []
+    const headers = await getAuthHeader()
+
+    for (let i = 0; i < arr.length; i++) {
+      const file = arr[i]
+      try {
+        // 1) OCR
+        const fd = new FormData()
+        fd.append('file', file)
+        const ocrRes = await fetch('/api/ocr-registration', { method: 'POST', headers: headers as any, body: fd })
+        const ocr = await ocrRes.json()
+        if (!ocrRes.ok || !ocr?.brand) {
+          results.push({ name: file.name, status: 'fail', msg: ocr?.error || 'OCR 실패' })
+          setBulkProgress({ done: i + 1, total: arr.length, results: [...results] })
+          continue
+        }
+        // 2) 차량 매칭 (number 또는 vin) — 기존 차량 있으면 PATCH, 없으면 POST
+        const candidatesRes = await fetch('/api/cars', { headers })
+        const candidatesJson = await candidatesRes.json()
+        const allCars = (candidatesJson?.data || []) as any[]
+        const matched = allCars.find((c: any) =>
+          (ocr.number && c.number === ocr.number) ||
+          (ocr.vin && c.vin === ocr.vin)
+        )
+        const body: any = {
+          brand: ocr.brand,
+          model: ocr.model_name || ocr.model,
+          year: ocr.year || null,
+          number: ocr.number || null,
+          vin: ocr.vin || null,
+        }
+        if (matched) {
+          await fetch(`/api/cars/${matched.id}`, {
+            method: 'PATCH',
+            headers: { ...(headers as any), 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+          })
+          results.push({ name: file.name, status: 'ok', msg: `갱신: ${matched.number || matched.id.slice(0, 6)}` })
+        } else {
+          const r = await fetch('/api/cars', {
+            method: 'POST',
+            headers: { ...(headers as any), 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...body, status: 'active' }),
+          })
+          results.push({ name: file.name, status: r.ok ? 'ok' : 'fail', msg: r.ok ? '신규 등록' : `등록 실패 ${r.status}` })
+        }
+      } catch (e: any) {
+        results.push({ name: file.name, status: 'fail', msg: e?.message || String(e) })
+      }
+      setBulkProgress({ done: i + 1, total: arr.length, results: [...results] })
     }
   }
 
@@ -197,17 +256,61 @@ function RegistrationInlineTab({ carId, car, onUpdate }: { carId: string; car: a
     <div className="animate-fade-in space-y-4">
       {/* 등록증 이미지 표시 */}
       <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
           <h3 className="font-bold text-gray-800 flex items-center gap-2">📄 차량 등록증</h3>
-          <button onClick={() => fileInputRef.current?.click()} disabled={uploading}
-            className="px-4 py-2 bg-blue-500 text-white rounded-lg font-bold hover:bg-blue-600 disabled:opacity-50">
-            {uploading ? '🤖 OCR 분석 중...' : '📤 등록증 업로드/교체'}
-          </button>
+          <div className="flex gap-2">
+            <button onClick={() => fileInputRef.current?.click()} disabled={uploading || !!bulkProgress}
+              className="px-4 py-2 bg-blue-500 text-white rounded-lg font-bold hover:bg-blue-600 disabled:opacity-50">
+              {uploading ? '🤖 OCR 분석 중...' : '📤 단일 업로드'}
+            </button>
+            <label className="px-4 py-2 bg-pink-500 text-white rounded-lg font-bold hover:bg-pink-600 cursor-pointer disabled:opacity-50"
+                   style={{ opacity: bulkProgress ? 0.5 : 1, cursor: bulkProgress ? 'wait' : 'pointer' }}>
+              📂 일괄 등록 (~30장)
+              <input type="file" accept="image/*,application/pdf" multiple disabled={!!bulkProgress}
+                className="hidden"
+                onChange={(e) => { if (e.target.files && e.target.files.length > 0) bulkUpload(e.target.files); e.target.value = '' }}
+              />
+            </label>
+          </div>
           <input ref={fileInputRef} type="file" accept="image/*,application/pdf" disabled={uploading}
             className="hidden"
             onChange={(e) => { const f = e.target.files?.[0]; if (f) upload(f); e.target.value = '' }}
           />
         </div>
+
+        {/* 일괄 OCR 진행 패널 */}
+        {bulkProgress && (
+          <div className="mb-4 p-4 bg-pink-50 border border-pink-200 rounded-xl">
+            <div className="flex justify-between mb-2">
+              <span className="font-bold text-pink-800">
+                {bulkProgress.done < bulkProgress.total ? '🤖 일괄 OCR 진행 중...' : '✓ 일괄 OCR 완료'}
+                {' '} ({bulkProgress.done}/{bulkProgress.total})
+              </span>
+              {bulkProgress.done >= bulkProgress.total && (
+                <button onClick={() => { setBulkProgress(null); onUpdate() }}
+                  className="text-xs text-gray-500 hover:text-gray-800">닫기</button>
+              )}
+            </div>
+            <div className="h-2 bg-pink-100 rounded-full overflow-hidden mb-2">
+              <div className="h-full bg-pink-500 transition-all"
+                style={{ width: `${(bulkProgress.done / Math.max(1, bulkProgress.total)) * 100}%` }} />
+            </div>
+            {bulkProgress.results.length > 0 && (
+              <details className="text-xs">
+                <summary className="cursor-pointer text-pink-700 font-bold">
+                  결과 보기 (성공 {bulkProgress.results.filter(r => r.status === 'ok').length} / 실패 {bulkProgress.results.filter(r => r.status === 'fail').length})
+                </summary>
+                <div className="mt-2 max-h-48 overflow-auto bg-white rounded p-2">
+                  {bulkProgress.results.map((r, i) => (
+                    <div key={i} className={`mb-1 ${r.status === 'fail' ? 'text-red-600' : 'text-gray-700'}`}>
+                      {r.status === 'ok' ? '✓' : '❌'} {r.name} — {r.msg}
+                    </div>
+                  ))}
+                </div>
+              </details>
+            )}
+          </div>
+        )}
         {car?.registration_image_url ? (
           car.registration_image_url.endsWith('.pdf') ? (
             <iframe src={car.registration_image_url} style={{ width: '100%', height: 480, border: 0 }} />
@@ -303,7 +406,7 @@ function InvestInlineTab({ carId }: { carId: string }) {
                     {isActive ? '진행중' : inv.status || '종료'}
                   </span>
                 </div>
-                <span className="text-sm font-bold text-blue-600">{inv.invest_amount?.toLocaleString()}원</span>
+                <span className="text-sm font-bold text-blue-600">{Number(inv.invest_amount || 0).toLocaleString()}원</span>
               </div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
                 <div>
@@ -533,7 +636,7 @@ export default function CarDetailPage() {
                  </div>
                  <div className="bg-gray-100 p-4 rounded-2xl backdrop-blur-sm">
                     <p className="text-gray-400 text-xs font-bold">주행거리</p>
-                    <p className="text-lg font-bold">{car.mileage?.toLocaleString()} km</p>
+                    <p className="text-lg font-bold">{Number(car.mileage || 0).toLocaleString()} km</p>
                  </div>
               </div>
               {/* 신차/중고차 구분 */}
@@ -545,7 +648,7 @@ export default function CarDetailPage() {
                 </span>
                 {car.is_used && car.purchase_mileage > 0 && (
                   <span className="text-xs text-gray-400">
-                    구입시 주행거리: <b className="text-white">{car.purchase_mileage?.toLocaleString()}km</b>
+                    구입시 주행거리: <b className="text-white">{Number(car.purchase_mileage || 0).toLocaleString()}km</b>
                   </span>
                 )}
               </div>
@@ -562,32 +665,39 @@ export default function CarDetailPage() {
              </div>
            </div>
 
-           {/* 취득 요약 */}
-           {(car.purchase_price > 0) && (
-             <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-200">
-               <p className="text-xs font-bold text-gray-400 mb-3">💰 취득 요약</p>
-               <div className="space-y-2">
-                 <div className="flex justify-between items-center">
-                   <span className="text-xs text-gray-500">구매가</span>
-                   <span className="text-sm font-bold text-gray-800">{car.purchase_price?.toLocaleString()}원</span>
-                 </div>
-                 {((car.registration_tax || 0) + (car.bond_amount || 0) + (car.delivery_fee || 0) + (car.plate_fee || 0) + (car.agency_fee || 0) + (car.other_initial_cost || 0)) > 0 && (
+           {/* 취득 요약 — Number 캐스팅 의무 (Prisma Decimal → string 반환 이슈) */}
+           {(Number(car.purchase_price || 0) > 0) && (() => {
+             const pp = Number(car.purchase_price || 0)
+             const rt = Number(car.registration_tax || 0)
+             const ba = Number(car.bond_amount || 0)
+             const df = Number(car.delivery_fee || 0)
+             const pf = Number(car.plate_fee || 0)
+             const af = Number(car.agency_fee || 0)
+             const oc = Number(car.other_initial_cost || 0)
+             const initial = rt + ba + df + pf + af + oc
+             const total = pp + initial
+             return (
+               <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-200">
+                 <p className="text-xs font-bold text-gray-400 mb-3">💰 취득 요약</p>
+                 <div className="space-y-2">
                    <div className="flex justify-between items-center">
-                     <span className="text-xs text-gray-500">초기비용</span>
-                     <span className="text-sm font-bold text-gray-800">
-                       {((car.registration_tax || 0) + (car.bond_amount || 0) + (car.delivery_fee || 0) + (car.plate_fee || 0) + (car.agency_fee || 0) + (car.other_initial_cost || 0)).toLocaleString()}원
-                     </span>
+                     <span className="text-xs text-gray-500">구매가</span>
+                     <span className="text-sm font-bold text-gray-800">{pp.toLocaleString()}원</span>
                    </div>
-                 )}
-                 <div className="border-t pt-2 flex justify-between items-center">
-                   <span className="text-xs font-bold text-gray-600">총 취득원가</span>
-                   <span className="text-sm font-black text-blue-600">
-                     {((car.purchase_price || 0) + (car.registration_tax || 0) + (car.bond_amount || 0) + (car.delivery_fee || 0) + (car.plate_fee || 0) + (car.agency_fee || 0) + (car.other_initial_cost || 0)).toLocaleString()}원
-                   </span>
+                   {initial > 0 && (
+                     <div className="flex justify-between items-center">
+                       <span className="text-xs text-gray-500">초기비용</span>
+                       <span className="text-sm font-bold text-gray-800">{initial.toLocaleString()}원</span>
+                     </div>
+                   )}
+                   <div className="border-t pt-2 flex justify-between items-center">
+                     <span className="text-xs font-bold text-gray-600">총 취득원가</span>
+                     <span className="text-sm font-black text-blue-600">{total.toLocaleString()}원</span>
+                   </div>
                  </div>
                </div>
-             </div>
-           )}
+             )
+           })()}
 
            {/* 보험 · 대출 · 투자 요약 */}
            <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-200">
@@ -806,20 +916,25 @@ export default function CarDetailPage() {
                          value={car.other_initial_cost || ''} onChange={e => handleChange('other_initial_cost', Number(e.target.value))} />
                      </div>
                    </div>
-                   {/* 초기비용 합계 */}
-                   <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between">
-                     <span className="text-sm font-bold text-gray-500">초기비용 합계</span>
-                     <span className="text-lg font-black text-gray-800">
-                       {((car.registration_tax || 0) + (car.bond_amount || 0) + (car.delivery_fee || 0) + (car.plate_fee || 0) + (car.agency_fee || 0) + (car.other_initial_cost || 0)).toLocaleString()}원
-                     </span>
-                   </div>
-                   {/* 총 취득원가 */}
-                   <div className="mt-2 flex items-center justify-between">
-                     <span className="text-sm font-bold text-gray-500">총 취득원가 (구매가 + 초기비용)</span>
-                     <span className="text-lg font-black text-blue-600">
-                       {((car.purchase_price || 0) + (car.registration_tax || 0) + (car.bond_amount || 0) + (car.delivery_fee || 0) + (car.plate_fee || 0) + (car.agency_fee || 0) + (car.other_initial_cost || 0)).toLocaleString()}원
-                     </span>
-                   </div>
+                   {/* 초기비용 합계 + 총 취득원가 — Number 캐스팅 */}
+                   {(() => {
+                     const pp = Number(car.purchase_price || 0)
+                     const initial = Number(car.registration_tax || 0) + Number(car.bond_amount || 0)
+                       + Number(car.delivery_fee || 0) + Number(car.plate_fee || 0)
+                       + Number(car.agency_fee || 0) + Number(car.other_initial_cost || 0)
+                     return (
+                       <>
+                         <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between">
+                           <span className="text-sm font-bold text-gray-500">초기비용 합계</span>
+                           <span className="text-lg font-black text-gray-800">{initial.toLocaleString()}원</span>
+                         </div>
+                         <div className="mt-2 flex items-center justify-between">
+                           <span className="text-sm font-bold text-gray-500">총 취득원가 (구매가 + 초기비용)</span>
+                           <span className="text-lg font-black text-blue-600">{(pp + initial).toLocaleString()}원</span>
+                         </div>
+                       </>
+                     )
+                   })()}
                    <div className="mt-3">
                      <label className="text-xs font-bold text-gray-500 block mb-1">초기비용 메모</label>
                      <input className="w-full border rounded-lg p-2.5 text-sm" placeholder="예: 공채 5% 할인 적용, 직접 이전"
@@ -1060,14 +1175,14 @@ export default function CarDetailPage() {
                                 <span className="text-xs bg-gray-100 px-2 py-0.5 rounded text-gray-500">{loan.type}</span>
                               </div>
                               <p className="text-sm text-gray-500 mt-1">
-                                월 <span className="font-bold text-gray-900">{loan.monthly_payment?.toLocaleString()}원</span> (매월 {loan.payment_date}일)
+                                월 <span className="font-bold text-gray-900">{Number(loan.monthly_payment || 0).toLocaleString()}원</span> (매월 {loan.payment_date}일)
                               </p>
                             </div>
                           </div>
                           <div className="flex items-center gap-6 w-full md:w-auto justify-end">
                              <div className="text-right">
                                 <p className="text-xs text-gray-400">총 대출금</p>
-                                <p className="font-bold text-gray-800">{loan.total_amount?.toLocaleString()}원</p>
+                                <p className="font-bold text-gray-800">{Number(loan.total_amount || 0).toLocaleString()}원</p>
                              </div>
                              <button onClick={() => handleDeleteLoan(loan.id)} className="text-gray-300 hover:text-red-500 p-2">🗑️</button>
                           </div>
