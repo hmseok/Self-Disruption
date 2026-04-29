@@ -16,7 +16,7 @@ async function getAuthHeader(): Promise<Record<string, string>> {
   }
 }
 
-// ── 보험 인라인 탭 ──────────────────────────
+// ── 보험 인라인 탭 (v2 — 신규 /api/insurance 응답 구조 적용) ──
 function InsuranceInlineTab({ carId, onNavigate }: { carId: string; onNavigate: () => void }) {
   const [data, setData] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -36,13 +36,40 @@ function InsuranceInlineTab({ carId, onNavigate }: { carId: string; onNavigate: 
 
   if (loading) return <div className="text-center py-4 text-gray-400">로딩 중...</div>
 
+  const fmtDate = (d: any) => d ? String(d).slice(0, 10) : '-'
+  const totalAnnual = data.reduce((s, ins) => s + Number(ins.total_premium || 0), 0)
+
   return (
     <div className="animate-fade-in space-y-4">
+      {/* 요약 통계 */}
+      {data.length > 0 && (
+        <div className="grid grid-cols-3 gap-3">
+          <div className="bg-emerald-50 border border-emerald-200 p-4 rounded-2xl">
+            <p className="text-xs text-emerald-700 mb-1">보유 보험</p>
+            <p className="text-2xl font-bold text-emerald-900">{data.length}건</p>
+          </div>
+          <div className="bg-blue-50 border border-blue-200 p-4 rounded-2xl">
+            <p className="text-xs text-blue-700 mb-1">총 보험료</p>
+            <p className="text-xl font-bold text-blue-900">{totalAnnual.toLocaleString()}원</p>
+          </div>
+          <div className="bg-amber-50 border border-amber-200 p-4 rounded-2xl">
+            <p className="text-xs text-amber-700 mb-1">만료 임박 (30일)</p>
+            <p className="text-2xl font-bold text-amber-900">
+              {data.filter((ins: any) => {
+                if (!ins.end_date) return false
+                const days = Math.ceil((new Date(ins.end_date).getTime() - Date.now()) / 86400000)
+                return days >= 0 && days <= 30
+              }).length}건
+            </p>
+          </div>
+        </div>
+      )}
+
       {data.length === 0 ? (
         <div className="text-center py-16 text-gray-400">
           <div className="text-5xl mb-4">🛡️</div>
           <p className="font-bold text-lg text-gray-500">등록된 보험이 없습니다</p>
-          <p className="text-sm mt-2">보험 상세 페이지에서 보험 계약을 등록해주세요.</p>
+          <p className="text-sm mt-2">아래 버튼으로 보험 관리 페이지에서 등록하세요</p>
         </div>
       ) : (
         data.map((ins: any) => {
@@ -50,42 +77,47 @@ function InsuranceInlineTab({ carId, onNavigate }: { carId: string; onNavigate: 
           const daysLeft = ins.end_date ? Math.ceil((new Date(ins.end_date).getTime() - Date.now()) / 86400000) : null
           return (
             <div key={ins.id} className={`bg-white p-5 rounded-2xl border shadow-sm ${isExpired ? 'border-red-200 bg-red-50/30' : 'border-gray-200'}`}>
-              <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
                 <div className="flex items-center gap-2">
                   <span className="text-lg">🛡️</span>
-                  <span className="font-bold text-gray-800">{ins.company || '보험사 미입력'}</span>
+                  <span className="font-bold text-gray-800">{ins.insurance_company || '-'}</span>
+                  {ins.policy_number && (
+                    <span className="text-xs text-gray-400 font-mono">{ins.policy_number}</span>
+                  )}
+                  {ins.design_number && !ins.policy_number && (
+                    <span className="text-xs text-gray-400 font-mono">{ins.design_number}</span>
+                  )}
                   <span className={`text-xs px-2 py-0.5 rounded font-bold ${
-                    isExpired ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'
+                    isExpired ? 'bg-red-100 text-red-600' : (daysLeft !== null && daysLeft < 30) ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-600'
                   }`}>
-                    {isExpired ? '만료' : '유효'}
+                    {isExpired ? '만기' : (daysLeft !== null && daysLeft < 30) ? `D-${daysLeft}` : '유효'}
                   </span>
                 </div>
-                {ins.total_premium > 0 && (
-                  <span className="text-sm font-bold text-gray-800">보험료 {ins.total_premium?.toLocaleString()}원</span>
-                )}
+                <span className="text-sm font-bold text-gray-800">
+                  {Number(ins.total_premium || 0).toLocaleString()}원
+                </span>
               </div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
                 <div>
-                  <p className="text-xs text-gray-400">연령한정</p>
-                  <p className="font-medium text-gray-700">{ins.age_limit || '-'}</p>
+                  <p className="text-xs text-gray-400">차종</p>
+                  <p className="font-medium text-gray-700">{ins.vehicle_class || '-'}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-400">운전범위</p>
-                  <p className="font-medium text-gray-700">{ins.driver_range || '-'}</p>
+                  <p className="text-xs text-gray-400">기간</p>
+                  <p className="font-medium text-gray-700">{fmtDate(ins.start_date)} ~ {fmtDate(ins.end_date)}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-400">시작일</p>
-                  <p className="font-medium text-gray-700">{ins.start_date || '-'}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-400">만기일</p>
+                  <p className="text-xs text-gray-400">납입방식</p>
                   <p className="font-medium text-gray-700">
-                    {ins.end_date || '-'}
-                    {daysLeft !== null && !isExpired && (
-                      <span className={`ml-1 text-xs ${daysLeft < 30 ? 'text-red-500 font-bold' : 'text-gray-400'}`}>
-                        (D-{daysLeft})
-                      </span>
-                    )}
+                    {ins.payment_type === 'installment' ? `분할 ${ins.installment_count}회` : '일시납'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-400">다음 납입</p>
+                  <p className="font-medium text-gray-700">
+                    {ins.next_due_date
+                      ? <>{fmtDate(ins.next_due_date)} <span className="text-xs text-gray-400">({Number(ins.next_due_amount || 0).toLocaleString()}원)</span></>
+                      : '완료'}
                   </p>
                 </div>
               </div>
@@ -93,10 +125,9 @@ function InsuranceInlineTab({ carId, onNavigate }: { carId: string; onNavigate: 
           )
         })
       )}
-      {/* 하단 버튼: 데이터 유무 관계없이 동일 UI */}
       <button onClick={onNavigate}
         className="w-full bg-white text-green-600 border-2 border-green-200 py-3 rounded-xl font-bold hover:bg-green-50 transition-all">
-        보험 관리 페이지로 이동 →
+        🛡 보험 관리 페이지로 이동 →
       </button>
     </div>
   )
@@ -817,7 +848,7 @@ export default function CarDetailPage() {
 
              {/* 🛡️ 보험 이력 탭 */}
              {activeTab === 'insurance' && (
-              <InsuranceInlineTab carId={carId!} onNavigate={() => router.push(`/insurance/${carId}`)} />
+              <InsuranceInlineTab carId={carId!} onNavigate={() => router.push(`/insurance`)} />
             )}
 
             {/* 🤝 지입 관리 탭 */}
@@ -1045,6 +1076,12 @@ export default function CarDetailPage() {
                     )
                   )}
                 </div>
+
+                {/* 대출 관리 페이지로 이동 (허브 패턴) */}
+                <button onClick={() => router.push('/loans')}
+                  className="w-full bg-white text-amber-600 border-2 border-amber-200 py-3 rounded-xl font-bold hover:bg-amber-50 transition-all">
+                  💰 대출 관리 페이지로 이동 →
+                </button>
               </div>
             )}
           </div>
