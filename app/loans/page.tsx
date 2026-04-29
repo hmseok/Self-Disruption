@@ -115,7 +115,8 @@ export default function LoanListPage() {
     return true
   })
 
-  const f = (n: number) => (n || 0).toLocaleString()
+  // ★ Decimal 안전 캐스팅 (string 직렬화 + 콤마 보장)
+  const f = (n: any) => (Number(n) || 0).toLocaleString()
 
   // ─── 드래그 앤 드롭 ───
   const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true) }

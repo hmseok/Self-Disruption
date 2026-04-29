@@ -118,7 +118,9 @@ export default function DashboardPage() {
   // ============================================
   // 공통 헬퍼
   // ============================================
-  const formatMoney = (n: number) => {
+  // ★ Decimal 안전 캐스팅
+  const formatMoney = (raw: any) => {
+    const n = Number(raw) || 0
     if (n >= 100000000) return (n / 100000000).toFixed(1) + '억'
     if (n >= 10000) return (n / 10000).toFixed(0) + '만'
     return n.toLocaleString()

@@ -20,7 +20,7 @@ async function getAuthHeader(): Promise<Record<string, string>> {
 
 // Sub-component: Contract Info Card
 function ContractInfoCard({ contract }: { contract: any }) {
-  const f = (n: number) => Math.round(n || 0).toLocaleString()
+  const f = (n: any) => Math.round(Number(n) || 0).toLocaleString()
 
   if (!contract) return null
 
@@ -106,7 +106,7 @@ function VehicleInfoCard({ car }: { car: any }) {
 
 // Sub-component: Collection Status Panel
 function CollectionStatusPanel({ schedules }: { schedules: any[] }) {
-  const f = (n: number) => Math.round(n || 0).toLocaleString()
+  const f = (n: any) => Math.round(Number(n) || 0).toLocaleString()
 
   const paidCount = schedules.filter(s => s.status === 'paid').length
   const totalCount = schedules.length
@@ -478,7 +478,7 @@ function DesktopPaymentTable({
   schedules: any[]
   onTogglePayment: (scheduleId: string, currentStatus: string) => void
 }) {
-  const f = (n: number) => Math.round(n || 0).toLocaleString()
+  const f = (n: any) => Math.round(Number(n) || 0).toLocaleString()
 
   return (
     <div className="hidden md:block" style={{ maxHeight: 700, overflowY: 'auto', overflowX: 'auto' }}>
@@ -568,7 +568,7 @@ function DesktopPaymentTable({
 
 // Sub-component: Payment Schedule Cards (Mobile)
 function MobilePaymentCards({ schedules, onTogglePayment }: { schedules: any[], onTogglePayment: (id: string, status: string) => void }) {
-  const f = (n: number) => Math.round(n || 0).toLocaleString()
+  const f = (n: any) => Math.round(Number(n) || 0).toLocaleString()
   if (!schedules.length) return null
   return (
     <div className="md:hidden space-y-3">
@@ -613,8 +613,8 @@ function MobilePaymentCards({ schedules, onTogglePayment }: { schedules: any[], 
 
 // Sub-component: Linked Transactions
 function LinkedTransactionsSection({ transactions }: { transactions: any[] }) {
-  const f = (n: number) => Math.round(Math.abs(n || 0)).toLocaleString()
-  const totalIncome = transactions.filter(t => t.type === 'income').reduce((s, t) => s + Math.abs(t.amount || 0), 0)
+  const f = (n: any) => Math.round(Math.abs(Number(n) || 0)).toLocaleString()
+  const totalIncome = transactions.filter(t => t.type === 'income').reduce((s, t) => s + Math.abs(Number(t.amount) || 0), 0)
   const totalExpense = transactions.filter(t => t.type !== 'income').reduce((s, t) => s + Math.abs(t.amount || 0), 0)
 
   return (
@@ -670,7 +670,7 @@ export default function ContractDetailPage() {
   const [linkedTransactions, setLinkedTransactions] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
-  const f = (n: number) => Math.round(n || 0).toLocaleString()
+  const f = (n: any) => Math.round(Number(n) || 0).toLocaleString()
 
   // Fetch data
   const fetchData = useCallback(async () => {

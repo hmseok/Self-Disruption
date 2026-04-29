@@ -34,8 +34,9 @@ interface HistoryRow {
   max_confidence: number | null
 }
 
-const formatMoney = (n: number | null | undefined) =>
-  n == null ? '-' : n.toLocaleString('ko-KR') + '원'
+// ★ Decimal 안전 캐스팅
+const formatMoney = (n: any) =>
+  n == null ? '-' : (Number(n) || 0).toLocaleString('ko-KR') + '원'
 
 function confidenceBadge(c: number) {
   if (c >= 0.75) return { label: '높음', bg: 'bg-green-100', fg: 'text-green-700', border: 'border-green-200' }

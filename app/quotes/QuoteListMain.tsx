@@ -98,7 +98,8 @@ function ShortTermDetailModal({
   const detail = quote.quote_detail || {}
   const items = detail.items || []
   const risk = detail.riskFactors || {}
-  const f = (n: number) => (n || 0).toLocaleString()
+  // ★ Decimal 안전 캐스팅
+  const f = (n: any) => (Number(n) || 0).toLocaleString()
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40" onClick={onClose}>

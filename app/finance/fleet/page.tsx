@@ -20,8 +20,10 @@ async function getAuthHeader(): Promise<Record<string, string>> {
 // 전체 차량 수익 현황 (Fleet P&L Dashboard)
 // ============================================
 
-const f = (n: number) => n.toLocaleString()
-const fMan = (n: number) => {
+// ★ Decimal 안전 캐스팅 (Prisma Decimal 은 string 직렬화)
+const f = (n: any) => (Number(n) || 0).toLocaleString()
+const fMan = (raw: any) => {
+  const n = Number(raw) || 0
   const abs = Math.abs(n)
   if (abs >= 100000000) return `${(n / 100000000).toFixed(1)}억`
   if (abs >= 10000) return `${Math.round(n / 10000)}만`

@@ -105,7 +105,7 @@ export default function ContractListMain() {
   const [contractStatusFilter, setContractStatusFilter] = useState<ContractStatusFilter>('all')
   const [sortBy, setSortBy] = useState<SortOption>('latest')
 
-  const f = (n: number) => Math.round(n || 0).toLocaleString()
+  const f = (n: any) => Math.round(Number(n) || 0).toLocaleString()
   const formatDate = (dateString: string) => dateString?.split('T')[0] || ''
 
   const companyId = role === 'admin' ? adminSelectedCompanyId : company?.id

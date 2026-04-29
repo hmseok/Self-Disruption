@@ -1,6 +1,7 @@
 import React from 'react'
 
-const nf = (n: number) => n ? n.toLocaleString() : '0'
+// ★ Decimal 안전 캐스팅
+const nf = (n: any) => (Number(n) || 0).toLocaleString()
 
 export default function GeneralContract({ data, signatureUrl, mode = 'print' }: { data: any, signatureUrl?: string, mode?: 'print' | 'mobile' }) {
   const today = new Date()

@@ -182,7 +182,8 @@ export default function LoanDetailPage() {
     })
   }
 
-  const fmt = (n: number) => (n || 0).toLocaleString()
+  // ★ Decimal 안전 캐스팅
+  const fmt = (n: any) => (Number(n) || 0).toLocaleString()
 
   // 파일 업로드 - GCS로 마이그레이션됨
   const uploadFiles = async (files: FileList | File[]) => {

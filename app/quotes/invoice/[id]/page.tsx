@@ -22,7 +22,8 @@ async function getAuthHeader(): Promise<Record<string, string>> {
 }
 
 // ── 유틸 ──
-const f = (n: number) => Math.round(n || 0).toLocaleString()
+// ★ Decimal 안전 캐스팅
+const f = (n: any) => Math.round(Number(n) || 0).toLocaleString()
 const fDate = (d: string) => {
   if (!d) return '-'
   const dt = new Date(d)

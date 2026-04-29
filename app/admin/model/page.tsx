@@ -122,7 +122,8 @@ export default function VehicleCodeManager() {
     }
   }
 
-  const f = (n: number) => n?.toLocaleString() || '0'
+  // ★ Decimal 안전 캐스팅
+  const f = (n: any) => (Number(n) || 0).toLocaleString()
 
   return (
     <div className="max-w-[1400px] mx-auto py-4 px-4 md:py-5 md:px-6 bg-gray-50/50 min-h-screen">
