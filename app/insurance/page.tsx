@@ -253,7 +253,7 @@ export default function InsurancePage() {
                     <td style={{ padding: '10px 12px' }}>
                       {row.payment_type === 'installment'
                         ? <span style={{ ...pillStyle('info'), fontSize: 10, padding: '1px 6px' }}>분할 {row.installment_count}회</span>
-                        : <span style={{ ...pillStyle('muted'), fontSize: 10, padding: '1px 6px' }}>일시납</span>}
+                        : <span style={{ ...pillStyle('neutral'), fontSize: 10, padding: '1px 6px' }}>일시납</span>}
                     </td>
                     <td style={{ padding: '10px 12px', fontSize: 12 }}>
                       {row.next_due_date
