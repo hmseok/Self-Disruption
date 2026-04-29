@@ -40,6 +40,8 @@ export default function InsurancePage() {
   const [cars, setCars] = useState<Car[]>([])
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [prefilledData, setPrefilledData] = useState<any>(null)
+  const [ocrLoading, setOcrLoading] = useState(false)
 
   const loadList = useCallback(async () => {
     setLoading(true)
@@ -60,8 +62,71 @@ export default function InsurancePage() {
 
   const totalAnnualPremium = Number(stats.total_premium_sum || 0)
 
-  const openNew = () => { setEditingId(null); setShowModal(true) }
-  const openEdit = (id: string) => { setEditingId(id); setShowModal(true) }
+  const openNew = () => { setEditingId(null); setPrefilledData(null); setShowModal(true) }
+  const openEdit = (id: string) => { setEditingId(id); setPrefilledData(null); setShowModal(true) }
+
+  const handleOcrUpload = async (file: File) => {
+    setOcrLoading(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      // fetchWithAuth 는 JSON 전용이므로 fetch + Bearer 헤더 직접
+      const { getAuthHeader } = await import('@/app/utils/finance-upload')
+      const headers = await getAuthHeader()
+      const res = await fetch('/api/insurance/ocr', {
+        method: 'POST',
+        headers: headers as any,
+        body: formData,
+      })
+      const json = await res.json()
+      if (!res.ok || !json.ok) {
+        alert(`OCR 실패: ${json?.error || res.status}\n\n${json?.raw_text_sample ? `Raw: ${json.raw_text_sample.slice(0, 200)}` : ''}`)
+        return
+      }
+      // 추출 데이터 → 모달에 prefill
+      const ext = json.extracted
+      const allocations = (ext.vehicles || []).map((v: any) => {
+        // vin → cars 매칭 시도 (클라이언트 측)
+        const matched = cars.find(c => c.vin === v.vin)
+        return {
+          car_id: matched?.id || null,
+          vin: v.vin || null,
+          vehicle_label: v.vehicle_label || null,
+          premium_amount: Number(v.premium) || 0,
+          coverage_note: v.coverage_note || null,
+        }
+      })
+      const schedules = (ext.schedules || []).map((s: any) => ({
+        installment_no: Number(s.installment_no),
+        due_date: s.due_date,
+        amount: Number(s.amount) || 0,
+      }))
+      setPrefilledData({
+        contract: {
+          insurance_company: ext.insurance_company || '',
+          policy_number: ext.policy_number || '',
+          design_number: ext.design_number || '',
+          vehicle_class: ext.vehicle_class || '',
+          start_date: ext.start_date || '',
+          end_date: ext.end_date || '',
+          total_premium: Number(ext.total_premium) || 0,
+          contract_type: ext.contract_type === 'fleet' ? 'fleet' : 'individual',
+          payment_type: ext.payment_type === 'installment' ? 'installment' : 'lump',
+          installment_count: Number(ext.installment_count) || 1,
+          memo: `OCR 추출 (신뢰도 ${json.confidence || 0}%)`,
+        },
+        allocations,
+        schedules,
+        confidence: json.confidence,
+      })
+      setEditingId(null)
+      setShowModal(true)
+    } catch (e: any) {
+      alert(`OCR 오류: ${e?.message || String(e)}`)
+    } finally {
+      setOcrLoading(false)
+    }
+  }
 
   const remove = async (id: string, label: string) => {
     if (!confirm(`「${label}」 보험계약을 삭제할까요?\n분담 정보 + 납입 스케줄도 모두 삭제됩니다.`)) return
@@ -119,14 +184,23 @@ export default function InsurancePage() {
         }}>
           + 보험 등록
         </button>
-        <button disabled title="Phase 5에서 제공" style={{
+        <label style={{
           ...BTN.sm, padding: '8px 16px', fontSize: 13, fontWeight: 700,
           background: 'rgba(168,85,247,0.1)', color: '#7e22ce',
           border: '1px solid rgba(168,85,247,0.35)',
-          cursor: 'not-allowed', opacity: 0.5,
+          cursor: ocrLoading ? 'wait' : 'pointer',
+          opacity: ocrLoading ? 0.6 : 1, display: 'inline-block',
         }}>
-          📤 청약서 OCR (준비 중)
-        </button>
+          {ocrLoading ? '🤖 OCR 분석 중...' : '📤 청약서 OCR'}
+          <input type="file" accept="application/pdf,image/*" disabled={ocrLoading}
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const f = e.target.files?.[0]
+              if (f) handleOcrUpload(f)
+              e.target.value = ''
+            }}
+          />
+        </label>
       </div>
 
       {/* 목록 */}
@@ -213,8 +287,9 @@ export default function InsurancePage() {
         <InsuranceFormModal
           contractId={editingId}
           cars={cars}
-          onClose={() => { setShowModal(false); setEditingId(null) }}
-          onSaved={() => { setShowModal(false); setEditingId(null); loadList() }}
+          prefill={prefilledData}
+          onClose={() => { setShowModal(false); setEditingId(null); setPrefilledData(null) }}
+          onSaved={() => { setShowModal(false); setEditingId(null); setPrefilledData(null); loadList() }}
         />
       )}
     </div>
@@ -225,13 +300,14 @@ export default function InsurancePage() {
 // 등록/수정 모달
 // ═══════════════════════════════════════════════════════════════════
 
-function InsuranceFormModal({ contractId, cars, onClose, onSaved }: {
+function InsuranceFormModal({ contractId, cars, prefill, onClose, onSaved }: {
   contractId: string | null
   cars: Car[]
+  prefill?: any
   onClose: () => void
   onSaved: () => void
 }) {
-  const [contract, setContract] = useState({
+  const [contract, setContract] = useState(prefill?.contract || {
     insurance_company: '전국렌터카공제조합',
     policy_number: '',
     design_number: '',
@@ -244,9 +320,10 @@ function InsuranceFormModal({ contractId, cars, onClose, onSaved }: {
     installment_count: 1,
     memo: '',
   })
-  const [allocations, setAllocations] = useState<Allocation[]>([])
-  const [schedules, setSchedules] = useState<Schedule[]>([])
+  const [allocations, setAllocations] = useState<Allocation[]>(prefill?.allocations || [])
+  const [schedules, setSchedules] = useState<Schedule[]>(prefill?.schedules || [])
   const [saving, setSaving] = useState(false)
+  const ocrConfidence = prefill?.confidence ?? null
 
   // 수정 모드 — 데이터 로드
   useEffect(() => {
@@ -375,7 +452,15 @@ function InsuranceFormModal({ contractId, cars, onClose, onSaved }: {
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
           <h2 style={{ fontSize: 18, fontWeight: 700 }}>
-            {contractId ? '보험 수정' : '보험 등록'}
+            {contractId ? '보험 수정' : prefill ? '🤖 OCR 결과 검토 후 등록' : '보험 등록'}
+            {ocrConfidence !== null && (
+              <span style={{
+                marginLeft: 10, fontSize: 11, fontWeight: 600,
+                padding: '2px 8px', borderRadius: 6,
+                background: ocrConfidence >= 80 ? 'rgba(34,197,94,0.15)' : ocrConfidence >= 60 ? 'rgba(245,158,11,0.15)' : 'rgba(239,68,68,0.15)',
+                color: ocrConfidence >= 80 ? '#15803d' : ocrConfidence >= 60 ? '#b45309' : '#b91c1c',
+              }}>OCR 신뢰도 {ocrConfidence}%</span>
+            )}
           </h2>
           <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: COLORS.textMuted }}>×</button>
         </div>
