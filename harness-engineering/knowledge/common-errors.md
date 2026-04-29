@@ -201,6 +201,71 @@
    → 컨텍스트가 날아가도 파일은 남는다.
 ```
 
+### 21. 외부 LLM API 미검증 → 토큰 무한 소모 [ACTIVE — CRITICAL]
+**사고일자**: 2026-04-29
+**피해**: 사용자 Gemini 토큰 1,500건 호출 낭비 (50 batch × 30건, 적용 0건)
+
+**시나리오 재현**
+1. AI 일괄 분류 API 작성 — `gemini-2.5-flash` 사용
+2. 클라이언트 루프: `remaining > 0` 인 동안 batch 반복 호출
+3. break 조건: `procThis === 0` (DB row fetch 0건)
+4. **함정 1**: gemini-2.5-flash는 **thinking 모드 기본 활성** — 응답 토큰을 thinking이 다 소진하면 실제 출력은 빈 문자열
+5. **함정 2**: 빈 응답 → AI 결과 0건 → DB UPDATE 0건 → 같은 미분류 row가 다음 batch에서 또 fetch → procThis는 여전히 30 → break 조건 미충족
+6. 50 batch 안전 한도까지 무한루프, 1500번 Gemini 호출 = 사용자 토큰 소모
+
+**근본 원인**: Generator가 **외부 API 응답 형태를 N=1로 사전 검증하지 않음**
+- gemini-2.5-flash thinking 모드 동작을 코드 작성 전 시뮬레이션 안 함
+- "응답 비면 → DB 미적용 → 같은 row 재fetch" End-to-End 시뮬레이션 누락 (CLAUDE.md 11-1 위반)
+- break 조건에 "DB write 0건" 안전망 없음 (사용자 자원 소모성 루프의 필수 안전망)
+
+**예방 규칙 (이후 강제)**
+```
+🚨 외부 LLM/유료 API 호출이 들어가는 모든 작업:
+
+1) N=1 dry-run 필수
+   - 본 작업 전, 1건만 호출하여 응답 형태 출력 (raw text + finishReason + usage)
+   - 응답이 의도한 형식인지 코드 + 사용자 둘 다 확인
+
+2) 모델별 quirk 사전 조사
+   - gemini-2.5-* : thinking 기본 활성 → thinkingConfig: { thinkingBudget: 0 } 필수
+   - JSON 응답 강제: responseMimeType: 'application/json'
+   - response parts는 배열로 split될 수 있음 → parts.map(p => p.text).join('')
+
+3) 루프/batch 코드는 "비용 안전망" 2중 필수
+   ❌ 단일 break: procThis === 0 (rows fetch 기준)
+   ✅ 이중 break:
+      - applied + below === 0 (DB write 기준) — 진짜 진척 체크
+      - 추가로 max batch limit (50 등) — 최후의 보호
+
+4) AI 응답을 응답 JSON에 디버그 노출
+   { gemini_debug: { rawTextSample, finishReason, usage } }
+   → 0건 발생 시 사용자가 즉시 원인 파악 가능
+```
+
+### 22. 하네스 GATE 우회 패턴 [ACTIVE — STRUCTURAL]
+**현상**: 짧은 사용자 요청을 받으면 즉답 모드로 GATE 5(영향 검증)·6(코드 품질)·8(평가) 우회
+
+**문제**:
+- "통장 분류 좀 해줘" 같은 짧은 요청에도 외부 API 호출/대량 DB 쓰기가 포함됨
+- 그런데 짧다는 이유로 Researcher → Planner 단계 생략하고 Generator로 직행
+- 결과: 사용자가 QA 담당이 되어 매 단계마다 버그를 발견하고 보고
+
+**규칙 (강제)**:
+```
+다음 중 하나라도 해당하면 GATE 1~9 풀 파이프라인 강제:
+✓ 외부 API/LLM 호출 포함
+✓ DB 대량 UPDATE/INSERT (≥10건)
+✓ 사용자 자원 소모 (토큰, 비용, 시간)
+✓ 새로운 통합 패턴 (SMS, 엑셀, 외부 연동)
+✓ 마이그레이션 필요
+✓ 보안/인증 변경
+
+즉답 허용 조건:
+✓ 단일 파일 typo/문법 수정
+✓ UI 텍스트/색상 변경 (글래스 시스템 내)
+✓ 기존 패턴 그대로 적용한 단순 추가
+```
+
 ---
 
-_마지막 업데이트: 2026-04-25_
+_마지막 업데이트: 2026-04-29_

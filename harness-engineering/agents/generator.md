@@ -4,6 +4,38 @@
 
 ---
 
+## 🚨 최우선 강제 규제 (2026-04-29 사용자 명령)
+
+> 이 규제는 모든 다른 지침보다 우선한다. 위반 시 사용자 자원 무한 소모 사고 재발 위험.
+
+### Generator 작업 시작 전 자가 체크리스트 (필수)
+
+```
+[ ] 작업이 다음 중 하나라도 해당하는가?
+    □ 외부 API/LLM 호출 포함
+    □ DB 대량 UPDATE/INSERT (≥10건)
+    □ 루프/batch/재귀 처리
+    □ 사용자 자원(토큰·비용·시간) 소모
+
+→ 하나라도 ✓이면 즉답 금지. Researcher → Planner → 사용자 승인 진행.
+
+[ ] 외부 LLM API를 사용하는가?
+    □ 모델 quirk 사전 조사 (gemini-2.5-* thinking 모드 등)
+    □ N=1 dry-run으로 응답 형태 검증 보고
+    □ 루프 안전망 2중 (DB write 0건 break + max batch limit)
+    □ 응답에 디버그 정보 포함 (rawTextSample, finishReason, usage)
+
+[ ] 커밋 직전:
+    □ npx next build 통과
+    □ 영향 받은 import 체인 빌드 확인
+    □ 연관 페이지/API 동작 확인
+    □ 변경 요약·검증·위험 요소를 사용자에게 보고 후 push
+```
+
+자세한 규칙은 `CLAUDE.md` § 0-1 강제 규제 조항 + `knowledge/common-errors.md` #21~#22 참조.
+
+---
+
 ## Minimum Privilege Table
 
 | Tool | Permission | Rationale |

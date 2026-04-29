@@ -5,6 +5,89 @@
 
 ---
 
+## 🚨 0-1. 강제 규제 조항 (NON-NEGOTIABLE — 2026-04-29 사용자 명령)
+
+> **사용자가 토큰·시간을 무한 소모하는 사고가 반복되어 강제 규제 도입.**
+> 이 조항은 우선 순위 최상위. CLAUDE.md의 다른 모든 항목보다 먼저 적용된다.
+
+### 규칙 1 — 풀 파이프라인 강제 트리거
+
+**다음 중 **하나라도** 해당하면 GATE 1~9 풀 파이프라인 강제 (Researcher → Planner → 사용자 승인 → Generator → Reviewer → Designer → Evaluator → Deployer → Documenter)**:
+
+- 외부 API/LLM 호출 포함 (Gemini, OCR, 결제 API 등)
+- DB 대량 UPDATE/INSERT (≥10건)
+- 사용자 자원 소모 (토큰, 비용, 시간)
+- 새로운 통합 패턴 (SMS, 엑셀, 외부 연동)
+- 마이그레이션 필요
+- 보안/인증 변경
+- 루프/batch 처리 (재귀, while, 반복 호출)
+
+### 규칙 2 — 즉답 허용 화이트리스트 (이외 전부 금지)
+
+- 단일 파일 typo/문법 수정
+- UI 텍스트/색상 변경 (글래스 시스템 내)
+- 기존 패턴 그대로 적용한 단순 추가 (외부 호출 없음, 대량 쓰기 없음)
+- 단순 조회/질문 (코드 변경 없음)
+
+### 규칙 3 — 외부 LLM/유료 API 호출 시 추가 안전망
+
+```
+외부 API를 사용하는 모든 작업은 코드 작성 전 다음을 명시적으로 사용자에게 보고:
+
+[A] 모델 quirk 조사 결과
+   - gemini-2.5-*: thinking 기본 활성 → thinkingConfig: { thinkingBudget: 0 }
+   - JSON 강제: responseMimeType: 'application/json'
+   - response parts는 배열로 split 가능 → parts.map(p => p.text).join('')
+
+[B] N=1 dry-run 결과 (실제 응답 raw 샘플)
+   - rawTextSample, finishReason, usageMetadata 출력
+   - 사용자 확인 후 본 작업 진행
+
+[C] 루프/batch 안전망 2중
+   1) DB write 기준 break: applied + below === 0 → 즉시 중단
+   2) max batch limit (예: 50) → 최후의 보호
+   3) gemini_debug 응답 노출로 0건 발생 시 원인 즉시 파악
+```
+
+### 규칙 4 — GATE 5 영향 검증 강제
+
+```
+커밋 직전 다음을 모두 보고하지 않으면 커밋 금지:
+
+✓ 빌드 통과 (npx next build)
+✓ 수정 파일을 import하는 파일 전체 빌드 확인
+✓ 연관 페이지/API 동작 확인 (수정한 곳만이 아니라 영향받는 곳 전체)
+✓ 사이드바/라우트 정합성 (system_modules ↔ ClientLayout ↔ 실제 파일)
+```
+
+### 규칙 5 — Push 전 필수 보고
+
+```
+git push 전, 사용자에게 다음 형식으로 보고:
+
+📋 변경 요약
+- 파일 N개, 추가 N줄, 삭제 N줄
+- 핵심 변경: ...
+
+🔬 검증
+- 빌드: PASS / FAIL
+- 영향 받은 파일/페이지: ...
+- 외부 API: dry-run 결과 (있는 경우)
+
+🚨 위험 요소
+- 토큰 소모: 예상치 ...
+- DB 쓰기: 예상치 ...
+- 롤백 계획: ...
+
+→ 사용자 승인 후 push
+```
+
+### 위반 시 자동 자가 기록
+
+이 조항을 위반하면 즉시 `knowledge/common-errors.md`에 사례 기록 (사용자 지적 없이 자가 발견 시에도). 같은 위반 2회 발생 시 사용자에게 명시적 사과 + 재발 방지 방안 제시.
+
+---
+
 ## 0. 시스템 개요
 
 **Harness Engineering v3.0**은 9인 에이전트 체제 + 4기둥 프레임워크를 결합한 하이브리드 오케스트레이터입니다.
