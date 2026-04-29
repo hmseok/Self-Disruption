@@ -454,9 +454,9 @@ export default function BankCardPage() {
 
   useEffect(() => {
     setLoading(true)
-    Promise.all([loadSummary(), loadTransactions(), loadSettlements(), loadCars()])
+    Promise.all([loadSummary(), loadTransactions(), loadSettlements(), loadCars(), loadMappings()])
       .finally(() => setLoading(false))
-  }, [loadSummary, loadTransactions, loadSettlements, loadCars])
+  }, [loadSummary, loadTransactions, loadSettlements, loadCars, loadMappings])
 
   // SMS 탭 전환 시 로드
   useEffect(() => {
@@ -1906,7 +1906,7 @@ export default function BankCardPage() {
                                     <tbody>
                                       {reviewItems.map((item: any) => {
                                         const srcLabel = String(item.imported_from || '').startsWith('excel_bank') ? '통장' : String(item.imported_from || '').startsWith('excel_card') ? '카드' : item.imported_from === 'sms' ? 'SMS' : item.imported_from === 'sms_bank' ? 'SMS통장' : '기타'
-                                        // 매칭 우선순위: 직접(related_id) > SMS(card_sms_transactions)
+                                        // 매칭 우선순위: 직접(related_id) > SMS(card_sms_transactions) > last4 → corporate_cards 검색
                                         const directCarNumber = item.matched_car_number || null
                                         const directCarModel = item.matched_car_model || null
                                         const smsCarNumber = item.matched_car_number_sms || null
@@ -1914,16 +1914,60 @@ export default function BankCardPage() {
                                         const carNumber = directCarNumber || smsCarNumber
                                         const carModel = directCarModel || smsCarModel
                                         const isDirectMatch = !!directCarNumber
-                                        const matchLabel = carNumber
-                                          ? `🚗 ${carNumber}${carModel ? ` (${carModel})` : ''}${isDirectMatch ? '' : ' [SMS]'}`
-                                          : item.matched_holder_name
-                                          ? `👤 ${item.matched_holder_name}`
-                                          : item.matched_card_alias
-                                          ? `💳 ${item.matched_card_alias}`
-                                          : item.card_last4
-                                          ? `❓ last4=${item.card_last4} (미매칭)`
-                                          : '-'
+                                        // last4로 corporate_cards 후보 검색 (매칭 안 된 경우 카드 정체 표시용)
+                                        const last4Cards = item.card_last4
+                                          ? mappingCards.filter((c: any) => {
+                                              const digits = String(c.card_number || '').replace(/\D/g, '')
+                                              return digits.length >= 4 && digits.slice(-4) === item.card_last4
+                                            })
+                                          : []
+                                        // 매칭 라벨 결정 — 명확한 우선순위
+                                        let matchLabel: string
+                                        let matchTone: 'success' | 'warning' | 'danger' | 'muted' = 'muted'
+                                        let matchSubLabel: string | null = null
+                                        if (carNumber) {
+                                          // 차량 매칭됨 (직접 또는 SMS)
+                                          matchLabel = `🚗 ${carNumber}${carModel ? ` (${carModel})` : ''}${isDirectMatch ? '' : ' [SMS]'}`
+                                          matchTone = 'success'
+                                          // 카드 정체 부가 표시
+                                          if (last4Cards.length === 1) {
+                                            const c = last4Cards[0]
+                                            matchSubLabel = [c.card_alias, c.holder_name].filter(Boolean).join(' · ')
+                                          }
+                                        } else if (last4Cards.length === 1) {
+                                          // last4 카드 1장 — 차량 미배정 상태
+                                          const c = last4Cards[0]
+                                          const parts = [c.card_alias || `카드 ${item.card_last4}`]
+                                          if (c.holder_name) parts.push(c.holder_name)
+                                          if (c.status && c.status !== 'active') parts.push(`[${c.status}]`)
+                                          matchLabel = `💳 ${parts.join(' · ')}`
+                                          matchTone = 'warning'
+                                          matchSubLabel = '차량 미배정'
+                                        } else if (last4Cards.length >= 2) {
+                                          // last4 동일 카드 2장 이상 — 사용자 선택 필요
+                                          matchLabel = `⚠️ 후보 ${last4Cards.length}장 (last4=${item.card_last4})`
+                                          matchTone = 'warning'
+                                          matchSubLabel = last4Cards.slice(0, 2).map((c: any) => c.card_alias || c.holder_name || '?').join(', ') + (last4Cards.length > 2 ? '...' : '')
+                                        } else if (item.matched_card_alias) {
+                                          // SMS 별칭 매칭 (last4 미사용)
+                                          matchLabel = `💳 ${item.matched_card_alias}`
+                                          matchTone = 'warning'
+                                        } else if (item.matched_holder_name) {
+                                          matchLabel = `👤 ${item.matched_holder_name}`
+                                          matchTone = 'muted'
+                                        } else if (item.card_last4) {
+                                          // last4 있지만 corporate_cards에 등록 안됨
+                                          matchLabel = `❌ 미등록 (last4=${item.card_last4})`
+                                          matchTone = 'danger'
+                                          matchSubLabel = '매핑 관리에서 카드 등록 필요'
+                                        } else {
+                                          matchLabel = '-'
+                                        }
                                         const currentCarId = item.matched_car_id || (isDirectMatch ? item.related_id : null) || ''
+                                        const matchColor = matchTone === 'success' ? '#15803d'
+                                                         : matchTone === 'warning' ? '#d97706'
+                                                         : matchTone === 'danger'  ? '#dc2626'
+                                                         : COLORS.textMuted
                                         return (
                                           <tr key={item.id} style={{ borderTop: '1px solid rgba(0,0,0,0.04)' }}>
                                             <td style={{ padding: '6px 10px', color: COLORS.textPrimary, whiteSpace: 'nowrap' }}>
@@ -1944,15 +1988,20 @@ export default function BankCardPage() {
                                               {nf(Math.abs(Number(item.amount || 0)))}
                                             </td>
                                             <td style={{ padding: '6px 10px', color: COLORS.textMuted, fontSize: 11 }}>{srcLabel}</td>
-                                            <td style={{ padding: '6px 10px', fontSize: 11, maxWidth: 200 }}>
-                                              <div style={{ color: matchLabel === '-' ? COLORS.textMuted : COLORS.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 2 }} title={matchLabel}>
+                                            <td style={{ padding: '6px 10px', fontSize: 11, maxWidth: 240 }}>
+                                              <div style={{ color: matchColor, fontWeight: matchTone === 'success' ? 600 : 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={matchLabel}>
                                                 {matchLabel}
                                               </div>
+                                              {matchSubLabel && (
+                                                <div style={{ color: COLORS.textMuted, fontSize: 10, marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={matchSubLabel}>
+                                                  {matchSubLabel}
+                                                </div>
+                                              )}
                                               {/* 차량 변경 dropdown — 사용자가 직접 매칭 수정 */}
                                               <select
                                                 value={currentCarId}
                                                 onChange={(e) => changeItemCar(item.id, e.target.value)}
-                                                style={{ fontSize: 10, padding: '1px 4px', border: `1px solid ${COLORS.borderSubtle}`, borderRadius: 4, color: COLORS.textSecondary, cursor: 'pointer', maxWidth: 180 }}>
+                                                style={{ fontSize: 10, padding: '1px 4px', border: `1px solid ${COLORS.borderSubtle}`, borderRadius: 4, color: COLORS.textSecondary, cursor: 'pointer', maxWidth: 220, marginTop: 2 }}>
                                                 <option value="">— 차량 매칭 변경 —</option>
                                                 {cars.map(c => (
                                                   <option key={c.id} value={c.id}>
