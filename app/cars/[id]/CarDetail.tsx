@@ -800,7 +800,14 @@ export default function CarDetailPage() {
                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                      <div>
                        <label className="text-xs font-bold text-gray-500 block mb-1">차량번호</label>
-                       <input className="w-full border rounded-lg p-2.5 text-sm font-bold" value={car.number || ''} onChange={e => handleChange('number', e.target.value)} />
+                       <input className="w-full border rounded-lg p-2.5 text-sm font-bold" value={car.number || ''} onChange={e => handleChange('number', e.target.value)} placeholder="예: 12가3456" />
+                     </div>
+                     <div>
+                       <label className="text-xs font-bold text-gray-500 block mb-1">차대번호 (VIN)</label>
+                       <input className="w-full border rounded-lg p-2.5 text-sm font-mono uppercase" value={car.vin || ''}
+                         onChange={e => handleChange('vin', e.target.value.toUpperCase())}
+                         maxLength={17}
+                         placeholder="17자리 (예: KMHKN81AFTU378615)" />
                      </div>
                      <div>
                        <label className="text-xs font-bold text-gray-500 block mb-1">브랜드</label>

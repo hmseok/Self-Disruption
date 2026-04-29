@@ -65,7 +65,8 @@ interface SettlementItem {
   }
 }
 
-const fmt = (n: number) => n.toLocaleString()
+// ★ Decimal 안전 캐스팅
+const fmt = (n: any) => (Number(n) || 0).toLocaleString()
 const fmtSign = (n: number) => n > 0 ? `+${fmt(n)}` : fmt(n)
 
 export default function CarSettlementTab({ carId, companyId, car }: CarSettlementTabProps) {

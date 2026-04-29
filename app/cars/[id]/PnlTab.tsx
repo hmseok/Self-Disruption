@@ -76,7 +76,8 @@ const CATEGORY_META: Record<string, { icon: string; color: string }> = {
   '기타비용': { icon: '📦', color: '#94a3b8' },
 }
 
-const fmt = (n: number) => n.toLocaleString()
+// ★ Decimal 안전 캐스팅 — Prisma Decimal 은 string 으로 직렬화됨
+const fmt = (n: any) => (Number(n) || 0).toLocaleString()
 
 export default function PnlTab({ carId, companyId, car }: PnlTabProps) {
   const [loading, setLoading] = useState(true)
