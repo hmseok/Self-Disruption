@@ -163,6 +163,7 @@ const BUSINESS_GROUPS = [
 const WORK_ESSENTIALS_MENUS = [
   { name: '내 정보', path: '/work-essentials/my-info', iconKey: 'Users' },
   { name: '영수증제출', path: '/work-essentials/receipts', iconKey: 'Clipboard' },
+  { name: '📋 회의록', path: '/meetings', iconKey: 'Doc' },
 ]
 
 // admin 전용 설정 메뉴
