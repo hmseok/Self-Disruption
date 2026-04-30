@@ -1967,12 +1967,6 @@ export default function BankCardPage() {
                   >
                     📤 엑셀 업로드
                   </button>
-                  <button
-                    onClick={linkSmsCards}
-                    style={{ ...BTN.sm, background: '#fff', color: COLORS.primary, border: `1px solid ${COLORS.borderBlue}`, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
-                  >
-                    📱 SMS 연결
-                  </button>
                   {summary && summary.transactions.card > 0 && (
                     <button
                       onClick={() => deleteAndReupload('excel_card')}
@@ -3043,10 +3037,6 @@ export default function BankCardPage() {
                 color: mappingSub === 'bank' ? '#065f46' : '#475569',
               }}>🏦 통장 매핑 ({mappingBanks.length})</button>
               <span style={{ flex: 1 }} />
-              <button onClick={runLinkCards} style={{
-                padding: '8px 14px', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: 'pointer',
-                background: 'rgba(191,219,254,0.6)', color: '#1e40af', border: '1px solid rgba(59,110,181,0.3)',
-              }}>🔗 SMS 일괄 연결</button>
               <button onClick={() => setEditMapping(mappingSub === 'card' ? { type: 'card' } : { type: 'bank' })} style={{
                 padding: '8px 14px', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: 'pointer',
                 background: 'rgba(167,243,208,0.5)', color: '#065f46', border: '1px solid rgba(5,150,105,0.3)',
