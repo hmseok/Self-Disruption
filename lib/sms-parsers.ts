@@ -477,7 +477,22 @@ export function parseSms(sender: string | null, rawText: string): ParsedSms | nu
   const issuer = detectIssuer(sender, text)
   if (issuer === 'UNKNOWN') return null
 
-  // 취소 전용 패턴 (금액만 있는 단순 취소)
+  // ── 1차: 카드사별 정상 파서 시도 ──────────────────────
+  //   취소/승인 무관 — 각 파서가 canceled 키워드를 자체 처리
+  //   (holder, card_alias, merchant 정상 추출 보장)
+  let result: ParsedSms | null = null
+  switch (issuer) {
+    case 'KB':          result = parseKB(text); break
+    case 'WOORI':       result = parseWoori(text); break
+    case 'HYUNDAI':     result = parseHyundai(text); break
+    case 'MYCOMPANY':   result = parseMyCompany(text); break
+    case 'WOORI_BANK':  result = parseWooriBank(text); break
+    case 'KB_BANK':     result = parseKBBank(text); break
+  }
+  if (result) return result
+
+  // ── 2차 fallback: 카드사별 파서가 실패했지만 취소 SMS인 경우 ──
+  //   비정형 취소 알림 (예: 단순 "취소 5,000원") 최소 정보만 보존
   if (isCancelSms(text)) {
     const amt = parseAmount(text)
     const dt = parseDateTime(text)
@@ -495,13 +510,5 @@ export function parseSms(sender: string | null, rawText: string): ParsedSms | nu
     }
   }
 
-  switch (issuer) {
-    case 'KB':          return parseKB(text)
-    case 'WOORI':       return parseWoori(text)
-    case 'HYUNDAI':     return parseHyundai(text)
-    case 'MYCOMPANY':   return parseMyCompany(text)
-    case 'WOORI_BANK':  return parseWooriBank(text)
-    case 'KB_BANK':     return parseKBBank(text)
-    default:            return null
-  }
+  return null
 }

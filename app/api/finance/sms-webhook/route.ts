@@ -167,7 +167,10 @@ export async function POST(req: NextRequest) {
   if (parsed && parsed.amount) {
     try {
       const txDate = parsed.txAt || receivedAt
-      const txType = (parsed.type === 'deposit') ? 'income' : 'expense'
+      // 취소 SMS → income(환불)으로 기록 — 원거래 -금액과 상쇄
+      // deposit(입금) → income, withdrawal(출금) / approved → expense
+      const isCanceled = parsed.type === 'canceled'
+      const txType = (parsed.type === 'deposit' || isCanceled) ? 'income' : 'expense'
       transactionId = randomUUID()
 
       // ── PHASE 3: 규칙 기반 1차 자동 분류 ──
@@ -178,6 +181,10 @@ export async function POST(req: NextRequest) {
         classificationTier = ruleResult.tier
       }
 
+      // 취소건은 description 앞에 [취소] 마커 — 거래 목록에서 즉시 식별
+      const baseDesc = parsed.merchant || parsed.issuer
+      const description = isCanceled ? `[취소] ${baseDesc}` : baseDesc
+
       await prisma.$executeRaw`
         INSERT INTO transactions (
           id, transaction_date, type, amount, description, client_name,
@@ -185,7 +192,7 @@ export async function POST(req: NextRequest) {
           category, status, created_at, updated_at
         ) VALUES (
           ${transactionId}, ${txDate}, ${txType}, ${parsed.amount},
-          ${parsed.merchant || parsed.issuer}, ${await resolveClientName(parsed.holder || '')},
+          ${description}, ${await resolveClientName(parsed.holder || '')},
           ${parsed.issuer}, 'sms',
           ${carId ? 'car' : null}, ${carId},
           ${ruleResult && ruleResult.tier === 'auto' ? ruleResult.category : null},
