@@ -8,6 +8,7 @@ import DcSubFilters, { SubFilterGroup } from '../components/DcSubFilters'
 import NeuDataTable, { TableColumn, MobileCardConfig } from '../components/NeuDataTable'
 import CalendarView from './CalendarView'
 import DispatchModal from './DispatchModal'
+import FleetBoard from './FleetBoard'
 
 async function getAuthHeader(): Promise<Record<string, string>> {
   try {
@@ -169,7 +170,7 @@ export default function OperationsMainPage() {
   const [loading, setLoading] = useState(true)
 
   // UI states
-  const [viewMode, setViewMode] = useState<'dashboard' | 'timeline' | 'calendar' | 'list'>('dashboard')
+  const [viewMode, setViewMode] = useState<'dashboard' | 'timeline' | 'calendar' | 'list' | 'fleet'>('dashboard')
   const [listFilter, setListFilter] = useState<'today' | 'week' | 'all'>('all')
   const [statusFilter, setStatusFilter] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
@@ -1183,6 +1184,7 @@ export default function OperationsMainPage() {
         placeholder="🔍 차량번호, 고객명 검색..."
         filters={[
           { key: 'dashboard', label: '🏠 대시보드' },
+          { key: 'fleet', label: '🚦 배차 보드' },
           { key: 'list', label: '📋 리스트' },
           { key: 'timeline', label: '📊 타임라인' },
           { key: 'calendar', label: '📅 캘린더' },
@@ -1211,6 +1213,7 @@ export default function OperationsMainPage() {
 
       {/* View Content */}
       {viewMode === 'dashboard' && renderDashboard()}
+      {viewMode === 'fleet' && <FleetBoard />}
       {viewMode === 'list' && renderListView()}
       {viewMode === 'timeline' && renderTimeline()}
       {viewMode === 'calendar' && (

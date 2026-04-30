@@ -32,7 +32,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const body = await request.json()
 
     const fields = [
-      'number', 'vin', 'brand', 'model', 'trim', 'year', 'fuel', 'status', 'location',
+      'number', 'vin', 'brand', 'model', 'trim', 'year', 'fuel', 'status', 'location', 'location_code',
       'mileage', 'purchase_price', 'acq_date', 'is_used', 'purchase_mileage',
       'registration_tax', 'bond_amount', 'delivery_fee', 'plate_fee', 'agency_fee',
       'other_initial_cost', 'initial_cost_memo', 'ownership_type', 'owner_name',

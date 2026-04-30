@@ -5,6 +5,88 @@ import PnlTab from './PnlTab'
 import CarSettlementTab from './CarSettlementTab'
 import { COLORS, GLASS, BTN, pillStyle } from '@/app/utils/ui-tokens'
 
+// ─── 위치 입력 필드 (코드 + 상세) ─────────────────────────────────
+function CarLocationField({ locationCode, location, onChange }: {
+  locationCode: string; location: string;
+  onChange: (code: string, detail: string) => void;
+}) {
+  const [locations, setLocations] = useState<Array<{ id: string; code: string; label: string; address: string | null }>>([])
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const headers = await getAuthHeader()
+        const res = await fetch('/api/locations', { headers })
+        if (!res.ok) return
+        const json = await res.json()
+        if (json?.data) setLocations(json.data)
+      } catch {}
+    })()
+  }, [])
+
+  const matched = locations.find(l => l.code === locationCode)
+
+  return (
+    <div style={{
+      ...GLASS.L3, border: `1px solid ${COLORS.borderSubtle}`,
+      borderRadius: 12, padding: 16,
+    }}>
+      <label style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSecondary, display: 'block', marginBottom: 8 }}>
+        📍 현재 차고지
+      </label>
+
+      {/* 표준 코드 드롭다운 */}
+      <div style={{ marginBottom: 8 }}>
+        <div style={{ fontSize: 10, color: COLORS.textMuted, marginBottom: 4 }}>위치 코드 (표준)</div>
+        <select
+          value={locationCode || ''}
+          onChange={e => onChange(e.target.value, location)}
+          style={{
+            width: '100%', padding: '8px 12px', borderRadius: 8,
+            fontSize: 13, fontWeight: 600,
+            color: COLORS.textPrimary,
+            background: 'rgba(255,255,255,0.7)',
+            border: `1px solid ${COLORS.borderSubtle}`,
+          }}>
+          <option value="">— 선택 안 함 —</option>
+          {locations.map(l => (
+            <option key={l.id} value={l.code}>{l.label}{l.address ? ` (${l.address})` : ''}</option>
+          ))}
+        </select>
+        {locations.length === 0 && (
+          <div style={{ fontSize: 10, color: COLORS.textMuted, marginTop: 4 }}>
+            ※ 위치 코드가 없습니다. <a href="/admin/locations" style={{ color: COLORS.primary, textDecoration: 'underline' }}>관리자 페이지</a>에서 추가하세요.
+          </div>
+        )}
+      </div>
+
+      {/* 상세 위치 텍스트 */}
+      <div>
+        <div style={{ fontSize: 10, color: COLORS.textMuted, marginBottom: 4 }}>상세 위치 (예: 본사 2층 25번 자리)</div>
+        <input
+          value={location || ''}
+          onChange={e => onChange(locationCode, e.target.value)}
+          placeholder="상세 위치를 입력"
+          style={{
+            width: '100%', padding: '8px 12px', borderRadius: 8,
+            fontSize: 13, fontWeight: 600,
+            color: COLORS.textPrimary,
+            background: 'rgba(255,255,255,0.7)',
+            border: `1px solid ${COLORS.borderSubtle}`,
+          }}
+        />
+      </div>
+
+      {matched && (
+        <div style={{ marginTop: 8, fontSize: 11, color: COLORS.textMuted }}>
+          ▸ 표준 위치: <strong style={{ color: COLORS.textSecondary }}>{matched.label}</strong>
+          {matched.address && <span> · {matched.address}</span>}
+        </div>
+      )}
+    </div>
+  )
+}
+
 async function getAuthHeader(): Promise<Record<string, string>> {
   try {
     const { auth } = await import('@/lib/auth-client')
@@ -690,27 +772,15 @@ export default function CarDetailPage() {
             </div>
           </div>
 
-          {/* === 현재 차고지 === */}
-          <div style={{
-            ...GLASS.L3, border: `1px solid ${COLORS.borderSubtle}`,
-            borderRadius: 12, padding: 16,
-          }}>
-            <label style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSecondary, display: 'block', marginBottom: 6 }}>
-              📍 현재 차고지
-            </label>
-            <input
-              value={car.location || ''}
-              onChange={e => handleChange('location', e.target.value)}
-              placeholder="위치 정보 입력"
-              style={{
-                width: '100%', padding: '8px 12px', borderRadius: 8,
-                fontSize: 13, fontWeight: 600,
-                color: COLORS.textPrimary,
-                background: 'rgba(255,255,255,0.7)',
-                border: `1px solid ${COLORS.borderSubtle}`,
-              }}
-            />
-          </div>
+          {/* === 현재 차고지 (위치 코드 + 상세 자유 입력) === */}
+          <CarLocationField
+            locationCode={car.location_code || ''}
+            location={car.location || ''}
+            onChange={(code, detail) => {
+              handleChange('location_code', code)
+              handleChange('location', detail)
+            }}
+          />
 
            {/* 취득 요약 — Number 캐스팅 의무 (Prisma Decimal → string 반환 이슈) */}
            {(Number(car.purchase_price || 0) > 0) && (() => {
