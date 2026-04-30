@@ -216,6 +216,7 @@ const MatchBadge = ({ matched }: { matched: boolean }) => (
     background: matched ? COLORS.bgGreen : COLORS.bgAmber,
     color: matched ? COLORS.success : COLORS.warning,
     border: `1px solid ${matched ? COLORS.borderGreen : COLORS.borderAmber}`,
+    whiteSpace: 'nowrap', flexShrink: 0,
   }}>
     {matched ? '● 매칭' : '○ 미매칭'}
   </span>
@@ -1518,7 +1519,7 @@ export default function BankCardPage() {
       <span style={{ fontSize: 12, color: COLORS.textSecondary }}>{r.balance_after != null ? nf(r.balance_after) : '-'}</span>,
       hideOnMobile: true
     },
-    { key: 'status', label: '상태', width: 80, align: 'center', render: (r) =>
+    { key: 'status', label: '상태', width: 92, align: 'center', render: (r) =>
       <MatchBadge matched={!!r.related_type && !!r.related_id} />
     },
     { key: 'actions', label: '', width: 40, align: 'center', render: (r) => (
@@ -1586,7 +1587,7 @@ export default function BankCardPage() {
       </span>,
       hideOnMobile: true
     },
-    { key: 'status', label: '상태', width: 80, align: 'center', render: (r) =>
+    { key: 'status', label: '상태', width: 92, align: 'center', render: (r) =>
       <MatchBadge matched={!!r.related_type && !!r.related_id} />
     },
   ]
@@ -1675,7 +1676,7 @@ export default function BankCardPage() {
       <span style={{ fontSize: 11, padding: '1px 6px', borderRadius: 4, background: COLORS.bgBlue, color: COLORS.info }}>{r.contract_type || '-'}</span>,
       hideOnMobile: true
     },
-    { key: 'status', label: '상태', width: 80, align: 'center', render: (r) => {
+    { key: 'status', label: '상태', width: 92, align: 'center', render: (r) => {
       const isLinked = r.status === 'matched' || r.status === 'confirmed' || r.status === 'paid'
       return (
         <span style={{
