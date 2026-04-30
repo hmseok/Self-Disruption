@@ -57,13 +57,17 @@ export async function GET(request: NextRequest) {
       const data = await prisma.$queryRawUnsafe<any[]>(`
         SELECT
           t.*,
-          sms.card_alias        AS sms_card_alias,
-          sms.card_id           AS sms_card_id,
-          cc.card_alias         AS matched_card_alias,
-          cc.holder_name        AS matched_holder_name,
+          sms.card_alias         AS sms_card_alias,
+          sms.card_id            AS sms_card_id,
+          sms.transaction_type   AS sms_transaction_type,
+          sms.merchant           AS sms_merchant,
+          sms.holder_name        AS sms_holder,
+          sms.parse_status       AS sms_parse_status,
+          cc.card_alias          AS matched_card_alias,
+          cc.holder_name         AS matched_holder_name,
           cc.assigned_employee_id AS matched_employee_id,
-          cc.assigned_car_id    AS matched_car_id,
-          car.number            AS matched_car_number,
+          cc.assigned_car_id     AS matched_car_id,
+          car.number             AS matched_car_number,
           CONCAT_WS(' ', car.brand, car.model) AS matched_car_model
         FROM transactions t
         LEFT JOIN card_sms_transactions sms ON sms.transaction_id COLLATE utf8mb4_unicode_ci = t.id COLLATE utf8mb4_unicode_ci
