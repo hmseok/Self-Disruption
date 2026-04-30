@@ -176,10 +176,12 @@ export async function POST(req: NextRequest) {
   if (parsed && parsed.amount) {
     try {
       const txDate = parsed.txAt || receivedAt
-      // 취소 SMS → income(환불)으로 기록 — 원거래 -금액과 상쇄
-      // deposit(입금) → income, withdrawal(출금) / approved → expense
-      const isCanceled = parsed.type === 'canceled'
-      const txType = (parsed.type === 'deposit' || isCanceled) ? 'income' : 'expense'
+      // type 매핑 (회계 관점):
+      //   deposit/canceled → income (입금/환불)
+      //   approved/withdrawal → expense (출금/사용)
+      // ※ 표시는 sms.transaction_type 으로 결정 (UI 단순화)
+      //   description 에 [취소] prefix 안 박음 — 가맹점만 그대로
+      const txType = (parsed.type === 'deposit' || parsed.type === 'canceled') ? 'income' : 'expense'
       transactionId = randomUUID()
 
       // ── PHASE 3: 규칙 기반 1차 자동 분류 ──
@@ -190,9 +192,8 @@ export async function POST(req: NextRequest) {
         classificationTier = ruleResult.tier
       }
 
-      // 취소건은 description 앞에 [취소] 마커 — 거래 목록에서 즉시 식별
-      const baseDesc = parsed.merchant || parsed.issuer
-      const description = isCanceled ? `[취소] ${baseDesc}` : baseDesc
+      // description = 가맹점 그대로 (prefix 없음 — UI 가 sms.transaction_type 으로 [취소] 표시)
+      const description = parsed.merchant || parsed.issuer
 
       await prisma.$executeRaw`
         INSERT INTO transactions (

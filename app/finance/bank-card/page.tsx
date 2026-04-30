@@ -1680,10 +1680,44 @@ export default function BankCardPage() {
         </div>
       )
     }},
-    { key: 'merchant', label: '가맹점', render: (r) => <span style={{ fontSize: 13, fontWeight: 500 }}>{r.description || '-'}</span> },
-    { key: 'amount', label: '금액', width: 110, align: 'right', render: (r) =>
-      <span style={{ fontWeight: 600, fontSize: 13, color: COLORS.expense }}>{nf(r.amount)}원</span>
-    },
+    { key: 'merchant', label: '가맹점', render: (r: any) => {
+      // SMS 가맹점 우선, 없으면 description (구 데이터 호환)
+      const merchant = r.sms_merchant || r.description || '-'
+      const stType = r.sms_transaction_type
+      const isCanceled = stType === 'canceled'
+      const isDeclined = r.sms_parse_status === 'ignored'
+      return (
+        <span style={{ fontSize: 13, fontWeight: 500 }}>
+          {isCanceled && <span style={{ color: '#b91c1c', marginRight: 4, fontWeight: 700 }}>[취소]</span>}
+          {isDeclined && <span style={{ color: '#94a3b8', marginRight: 4, fontWeight: 600 }}>[미승인]</span>}
+          {merchant}
+        </span>
+      )
+    }},
+    { key: 'amount', label: '금액', width: 110, align: 'right', render: (r: any) => {
+      // SMS transaction_type 따라 색/부호 결정 (단순 모델)
+      //   approved/withdrawal → 빨강 -금액 (출금)
+      //   canceled            → 빨강 -금액 (취소 — 사용자 표시 모델)
+      //   deposit             → 녹색 +금액 (입금)
+      //   declined            → 회색 (미승인 — 합산 제외 의미)
+      //   기본 (SMS 없음)      → 빨강 (전통 expense)
+      const stType = r.sms_transaction_type
+      const isDeclined = r.sms_parse_status === 'ignored'
+      const color =
+        isDeclined ? '#94a3b8' :
+        stType === 'deposit' ? COLORS.income :
+        stType === 'canceled' || stType === 'withdrawal' || stType === 'approved' ? COLORS.expense :
+        r.type === 'income' ? COLORS.income : COLORS.expense
+      const sign =
+        stType === 'deposit' ? '+' :
+        stType === 'canceled' || stType === 'withdrawal' ? '-' :
+        ''
+      return (
+        <span style={{ fontWeight: 600, fontSize: 13, color }}>
+          {sign}{nf(r.amount)}원
+        </span>
+      )
+    }},
     { key: 'matched', label: '매칭', width: 140, render: (r: any) => {
       // 차량 매칭 우선, 없으면 직원
       if (r.matched_car_number) {
