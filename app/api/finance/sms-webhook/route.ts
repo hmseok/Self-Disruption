@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { createHash, randomUUID } from 'crypto'
-import { parseSms, detectIssuer } from '@/lib/sms-parsers'
+import { parseSms, detectIssuer, isNonTransactionSms } from '@/lib/sms-parsers'
 import { classifyByRules } from '@/lib/transaction-classifier'
 import { resolveClientName } from '@/lib/client-name-aliases'
 
@@ -97,10 +97,19 @@ export async function POST(req: NextRequest) {
   // ── 4. 파싱 ──────────────────────────────────────────
   const issuer = detectIssuer(from || null, text)
   const parsed = parseSms(from || null, text)
+  const isNonTx = isNonTransactionSms(text)  // 승인거절/한도초과/결제거절 등
 
   const id = randomUUID()
-  const parseStatus = parsed ? 'parsed' : (issuer === 'UNKNOWN' ? 'ignored' : 'failed')
-  const parseError = parsed ? null : (issuer === 'UNKNOWN' ? 'non-financial SMS' : 'parser returned null — unknown format')
+  const parseStatus = parsed
+    ? 'parsed'
+    : isNonTx
+      ? 'ignored'
+      : (issuer === 'UNKNOWN' ? 'ignored' : 'failed')
+  const parseError = parsed
+    ? null
+    : isNonTx
+      ? 'non-transaction (declined/over-limit)'
+      : (issuer === 'UNKNOWN' ? 'non-financial SMS' : 'parser returned null — unknown format')
 
   // ── 5. DB 적재 ───────────────────────────────────────
   await prisma.$executeRaw`

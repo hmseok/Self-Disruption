@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyUser } from '@/lib/auth-server'
 import { prisma } from '@/lib/prisma'
-import { parseSms } from '@/lib/sms-parsers'
+import { parseSms, isNonTransactionSms, detectIssuer } from '@/lib/sms-parsers'
 
 // ═══════════════════════════════════════════════════════════════════
 // 취소 SMS 일괄 재파싱 API (관리자 전용 — 일회성 운영 도구)
@@ -49,6 +49,10 @@ type Diff = {
 }
 
 // ─── 후보 조회 ─────────────────────────────────────────────
+//   대상:
+//     ① parse_status='parsed' 이지만 merchant/holder/card_alias 가 NULL
+//        AND 취소 키워드 포함 → 취소 SMS 재파싱
+//     ② parse_status='failed' → 새 파서로 재시도 (KB 변형 포맷, [MY COMPANY] 취소 등)
 async function loadCandidates(max: number): Promise<Candidate[]> {
   const limit = Math.min(Math.max(max, 1), 200)
   return prisma.$queryRaw<Candidate[]>`
@@ -66,10 +70,15 @@ async function loadCandidates(max: number): Promise<Candidate[]> {
       FROM card_sms_transactions s
       LEFT JOIN transactions t
         ON t.id COLLATE utf8mb4_unicode_ci = s.transaction_id COLLATE utf8mb4_unicode_ci
-     WHERE s.parse_status = 'parsed'
-       AND (
-              s.transaction_type = 'canceled'
-           OR (s.merchant IS NULL AND s.raw_text REGEXP '취소|승인취소|거래취소')
+     WHERE (
+            -- ① 취소 SMS 정보 결손
+            (s.parse_status = 'parsed'
+              AND (
+                s.transaction_type = 'canceled'
+                OR (s.merchant IS NULL AND s.raw_text REGEXP '취소|승인취소|거래취소')
+              ))
+            -- ② 파싱 실패 SMS (새 파서로 재시도)
+         OR  s.parse_status = 'failed'
            )
      ORDER BY s.received_at DESC
      LIMIT ${limit}
@@ -77,11 +86,18 @@ async function loadCandidates(max: number): Promise<Candidate[]> {
 }
 
 // ─── 재파싱 + 진단 ─────────────────────────────────────────
-function diffOne(row: Candidate): { diff: Diff | null; skipReason: string | null } {
+function diffOne(row: Candidate): { diff: Diff | null; skipReason: string | null; markIgnored?: boolean } {
   // 사용자 수동 수정 보호
   if (row.tx_final_cat) return { diff: null, skipReason: 'has_final_category' }
 
-  const newParsed = parseSms(row.sender, row.raw_text || '')
+  const text = row.raw_text || ''
+
+  // 비-거래 SMS (승인거절/한도초과) → ignored 처리
+  if (isNonTransactionSms(text)) {
+    return { diff: null, skipReason: 'non_transaction_sms', markIgnored: true }
+  }
+
+  const newParsed = parseSms(row.sender, text)
   if (!newParsed) return { diff: null, skipReason: 'reparse_failed' }
 
   // 정보 보강이 없으면 skip
@@ -103,7 +119,7 @@ function diffOne(row: Candidate): { diff: Diff | null; skipReason: string | null
     diff: {
       id: row.id,
       txId: row.transaction_id,
-      raw_sample: (row.raw_text || '').slice(0, 80),
+      raw_sample: text.slice(0, 80),
       before: {
         old_merchant: row.old_merchant,
         old_holder: row.old_holder,
@@ -180,12 +196,32 @@ export async function POST(request: NextRequest) {
     const candidates = await loadCandidates(max)
     let applied = 0
     let txUpdated = 0
+    let ignoredMarked = 0
     const skips: Record<string, number> = {}
     const errors: Array<{ id: string; reason: string }> = []
     const samples: Diff[] = []
 
     for (const row of candidates) {
       const r = diffOne(row)
+
+      // ── 비-거래 SMS (승인거절/한도초과) → ignored 마킹 ──
+      if (!r.diff && r.markIgnored) {
+        try {
+          await prisma.$executeRaw`
+            UPDATE card_sms_transactions SET
+              parse_status = 'ignored',
+              parse_error = 'non-transaction (declined/over-limit)',
+              updated_at = NOW()
+            WHERE id = ${row.id}
+          `
+          ignoredMarked++
+        } catch (e: any) {
+          errors.push({ id: row.id, reason: e?.message || 'ignored mark fail' })
+        }
+        if (r.skipReason) skips[r.skipReason] = (skips[r.skipReason] || 0) + 1
+        continue
+      }
+
       if (!r.diff) {
         if (r.skipReason) skips[r.skipReason] = (skips[r.skipReason] || 0) + 1
         continue
@@ -193,12 +229,15 @@ export async function POST(request: NextRequest) {
       if (samples.length < 5) samples.push(r.diff)
       try {
         // ── 1) card_sms_transactions UPDATE ──
+        //   parse_status도 'parsed'로 갱신 (failed → parsed 이행)
         await prisma.$executeRaw`
           UPDATE card_sms_transactions SET
             merchant         = ${r.diff.after.merchant},
             holder_name      = ${r.diff.after.holder},
             card_alias       = ${r.diff.after.card_alias},
             transaction_type = ${r.diff.after.type},
+            parse_status     = 'parsed',
+            parse_error      = NULL,
             updated_at       = NOW()
           WHERE id = ${r.diff.id}
         `
@@ -221,10 +260,11 @@ export async function POST(request: NextRequest) {
     }
 
     // 안전망: 한 건도 적용 안 됐으면 사용자에게 명시적 알림
-    if (candidates.length > 0 && applied === 0) {
+    if (candidates.length > 0 && applied === 0 && ignoredMarked === 0) {
       return NextResponse.json({
         applied: 0,
         tx_updated: 0,
+        ignored_marked: 0,
         skipped: skips,
         errors,
         note: '⚠️ 변경 적용 0건 — 모두 skip 처리됨 (사유는 skipped 객체 참조)',
@@ -236,6 +276,7 @@ export async function POST(request: NextRequest) {
       total_candidates: candidates.length,
       applied,
       tx_updated: txUpdated,
+      ignored_marked: ignoredMarked,
       skipped: skips,
       errors,
       sample: samples,

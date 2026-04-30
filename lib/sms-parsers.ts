@@ -90,7 +90,15 @@ function parseDateTime(text: string, year = new Date().getFullYear()): Date | nu
 
 // ── 취소 감지 ────────────────────────────────────────────
 function isCancelSms(text: string): boolean {
+  // "승인거절" 은 취소가 아님 — 한도/잔액 부족 등으로 결제 자체가 안 된 케이스
+  if (/승인\s*거절|거절|한도\s*초과|잔액\s*부족/.test(text)) return false
   return /취소|승인취소|거래취소/.test(text) && !/승인\s*$/.test(text.trim())
+}
+
+// ── 비-거래 SMS 감지 (승인거절, 한도초과 등) ─────────────
+//   true 시 webhook 에서 parse_status='ignored' 처리 (failed 가 아님)
+export function isNonTransactionSms(text: string): boolean {
+  return /승인\s*거절|한도\s*초과|잔액\s*부족|결제\s*거절/.test(text)
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -328,17 +336,19 @@ function parseHyundai(text: string): ParsedSms | null {
 // ═══════════════════════════════════════════════════════════
 // [MY COMPANY] 법인카드 파서
 // ═══════════════════════════════════════════════════════════
-// 포맷: [MY COMPANY] 승인 7109 석호민님 9,000원 일시불 더벤티문정점 잔여한도3,422,272원
+// 포맷:  [MY COMPANY] 승인 7109 석호민님 9,000원 일시불 더벤티문정점 잔여한도3,422,272원
+// 포맷:  [MY COMPANY] 취소 7109 석호민님 180,000원 일시불 (주)잠실에너지 잔여한도...
 function parseMyCompany(text: string): ParsedSms | null {
   const canceled = isCancelSms(text)
 
+  // 메인 — 승인/사용/결제/취소 verb 모두 처리
   const m = text.match(
-    /\[MY COMPANY\]\s*(?:승인|사용|결제)\s+(\d{4})\s+([^\s]+?)님?\s+([\d,]+)\s*원\s+(일시불|\d+개월)\s+(.+?)(?:\s+잔여한도|$)/
+    /\[MY COMPANY\]\s*(?:승인|사용|결제|취소)\s+(\d{4})\s+([^\s]+?)님?\s+([\d,]+)\s*원\s+(일시불|\d+개월)\s+(.+?)(?:\s+잔여한도|$)/
   )
   if (!m) {
     // 포맷 변형: 금액 뒤에 할부 없이 바로 가맹점
     const m2 = text.match(
-      /\[MY COMPANY\]\s*(?:승인|사용|결제)\s+(\d{4})\s+([^\s]+?)님?\s+([\d,]+)\s*원\s+(.+?)(?:\s+잔여한도|$)/
+      /\[MY COMPANY\]\s*(?:승인|사용|결제|취소)\s+(\d{4})\s+([^\s]+?)님?\s+([\d,]+)\s*원\s+(.+?)(?:\s+잔여한도|$)/
     )
     if (!m2) return null
     const [, cardNum, holder, amtStr, merchantRaw] = m2

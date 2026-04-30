@@ -502,17 +502,21 @@ export default function BankCardPage() {
   }, [])
 
   const handleRecancelApply = useCallback(async () => {
-    if (!confirm('취소 SMS를 일괄 재파싱하여 거래내역을 갱신합니다. 계속할까요?\n(max 50건씩 처리, 안전을 위해 dry-run 먼저 권장)')) return
+    if (!confirm('SMS 재파싱 일괄 적용:\n· 취소 SMS의 누락된 정보 보강\n· 파싱 실패 SMS 재시도\n· 승인거절/한도초과 SMS는 ignored 처리\n\n계속할까요? (max 100건/실행)')) return
     setRecanceling(true)
     try {
-      const { json } = await fetchWithAuth('/api/admin/sms-recanceled?apply=true&max=50', { method: 'POST' })
+      const { json } = await fetchWithAuth('/api/admin/sms-recanceled?apply=true&max=100', { method: 'POST' })
       if (json?.error) { alert(`오류: ${json.error}`); return }
+      const skips = Object.entries(json?.skipped || {})
+        .map(([k, v]) => `  · ${k}: ${v}건`).join('\n') || '  (없음)'
       alert(
         `✅ 적용 완료\n\n` +
         `· 후보: ${json?.total_candidates || 0}건\n` +
         `· SMS 갱신: ${json?.applied || 0}건\n` +
         `· 거래내역 갱신: ${json?.tx_updated || 0}건\n` +
+        `· ignored 마킹(승인거절 등): ${json?.ignored_marked || 0}건\n` +
         `· 오류: ${(json?.errors || []).length}건\n\n` +
+        `skip 내역:\n${skips}\n\n` +
         `${json?.note || ''}`
       )
       loadSmsData()
