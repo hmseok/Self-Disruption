@@ -169,13 +169,43 @@ export async function GET(request: NextRequest) {
       else if (r.skipReason) skips[r.skipReason] = (skips[r.skipReason] || 0) + 1
     }
 
+    // ── 진단 정보 (규칙 10): no_improvement skip 된 row 의 현재 상태 ──
+    const diagnostics: any[] = []
+    for (const row of candidates.slice(0, 10)) {
+      const r = diffOne(row)
+      const text = (row.raw_text || '').slice(0, 60)
+      if (r.diff) {
+        diagnostics.push({
+          status: 'will_update',
+          raw: text,
+          tx_id: row.transaction_id,
+          tx_state_now: { type: row.tx_type, desc: row.tx_desc },
+          tx_state_expected: { type: r.diff.after.new_tx_type, desc: r.diff.after.new_tx_desc },
+        })
+      } else {
+        diagnostics.push({
+          status: r.skipReason || 'unknown',
+          raw: text,
+          sms_state: {
+            merchant: row.old_merchant,
+            holder: row.old_holder,
+            card_alias: row.old_card_alias,
+            type: row.old_type,
+          },
+          tx_id: row.transaction_id,  // ← null 이면 transaction 자체 미생성
+          tx_state_now: { type: row.tx_type, desc: row.tx_desc },
+        })
+      }
+    }
+
     return NextResponse.json({
       dryRun: true,
       total_candidates: candidates.length,
       will_update: diffs.length,
       skipped: skips,
       sample: diffs.slice(0, 5),
-      note: 'POST /api/admin/sms-recanceled?apply=true&max=N 으로 실제 적용',
+      diagnostics,  // ← 진단: 후보 10건의 현재 상태 + 기대 상태
+      note: 'POST /api/admin/sms-recanceled?apply=true&max=N 으로 실제 적용. force=true 옵션은 transactions 재계산 강제.',
     })
   } catch (e: any) {
     console.error('[GET /api/admin/sms-recanceled]', e)
@@ -192,6 +222,7 @@ export async function POST(request: NextRequest) {
   try {
     const sp = request.nextUrl.searchParams
     const apply = sp.get('apply') === 'true'
+    const force = sp.get('force') === 'true'  // no_improvement 도 transactions 강제 갱신
     const max = Math.min(Math.max(Number(sp.get('max') || 50), 1), 200)
 
     if (!apply) {
@@ -202,6 +233,24 @@ export async function POST(request: NextRequest) {
     }
 
     const candidates = await loadCandidates(max)
+    // ── force 모드: no_improvement 인 row 도 강제 transactions 갱신 ──
+    const forceUpdates: Array<{ row: Candidate; new_tx_desc: string; new_tx_type: 'income' | 'expense' }> = []
+    if (force) {
+      for (const row of candidates) {
+        if (!row.transaction_id) continue
+        if (row.tx_final_cat) continue
+        const text = row.raw_text || ''
+        if (isNonTransactionSms(text)) continue
+        const newParsed = parseSms(row.sender, text)
+        if (!newParsed) continue
+        const isCanceled = newParsed.type === 'canceled'
+        const newTxType: 'income' | 'expense' =
+          newParsed.type === 'deposit' || isCanceled ? 'income' : 'expense'
+        const baseDesc = newParsed.merchant || newParsed.issuer
+        const newTxDesc = isCanceled ? `[취소] ${baseDesc}` : baseDesc
+        forceUpdates.push({ row, new_tx_desc: newTxDesc, new_tx_type: newTxType })
+      }
+    }
     let applied = 0
     let txUpdated = 0
     let ignoredMarked = 0
@@ -267,27 +316,75 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // ── force 모드: no_improvement 인 row 의 transactions 강제 갱신 ──
+    let forceUpdated = 0
+    if (force && forceUpdates.length > 0) {
+      for (const f of forceUpdates) {
+        try {
+          await prisma.$executeRaw`
+            UPDATE transactions SET
+              description = ${f.new_tx_desc},
+              type        = ${f.new_tx_type},
+              updated_at  = NOW()
+            WHERE id = ${f.row.transaction_id}
+          `
+          forceUpdated++
+        } catch (e: any) {
+          errors.push({ id: f.row.transaction_id || '?', reason: `force: ${e?.message || 'unknown'}` })
+        }
+      }
+    }
+
+    // ── 검증 (규칙 10): apply 후 실제 상태 확인 ──
+    let verification: any = null
+    try {
+      const verifyRows = await prisma.$queryRaw<Array<{ status: string; cnt: bigint }>>`
+        SELECT
+          CASE
+            WHEN s.transaction_type = 'canceled' AND t.type = 'income' AND t.description LIKE '[취소]%' THEN 'pass_canceled'
+            WHEN s.transaction_type = 'canceled' AND (t.type != 'income' OR t.description NOT LIKE '[취소]%') THEN 'fail_canceled'
+            WHEN s.transaction_type = 'canceled' AND t.id IS NULL THEN 'orphan_canceled'
+            ELSE 'other'
+          END AS status,
+          COUNT(*) AS cnt
+        FROM card_sms_transactions s
+        LEFT JOIN transactions t
+          ON t.id COLLATE utf8mb4_unicode_ci = s.transaction_id COLLATE utf8mb4_unicode_ci
+         AND t.deleted_at IS NULL
+        WHERE s.transaction_type = 'canceled'
+        GROUP BY status
+      `
+      verification = Object.fromEntries(verifyRows.map(r => [r.status, Number(r.cnt)]))
+    } catch (e: any) {
+      verification = { error: e?.message || 'verify failed' }
+    }
+
     // 안전망: 한 건도 적용 안 됐으면 사용자에게 명시적 알림
-    if (candidates.length > 0 && applied === 0 && ignoredMarked === 0) {
+    if (candidates.length > 0 && applied === 0 && ignoredMarked === 0 && forceUpdated === 0) {
       return NextResponse.json({
         applied: 0,
         tx_updated: 0,
         ignored_marked: 0,
+        force_updated: 0,
         skipped: skips,
         errors,
-        note: '⚠️ 변경 적용 0건 — 모두 skip 처리됨 (사유는 skipped 객체 참조)',
+        verification,
+        note: '⚠️ 변경 적용 0건 — 모두 skip 처리됨. force=true 옵션 시도 권장',
       })
     }
 
     return NextResponse.json({
       apply: true,
+      force,
       total_candidates: candidates.length,
       applied,
       tx_updated: txUpdated,
       ignored_marked: ignoredMarked,
+      force_updated: forceUpdated,
       skipped: skips,
       errors,
       sample: samples,
+      verification,  // 규칙 10: apply 후 실제 검증 결과
       note:
         candidates.length === max
           ? `남은 row가 더 있을 수 있음 — 한 번 더 호출 가능 (max=${max})`

@@ -487,19 +487,49 @@ export default function BankCardPage() {
       if (json?.error) { alert(`오류: ${json.error}`); return }
       const skips = Object.entries(json?.skipped || {})
         .map(([k, v]) => `  · ${k}: ${v}건`).join('\n') || '  (없음)'
-      const sample = (json?.sample || []).slice(0, 3)
-        .map((d: any) => `  • ${d.raw_sample}\n     before: merchant=${d.before.old_merchant || '∅'}\n     after:  merchant=${d.after.merchant || '∅'} / type=${d.after.type}`)
-        .join('\n') || '  (없음)'
+      // 진단 정보: skip 된 row 의 transaction 상태 표시
+      const diags = (json?.diagnostics || []).slice(0, 5)
+        .map((d: any) => {
+          if (d.status === 'will_update') {
+            return `  ✓ ${d.raw}\n     tx: ${d.tx_state_now?.type}/${d.tx_state_now?.desc} → ${d.tx_state_expected?.type}/${d.tx_state_expected?.desc}`
+          }
+          return `  · [${d.status}] ${d.raw}\n     tx_id: ${d.tx_id || 'NULL'}, tx now: ${d.tx_state_now?.type || '?'}/${d.tx_state_now?.desc || '?'}`
+        }).join('\n') || '  (진단 없음)'
       alert(
         `🔍 dry-run 결과\n\n` +
         `· 후보: ${json?.total_candidates || 0}건\n` +
         `· 변경 예정: ${json?.will_update || 0}건\n` +
         `· skip:\n${skips}\n\n` +
-        `샘플 (앞 3건):\n${sample}\n\n` +
-        `→ 실제 적용은 "🚨 취소 SMS 적용" 버튼`
+        `📊 진단 (앞 5건):\n${diags}\n\n` +
+        `→ 변경 예정 0건이지만 실제 카드 탭이 stale 이면 "🔧 강제 갱신" 버튼`
       )
     } finally { setRecanceling(false) }
   }, [])
+
+  const handleRecancelForceApply = useCallback(async () => {
+    if (!confirm('🔧 강제 모드 적용:\n· no_improvement 인 row 도 transactions 강제 갱신\n· transaction_id 있는 모든 후보의 description/type 재계산\n· 사용자 final_category 보호 유지\n\n계속할까요?')) return
+    setRecanceling(true)
+    try {
+      const { json } = await fetchWithAuth('/api/admin/sms-recanceled?apply=true&force=true&max=200', { method: 'POST' })
+      if (json?.error) { alert(`오류: ${json.error}`); return }
+      const v = json?.verification || {}
+      alert(
+        `✅ 강제 모드 적용 완료\n\n` +
+        `· 후보: ${json?.total_candidates || 0}건\n` +
+        `· SMS 갱신: ${json?.applied || 0}건\n` +
+        `· tx 갱신: ${json?.tx_updated || 0}건\n` +
+        `· tx 강제 갱신: ${json?.force_updated || 0}건\n` +
+        `· ignored 마킹: ${json?.ignored_marked || 0}건\n\n` +
+        `🔬 검증 (취소 SMS 전체):\n` +
+        `  · pass (정상): ${v.pass_canceled || 0}건\n` +
+        `  · fail (재시도): ${v.fail_canceled || 0}건\n` +
+        `  · orphan (tx 없음): ${v.orphan_canceled || 0}건\n\n` +
+        `${json?.note || ''}`
+      )
+      loadSmsData()
+      window.location.reload()
+    } finally { setRecanceling(false) }
+  }, [loadSmsData])
 
   const handleRecancelApply = useCallback(async () => {
     if (!confirm('SMS 재파싱 일괄 적용:\n· 취소 SMS의 누락된 정보 보강\n· 파싱 실패 SMS 재시도\n· 승인거절/한도초과 SMS는 ignored 처리\n\n계속할까요? (max 100건/실행)')) return
@@ -2914,6 +2944,15 @@ export default function BankCardPage() {
                 opacity: recanceling ? 0.6 : 1,
               }} title="실제 적용 (admin) — dry-run 후 사용 권장">
                 🚨 취소 SMS 적용
+              </button>
+              <button onClick={handleRecancelForceApply} disabled={recanceling} style={{
+                padding: '6px 14px', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: recanceling ? 'wait' : 'pointer',
+                border: '1px solid rgba(245,158,11,0.45)',
+                background: 'rgba(254,243,199,0.7)',
+                color: '#92400e',
+                opacity: recanceling ? 0.6 : 1,
+              }} title="강제 갱신 — no_improvement 인 stale tx도 재계산">
+                🔧 tx 강제 갱신
               </button>
               <span style={{ width: 1, height: 20, background: 'rgba(0,0,0,0.08)', margin: '0 4px' }} />
               <button onClick={handleDedupDryRun} disabled={dedupRunning} style={{
