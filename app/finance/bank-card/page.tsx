@@ -1271,12 +1271,19 @@ export default function BankCardPage() {
     }
   }
 
-  // 🔮 풀 자동 매칭 — 차량/보험/대출/정비/지입/투자/급여 순차 실행
+  // 🔮 풀 자동 매칭 — 차량/보험/대출/정비/지입/투자/급여 + AI 일괄 분류 순차 실행
   const runFullAutoMatch = async () => {
-    if (!confirm('통장 거래 전체 풀 자동 매칭을 실행합니다.\n\n순차: 차량 → 보험 → 대출 → 정비 → 지입 → 투자 → 급여\n약 30~60초 소요, 중간 정지 불가\n\n계속할까요?')) return
+    if (!confirm(
+      '통장 거래 전체 풀 자동 매칭 + AI 분류 실행:\n\n' +
+      '1) 마스터 매칭: 차량 → 보험 → 대출 → 정비 → 지입 → 투자 → 급여\n' +
+      '2) AI 일괄 분류: Gemini 로 미분류 거래 자동 카테고리 부여\n\n' +
+      '· 약 1~3분 소요\n· 토큰 비용 발생 (AI 분류 단계)\n· 중간 정지 불가\n\n' +
+      '계속할까요?'
+    )) return
     setAutoClassifying(true)
     const results: string[] = []
     try {
+      // ── Phase 1: 마스터 데이터 매칭 ──
       const calls: { name: string; url: string; body?: any }[] = [
         { name: '차량(last4)',  url: '/api/finance/transactions/auto-match-card' },
         { name: '보험',          url: '/api/finance/transactions/auto-match-insurance', body: { dateTolerance: 7 } },
@@ -1304,8 +1311,56 @@ export default function BankCardPage() {
           results.push(`❌ ${c.name}: ${e?.message?.slice(0, 60)}`)
         }
       }
+
+      // ── Phase 2: AI 일괄 분류 (Gemini) ──
+      let aiProcessed = 0, aiApplied = 0, aiBelow = 0, aiInitial = 0
+      let aiError: string | undefined
+      const MAX_BATCHES = 50
+      let batches = 0
+      try {
+        while (batches < MAX_BATCHES) {
+          batches++
+          const { ok, status, json } = await fetchWithAuth('/api/finance/transactions/auto-classify-ai', {
+            method: 'POST',
+            body: { batchSize: 30, minConfidence: 70 },
+          })
+          if (!ok) {
+            aiError = `HTTP ${status} — ${json?.error || '응답 없음'}`
+            break
+          }
+          const total = Number(json.total_unclassified || 0)
+          if (aiInitial === 0) aiInitial = total
+          if (total === 0) break
+
+          const procThis = Number(json.processed_this_batch || 0)
+          const appliedThis = Number(json.applied_high_confidence || 0)
+          const belowThis = Number(json.below_threshold || 0)
+          aiProcessed += procThis
+          aiApplied += appliedThis
+          aiBelow += belowThis
+
+          // 안전망: DB write 0건이면 즉시 중단 (토큰 무한 소모 방지)
+          if (appliedThis + belowThis === 0) {
+            const dbg = json?.gemini_debug || {}
+            aiError = `Gemini 응답 0건 · finishReason=${dbg.finishReason || 'n/a'}`
+            break
+          }
+          if (procThis === 0) break
+          if (Number(json.remaining || 0) === 0) break
+          await new Promise(r => setTimeout(r, 800))
+        }
+      } catch (e: any) {
+        aiError = e?.message?.slice(0, 60)
+      }
+      results.push('') // 구분선
+      if (aiError) {
+        results.push(`❌ AI 분류: ${aiError}`)
+      } else {
+        results.push(`${aiApplied > 0 ? '✓' : '·'} AI 분류: ${aiApplied}/${aiInitial}건 적용 (검토 ${aiBelow})`)
+      }
+
       alert(
-        `✓ 풀 자동 매칭 완료\n\n${results.join('\n')}\n\n` +
+        `✓ 풀 자동 매칭 + AI 분류 완료\n\n${results.join('\n')}\n\n` +
         `💡 매칭 0건 사유:\n` +
         `  · 매핑X = corporate_cards 에 카드 등록 X\n` +
         `  · 차량X = 카드는 있지만 assigned_car_id 미설정\n` +
