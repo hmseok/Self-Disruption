@@ -100,20 +100,28 @@ function diffOne(row: Candidate): { diff: Diff | null; skipReason: string | null
   const newParsed = parseSms(row.sender, text)
   if (!newParsed) return { diff: null, skipReason: 'reparse_failed' }
 
-  // 정보 보강이 없으면 skip
-  const improved =
-    (newParsed.merchant && !row.old_merchant) ||
-    (newParsed.holder && !row.old_holder) ||
-    (newParsed.card_alias && !row.old_card_alias) ||
-    (newParsed.type !== row.old_type)
-
-  if (!improved) return { diff: null, skipReason: 'no_improvement' }
-
+  // 새 파서 결과로 기대되는 transactions 상태
   const isCanceled = newParsed.type === 'canceled'
   const newTxType: 'income' | 'expense' =
     newParsed.type === 'deposit' || isCanceled ? 'income' : 'expense'
   const baseDesc = newParsed.merchant || newParsed.issuer
   const newTxDesc = isCanceled ? `[취소] ${baseDesc}` : baseDesc
+
+  // SMS row 보강 필요 여부
+  const smsImproved =
+    (newParsed.merchant && !row.old_merchant) ||
+    (newParsed.holder && !row.old_holder) ||
+    (newParsed.card_alias && !row.old_card_alias) ||
+    (newParsed.type !== row.old_type)
+
+  // 연결된 transactions row 가 기대 상태와 다른지 (stale 검사)
+  //   SMS 가 이미 정리됐어도 transactions 가 아직 stale 일 수 있음 — 그 케이스도 처리
+  const txStale = !!row.transaction_id && (
+    (row.tx_type && row.tx_type !== newTxType) ||
+    (row.tx_desc !== newTxDesc)
+  )
+
+  if (!smsImproved && !txStale) return { diff: null, skipReason: 'no_improvement' }
 
   return {
     diff: {
