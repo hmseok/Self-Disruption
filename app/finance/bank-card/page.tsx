@@ -973,6 +973,7 @@ export default function BankCardPage() {
           fileSkipBreakdown.no_amount += res.skipBreakdown.no_amount || 0
           fileSkipBreakdown.meta_row += res.skipBreakdown.meta_row || 0
           fileSkipBreakdown.duplicate += res.skipBreakdown.duplicate || 0
+          fileSkipBreakdown.sms_already_exists = (fileSkipBreakdown.sms_already_exists || 0) + (res.skipBreakdown.sms_already_exists || 0)
         }
       }
 
@@ -997,6 +998,7 @@ export default function BankCardPage() {
       acc.no_amount += sb.no_amount || 0
       acc.meta_row += sb.meta_row || 0
       acc.duplicate += sb.duplicate || 0
+      acc.sms_already_exists = (acc.sms_already_exists || 0) + (sb.sms_already_exists || 0)
       return acc
     }, { no_date: 0, invalid_date: 0, no_amount: 0, meta_row: 0, duplicate: 0 })
 
@@ -2958,54 +2960,8 @@ export default function BankCardPage() {
                 background: 'rgba(221,214,254,0.5)',
                 color: '#7c3aed',
                 opacity: reparsing ? 0.6 : 1,
-              }}>
+              }} title="실패 SMS 새 파서로 재시도 (필요 시에만)">
                 {reparsing ? '재파싱 중...' : '🔄 실패 건 재파싱'}
-              </button>
-              <button onClick={handleRecancelDryRun} disabled={recanceling} style={{
-                padding: '6px 14px', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: recanceling ? 'wait' : 'pointer',
-                border: '1px solid rgba(245,158,11,0.35)',
-                background: 'rgba(254,243,199,0.6)',
-                color: '#b45309',
-                opacity: recanceling ? 0.6 : 1,
-              }} title="취소 SMS 일괄 재파싱 미리보기 (admin)">
-                🔍 취소건 dry-run
-              </button>
-              <button onClick={handleRecancelApply} disabled={recanceling} style={{
-                padding: '6px 14px', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: recanceling ? 'wait' : 'pointer',
-                border: '1px solid rgba(239,68,68,0.35)',
-                background: 'rgba(254,202,202,0.6)',
-                color: '#b91c1c',
-                opacity: recanceling ? 0.6 : 1,
-              }} title="실제 적용 (admin) — dry-run 후 사용 권장">
-                🚨 취소 SMS 적용
-              </button>
-              <button onClick={handleRecancelForceApply} disabled={recanceling} style={{
-                padding: '6px 14px', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: recanceling ? 'wait' : 'pointer',
-                border: '1px solid rgba(245,158,11,0.45)',
-                background: 'rgba(254,243,199,0.7)',
-                color: '#92400e',
-                opacity: recanceling ? 0.6 : 1,
-              }} title="강제 갱신 — no_improvement 인 stale tx도 재계산">
-                🔧 tx 강제 갱신
-              </button>
-              <span style={{ width: 1, height: 20, background: 'rgba(0,0,0,0.08)', margin: '0 4px' }} />
-              <button onClick={handleDedupDryRun} disabled={dedupRunning} style={{
-                padding: '6px 14px', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: dedupRunning ? 'wait' : 'pointer',
-                border: '1px solid rgba(14,165,233,0.35)',
-                background: 'rgba(186,230,253,0.5)',
-                color: '#0369a1',
-                opacity: dedupRunning ? 0.6 : 1,
-              }} title="SMS ↔ Excel 중복 dry-run (admin)">
-                🔍 SMS↔Excel dry-run
-              </button>
-              <button onClick={handleDedupApply} disabled={dedupRunning} style={{
-                padding: '6px 14px', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: dedupRunning ? 'wait' : 'pointer',
-                border: '1px solid rgba(217,70,239,0.35)',
-                background: 'rgba(245,208,254,0.5)',
-                color: '#a21caf',
-                opacity: dedupRunning ? 0.6 : 1,
-              }} title="실제 적용 (admin) — dry-run 후 사용 권장">
-                🚨 중복 정리 적용
               </button>
             </div>
 
@@ -3723,7 +3679,8 @@ export default function BankCardPage() {
                   <div style={{ marginTop: 6, padding: '6px 8px', background: 'rgba(255,255,255,0.5)', borderRadius: 6, fontSize: 12 }}>
                     <div style={{ color: COLORS.textSecondary, fontWeight: 600, marginBottom: 2 }}>📊 스킵 사유</div>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, color: COLORS.textSecondary }}>
-                      {uploadResult.skipBreakdown.duplicate > 0 && <span>중복: {uploadResult.skipBreakdown.duplicate}건</span>}
+                      {uploadResult.skipBreakdown.duplicate > 0 && <span>중복(엑셀끼리): {uploadResult.skipBreakdown.duplicate}건</span>}
+                      {uploadResult.skipBreakdown.sms_already_exists > 0 && <span style={{ color: '#059669', fontWeight: 600 }}>📲 SMS 이미 있음(자동 skip): {uploadResult.skipBreakdown.sms_already_exists}건</span>}
                       {uploadResult.skipBreakdown.no_date > 0 && <span style={{ color: '#d97706' }}>날짜 없음(총합/메타 행): {uploadResult.skipBreakdown.no_date}건</span>}
                       {uploadResult.skipBreakdown.invalid_date > 0 && <span style={{ color: '#d97706' }}>날짜 형식 오류: {uploadResult.skipBreakdown.invalid_date}건</span>}
                       {uploadResult.skipBreakdown.meta_row > 0 && <span style={{ color: '#d97706' }}>합계/소계 행: {uploadResult.skipBreakdown.meta_row}건</span>}
