@@ -430,8 +430,19 @@ export default function BankCardPage() {
         alert(`저장 실패: ${detail}`)
         return
       }
+      // 자동 backfill 결과 안내 (SMS 가 미리 들어와 있던 케이스)
+      const bf = json?.backfill
+      if (bf && (bf.sms > 0 || bf.tx > 0)) {
+        alert(
+          `✅ 매핑 저장 완료\n\n` +
+          `📲 자동 연결됨:\n` +
+          `  · 기존 SMS ${bf.sms}건 카드 연결\n` +
+          `  · 기존 거래내역 ${bf.tx}건 차량 매칭`
+        )
+      }
       setEditMapping(null)
       loadMappings()
+      loadTransactions()
     } catch (e: any) {
       console.error('[saveMapping] 예외:', e)
       alert(`저장 실패: ${e.message || '알 수 없는 오류'}`)

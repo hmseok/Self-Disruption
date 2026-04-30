@@ -162,6 +162,52 @@ export async function POST(req: NextRequest) {
         )
       `
     }
+    // ── 자동 backfill: 같은 alias 의 기존 SMS + transactions 일괄 갱신 ──
+    //   매핑이 SMS 들어온 후 등록되어도 자동 연결되도록 (사용자 부담 X)
+    let backfilledSms = 0
+    let backfilledTx = 0
+    if (card_alias) {
+      // 1) 현재 카드의 id 조회 (UPSERT 후)
+      let cardId: string = id || ''
+      if (!cardId) {
+        const found = await prisma.$queryRaw<Array<{ id: string }>>`
+          SELECT id FROM corporate_cards WHERE card_alias = ${card_alias} LIMIT 1
+        `
+        if (found.length > 0) cardId = found[0].id
+      }
+
+      if (cardId) {
+        // 2) SMS row 의 card_id 갱신 (NULL 인 것만)
+        const smsRes = await prisma.$executeRaw`
+          UPDATE card_sms_transactions
+          SET card_id = ${cardId}, updated_at = NOW()
+          WHERE card_alias = ${card_alias} AND card_id IS NULL
+        `
+        backfilledSms = Number(smsRes)
+
+        // 3) 차량 매핑된 카드면 transactions.related_id 갱신 (현재 매칭 없는 것만)
+        if (assigned_car_id) {
+          try {
+            const txRes = await prisma.$executeRawUnsafe(`
+              UPDATE transactions t
+              INNER JOIN card_sms_transactions s ON s.transaction_id COLLATE utf8mb4_unicode_ci = t.id COLLATE utf8mb4_unicode_ci
+              SET t.related_type = 'car', t.related_id = ?, t.updated_at = NOW()
+              WHERE s.card_alias = ?
+                AND (t.related_type IS NULL OR t.related_id IS NULL)
+                AND t.deleted_at IS NULL
+            `, assigned_car_id, card_alias)
+            backfilledTx = Number(txRes)
+          } catch (e: any) {
+            console.warn('[mappings backfill tx]', e.message)
+          }
+        }
+      }
+    }
+
+    return NextResponse.json({
+      ok: true,
+      backfill: { sms: backfilledSms, tx: backfilledTx },
+    })
   } else if (type === 'bank') {
     if (id) {
       await prisma.$executeRaw`
@@ -191,6 +237,29 @@ export async function POST(req: NextRequest) {
           updated_at = NOW()
       `
     }
+
+    // ── 은행 자동 backfill: 같은 account_alias 의 기존 SMS transactions 갱신 ──
+    let bankBackfilledTx = 0
+    if (account_alias && assigned_car_id) {
+      try {
+        const txRes = await prisma.$executeRawUnsafe(`
+          UPDATE transactions t
+          INNER JOIN card_sms_transactions s ON s.transaction_id COLLATE utf8mb4_unicode_ci = t.id COLLATE utf8mb4_unicode_ci
+          SET t.related_type = 'car', t.related_id = ?, t.updated_at = NOW()
+          WHERE s.card_alias = ?
+            AND (t.related_type IS NULL OR t.related_id IS NULL)
+            AND t.deleted_at IS NULL
+        `, assigned_car_id, account_alias)
+        bankBackfilledTx = Number(txRes)
+      } catch (e: any) {
+        console.warn('[mappings bank backfill]', e.message)
+      }
+    }
+
+    return NextResponse.json({
+      ok: true,
+      backfill: { sms: 0, tx: bankBackfilledTx },
+    })
   }
 
   return NextResponse.json({ ok: true })
