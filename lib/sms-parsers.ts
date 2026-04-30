@@ -54,15 +54,18 @@ export function detectIssuer(sender: string | null, text: string): CardIssuer {
     if (/\[KB\]|\[국민은행\]|국민은행/.test(text)) return 'KB_BANK'
   }
 
-  // ── 카드 발신번호 매칭 ──
-  for (const { issuer, patterns } of SENDER_MAP) {
-    if (patterns.some(p => p.test(s))) return issuer
-  }
-  // 본문 키워드 fallback
+  // ── 본문 키워드 우선 매칭 (sender 정보가 잘못된 경우 방어) ──
+  //   ※ 2026-04-30: SMS Forwarder 가 sender를 다른 발신번호로 잘못 전달하는 케이스 발견.
+  //     본문에 명시된 카드사 키워드가 sender 보다 신뢰도 높음.
   if (/\[MY COMPANY\]/.test(text)) return 'MYCOMPANY'
   if (/\[KB국민/.test(text) || /KB국민카드/.test(text)) return 'KB'
   if (/\[우리카드/.test(text) || /우리카드/.test(text) || /^우리\s+\d/.test(text)) return 'WOORI'
   if (/\[현대카드/.test(text) || /현대카드/.test(text)) return 'HYUNDAI'
+
+  // ── 카드 발신번호 매칭 (본문 키워드 없을 때만) ──
+  for (const { issuer, patterns } of SENDER_MAP) {
+    if (patterns.some(p => p.test(s))) return issuer
+  }
 
   // ── 은행 키워드 fallback (출금/입금 없이 은행명만 있는 경우) ──
   if (/\[우리은행\]|우리은행/.test(text)) return 'WOORI_BANK'
@@ -169,6 +172,33 @@ function parseKB(text: string): ParsedSms | null {
       merchant: merchant.trim() || null,
       installment: installMatch ? installMatch[1] : null,
       txAt: parseDateTime(dt),
+    }
+  }
+
+  // 포맷 4 (robust fallback): KB국민카드 어디든 + 4자리 + 금액원
+  //   예: "KB국민카드 1804(기업) 04/30 18:23 2,300원 서울특별시송파구시 잔여20,530원"
+  //   format 2/3 의 strict 매칭이 실패한 변형 포맷 잡기 위함
+  m = text.match(/KB국민카드\s*(\d{4})/)
+  const amtM = text.match(/([\d,]+)\s*원/)
+  if (m && amtM) {
+    const cardNum = m[1]
+    const amt = Number(amtM[1].replace(/,/g, ''))
+    if (Number.isFinite(amt) && amt > 0) {
+      // 가맹점 추정: "금액원 " 다음 ~ "잔여" 또는 끝 사이
+      let merchant: string | null = null
+      const merchM = text.match(/[\d,]+\s*원\s+(.+?)(?:\s+잔여|\s+승인거절|$)/)
+      if (merchM) merchant = merchM[1].trim() || null
+      const installMatch = text.match(/(일시불|\d+개월)/)
+      return {
+        issuer: 'KB',
+        type: canceled ? 'canceled' : 'approved',
+        holder: null,
+        card_alias: `KB****${cardNum}`,
+        amount: amt,
+        merchant,
+        installment: installMatch ? installMatch[1] : null,
+        txAt: parseDateTime(text),
+      }
     }
   }
 
