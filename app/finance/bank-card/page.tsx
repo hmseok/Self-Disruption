@@ -1292,12 +1292,26 @@ export default function BankCardPage() {
           if (!ok) { results.push(`❌ ${c.name}: HTTP ${status}`); continue }
           const applied = json.applied ?? json.applied_high_confidence ?? 0
           const total = json.total_candidates ?? json.total_unmatched ?? 0
-          results.push(`✓ ${c.name}: ${applied}/${total}건 매칭`)
+          // 진단: skip 사유 노출 — 0건일 때 무엇이 문제인지 즉시 파악
+          const skips: string[] = []
+          if (json.skipped_no_match > 0) skips.push(`매핑X ${json.skipped_no_match}`)
+          if (json.skipped_no_car > 0) skips.push(`차량X ${json.skipped_no_car}`)
+          if (json.skipped_ambiguous > 0) skips.push(`모호 ${json.skipped_ambiguous}`)
+          if (json.skipped_already > 0) skips.push(`이미매칭 ${json.skipped_already}`)
+          const skipStr = skips.length > 0 ? ` [${skips.join(', ')}]` : ''
+          results.push(`${applied > 0 ? '✓' : '·'} ${c.name}: ${applied}/${total}건${skipStr}`)
         } catch (e: any) {
           results.push(`❌ ${c.name}: ${e?.message?.slice(0, 60)}`)
         }
       }
-      alert(`✓ 풀 자동 매칭 완료\n\n${results.join('\n')}`)
+      alert(
+        `✓ 풀 자동 매칭 완료\n\n${results.join('\n')}\n\n` +
+        `💡 매칭 0건 사유:\n` +
+        `  · 매핑X = corporate_cards 에 카드 등록 X\n` +
+        `  · 차량X = 카드는 있지만 assigned_car_id 미설정\n` +
+        `  · 모호 = 같은 last4 카드 2개 이상\n\n` +
+        `→ 매핑 관리 탭에서 카드 추가/수정 후 다시 시도`
+      )
       await Promise.all([loadSummary(), loadTransactions()])
       if (reviewCategory) await loadReviewItems(reviewCategory)
     } finally { setAutoClassifying(false) }
