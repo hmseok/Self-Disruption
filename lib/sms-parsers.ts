@@ -477,10 +477,18 @@ function parseKBBank(text: string): ParsedSms | null {
 // 라우터
 // ═══════════════════════════════════════════════════════════
 export function parseSms(sender: string | null, rawText: string): ParsedSms | null {
-  // ── 텍스트 정규화: 줄바꿈/탭/다중공백 → 단일공백 ──
-  // (실제 SMS는 줄바꿈으로 들어오는데 기존 파서는 한 줄 가정)
+  // ── 텍스트 정규화 (강화) ──
+  //   1) Unicode NFC 정규화 (한글 분해/조합 차이 통일)
+  //   2) 줄바꿈/탭 → 공백
+  //   3) NBSP(U+00A0), ZWSP(U+200B) 등 invisible whitespace → 일반 공백
+  //   4) 다중 공백 → 단일 공백
+  //
+  //   ⚠️ 주의: KB 일부 SMS 발신 시스템이 정렬용으로 NBSP 삽입 →
+  //           JavaScript \s 가 NBSP 미매칭 → 정규식 실패하던 버그 (2026-04-30)
   const text = rawText
+    .normalize('NFC')
     .replace(/[\r\n\t]+/g, ' ')
+    .replace(/[\u00A0\u200B\u200C\u200D\uFEFF\u2028\u2029\u3000]/g, " ")  // NBSP, ZWSP, BOM, LSEP 등 invisible whitespace
     .replace(/\s{2,}/g, ' ')
     .trim()
 
