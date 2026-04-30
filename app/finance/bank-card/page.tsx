@@ -523,6 +523,52 @@ export default function BankCardPage() {
     } finally { setRecanceling(false) }
   }, [loadSmsData])
 
+  // ── SMS ↔ 엑셀 중복 정리 (admin) ──────────────────────────────
+  const [dedupRunning, setDedupRunning] = useState(false)
+  const handleDedupDryRun = useCallback(async () => {
+    setDedupRunning(true)
+    try {
+      const { json } = await fetchWithAuth('/api/admin/sms-excel-dedup')
+      if (json?.error) { alert(`오류: ${json.error}`); return }
+      const sample = (json?.sample || []).slice(0, 3)
+        .map((p: any) => `  • ${p.amount?.toLocaleString()}원\n    SMS: ${p.sms?.desc || '?'}\n    Excel(삭제예정): ${p.excel_to_delete?.desc || '?'}\n    시간차: ${p.date_diff_min}분`)
+        .join('\n\n') || '  (없음)'
+      alert(
+        `🔍 SMS↔Excel 중복 dry-run\n\n` +
+        `· SMS 거래: ${json?.total_sms || 0}건\n` +
+        `· Excel 거래: ${json?.total_excel || 0}건\n` +
+        `· 삭제 예정 (Excel): ${json?.will_delete_excel || 0}건\n\n` +
+        `모호 (자동 skip):\n` +
+        `  · SMS 1건에 Excel 후보 N개: ${json?.ambiguous?.sms_with_multiple_excel || 0}건\n` +
+        `  · Excel 1건에 SMS 후보 N개: ${json?.ambiguous?.excel_with_multiple_sms || 0}건\n` +
+        `보호 (final_category 있음): ${json?.protected?.excel_has_final_category || 0}건\n\n` +
+        `샘플 (앞 3건):\n${sample}\n\n` +
+        `→ 실제 적용은 "🚨 중복 정리 적용" 버튼`
+      )
+    } finally { setDedupRunning(false) }
+  }, [])
+
+  const handleDedupApply = useCallback(async () => {
+    if (!confirm('SMS ↔ Excel 중복 정리:\n· 같은 거래(±3분, 금액 동일)의 Excel row 를 soft-delete\n· SMS row 는 유지 (더 정확)\n· final_category 있는 Excel 은 보호\n\n계속할까요? (max 100건/실행, 복원 가능)')) return
+    setDedupRunning(true)
+    try {
+      const { json } = await fetchWithAuth('/api/admin/sms-excel-dedup?apply=true&max=100', { method: 'POST' })
+      if (json?.error) { alert(`오류: ${json.error}`); return }
+      alert(
+        `✅ 중복 정리 완료\n\n` +
+        `· 발견된 페어: ${json?.total_pairs_found || 0}건\n` +
+        `· 삭제된 Excel row: ${json?.excel_deleted || 0}건\n` +
+        `· 모호 skip: SMS-Excel ${json?.ambiguous_skipped?.sms_with_multiple_excel || 0} / Excel-SMS ${json?.ambiguous_skipped?.excel_with_multiple_sms || 0}\n` +
+        `· 보호 skip: ${json?.protected_skipped?.excel_has_final_category || 0}건\n` +
+        `· 오류: ${(json?.errors || []).length}건\n\n` +
+        `${json?.note || ''}`
+      )
+      // 거래 목록 다시 로드
+      loadSmsData()
+      window.location.reload()
+    } finally { setDedupRunning(false) }
+  }, [loadSmsData])
+
   // ─── 필터링 ──────────────────────────────────────────
 
   // 통장 vs 카드 구분 헬퍼
@@ -2868,6 +2914,25 @@ export default function BankCardPage() {
                 opacity: recanceling ? 0.6 : 1,
               }} title="실제 적용 (admin) — dry-run 후 사용 권장">
                 🚨 취소 SMS 적용
+              </button>
+              <span style={{ width: 1, height: 20, background: 'rgba(0,0,0,0.08)', margin: '0 4px' }} />
+              <button onClick={handleDedupDryRun} disabled={dedupRunning} style={{
+                padding: '6px 14px', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: dedupRunning ? 'wait' : 'pointer',
+                border: '1px solid rgba(14,165,233,0.35)',
+                background: 'rgba(186,230,253,0.5)',
+                color: '#0369a1',
+                opacity: dedupRunning ? 0.6 : 1,
+              }} title="SMS ↔ Excel 중복 dry-run (admin)">
+                🔍 SMS↔Excel dry-run
+              </button>
+              <button onClick={handleDedupApply} disabled={dedupRunning} style={{
+                padding: '6px 14px', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: dedupRunning ? 'wait' : 'pointer',
+                border: '1px solid rgba(217,70,239,0.35)',
+                background: 'rgba(245,208,254,0.5)',
+                color: '#a21caf',
+                opacity: dedupRunning ? 0.6 : 1,
+              }} title="실제 적용 (admin) — dry-run 후 사용 권장">
+                🚨 중복 정리 적용
               </button>
             </div>
 

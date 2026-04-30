@@ -81,8 +81,10 @@ export async function POST(request: NextRequest) {
       invalid_date: 0,   // 날짜 형식 인식 안됨
       no_amount: 0,      // 금액 0 또는 없음
       meta_row: 0,       // '총합/합계/소계' 키워드
-      duplicate: 0,      // 중복 해시
+      duplicate: 0,      // 중복 해시 (엑셀끼리)
+      sms_already_exists: 0,  // 같은 거래의 SMS row 가 이미 있음 — Excel skip
     }
+    let smsMatched = 0  // SMS 와 매칭되어 skip 한 건수 (사용자에게 알림)
     // 메타 행 키워드 — 정확 매칭만 (부분 포함 X)
     // 새 카드사가 새 패턴 만들면 여기 추가
     const META_KEYWORDS = /^(총합|합계|소계|총합계|총계|청구합계|청구금액|결제예정금액|결제예정|이월잔액|차월이월|전월이월|당월합계|월합계|연합계|기간합계|누계|잔액)$/
@@ -162,6 +164,36 @@ export async function POST(request: NextRequest) {
           continue
         }
 
+        // ── SMS ↔ Excel 중복 체크 ──
+        //   같은 거래의 SMS transactions row 가 이미 있으면 Excel skip (SMS 우선)
+        //   매칭 기준: imported_from='sms' + type 동일 + amount 동일 + ±3분
+        try {
+          const tsTarget = new Date(txDate).getTime()
+          if (isFinite(tsTarget)) {
+            const fromDt = new Date(tsTarget - 3 * 60000)
+            const toDt = new Date(tsTarget + 3 * 60000)
+            const smsMatch = await prisma.$queryRaw<Array<{ id: string }>>`
+              SELECT id FROM transactions
+               WHERE deleted_at IS NULL
+                 AND imported_from = 'sms'
+                 AND type = ${txType}
+                 AND amount = ${finalAmount}
+                 AND transaction_date BETWEEN ${fromDt} AND ${toDt}
+               LIMIT 2
+            `
+            // 정확히 1건이어야 dedup 인정 (모호하면 Excel insert 진행)
+            if (smsMatch.length === 1) {
+              skipBreakdown.sms_already_exists++
+              smsMatched++
+              skipped++
+              continue
+            }
+          }
+        } catch (e: any) {
+          // dedup 실패해도 안전하게 INSERT 진행 (Cloud Run 일시 장애 보호)
+          console.warn('[import] SMS dedup check fail:', e?.message)
+        }
+
         const id = crypto.randomUUID()
         const resolvedClient = await resolveClientName(row.counterpart || row.client_name || '') || null
 
@@ -239,7 +271,8 @@ export async function POST(request: NextRequest) {
       data: {
         inserted,
         skipped,
-        skipBreakdown,  // { no_date, invalid_date, no_amount, meta_row, duplicate }
+        sms_matched: smsMatched,  // SMS 와 매칭되어 skip 한 건수 (정상 동작)
+        skipBreakdown,  // { no_date, invalid_date, no_amount, meta_row, duplicate, sms_already_exists }
         errors: errors.slice(0, 5),
       },
       error: errors.length > 0 ? `${errors.length}건 오류 발생` : null,
