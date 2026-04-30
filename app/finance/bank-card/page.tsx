@@ -478,6 +478,47 @@ export default function BankCardPage() {
     }
   }, [loadSmsData])
 
+  // ── 취소 SMS 일괄 재파싱 (admin 전용 — 서버가 권한 체크) ─────
+  const [recanceling, setRecanceling] = useState(false)
+  const handleRecancelDryRun = useCallback(async () => {
+    setRecanceling(true)
+    try {
+      const { json } = await fetchWithAuth('/api/admin/sms-recanceled?max=200')
+      if (json?.error) { alert(`오류: ${json.error}`); return }
+      const skips = Object.entries(json?.skipped || {})
+        .map(([k, v]) => `  · ${k}: ${v}건`).join('\n') || '  (없음)'
+      const sample = (json?.sample || []).slice(0, 3)
+        .map((d: any) => `  • ${d.raw_sample}\n     before: merchant=${d.before.old_merchant || '∅'}\n     after:  merchant=${d.after.merchant || '∅'} / type=${d.after.type}`)
+        .join('\n') || '  (없음)'
+      alert(
+        `🔍 dry-run 결과\n\n` +
+        `· 후보: ${json?.total_candidates || 0}건\n` +
+        `· 변경 예정: ${json?.will_update || 0}건\n` +
+        `· skip:\n${skips}\n\n` +
+        `샘플 (앞 3건):\n${sample}\n\n` +
+        `→ 실제 적용은 "🚨 취소 SMS 적용" 버튼`
+      )
+    } finally { setRecanceling(false) }
+  }, [])
+
+  const handleRecancelApply = useCallback(async () => {
+    if (!confirm('취소 SMS를 일괄 재파싱하여 거래내역을 갱신합니다. 계속할까요?\n(max 50건씩 처리, 안전을 위해 dry-run 먼저 권장)')) return
+    setRecanceling(true)
+    try {
+      const { json } = await fetchWithAuth('/api/admin/sms-recanceled?apply=true&max=50', { method: 'POST' })
+      if (json?.error) { alert(`오류: ${json.error}`); return }
+      alert(
+        `✅ 적용 완료\n\n` +
+        `· 후보: ${json?.total_candidates || 0}건\n` +
+        `· SMS 갱신: ${json?.applied || 0}건\n` +
+        `· 거래내역 갱신: ${json?.tx_updated || 0}건\n` +
+        `· 오류: ${(json?.errors || []).length}건\n\n` +
+        `${json?.note || ''}`
+      )
+      loadSmsData()
+    } finally { setRecanceling(false) }
+  }, [loadSmsData])
+
   // ─── 필터링 ──────────────────────────────────────────
 
   // 통장 vs 카드 구분 헬퍼
@@ -2805,6 +2846,24 @@ export default function BankCardPage() {
                 opacity: reparsing ? 0.6 : 1,
               }}>
                 {reparsing ? '재파싱 중...' : '🔄 실패 건 재파싱'}
+              </button>
+              <button onClick={handleRecancelDryRun} disabled={recanceling} style={{
+                padding: '6px 14px', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: recanceling ? 'wait' : 'pointer',
+                border: '1px solid rgba(245,158,11,0.35)',
+                background: 'rgba(254,243,199,0.6)',
+                color: '#b45309',
+                opacity: recanceling ? 0.6 : 1,
+              }} title="취소 SMS 일괄 재파싱 미리보기 (admin)">
+                🔍 취소건 dry-run
+              </button>
+              <button onClick={handleRecancelApply} disabled={recanceling} style={{
+                padding: '6px 14px', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: recanceling ? 'wait' : 'pointer',
+                border: '1px solid rgba(239,68,68,0.35)',
+                background: 'rgba(254,202,202,0.6)',
+                color: '#b91c1c',
+                opacity: recanceling ? 0.6 : 1,
+              }} title="실제 적용 (admin) — dry-run 후 사용 권장">
+                🚨 취소 SMS 적용
               </button>
             </div>
 
