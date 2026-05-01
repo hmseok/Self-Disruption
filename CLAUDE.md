@@ -315,6 +315,74 @@ git push 전, 사용자에게 다음 형식으로 보고:
    - 위치: harness-engineering/scripts/ui-data-coverage.js (TBD)
 ```
 
+### 규칙 13 — 외부 시스템 호환성 사전 검증 의무 (2026-05-01 신설)
+
+> **2026-05-01 사건 (반복)**: 같은 날 외부 시스템 호환성 실수 2회 연속.
+> ① profiles.full_name 추측 (1054 Unknown column)
+> ② REGEXP_REPLACE MySQL 호환 미확인 (500 에러)
+>
+> 두 사건 공통점: "이 함수/컬럼이 존재할 것" 이라는 추측 후 코드 작성.
+> 검증 단계 없이 푸시 → 사용자가 에러 보고 → 수정 → 또 다른 추측.
+
+**다음 중 하나라도 해당하면 사용 전 호환성 검증 의무**:
+
+```
+✓ 새 DB 함수 사용 (REGEXP_REPLACE / JSON_TABLE / WINDOW 함수 등)
+✓ 새 SQL 컬럼/테이블 참조
+✓ 새 npm 라이브러리 import
+✓ 새 외부 API 호출
+✓ 환경 변수 / 설정 값 의존
+```
+
+**검증 프로토콜** (사용 전 보고 의무):
+
+```
+[A] DB 함수 호환성
+   1. MySQL 버전 확인 (Cloud SQL = MySQL 8.x — package.json 또는 사용자 확인)
+   2. 사용 함수의 도입 버전 확인 (예: REGEXP_REPLACE = 8.0+, JSON_TABLE = 8.0+)
+   3. 미확실하면 "확인 후 사용" 또는 "단순 SQL 로 회피"
+   4. 화이트리스트 (안전):
+      · CONCAT, CONCAT_WS, COALESCE, IF, CASE WHEN
+      · LEFT, RIGHT, SUBSTRING, INSTR, REPLACE
+      · LENGTH, CHAR_LENGTH
+      · DATE_FORMAT, DATE_SUB, DATE_ADD, NOW, CURDATE
+      · ROUND, FLOOR, CEILING, MOD
+      · COUNT, SUM, AVG, MAX, MIN, GROUP_CONCAT
+   5. 회색 (검증 필요):
+      · REGEXP_REPLACE (5.7 미지원, 8.0+)
+      · JSON_TABLE (8.0+)
+      · WINDOW 함수 (8.0+)
+      · ROW_NUMBER, RANK (8.0+)
+
+[B] 라이브러리 import
+   1. package.json 에 이미 있으면 사용 OK
+   2. 없으면: 추가 동의 받고 설치
+
+[C] 외부 API
+   1. 실제 호출 후 응답 구조 확인 (curl 또는 단발 fetch)
+   2. 응답 샘플을 보고서에 명시
+
+[D] try/catch 광범위 적용
+   1. SQL/외부 호출 모두 try/catch 로 wrap
+   2. 광범위 catch — 알려진 에러만 처리 X, 모든 에러 graceful fallback
+   3. fallback 경로가 "더 단순" 해야 (의존성 적게)
+```
+
+**위반 사례 (2026-05-01)**
+
+| 사례 | 사용 함수/컬럼 | 검증 누락 | 결과 |
+|------|---------------|----------|------|
+| profiles.full_name | profile.full_name | schema 확인 X | 1054 에러 |
+| REGEXP_REPLACE | REGEXP_REPLACE | MySQL 버전 확인 X | 500 에러 |
+
+**자동화 안전장치 (TBD)**
+```
+5. SQL 함수 화이트리스트 검증
+   - $queryRaw 안 함수 호출을 화이트리스트와 대조
+   - 회색 함수 사용 시 빌드 경고
+   - 위치: harness-engineering/scripts/sql-fn-lint.js (TBD)
+```
+
 ### 위반 시 자동 자가 기록 + 누적 시 시스템 안전장치
 
 이 조항을 위반하면 즉시 `knowledge/common-errors.md`에 사례 기록.
