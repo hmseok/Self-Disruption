@@ -1701,24 +1701,30 @@ export default function BankCardPage() {
 
   const bankColumns: TableColumn<Transaction>[] = [
     { key: 'date', label: '날짜', width: 100, render: (r) => <span style={{ fontSize: 13, color: COLORS.textSecondary }}>{fmtDate(r.transaction_date)}</span> },
-    { key: 'account', label: '계좌', width: 160, render: (r: any) => {
-      // 통장 컬럼 (카드 컬럼과 동일한 방식): SMS card_alias 의 끝4자리 + 매칭 표시
+    { key: 'account', label: '계좌', width: 170, render: (r: any) => {
+      // 통장 컬럼: 계좌번호 + 통장 등록 여부 표시
+      //   "통장미등록" = bank_account_mappings 에 미등록 → 매핑 관리에서 등록 필요
+      //   "차량미할당" = 통장은 등록됐으나 assigned_car_id 없음 (차량 미배정 — 정상일 수도)
       const alias = r.bank_account_alias || r.sms_card_alias || ''
       const aliasLast4 = alias.match(/(\d{4})\s*$/)?.[1]
-      const accountNumLast4 = String(r.bank_account_number || '').replace(/\D/g, '').slice(-4)
-      const last4 = aliasLast4 || accountNumLast4
-      const matched = !!(r.related_type === 'car' && r.related_id)
+      const last4 = aliasLast4
       const bankName = r.bank_name || (r.card_company || '').replace('_BANK', '')
-      const hasMapping = !!(r.bank_account_alias || r.bank_account_holder)
+      const hasBankMapping = !!(r.bank_account_alias || r.bank_account_holder)
+      const hasCarAssigned = !!r.bank_matched_car_number
       return (
         <div>
           <div style={{ fontSize: 12, fontWeight: 700, color: COLORS.primary }}>
             {bankName || '-'}{last4 ? ` ${last4}` : ''}
           </div>
-          {alias && hasMapping && <div style={{ fontSize: 10, color: '#94a3b8' }}>{alias}</div>}
-          {!hasMapping && last4 && (
-            <div style={{ fontSize: 10, color: '#dc2626', fontWeight: 600 }}>
-              ****{last4} · 매핑X
+          {alias && hasBankMapping && <div style={{ fontSize: 10, color: '#94a3b8' }}>{alias}</div>}
+          {!hasBankMapping && last4 && (
+            <div style={{ fontSize: 10, color: '#dc2626', fontWeight: 600 }} title="bank_account_mappings 에 등록 필요">
+              📝 통장 미등록
+            </div>
+          )}
+          {hasBankMapping && !hasCarAssigned && (
+            <div style={{ fontSize: 10, color: '#d97706', fontWeight: 500 }} title="통장은 등록됐으나 차량 할당 X (공용/일반계좌일 수 있음)">
+              🚗 차량 미할당
             </div>
           )}
         </div>
@@ -1811,25 +1817,28 @@ export default function BankCardPage() {
 
   const cardColumns: TableColumn<Transaction>[] = [
     { key: 'date', label: '날짜', width: 100, render: (r) => <span style={{ fontSize: 13, color: COLORS.textSecondary }}>{fmtDate(r.transaction_date)}</span> },
-    { key: 'card', label: '카드', width: 160, render: (r: any) => {
-      // last4 우선순위:
-      //   1) sms_card_alias 끝4자리 (SMS 매칭된 row)
-      //   2) matched_card_alias 끝4자리 (직접 매칭)
-      //   3) raw_data.card_last4 (엑셀 업로드 시 추출)
+    { key: 'card', label: '카드', width: 170, render: (r: any) => {
+      // last4 우선순위 + 등록/차량할당 상태 명확 표시
       const alias = r.sms_card_alias || r.matched_card_alias || ''
       const aliasLast4 = alias.match(/(\d{4})\s*$/)?.[1]
       const rawLast4 = r.card_last4 || ''
       const last4 = aliasLast4 || rawLast4
-      const matched = !!(r.related_type === 'car' && r.related_id)
+      const hasCardMapping = !!(r.matched_card_alias || r.matched_holder_name || r.matched_car_id)
+      const hasCarAssigned = !!(r.matched_car_number || (r.related_type === 'car' && r.related_id))
       return (
         <div>
           <div style={{ fontSize: 12, fontWeight: 700, color: COLORS.primary }}>
             {r.card_company || '-'}{last4 ? ` ${last4}` : ''}
           </div>
-          {alias && <div style={{ fontSize: 10, color: '#94a3b8' }}>{alias}</div>}
-          {!alias && rawLast4 && (
-            <div style={{ fontSize: 10, color: matched ? '#94a3b8' : '#dc2626', fontWeight: matched ? 400 : 600 }}>
-              ****{rawLast4}{!matched && ' · 매핑X'}
+          {alias && hasCardMapping && <div style={{ fontSize: 10, color: '#94a3b8' }}>{alias}</div>}
+          {!hasCardMapping && last4 && (
+            <div style={{ fontSize: 10, color: '#dc2626', fontWeight: 600 }} title="corporate_cards 에 등록 필요">
+              📝 카드 미등록
+            </div>
+          )}
+          {hasCardMapping && !hasCarAssigned && (
+            <div style={{ fontSize: 10, color: '#d97706', fontWeight: 500 }} title="카드는 등록됐으나 차량 할당 X (공용/직원 카드일 수 있음)">
+              🚗 차량 미할당
             </div>
           )}
         </div>
