@@ -2547,24 +2547,35 @@ export default function BankCardPage() {
                                                          : matchTone === 'warning' ? '#d97706'
                                                          : matchTone === 'danger'  ? '#dc2626'
                                                          : COLORS.textMuted
+                                        // ★ 유형/거래처/금액 표시 — sms_transaction_type 우선
+                                        const stType = item.sms_transaction_type
+                                        const isCanceled = stType === 'canceled'
+                                        const isDeposit = stType === 'deposit' || (stType !== 'canceled' && stType !== 'withdrawal' && stType !== 'approved' && item.type === 'income')
+                                        const isWithdrawal = stType === 'withdrawal'
+                                        const typeLabel = isCanceled ? '취소' : isDeposit ? '수입' : isWithdrawal ? '출금' : '지출'
+                                        const typeTone = isCanceled ? 'danger' : isDeposit ? 'success' : 'danger'
+                                        const merchantText = item.sms_merchant || item.description || '-'
+                                        const amtSign = isCanceled || isWithdrawal ? '-' : isDeposit ? '+' : ''
+                                        const amtColor = isCanceled ? '#dc2626' : isDeposit ? '#2563eb' : COLORS.textPrimary
                                         return (
-                                          <tr key={item.id} style={{ borderTop: '1px solid rgba(0,0,0,0.04)' }}>
+                                          <tr key={item.id} style={{ borderTop: '1px solid rgba(0,0,0,0.04)', background: isCanceled ? 'rgba(254,202,202,0.18)' : undefined }}>
                                             <td style={{ padding: '6px 10px', color: COLORS.textPrimary, whiteSpace: 'nowrap' }}>
                                               {item.transaction_date ? String(item.transaction_date instanceof Date ? item.transaction_date.toISOString() : item.transaction_date).slice(0, 10) : '-'}
                                             </td>
                                             <td style={{ padding: '6px 10px' }}>
-                                              <span style={{ ...pillStyle(item.type === 'income' ? 'success' : 'danger'), fontSize: 10, padding: '1px 6px' }}>
-                                                {item.type === 'income' ? '수입' : '지출'}
+                                              <span style={{ ...pillStyle(typeTone as any), fontSize: 10, padding: '1px 6px', fontWeight: isCanceled ? 700 : 600 }}>
+                                                {typeLabel}
                                               </span>
                                             </td>
                                             <td style={{ padding: '6px 10px', color: COLORS.textPrimary, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                              {item.client_name || '-'}
+                                              {item.client_name || item.sms_holder || '-'}
                                             </td>
                                             <td style={{ padding: '6px 10px', color: COLORS.textSecondary, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                              {item.description || '-'}
+                                              {isCanceled && <span style={{ color: '#dc2626', fontWeight: 700, marginRight: 4 }}>[취소]</span>}
+                                              {merchantText}
                                             </td>
-                                            <td style={{ padding: '6px 10px', textAlign: 'right', fontWeight: 600, color: item.type === 'income' ? '#2563eb' : COLORS.textPrimary }}>
-                                              {nf(Math.abs(Number(item.amount || 0)))}
+                                            <td style={{ padding: '6px 10px', textAlign: 'right', fontWeight: 600, color: amtColor }}>
+                                              {amtSign}{nf(Math.abs(Number(item.amount || 0)))}
                                             </td>
                                             <td style={{ padding: '6px 10px', color: COLORS.textMuted, fontSize: 11 }}>{srcLabel}</td>
                                             <td style={{ padding: '6px 10px', fontSize: 11, maxWidth: 240 }}>
