@@ -14,12 +14,19 @@ import { prisma } from '@/lib/prisma'
 //   - 매핑 있지만 차량 미할당 last4
 // ═══════════════════════════════════════════════════════════════════
 
-function deriveLast4(card: { card_number: string | null; card_alias: string | null }): string | null {
-  const num = String(card.card_number || '').replace(/\D/g, '')
-  if (num.length >= 4) return num.slice(-4)
-  const alias = String(card.card_alias || '').replace(/\D/g, '')
-  if (alias.length >= 4) return alias.slice(-4)
-  return null
+// last4 후보를 모두 추출 (card_number, card_alias, previous_card_number 까지)
+//   ※ 카드 교체 시 이전 번호가 previous_card_number 에 남는 케이스 처리
+function deriveAllLast4(card: {
+  card_number: string | null;
+  card_alias: string | null;
+  previous_card_number?: string | null;
+}): string[] {
+  const last4s = new Set<string>()
+  for (const src of [card.card_number, card.card_alias, card.previous_card_number]) {
+    const digits = String(src || '').replace(/\D/g, '')
+    if (digits.length >= 4) last4s.add(digits.slice(-4))
+  }
+  return Array.from(last4s)
 }
 
 export async function GET(request: NextRequest) {
@@ -63,12 +70,14 @@ export async function GET(request: NextRequest) {
     // 2) corporate_cards 전체 + last4 추출 + 상태/부서 (사용자 의도 인식용)
     const cards = await prisma.$queryRaw<Array<{
       id: string; card_number: string | null; card_alias: string | null;
+      previous_card_number: string | null;
       holder_name: string | null;
       assigned_car_id: string | null; car_number: string | null;
       assigned_employee_id: string | null; employee_name: string | null;
       status: string | null; department: string | null; card_type: string | null;
     }>>`
-      SELECT cc.id, cc.card_number, cc.card_alias, cc.holder_name,
+      SELECT cc.id, cc.card_number, cc.card_alias,
+             cc.previous_card_number, cc.holder_name,
              cc.assigned_car_id,
              car.number AS car_number,
              cc.assigned_employee_id,
@@ -79,12 +88,17 @@ export async function GET(request: NextRequest) {
         LEFT JOIN profiles p ON p.id COLLATE utf8mb4_unicode_ci = cc.assigned_employee_id COLLATE utf8mb4_unicode_ci
     `
 
+    // last4 → 매칭되는 카드 배열 (card_number, card_alias, previous_card_number 모두 검색)
     const cardLast4Map = new Map<string, typeof cards>()
     for (const c of cards) {
-      const l4 = deriveLast4(c)
-      if (!l4) continue
-      if (!cardLast4Map.has(l4)) cardLast4Map.set(l4, [])
-      cardLast4Map.get(l4)!.push(c)
+      const last4s = deriveAllLast4(c)
+      for (const l4 of last4s) {
+        if (!cardLast4Map.has(l4)) cardLast4Map.set(l4, [])
+        // 같은 카드가 여러 last4 매칭될 수 있으므로 dedup
+        if (!cardLast4Map.get(l4)!.includes(c)) {
+          cardLast4Map.get(l4)!.push(c)
+        }
+      }
     }
 
     // 3) 진단 분석
@@ -198,6 +212,17 @@ export async function GET(request: NextRequest) {
         last4: r.last4, tx: r.tx_count, holders: r.holders,
       })),
       ok_count: okCar.length + okEmployee.length + okPool.length + okCanceled.length,
+      // ★ 등록된 모든 카드의 last4 목록 (사용자 직접 검수용)
+      //   "내가 등록한 게 정말 ****2823 가 맞나?" 확인 가능
+      all_registered_cards: cards.map(c => ({
+        alias: c.card_alias,
+        last4_candidates: deriveAllLast4(c),
+        status: c.status,
+        holder: c.holder_name,
+        department: c.department,
+        car: c.car_number,
+        employee: c.employee_name,
+      })),
     })
   } catch (e: any) {
     console.error('[GET /api/admin/card-match-diag]', e)

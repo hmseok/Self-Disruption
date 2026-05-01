@@ -2076,18 +2076,24 @@ export default function BankCardPage() {
                         `  · ****${x.last4} — ${x.tx}건${x.holders?.length ? ` [${x.holders.join(',')}/${x.departments?.[0] || '공용'}]` : ''}`)
                       const okCanceled = fmtList(json?.ok_canceled, (x: any) =>
                         `  · ****${x.last4} — ${x.tx}건${x.holders?.length ? ` [${x.holders.join(',')}]` : ''}`)
+                      // 콘솔에 등록된 카드 전체 last4 출력 — 사용자가 직접 확인 가능
+                      const allCards = json?.all_registered_cards || []
+                      console.log('[카드 매칭 진단] 등록된 카드 전체:', allCards)
                       alert(
                         `🔍 카드 매칭 진단\n\n` +
                         `📊 요약\n` +
                         `  · 카드 거래: ${s.total_transactions || 0}건 (매칭 ${s.matched_transactions || 0} / 미매칭 ${s.unmatched_transactions || 0})\n` +
                         `  · 등록 카드: ${s.total_cards_registered || 0}장 (차량 할당 ${s.cards_with_car_assigned || 0})\n` +
                         `  · last4 종류: ${s.unique_last4_in_tx || 0}개\n\n` +
-                        `🔴 매핑 부재 — 신규 카드 등록 필요\n${noCard}\n\n` +
+                        `🔴 매핑 부재 — 신규 카드 등록 필요\n${noCard}\n` +
+                        `   ※ 이전 카드번호도 검색됨 (previous_card_number)\n` +
+                        `   안 잡혔다면 진짜 미등록\n\n` +
                         `🟠 진짜 누락 — 활성 카드인데 차량/직원/공용 모두 X\n${noAssign}\n\n` +
                         `👤 직원 카드 (정상 — 직원에게 비용 귀속)\n${okEmp}\n\n` +
                         `⚪ 공용 카드 (정상 — 배차팀/탁송팀 의도)\n${okPool}\n\n` +
                         `🔘 해지 카드 (정상 — 사용 종료)\n${okCanceled}\n\n` +
                         `🟢 정상 매칭: ${json?.ok_count || 0} 종류\n\n` +
+                        `💡 등록 카드 전체 ${allCards.length}장은 콘솔(F12)에서 확인 가능\n` +
                         `→ 매핑 관리 탭에서 카드 추가 시 자동 backfill 동작`
                       )
                     }}
