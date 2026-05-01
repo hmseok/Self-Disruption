@@ -2253,6 +2253,45 @@ export default function BankCardPage() {
                           }}
                         >🤖 AI 일괄 분류</button>
                         <button
+                          onClick={async () => {
+                            const { json } = await fetchWithAuth('/api/admin/ai-classify-review')
+                            if (json?.error) { alert(`오류: ${json.error}`); return }
+                            const s = json?.summary || {}
+                            const fmtList = (arr: any[], fn: (x: any) => string) =>
+                              (arr || []).slice(0, 10).map(fn).join('\n') || '  (없음)'
+                            const top = fmtList(json?.by_category, (x: any) =>
+                              `  · ${x.category}: ${x.count}건 (${(x.total_amount/10000).toFixed(0)}만원)`)
+                            const inconsistent = fmtList(json?.inconsistent, (x: any) =>
+                              `  · "${(x.description || '').slice(0, 30)}" — ${x.count}건 [${x.categories.join(',')}]`)
+                            const overridden = fmtList(json?.user_overridden, (x: any) =>
+                              `  · ${x.ai_category} → ${x.final_category}: ${x.count}건`)
+                            const lowValue = fmtList(json?.top_unclassified_high_value, (x: any) =>
+                              `  · ${(x.description || '').slice(0, 25)} ${(Number(x.amount)/10000).toFixed(0)}만 [${x.type === 'income' ? '입' : '출'}]`)
+                            console.log('[AI 분류 검수]', json)
+                            alert(
+                              `🤖 AI 분류 검수\n\n` +
+                              `📊 요약\n` +
+                              `  · 전체: ${s.total || 0}건\n` +
+                              `  · 분류 완료: ${s.classified || 0}건 (${s.classification_rate || 0}%)\n` +
+                              `  · 미분류: ${s.unclassified || 0}건\n` +
+                              `  · 사용자 수정: ${s.user_overridden_count || 0}건\n\n` +
+                              `📁 카테고리 분포 (top 10)\n${top}\n\n` +
+                              `⚠ 불일치 — 같은 적요 다른 카테고리\n${inconsistent}\n\n` +
+                              `✏️ 사용자 수정 패턴\n${overridden}\n\n` +
+                              `💰 미분류 고액 거래 (top 10)\n${lowValue}\n\n` +
+                              `→ 콘솔(F12) 에서 전체 데이터 확인`
+                            )
+                          }}
+                          disabled={autoClassifying}
+                          title="AI 분류 결과 통계 + 의심 케이스 진단"
+                          style={{
+                            ...BTN.sm, padding: '5px 12px', fontSize: 11, fontWeight: 700,
+                            background: '#fff', color: '#7e22ce',
+                            border: '1px solid rgba(168,85,247,0.35)',
+                            cursor: 'pointer',
+                          }}
+                        >🔍 AI 분류 검수</button>
+                        <button
                           onClick={() => runCarMatch(false)}
                           disabled={autoClassifying}
                           title="Excel 카드 거래 last4 → corporate_cards.card_number 매칭하여 차량 자동 할당"
