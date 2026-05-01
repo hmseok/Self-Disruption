@@ -2064,20 +2064,29 @@ export default function BankCardPage() {
                       if (json?.error) { alert(`오류: ${json.error}`); return }
                       const s = json?.summary || {}
                       const p = json?.problems || {}
-                      const noCard = (json?.top_no_card || []).slice(0, 10)
-                        .map((x: any) => `  · ****${x.last4} — ${x.tx}건${x.sms > 0 ? ` (SMS ${x.sms})` : ''}`).join('\n') || '  (없음)'
-                      const noCar = (json?.top_no_car || []).slice(0, 10)
-                        .map((x: any) => `  · ****${x.last4} — ${x.tx}건${x.holders?.length ? ` [${x.holders.join(',')}]` : ''}`).join('\n') || '  (없음)'
+                      const fmtList = (arr: any[], format: (x: any) => string) =>
+                        (arr || []).slice(0, 10).map(format).join('\n') || '  (없음)'
+                      const noCard = fmtList(json?.top_no_card, (x: any) =>
+                        `  · ****${x.last4} — ${x.tx}건${x.sms > 0 ? ` (SMS ${x.sms})` : ''}`)
+                      const noAssign = fmtList(json?.top_no_assignment, (x: any) =>
+                        `  · ****${x.last4} — ${x.tx}건${x.holders?.length ? ` [${x.holders.join(',')}]` : ''}`)
+                      const okEmp = fmtList(json?.ok_employee_card, (x: any) =>
+                        `  · ****${x.last4} — ${x.tx}건${x.employees?.length ? ` [${x.employees.join(',')}]` : ''}`)
+                      const okPool = fmtList(json?.ok_pool_card, (x: any) =>
+                        `  · ****${x.last4} — ${x.tx}건${x.holders?.length ? ` [${x.holders.join(',')}/${x.departments?.[0] || '공용'}]` : ''}`)
+                      const okCanceled = fmtList(json?.ok_canceled, (x: any) =>
+                        `  · ****${x.last4} — ${x.tx}건${x.holders?.length ? ` [${x.holders.join(',')}]` : ''}`)
                       alert(
                         `🔍 카드 매칭 진단\n\n` +
                         `📊 요약\n` +
                         `  · 카드 거래: ${s.total_transactions || 0}건 (매칭 ${s.matched_transactions || 0} / 미매칭 ${s.unmatched_transactions || 0})\n` +
                         `  · 등록 카드: ${s.total_cards_registered || 0}장 (차량 할당 ${s.cards_with_car_assigned || 0})\n` +
                         `  · last4 종류: ${s.unique_last4_in_tx || 0}개\n\n` +
-                        `🔴 매핑 부재 — 카드 등록 필요 (top 10)\n` +
-                        `${noCard}\n\n` +
-                        `🟠 차량 미할당 — 매핑 관리에서 차량 추가 (top 10)\n` +
-                        `${noCar}\n\n` +
+                        `🔴 매핑 부재 — 신규 카드 등록 필요\n${noCard}\n\n` +
+                        `🟠 진짜 누락 — 활성 카드인데 차량/직원/공용 모두 X\n${noAssign}\n\n` +
+                        `👤 직원 카드 (정상 — 직원에게 비용 귀속)\n${okEmp}\n\n` +
+                        `⚪ 공용 카드 (정상 — 배차팀/탁송팀 의도)\n${okPool}\n\n` +
+                        `🔘 해지 카드 (정상 — 사용 종료)\n${okCanceled}\n\n` +
                         `🟢 정상 매칭: ${json?.ok_count || 0} 종류\n\n` +
                         `→ 매핑 관리 탭에서 카드 추가 시 자동 backfill 동작`
                       )
