@@ -3249,9 +3249,34 @@ export default function BankCardPage() {
             </div>
 
             {/* SMS에서 감지됐지만 미등록된 카드/계좌 알림 */}
+            {/*   ※ 매칭 기준: card_alias 정확 일치 + last4 일치 OR previous_card_number 일치 */}
             {(() => {
-              const registeredAliases = new Set([...mappingCards.map((c: any) => c.card_alias), ...mappingBanks.map((b: any) => b.account_alias)])
-              const unregistered = smsAliases.filter((s: any) => !registeredAliases.has(s.card_alias))
+              // 등록된 카드/계좌의 last4 추출 (card_number, card_alias, previous_card_number 모두)
+              const extractLast4 = (s: string | null | undefined): string | null => {
+                if (!s) return null
+                const d = String(s).replace(/\D/g, '')
+                return d.length >= 4 ? d.slice(-4) : null
+              }
+              const registeredLast4 = new Set<string>()
+              const registeredAliases = new Set<string>()
+              for (const c of mappingCards) {
+                if (c.card_alias) registeredAliases.add(c.card_alias)
+                const l1 = extractLast4(c.card_number); if (l1) registeredLast4.add(l1)
+                const l2 = extractLast4(c.card_alias);  if (l2) registeredLast4.add(l2)
+                const l3 = extractLast4((c as any).previous_card_number); if (l3) registeredLast4.add(l3)
+              }
+              for (const b of mappingBanks) {
+                if (b.account_alias) registeredAliases.add(b.account_alias)
+                const l = extractLast4(b.account_alias); if (l) registeredLast4.add(l)
+              }
+
+              // 미등록 = 별칭 정확 일치도 안 되고 last4 도 안 맞는 것
+              const unregistered = smsAliases.filter((s: any) => {
+                if (registeredAliases.has(s.card_alias)) return false
+                const last4 = extractLast4(s.card_alias)
+                if (last4 && registeredLast4.has(last4)) return false
+                return true
+              })
               if (unregistered.length === 0) return null
               return (
                 <div style={{
@@ -3263,6 +3288,7 @@ export default function BankCardPage() {
                   {unregistered.map((u: any) => (
                     <button key={u.card_alias} onClick={() => {
                       const isBank = (u.card_issuer || '').includes('BANK')
+                      setMappingSub(isBank ? 'bank' : 'card')
                       setEditMapping(isBank
                         ? { type: 'bank', account_alias: u.card_alias, bank_issuer: u.card_issuer }
                         : { type: 'card', card_alias: u.card_alias, card_issuer: u.card_issuer })
