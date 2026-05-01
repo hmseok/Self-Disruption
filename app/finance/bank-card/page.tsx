@@ -327,6 +327,7 @@ export default function BankCardPage() {
   // 분류 검수 탭 상태
   const [reviewCategory, setReviewCategory] = useState<string | null>(null)
   const [reviewItems, setReviewItems] = useState<any[]>([])
+  const [showAdvancedMatch, setShowAdvancedMatch] = useState(false)
   const [reviewLoading, setReviewLoading] = useState(false)
   const [reviewTypeFilter, setReviewTypeFilter] = useState<'all' | 'income' | 'expense'>('all')
 
@@ -654,12 +655,19 @@ export default function BankCardPage() {
   const cardTransactions = useMemo(() => {
     let data = transactions.filter(isCardTx)
     if (cardFilter !== 'all') {
-      // 카드사 정확 매칭 — 'kb' → 'KB' (KB_BANK 제외)
-      const q = cardFilter.toLowerCase()
+      // 카드사 매칭 — 한글/영문 양방향 (KB_BANK 제외)
+      // 'kb' → 'KB', 'KB국민', 'KB국민카드' / '우리' → 'WOORI', '우리카드' / '현대' → 'HYUNDAI', '현대카드'
+      const aliases: Record<string, string[]> = {
+        'kb':   ['kb', '국민', 'kb국민'],
+        '우리':  ['woori', '우리', '우리카드'],
+        '현대':  ['hyundai', '현대', '현대카드'],
+        '법인':  ['mycompany', '법인', '법인카드', 'my company'],
+      }
+      const keys = aliases[cardFilter.toLowerCase()] || [cardFilter.toLowerCase()]
       data = data.filter(t => {
         const cc = (t.card_company || '').toLowerCase()
         if (/_bank$/.test(cc)) return false
-        return cc === q || cc.startsWith(q)
+        return keys.some(k => cc === k || cc.startsWith(k) || cc.includes(k))
       })
     }
     if (search) {
@@ -2238,26 +2246,19 @@ export default function BankCardPage() {
                         </div>
                       </div>
                       <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                        {/* 메인 — 풀 자동 매칭(+AI) 한 개로 충분. 검수 도구 1개 */}
                         <button
-                          onClick={() => runAutoClassify(false)}
+                          onClick={runFullAutoMatch}
                           disabled={autoClassifying}
+                          title="차량/보험/대출/정비/지입/투자/급여 매칭 + 룰 분류 + AI 일괄 분류 순차 실행 (1~3분)"
                           style={{
-                            ...BTN.sm, padding: '5px 12px', fontSize: 11, fontWeight: 700,
-                            background: 'rgba(34,197,94,0.1)', color: '#15803d',
-                            border: '1px solid rgba(34,197,94,0.35)',
+                            ...BTN.sm, padding: '6px 16px', fontSize: 12, fontWeight: 700,
+                            background: 'linear-gradient(90deg, rgba(236,72,153,0.18), rgba(99,102,241,0.18))',
+                            color: '#7c3aed',
+                            border: '1px solid rgba(124,58,237,0.45)',
                             cursor: autoClassifying ? 'wait' : 'pointer', opacity: autoClassifying ? 0.6 : 1,
                           }}
-                        >📐 룰 분류</button>
-                        <button
-                          onClick={runAiClassify}
-                          disabled={autoClassifying}
-                          style={{
-                            ...BTN.sm, padding: '5px 12px', fontSize: 11, fontWeight: 700,
-                            background: 'rgba(168,85,247,0.1)', color: '#7e22ce',
-                            border: '1px solid rgba(168,85,247,0.35)',
-                            cursor: autoClassifying ? 'wait' : 'pointer', opacity: autoClassifying ? 0.6 : 1,
-                          }}
-                        >🤖 AI 일괄 분류</button>
+                        >🔮 풀 자동 매칭 (+AI)</button>
                         <button
                           onClick={async () => {
                             const { json } = await fetchWithAuth('/api/admin/ai-classify-review')
@@ -2291,68 +2292,43 @@ export default function BankCardPage() {
                           disabled={autoClassifying}
                           title="AI 분류 결과 통계 + 의심 케이스 진단"
                           style={{
-                            ...BTN.sm, padding: '5px 12px', fontSize: 11, fontWeight: 700,
+                            ...BTN.sm, padding: '6px 12px', fontSize: 12, fontWeight: 700,
                             background: '#fff', color: '#7e22ce',
                             border: '1px solid rgba(168,85,247,0.35)',
                             cursor: 'pointer',
                           }}
                         >🔍 AI 분류 검수</button>
+                        {/* 고급 — 토글로 펼침 */}
                         <button
-                          onClick={() => runCarMatch(false)}
-                          disabled={autoClassifying}
-                          title="Excel 카드 거래 last4 → corporate_cards.card_number 매칭하여 차량 자동 할당"
+                          onClick={() => setShowAdvancedMatch(!showAdvancedMatch)}
                           style={{
-                            ...BTN.sm, padding: '5px 12px', fontSize: 11, fontWeight: 700,
-                            background: 'rgba(59,130,246,0.1)', color: '#1d4ed8',
-                            border: '1px solid rgba(59,130,246,0.35)',
-                            cursor: autoClassifying ? 'wait' : 'pointer', opacity: autoClassifying ? 0.6 : 1,
+                            ...BTN.sm, padding: '6px 10px', fontSize: 11, fontWeight: 600,
+                            background: 'rgba(0,0,0,0.04)', color: COLORS.textSecondary,
+                            border: `1px solid ${COLORS.borderSubtle}`, cursor: 'pointer',
                           }}
-                        >🔗 차량 매칭</button>
-                        <button
-                          onClick={() => runInsuranceMatch(false)}
-                          disabled={autoClassifying}
-                          title="보험성 거래를 등록된 보험계약 스케줄과 자동 매칭"
-                          style={{
-                            ...BTN.sm, padding: '5px 12px', fontSize: 11, fontWeight: 700,
-                            background: 'rgba(16,185,129,0.1)', color: '#047857',
-                            border: '1px solid rgba(16,185,129,0.35)',
-                            cursor: autoClassifying ? 'wait' : 'pointer', opacity: autoClassifying ? 0.6 : 1,
-                          }}
-                        >🛡 보험 매칭</button>
-                        <button
-                          onClick={() => runLoanMatch(false)}
-                          disabled={autoClassifying}
-                          title="대출 월불입 거래를 loans 와 자동 매칭"
-                          style={{
-                            ...BTN.sm, padding: '5px 12px', fontSize: 11, fontWeight: 700,
-                            background: 'rgba(245,158,11,0.1)', color: '#b45309',
-                            border: '1px solid rgba(245,158,11,0.35)',
-                            cursor: autoClassifying ? 'wait' : 'pointer', opacity: autoClassifying ? 0.6 : 1,
-                          }}
-                        >💰 대출 매칭</button>
-                        <button
-                          onClick={() => runMaintenanceMatch(false)}
-                          disabled={autoClassifying}
-                          title="정비/수리 거래를 maintenance_records 에 자동 등록"
-                          style={{
-                            ...BTN.sm, padding: '5px 12px', fontSize: 11, fontWeight: 700,
-                            background: 'rgba(99,102,241,0.1)', color: '#4338ca',
-                            border: '1px solid rgba(99,102,241,0.35)',
-                            cursor: autoClassifying ? 'wait' : 'pointer', opacity: autoClassifying ? 0.6 : 1,
-                          }}
-                        >🔧 정비 매칭</button>
-                        <button
-                          onClick={runFullAutoMatch}
-                          disabled={autoClassifying}
-                          title="차량/보험/대출/정비/지입/투자/급여 매칭 + AI 일괄 분류 순차 실행 (1~3분 소요)"
-                          style={{
-                            ...BTN.sm, padding: '5px 14px', fontSize: 11, fontWeight: 700,
-                            background: 'linear-gradient(90deg, rgba(236,72,153,0.15), rgba(99,102,241,0.15))',
-                            color: '#7c3aed',
-                            border: '1px solid rgba(124,58,237,0.4)',
-                            cursor: autoClassifying ? 'wait' : 'pointer', opacity: autoClassifying ? 0.6 : 1,
-                          }}
-                        >🔮 풀 자동 매칭 (+AI)</button>
+                        >{showAdvancedMatch ? '▾' : '▸'} 고급</button>
+                        {showAdvancedMatch && (
+                          <>
+                            <button onClick={() => runAutoClassify(false)} disabled={autoClassifying}
+                              style={{ ...BTN.sm, padding: '5px 10px', fontSize: 11, fontWeight: 700, background: 'rgba(34,197,94,0.08)', color: '#15803d', border: '1px solid rgba(34,197,94,0.3)', cursor: autoClassifying ? 'wait' : 'pointer', opacity: autoClassifying ? 0.6 : 1 }}
+                            >📐 룰</button>
+                            <button onClick={runAiClassify} disabled={autoClassifying}
+                              style={{ ...BTN.sm, padding: '5px 10px', fontSize: 11, fontWeight: 700, background: 'rgba(168,85,247,0.08)', color: '#7e22ce', border: '1px solid rgba(168,85,247,0.3)', cursor: autoClassifying ? 'wait' : 'pointer', opacity: autoClassifying ? 0.6 : 1 }}
+                            >🤖 AI</button>
+                            <button onClick={() => runCarMatch(false)} disabled={autoClassifying}
+                              style={{ ...BTN.sm, padding: '5px 10px', fontSize: 11, fontWeight: 700, background: 'rgba(59,130,246,0.08)', color: '#1d4ed8', border: '1px solid rgba(59,130,246,0.3)', cursor: autoClassifying ? 'wait' : 'pointer', opacity: autoClassifying ? 0.6 : 1 }}
+                            >🔗 차량</button>
+                            <button onClick={() => runInsuranceMatch(false)} disabled={autoClassifying}
+                              style={{ ...BTN.sm, padding: '5px 10px', fontSize: 11, fontWeight: 700, background: 'rgba(16,185,129,0.08)', color: '#047857', border: '1px solid rgba(16,185,129,0.3)', cursor: autoClassifying ? 'wait' : 'pointer', opacity: autoClassifying ? 0.6 : 1 }}
+                            >🛡 보험</button>
+                            <button onClick={() => runLoanMatch(false)} disabled={autoClassifying}
+                              style={{ ...BTN.sm, padding: '5px 10px', fontSize: 11, fontWeight: 700, background: 'rgba(245,158,11,0.08)', color: '#b45309', border: '1px solid rgba(245,158,11,0.3)', cursor: autoClassifying ? 'wait' : 'pointer', opacity: autoClassifying ? 0.6 : 1 }}
+                            >💰 대출</button>
+                            <button onClick={() => runMaintenanceMatch(false)} disabled={autoClassifying}
+                              style={{ ...BTN.sm, padding: '5px 10px', fontSize: 11, fontWeight: 700, background: 'rgba(99,102,241,0.08)', color: '#4338ca', border: '1px solid rgba(99,102,241,0.3)', cursor: autoClassifying ? 'wait' : 'pointer', opacity: autoClassifying ? 0.6 : 1 }}
+                            >🔧 정비</button>
+                          </>
+                        )}
                         <span style={{ width: 1, height: 18, background: 'rgba(0,0,0,0.08)', margin: '0 4px' }} />
                         {(['all', 'expense', 'income'] as const).map(f => (
                           <button key={f} onClick={() => setReviewTypeFilter(f)}
