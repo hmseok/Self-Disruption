@@ -3532,7 +3532,19 @@ export default function BankCardPage() {
                         </td>
                         <td style={{ padding: '10px 12px', fontSize: 11 }}>{b.purpose || '—'}</td>
                         <td style={{ padding: '10px 12px', textAlign: 'center' }}>
-                          <button onClick={() => setEditMapping({ type: 'bank', id: b.id, account_alias: b.account_alias, bank_issuer: b.bank_issuer, bank_name: b.bank_name, account_holder: b.account_holder, assigned_car_id: b.assigned_car_id, purpose: b.purpose, memo: b.memo })} style={{ padding: '3px 8px', borderRadius: 6, fontSize: 11, cursor: 'pointer', background: 'rgba(167,243,208,0.5)', border: '1px solid rgba(5,150,105,0.2)', color: '#065f46', marginRight: 4 }}>수정</button>
+                          <button onClick={() => setEditMapping({
+                            type: 'bank', id: b.id,
+                            account_alias: b.account_alias,
+                            account_number: b.account_number || '',
+                            branch: b.branch || '',
+                            bank_issuer: b.bank_issuer,
+                            bank_name: b.bank_name,
+                            account_holder: b.account_holder,
+                            account_holder_phone: b.account_holder_phone || '',
+                            assigned_car_id: b.assigned_car_id,
+                            purpose: b.purpose,
+                            memo: b.memo,
+                          })} style={{ padding: '3px 8px', borderRadius: 6, fontSize: 11, cursor: 'pointer', background: 'rgba(167,243,208,0.5)', border: '1px solid rgba(5,150,105,0.2)', color: '#065f46', marginRight: 4 }}>수정</button>
                           <button onClick={() => deleteMapping(b.id, 'bank')} style={{ padding: '3px 8px', borderRadius: 6, fontSize: 11, cursor: 'pointer', background: 'rgba(254,202,202,0.5)', border: '1px solid rgba(239,68,68,0.2)', color: '#b91c1c' }}>삭제</button>
                         </td>
                       </tr>

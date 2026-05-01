@@ -53,9 +53,11 @@ export async function GET(req: NextRequest) {
   // ※ bank_account_mappings.assigned_car_id 와 cars.id 의 collation 이 다를 수 있어
   //    JOIN 비교에 COLLATE 강제 (utf8mb4_unicode_ci 통일)
   let bankAccounts: any[] = []
+  // 1차: 신규 컬럼 (account_number / branch / account_holder_phone) 포함
   try {
     bankAccounts = await prisma.$queryRaw<any[]>`
-      SELECT b.id, b.account_alias, b.bank_issuer, b.bank_name, b.account_holder,
+      SELECT b.id, b.account_alias, b.account_number, b.branch,
+             b.bank_issuer, b.bank_name, b.account_holder, b.account_holder_phone,
              b.assigned_car_id, b.purpose, b.memo, b.status,
              car.number AS car_number, CONCAT_WS(' ', car.brand, car.model) AS car_model
       FROM bank_account_mappings b
@@ -63,17 +65,34 @@ export async function GET(req: NextRequest) {
       ORDER BY b.created_at DESC
     `
   } catch (e: any) {
-    console.error('[mappings GET] bankAccounts 쿼리 실패:', e.message)
-    // 폴백: JOIN 없이 단순 SELECT
+    console.warn('[mappings GET] full schema 실패, legacy fallback:', e?.message?.slice(0, 100))
+    // 2차 fallback: 기존 컬럼만
     try {
       bankAccounts = await prisma.$queryRaw<any[]>`
-        SELECT id, account_alias, bank_issuer, bank_name, account_holder,
-               assigned_car_id, purpose, memo, status,
-               NULL AS car_number, NULL AS car_model
-        FROM bank_account_mappings
-        ORDER BY created_at DESC
+        SELECT b.id, b.account_alias,
+               NULL AS account_number, NULL AS branch,
+               b.bank_issuer, b.bank_name, b.account_holder,
+               NULL AS account_holder_phone,
+               b.assigned_car_id, b.purpose, b.memo, b.status,
+               car.number AS car_number, CONCAT_WS(' ', car.brand, car.model) AS car_model
+        FROM bank_account_mappings b
+        LEFT JOIN cars car ON b.assigned_car_id COLLATE utf8mb4_unicode_ci = car.id COLLATE utf8mb4_unicode_ci
+        ORDER BY b.created_at DESC
       `
-    } catch (e2) { /* 테이블 미존재 */ }
+    } catch (e2: any) {
+      console.error('[mappings GET] legacy 실패:', e2?.message)
+      // 3차 fallback: JOIN 제거
+      try {
+        bankAccounts = await prisma.$queryRaw<any[]>`
+          SELECT id, account_alias, bank_issuer, bank_name, account_holder,
+                 assigned_car_id, purpose, memo, status,
+                 NULL AS account_number, NULL AS branch, NULL AS account_holder_phone,
+                 NULL AS car_number, NULL AS car_model
+          FROM bank_account_mappings
+          ORDER BY created_at DESC
+        `
+      } catch { /* 테이블 미존재 */ }
+    }
   }
 
   // 차량 목록 (드롭다운용)
@@ -205,8 +224,23 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // ── 검증 (규칙 10): INSERT/UPDATE 후 실제 row 가 있는지 확인 ──
+    let verifiedCard: any = null
+    if (card_alias) {
+      try {
+        const v = await prisma.$queryRaw<any[]>`
+          SELECT id, card_alias, holder_name, assigned_car_id, status
+          FROM corporate_cards WHERE card_alias = ${card_alias} LIMIT 1
+        `
+        if (v.length > 0) verifiedCard = v[0]
+      } catch (e: any) {
+        console.warn('[mappings card verify]', e.message)
+      }
+    }
+
     return NextResponse.json({
       ok: true,
+      verified: verifiedCard ? { id: verifiedCard.id, card_alias: verifiedCard.card_alias } : null,
       backfill: { sms: backfilledSms, tx: backfilledTx },
     })
   } else if (type === 'bank') {
@@ -348,8 +382,23 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // ── 검증 (규칙 10): INSERT/UPDATE 후 실제 row 가 있는지 확인 ──
+    let verifiedBank: any = null
+    if (account_alias) {
+      try {
+        const v = await prisma.$queryRaw<any[]>`
+          SELECT id, account_alias, bank_name, account_holder, assigned_car_id, purpose
+          FROM bank_account_mappings WHERE account_alias = ${account_alias} LIMIT 1
+        `
+        if (v.length > 0) verifiedBank = v[0]
+      } catch (e: any) {
+        console.warn('[mappings bank verify]', e.message)
+      }
+    }
+
     return NextResponse.json({
       ok: true,
+      verified: verifiedBank ? { id: verifiedBank.id, account_alias: verifiedBank.account_alias } : null,
       backfill: { sms: 0, tx: bankBackfilledTx },
     })
   }
