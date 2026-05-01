@@ -207,6 +207,66 @@ git push 전, 사용자에게 다음 형식으로 보고:
 실제로 동작했는지 알 수 있음.
 ```
 
+### 규칙 11 — SQL 컬럼/API 경로 사전 검증 의무 (2026-05-01 신설)
+
+> **2026-05-01 사건**: 같은 부류의 실수 3가지 반복 발생.
+> ① 회의록 4차례 hotfix — 데이터 흐름 끝까지 안 따라감
+> ② 카드 탭 표시 — `/list` API 만 수정하고 실제 사용 API `/finance-upload` 누락
+> ③ profiles.full_name 잘못 가정 → SQL 1054 에러
+>
+> 이 규칙은 그 악순환을 차단한다.
+
+**다음 중 하나라도 해당하면 코드 작성 전 사전 검증 의무**:
+
+```
+✓ 새 SQL 쿼리 (`$queryRaw` / `$queryRawUnsafe`) 작성/수정
+✓ 새 LEFT JOIN / INNER JOIN 추가
+✓ 새 API 엔드포인트 신설
+✓ 기존 UI 의 데이터 표시 변경
+✓ 새 컬럼/필드/별칭 참조
+```
+
+**검증 프로토콜** (코드 작성 전 보고 의무):
+
+```
+[A] SQL 컬럼명 검증
+   1. prisma/schema.prisma 에서 모델 정의 직접 확인
+   2. 또는 migrations/*.sql 에서 ALTER/CREATE 컬럼명 확인
+   3. 사용 컬럼 목록을 보고서에 명시:
+      예: "사용 컬럼: profiles.name (full_name 아님 — schema:29 확인)"
+   4. 추측 금지 — 모르면 read 도구로 직접 조회
+
+[B] API 사용처 추적
+   1. 새 API 만들 때 어느 UI 컴포넌트에서 호출하는지 명시
+   2. 기존 API 수정 시 grep 으로 모든 호출처 확인 후 영향 보고
+   3. UI 데이터 변경 시 어느 API → 어느 SQL → 어느 컬럼인지 1:1 매핑 후 작업
+
+[C] 데이터 흐름 끝점 검증
+   1. UI 의 표시 컬럼 → API 응답 키 → SQL SELECT 컬럼 → DB 실제 컬럼
+   2. 4단계 모두 일치 확인
+   3. 불일치 발견 시 사용자에게 보고 후 작업
+```
+
+**위반 시 자동 페널티**:
+- 같은 부류의 반복 실수 발생 → CLAUDE.md § 0-1 "위반 누적 횟수" 규칙 적용
+- 3회 이상 같은 실수 → 시스템 차원 안전장치 도입 (예: SQL 컬럼 자동 검증 hook)
+
+### 자동화 안전장치 (장기 — 추후 구현)
+
+```
+1. SQL Linter
+   - $queryRaw 안의 컬럼 참조를 schema.prisma + migrations 와 대조
+   - 미정의 컬럼 사용 시 빌드 시 경고/에러
+   - 위치: harness-engineering/scripts/sql-lint.js (TBD)
+
+2. API 호출 매핑 자동 탐지
+   - 새 API 만들면 호출하는 UI 자동 인덱싱
+   - 매핑 깨질 때 알림
+
+3. PR 체크리스트 자동화
+   - 규칙 8/11 의 검증 항목을 git commit message 에 강제 포함
+```
+
 ### 위반 시 자동 자가 기록 + 누적 시 시스템 안전장치
 
 이 조항을 위반하면 즉시 `knowledge/common-errors.md`에 사례 기록.
