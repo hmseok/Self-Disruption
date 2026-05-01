@@ -620,10 +620,15 @@ export default function BankCardPage() {
   // 실제 batch_id는 'excel_bank_20260427_1701234567890' 형식이므로 startsWith 매칭 필수
   const isBankTx = (t: any) => {
     const imp = String(t.imported_from || '')
+    // 1) Excel 은행 / SMS 은행 명시 출처
     if (imp.startsWith('excel_bank') || imp === 'sms_bank') return true
+    // 2) bank_name 컬럼 있으면 통장
     if (t.bank_name) return true
-    if (t.card_company && /_BANK$/i.test(t.card_company)) return true   // SMS 통장 (WOORI_BANK 등)
-    // imported_from 없는 수동 입력 — card 단서가 없으면 통장으로
+    // 3) card_company 가 BANK 포함 (WOORI_BANK / KB_BANK / WOORI BANK 등 다양한 형식)
+    if (t.card_company && /BANK/i.test(t.card_company)) return true
+    // 4) SMS card_alias 에 '은행' 포함 (우리은행****8777 등)
+    if (t.sms_card_alias && /은행/.test(t.sms_card_alias)) return true
+    // 5) imported_from 없는 수동 입력 — card 단서가 없으면 통장으로
     if (!imp && !t.card_company) return true
     return false
   }
@@ -632,7 +637,7 @@ export default function BankCardPage() {
     const imp = String(t.imported_from || '')
     if (imp.startsWith('excel_card')) return true
     if (imp === 'sms' && t.card_company) return true
-    if (t.card_company && !/_BANK$/i.test(t.card_company)) return true
+    if (t.card_company && !/BANK/i.test(t.card_company)) return true
     return false
   }
 
@@ -2055,9 +2060,9 @@ export default function BankCardPage() {
               onSearchChange={setSearch}
               placeholder="적요, 거래처 검색..."
               filters={[
-                { key: 'all', label: '전체', count: transactions.filter(t => !t.card_company && !t.imported_from?.includes('card')).length },
-                { key: 'income', label: '입금' },
-                { key: 'expense', label: '출금' },
+                { key: 'all', label: '전체', count: transactions.filter(isBankTx).length },
+                { key: 'income', label: '입금', count: transactions.filter(t => isBankTx(t) && t.type === 'income').length },
+                { key: 'expense', label: '출금', count: transactions.filter(t => isBankTx(t) && t.type === 'expense').length },
               ]}
               activeFilter={bankFilter}
               onFilterChange={setBankFilter}
