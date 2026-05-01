@@ -1749,16 +1749,27 @@ export default function BankCardPage() {
 
   const cardColumns: TableColumn<Transaction>[] = [
     { key: 'date', label: '날짜', width: 100, render: (r) => <span style={{ fontSize: 13, color: COLORS.textSecondary }}>{fmtDate(r.transaction_date)}</span> },
-    { key: 'card', label: '카드', width: 140, render: (r: any) => {
-      // sms_card_alias 있으면 끝4자리 추출, 없으면 card_company
+    { key: 'card', label: '카드', width: 160, render: (r: any) => {
+      // last4 우선순위:
+      //   1) sms_card_alias 끝4자리 (SMS 매칭된 row)
+      //   2) matched_card_alias 끝4자리 (직접 매칭)
+      //   3) raw_data.card_last4 (엑셀 업로드 시 추출)
       const alias = r.sms_card_alias || r.matched_card_alias || ''
-      const last4 = alias.match(/(\d{4})\s*$/)?.[1]
+      const aliasLast4 = alias.match(/(\d{4})\s*$/)?.[1]
+      const rawLast4 = r.card_last4 || ''
+      const last4 = aliasLast4 || rawLast4
+      const matched = !!(r.related_type === 'car' && r.related_id)
       return (
         <div>
           <div style={{ fontSize: 12, fontWeight: 700, color: COLORS.primary }}>
             {r.card_company || '-'}{last4 ? ` ${last4}` : ''}
           </div>
           {alias && <div style={{ fontSize: 10, color: '#94a3b8' }}>{alias}</div>}
+          {!alias && rawLast4 && (
+            <div style={{ fontSize: 10, color: matched ? '#94a3b8' : '#dc2626', fontWeight: matched ? 400 : 600 }}>
+              ****{rawLast4}{!matched && ' · 매핑X'}
+            </div>
+          )}
         </div>
       )
     }},
@@ -2046,6 +2057,34 @@ export default function BankCardPage() {
                     style={{ ...BTN.sm, background: COLORS.primary, color: '#fff', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
                   >
                     📤 엑셀 업로드
+                  </button>
+                  <button
+                    onClick={async () => {
+                      const { json } = await fetchWithAuth('/api/admin/card-match-diag')
+                      if (json?.error) { alert(`오류: ${json.error}`); return }
+                      const s = json?.summary || {}
+                      const p = json?.problems || {}
+                      const noCard = (json?.top_no_card || []).slice(0, 10)
+                        .map((x: any) => `  · ****${x.last4} — ${x.tx}건${x.sms > 0 ? ` (SMS ${x.sms})` : ''}`).join('\n') || '  (없음)'
+                      const noCar = (json?.top_no_car || []).slice(0, 10)
+                        .map((x: any) => `  · ****${x.last4} — ${x.tx}건${x.holders?.length ? ` [${x.holders.join(',')}]` : ''}`).join('\n') || '  (없음)'
+                      alert(
+                        `🔍 카드 매칭 진단\n\n` +
+                        `📊 요약\n` +
+                        `  · 카드 거래: ${s.total_transactions || 0}건 (매칭 ${s.matched_transactions || 0} / 미매칭 ${s.unmatched_transactions || 0})\n` +
+                        `  · 등록 카드: ${s.total_cards_registered || 0}장 (차량 할당 ${s.cards_with_car_assigned || 0})\n` +
+                        `  · last4 종류: ${s.unique_last4_in_tx || 0}개\n\n` +
+                        `🔴 매핑 부재 — 카드 등록 필요 (top 10)\n` +
+                        `${noCard}\n\n` +
+                        `🟠 차량 미할당 — 매핑 관리에서 차량 추가 (top 10)\n` +
+                        `${noCar}\n\n` +
+                        `🟢 정상 매칭: ${json?.ok_count || 0} 종류\n\n` +
+                        `→ 매핑 관리 탭에서 카드 추가 시 자동 backfill 동작`
+                      )
+                    }}
+                    style={{ ...BTN.sm, background: '#fff', color: '#0369a1', border: '1px solid rgba(14,165,233,0.4)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+                  >
+                    🔍 매칭 진단
                   </button>
                   {summary && summary.transactions.card > 0 && (
                     <button
