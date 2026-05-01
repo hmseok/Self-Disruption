@@ -61,3 +61,7 @@ scripts/migrate/01_pgloader.load
 design-*.html
 UI-Pattern-Analysis.xlsx
 .sms-token
+
+# harness-engineering — runtime-generated indices (regenerated each lint run)
+harness-engineering/knowledge/ui-coverage.json
+harness-engineering/knowledge/api-trace.json

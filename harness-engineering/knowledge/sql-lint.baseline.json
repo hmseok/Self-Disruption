@@ -1,0 +1,240 @@
+{
+  "violations": [
+    {
+      "file": "app/api/admin-invite/route.ts",
+      "ref": "pc.employee_name",
+      "table": "profiles",
+      "column": "employee_name"
+    },
+    {
+      "file": "app/api/admin-invite/route.ts",
+      "ref": "pu.employee_name",
+      "table": "profiles",
+      "column": "employee_name"
+    },
+    {
+      "file": "app/api/assignments/route.ts",
+      "ref": "p.employee_name",
+      "table": "profiles",
+      "column": "employee_name"
+    },
+    {
+      "file": "app/api/assignments/route.ts",
+      "ref": "p.employee_name",
+      "table": "profiles",
+      "column": "employee_name"
+    },
+    {
+      "file": "app/api/assignments/route.ts",
+      "ref": "p.employee_name",
+      "table": "profiles",
+      "column": "employee_name"
+    },
+    {
+      "file": "app/api/assignments/route.ts",
+      "ref": "ap.employee_name",
+      "table": "profiles",
+      "column": "employee_name"
+    },
+    {
+      "file": "app/api/contracts/send-email/route.ts",
+      "ref": "p.employee_name",
+      "table": "profiles",
+      "column": "employee_name"
+    },
+    {
+      "file": "app/api/contracts/status/route.ts",
+      "ref": "p.employee_name",
+      "table": "profiles",
+      "column": "employee_name"
+    },
+    {
+      "file": "app/api/cost-standards/rollup/route.ts",
+      "ref": "cars.vehicle_class",
+      "table": "cars",
+      "column": "vehicle_class"
+    },
+    {
+      "file": "app/api/cost-standards/rollup/route.ts",
+      "ref": "cars.fuel_type",
+      "table": "cars",
+      "column": "fuel_type"
+    },
+    {
+      "file": "app/api/cost-standards/rollup/route.ts",
+      "ref": "cars.vehicle_class",
+      "table": "cars",
+      "column": "vehicle_class"
+    },
+    {
+      "file": "app/api/cost-standards/rollup/route.ts",
+      "ref": "cars.fuel_type",
+      "table": "cars",
+      "column": "fuel_type"
+    },
+    {
+      "file": "app/api/cost-standards/rollup/route.ts",
+      "ref": "cars.vehicle_class",
+      "table": "cars",
+      "column": "vehicle_class"
+    },
+    {
+      "file": "app/api/cost-standards/rollup/route.ts",
+      "ref": "cars.fuel_type",
+      "table": "cars",
+      "column": "fuel_type"
+    },
+    {
+      "file": "app/api/finance/mappings/route.ts",
+      "ref": "c.card_issuer",
+      "table": "corporate_cards",
+      "column": "card_issuer"
+    },
+    {
+      "file": "app/api/finance/mappings/route.ts",
+      "ref": "c.card_type",
+      "table": "corporate_cards",
+      "column": "card_type"
+    },
+    {
+      "file": "app/api/finance/mappings/route.ts",
+      "ref": "c.card_holder_type",
+      "table": "corporate_cards",
+      "column": "card_holder_type"
+    },
+    {
+      "file": "app/api/finance/mappings/route.ts",
+      "ref": "c.valid_thru",
+      "table": "corporate_cards",
+      "column": "valid_thru"
+    },
+    {
+      "file": "app/api/finance/mappings/route.ts",
+      "ref": "c.issued_at",
+      "table": "corporate_cards",
+      "column": "issued_at"
+    },
+    {
+      "file": "app/api/finance/mappings/route.ts",
+      "ref": "c.expires_at",
+      "table": "corporate_cards",
+      "column": "expires_at"
+    },
+    {
+      "file": "app/api/finance/mappings/route.ts",
+      "ref": "c.payment_bank",
+      "table": "corporate_cards",
+      "column": "payment_bank"
+    },
+    {
+      "file": "app/api/finance/mappings/route.ts",
+      "ref": "c.payment_account",
+      "table": "corporate_cards",
+      "column": "payment_account"
+    },
+    {
+      "file": "app/api/finance/mappings/route.ts",
+      "ref": "c.payment_day",
+      "table": "corporate_cards",
+      "column": "payment_day"
+    },
+    {
+      "file": "app/api/finance/mappings/route.ts",
+      "ref": "c.monthly_limit",
+      "table": "corporate_cards",
+      "column": "monthly_limit"
+    },
+    {
+      "file": "app/api/finance/mappings/route.ts",
+      "ref": "c.previous_card_number",
+      "table": "corporate_cards",
+      "column": "previous_card_number"
+    },
+    {
+      "file": "app/api/finance/mappings/route.ts",
+      "ref": "c.department",
+      "table": "corporate_cards",
+      "column": "department"
+    },
+    {
+      "file": "app/api/finance/mappings/route.ts",
+      "ref": "c.memo",
+      "table": "corporate_cards",
+      "column": "memo"
+    },
+    {
+      "file": "app/api/finance/transactions/list/route.ts",
+      "ref": "t.bank_name",
+      "table": "transactions",
+      "column": "bank_name"
+    },
+    {
+      "file": "app/api/finance/transactions/list/route.ts",
+      "ref": "t.card_company",
+      "table": "transactions",
+      "column": "card_company"
+    },
+    {
+      "file": "app/api/lib/assignment-engine.ts",
+      "ref": "p.employee_name",
+      "table": "profiles",
+      "column": "employee_name"
+    },
+    {
+      "file": "app/api/lib/assignment-engine.ts",
+      "ref": "p.employee_name",
+      "table": "profiles",
+      "column": "employee_name"
+    },
+    {
+      "file": "app/api/lib/assignment-engine.ts",
+      "ref": "p.employee_name",
+      "table": "profiles",
+      "column": "employee_name"
+    },
+    {
+      "file": "app/api/operations/fleet/route.ts",
+      "ref": "c.location",
+      "table": "cars",
+      "column": "location"
+    },
+    {
+      "file": "app/api/operations/fleet/route.ts",
+      "ref": "c.mileage",
+      "table": "cars",
+      "column": "mileage"
+    },
+    {
+      "file": "app/api/payroll/[id]/route.ts",
+      "ref": "pr.employee_name",
+      "table": "profiles",
+      "column": "employee_name"
+    },
+    {
+      "file": "app/api/payroll/route.ts",
+      "ref": "p.employee_name",
+      "table": "profiles",
+      "column": "employee_name"
+    },
+    {
+      "file": "app/api/profiles/route.ts",
+      "ref": "p.position_id",
+      "table": "profiles",
+      "column": "position_id"
+    },
+    {
+      "file": "app/api/profiles/route.ts",
+      "ref": "p.department_id",
+      "table": "profiles",
+      "column": "department_id"
+    },
+    {
+      "file": "app/api/profiles/route.ts",
+      "ref": "p.employee_name",
+      "table": "profiles",
+      "column": "employee_name"
+    }
+  ],
+  "generatedAt": "2026-05-01T23:42:18.677Z",
+  "note": "기존 SQL 컬럼 위반 — known issue 로 처리. 새 위반만 lint fail."
+}

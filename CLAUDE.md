@@ -10,6 +10,17 @@
 > **사용자가 토큰·시간을 무한 소모하는 사고가 반복되어 강제 규제 도입.**
 > 이 조항은 우선 순위 최상위. CLAUDE.md의 다른 모든 항목보다 먼저 적용된다.
 
+### 🔒 자동화 안전장치 (도입 완료 — 2026-05-02)
+
+**평가 → 훅 → 기록 → 개선** 사이클이 매 commit 마다 자동 실행:
+
+- `npm run lint:harness` — 4개 lint 통합 실행 (sql-lint / sql-fn-lint / api-call-trace / ui-data-coverage)
+- `.git/hooks/pre-commit` — commit 시점 자동 호출 (`git commit --no-verify` 로 우회 가능 — 권장 X)
+- `harness-engineering/knowledge/lint-violations.md` — 누적 위반 자동 기록
+- baseline 패턴: 기존 issue 동결, 새 위반만 차단
+
+규칙 11/12/13 의 "사전 검증 의무" 는 lint 가 자동 강제. 코드 작성 후 즉시 결과 확인 가능.
+
 ### 규칙 1 — 풀 파이프라인 강제 트리거
 
 **다음 중 **하나라도** 해당하면 GATE 1~9 풀 파이프라인 강제 (Researcher → Planner → 사용자 승인 → Generator → Reviewer → Designer → Evaluator → Deployer → Documenter)**:
@@ -251,20 +262,31 @@ git push 전, 사용자에게 다음 형식으로 보고:
 - 같은 부류의 반복 실수 발생 → CLAUDE.md § 0-1 "위반 누적 횟수" 규칙 적용
 - 3회 이상 같은 실수 → 시스템 차원 안전장치 도입 (예: SQL 컬럼 자동 검증 hook)
 
-### 자동화 안전장치 (장기 — 추후 구현)
+### 자동화 안전장치 (도입 완료 — 2026-05-02)
+
+> **평가 → 훅 → 기록 → 개선** 사이클이 매 commit 마다 자동 실행.
 
 ```
-1. SQL Linter
-   - $queryRaw 안의 컬럼 참조를 schema.prisma + migrations 와 대조
-   - 미정의 컬럼 사용 시 빌드 시 경고/에러
-   - 위치: harness-engineering/scripts/sql-lint.js (TBD)
+✅ 1. SQL Linter (harness-engineering/scripts/sql-lint.js)
+   - $queryRaw 안의 컬럼 참조를 schema.prisma + migrations 와 자동 대조
+   - 미정의 컬럼 사용 시 commit 차단
+   - baseline 패턴: 기존 issue 동결, 새 위반만 차단
 
-2. API 호출 매핑 자동 탐지
-   - 새 API 만들면 호출하는 UI 자동 인덱싱
-   - 매핑 깨질 때 알림
+✅ 2. API 호출 매핑 자동 탐지 (api-call-trace.js)
+   - app/api/ 디렉토리 자동 스캔 → 라우트 인덱스
+   - UI fetch URL 모두 추출 → 라우트 매칭
+   - broken call (UI 호출 + 라우트 없음) 자동 감지
 
-3. PR 체크리스트 자동화
-   - 규칙 8/11 의 검증 항목을 git commit message 에 강제 포함
+✅ 3. PR 체크리스트 자동화 (.git/hooks/pre-commit)
+   - 매 commit 시 npm run lint:harness 자동 실행
+   - 위반 발견 시 commit 차단 + lint-violations.md 자동 append
+   - 강제 우회: git commit --no-verify (권장 X)
+
+명령어:
+   npm run lint:harness            # 전체 검증
+   npm run lint:harness:report     # 정보성 (exit 0 강제)
+   npm run lint:harness:baseline   # 현재 위반을 known issue 로 동결
+   npm run harness:install-hook    # pre-commit hook 설치
 ```
 
 ### 규칙 12 — UI 화면별 데이터 정합성 자가 검증 (2026-05-01 신설)
@@ -307,12 +329,13 @@ git push 전, 사용자에게 다음 형식으로 보고:
 - 분류 검수 화면: **누락 (3시간 후 사용자가 분노 후 발견)**
 - 미분류 화면: 미확인 (다음 검사 대상)
 
-**자동화 안전장치 (TBD)**
+**자동화 안전장치 (도입 완료 — 2026-05-02)**
 ```
-4. UI 화면 데이터 정합성 인덱스
-   - 한 데이터 필드 (예: sms_transaction_type) 가 어느 화면에서 표출되는지 자동 매핑
-   - 새 화면 추가 시 누락 자동 감지
-   - 위치: harness-engineering/scripts/ui-data-coverage.js (TBD)
+✅ 4. UI 화면 데이터 정합성 인덱스 (harness-engineering/scripts/ui-data-coverage.js)
+   - app/**/*.tsx 자동 스캔 → 필드 사용 인덱스
+   - 같은 API 를 호출하는 page 그룹 비교 → 80%+ 사용하는데 1~2 page 누락 시 warning
+   - 결과: harness-engineering/knowledge/ui-coverage.json (자동 생성)
+   - 명령어: npm run lint:ui
 ```
 
 ### 규칙 13 — 외부 시스템 호환성 사전 검증 의무 (2026-05-01 신설)
@@ -375,12 +398,14 @@ git push 전, 사용자에게 다음 형식으로 보고:
 | profiles.full_name | profile.full_name | schema 확인 X | 1054 에러 |
 | REGEXP_REPLACE | REGEXP_REPLACE | MySQL 버전 확인 X | 500 에러 |
 
-**자동화 안전장치 (TBD)**
+**자동화 안전장치 (도입 완료 — 2026-05-02)**
 ```
-5. SQL 함수 화이트리스트 검증
-   - $queryRaw 안 함수 호출을 화이트리스트와 대조
-   - 회색 함수 사용 시 빌드 경고
-   - 위치: harness-engineering/scripts/sql-fn-lint.js (TBD)
+✅ 5. SQL 함수 화이트리스트 (harness-engineering/scripts/sql-fn-lint.js)
+   - $queryRaw 안 회색 함수 (REGEXP_REPLACE / JSON_TABLE / WINDOW 함수)
+     사용 즉시 commit 차단
+   - 정당한 사유 시 코드에 주석 추가:  // sql-fn-lint-allow: REGEXP_REPLACE
+   - pre-commit hook 으로 자동 실행
+   - 명령어: npm run lint:sql-fn
 ```
 
 ### 위반 시 자동 자가 기록 + 누적 시 시스템 안전장치
