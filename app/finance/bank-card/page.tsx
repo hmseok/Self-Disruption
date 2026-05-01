@@ -1682,6 +1682,29 @@ export default function BankCardPage() {
 
   const bankColumns: TableColumn<Transaction>[] = [
     { key: 'date', label: '날짜', width: 100, render: (r) => <span style={{ fontSize: 13, color: COLORS.textSecondary }}>{fmtDate(r.transaction_date)}</span> },
+    { key: 'account', label: '계좌', width: 160, render: (r: any) => {
+      // 통장 컬럼 (카드 컬럼과 동일한 방식): SMS card_alias 의 끝4자리 + 매칭 표시
+      const alias = r.bank_account_alias || r.sms_card_alias || ''
+      const aliasLast4 = alias.match(/(\d{4})\s*$/)?.[1]
+      const accountNumLast4 = String(r.bank_account_number || '').replace(/\D/g, '').slice(-4)
+      const last4 = aliasLast4 || accountNumLast4
+      const matched = !!(r.related_type === 'car' && r.related_id)
+      const bankName = r.bank_name || (r.card_company || '').replace('_BANK', '')
+      const hasMapping = !!(r.bank_account_alias || r.bank_account_holder)
+      return (
+        <div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: COLORS.primary }}>
+            {bankName || '-'}{last4 ? ` ${last4}` : ''}
+          </div>
+          {alias && hasMapping && <div style={{ fontSize: 10, color: '#94a3b8' }}>{alias}</div>}
+          {!hasMapping && last4 && (
+            <div style={{ fontSize: 10, color: '#dc2626', fontWeight: 600 }}>
+              ****{last4} · 매핑X
+            </div>
+          )}
+        </div>
+      )
+    }, hideOnMobile: true },
     { key: 'desc', label: '적요', render: (r) => <span style={{ fontSize: 13, fontWeight: 500 }}>{r.description || '-'}</span> },
     { key: 'counterpart', label: '거래처', width: 140, render: (r) =>
       editingTx?.id === r.id && editingTx.field === 'client_name' ? (
@@ -1722,6 +1745,26 @@ export default function BankCardPage() {
       <span style={{ fontSize: 12, color: COLORS.textSecondary }}>{r.balance_after != null ? nf(r.balance_after) : '-'}</span>,
       hideOnMobile: true
     },
+    { key: 'matched', label: '매칭', width: 130, render: (r: any) => {
+      // 차량 매칭 우선, 없으면 통장 매핑의 예금주/용도, 없으면 미매칭
+      if (r.bank_matched_car_number) {
+        return (
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: '#1e40af' }}>🚗 {r.bank_matched_car_number}</div>
+            {r.bank_matched_car_model && <div style={{ fontSize: 10, color: '#94a3b8' }}>{r.bank_matched_car_model}</div>}
+          </div>
+        )
+      }
+      if (r.bank_account_holder) {
+        return (
+          <div>
+            <span style={{ fontSize: 12, color: '#7c3aed' }}>👤 {r.bank_account_holder}</span>
+            {r.bank_purpose && <div style={{ fontSize: 10, color: '#94a3b8' }}>{r.bank_purpose}</div>}
+          </div>
+        )
+      }
+      return <span style={{ fontSize: 11, color: '#cbd5e1' }}>—</span>
+    }, hideOnMobile: true },
     { key: 'status', label: '상태', width: 92, align: 'center', render: (r) =>
       <MatchBadge matched={!!r.related_type && !!r.related_id} />
     },

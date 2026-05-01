@@ -54,7 +54,11 @@ export async function GET(request: NextRequest) {
 
     // transactions: 카드 매칭 정보 (card_alias + 매칭된 차량/직원) JOIN
     if (table === 'transactions') {
-      const data = await prisma.$queryRawUnsafe<any[]>(`
+      // bank_account_mappings 와 LEFT JOIN — 통장 매핑 정보 노출
+      // SMS card_alias 정확 일치 OR last4 일치 (account_alias / account_number 모두 검색)
+      // legacy 환경 (account_number 컬럼 없음) 도 graceful 처리
+      let data: any[] = []
+      const fullQuery = `
         SELECT
           t.*,
           sms.card_alias         AS sms_card_alias,
@@ -68,15 +72,71 @@ export async function GET(request: NextRequest) {
           cc.assigned_employee_id AS matched_employee_id,
           cc.assigned_car_id     AS matched_car_id,
           car.number             AS matched_car_number,
-          CONCAT_WS(' ', car.brand, car.model) AS matched_car_model
+          CONCAT_WS(' ', car.brand, car.model) AS matched_car_model,
+          bam.account_alias      AS bank_account_alias,
+          bam.account_number     AS bank_account_number,
+          bam.account_holder     AS bank_account_holder,
+          bam.purpose            AS bank_purpose,
+          bam_car.number         AS bank_matched_car_number,
+          CONCAT_WS(' ', bam_car.brand, bam_car.model) AS bank_matched_car_model
         FROM transactions t
         LEFT JOIN card_sms_transactions sms ON sms.transaction_id COLLATE utf8mb4_unicode_ci = t.id COLLATE utf8mb4_unicode_ci
         LEFT JOIN corporate_cards cc       ON cc.id COLLATE utf8mb4_unicode_ci = sms.card_id COLLATE utf8mb4_unicode_ci
         LEFT JOIN cars car                 ON car.id COLLATE utf8mb4_unicode_ci = cc.assigned_car_id COLLATE utf8mb4_unicode_ci
+        LEFT JOIN bank_account_mappings bam
+          ON sms.card_alias IS NOT NULL
+         AND (
+              bam.account_alias = sms.card_alias
+           OR (bam.account_number IS NOT NULL
+               AND RIGHT(REGEXP_REPLACE(bam.account_number, '[^0-9]', ''), 4)
+                   = RIGHT(REGEXP_REPLACE(sms.card_alias, '[^0-9]', ''), 4)
+               AND CHAR_LENGTH(REGEXP_REPLACE(bam.account_number, '[^0-9]', '')) >= 4
+              )
+         )
+        LEFT JOIN cars bam_car             ON bam_car.id COLLATE utf8mb4_unicode_ci = bam.assigned_car_id COLLATE utf8mb4_unicode_ci
         WHERE t.deleted_at IS NULL
         ORDER BY t.created_at DESC
         LIMIT 5000
-      `)
+      `
+      const legacyQuery = `
+        SELECT
+          t.*,
+          sms.card_alias         AS sms_card_alias,
+          sms.card_id            AS sms_card_id,
+          sms.transaction_type   AS sms_transaction_type,
+          sms.merchant           AS sms_merchant,
+          sms.holder_name        AS sms_holder,
+          sms.parse_status       AS sms_parse_status,
+          cc.card_alias          AS matched_card_alias,
+          cc.holder_name         AS matched_holder_name,
+          cc.assigned_employee_id AS matched_employee_id,
+          cc.assigned_car_id     AS matched_car_id,
+          car.number             AS matched_car_number,
+          CONCAT_WS(' ', car.brand, car.model) AS matched_car_model,
+          bam.account_alias      AS bank_account_alias,
+          NULL                   AS bank_account_number,
+          bam.account_holder     AS bank_account_holder,
+          bam.purpose            AS bank_purpose,
+          bam_car.number         AS bank_matched_car_number,
+          CONCAT_WS(' ', bam_car.brand, bam_car.model) AS bank_matched_car_model
+        FROM transactions t
+        LEFT JOIN card_sms_transactions sms ON sms.transaction_id COLLATE utf8mb4_unicode_ci = t.id COLLATE utf8mb4_unicode_ci
+        LEFT JOIN corporate_cards cc       ON cc.id COLLATE utf8mb4_unicode_ci = sms.card_id COLLATE utf8mb4_unicode_ci
+        LEFT JOIN cars car                 ON car.id COLLATE utf8mb4_unicode_ci = cc.assigned_car_id COLLATE utf8mb4_unicode_ci
+        LEFT JOIN bank_account_mappings bam ON bam.account_alias = sms.card_alias
+        LEFT JOIN cars bam_car             ON bam_car.id COLLATE utf8mb4_unicode_ci = bam.assigned_car_id COLLATE utf8mb4_unicode_ci
+        WHERE t.deleted_at IS NULL
+        ORDER BY t.created_at DESC
+        LIMIT 5000
+      `
+      try {
+        data = await prisma.$queryRawUnsafe<any[]>(fullQuery)
+      } catch (e: any) {
+        if (/Unknown column/i.test(e?.message || '')) {
+          console.warn('[finance-upload] bank_account_mappings.account_number 미적용 — legacy fallback')
+          data = await prisma.$queryRawUnsafe<any[]>(legacyQuery)
+        } else { throw e }
+      }
       return NextResponse.json({ data: serialize(data), error: null })
     }
 
