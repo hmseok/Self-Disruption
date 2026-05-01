@@ -81,7 +81,7 @@ export async function GET(request: NextRequest) {
              cc.assigned_car_id,
              car.number AS car_number,
              cc.assigned_employee_id,
-             p.full_name AS employee_name,
+             p.name AS employee_name,
              cc.status, cc.department, cc.card_type
         FROM corporate_cards cc
         LEFT JOIN cars car ON car.id COLLATE utf8mb4_unicode_ci = cc.assigned_car_id COLLATE utf8mb4_unicode_ci
