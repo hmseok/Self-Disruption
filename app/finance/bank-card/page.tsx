@@ -1355,8 +1355,10 @@ export default function BankCardPage() {
       results.push('') // 구분선
       if (aiError) {
         results.push(`❌ AI 분류: ${aiError}`)
+      } else if (aiInitial === 0) {
+        results.push(`· AI 분류: 미분류 거래 0건 (분류 대상 없음)`)
       } else {
-        results.push(`${aiApplied > 0 ? '✓' : '·'} AI 분류: ${aiApplied}/${aiInitial}건 적용 (검토 ${aiBelow})`)
+        results.push(`${aiApplied > 0 ? '✓' : '·'} AI 분류: ${aiApplied}/${aiInitial}건 자동 적용 (검토 큐 ${aiBelow}, batch ${batches}회)`)
       }
 
       alert(
@@ -1365,7 +1367,11 @@ export default function BankCardPage() {
         `  · 매핑X = corporate_cards 에 카드 등록 X\n` +
         `  · 차량X = 카드는 있지만 assigned_car_id 미설정\n` +
         `  · 모호 = 같은 last4 카드 2개 이상\n\n` +
-        `→ 매핑 관리 탭에서 카드 추가/수정 후 다시 시도`
+        `💡 AI 분류 결과 해석:\n` +
+        `  · "0/N" = AI 가 신뢰도 70% 이상 분류 X — 검토 큐로\n` +
+        `  · "❌ Gemini 응답 0건" = API 키 문제 또는 응답 파싱 실패\n` +
+        `  · "0건 (분류 대상 없음)" = 이미 다 분류됨\n\n` +
+        `→ 미분류 ${0}건 남음 — 분류 검수 탭에서 수동 처리`
       )
       await Promise.all([loadSummary(), loadTransactions()])
       if (reviewCategory) await loadReviewItems(reviewCategory)
@@ -2338,7 +2344,7 @@ export default function BankCardPage() {
                         <button
                           onClick={runFullAutoMatch}
                           disabled={autoClassifying}
-                          title="차량/보험/대출/정비/지입/투자/급여 — 모든 자동 매칭 순차 실행"
+                          title="차량/보험/대출/정비/지입/투자/급여 매칭 + AI 일괄 분류 순차 실행 (1~3분 소요)"
                           style={{
                             ...BTN.sm, padding: '5px 14px', fontSize: 11, fontWeight: 700,
                             background: 'linear-gradient(90deg, rgba(236,72,153,0.15), rgba(99,102,241,0.15))',
@@ -2346,7 +2352,7 @@ export default function BankCardPage() {
                             border: '1px solid rgba(124,58,237,0.4)',
                             cursor: autoClassifying ? 'wait' : 'pointer', opacity: autoClassifying ? 0.6 : 1,
                           }}
-                        >🔮 풀 자동 매칭</button>
+                        >🔮 풀 자동 매칭 (+AI)</button>
                         <span style={{ width: 1, height: 18, background: 'rgba(0,0,0,0.08)', margin: '0 4px' }} />
                         {(['all', 'expense', 'income'] as const).map(f => (
                           <button key={f} onClick={() => setReviewTypeFilter(f)}
