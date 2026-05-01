@@ -295,19 +295,54 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // ── 은행 자동 backfill: 같은 account_alias 의 기존 SMS transactions 갱신 ──
+    // ── 은행 자동 backfill: 같은 account_alias 또는 last4 의 기존 SMS transactions 갱신 ──
+    //   매칭 키 (우선순위):
+    //     1) account_alias 정확 일치
+    //     2) account_number 끝 4자리 = card_sms_transactions.card_alias 끝 4자리
     let bankBackfilledTx = 0
-    if (account_alias && assigned_car_id) {
+    if (assigned_car_id && (account_alias || account_number)) {
+      // last4 추출 (account_number 우선, 없으면 account_alias)
+      const numDigits = String(account_number || '').replace(/\D/g, '')
+      const aliasDigits = String(account_alias || '').replace(/\D/g, '')
+      const last4 = numDigits.length >= 4 ? numDigits.slice(-4)
+                  : aliasDigits.length >= 4 ? aliasDigits.slice(-4)
+                  : null
+
       try {
-        const txRes = await prisma.$executeRawUnsafe(`
-          UPDATE transactions t
-          INNER JOIN card_sms_transactions s ON s.transaction_id COLLATE utf8mb4_unicode_ci = t.id COLLATE utf8mb4_unicode_ci
-          SET t.related_type = 'car', t.related_id = ?, t.updated_at = NOW()
-          WHERE s.card_alias = ?
-            AND (t.related_type IS NULL OR t.related_id IS NULL)
-            AND t.deleted_at IS NULL
-        `, assigned_car_id, account_alias)
-        bankBackfilledTx = Number(txRes)
+        if (account_alias && last4) {
+          // 별칭 정확 일치 OR last4 끝자리 일치
+          const txRes = await prisma.$executeRawUnsafe(`
+            UPDATE transactions t
+            INNER JOIN card_sms_transactions s ON s.transaction_id COLLATE utf8mb4_unicode_ci = t.id COLLATE utf8mb4_unicode_ci
+            SET t.related_type = 'car', t.related_id = ?, t.updated_at = NOW()
+            WHERE (s.card_alias = ? OR s.card_alias REGEXP CONCAT(?, '$'))
+              AND (t.related_type IS NULL OR t.related_id IS NULL)
+              AND t.deleted_at IS NULL
+          `, assigned_car_id, account_alias, last4)
+          bankBackfilledTx = Number(txRes)
+        } else if (account_alias) {
+          // 별칭 정확 일치만
+          const txRes = await prisma.$executeRawUnsafe(`
+            UPDATE transactions t
+            INNER JOIN card_sms_transactions s ON s.transaction_id COLLATE utf8mb4_unicode_ci = t.id COLLATE utf8mb4_unicode_ci
+            SET t.related_type = 'car', t.related_id = ?, t.updated_at = NOW()
+            WHERE s.card_alias = ?
+              AND (t.related_type IS NULL OR t.related_id IS NULL)
+              AND t.deleted_at IS NULL
+          `, assigned_car_id, account_alias)
+          bankBackfilledTx = Number(txRes)
+        } else if (last4) {
+          // last4 만으로 매칭
+          const txRes = await prisma.$executeRawUnsafe(`
+            UPDATE transactions t
+            INNER JOIN card_sms_transactions s ON s.transaction_id COLLATE utf8mb4_unicode_ci = t.id COLLATE utf8mb4_unicode_ci
+            SET t.related_type = 'car', t.related_id = ?, t.updated_at = NOW()
+            WHERE s.card_alias REGEXP CONCAT(?, '$')
+              AND (t.related_type IS NULL OR t.related_id IS NULL)
+              AND t.deleted_at IS NULL
+          `, assigned_car_id, last4)
+          bankBackfilledTx = Number(txRes)
+        }
       } catch (e: any) {
         console.warn('[mappings bank backfill]', e.message)
       }

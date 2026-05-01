@@ -2012,6 +2012,34 @@ export default function BankCardPage() {
                   >
                     📤 엑셀 업로드
                   </button>
+                  <button
+                    onClick={async () => {
+                      const { json } = await fetchWithAuth('/api/admin/bank-match-diag')
+                      if (json?.error) { alert(`오류: ${json.error}`); return }
+                      const s = json?.summary || {}
+                      const fmtList = (arr: any[], format: (x: any) => string) =>
+                        (arr || []).slice(0, 10).map(format).join('\n') || '  (없음)'
+                      const noMapping = fmtList(json?.top_no_mapping, (x: any) =>
+                        `  · ****${x.last4} — ${x.tx}건`)
+                      const noCar = fmtList(json?.top_no_car, (x: any) =>
+                        `  · ****${x.last4} — ${x.tx}건${x.holders?.length ? ` [${x.holders.join(',')}]` : ''}${x.purposes?.length ? ` (${x.purposes.join(',')})` : ''}`)
+                      console.log('[통장 매칭 진단] 등록 매핑 전체:', json?.all_mappings || [])
+                      alert(
+                        `🏦 통장 매칭 진단\n\n` +
+                        `📊 요약\n` +
+                        `  · 통장 거래(SMS): ${s.total_transactions || 0}건 (매칭 ${s.matched_transactions || 0} / 미매칭 ${s.unmatched_transactions || 0})\n` +
+                        `  · 등록 매핑: ${s.total_mappings || 0}개 (차량 할당 ${s.mappings_with_car || 0})\n` +
+                        `  · last4 종류: ${s.unique_last4 || 0}개\n\n` +
+                        `🔴 매핑 부재 — 통장 등록 필요\n${noMapping}\n\n` +
+                        `🟠 차량 미할당 — 매핑 관리에서 차량 추가 (또는 의도된 공용 계좌)\n${noCar}\n\n` +
+                        `🟢 정상 매칭: ${json?.ok_count || 0} 종류\n\n` +
+                        `→ 등록 매핑 전체는 콘솔(F12) 확인`
+                      )
+                    }}
+                    style={{ ...BTN.sm, background: '#fff', color: '#0369a1', border: '1px solid rgba(14,165,233,0.4)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+                  >
+                    🔍 매칭 진단
+                  </button>
                   {summary && summary.transactions.bank > 0 && (
                     <button
                       onClick={() => deleteAndReupload('excel_bank')}
