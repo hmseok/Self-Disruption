@@ -112,7 +112,8 @@ export async function POST(req: NextRequest) {
           card_number, valid_thru, issued_at, expires_at,
           payment_bank, payment_account, payment_day, monthly_limit,
           previous_card_number, department, memo: cardMemo,
-          account_alias, bank_issuer, bank_name, account_holder, purpose, memo } = body
+          account_alias, account_number, branch, bank_issuer, bank_name,
+          account_holder, account_holder_phone, purpose, memo } = body
 
   if (type === 'card') {
     if (id) {
@@ -209,33 +210,89 @@ export async function POST(req: NextRequest) {
       backfill: { sms: backfilledSms, tx: backfilledTx },
     })
   } else if (type === 'bank') {
-    if (id) {
-      await prisma.$executeRaw`
-        UPDATE bank_account_mappings SET
-          account_alias = ${account_alias || null},
-          bank_issuer = ${bank_issuer || null},
-          bank_name = ${bank_name || null},
-          account_holder = ${account_holder || null},
-          assigned_car_id = ${assigned_car_id || null},
-          purpose = ${purpose || null},
-          memo = ${memo || null},
-          updated_at = NOW()
-        WHERE id = ${id}
-      `
-    } else {
-      // UPSERT: 같은 별칭이 있으면 자동 업데이트 (중복 에러 방지)
-      await prisma.$executeRaw`
-        INSERT INTO bank_account_mappings (id, account_alias, bank_issuer, bank_name, account_holder, assigned_car_id, purpose, memo, status, created_at, updated_at)
-        VALUES (${randomUUID()}, ${account_alias}, ${bank_issuer || ''}, ${bank_name || null}, ${account_holder || null}, ${assigned_car_id || null}, ${purpose || null}, ${memo || null}, 'active', NOW(), NOW())
-        ON DUPLICATE KEY UPDATE
-          bank_issuer = VALUES(bank_issuer),
-          bank_name = VALUES(bank_name),
-          account_holder = VALUES(account_holder),
-          assigned_car_id = VALUES(assigned_car_id),
-          purpose = VALUES(purpose),
-          memo = VALUES(memo),
-          updated_at = NOW()
-      `
+    // account_number 컬럼은 마이그레이션 (2026-05-01_bank_account_number.sql) 필요.
+    // 컬럼 없는 환경에서도 동작하도록 try/catch 분기.
+    const tryWithFullSchema = async () => {
+      if (id) {
+        await prisma.$executeRaw`
+          UPDATE bank_account_mappings SET
+            account_alias = ${account_alias || null},
+            account_number = ${account_number || null},
+            branch = ${branch || null},
+            bank_issuer = ${bank_issuer || null},
+            bank_name = ${bank_name || null},
+            account_holder = ${account_holder || null},
+            account_holder_phone = ${account_holder_phone || null},
+            assigned_car_id = ${assigned_car_id || null},
+            purpose = ${purpose || null},
+            memo = ${memo || null},
+            updated_at = NOW()
+          WHERE id = ${id}
+        `
+      } else {
+        await prisma.$executeRaw`
+          INSERT INTO bank_account_mappings (
+            id, account_alias, account_number, branch,
+            bank_issuer, bank_name, account_holder, account_holder_phone,
+            assigned_car_id, purpose, memo, status, created_at, updated_at
+          )
+          VALUES (
+            ${randomUUID()}, ${account_alias}, ${account_number || null}, ${branch || null},
+            ${bank_issuer || ''}, ${bank_name || null}, ${account_holder || null}, ${account_holder_phone || null},
+            ${assigned_car_id || null}, ${purpose || null}, ${memo || null}, 'active', NOW(), NOW()
+          )
+          ON DUPLICATE KEY UPDATE
+            account_number = VALUES(account_number),
+            branch = VALUES(branch),
+            bank_issuer = VALUES(bank_issuer),
+            bank_name = VALUES(bank_name),
+            account_holder = VALUES(account_holder),
+            account_holder_phone = VALUES(account_holder_phone),
+            assigned_car_id = VALUES(assigned_car_id),
+            purpose = VALUES(purpose),
+            memo = VALUES(memo),
+            updated_at = NOW()
+        `
+      }
+    }
+    const tryLegacy = async () => {
+      if (id) {
+        await prisma.$executeRaw`
+          UPDATE bank_account_mappings SET
+            account_alias = ${account_alias || null},
+            bank_issuer = ${bank_issuer || null},
+            bank_name = ${bank_name || null},
+            account_holder = ${account_holder || null},
+            assigned_car_id = ${assigned_car_id || null},
+            purpose = ${purpose || null},
+            memo = ${memo || null},
+            updated_at = NOW()
+          WHERE id = ${id}
+        `
+      } else {
+        await prisma.$executeRaw`
+          INSERT INTO bank_account_mappings (id, account_alias, bank_issuer, bank_name, account_holder, assigned_car_id, purpose, memo, status, created_at, updated_at)
+          VALUES (${randomUUID()}, ${account_alias}, ${bank_issuer || ''}, ${bank_name || null}, ${account_holder || null}, ${assigned_car_id || null}, ${purpose || null}, ${memo || null}, 'active', NOW(), NOW())
+          ON DUPLICATE KEY UPDATE
+            bank_issuer = VALUES(bank_issuer),
+            bank_name = VALUES(bank_name),
+            account_holder = VALUES(account_holder),
+            assigned_car_id = VALUES(assigned_car_id),
+            purpose = VALUES(purpose),
+            memo = VALUES(memo),
+            updated_at = NOW()
+        `
+      }
+    }
+    try {
+      await tryWithFullSchema()
+    } catch (e: any) {
+      if (/Unknown column/i.test(e?.message || '')) {
+        console.warn('[mappings] bank_account_mappings 의 account_number 컬럼 없음 — 마이그레이션 미적용. legacy 모드로 fallback.')
+        await tryLegacy()
+      } else {
+        throw e
+      }
     }
 
     // ── 은행 자동 backfill: 같은 account_alias 의 기존 SMS transactions 갱신 ──

@@ -3545,8 +3545,32 @@ export default function BankCardPage() {
               ) : (
                 <>
                   <label style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>계좌 별칭 (SMS 형식)
-                    <input value={editMapping.account_alias || ''} onChange={e => setEditMapping({ ...editMapping, account_alias: e.target.value })}
-                      placeholder="예: 우리은행****8777" style={{ ...GLASS.L1, width: '100%', padding: '8px 12px', borderRadius: 8, fontSize: 13, marginTop: 4 }} />
+                    <input value={editMapping.account_alias || ''} onChange={e => {
+                      const v = e.target.value
+                      // 계좌번호 입력했는데 별칭 비어있으면 자동 생성: "은행한글명****끝4자리"
+                      const next: any = { ...editMapping, account_alias: v }
+                      setEditMapping(next)
+                    }}
+                      placeholder="예: 우리은행****8777 (SMS 와 정확히 일치)" style={{ ...GLASS.L1, width: '100%', padding: '8px 12px', borderRadius: 8, fontSize: 13, marginTop: 4 }} />
+                  </label>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>계좌번호 (정확 매칭용 ★)
+                    <input value={editMapping.account_number || ''} onChange={e => {
+                      const v = e.target.value
+                      const next: any = { ...editMapping, account_number: v }
+                      // 계좌 별칭 비어있으면 자동 생성 시도
+                      const digits = v.replace(/\D/g, '')
+                      if (digits.length >= 4 && !editMapping.account_alias && editMapping.bank_name) {
+                        next.account_alias = `${editMapping.bank_name}****${digits.slice(-4)}`
+                      }
+                      setEditMapping(next)
+                    }}
+                      placeholder="예: 1002-928-828777 (선택, 정확 매칭에 사용)"
+                      style={{ ...GLASS.L1, width: '100%', padding: '8px 12px', borderRadius: 8, fontSize: 13, marginTop: 4 }} />
+                  </label>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>지점 (선택)
+                    <input value={editMapping.branch || ''} onChange={e => setEditMapping({ ...editMapping, branch: e.target.value })}
+                      placeholder="예: 송파지점"
+                      style={{ ...GLASS.L1, width: '100%', padding: '8px 12px', borderRadius: 8, fontSize: 13, marginTop: 4 }} />
                   </label>
                   <label style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>은행
                     <select value={editMapping.bank_issuer || ''} onChange={e => {
@@ -3578,6 +3602,12 @@ export default function BankCardPage() {
                   </label>
                   <label style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>예금주
                     <input value={editMapping.account_holder || ''} onChange={e => setEditMapping({ ...editMapping, account_holder: e.target.value })}
+                      placeholder="예: 주식회사 에프엠아이"
+                      style={{ ...GLASS.L1, width: '100%', padding: '8px 12px', borderRadius: 8, fontSize: 13, marginTop: 4 }} />
+                  </label>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>예금주 연락처 (선택)
+                    <input value={editMapping.account_holder_phone || ''} onChange={e => setEditMapping({ ...editMapping, account_holder_phone: e.target.value })}
+                      placeholder="010-XXXX-XXXX"
                       style={{ ...GLASS.L1, width: '100%', padding: '8px 12px', borderRadius: 8, fontSize: 13, marginTop: 4 }} />
                   </label>
                   <label style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>용도 (자유 입력 + 추천)
