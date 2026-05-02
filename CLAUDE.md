@@ -589,6 +589,50 @@ finish(taskId, '✅ 완료 — 285건 적용')
 - ⚠️ DB prefix 일관성 없음 (cars, transactions, bank_account_mappings 등)
 - 🔜 향후 별도 작업 — route group 마이그레이션 + DB prefix 정리
 
+### 규칙 18 — 테이블 모든 컬럼에 정렬 의무 (2026-05-02 신설)
+
+> **사용자 명령**: "정렬을 모든 항목 다 적용해줘야지 날짜만.... 그리고 모든 규정에 정렬기능은 항목에 넣는것으로 규정"
+
+**원칙**: NeuDataTable 컴포넌트의 모든 컬럼에 `sortBy` 함수 의무 정의.
+
+```
+✓ 모든 컬럼에 sortBy: (row) => string|number|Date 정의
+✓ 기본 정렬: defaultSort={{ key: 'date', dir: 'desc' }} (시간순) 권장
+✓ 헤더 클릭 시 toggle (asc ↔ desc)
+✓ '액션' 같은 sortable 의미 없는 컬럼만 예외 (sortBy 미정의 OK)
+```
+
+**금지 패턴**:
+- ❌ 일부 컬럼만 sortBy — 사용자가 정렬 시도해도 동작 안 함 → 답답
+- ❌ 자동 정렬 없는 표 — 사용자가 매번 스크롤로 찾음
+
+**예시** (통장/카드 거래 테이블):
+```ts
+const cardColumns: TableColumn<Transaction>[] = [
+  { key: 'date', sortBy: (r) => new Date(r.transaction_date).getTime(), ... },
+  { key: 'card', sortBy: (r) => `${r.card_company || ''} ${r.card_alias || ''}`, ... },
+  { key: 'merchant', sortBy: (r) => r.sms_merchant || r.description || '', ... },
+  { key: 'amount', sortBy: (r) => Number(r.amount || 0), ... },
+  { key: 'tx_status', sortBy: (r) => r.sms_transaction_type || '', ... },
+  { key: 'matched', sortBy: (r) => r.matched_car_number || r.matched_holder_name || '', ... },
+  ...
+]
+<NeuDataTable columns={cardColumns} defaultSort={{ key: 'date', dir: 'desc' }} ... />
+```
+
+**금액 표시 규칙 (운영 모델)**:
+- 카드 거래: 취소만 `-` 부호 (빨강), 승인은 부호 없음 (검정)
+- 통장 거래: 입금=`+` 녹색, 출금=`-` 빨강 (회계 관행)
+- 카드는 별도 「상태」 컬럼 (승인/취소/거절) — 색상 배지
+
+**자동화 안전장치 (TBD)**:
+```
+🔜 8. table-sort-coverage-lint.js — 컬럼 sortBy 누락 감지
+   - NeuDataTable 의 모든 columns 정의에 sortBy 있는지 검사
+   - '액션', '✂️' 같은 의미 없는 컬럼은 화이트리스트
+   - 위반 시 commit 차단
+```
+
 ### 위반 시 자동 자가 기록 + 누적 시 시스템 안전장치
 
 이 조항을 위반하면 즉시 `knowledge/common-errors.md`에 사례 기록.

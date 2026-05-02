@@ -1941,7 +1941,9 @@ export default function BankCardPage() {
     { key: 'date', label: '날짜', width: 100,
       sortBy: (r) => r.transaction_date ? new Date(r.transaction_date as any).getTime() : 0,
       render: (r) => <span style={{ fontSize: 13, color: COLORS.textSecondary }}>{fmtDate(r.transaction_date)}</span> },
-    { key: 'account', label: '계좌', width: 170, render: (r: any) => {
+    { key: 'account', label: '계좌', width: 170,
+      sortBy: (r: any) => `${r.bank_name || r.card_company || ''} ${r.bank_account_alias || r.sms_card_alias || ''}`,
+      render: (r: any) => {
       // 통장 컬럼: 계좌번호 + 매핑 상태
       //   "통장미등록"  = bank_account_mappings 에 미등록 → 매핑 관리에서 등록 필요
       //   "사업 통장"   = 등록됐고 차량 미할당 (정상 운영 — 사업 단위 공용 계좌)
@@ -1972,8 +1974,12 @@ export default function BankCardPage() {
         </div>
       )
     }, hideOnMobile: true },
-    { key: 'desc', label: '적요', render: (r) => <span style={{ fontSize: 13, fontWeight: 500 }}>{r.description || '-'}</span> },
-    { key: 'counterpart', label: '거래처', width: 140, render: (r) =>
+    { key: 'desc', label: '적요',
+      sortBy: (r) => r.description || '',
+      render: (r) => <span style={{ fontSize: 13, fontWeight: 500 }}>{r.description || '-'}</span> },
+    { key: 'counterpart', label: '거래처', width: 140,
+      sortBy: (r) => r.client_name || '',
+      render: (r) =>
       editingTx?.id === r.id && editingTx.field === 'client_name' ? (
         <input
           autoFocus
@@ -2018,7 +2024,9 @@ export default function BankCardPage() {
       <span style={{ fontSize: 12, color: COLORS.textSecondary }}>{r.balance_after != null ? nf(r.balance_after) : '-'}</span>,
       hideOnMobile: true
     },
-    { key: 'matched', label: '매칭', width: 130, render: (r: any) => {
+    { key: 'matched', label: '매칭', width: 130,
+      sortBy: (r: any) => r.bank_matched_car_number || r.bank_account_holder || '',
+      render: (r: any) => {
       // 차량 매칭 우선, 없으면 통장 매핑의 예금주/용도, 없으면 미매칭
       if (r.bank_matched_car_number) {
         return (
@@ -2038,7 +2046,9 @@ export default function BankCardPage() {
       }
       return <span style={{ fontSize: 11, color: '#cbd5e1' }}>—</span>
     }, hideOnMobile: true },
-    { key: 'status', label: '상태', width: 92, align: 'center', render: (r) =>
+    { key: 'status', label: '상태', width: 92, align: 'center',
+      sortBy: (r) => (!!r.related_type && !!r.related_id) ? 1 : 0,
+      render: (r) =>
       <MatchBadge matched={!!r.related_type && !!r.related_id} />
     },
     { key: 'actions', label: '', width: 40, align: 'center', render: (r) => (
@@ -2067,7 +2077,9 @@ export default function BankCardPage() {
     { key: 'date', label: '날짜', width: 100,
       sortBy: (r) => r.transaction_date ? new Date(r.transaction_date as any).getTime() : 0,
       render: (r) => <span style={{ fontSize: 13, color: COLORS.textSecondary }}>{fmtDate(r.transaction_date)}</span> },
-    { key: 'card', label: '카드', width: 170, render: (r: any) => {
+    { key: 'card', label: '카드', width: 170,
+      sortBy: (r: any) => `${r.card_company || ''} ${r.sms_card_alias || r.matched_card_alias || ''}`,
+      render: (r: any) => {
       // 카드 라벨 분기 (사용자 운영 모델 반영):
       //   📝 미등록      = corporate_cards 에 미등록
       //   🚗 차량 카드   = assigned_car_id 있음 (그 차량 전용 — 거래 자동 차량 매칭)
@@ -2130,7 +2142,9 @@ export default function BankCardPage() {
         </div>
       )
     }},
-    { key: 'merchant', label: '가맹점', render: (r: any) => {
+    { key: 'merchant', label: '가맹점',
+      sortBy: (r: any) => r.sms_merchant || r.description || '',
+      render: (r: any) => {
       // SMS 가맹점 우선, 없으면 description (구 데이터 호환)
       const merchant = r.sms_merchant || r.description || '-'
       const stType = r.sms_transaction_type
@@ -2147,11 +2161,10 @@ export default function BankCardPage() {
     { key: 'amount', label: '금액', width: 110, align: 'right',
       sortBy: (r: any) => Number(r.amount || 0),
       render: (r: any) => {
-      // 카드 거래 부호 표시 — 사용자 운영 관점:
-      //   승인 (approved) → +금액 (검정)  — 정상 결제
-      //   취소 (canceled) → -금액 (빨강)  — 환불/취소
-      //   declined        → 회색 부호 없음 (미승인 — 합산 제외)
-      // 지출/입금 (income/expense) 개념과 분리.
+      // 카드 부호 표시 (사용자 운영 모델):
+      //   취소 → -금액 (빨강)
+      //   승인 → 금액 (검정, 부호 없음)
+      //   declined → 금액 (회색)
       const stType = r.sms_transaction_type
       const isDeclined = r.sms_parse_status === 'ignored'
       const isCanceled = stType === 'canceled'
@@ -2159,14 +2172,38 @@ export default function BankCardPage() {
         isDeclined ? '#94a3b8' :
         isCanceled ? COLORS.expense :
         COLORS.textPrimary
-      const sign = isDeclined ? '' : (isCanceled ? '-' : '+')
       return (
         <span style={{ fontWeight: 600, fontSize: 13, color }}>
-          {sign}{nf(r.amount)}원
+          {isCanceled ? '-' : ''}{nf(r.amount)}원
         </span>
       )
     }},
-    { key: 'matched', label: '매칭', width: 140, render: (r: any) => {
+    { key: 'tx_status', label: '상태', width: 70, align: 'center',
+      sortBy: (r: any) => r.sms_transaction_type || '',
+      render: (r: any) => {
+        const stType = r.sms_transaction_type
+        const isDeclined = r.sms_parse_status === 'ignored'
+        if (isDeclined) {
+          return <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 4, background: 'rgba(0,0,0,0.05)', color: '#94a3b8', fontWeight: 600 }}>거절</span>
+        }
+        if (stType === 'canceled') {
+          return <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 4, background: 'rgba(239,68,68,0.10)', color: '#b91c1c', fontWeight: 700 }}>취소</span>
+        }
+        if (stType === 'approved') {
+          return <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 4, background: 'rgba(34,197,94,0.10)', color: '#15803d', fontWeight: 700 }}>승인</span>
+        }
+        if (stType === 'deposit') {
+          return <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 4, background: 'rgba(59,130,246,0.10)', color: '#1e40af', fontWeight: 700 }}>입금</span>
+        }
+        if (stType === 'withdrawal') {
+          return <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 4, background: 'rgba(245,158,11,0.10)', color: '#b45309', fontWeight: 700 }}>출금</span>
+        }
+        return <span style={{ fontSize: 11, color: '#cbd5e1' }}>—</span>
+      }
+    },
+    { key: 'matched', label: '매칭', width: 140,
+      sortBy: (r: any) => r.matched_car_number || r.matched_holder_name || r.client_name || '',
+      render: (r: any) => {
       // 차량 매칭 우선, 없으면 직원
       if (r.matched_car_number) {
         return (
@@ -2184,13 +2221,17 @@ export default function BankCardPage() {
       }
       return <span style={{ fontSize: 11, color: '#cbd5e1' }}>—</span>
     }, hideOnMobile: true },
-    { key: 'source', label: '출처', width: 70, align: 'center', render: (r) =>
+    { key: 'source', label: '출처', width: 70, align: 'center',
+      sortBy: (r) => r.imported_from || '',
+      render: (r) =>
       <span style={{ fontSize: 11, padding: '1px 6px', borderRadius: 4, background: r.imported_from === 'sms' ? COLORS.bgGreen : COLORS.bgBlue, color: r.imported_from === 'sms' ? COLORS.success : COLORS.info }}>
         {r.imported_from === 'sms' ? 'SMS' : '엑셀'}
       </span>,
       hideOnMobile: true
     },
-    { key: 'status', label: '상태', width: 92, align: 'center', render: (r) =>
+    { key: 'status', label: '매칭상태', width: 92, align: 'center',
+      sortBy: (r) => (!!r.related_type && !!r.related_id) ? 1 : 0,
+      render: (r) =>
       <MatchBadge matched={!!r.related_type && !!r.related_id} />
     },
   ]
