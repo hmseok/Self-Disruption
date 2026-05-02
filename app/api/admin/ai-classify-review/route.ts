@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
         SUM(amount) AS total_amount
       FROM transactions
       WHERE deleted_at IS NULL
-      GROUP BY category
+      GROUP BY COALESCE(final_category, category, '미분류')
       ORDER BY cnt DESC
       LIMIT 50
     `
