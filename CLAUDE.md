@@ -458,6 +458,60 @@ git push 전, 사용자에게 다음 형식으로 보고:
    - 위치: harness-engineering/scripts/helper-coverage-lint.js (TBD)
 ```
 
+### 규칙 15 — 반복 실수 자동 차단 (2026-05-02 신설)
+
+> **사용자 명령**: "실수하고 재반복하게 된 부분은 하네스에 학습시켜 무조건 이후 동일 실수가 나오지 않도록 학습. 무조건 자동화."
+
+**원칙**: 인간 주의력 (memo / 의지) 의존 X. 시스템 차원 강제 차단.
+
+**같은 부류 실수가 N회 발생하면 즉시 자동화 도구 신설:**
+
+| 실수 부류 | 자동화 대응 |
+|----------|------------|
+| SQL 컬럼 추측 (profiles.full_name, transactions.card_last4 등) | `sql-lint.js` — $queryRaw + lib/ helper SQL 모두 검증 ✅ |
+| MySQL 회색 함수 (REGEXP_REPLACE) | `sql-fn-lint.js` ✅ |
+| Collation mismatch | (TBD — `sql-collation-lint.js`) |
+| 동형 패턴 한 곳만 fix | 규칙 14 + (TBD — `helper-coverage-lint.js`) |
+| API 라우트 / UI fetch 불일치 | `api-call-trace.js` ✅ |
+| 같은 데이터 다른 화면 누락 | `ui-data-coverage.js` ✅ |
+| 답변에 SQL 적기 전 schema 추측 | (TBD — 답변 작성 워크플로우 self-check 강화) |
+
+**적용 절차**:
+
+```
+실수 1회 발생:
+  → harness-engineering/regression-cases/{date}-{slug}.md 자동 기록
+  → knowledge/lint-violations.md 누적
+
+실수 2회 발생 (같은 부류):
+  → 사용자에게 "같은 부류 N회 발생 — 자동화 도입 제안" 보고
+  → 자동화 hook 설계서 + GO 받기
+
+실수 3회+ 발생:
+  → 자동화 hook 즉시 신설 (사용자 명시적 사과 + 신설 commit)
+  → CLAUDE.md 에 자동화 도구 등록
+  → pre-commit hook 으로 자동 강제
+
+실수 5회+ 발생 같은 부류:
+  → 해당 작업 영역 "자율 개시 금지" — 사용자 명시적 지시만 수행
+```
+
+**오늘 (2026-05-02) 신설 자동화**:
+
+```
+[before commit ad37d3a] sql-lint $queryRaw 호출만 검증
+[after  commit 4d2a8f4] cardMappingJoinSql 안 transactions.card_last4 컬럼 (실재 X)
+                         → 카드 거래 화면 깨짐 (사용자 답답)
+
+[hotfix 8dc3698] cardMappingJoinSql 안전화
+
+[자동화 신설 — sql-lint 확장]
+sql-lint 가 lib/*.ts 안 SQL helper 함수 (이름 *Sql 끝) 검사:
+- 추출된 column 이 schema 의 어느 테이블에든 있는지 확인
+- 없으면 즉시 violation
+검증: lib/_test-helper.ts 의 nonexistent_col_xyz → ❌ 차단 확인
+```
+
 ### 위반 시 자동 자가 기록 + 누적 시 시스템 안전장치
 
 이 조항을 위반하면 즉시 `knowledge/common-errors.md`에 사례 기록.

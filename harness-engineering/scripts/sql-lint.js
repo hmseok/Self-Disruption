@@ -66,6 +66,13 @@ function extractSqlCalls(src, file) {
   while ((m = unsafeRe.exec(src)) !== null) {
     out.push({ sql: m[2], file, offset: m.index })
   }
+  // ── lib/ 의 SQL helper 추출 (2026-05-02 신설 — 자동화 사고 방지) ──
+  // 함수 이름이 Sql 로 끝나는 export function 의 backtick 반환 SQL 단편 검사.
+  // 예: export function bankMappingJoinSql(...) { return `...` }
+  const helperRe = /export\s+function\s+\w*Sql\s*\([^)]*\)[^{]*\{[\s\S]*?return\s*`([\s\S]*?)`/g
+  while ((m = helperRe.exec(src)) !== null) {
+    out.push({ sql: m[1], file, offset: m.index, isHelper: true })
+  }
   return out
 }
 
@@ -116,6 +123,11 @@ function walkTs(dir, out = []) {
 
 function lint() {
   const { strict, partial } = buildIndex()
+  // 모든 schema 의 컬럼 합집합 — helper SQL 의 어디에든 존재 검증용
+  const ALL_COLS = new Set()
+  for (const cols of Object.values(strict)) for (const c of cols) ALL_COLS.add(c)
+  for (const cols of Object.values(partial)) for (const c of cols) ALL_COLS.add(c)
+
   const violations = []
   const warnings = []
   const files = [...walkTs(APP_DIR), ...walkTs(LIB_DIR)]
@@ -123,29 +135,58 @@ function lint() {
   for (const file of files) {
     const src = fs.readFileSync(file, 'utf-8')
     const calls = extractSqlCalls(src, file)
-    for (const { sql, offset } of calls) {
-      const aliases = buildAliasMap(sql)
-      const refs = extractColRefs(sql)
-
+    for (const { sql, offset, isHelper } of calls) {
       const before = src.slice(0, offset)
       const lineNo = before.split('\n').length
 
-      for (const { aliasOrTable, col } of refs) {
-        const table = aliases[aliasOrTable]
-        // alias 미매핑 (subquery / CTE / 외부 변수) → skip
-        if (!table) continue
-        // strict (schema 정의) 만 검증, partial (migrations only) 은 skip — 정보 부족
-        const knownCols = strict[table]
-        if (!knownCols) continue
-        if (!knownCols.has(col)) {
-          violations.push({
-            file: path.relative(ROOT, file),
-            line: lineNo,
-            table,
-            column: col,
-            ref: `${aliasOrTable}.${col}`,
-            knownCols: [...knownCols].sort().slice(0, 10),
-          })
+      if (isHelper) {
+        // ── lib/ helper SQL — alias 가 동적 (${aliasParam}) 이라 어느 테이블인지 모름.
+        //    추출된 column 이 schema 의 어느 테이블에든 존재하는지 확인. 없으면 위반.
+        // 패턴: \w+\.(snake_col)  + ${alias}.column 모두 추출
+        const colSet = new Set()
+        // alias.col
+        const re1 = /\b([a-z_]\w*)\.([a-z_][a-z0-9_]*)\b/gi
+        let m1
+        while ((m1 = re1.exec(sql)) !== null) {
+          if (!SQL_KEYWORDS.has(m1[2].toLowerCase())) colSet.add(m1[2])
+        }
+        // ${alias}.col
+        const re2 = /\$\{[^}]+\}\.([a-z_][a-z0-9_]*)/g
+        let m2
+        while ((m2 = re2.exec(sql)) !== null) {
+          if (!SQL_KEYWORDS.has(m2[1].toLowerCase())) colSet.add(m2[1])
+        }
+        for (const col of colSet) {
+          if (!ALL_COLS.has(col)) {
+            violations.push({
+              file: path.relative(ROOT, file),
+              line: lineNo,
+              table: '(helper)',
+              column: col,
+              ref: `(SQL helper) ${col}`,
+              knownCols: ['→ schema 의 어떤 테이블에도 없는 컬럼'],
+            })
+          }
+        }
+      } else {
+        // 기존 — $queryRaw 호출의 SQL — alias 매핑으로 정확 검증
+        const aliases = buildAliasMap(sql)
+        const refs = extractColRefs(sql)
+        for (const { aliasOrTable, col } of refs) {
+          const table = aliases[aliasOrTable]
+          if (!table) continue
+          const knownCols = strict[table]
+          if (!knownCols) continue
+          if (!knownCols.has(col)) {
+            violations.push({
+              file: path.relative(ROOT, file),
+              line: lineNo,
+              table,
+              column: col,
+              ref: `${aliasOrTable}.${col}`,
+              knownCols: [...knownCols].sort().slice(0, 10),
+            })
+          }
         }
       }
     }

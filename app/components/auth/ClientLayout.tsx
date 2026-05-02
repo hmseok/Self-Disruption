@@ -369,9 +369,9 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="print:!h-auto print:!overflow-visible print:!block" style={{ display: 'flex', height: '100dvh', background: '#f2f1ef', overflowX: 'hidden', overflowY: 'hidden' }}>
-      {/* 모바일 상단 고정 바 — 햄버거 + 업체선택 */}
+      {/* 상단 고정 바 — 햄버거 + 업체선택 (lg:hidden 제거 — 데스크탑에서도 사이드바 닫기 가능) */}
       {!isSidebarOpen && (
-        <div className="fixed top-0 left-0 right-0 z-30 lg:hidden safe-top" style={{ background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', borderBottom: '1px solid rgba(0,0,0,0.06)', boxShadow: '0 4px 12px rgba(140,170,210,0.15)' }}>
+        <div className="fixed top-0 left-0 right-0 z-30 safe-top" style={{ background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', borderBottom: '1px solid rgba(0,0,0,0.06)', boxShadow: '0 4px 12px rgba(140,170,210,0.15)' }}>
           <div className="flex items-center gap-3 px-4 py-2.5" style={{ paddingTop: 'max(0.625rem, env(safe-area-inset-top))' }}>
             {/* 햄버거 */}
             <button
@@ -396,8 +396,8 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
         onClick={() => setIsSidebarOpen(false)}
       />
 
-      {/* 사이드바 */}
-      <aside className={`${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} w-60 transition-transform duration-300 overflow-hidden flex flex-col fixed h-full z-20 lg:translate-x-0`} style={{ background: 'rgba(255,255,255,0.75)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', borderRight: '1px solid rgba(255,255,255,0.30)', boxShadow: '4px 0 12px rgba(140,170,210,0.12)', color: '#1e293b' }}>
+      {/* 사이드바 — lg:translate-x-0 제거: 데스크탑에서도 isSidebarOpen state 따름 (사용자 토글 가능) */}
+      <aside className={`${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} w-60 transition-transform duration-300 overflow-hidden flex flex-col fixed h-full z-20`} style={{ background: 'rgba(255,255,255,0.75)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', borderRight: '1px solid rgba(255,255,255,0.30)', boxShadow: '4px 0 12px rgba(140,170,210,0.12)', color: '#1e293b' }}>
         <div className="w-60 flex flex-col h-full">
 
           {/* 로고 */}
@@ -405,7 +405,7 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
             <span className="tracking-tight cursor-pointer" onClick={() => router.push('/dashboard')} style={{ fontSize: 18, fontWeight: 900, background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
               FMI ERP
             </span>
-            <button onClick={() => setIsSidebarOpen(false)} className="text-slate-400 hover:text-slate-700 lg:hidden">
+            <button onClick={() => setIsSidebarOpen(false)} className="text-slate-400 hover:text-slate-700" title="사이드바 닫기">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
             </button>
           </div>
