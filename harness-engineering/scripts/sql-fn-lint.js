@@ -39,14 +39,15 @@ const GREY_FUNCTIONS = [
 
 function extractSqlBlocks(src) {
   const out = []
-  // Tagged template 호출
-  const tagRe = /\$(?:query|execute)Raw(?:<[^>]*>)?\s*`([\s\S]*?)`/g
+  // Tagged template 호출 — generic 중첩 (예: $queryRaw<Array<{...}>>) 도 매칭.
+  // "Raw 뒤에 Unsafe 가 아닌 위치부터 백틱 직전까지 어떤 글자든" 으로 단순화.
+  const tagRe = /\$(?:query|execute)Raw(?!Unsafe)\b[^`]*`([\s\S]*?)`/g
   let m
   while ((m = tagRe.exec(src)) !== null) {
     out.push({ sql: m[1], offset: m.index })
   }
-  // Unsafe 호출
-  const unsafeRe = /\$(?:query|execute)RawUnsafe\s*(?:<[^>]*>)?\s*\(\s*([`'"])([\s\S]*?)\1/g
+  // Unsafe 호출 — generic 무시
+  const unsafeRe = /\$(?:query|execute)RawUnsafe\b[^(]*\(\s*([`'"])([\s\S]*?)\1/g
   while ((m = unsafeRe.exec(src)) !== null) {
     out.push({ sql: m[2], offset: m.index })
   }

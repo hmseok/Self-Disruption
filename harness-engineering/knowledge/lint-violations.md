@@ -121,3 +121,39 @@
 - sql-fn-lint: total=0
 - api-trace: broken=33, newBroken=0
 - ui-coverage: warnings=32
+
+## 2026-05-02 00:08:23
+- sql-lint: total=42, new=3, known=39
+- sql-fn-lint: total=0
+- api-trace: broken=33, newBroken=0
+- ui-coverage: warnings=32
+  - **새 SQL 컬럼 위반**:
+    - `app/api/admin/card-match-diag/route.ts:75` cc.previous_card_number (table `corporate_cards` 에 `previous_card_number` 없음)
+    - `app/api/admin/card-match-diag/route.ts:75` cc.department (table `corporate_cards` 에 `department` 없음)
+    - `app/api/admin/card-match-diag/route.ts:75` cc.card_type (table `corporate_cards` 에 `card_type` 없음)
+
+## 2026-05-02 00:08:36
+- sql-lint: total=42, new=3, known=39
+- sql-fn-lint: total=0
+- api-trace: broken=33, newBroken=0
+- ui-coverage: warnings=32
+  - **새 SQL 컬럼 위반**:
+    - `app/api/admin/card-match-diag/route.ts:75` cc.previous_card_number (table `corporate_cards` 에 `previous_card_number` 없음)
+    - `app/api/admin/card-match-diag/route.ts:75` cc.department (table `corporate_cards` 에 `department` 없음)
+    - `app/api/admin/card-match-diag/route.ts:75` cc.card_type (table `corporate_cards` 에 `card_type` 없음)
+
+## 2026-05-02 00:08:59
+- sql-lint: total=42, new=3, known=39
+- sql-fn-lint: total=0
+- api-trace: broken=33, newBroken=0
+- ui-coverage: warnings=32
+  - **새 SQL 컬럼 위반**:
+    - `app/api/admin/card-match-diag/route.ts:75` cc.previous_card_number (table `corporate_cards` 에 `previous_card_number` 없음)
+    - `app/api/admin/card-match-diag/route.ts:75` cc.department (table `corporate_cards` 에 `department` 없음)
+    - `app/api/admin/card-match-diag/route.ts:75` cc.card_type (table `corporate_cards` 에 `card_type` 없음)
+
+## 2026-05-02 00:09:09
+- sql-lint: total=42, new=0, known=42
+- sql-fn-lint: total=0
+- api-trace: broken=33, newBroken=0
+- ui-coverage: warnings=32

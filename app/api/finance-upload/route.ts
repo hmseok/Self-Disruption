@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyUser } from '@/lib/auth-server'
 import { prisma } from '@/lib/prisma'
+import { bankMappingJoinSql } from '@/lib/last4-match'
 
 function serialize<T>(data: T): T {
   return JSON.parse(JSON.stringify(data, (_, v) => typeof v === 'bigint' ? v.toString() : v))
@@ -82,12 +83,7 @@ export async function GET(request: NextRequest) {
         LEFT JOIN corporate_cards cc       ON cc.id COLLATE utf8mb4_unicode_ci = sms.card_id COLLATE utf8mb4_unicode_ci
         LEFT JOIN cars car                 ON car.id COLLATE utf8mb4_unicode_ci = cc.assigned_car_id COLLATE utf8mb4_unicode_ci
         LEFT JOIN bank_account_mappings bam
-          ON (bam.account_alias = sms.card_alias
-              OR (bam.account_number IS NOT NULL
-                  AND sms.card_alias IS NOT NULL
-                  AND CHAR_LENGTH(TRIM(bam.account_number)) >= 4
-                  AND CHAR_LENGTH(TRIM(sms.card_alias)) >= 4
-                  AND RIGHT(TRIM(bam.account_number), 4) = RIGHT(TRIM(sms.card_alias), 4)))
+          ON ${bankMappingJoinSql('bam', 'sms')}
         LEFT JOIN cars bam_car             ON bam_car.id COLLATE utf8mb4_unicode_ci = bam.assigned_car_id COLLATE utf8mb4_unicode_ci
         WHERE t.deleted_at IS NULL
         ORDER BY t.created_at DESC

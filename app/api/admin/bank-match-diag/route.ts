@@ -37,7 +37,11 @@ export async function GET(request: NextRequest) {
       matched: bigint
     }>>`
       SELECT
-        RIGHT(REGEXP_SUBSTR(s.card_alias, '[0-9]+$'), 4) AS last4,
+        CASE
+          WHEN s.card_alias IS NULL THEN NULL
+          WHEN CHAR_LENGTH(TRIM(s.card_alias)) < 4 THEN NULL
+          ELSE RIGHT(TRIM(s.card_alias), 4)
+        END AS last4,
         COUNT(*) AS total,
         SUM(CASE
           WHEN t.related_type = 'car' AND t.related_id IS NOT NULL THEN 1

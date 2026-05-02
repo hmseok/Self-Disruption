@@ -45,7 +45,11 @@ export async function GET(request: NextRequest) {
       SELECT
         COALESCE(
           JSON_UNQUOTE(JSON_EXTRACT(t.raw_data, '$.card_last4')),
-          RIGHT(REGEXP_SUBSTR(s.card_alias, '[0-9]+$'), 4)
+          CASE
+            WHEN s.card_alias IS NULL THEN NULL
+            WHEN CHAR_LENGTH(TRIM(s.card_alias)) < 4 THEN NULL
+            ELSE RIGHT(TRIM(s.card_alias), 4)
+          END
         ) AS last4,
         COUNT(*) AS total,
         SUM(CASE

@@ -55,14 +55,14 @@ const PROJECT_ALIASES = new Set([
 // $queryRaw / $executeRaw 호출 추출
 function extractSqlCalls(src, file) {
   const out = []
-  // Tagged template: prisma.$queryRaw`...` 또는 prisma.$queryRaw<T>`...`
-  const tagRe = /\$(?:query|execute)Raw(?:<[^>]*>)?\s*`([\s\S]*?)`/g
+  // Tagged template — generic 중첩 (Array<{...}>) 도 매칭하도록 단순화
+  const tagRe = /\$(?:query|execute)Raw(?!Unsafe)\b[^`]*`([\s\S]*?)`/g
   let m
   while ((m = tagRe.exec(src)) !== null) {
     out.push({ sql: m[1], file, offset: m.index })
   }
-  // Unsafe call: prisma.$queryRawUnsafe(`...`) 또는 ('...')
-  const unsafeRe = /\$(?:query|execute)RawUnsafe\s*(?:<[^>]*>)?\s*\(\s*([`'"])([\s\S]*?)\1/g
+  // Unsafe call — generic 무시
+  const unsafeRe = /\$(?:query|execute)RawUnsafe\b[^(]*\(\s*([`'"])([\s\S]*?)\1/g
   while ((m = unsafeRe.exec(src)) !== null) {
     out.push({ sql: m[2], file, offset: m.index })
   }

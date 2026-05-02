@@ -1,6 +1,24 @@
 {
   "violations": [
     {
+      "file": "app/api/admin/card-match-diag/route.ts",
+      "ref": "cc.previous_card_number",
+      "table": "corporate_cards",
+      "column": "previous_card_number"
+    },
+    {
+      "file": "app/api/admin/card-match-diag/route.ts",
+      "ref": "cc.department",
+      "table": "corporate_cards",
+      "column": "department"
+    },
+    {
+      "file": "app/api/admin/card-match-diag/route.ts",
+      "ref": "cc.card_type",
+      "table": "corporate_cards",
+      "column": "card_type"
+    },
+    {
       "file": "app/api/admin-invite/route.ts",
       "ref": "pc.employee_name",
       "table": "profiles",
@@ -235,6 +253,6 @@
       "column": "employee_name"
     }
   ],
-  "generatedAt": "2026-05-01T23:42:18.677Z",
+  "generatedAt": "2026-05-02T00:08:59.800Z",
   "note": "기존 SQL 컬럼 위반 — known issue 로 처리. 새 위반만 lint fail."
 }
