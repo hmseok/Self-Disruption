@@ -103,6 +103,12 @@
       "column": "fuel_type"
     },
     {
+      "file": "app/api/finance/auto-classify/dry-run/route.ts",
+      "ref": "t.card_company",
+      "table": "transactions",
+      "column": "card_company"
+    },
+    {
       "file": "app/api/finance/mappings/route.ts",
       "ref": "c.card_issuer",
       "table": "corporate_cards",
@@ -253,6 +259,6 @@
       "column": "employee_name"
     }
   ],
-  "generatedAt": "2026-05-02T00:08:59.800Z",
+  "generatedAt": "2026-05-02T01:01:59.569Z",
   "note": "기존 SQL 컬럼 위반 — known issue 로 처리. 새 위반만 lint fail."
 }

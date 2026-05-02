@@ -163,3 +163,33 @@
 - sql-fn-lint: total=0
 - api-trace: broken=33, newBroken=0
 - ui-coverage: warnings=32
+
+## 2026-05-02 01:00:32
+- sql-lint: total=43, new=1, known=42
+- sql-fn-lint: total=0
+- api-trace: broken=33, newBroken=0
+- ui-coverage: warnings=32
+  - **새 SQL 컬럼 위반**:
+    - `app/api/finance/auto-classify/dry-run/route.ts:93` t.card_company (table `transactions` 에 `card_company` 없음)
+
+## 2026-05-02 01:01:38
+- sql-lint: total=43, new=1, known=42
+- sql-fn-lint: total=0
+- api-trace: broken=33, newBroken=0
+- ui-coverage: warnings=32
+  - **새 SQL 컬럼 위반**:
+    - `app/api/finance/auto-classify/dry-run/route.ts:93` t.card_company (table `transactions` 에 `card_company` 없음)
+
+## 2026-05-02 01:01:59
+- sql-lint: total=43, new=1, known=42
+- sql-fn-lint: total=0
+- api-trace: broken=33, newBroken=0
+- ui-coverage: warnings=32
+  - **새 SQL 컬럼 위반**:
+    - `app/api/finance/auto-classify/dry-run/route.ts:93` t.card_company (table `transactions` 에 `card_company` 없음)
+
+## 2026-05-02 01:02:08
+- sql-lint: total=43, new=0, known=43
+- sql-fn-lint: total=0
+- api-trace: broken=33, newBroken=0
+- ui-coverage: warnings=32
