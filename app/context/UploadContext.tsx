@@ -620,6 +620,202 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
       }
 
       // ═════════════════════════════════════════
+      // 💳 카드 거래/리포트 직접 파싱 (Gemini 우회)
+      // 형식 A: 승인내역_*.xls (현대/우리 단일 카드) — 번호|카드번호|이용일시|가맹점명|승인금액|...
+      // 형식 B: 승인내역조회.xls (KB 부서별) — 승인일|승인시간|부서번호|부서명|카드번호|이용자명|가맹점명|...
+      // 형식 C: report (n).xls (우리카드 월별 리포트) — 메타 + 이용일자|이용카드(last4)|이용가맹점명|...
+      // ═════════════════════════════════════════
+      if (fileType === 'card_transaction' || fileType === 'card_report') {
+        updateProgress(10)
+        setLogs(`💳 카드 거래 직접 파싱 중... ${file.name} (${bodyRows.length}행)`)
+
+        // 메타 추출 (형식 C: report)
+        let cardReportYear = ''
+        let cardReportBank = ''
+        let cardReportAccount = ''
+        if (fileType === 'card_report') {
+          for (let mi = 0; mi < headerIdx; mi++) {
+            const row = jsonData[mi] || []
+            const rowStr = row.map((c: any) => String(c || '').trim()).filter(Boolean).join(' | ')
+            // "2025.11.01 ~ 2025.11.30"
+            const yrM = rowStr.match(/(\d{4})\.\d{2}\.\d{2}\s*~\s*(\d{4})\.\d{2}\.\d{2}/)
+            if (yrM && !cardReportYear) cardReportYear = yrM[1]
+            // "[우리은행]10055048*****"
+            const bkM = rowStr.match(/\[([^\]]+)\]\s*([0-9*]+)/)
+            if (bkM && !cardReportBank) {
+              cardReportBank = bkM[1]
+              cardReportAccount = bkM[2]
+            }
+          }
+          console.log(`[UploadContext] 카드 리포트 메타: 연도=${cardReportYear}, 결제은행=${cardReportBank}, 계좌=${cardReportAccount}`)
+        }
+
+        // 헤더 컬럼 매핑 (3가지 형식 통합)
+        const cardHeaders = (headerRow || []).map((h: any) => String(h || '').replace(/\n/g, ' ').trim())
+        const findCard = (...keywords: string[]) => cardHeaders.findIndex(h => keywords.some(kw => h.includes(kw)))
+
+        const idx = {
+          cardNumber: findCard('카드번호', '이용카드'),
+          dateTime: findCard('이용일시', '이용일자', '거래일시'),
+          dateOnly: findCard('승인일'),  // 형식 B: 승인일 + 승인시간 분리
+          time: findCard('승인시간'),
+          merchant: findCard('가맹점명', '이용가맹점명', '가맹점'),
+          amount: findCard('승인금액'),
+          cancelAmount: findCard('취소금액'),
+          approvalNo: findCard('승인번호'),
+          dept: findCard('부서명'),
+          deptNo: findCard('부서번호'),
+          userName: findCard('이용자명'),
+          industry: findCard('업종명', '업종'),
+          installment: findCard('할부'),
+          status: findCard('상태'),
+          domestic: findCard('국내/외'),
+          rejectReason: findCard('거절사유'),
+        }
+
+        console.log(`[UploadContext] 카드 컬럼 매핑:`, JSON.stringify(idx))
+
+        if (idx.cardNumber < 0 || idx.amount < 0 || (idx.dateTime < 0 && idx.dateOnly < 0)) {
+          console.warn('[UploadContext] 카드 컬럼 매핑 실패 → Gemini 파싱으로 폴백')
+        } else {
+          const parseAmt = (v: any): number => {
+            if (v == null) return 0
+            const s = String(v).replace(/[,\s원]/g, '').trim()
+            return Math.abs(Number(s) || 0)
+          }
+          const parseDate = (raw: string): string => {
+            if (!raw) return ''
+            // 엑셀 시리얼
+            const numVal = Number(raw)
+            if (!isNaN(numVal) && numVal > 30000 && numVal < 60000) {
+              const p = XLSX.SSF.parse_date_code(numVal)
+              return `${p.y}-${String(p.m).padStart(2, '0')}-${String(p.d).padStart(2, '0')} ${String(p.H).padStart(2, '0')}:${String(p.M).padStart(2, '0')}:${String(p.S).padStart(2, '0')}`
+            }
+            // "2026.04.25 00:39:56" / "2026-04-25" / "11.29 12:38" (월일.시분)
+            const s = String(raw).trim()
+            // 형식 C: "11.29 12:38" — 연도 누락 → cardReportYear 보충
+            const monthOnly = s.match(/^(\d{1,2})\.(\d{1,2})(?:\s+(\d{1,2}):(\d{1,2}))?/)
+            if (monthOnly && !s.match(/^\d{4}/) && cardReportYear) {
+              const [, mm, dd, hh, mi] = monthOnly
+              return `${cardReportYear}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')} ${(hh || '00').padStart(2, '0')}:${(mi || '00').padStart(2, '0')}:00`
+            }
+            // 표준
+            return s.replace(/\./g, '-')
+          }
+
+          const directParsed: any[] = []
+          let skippedRows = 0
+
+          for (const row of bodyRows) {
+            // 카드번호 검증 (마스킹 또는 전체 번호)
+            const cardNumRaw = String(row[idx.cardNumber] || '').trim()
+            if (!cardNumRaw || /^[\s\-]+$/.test(cardNumRaw)) { skippedRows++; continue }
+
+            // 날짜 합치기
+            let txDate = ''
+            if (idx.dateTime >= 0) {
+              txDate = parseDate(String(row[idx.dateTime] || '').trim())
+            } else if (idx.dateOnly >= 0) {
+              const d = parseDate(String(row[idx.dateOnly] || '').trim())
+              const t = idx.time >= 0 ? String(row[idx.time] || '').trim() : ''
+              txDate = t ? `${d.split(' ')[0]} ${t}` : d
+            }
+            if (!txDate || !/^\d{4}-\d{2}-\d{2}/.test(txDate)) { skippedRows++; continue }
+
+            // 금액 (취소면 음수 처리, 승인은 양수)
+            const approveAmt = parseAmt(row[idx.amount])
+            const cancelAmt = idx.cancelAmount >= 0 ? parseAmt(row[idx.cancelAmount]) : 0
+            const isCanceled = cancelAmt > 0 && approveAmt === 0
+            const amount = isCanceled ? cancelAmt : approveAmt
+            if (amount === 0) { skippedRows++; continue }
+
+            // 상태 (승인/취소/거절)
+            const statusRaw = idx.status >= 0 ? String(row[idx.status] || '').trim() : ''
+            const isReject = /거절/.test(statusRaw)
+            if (isReject) { skippedRows++; continue }  // 거절은 합산 제외
+
+            // last4 추출 (마스킹: ****-1234-5678-0202 또는 9410-4992-1234-5817)
+            const cardDigits = cardNumRaw.replace(/\D/g, '')
+            const cardLast4 = cardDigits.length >= 4 ? cardDigits.slice(-4) : ''
+
+            // 카드사 자동 감지 (메타 + 카드번호 prefix)
+            let cardCompany = ''
+            if (cardReportBank.includes('우리') || /우리카드|woori/i.test(file.name)) cardCompany = 'WOORI'
+            else if (cardNumRaw.startsWith('9410')) cardCompany = 'KB'
+            else if (cardNumRaw.includes('3210') || cardNumRaw.includes('3910')) cardCompany = 'HYUNDAI'
+            else cardCompany = ''
+
+            const merchant = idx.merchant >= 0 ? String(row[idx.merchant] || '').trim() : ''
+
+            directParsed.push({
+              transaction_date: txDate,
+              client_name: merchant,
+              amount,
+              type: isCanceled ? 'income' : 'expense',  // 취소=income (환불), 승인=expense
+              payment_method: 'Card',
+              description: idx.industry >= 0 ? String(row[idx.industry] || '').trim() : '',
+              card_number: cardNumRaw,
+              card_last4: cardLast4,
+              card_company: cardCompany,
+              approval_number: idx.approvalNo >= 0 ? String(row[idx.approvalNo] || '').trim() : '',
+              installment: idx.installment >= 0 ? String(row[idx.installment] || '').trim() : '',
+              currency: 'KRW',
+              // 메타
+              _user_name: idx.userName >= 0 ? String(row[idx.userName] || '').trim() : '',
+              _dept: idx.dept >= 0 ? String(row[idx.dept] || '').trim() : '',
+              _is_canceled: isCanceled,
+            })
+          }
+
+          console.log(`[UploadContext] 카드 직접파싱 완료: ${directParsed.length}건 (스킵 ${skippedRows}건)`)
+          setLogs(`💳 카드 직접 파싱 완료: ${directParsed.length}건`)
+
+          // 통장 분기와 동일한 후처리 (transformItem + 분류 API + 중복 제거)
+          let newTransactions = directParsed.map((item: any) => transformItem(item))
+          if (newTransactions.length > 0 && companyIdRef.current) {
+            try {
+              setLogs(`🔍 세무 분류 중... (${newTransactions.length}건)`)
+              const classifyHeaders = await getAuthHeaders()
+              const analyzeRes = await fetch('/api/finance/classify', {
+                method: 'POST',
+                headers: classifyHeaders,
+                body: JSON.stringify({ transactions: newTransactions }),
+              })
+              if (analyzeRes.ok) {
+                const { transactions: enriched } = await analyzeRes.json()
+                if (Array.isArray(enriched)) {
+                  newTransactions = enriched.map((item: any, idx: number) => ({
+                    ...newTransactions[idx],
+                    category: item.category || newTransactions[idx].category,
+                    related_type: item.related_type || newTransactions[idx].related_type,
+                    related_id: item.related_id || newTransactions[idx].related_id,
+                    matched_schedule_id: item.matched_schedule_id || null,
+                    match_score: item.match_score || 0,
+                    matched_contract_name: item.matched_contract_name || null,
+                    confidence: item.confidence || 0,
+                    classification_tier: item.classification_tier || 'manual',
+                    alternatives: item.alternatives || [],
+                    card_id: item.card_id || null,
+                    matched_employee_id: item.matched_employee_id || null,
+                    matched_employee_name: item.matched_employee_name || null,
+                    _queue_id: item._queue_id || null,
+                  }))
+                }
+              }
+            } catch (e) { console.error('분류 API 오류:', e) }
+          }
+
+          matchCancelPairs(newTransactions)
+          setTransactions(prev => {
+            const combined = [...prev, ...newTransactions]
+            return combined
+          })
+          updateProgress(100)
+          return  // 직접 파싱 완료 → Gemini 파싱 스킵
+        }
+      }
+
+      // ═════════════════════════════════════════
       // B) 카드 거래 / 통장 거래 / 카드 리포트 → AI 분석
       // ═════════════════════════════════════════
       const BATCH_SIZE = 30;
