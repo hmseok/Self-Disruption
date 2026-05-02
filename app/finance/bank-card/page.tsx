@@ -1721,6 +1721,50 @@ export default function BankCardPage() {
     }
   }
 
+  // [👤 개인 사용] 액션 — transaction_flags 신규 (급여 차감 후보)
+  const markAsPersonal = async (it: any) => {
+    const reason = prompt(`개인 사용으로 처리합니다 — 사유 (선택):\n\n적요: ${(it.description || '').slice(0, 60)}\n금액: ${nf(Number(it.amount || 0))}원\n${it.card_holder_name ? `직원: ${it.card_holder_name}` : ''}`, '')
+    if (reason === null) return // cancel
+    setRuleClassifyLoading(true)
+    try {
+      const { json } = await fetchWithAuth('/api/transactions/classify', {
+        method: 'PATCH',
+        body: {
+          id: it.id,
+          action: 'personal',
+          employee_name: it.card_holder_name || null,
+          reason: reason || null,
+        },
+      })
+      if (json?.ok) {
+        // 결과에서 제거
+        setRuleClassifyResult((prev: any) => {
+          if (!prev) return prev
+          const newGroups = { ...prev.groups }
+          for (const conf of ['high', 'medium', 'low'] as const) {
+            newGroups[conf] = newGroups[conf].filter((x: any) => x.id !== it.id)
+          }
+          return {
+            ...prev,
+            groups: newGroups,
+            counts: {
+              high: newGroups.high.length,
+              medium: newGroups.medium.length,
+              low: newGroups.low.length,
+              total: newGroups.high.length + newGroups.medium.length + newGroups.low.length,
+            },
+          }
+        })
+      } else {
+        alert(`개인 사용 처리 실패: ${json?.error || '알 수 없음'}`)
+      }
+    } catch (e: any) {
+      alert(`오류: ${e.message}`)
+    } finally {
+      setRuleClassifyLoading(false)
+    }
+  }
+
   // ── Phase 3-C — 분류 룰 관리 ──
   const loadRules = async () => {
     setRulesLoading(true)
@@ -2733,12 +2777,21 @@ export default function BankCardPage() {
                                   </td>
                                   <td style={{ padding: '6px 8px', fontSize: 11, color: COLORS.textMuted }}>{it.reason}</td>
                                   <td style={{ padding: '6px 8px', textAlign: 'center' }}>
-                                    <button
-                                      onClick={() => applyOneClassify(it)}
-                                      disabled={ruleClassifyLoading}
-                                      style={{ ...BTN.sm, padding: '3px 10px', fontSize: 10, fontWeight: 600,
-                                               background: '#15803d', color: '#fff', cursor: ruleClassifyLoading ? 'wait' : 'pointer' }}
-                                    >✓ 확정</button>
+                                    <div style={{ display: 'flex', gap: 4, justifyContent: 'center', flexWrap: 'wrap' }}>
+                                      <button
+                                        onClick={() => applyOneClassify(it)}
+                                        disabled={ruleClassifyLoading}
+                                        style={{ ...BTN.sm, padding: '3px 8px', fontSize: 10, fontWeight: 600,
+                                                 background: '#15803d', color: '#fff', cursor: ruleClassifyLoading ? 'wait' : 'pointer' }}
+                                      >✓ 확정</button>
+                                      <button
+                                        onClick={() => markAsPersonal(it)}
+                                        disabled={ruleClassifyLoading}
+                                        title="직원 개인 사용 — 급여 차감 후보로 등록"
+                                        style={{ ...BTN.sm, padding: '3px 8px', fontSize: 10, fontWeight: 600,
+                                                 background: '#ca8a04', color: '#fff', cursor: ruleClassifyLoading ? 'wait' : 'pointer' }}
+                                      >👤 개인</button>
+                                    </div>
                                   </td>
                                 </tr>
                               ))}
