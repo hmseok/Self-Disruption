@@ -4507,6 +4507,37 @@ export default function BankCardPage() {
                            background: 'rgba(59,130,246,0.10)', color: '#1d4ed8', border: '1px solid rgba(59,130,246,0.4)', cursor: 'pointer' }}
                 >💼 실행</button>
               </div>
+              <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px dashed ${COLORS.borderSubtle}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+                <div style={{ fontSize: 12, color: COLORS.textSecondary }}>
+                  ⚠️ backfill 결과 「기준없이 매핑」 으로 부정확하면 되돌리기 → 통장 엑셀 재업로드 (새 fix 가 정확한 메타 저장)
+                </div>
+                <button
+                  onClick={async () => {
+                    const { json: dry } = await fetchWithAuth('/api/admin/bank-excel-backfill', { method: 'POST', body: { revert: true, dryRun: true } })
+                    if (dry?.error) { alert(`오류: ${dry.error}`); return }
+                    if ((dry?.target_count || 0) === 0) { alert('🟢 되돌릴 backfill 데이터 없음'); return }
+                    const ok = confirm(
+                      `↩️ 통장 backfill 되돌리기\n\n` +
+                      `대상: ${dry?.target_count || 0}건\n` +
+                      `raw_data 의 _account_last4 / _account_number / _bank_alias / _account_holder 제거\n\n` +
+                      `▶ 적용?`
+                    )
+                    if (!ok) return
+                    const taskId = floaterProgress.start({ title: '↩️ backfill 되돌리기 중', total: dry?.target_count || 0 })
+                    try {
+                      const { json: applied } = await fetchWithAuth('/api/admin/bank-excel-backfill', { method: 'POST', body: { revert: true, dryRun: false } })
+                      if (applied?.error) { floaterProgress.finish(taskId, `오류: ${applied.error}`, 'error'); return }
+                      floaterProgress.update(taskId, { processed: applied?.target_count || 0, applied: applied?.updated || 0 })
+                      floaterProgress.finish(taskId, `✅ ${applied?.updated || 0}건 되돌림 — 통장 엑셀 재업로드 권장`)
+                      await Promise.all([loadSummary(), loadTransactions()])
+                    } catch (e: any) {
+                      floaterProgress.finish(taskId, `오류: ${e.message}`, 'error')
+                    }
+                  }}
+                  style={{ ...BTN.sm, padding: '6px 14px', fontSize: 11, fontWeight: 600,
+                           background: 'rgba(245,158,11,0.10)', color: '#b45309', border: '1px solid rgba(245,158,11,0.4)', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                >↩️ 되돌리기</button>
+              </div>
             </div>
 
             <div style={{ marginTop: 16, fontSize: 11, color: COLORS.textMuted, textAlign: 'center' }}>

@@ -81,6 +81,60 @@ export async function POST(request: NextRequest) {
     const body = await request.json().catch(() => ({}))
     const dryRun = !!body.dryRun
     const explicitMappingId: string | null = body.mapping_id || null
+    const revert = !!body.revert
+
+    // ─── REVERT 모드 — 기존 backfill 결과 rollback ─────────────────
+    // raw_data 에서 _account_last4 / _account_number / _bank_alias / _account_holder 만 제거
+    // (card_last4 등 다른 키는 유지)
+    if (revert) {
+      const targets = await prisma.$queryRawUnsafe<any[]>(`
+        SELECT id, raw_data
+        FROM transactions
+        WHERE deleted_at IS NULL
+          AND imported_from = 'excel_bank'
+          AND raw_data IS NOT NULL
+          AND (
+            JSON_UNQUOTE(JSON_EXTRACT(raw_data, '$._account_last4')) IS NOT NULL
+            OR JSON_UNQUOTE(JSON_EXTRACT(raw_data, '$._account_number')) IS NOT NULL
+            OR JSON_UNQUOTE(JSON_EXTRACT(raw_data, '$._bank_alias')) IS NOT NULL
+            OR JSON_UNQUOTE(JSON_EXTRACT(raw_data, '$._account_holder')) IS NOT NULL
+          )
+        LIMIT 5000
+      `)
+
+      let updated = 0
+      for (const tx of targets) {
+        let rawObj: any = {}
+        try {
+          rawObj = typeof tx.raw_data === 'string' ? JSON.parse(tx.raw_data) : tx.raw_data
+        } catch {
+          rawObj = {}
+        }
+        delete rawObj._account_last4
+        delete rawObj._account_number
+        delete rawObj._bank_alias
+        delete rawObj._account_holder
+
+        const newRaw = Object.keys(rawObj).length > 0 ? JSON.stringify(rawObj) : null
+
+        if (!dryRun) {
+          await prisma.$executeRawUnsafe(
+            `UPDATE transactions SET raw_data = ?, updated_at = NOW() WHERE id = ?`,
+            newRaw,
+            tx.id
+          )
+        }
+        updated++
+      }
+
+      return NextResponse.json({
+        mode: 'revert',
+        dryRun,
+        target_count: targets.length,
+        updated,
+      })
+    }
+    // ─────────────────────────────────────────────────────────────
 
     // 1) 매핑 조회
     const mappings = await prisma.$queryRawUnsafe<any[]>(`
