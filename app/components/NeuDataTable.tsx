@@ -1,8 +1,10 @@
 'use client'
+import { useState, useMemo } from 'react'
 
 // ═══════════════════════════════════════════════════════════════
 // NeuDataTable — 뉴모피즘 데이터 테이블
 // 데스크탑 테이블 + 모바일 카드 리스트 자동 전환
+// 컬럼 클릭 정렬 지원 (sortBy 정의된 컬럼만)
 // 모든 리스트 페이지 데이터 영역 통일 컴포넌트
 // ═══════════════════════════════════════════════════════════════
 
@@ -19,6 +21,8 @@ export interface TableColumn<T> {
   hideOnMobile?: boolean
   /** 모바일 카드에서 표시 순서 (0이면 미표시) */
   mobileOrder?: number
+  /** 정렬 가능 — 정렬 키 추출 함수 (string/number/Date 반환) */
+  sortBy?: (row: T) => string | number | Date | null | undefined
 }
 
 export interface MobileCardConfig<T> {
@@ -48,13 +52,53 @@ interface NeuDataTableProps<T> {
   loading?: boolean
   /** 최대 높이 (스크롤) */
   maxHeight?: number | string
+  /** 기본 정렬 — { key: 컬럼 key, dir: 'asc'|'desc' } */
+  defaultSort?: { key: string; dir: 'asc' | 'desc' }
+}
+
+function compareValues(a: any, b: any): number {
+  // null/undefined 는 마지막
+  const aNull = a === null || a === undefined
+  const bNull = b === null || b === undefined
+  if (aNull && bNull) return 0
+  if (aNull) return 1
+  if (bNull) return -1
+  // Date
+  if (a instanceof Date && b instanceof Date) return a.getTime() - b.getTime()
+  // Number
+  if (typeof a === 'number' && typeof b === 'number') return a - b
+  // string compare
+  return String(a).localeCompare(String(b))
 }
 
 export default function NeuDataTable<T>({
   columns, data, rowKey, onRowClick,
   emptyIcon = '📋', emptyMessage = '데이터가 없습니다',
-  mobileCard, loading, maxHeight,
+  mobileCard, loading, maxHeight, defaultSort,
 }: NeuDataTableProps<T>) {
+
+  // ── 정렬 상태 ──
+  const [sortKey, setSortKey] = useState<string | null>(defaultSort?.key || null)
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>(defaultSort?.dir || 'desc')
+
+  const sortedData = useMemo(() => {
+    if (!sortKey) return data
+    const col = columns.find(c => c.key === sortKey)
+    if (!col?.sortBy) return data
+    const dirMul = sortDir === 'asc' ? 1 : -1
+    return [...data].sort((a, b) => compareValues(col.sortBy!(a), col.sortBy!(b)) * dirMul)
+  }, [data, sortKey, sortDir, columns])
+
+  function handleSort(colKey: string) {
+    const col = columns.find(c => c.key === colKey)
+    if (!col?.sortBy) return // sortable 아님
+    if (sortKey === colKey) {
+      setSortDir(d => (d === 'asc' ? 'desc' : 'asc'))
+    } else {
+      setSortKey(colKey)
+      setSortDir('desc')  // 새 컬럼 클릭 시 기본 desc
+    }
+  }
 
   if (loading) {
     return (
@@ -107,36 +151,49 @@ export default function NeuDataTable<T>({
             <tr style={{
               borderBottom: '1px solid rgba(0,0,0,0.06)',
             }}>
-              {columns.filter(c => !c.hideOnMobile || true).map(col => (
-                <th
-                  key={col.key}
-                  style={{
-                    padding: '12px 14px',
-                    fontSize: 11,
-                    fontWeight: 600,
-                    color: '#64748b',
-                    textAlign: col.align || 'left',
-                    whiteSpace: 'nowrap',
-                    background: 'rgba(255,255,255,0.40)',
-                    letterSpacing: '0.02em',
-                    width: col.width,
-                    position: 'sticky',
-                    top: 0,
-                    zIndex: 1,
-                  }}
-                >
-                  {col.label}
-                </th>
-              ))}
+              {columns.filter(c => !c.hideOnMobile || true).map(col => {
+                const sortable = !!col.sortBy
+                const active = sortKey === col.key
+                return (
+                  <th
+                    key={col.key}
+                    onClick={sortable ? () => handleSort(col.key) : undefined}
+                    style={{
+                      padding: '12px 14px',
+                      fontSize: 11,
+                      fontWeight: 600,
+                      color: active ? '#3b6eb5' : '#64748b',
+                      textAlign: col.align || 'left',
+                      whiteSpace: 'nowrap',
+                      background: 'rgba(255,255,255,0.40)',
+                      letterSpacing: '0.02em',
+                      width: col.width,
+                      position: 'sticky',
+                      top: 0,
+                      zIndex: 1,
+                      cursor: sortable ? 'pointer' : 'default',
+                      userSelect: 'none',
+                    }}
+                    title={sortable ? '클릭하여 정렬' : undefined}
+                  >
+                    {col.label}
+                    {sortable && (
+                      <span style={{ marginLeft: 4, opacity: active ? 1 : 0.3, fontSize: 10 }}>
+                        {active ? (sortDir === 'asc' ? '▲' : '▼') : '⇅'}
+                      </span>
+                    )}
+                  </th>
+                )
+              })}
             </tr>
           </thead>
           <tbody>
-            {data.map((row, i) => (
+            {sortedData.map((row, i) => (
               <tr
                 key={rowKey(row)}
                 onClick={() => onRowClick?.(row)}
                 style={{
-                  borderBottom: i < data.length - 1 ? '1px solid rgba(0,0,0,0.04)' : 'none',
+                  borderBottom: i < sortedData.length - 1 ? '1px solid rgba(0,0,0,0.04)' : 'none',
                   cursor: onRowClick ? 'pointer' : 'default',
                   transition: 'background 0.15s',
                 }}
@@ -169,13 +226,13 @@ export default function NeuDataTable<T>({
 
       {/* ── 모바일 카드 리스트 ── */}
       <div className="md:hidden">
-        {data.map((row, i) => (
+        {sortedData.map((row, i) => (
           <div
             key={rowKey(row)}
             onClick={() => onRowClick?.(row)}
             style={{
               padding: '14px 16px',
-              borderBottom: i < data.length - 1 ? '1px solid rgba(0,0,0,0.04)' : 'none',
+              borderBottom: i < sortedData.length - 1 ? '1px solid rgba(0,0,0,0.04)' : 'none',
               cursor: onRowClick ? 'pointer' : 'default',
             }}
           >

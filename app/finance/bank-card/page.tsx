@@ -1931,7 +1931,9 @@ export default function BankCardPage() {
   // ── 통장 거래 탭 ──────────────────────────────────────
 
   const bankColumns: TableColumn<Transaction>[] = [
-    { key: 'date', label: '날짜', width: 100, render: (r) => <span style={{ fontSize: 13, color: COLORS.textSecondary }}>{fmtDate(r.transaction_date)}</span> },
+    { key: 'date', label: '날짜', width: 100,
+      sortBy: (r) => r.transaction_date ? new Date(r.transaction_date as any).getTime() : 0,
+      render: (r) => <span style={{ fontSize: 13, color: COLORS.textSecondary }}>{fmtDate(r.transaction_date)}</span> },
     { key: 'account', label: '계좌', width: 170, render: (r: any) => {
       // 통장 컬럼: 계좌번호 + 매핑 상태
       //   "통장미등록"  = bank_account_mappings 에 미등록 → 매핑 관리에서 등록 필요
@@ -1993,13 +1995,19 @@ export default function BankCardPage() {
       ),
       hideOnMobile: true
     },
-    { key: 'deposit', label: '입금', width: 110, align: 'right', render: (r) =>
+    { key: 'deposit', label: '입금', width: 110, align: 'right',
+      sortBy: (r) => r.type === 'income' ? Number(r.amount || 0) : 0,
+      render: (r) =>
       r.type === 'income' ? <span style={{ color: COLORS.income, fontWeight: 600, fontSize: 13 }}>+{nf(r.amount)}</span> : <span style={{ color: COLORS.textMuted }}>-</span>
     },
-    { key: 'withdrawal', label: '출금', width: 110, align: 'right', render: (r) =>
+    { key: 'withdrawal', label: '출금', width: 110, align: 'right',
+      sortBy: (r) => r.type === 'expense' ? Number(r.amount || 0) : 0,
+      render: (r) =>
       r.type === 'expense' ? <span style={{ color: COLORS.expense, fontWeight: 600, fontSize: 13 }}>-{nf(r.amount)}</span> : <span style={{ color: COLORS.textMuted }}>-</span>
     },
-    { key: 'balance', label: '잔액', width: 110, align: 'right', render: (r) =>
+    { key: 'balance', label: '잔액', width: 110, align: 'right',
+      sortBy: (r) => r.balance_after != null ? Number(r.balance_after) : 0,
+      render: (r) =>
       <span style={{ fontSize: 12, color: COLORS.textSecondary }}>{r.balance_after != null ? nf(r.balance_after) : '-'}</span>,
       hideOnMobile: true
     },
@@ -2049,7 +2057,9 @@ export default function BankCardPage() {
   // ── 카드 거래 탭 ──────────────────────────────────────
 
   const cardColumns: TableColumn<Transaction>[] = [
-    { key: 'date', label: '날짜', width: 100, render: (r) => <span style={{ fontSize: 13, color: COLORS.textSecondary }}>{fmtDate(r.transaction_date)}</span> },
+    { key: 'date', label: '날짜', width: 100,
+      sortBy: (r) => r.transaction_date ? new Date(r.transaction_date as any).getTime() : 0,
+      render: (r) => <span style={{ fontSize: 13, color: COLORS.textSecondary }}>{fmtDate(r.transaction_date)}</span> },
     { key: 'card', label: '카드', width: 170, render: (r: any) => {
       // 카드 라벨 분기 (사용자 운영 모델 반영):
       //   📝 미등록      = corporate_cards 에 미등록
@@ -2127,24 +2137,22 @@ export default function BankCardPage() {
         </span>
       )
     }},
-    { key: 'amount', label: '금액', width: 110, align: 'right', render: (r: any) => {
-      // SMS transaction_type 따라 색/부호 결정 (단순 모델)
-      //   approved/withdrawal → 빨강 -금액 (출금)
-      //   canceled            → 빨강 -금액 (취소 — 사용자 표시 모델)
-      //   deposit             → 녹색 +금액 (입금)
-      //   declined            → 회색 (미승인 — 합산 제외 의미)
-      //   기본 (SMS 없음)      → 빨강 (전통 expense)
+    { key: 'amount', label: '금액', width: 110, align: 'right',
+      sortBy: (r: any) => Number(r.amount || 0),
+      render: (r: any) => {
+      // 카드 거래 부호 표시 — 사용자 운영 관점:
+      //   승인 (approved) → +금액 (검정)  — 정상 결제
+      //   취소 (canceled) → -금액 (빨강)  — 환불/취소
+      //   declined        → 회색 부호 없음 (미승인 — 합산 제외)
+      // 지출/입금 (income/expense) 개념과 분리.
       const stType = r.sms_transaction_type
       const isDeclined = r.sms_parse_status === 'ignored'
+      const isCanceled = stType === 'canceled'
       const color =
         isDeclined ? '#94a3b8' :
-        stType === 'deposit' ? COLORS.income :
-        stType === 'canceled' || stType === 'withdrawal' || stType === 'approved' ? COLORS.expense :
-        r.type === 'income' ? COLORS.income : COLORS.expense
-      const sign =
-        stType === 'deposit' ? '+' :
-        stType === 'canceled' || stType === 'withdrawal' ? '-' :
-        ''
+        isCanceled ? COLORS.expense :
+        COLORS.textPrimary
+      const sign = isDeclined ? '' : (isCanceled ? '-' : '+')
       return (
         <span style={{ fontWeight: 600, fontSize: 13, color }}>
           {sign}{nf(r.amount)}원
@@ -2400,6 +2408,7 @@ export default function BankCardPage() {
               loading={loading}
               emptyIcon="🏦"
               emptyMessage="통장 거래 데이터가 없습니다"
+              defaultSort={{ key: 'date', dir: 'desc' }}
             />
           </>
         )}
@@ -2490,6 +2499,7 @@ export default function BankCardPage() {
               loading={loading}
               emptyIcon="💳"
               emptyMessage="카드 거래 데이터가 없습니다"
+              defaultSort={{ key: 'date', dir: 'desc' }}
             />
           </>
         )}
@@ -2774,8 +2784,22 @@ export default function BankCardPage() {
                                     {it.subcategory && <div style={{ fontSize: 10, color: COLORS.textSecondary }}>{it.subcategory}</div>}
                                   </td>
                                   <td style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 600,
-                                                color: it.type === 'income' ? COLORS.income : COLORS.expense }}>
-                                    {it.type === 'income' ? '+' : '-'}{nf(Number(it.amount || 0))}
+                                                color: (() => {
+                                                  // 카드 거래 (sms): 승인=검정, 취소=빨강
+                                                  // 통장 거래 (sms_bank/excel_bank): 입금=녹색, 출금=빨강
+                                                  const isCard = it.imported_from === 'sms' || (it.imported_from || '').startsWith('excel_card') || (it.imported_from || '').startsWith('pdf_card')
+                                                  if (isCard) {
+                                                    return it.sms_transaction_type === 'canceled' ? COLORS.expense : COLORS.textPrimary
+                                                  }
+                                                  return it.type === 'income' ? COLORS.income : COLORS.expense
+                                                })() }}>
+                                    {(() => {
+                                      const isCard = it.imported_from === 'sms' || (it.imported_from || '').startsWith('excel_card') || (it.imported_from || '').startsWith('pdf_card')
+                                      const sign = isCard
+                                        ? (it.sms_transaction_type === 'canceled' ? '-' : '+')
+                                        : (it.type === 'income' ? '+' : '-')
+                                      return `${sign}${nf(Number(it.amount || 0))}`
+                                    })()}
                                   </td>
                                   <td style={{ padding: '6px 8px', fontSize: 11, color: COLORS.textMuted }}>{it.reason}</td>
                                   <td style={{ padding: '6px 8px', textAlign: 'center' }}>
