@@ -61,13 +61,14 @@ export async function GET(request: NextRequest) {
 
     // 3) 같은 description 인데 다른 카테고리 (불일치)
     //    SMS merchant 또는 description 으로 그룹핑
+    // desc 는 MySQL 예약어 — description_text 로 alias 사용
     const inconsistent = await prisma.$queryRaw<Array<{
-      desc: string
+      description_text: string
       categories: string
       total_count: bigint
     }>>`
       SELECT
-        COALESCE(description, '') AS desc,
+        COALESCE(description, '') AS description_text,
         GROUP_CONCAT(DISTINCT COALESCE(final_category, category, '미분류') SEPARATOR '|') AS categories,
         COUNT(*) AS total_count
       FROM transactions
@@ -122,7 +123,7 @@ export async function GET(request: NextRequest) {
         total_amount: Number(r.total_amount || 0),
       })),
       inconsistent: inconsistent.map(r => ({
-        description: r.desc,
+        description: r.description_text,
         categories: String(r.categories || '').split('|'),
         count: Number(r.total_count),
       })),
