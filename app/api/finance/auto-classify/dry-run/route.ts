@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyUser } from '@/lib/auth-server'
 import { prisma } from '@/lib/prisma'
+import { cardMappingJoinSql } from '@/lib/last4-match'
 
 /**
  * POST /api/finance/auto-classify/dry-run
@@ -108,7 +109,7 @@ export async function POST(request: NextRequest) {
           car.model               AS car_model
         FROM transactions t
         LEFT JOIN card_sms_transactions sms ON sms.transaction_id COLLATE utf8mb4_unicode_ci = t.id COLLATE utf8mb4_unicode_ci
-        LEFT JOIN corporate_cards cc       ON cc.id COLLATE utf8mb4_unicode_ci = sms.card_id COLLATE utf8mb4_unicode_ci
+        LEFT JOIN corporate_cards cc       ON ${cardMappingJoinSql('cc', 'sms', 't')}
         LEFT JOIN cars car                 ON car.id COLLATE utf8mb4_unicode_ci = cc.assigned_car_id COLLATE utf8mb4_unicode_ci
         WHERE t.deleted_at IS NULL
           ${onlyUnclassified ? "AND (t.category IS NULL OR t.category = '')" : ''}

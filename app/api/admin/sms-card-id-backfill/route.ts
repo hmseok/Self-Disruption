@@ -60,6 +60,7 @@ export async function POST(request: NextRequest) {
       INNER JOIN transactions t
         ON t.id COLLATE utf8mb4_unicode_ci = s.transaction_id COLLATE utf8mb4_unicode_ci
         AND t.deleted_at IS NULL
+      -- helper-coverage-allow: 이 도구가 sms.card_id 를 backfill 하는 단계 — cardMappingJoinSql 의존성 만들면 안 됨
       INNER JOIN corporate_cards cc
         ON cc.status = 'active'
         AND cc.card_number IS NOT NULL

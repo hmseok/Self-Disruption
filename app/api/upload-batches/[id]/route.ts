@@ -77,6 +77,7 @@ export async function GET(
       LEFT JOIN freelancers fl         ON t.related_type = 'freelancer' AND t.related_id = fl.id
       LEFT JOIN contracts con          ON t.related_type = 'contract'   AND t.related_id = con.id
       LEFT JOIN fmi_rentals fr         ON (t.related_type IN ('fmi_rental', 'rental')) AND t.related_id = fr.id
+      -- helper-coverage-allow: related_type='card' 직접 매칭만 — last4 fallback 불필요
       LEFT JOIN corporate_cards cc     ON t.related_type = 'card'       AND t.related_id = cc.id
       LEFT JOIN insurance_contracts ic ON t.related_type = 'insurance'  AND t.related_id = ic.id
       LEFT JOIN loans ln               ON t.related_type = 'loan'       AND t.related_id = ln.id

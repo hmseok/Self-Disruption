@@ -15,6 +15,7 @@
     "lint:harness:baseline": "node harness-engineering/scripts/harness-lint.js --baseline-update",
     "lint:sql": "node harness-engineering/scripts/sql-lint.js",
     "lint:sql-fn": "node harness-engineering/scripts/sql-fn-lint.js",
+    "lint:helper": "node harness-engineering/scripts/helper-coverage-lint.js",
     "lint:api": "node harness-engineering/scripts/api-call-trace.js",
     "lint:ui": "node harness-engineering/scripts/ui-data-coverage.js",
     "harness:install-hook": "node harness-engineering/scripts/install-hook.js"

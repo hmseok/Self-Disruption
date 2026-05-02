@@ -30,6 +30,7 @@ const sqlFnLint = require('./sql-fn-lint')
 const apiTrace = require('./api-call-trace')
 const uiCoverage = require('./ui-data-coverage')
 const amountSignLint = require('./amount-sign-lint')
+const helperCoverageLint = require('./helper-coverage-lint')
 
 const flags = new Set(process.argv.slice(2))
 
@@ -122,6 +123,23 @@ function main() {
     console.error(`  ❌ ${b.url}  ← ${b.callers.slice(0, 2).join(', ')}`)
   }
 
+  // [평가] 4-1. helper-coverage — corporate_cards / bank_account_mappings JOIN 헬퍼 사용 강제 (규칙 14, 15)
+  console.log('\n▸ [3.4] helper-coverage-lint — JOIN 헬퍼 사용 강제')
+  const helperR = helperCoverageLint.lint()
+  const helperBaselinePath = path.join(KNOWLEDGE_DIR, 'helper-coverage-lint.baseline.json')
+  let helperBaselineSet = new Set()
+  if (fs.existsSync(helperBaselinePath)) {
+    try {
+      const data = JSON.parse(fs.readFileSync(helperBaselinePath, 'utf-8'))
+      helperBaselineSet = new Set((data.violations || []).map(v => `${v.file}:${v.line}`))
+    } catch {}
+  }
+  const newHelper = helperR.violations.filter(v => !helperBaselineSet.has(`${v.file}:${v.line}`))
+  console.log(`  ${helperR.fileCount} files, total=${helperR.violations.length}, new=${newHelper.length}`)
+  for (const v of newHelper.slice(0, 5)) {
+    console.error(`  ❌ ${v.file}:${v.line} ${v.table} (alias=${v.alias}) → ${v.helper} 사용 X`)
+  }
+
   // [평가] 4-2. amount + 부호 사용 차단 (CLAUDE.md 규칙 18)
   console.log('\n▸ [3.5] amount-sign-lint — + 부호 사용 차단')
   const signR = amountSignLint.lint()
@@ -185,7 +203,7 @@ function main() {
   }
 
   // 결과 집계
-  const newCritical = newSqlViolations.length + fnR.violations.length + newApiBroken.length + newSign.length
+  const newCritical = newSqlViolations.length + fnR.violations.length + newApiBroken.length + newSign.length + newHelper.length
   console.log('\n═══ 결과 ═══')
   console.log(`  새 critical 위반: ${newCritical}`)
   console.log(`  known issue: ${knownSqlViolations.length} SQL + ${apiR.brokenCalls.length - newApiBroken.length} broken-call`)

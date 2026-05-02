@@ -1954,8 +1954,8 @@ export default function BankCardPage() {
   const tabs = [
     { key: 'bank', label: '통장 거래', count: summary?.transactions.bank },
     { key: 'card', label: '카드 거래', count: summary?.transactions.card },
-    { key: 'classify', label: '분류 검수', count: summary?.transactions.classified },
-    { key: 'matching', label: '미분류', count: summary?.transactions.unclassified },
+    // 분류 검수 / 미분류 통합 — 한 탭에서 미분류 그룹 분류 + 분류 완료 카테고리 검수 모두 처리
+    { key: 'classify', label: '분류 검수', count: (summary?.transactions.classified || 0) + (summary?.transactions.unclassified || 0) },
     { key: 'settlement', label: '정산 연결', count: summary?.settlement.total },
     { key: 'sms', label: 'SMS 수집', count: summary?.sms?.total || 0 },
     { key: 'mapping', label: '매핑 관리' },
@@ -3184,8 +3184,8 @@ export default function BankCardPage() {
           </>
         )}
 
-        {/* ──── 미분류 + 그룹분류 탭 ──── */}
-        {activeTab === 'matching' && (
+        {/* ──── 미분류 + 그룹분류 (분류 검수 탭 안에서 같이 표시) ──── */}
+        {activeTab === 'classify' && (
           <>
             {/* 데이터 품질 안내 배너 */}
             {summary && summary.transactions.unclassified > 0 && summary.transactions.classified === 0 && !autoClassifyResult && (
@@ -4453,48 +4453,6 @@ export default function BankCardPage() {
                   style={{ ...BTN.sm, padding: '8px 18px', fontSize: 12, fontWeight: 700,
                            background: 'rgba(168,85,247,0.10)', color: '#7c3aed', border: '1px solid rgba(168,85,247,0.4)', cursor: 'pointer' }}
                 >🧪 실행</button>
-              </div>
-            </div>
-
-            {/* 통장 backfill 정리 (REVERT 전용) */}
-            <div style={{ ...GLASS.L4, borderRadius: 12, padding: 20, marginBottom: 12, border: `1px solid ${COLORS.borderSubtle}` }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
-                <div>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.textPrimary, marginBottom: 4 }}>
-                    ↩️ 통장 backfill 정리 (이전 부정확 매핑 제거)
-                  </div>
-                  <div style={{ fontSize: 12, color: COLORS.textSecondary, lineHeight: 1.5 }}>
-                    이전 backfill 실행으로 「기준없이」 강제 매핑된 거래의 raw_data 메타 제거.<br/>
-                    정리 후 통장 엑셀을 그대로 재업로드하면 새 코드가 파일 상단 메타를 정확하게 저장합니다.<br/>
-                    <span style={{ color: '#b45309' }}>※ apply 기능은 사용자 명령으로 제거됨 (부정확 매핑 방지)</span>
-                  </div>
-                </div>
-                <button
-                  onClick={async () => {
-                    const { json: dry } = await fetchWithAuth('/api/admin/bank-excel-backfill', { method: 'POST', body: { revert: true, dryRun: true } })
-                    if (dry?.error) { alert(`오류: ${dry.error}`); return }
-                    if ((dry?.target_count || 0) === 0) { alert('🟢 정리할 backfill 데이터 없음'); return }
-                    const ok = confirm(
-                      `↩️ 통장 backfill 정리\n\n` +
-                      `대상: ${dry?.target_count || 0}건\n` +
-                      `raw_data 의 _account_last4 / _account_number / _bank_alias / _account_holder 제거\n\n` +
-                      `▶ 적용?\n※ 정리 후 통장 엑셀 재업로드 권장`
-                    )
-                    if (!ok) return
-                    const taskId = floaterProgress.start({ title: '↩️ backfill 정리 중', total: dry?.target_count || 0 })
-                    try {
-                      const { json: applied } = await fetchWithAuth('/api/admin/bank-excel-backfill', { method: 'POST', body: { revert: true, dryRun: false } })
-                      if (applied?.error) { floaterProgress.finish(taskId, `오류: ${applied.error}`, 'error'); return }
-                      floaterProgress.update(taskId, { processed: applied?.target_count || 0, applied: applied?.updated || 0 })
-                      floaterProgress.finish(taskId, `✅ ${applied?.updated || 0}건 정리 완료 — 통장 엑셀 재업로드 권장`)
-                      await Promise.all([loadSummary(), loadTransactions()])
-                    } catch (e: any) {
-                      floaterProgress.finish(taskId, `오류: ${e.message}`, 'error')
-                    }
-                  }}
-                  style={{ ...BTN.sm, padding: '8px 18px', fontSize: 12, fontWeight: 700,
-                           background: 'rgba(245,158,11,0.10)', color: '#b45309', border: '1px solid rgba(245,158,11,0.4)', cursor: 'pointer' }}
-                >↩️ 정리</button>
               </div>
             </div>
 
