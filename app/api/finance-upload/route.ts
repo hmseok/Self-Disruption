@@ -80,7 +80,7 @@ export async function GET(request: NextRequest) {
           CONCAT_WS(' ', bam_car.brand, bam_car.model) AS bank_matched_car_model
         FROM transactions t
         LEFT JOIN card_sms_transactions sms ON sms.transaction_id COLLATE utf8mb4_unicode_ci = t.id COLLATE utf8mb4_unicode_ci
-        LEFT JOIN corporate_cards cc       ON ${cardMappingJoinSql('cc', 'sms')}
+        LEFT JOIN corporate_cards cc       ON ${cardMappingJoinSql('cc', 'sms', 't')}
         LEFT JOIN cars car                 ON car.id COLLATE utf8mb4_unicode_ci = cc.assigned_car_id COLLATE utf8mb4_unicode_ci
         LEFT JOIN bank_account_mappings bam
           ON ${bankMappingJoinSql('bam', 'sms')}
@@ -111,7 +111,7 @@ export async function GET(request: NextRequest) {
             CONCAT_WS(' ', car.brand, car.model) AS matched_car_model
           FROM transactions t
           LEFT JOIN card_sms_transactions sms ON sms.transaction_id COLLATE utf8mb4_unicode_ci = t.id COLLATE utf8mb4_unicode_ci
-          LEFT JOIN corporate_cards cc       ON ${cardMappingJoinSql('cc', 'sms')}
+          LEFT JOIN corporate_cards cc       ON ${cardMappingJoinSql('cc', 'sms', 't')}
           LEFT JOIN cars car                 ON car.id COLLATE utf8mb4_unicode_ci = cc.assigned_car_id COLLATE utf8mb4_unicode_ci
           WHERE t.deleted_at IS NULL
           ORDER BY t.created_at DESC

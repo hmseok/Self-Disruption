@@ -103,22 +103,33 @@ export function smsLast4Sql(smsAliasCol: string): string {
  *
  * collation: bank_account_mappings 와 같은 이슈 — utf8mb4_unicode_ci 명시.
  */
-export function cardMappingJoinSql(ccAlias: string, smsAlias: string): string {
+export function cardMappingJoinSql(ccAlias: string, smsAlias: string, txAlias?: string): string {
   const COLL = 'COLLATE utf8mb4_unicode_ci'
+  // tx.card_last4 fallback — 이전 파싱 거래 (card_alias NULL 또는 단순 발급사명) 강제 매칭용
+  const txLast4Match = txAlias ? `
+        OR (
+          ${txAlias}.card_last4 IS NOT NULL
+          AND CHAR_LENGTH(TRIM(${txAlias}.card_last4)) = 4
+          AND ${ccAlias}.card_number IS NOT NULL
+          AND CHAR_LENGTH(TRIM(${ccAlias}.card_number)) >= 4
+          AND RIGHT(TRIM(${ccAlias}.card_number), 4) ${COLL} = TRIM(${txAlias}.card_last4) ${COLL}
+        )` : ''
   return `(
     ${ccAlias}.id ${COLL} = ${smsAlias}.card_id ${COLL}
     OR (
-      ${smsAlias}.card_alias IS NOT NULL
-      AND CHAR_LENGTH(TRIM(${smsAlias}.card_alias)) >= 4
-      AND ${ccAlias}.status = 'active'
+      ${ccAlias}.status = 'active'
       AND (
-        (${ccAlias}.card_number IS NOT NULL
+        (${smsAlias}.card_alias IS NOT NULL
+         AND CHAR_LENGTH(TRIM(${smsAlias}.card_alias)) >= 4
+         AND ${ccAlias}.card_number IS NOT NULL
          AND CHAR_LENGTH(TRIM(${ccAlias}.card_number)) >= 4
          AND RIGHT(TRIM(${ccAlias}.card_number), 4) ${COLL} = RIGHT(TRIM(${smsAlias}.card_alias), 4) ${COLL})
         OR
-        (${ccAlias}.card_alias IS NOT NULL
+        (${smsAlias}.card_alias IS NOT NULL
+         AND CHAR_LENGTH(TRIM(${smsAlias}.card_alias)) >= 4
+         AND ${ccAlias}.card_alias IS NOT NULL
          AND CHAR_LENGTH(TRIM(${ccAlias}.card_alias)) >= 4
-         AND RIGHT(TRIM(${ccAlias}.card_alias), 4) ${COLL} = RIGHT(TRIM(${smsAlias}.card_alias), 4) ${COLL})
+         AND RIGHT(TRIM(${ccAlias}.card_alias), 4) ${COLL} = RIGHT(TRIM(${smsAlias}.card_alias), 4) ${COLL})${txLast4Match}
       )
     )
   )`
