@@ -2469,6 +2469,42 @@ export default function BankCardPage() {
                   >
                     🔍 매칭 진단
                   </button>
+                  <button
+                    onClick={async () => {
+                      // 1) DRY RUN
+                      const { json: dry } = await fetchWithAuth('/api/admin/sms-card-id-backfill', {
+                        method: 'POST',
+                        body: { dryRun: true },
+                      })
+                      if (dry?.error) { alert(`오류: ${dry.error}`); return }
+                      const cands = dry?.candidates || 0
+                      if (cands === 0) {
+                        alert('🟢 강제 매칭 후보 없음 — 모두 매칭됐거나 raw_data 의 card_last4 가 없습니다.')
+                        return
+                      }
+                      const byCardSummary = (dry?.by_card || []).slice(0, 10)
+                        .map((c: any) => `  · ${c.cc_alias || '(NULL)'}: ${c.count}건`).join('\n')
+                      const ok = confirm(
+                        `🔧 SMS card_id 강제 매칭\n\n` +
+                        `매칭 후보: ${cands}건 (raw_data.card_last4 ↔ corporate_cards.card_number 의 last4 일치)\n\n` +
+                        `카드별 분포:\n${byCardSummary || '  (없음)'}\n\n` +
+                        `▶ 적용하시겠습니까? card_sms_transactions.card_id 가 갱신됩니다.`
+                      )
+                      if (!ok) return
+                      // 2) APPLY
+                      const { json: applied } = await fetchWithAuth('/api/admin/sms-card-id-backfill', {
+                        method: 'POST',
+                        body: { dryRun: false },
+                      })
+                      if (applied?.error) { alert(`적용 오류: ${applied.error}`); return }
+                      alert(`✅ 적용: ${applied?.updated || 0}건 / 후보: ${applied?.candidates || 0}건\n\n새로고침 후 화면에 매칭 라벨이 표시됩니다.`)
+                      await loadTransactions()
+                    }}
+                    title="이전 파싱 SMS 거래의 card_id 를 raw_data.card_last4 매칭으로 강제 채움"
+                    style={{ ...BTN.sm, background: 'rgba(34,197,94,0.10)', color: '#15803d', border: '1px solid rgba(34,197,94,0.4)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+                  >
+                    🔧 SMS 강제 매칭
+                  </button>
                   {summary && summary.transactions.card > 0 && (
                     <button
                       onClick={() => deleteAndReupload('excel_card')}
