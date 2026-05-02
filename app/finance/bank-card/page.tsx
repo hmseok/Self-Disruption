@@ -2018,46 +2018,31 @@ export default function BankCardPage() {
       render: (r) =>
       r.type === 'expense' ? <span style={{ color: COLORS.expense, fontWeight: 600, fontSize: 13 }}>{nf(r.amount)}</span> : <span style={{ color: COLORS.textMuted }}>-</span>
     },
-    { key: 'balance', label: '잔액', width: 110, align: 'right',
-      sortBy: (r) => r.balance_after != null ? Number(r.balance_after) : 0,
-      render: (r) =>
-      <span style={{ fontSize: 12, color: COLORS.textSecondary }}>{r.balance_after != null ? nf(r.balance_after) : '-'}</span>,
-      hideOnMobile: true
-    },
-    { key: 'matched', label: '매칭', width: 130,
-      sortBy: (r: any) => r.bank_matched_car_number || r.bank_account_holder || '',
+    // 잔액 컬럼 제거 — 거의 없는 데이터 (화면 자리 차지)
+    { key: 'matched', label: '매칭', width: 110,
+      sortBy: (r: any) => r.bank_matched_car_number || r.bank_purpose || '',
       render: (r: any) => {
-      // 차량 매칭 우선, 없으면 통장 매핑의 예금주/용도, 없으면 미매칭
-      if (r.bank_matched_car_number) {
-        return (
-          <div>
-            <div style={{ fontSize: 12, fontWeight: 600, color: '#1e40af' }}>🚗 {r.bank_matched_car_number}</div>
-            {r.bank_matched_car_model && <div style={{ fontSize: 10, color: '#94a3b8' }}>{r.bank_matched_car_model}</div>}
-          </div>
-        )
-      }
-      if (r.bank_account_holder) {
-        return (
-          <div>
-            <span style={{ fontSize: 12, color: '#7c3aed' }}>👤 {r.bank_account_holder}</span>
-            {r.bank_purpose && <div style={{ fontSize: 10, color: '#94a3b8' }}>{r.bank_purpose}</div>}
-          </div>
-        )
-      }
-      return <span style={{ fontSize: 11, color: '#cbd5e1' }}>—</span>
-    }, hideOnMobile: true },
-    { key: 'status', label: '상태', width: 92, align: 'center',
+        // 한 줄 표시 (줄바꿈 최소화 — CLAUDE.md 규칙 19)
+        // 차량 > purpose > —
+        if (r.bank_matched_car_number) {
+          return <span style={{ fontSize: 12, fontWeight: 600, color: '#1e40af', whiteSpace: 'nowrap' }}>🚗 {r.bank_matched_car_number}</span>
+        }
+        if (r.bank_purpose) {
+          // 회사이름 (예금주) 안 표시 — 어차피 회사 통장. purpose 만 한 줄
+          const firstPurpose = r.bank_purpose.split('/')[0]
+          return <span style={{ fontSize: 12, color: '#7c3aed', whiteSpace: 'nowrap' }}>💼 {firstPurpose}</span>
+        }
+        return <span style={{ fontSize: 11, color: '#cbd5e1' }}>—</span>
+      }, hideOnMobile: true },
+    { key: 'status', label: '', width: 28, align: 'center',
       sortBy: (r) => (!!r.related_type && !!r.related_id) ? 1 : 0,
       render: (r) =>
-      <MatchBadge matched={!!r.related_type && !!r.related_id} />
+        // 매칭 안 된 거래만 작은 빨간 점 (자리 절약 — 규칙 19)
+        (!!r.related_type && !!r.related_id)
+          ? <span style={{ fontSize: 10, color: '#15803d' }}>✓</span>
+          : <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: 3, background: '#f59e0b' }} title="미매칭" />
     },
-    { key: 'actions', label: '', width: 40, align: 'center', render: (r) => (
-      <button
-        onClick={(e) => { e.stopPropagation(); openSplitModal(r) }}
-        title="거래 분리"
-        style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, padding: 2, color: COLORS.textMuted }}
-      >✂️</button>
-    ), hideOnMobile: true },
+    // 가위 (✂️ split) 컬럼 제거 — 사용 빈도 낮음 (규칙 19)
   ]
 
   const bankMobile: MobileCardConfig<Transaction> = {
@@ -5045,7 +5030,7 @@ export default function BankCardPage() {
             </div>
 
             <div style={{ padding: 12, borderRadius: 8, background: COLORS.bgBlue, marginBottom: 16, fontSize: 13 }}>
-              <strong>원본:</strong> {fmtDate(splitTarget.transaction_date)} · {splitTarget.description} · {splitTarget.client_name || '-'} · {splitTarget.type === 'income' ? '+' : '-'}{nf(splitTarget.amount)}원
+              <strong>원본:</strong> {fmtDate(splitTarget.transaction_date)} · {splitTarget.description} · {splitTarget.client_name || '-'} · <span style={{ color: splitTarget.type === 'income' ? COLORS.income : COLORS.expense }}>{splitTarget.type === 'expense' ? '-' : ''}{nf(splitTarget.amount)}원</span>
             </div>
 
             {splitItems.map((item, i) => (
