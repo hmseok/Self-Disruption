@@ -512,6 +512,83 @@ sql-lint 가 lib/*.ts 안 SQL helper 함수 (이름 *Sql 끝) 검사:
 검증: lib/_test-helper.ts 의 nonexistent_col_xyz → ❌ 차단 확인
 ```
 
+### 규칙 16 — 시간 걸리는 작업은 플로팅 진행률 의무 (2026-05-02 신설)
+
+> **사용자 명령**: "AI 진행 관련은 공통컴포넌트로 진행율 표출. 시간도 걸리니 플로팅화."
+
+**다음 중 하나라도 해당하면 `AIProgressFloater` 의무 사용**:
+
+```
+✓ AI/LLM 호출 (Gemini, OpenAI 등)
+✓ batch loop (≥10건 처리)
+✓ DB 대량 INSERT/UPDATE
+✓ 1초+ 걸리는 작업
+✓ webhook polling
+```
+
+**금지 패턴**:
+- ❌ alert("진행 중...") — 비동기 동작 끊김
+- ❌ inline progress bar 매번 새로 작성 — 중복
+
+**올바른 패턴** (app/components/AIProgressFloater.tsx):
+```ts
+const { start, update, finish } = useAIProgress()
+const taskId = start({ title: '🤖 AI 분류', total: 304 })
+update(taskId, { processed: 50, applied: 30 })
+finish(taskId, '✅ 완료 — 285건 적용')
+// 5초 후 자동 사라짐
+```
+
+전역 mount: `app/components/auth/ClientLayout.tsx` 의 AIProgressProvider.
+
+### 규칙 17 — 모듈 폴더 분리 + import 경계 (2026-05-02 신설, 다른 AI 검수 반영)
+
+> **외부 AI 검수**: "Next.js 자체 안정. 진짜 걱정은 프로젝트 구조 — 1년 후 본인도 어디 뭐 있는지 못 찾음."
+>
+> **바이브 코딩 함정**:
+> - 기능 추가 시 한 폴더에 쌓임
+> - 모듈 간 경계 흐려짐 (가계부 코드가 렌터카 import)
+> - 공통 컴포넌트 중복 생성 (Button 3개)
+
+**규칙**:
+
+```
+[A] 모듈 폴더 분리
+   향후 신규 모듈은 route group 으로 분리:
+   app/(admin)/finance/      ← 가계부 ERP
+   app/(admin)/rental/       ← 렌터카 ERP (예정)
+   app/(admin)/charger/      ← 충전기 ERP (예정)
+   app/(public)/cars/        ← 고객용 차량 페이지
+   app/(public)/booking/     ← 고객용 예약
+
+[B] 모듈 간 import 금지
+   - 가계부에서 렌터카 import X
+   - 공통은 components/, lib/ 로만
+   - DB: finance_*, rental_*, charger_* prefix 통일
+
+[C] Claude 한테 시킬 때 모듈 명시
+   ❌ "카드 추가 기능 만들어줘"
+   ✅ "가계부 모듈 (app/finance) 에 카드 추가 기능 만들어줘"
+
+[D] 공통 컴포넌트 폴더 미리 정해두기
+   app/components/ — UI 공통 (NeuDataTable, AIProgressFloater 등)
+   lib/ — 유틸/헬퍼 (last4-match.ts 등)
+   매번 새로 만들지 말고 "기존 components/ 안에 있는 거 먼저 써라"
+```
+
+**자동화 안전장치 (TBD)**:
+```
+🔜 7. module-import-lint.js (계획 중)
+   - app/(admin)/finance/ 안에서 app/(admin)/rental/ import 시 차단
+   - 공통은 app/components/, lib/ 로만 허용
+   - 위반 시 commit 차단
+```
+
+**현재 상태 (2026-05-02)**:
+- ⚠️ app/finance/, app/cars/, app/admin/ — 평면 구조 (route group 미적용)
+- ⚠️ DB prefix 일관성 없음 (cars, transactions, bank_account_mappings 등)
+- 🔜 향후 별도 작업 — route group 마이그레이션 + DB prefix 정리
+
 ### 위반 시 자동 자가 기록 + 누적 시 시스템 안전장치
 
 이 조항을 위반하면 즉시 `knowledge/common-errors.md`에 사례 기록.

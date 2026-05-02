@@ -6,6 +6,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useApp } from '../../context/AppContext'
 import { usePermission } from '../../hooks/usePermission'
 import { UploadProvider, useUpload } from '@/app/context/UploadContext'
+import { AIProgressProvider } from '../AIProgressFloater'
 import PageTitle from '../PageTitle'
 import QuickTxModal from '../QuickTxModal'
 import { getAuthHeader } from '@/app/utils/auth-client'
@@ -210,9 +211,11 @@ function MenuItem({ item, pathname, accent, allPaths }: { item: { name: string; 
 // ============================================
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
   return (
-    <UploadProvider>
-      <ClientLayoutInner>{children}</ClientLayoutInner>
-    </UploadProvider>
+    <AIProgressProvider>
+      <UploadProvider>
+        <ClientLayoutInner>{children}</ClientLayoutInner>
+      </UploadProvider>
+    </AIProgressProvider>
   )
 }
 

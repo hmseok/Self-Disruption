@@ -5,6 +5,7 @@ import NeuFilterTabs from '@/app/components/NeuFilterTabs'
 import DcStatStrip, { StatItem, ActionButton } from '@/app/components/DcStatStrip'
 import DcToolbar, { FilterItem } from '@/app/components/DcToolbar'
 import NeuDataTable, { TableColumn, MobileCardConfig } from '@/app/components/NeuDataTable'
+import { useAIProgress } from '@/app/components/AIProgressFloater'
 import { COLORS, GLASS, BTN, pillStyle } from '@/app/utils/ui-tokens'
 import { fetchWithAuth, getAuthHeader } from '@/app/utils/finance-upload'
 import * as XLSX from 'xlsx'
@@ -330,6 +331,9 @@ export default function BankCardPage() {
   const [showAdvancedMatch, setShowAdvancedMatch] = useState(false)
   const [reviewLoading, setReviewLoading] = useState(false)
   const [reviewTypeFilter, setReviewTypeFilter] = useState<'all' | 'income' | 'expense'>('all')
+
+  // AI 진행률 floater (전역 hook — 시간 걸리는 작업 UI)
+  const floaterProgress = useAIProgress()
 
   // 룰 기반 자동 분류 (Phase 3-A 신규 API 연동)
   const [ruleClassifyResult, setRuleClassifyResult] = useState<any>(null)
@@ -1627,6 +1631,7 @@ export default function BankCardPage() {
 
   // ── Phase 3-A — 룰 기반 자동 분류 (dry-run + apply) ──
   const runRuleClassify = async () => {
+    const taskId = floaterProgress.start({ title: '🤖 룰 자동 분류 시도 중', total: 0 })
     setRuleClassifyLoading(true)
     setRuleClassifyResult(null)
     setExpandedGroup(null)
@@ -1636,12 +1641,14 @@ export default function BankCardPage() {
         body: { source: 'all', limit: 5000 },
       })
       if (json?.error) {
-        alert(`자동 분류 오류: ${json.error}`)
+        floaterProgress.finish(taskId, `오류: ${json.error}`, 'error')
         return
       }
       setRuleClassifyResult(json)
+      const c = json?.counts || {}
+      floaterProgress.finish(taskId, `완료 — HIGH ${c.high || 0} / MEDIUM ${c.medium || 0} / LOW ${c.low || 0}`)
     } catch (e: any) {
-      alert(`자동 분류 오류: ${e.message}`)
+      floaterProgress.finish(taskId, `오류: ${e.message}`, 'error')
     } finally {
       setRuleClassifyLoading(false)
     }
@@ -1656,6 +1663,7 @@ export default function BankCardPage() {
     }
     if (!confirm(`${confidence.toUpperCase()} 그룹 ${items.length}건 일괄 확정하시겠습니까?\n(분류 적용 — 되돌리려면 분류 검수에서 직접 수정)`)) return
 
+    const taskId = floaterProgress.start({ title: `✓ ${confidence.toUpperCase()} 일괄 확정 진행 중`, total: items.length })
     setRuleClassifyLoading(true)
     try {
       const payload = items.map((it: any) => ({
@@ -1668,13 +1676,12 @@ export default function BankCardPage() {
         method: 'POST',
         body: { items: payload },
       })
-      alert(`✅ 적용: ${json?.applied || 0}건 / 실패: ${json?.failed || 0}건`)
-      // 재실행 — 적용된 거래 빠지고 남은 것만 다시 표시
+      floaterProgress.update(taskId, { processed: items.length, applied: json?.applied || 0, failed: json?.failed || 0 })
+      floaterProgress.finish(taskId, `✅ 적용 ${json?.applied || 0}건 / 실패 ${json?.failed || 0}건`)
       await runRuleClassify()
-      // 통계 새로고침
       await Promise.all([loadSummary(), loadTransactions()])
     } catch (e: any) {
-      alert(`적용 오류: ${e.message}`)
+      floaterProgress.finish(taskId, `오류: ${e.message}`, 'error')
     } finally {
       setRuleClassifyLoading(false)
     }
@@ -4216,10 +4223,16 @@ export default function BankCardPage() {
                       `▶ 진행하시겠습니까? (soft-delete — 복원 가능)`
                     )
                     if (!ok) return
-                    const { json: applied } = await fetchWithAuth('/api/admin/sms-rebuild-transactions', { method: 'POST', body: { dryRun: false } })
-                    if (applied?.error) { alert(`적용 오류: ${applied.error}`); return }
-                    alert(`✅ 완료\n· 삭제: ${applied?.deleted || 0}건\n· 재생성: ${applied?.created || 0}건`)
-                    await Promise.all([loadSummary(), loadTransactions()])
+                    const taskId = floaterProgress.start({ title: '📛 SMS 거래 재생성 진행 중', total: dry?.sms_count || 0 })
+                    try {
+                      const { json: applied } = await fetchWithAuth('/api/admin/sms-rebuild-transactions', { method: 'POST', body: { dryRun: false } })
+                      if (applied?.error) { floaterProgress.finish(taskId, `오류: ${applied.error}`, 'error'); return }
+                      floaterProgress.update(taskId, { processed: applied?.sms_count || 0, applied: applied?.created || 0 })
+                      floaterProgress.finish(taskId, `✅ 삭제 ${applied?.deleted || 0}건 → 재생성 ${applied?.created || 0}건 (SMS 1:1)`)
+                      await Promise.all([loadSummary(), loadTransactions()])
+                    } catch (e: any) {
+                      floaterProgress.finish(taskId, `오류: ${e.message}`, 'error')
+                    }
                   }}
                   style={{ ...BTN.sm, padding: '8px 18px', fontSize: 12, fontWeight: 700,
                            background: 'rgba(239,68,68,0.10)', color: '#b91c1c', border: '1px solid rgba(239,68,68,0.4)', cursor: 'pointer' }}
@@ -4300,13 +4313,19 @@ export default function BankCardPage() {
                       `▶ 삭제하시겠습니까?\n※ SMS 는 hard-delete, transactions 는 soft-delete`
                     )
                     if (!ok) return
-                    const { json: applied } = await fetchWithAuth('/api/admin/cleanup-test-data', {
-                      method: 'POST',
-                      body: { keyword: kw, dryRun: false },
-                    })
-                    if (applied?.error) { alert(`적용 오류: ${applied.error}`); return }
-                    alert(`✅ 완료\n· SMS 삭제: ${applied?.sms_deleted || 0}건\n· transactions soft-delete: ${applied?.tx_deleted || 0}건`)
-                    await Promise.all([loadSummary(), loadTransactions()])
+                    const taskId = floaterProgress.start({ title: `🧪 「${kw}」 데이터 정리 진행 중`, total: dry?.sms_count || 0 })
+                    try {
+                      const { json: applied } = await fetchWithAuth('/api/admin/cleanup-test-data', {
+                        method: 'POST',
+                        body: { keyword: kw, dryRun: false },
+                      })
+                      if (applied?.error) { floaterProgress.finish(taskId, `오류: ${applied.error}`, 'error'); return }
+                      floaterProgress.update(taskId, { processed: dry?.sms_count || 0, applied: applied?.sms_deleted || 0 })
+                      floaterProgress.finish(taskId, `✅ SMS ${applied?.sms_deleted || 0}건 / TX ${applied?.tx_deleted || 0}건 삭제`)
+                      await Promise.all([loadSummary(), loadTransactions()])
+                    } catch (e: any) {
+                      floaterProgress.finish(taskId, `오류: ${e.message}`, 'error')
+                    }
                   }}
                   style={{ ...BTN.sm, padding: '8px 18px', fontSize: 12, fontWeight: 700,
                            background: 'rgba(168,85,247,0.10)', color: '#7c3aed', border: '1px solid rgba(168,85,247,0.4)', cursor: 'pointer' }}
