@@ -1702,15 +1702,17 @@ export default function BankCardPage() {
   const bankColumns: TableColumn<Transaction>[] = [
     { key: 'date', label: '날짜', width: 100, render: (r) => <span style={{ fontSize: 13, color: COLORS.textSecondary }}>{fmtDate(r.transaction_date)}</span> },
     { key: 'account', label: '계좌', width: 170, render: (r: any) => {
-      // 통장 컬럼: 계좌번호 + 통장 등록 여부 표시
-      //   "통장미등록" = bank_account_mappings 에 미등록 → 매핑 관리에서 등록 필요
-      //   "차량미할당" = 통장은 등록됐으나 assigned_car_id 없음 (차량 미배정 — 정상일 수도)
+      // 통장 컬럼: 계좌번호 + 매핑 상태
+      //   "통장미등록"  = bank_account_mappings 에 미등록 → 매핑 관리에서 등록 필요
+      //   "사업 통장"   = 등록됐고 차량 미할당 (정상 운영 — 사업 단위 공용 계좌)
+      //   "🚗 차량번호" = 등록 + 차량 할당 (드뭄 — 차량 전용 통장)
       const alias = r.bank_account_alias || r.sms_card_alias || ''
       const aliasLast4 = alias.match(/(\d{4})\s*$/)?.[1]
       const last4 = aliasLast4
       const bankName = r.bank_name || (r.card_company || '').replace('_BANK', '')
       const hasBankMapping = !!(r.bank_account_alias || r.bank_account_holder)
       const hasCarAssigned = !!r.bank_matched_car_number
+      const purpose = r.bank_purpose || ''
       return (
         <div>
           <div style={{ fontSize: 12, fontWeight: 700, color: COLORS.primary }}>
@@ -1723,8 +1725,8 @@ export default function BankCardPage() {
             </div>
           )}
           {hasBankMapping && !hasCarAssigned && (
-            <div style={{ fontSize: 10, color: '#d97706', fontWeight: 500 }} title="통장은 등록됐으나 차량 할당 X (공용/일반계좌일 수 있음)">
-              🚗 차량 미할당
+            <div style={{ fontSize: 10, color: '#64748b', fontWeight: 500 }} title="사업 단위 공용 계좌 — 정상 운영. 차량 매칭은 거래별 검수에서 처리.">
+              💼 사업 통장{purpose ? ` · ${purpose.split('/')[0]}` : ''}
             </div>
           )}
         </div>
@@ -1818,13 +1820,24 @@ export default function BankCardPage() {
   const cardColumns: TableColumn<Transaction>[] = [
     { key: 'date', label: '날짜', width: 100, render: (r) => <span style={{ fontSize: 13, color: COLORS.textSecondary }}>{fmtDate(r.transaction_date)}</span> },
     { key: 'card', label: '카드', width: 170, render: (r: any) => {
-      // last4 우선순위 + 등록/차량할당 상태 명확 표시
+      // 카드 라벨 분기 (사용자 운영 모델 반영):
+      //   📝 미등록      = corporate_cards 에 미등록
+      //   🚗 차량 카드   = assigned_car_id 있음 (그 차량 전용 — 거래 자동 차량 매칭)
+      //   👤 직원 카드   = assigned_employee_id 있고 assigned_car_id 없음
+      //                    → 거래별 분류 검수 필요 (차량지원/운영비/개인)
+      //   🃏 공용 카드   = 둘 다 없음 (드뭄)
       const alias = r.sms_card_alias || r.matched_card_alias || ''
       const aliasLast4 = alias.match(/(\d{4})\s*$/)?.[1]
       const rawLast4 = r.card_last4 || ''
       const last4 = aliasLast4 || rawLast4
-      const hasCardMapping = !!(r.matched_card_alias || r.matched_holder_name || r.matched_car_id)
-      const hasCarAssigned = !!(r.matched_car_number || (r.related_type === 'car' && r.related_id))
+      const hasCardMapping = !!(r.matched_card_alias || r.matched_holder_name || r.matched_car_id || r.matched_employee_id)
+      const hasCarCard = !!r.matched_car_id
+      const hasEmployeeCard = !!r.matched_employee_id && !hasCarCard
+      const holder = r.matched_holder_name || ''
+      // 거래 분류 상태 (직원 카드일 때 의미)
+      const txCategorized = !!r.related_type || !!r.category
+      const txCar = r.related_type === 'car' && !!r.related_id
+      const txSalary = !!r.salary_adjustment_id
       return (
         <div>
           <div style={{ fontSize: 12, fontWeight: 700, color: COLORS.primary }}>
@@ -1836,9 +1849,34 @@ export default function BankCardPage() {
               📝 카드 미등록
             </div>
           )}
-          {hasCardMapping && !hasCarAssigned && (
-            <div style={{ fontSize: 10, color: '#d97706', fontWeight: 500 }} title="카드는 등록됐으나 차량 할당 X (공용/직원 카드일 수 있음)">
-              🚗 차량 미할당
+          {hasCardMapping && hasCarCard && (
+            <div style={{ fontSize: 10, color: '#1e40af', fontWeight: 600 }} title="차량 전용 카드 — 자동 차량 매칭">
+              🚗 차량 카드 {r.matched_car_number ? `· ${r.matched_car_number}` : ''}
+            </div>
+          )}
+          {hasCardMapping && hasEmployeeCard && !txCategorized && (
+            <div style={{ fontSize: 10, color: '#d97706', fontWeight: 600 }} title="직원 카드 — 거래별 분류 검수 필요 (차량지원/운영비/개인)">
+              👤 {holder || '직원'} · 분류 필요
+            </div>
+          )}
+          {hasCardMapping && hasEmployeeCard && txCategorized && txCar && (
+            <div style={{ fontSize: 10, color: '#15803d', fontWeight: 500 }} title="직원 카드 → 차량 비용 분류 완료">
+              👤 {holder || '직원'} → 🚗 분류완료
+            </div>
+          )}
+          {hasCardMapping && hasEmployeeCard && txCategorized && !txCar && txSalary && (
+            <div style={{ fontSize: 10, color: '#ca8a04', fontWeight: 600 }} title="직원 개인 사용 — 급여 차감 대기">
+              👤 {holder || '직원'} · 개인 (급여)
+            </div>
+          )}
+          {hasCardMapping && hasEmployeeCard && txCategorized && !txCar && !txSalary && (
+            <div style={{ fontSize: 10, color: '#64748b', fontWeight: 500 }} title="직원 카드 → 운영비 분류">
+              👤 {holder || '직원'} · 운영비
+            </div>
+          )}
+          {hasCardMapping && !hasCarCard && !hasEmployeeCard && (
+            <div style={{ fontSize: 10, color: '#7c3aed', fontWeight: 500 }} title="공용 카드 — 거래별 분류 필요">
+              🃏 공용 카드
             </div>
           )}
         </div>
@@ -2098,12 +2136,13 @@ export default function BankCardPage() {
                       alert(
                         `🏦 통장 매칭 진단\n\n` +
                         `📊 요약\n` +
-                        `  · 통장 거래(SMS): ${s.total_transactions || 0}건 (매칭 ${s.matched_transactions || 0} / 미매칭 ${s.unmatched_transactions || 0})\n` +
-                        `  · 등록 매핑: ${s.total_mappings || 0}개 (차량 할당 ${s.mappings_with_car || 0})\n` +
+                        `  · 통장 거래(SMS): ${s.total_transactions || 0}건\n` +
+                        `  · 거래의 차량 직접 매칭: ${s.matched_transactions || 0}건 (드뭄 — 통장은 보통 사업 단위)\n` +
+                        `  · 등록 매핑: ${s.total_mappings || 0}개 (차량 전용 통장: ${s.mappings_with_car || 0})\n` +
                         `  · last4 종류: ${s.unique_last4 || 0}개\n\n` +
                         `🔴 매핑 부재 — 통장 등록 필요\n${noMapping}\n\n` +
-                        `🟠 차량 미할당 — 매핑 관리에서 차량 추가 (또는 의도된 공용 계좌)\n${noCar}\n\n` +
-                        `🟢 정상 매칭: ${json?.ok_count || 0} 종류\n\n` +
+                        `💼 사업 통장 (정상 운영 — 차량 매칭은 거래별 검수에서 처리)\n${noCar}\n\n` +
+                        `🟢 차량 전용 통장 매칭: ${json?.ok_count || 0} 종류\n\n` +
                         `→ 등록 매핑 전체는 콘솔(F12) 확인`
                       )
                     }}
