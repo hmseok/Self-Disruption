@@ -4456,6 +4456,59 @@ export default function BankCardPage() {
               </div>
             </div>
 
+            {/* 통장 엑셀 매칭 backfill */}
+            <div style={{ ...GLASS.L4, borderRadius: 12, padding: 20, marginBottom: 12, border: `1px solid ${COLORS.borderSubtle}` }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.textPrimary, marginBottom: 4 }}>
+                    💼 통장 엑셀 매칭 backfill
+                  </div>
+                  <div style={{ fontSize: 12, color: COLORS.textSecondary, lineHeight: 1.5 }}>
+                    2026-05-02 BANK-FIX 이전 업로드된 통장 거래 (raw_data 메타 없음) 에 매핑의 last4 강제 적용.<br/>
+                    매핑 1개 → 자동 / N개 → bank_name 매칭. 새 업로드 없이 기존 거래도 매칭됩니다.
+                  </div>
+                </div>
+                <button
+                  onClick={async () => {
+                    const { json: diag } = await fetchWithAuth('/api/admin/bank-excel-backfill', { method: 'GET' })
+                    if (diag?.error) { alert(`오류: ${diag.error}`); return }
+                    const mappings = diag?.mappings || []
+                    const stats = diag?.stats || []
+                    if (mappings.length === 0) { alert('등록된 통장 매핑이 없습니다. 먼저 매핑 탭에서 등록하세요.'); return }
+                    const mappingsText = mappings.map((m: any) => `  · ${m.bank_name || '-'} ${m.last4 ? `*${m.last4}` : '(last4 없음)'} ${m.account_holder ? `[${m.account_holder}]` : ''}`).join('\n')
+                    const statsText = stats.map((s: any) => `  · ${s.bank_name || '(NULL)'}: ${s.total}건 (메타 보유 ${s.has_meta} / 누락 ${s.missing_meta})`).join('\n')
+                    const { json: dry } = await fetchWithAuth('/api/admin/bank-excel-backfill', { method: 'POST', body: { dryRun: true } })
+                    if (dry?.error) { alert(`dry-run 오류: ${dry.error}`); return }
+                    if ((dry?.target_count || 0) === 0) { alert('🟢 backfill 대상 없음 — 모든 통장 거래가 이미 메타 보유'); return }
+                    const sampleText = (dry?.sample_updates || []).slice(0, 5).map((s: any) =>
+                      `  · ${s.id} (${s.bank_name || '-'}) → last4=${s.new_last4}`
+                    ).join('\n')
+                    const ok = confirm(
+                      `💼 통장 엑셀 매칭 backfill\n\n` +
+                      `[등록된 매핑]\n${mappingsText}\n\n` +
+                      `[현재 거래 통계]\n${statsText}\n\n` +
+                      `[backfill 대상]\n  · 메타 누락 거래: ${dry?.target_count || 0}건\n  · 매핑 매칭: ${dry?.updated || 0}건\n  · 매칭 실패: ${dry?.skipped_no_match || 0}건\n\n` +
+                      `[샘플]\n${sampleText}\n\n` +
+                      `▶ 적용?`
+                    )
+                    if (!ok) return
+                    const taskId = floaterProgress.start({ title: '💼 통장 매칭 backfill 진행 중', total: dry?.target_count || 0 })
+                    try {
+                      const { json: applied } = await fetchWithAuth('/api/admin/bank-excel-backfill', { method: 'POST', body: { dryRun: false } })
+                      if (applied?.error) { floaterProgress.finish(taskId, `오류: ${applied.error}`, 'error'); return }
+                      floaterProgress.update(taskId, { processed: applied?.target_count || 0, applied: applied?.updated || 0 })
+                      floaterProgress.finish(taskId, `✅ ${applied?.updated || 0}건 backfill 완료 (스킵 ${applied?.skipped_no_match || 0}건)`)
+                      await Promise.all([loadSummary(), loadTransactions()])
+                    } catch (e: any) {
+                      floaterProgress.finish(taskId, `오류: ${e.message}`, 'error')
+                    }
+                  }}
+                  style={{ ...BTN.sm, padding: '8px 18px', fontSize: 12, fontWeight: 700,
+                           background: 'rgba(59,130,246,0.10)', color: '#1d4ed8', border: '1px solid rgba(59,130,246,0.4)', cursor: 'pointer' }}
+                >💼 실행</button>
+              </div>
+            </div>
+
             <div style={{ marginTop: 16, fontSize: 11, color: COLORS.textMuted, textAlign: 'center' }}>
               📌 새 도구 추가는 admin 권한자만 — 운영 정상화 후 추가 예정
             </div>
