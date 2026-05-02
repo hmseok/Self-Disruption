@@ -1914,6 +1914,7 @@ export default function BankCardPage() {
     { key: 'sms', label: 'SMS 수집', count: summary?.sms?.total || 0 },
     { key: 'mapping', label: '매핑 관리' },
     { key: 'rules', label: '분류 룰' },
+    { key: 'system', label: '⚙ 시스템' },
   ]
 
   // ── 통계 카드 ─────────────────────────────────────────
@@ -2469,82 +2470,7 @@ export default function BankCardPage() {
                   >
                     🔍 매칭 진단
                   </button>
-                  <button
-                    onClick={async () => {
-                      // 1) DRY RUN — 거래 재생성
-                      const { json: dry } = await fetchWithAuth('/api/admin/sms-rebuild-transactions', {
-                        method: 'POST',
-                        body: { dryRun: true },
-                      })
-                      if (dry?.error) { alert(`오류: ${dry.error}`); return }
-                      const ok = confirm(
-                        `📛 SMS 거래 재생성\n\n` +
-                        `현재 transactions(SMS): ${dry?.current_tx_count || 0}건\n` +
-                        `card_sms_transactions(parsed): ${dry?.sms_count || 0}건\n` +
-                        `삭제 예정: ${dry?.will_delete || 0}건\n` +
-                        `재생성 예정: ${dry?.will_create || 0}건 (SMS 기준 1:1)\n\n` +
-                        `차이: ${dry?.delta > 0 ? '+' : ''}${dry?.delta || 0}건\n\n` +
-                        `※ 기존 transactions 는 soft-delete (deleted_at) — DB 에서 복원 가능\n` +
-                        `※ card_sms_transactions 는 그대로 유지\n` +
-                        `※ 차량/카테고리 분류는 「🤖 룰 자동 분류」 로 별도 진행\n\n` +
-                        `▶ 진행하시겠습니까?`
-                      )
-                      if (!ok) return
-                      // 2) APPLY
-                      const { json: applied } = await fetchWithAuth('/api/admin/sms-rebuild-transactions', {
-                        method: 'POST',
-                        body: { dryRun: false },
-                      })
-                      if (applied?.error) { alert(`적용 오류: ${applied.error}`); return }
-                      alert(
-                        `✅ 재생성 완료\n\n` +
-                        `· 삭제: ${applied?.deleted || 0}건\n` +
-                        `· 재생성: ${applied?.created || 0}건 (SMS 1:1)\n\n` +
-                        `이제 「🤖 룰 자동 분류」 클릭하시면 카테고리 + 차량 자동 매칭됩니다.`
-                      )
-                      await Promise.all([loadSummary(), loadTransactions()])
-                    }}
-                    title="SMS 기반 거래 전체 삭제 + card_sms_transactions 기준으로 1:1 재생성 (중복 N배 정리)"
-                    style={{ ...BTN.sm, background: 'rgba(239,68,68,0.10)', color: '#b91c1c', border: '1px solid rgba(239,68,68,0.4)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, fontWeight: 700 }}
-                  >
-                    📛 거래 재생성
-                  </button>
-                  <button
-                    onClick={async () => {
-                      // 1) DRY RUN
-                      const { json: dry } = await fetchWithAuth('/api/admin/sms-card-id-backfill', {
-                        method: 'POST',
-                        body: { dryRun: true },
-                      })
-                      if (dry?.error) { alert(`오류: ${dry.error}`); return }
-                      const cands = dry?.candidates || 0
-                      if (cands === 0) {
-                        alert('🟢 강제 매칭 후보 없음 — 모두 매칭됐거나 raw_data 의 card_last4 가 없습니다.')
-                        return
-                      }
-                      const byCardSummary = (dry?.by_card || []).slice(0, 10)
-                        .map((c: any) => `  · ${c.cc_alias || '(NULL)'}: ${c.count}건`).join('\n')
-                      const ok = confirm(
-                        `🔧 SMS card_id 강제 매칭\n\n` +
-                        `매칭 후보: ${cands}건 (raw_data.card_last4 ↔ corporate_cards.card_number 의 last4 일치)\n\n` +
-                        `카드별 분포:\n${byCardSummary || '  (없음)'}\n\n` +
-                        `▶ 적용하시겠습니까? card_sms_transactions.card_id 가 갱신됩니다.`
-                      )
-                      if (!ok) return
-                      // 2) APPLY
-                      const { json: applied } = await fetchWithAuth('/api/admin/sms-card-id-backfill', {
-                        method: 'POST',
-                        body: { dryRun: false },
-                      })
-                      if (applied?.error) { alert(`적용 오류: ${applied.error}`); return }
-                      alert(`✅ 적용: ${applied?.updated || 0}건 / 후보: ${applied?.candidates || 0}건\n\n새로고침 후 화면에 매칭 라벨이 표시됩니다.`)
-                      await loadTransactions()
-                    }}
-                    title="이전 파싱 SMS 거래의 card_id 를 raw_data.card_last4 매칭으로 강제 채움"
-                    style={{ ...BTN.sm, background: 'rgba(34,197,94,0.10)', color: '#15803d', border: '1px solid rgba(34,197,94,0.4)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
-                  >
-                    🔧 SMS 강제 매칭
-                  </button>
+                  {/* 일회성 정리 도구 (📛 거래 재생성 / 🔧 SMS 강제 매칭) 는 admin 영역으로 이동 — 일반 사용 패턴 X */}
                   {summary && summary.transactions.card > 0 && (
                     <button
                       onClick={() => deleteAndReupload('excel_card')}
@@ -4224,6 +4150,92 @@ export default function BankCardPage() {
                 </div>
               </div>
             )}
+          </>
+        )}
+
+        {/* ──── ⚙ 시스템 탭 — 일회성 정리 도구 모음 ──── */}
+        {activeTab === 'system' && (
+          <>
+            <div style={{
+              ...GLASS.L4, borderRadius: 12, padding: 20, marginBottom: 14,
+              border: `1px solid rgba(245,158,11,0.3)`, background: 'rgba(254,243,199,0.3)',
+            }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#92400e', marginBottom: 4 }}>
+                ⚠️ 일회성 정리 도구 — 일반 운영에서는 사용 X
+              </div>
+              <div style={{ fontSize: 12, color: '#78350f' }}>
+                중복 발생 / 매칭 누락 / 마이그레이션 등 예외 상황에서만 사용. 평소에는 클릭 금지.
+              </div>
+            </div>
+
+            {/* 거래 재생성 */}
+            <div style={{ ...GLASS.L4, borderRadius: 12, padding: 20, marginBottom: 12, border: `1px solid ${COLORS.borderSubtle}` }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.textPrimary, marginBottom: 4 }}>
+                    📛 SMS 거래 재생성
+                  </div>
+                  <div style={{ fontSize: 12, color: COLORS.textSecondary, lineHeight: 1.5 }}>
+                    SMS 기반 transactions 전체 삭제 + card_sms_transactions 기준으로 1:1 재생성.<br/>
+                    중복 N배 발생 시 한 번 실행으로 정리. (SMS 수집 데이터는 그대로 유지)
+                  </div>
+                </div>
+                <button
+                  onClick={async () => {
+                    const { json: dry } = await fetchWithAuth('/api/admin/sms-rebuild-transactions', { method: 'POST', body: { dryRun: true } })
+                    if (dry?.error) { alert(`오류: ${dry.error}`); return }
+                    const ok = confirm(
+                      `📛 SMS 거래 재생성\n\n` +
+                      `현재 transactions(SMS): ${dry?.current_tx_count || 0}건\n` +
+                      `card_sms_transactions(parsed): ${dry?.sms_count || 0}건\n` +
+                      `→ ${dry?.will_create || 0}건 (1:1)\n\n` +
+                      `▶ 진행하시겠습니까? (soft-delete — 복원 가능)`
+                    )
+                    if (!ok) return
+                    const { json: applied } = await fetchWithAuth('/api/admin/sms-rebuild-transactions', { method: 'POST', body: { dryRun: false } })
+                    if (applied?.error) { alert(`적용 오류: ${applied.error}`); return }
+                    alert(`✅ 완료\n· 삭제: ${applied?.deleted || 0}건\n· 재생성: ${applied?.created || 0}건`)
+                    await Promise.all([loadSummary(), loadTransactions()])
+                  }}
+                  style={{ ...BTN.sm, padding: '8px 18px', fontSize: 12, fontWeight: 700,
+                           background: 'rgba(239,68,68,0.10)', color: '#b91c1c', border: '1px solid rgba(239,68,68,0.4)', cursor: 'pointer' }}
+                >📛 실행</button>
+              </div>
+            </div>
+
+            {/* SMS card_id 강제 매칭 */}
+            <div style={{ ...GLASS.L4, borderRadius: 12, padding: 20, marginBottom: 12, border: `1px solid ${COLORS.borderSubtle}` }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.textPrimary, marginBottom: 4 }}>
+                    🔧 SMS card_id 강제 매칭
+                  </div>
+                  <div style={{ fontSize: 12, color: COLORS.textSecondary, lineHeight: 1.5 }}>
+                    이전 파싱된 SMS 의 card_id 가 NULL 인 row 를 raw_data.card_last4 ↔ corporate_cards.card_number 로 강제 매칭.
+                  </div>
+                </div>
+                <button
+                  onClick={async () => {
+                    const { json: dry } = await fetchWithAuth('/api/admin/sms-card-id-backfill', { method: 'POST', body: { dryRun: true } })
+                    if (dry?.error) { alert(`오류: ${dry.error}`); return }
+                    if ((dry?.candidates || 0) === 0) { alert('🟢 매칭 후보 없음'); return }
+                    const byCard = (dry?.by_card || []).slice(0, 10).map((c: any) => `  · ${c.cc_alias || '(NULL)'}: ${c.count}건`).join('\n')
+                    const ok = confirm(`🔧 매칭 후보: ${dry?.candidates || 0}건\n\n${byCard}\n\n▶ 적용?`)
+                    if (!ok) return
+                    const { json: applied } = await fetchWithAuth('/api/admin/sms-card-id-backfill', { method: 'POST', body: { dryRun: false } })
+                    if (applied?.error) { alert(`적용 오류: ${applied.error}`); return }
+                    alert(`✅ 적용: ${applied?.updated || 0}건`)
+                    await loadTransactions()
+                  }}
+                  style={{ ...BTN.sm, padding: '8px 18px', fontSize: 12, fontWeight: 700,
+                           background: 'rgba(34,197,94,0.10)', color: '#15803d', border: '1px solid rgba(34,197,94,0.4)', cursor: 'pointer' }}
+                >🔧 실행</button>
+              </div>
+            </div>
+
+            <div style={{ marginTop: 16, fontSize: 11, color: COLORS.textMuted, textAlign: 'center' }}>
+              📌 새 도구 추가는 admin 권한자만 — 운영 정상화 후 추가 예정
+            </div>
           </>
         )}
 
