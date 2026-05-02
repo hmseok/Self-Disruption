@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyUser } from '@/lib/auth-server'
 import { prisma } from '@/lib/prisma'
-import { bankMappingJoinSql } from '@/lib/last4-match'
+import { bankMappingJoinSql, cardMappingJoinSql } from '@/lib/last4-match'
 
 function serialize<T>(data: T): T {
   return JSON.parse(JSON.stringify(data, (_, v) => typeof v === 'bigint' ? v.toString() : v))
@@ -80,7 +80,7 @@ export async function GET(request: NextRequest) {
           CONCAT_WS(' ', bam_car.brand, bam_car.model) AS bank_matched_car_model
         FROM transactions t
         LEFT JOIN card_sms_transactions sms ON sms.transaction_id COLLATE utf8mb4_unicode_ci = t.id COLLATE utf8mb4_unicode_ci
-        LEFT JOIN corporate_cards cc       ON cc.id COLLATE utf8mb4_unicode_ci = sms.card_id COLLATE utf8mb4_unicode_ci
+        LEFT JOIN corporate_cards cc       ON ${cardMappingJoinSql('cc', 'sms')}
         LEFT JOIN cars car                 ON car.id COLLATE utf8mb4_unicode_ci = cc.assigned_car_id COLLATE utf8mb4_unicode_ci
         LEFT JOIN bank_account_mappings bam
           ON ${bankMappingJoinSql('bam', 'sms')}
@@ -111,7 +111,7 @@ export async function GET(request: NextRequest) {
             CONCAT_WS(' ', car.brand, car.model) AS matched_car_model
           FROM transactions t
           LEFT JOIN card_sms_transactions sms ON sms.transaction_id COLLATE utf8mb4_unicode_ci = t.id COLLATE utf8mb4_unicode_ci
-          LEFT JOIN corporate_cards cc       ON cc.id COLLATE utf8mb4_unicode_ci = sms.card_id COLLATE utf8mb4_unicode_ci
+          LEFT JOIN corporate_cards cc       ON ${cardMappingJoinSql('cc', 'sms')}
           LEFT JOIN cars car                 ON car.id COLLATE utf8mb4_unicode_ci = cc.assigned_car_id COLLATE utf8mb4_unicode_ci
           WHERE t.deleted_at IS NULL
           ORDER BY t.created_at DESC

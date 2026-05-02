@@ -82,9 +82,6 @@ export function bankMappingJoinSql(bamAlias: string, smsAlias: string): string {
 /**
  * SQL 단편 — SMS card_alias 에서 last4 추출.
  * REGEXP_SUBSTR 회피 — 단순 RIGHT(TRIM(...), 4) 사용.
- *
- * 한계: card_alias 가 "법인****7109" 같은 패턴이면 마지막 4글자는 숫자라 OK.
- *       끝이 숫자가 아니면 null 처리 필요 (호출 측에서 디지트 검증).
  */
 export function smsLast4Sql(smsAliasCol: string): string {
   return `CASE
@@ -92,4 +89,37 @@ export function smsLast4Sql(smsAliasCol: string): string {
     WHEN CHAR_LENGTH(TRIM(${smsAliasCol})) < 4 THEN NULL
     ELSE RIGHT(TRIM(${smsAliasCol}), 4)
   END`
+}
+
+/**
+ * SQL JOIN 단편 — corporate_cards 매핑 매칭.
+ *
+ *   1차: cc.id = sms.card_id 정확 매칭 (이미 backfill 된 경우)
+ *   2차: cc.card_number 또는 cc.card_alias 의 last4 == sms.card_alias 의 last4
+ *        AND cc.status = 'active' (해지 카드 매칭 방지)
+ *
+ * 사용 예:
+ *   LEFT JOIN corporate_cards cc ON ${cardMappingJoinSql('cc', 'sms')}
+ *
+ * collation: bank_account_mappings 와 같은 이슈 — utf8mb4_unicode_ci 명시.
+ */
+export function cardMappingJoinSql(ccAlias: string, smsAlias: string): string {
+  const COLL = 'COLLATE utf8mb4_unicode_ci'
+  return `(
+    ${ccAlias}.id ${COLL} = ${smsAlias}.card_id ${COLL}
+    OR (
+      ${smsAlias}.card_alias IS NOT NULL
+      AND CHAR_LENGTH(TRIM(${smsAlias}.card_alias)) >= 4
+      AND ${ccAlias}.status = 'active'
+      AND (
+        (${ccAlias}.card_number IS NOT NULL
+         AND CHAR_LENGTH(TRIM(${ccAlias}.card_number)) >= 4
+         AND RIGHT(TRIM(${ccAlias}.card_number), 4) ${COLL} = RIGHT(TRIM(${smsAlias}.card_alias), 4) ${COLL})
+        OR
+        (${ccAlias}.card_alias IS NOT NULL
+         AND CHAR_LENGTH(TRIM(${ccAlias}.card_alias)) >= 4
+         AND RIGHT(TRIM(${ccAlias}.card_alias), 4) ${COLL} = RIGHT(TRIM(${smsAlias}.card_alias), 4) ${COLL})
+      )
+    )
+  )`
 }
