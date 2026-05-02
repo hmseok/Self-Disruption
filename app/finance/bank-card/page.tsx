@@ -4233,6 +4233,63 @@ export default function BankCardPage() {
               </div>
             </div>
 
+            {/* 테스트 데이터 정리 */}
+            <div style={{ ...GLASS.L4, borderRadius: 12, padding: 20, marginBottom: 12, border: `1px solid ${COLORS.borderSubtle}` }}>
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.textPrimary, marginBottom: 4 }}>
+                  🧪 테스트 데이터 정리
+                </div>
+                <div style={{ fontSize: 12, color: COLORS.textSecondary, lineHeight: 1.5 }}>
+                  키워드로 매칭되는 SMS + 연결 transactions 일괄 삭제. (예: 「홍길동」, 「테스트」)<br/>
+                  매칭: card_sms_transactions 의 holder_name / raw_text / merchant
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                <input
+                  id="cleanupKeyword"
+                  type="text"
+                  defaultValue="홍길동"
+                  placeholder="삭제할 키워드 (예: 홍길동)"
+                  style={{ ...GLASS.L1, flex: 1, minWidth: 200, padding: '8px 12px', borderRadius: 8, fontSize: 13, border: `1px solid ${COLORS.borderSubtle}` }}
+                />
+                <button
+                  onClick={async () => {
+                    const kw = (document.getElementById('cleanupKeyword') as HTMLInputElement)?.value?.trim()
+                    if (!kw || kw.length < 2) { alert('키워드 2글자 이상 입력'); return }
+                    const { json: dry } = await fetchWithAuth('/api/admin/cleanup-test-data', {
+                      method: 'POST',
+                      body: { keyword: kw, dryRun: true },
+                    })
+                    if (dry?.error) { alert(`오류: ${dry.error}`); return }
+                    if ((dry?.sms_count || 0) === 0) {
+                      alert(`🟢 「${kw}」 매칭 데이터 없음`)
+                      return
+                    }
+                    const samplesText = (dry?.samples || []).slice(0, 5).map((s: any) =>
+                      `  · ${s.holder_name || '-'} / ${s.merchant || '-'} / ${s.amount || '-'}원`
+                    ).join('\n')
+                    const ok = confirm(
+                      `🧪 테스트 데이터 정리 — 키워드 「${kw}」\n\n` +
+                      `card_sms_transactions: ${dry?.sms_count || 0}건\n` +
+                      `연결 transactions: ${dry?.tx_count || 0}건\n\n` +
+                      `샘플:\n${samplesText}\n\n` +
+                      `▶ 삭제하시겠습니까?\n※ SMS 는 hard-delete, transactions 는 soft-delete`
+                    )
+                    if (!ok) return
+                    const { json: applied } = await fetchWithAuth('/api/admin/cleanup-test-data', {
+                      method: 'POST',
+                      body: { keyword: kw, dryRun: false },
+                    })
+                    if (applied?.error) { alert(`적용 오류: ${applied.error}`); return }
+                    alert(`✅ 완료\n· SMS 삭제: ${applied?.sms_deleted || 0}건\n· transactions soft-delete: ${applied?.tx_deleted || 0}건`)
+                    await Promise.all([loadSummary(), loadTransactions()])
+                  }}
+                  style={{ ...BTN.sm, padding: '8px 18px', fontSize: 12, fontWeight: 700,
+                           background: 'rgba(168,85,247,0.10)', color: '#7c3aed', border: '1px solid rgba(168,85,247,0.4)', cursor: 'pointer' }}
+                >🧪 실행</button>
+              </div>
+            </div>
+
             <div style={{ marginTop: 16, fontSize: 11, color: COLORS.textMuted, textAlign: 'center' }}>
               📌 새 도구 추가는 admin 권한자만 — 운영 정상화 후 추가 예정
             </div>
