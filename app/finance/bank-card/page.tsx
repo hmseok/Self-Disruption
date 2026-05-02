@@ -311,6 +311,44 @@ export default function BankCardPage() {
   // 차량 목록 (분류 검수에서 차량 매칭 변경 dropdown 용)
   const [cars, setCars] = useState<Array<{ id: string; number: string; brand?: string; model?: string }>>([])
 
+  // ─── 매칭 통합 (2단 dropdown) ──────────────────────────────
+  // 모든 related_type 의 entity 목록 lazy load
+  // (CLAUDE.md 규칙 14 — 동형 패턴 통합)
+  const MATCH_TYPES: Array<{
+    type: string
+    label: string
+    api: string
+    labelFn: (r: any) => string
+  }> = [
+    { type: 'car', label: '🚗 차량', api: '/api/finance-upload?table=cars', labelFn: (r) => `${r.number || '?'}${r.brand || r.model ? ` (${[r.brand, r.model].filter(Boolean).join(' ')})` : ''}` },
+    { type: 'employee', label: '👤 직원', api: '/api/employees', labelFn: (r) => r.name || r.email || '?' },
+    { type: 'salary', label: '💰 급여 (직원)', api: '/api/employees', labelFn: (r) => r.name || r.email || '?' },
+    { type: 'insurance', label: '📄 보험', api: '/api/insurance', labelFn: (r) => `${r.insurance_company || '?'}${r.policy_number ? ` · ${r.policy_number}` : ''}` },
+    { type: 'loan', label: '💳 대출', api: '/api/loans', labelFn: (r) => `${r.finance_name || '?'}${r.principal ? ` · ${Number(r.principal).toLocaleString()}원` : ''}` },
+    { type: 'jiip', label: '🤝 지입', api: '/api/jiip', labelFn: (r) => `${r.investor_name || '?'}${r.car_number ? ` · ${r.car_number}` : ''}` },
+    { type: 'invest', label: '📈 투자', api: '/api/investments', labelFn: (r) => `${r.investor_name || '?'}${r.amount ? ` · ${Number(r.amount).toLocaleString()}원` : ''}` },
+    { type: 'fmi_rental', label: '🏷️ 렌탈', api: '/api/fmi-rentals', labelFn: (r) => `${r.customer_name || '?'}${r.car_number ? ` · ${r.car_number}` : ''}` },
+    { type: 'rental', label: '🏷️ 렌탈 (구)', api: '/api/fmi-rentals', labelFn: (r) => `${r.customer_name || '?'}${r.car_number ? ` · ${r.car_number}` : ''}` },
+    { type: 'contract', label: '📝 계약', api: '/api/contracts', labelFn: (r) => `${r.customer_name || '?'}` },
+    { type: 'card', label: '💳 카드 (법인)', api: '/api/corporate-cards', labelFn: (r) => `${r.card_alias || r.card_number || '?'}${r.holder_name ? ` · ${r.holder_name}` : ''}` },
+  ]
+  const [matchEntities, setMatchEntities] = useState<Record<string, any[]>>({})
+  const [matchEntityLoading, setMatchEntityLoading] = useState<Record<string, boolean>>({})
+
+  const loadMatchEntities = useCallback(async (type: string) => {
+    if (matchEntities[type] || matchEntityLoading[type]) return
+    const cfg = MATCH_TYPES.find(t => t.type === type)
+    if (!cfg) return
+    setMatchEntityLoading(prev => ({ ...prev, [type]: true }))
+    try {
+      const { json } = await fetchWithAuth(cfg.api)
+      const list = Array.isArray(json?.data) ? json.data : Array.isArray(json) ? json : []
+      setMatchEntities(prev => ({ ...prev, [type]: list }))
+    } finally {
+      setMatchEntityLoading(prev => ({ ...prev, [type]: false }))
+    }
+  }, [matchEntities, matchEntityLoading])
+
   // 자동 분류
   const [autoClassifying, setAutoClassifying] = useState(false)
   const [autoClassifyResult, setAutoClassifyResult] = useState<any>(null)
@@ -1226,30 +1264,48 @@ export default function BankCardPage() {
     loadSummary() // 통계 갱신
   }
 
-  // 분류 검수에서 차량 매칭 변경 (사용자 수정)
-  const changeItemCar = async (id: string, carId: string) => {
-    if (!carId) {
-      // 매칭 해제
-      await fetchWithAuth(`/api/finance-upload?table=transactions&id=${id}`, {
-        method: 'PATCH',
-        body: { related_type: null, related_id: null },
-      })
-    } else {
-      await fetchWithAuth(`/api/finance-upload?table=transactions&id=${id}`, {
-        method: 'PATCH',
-        body: { related_type: 'car', related_id: carId },
-      })
-    }
+  // 분류 검수에서 매칭 변경 — 통합 (차량/직원/보험/대출/지입/투자/렌탈/계약/카드/급여)
+  const changeItemMatch = async (id: string, type: string | null, entityId: string | null) => {
+    const body = (type && entityId)
+      ? { related_type: type, related_id: entityId }
+      : { related_type: null, related_id: null }
+    await fetchWithAuth(`/api/finance-upload?table=transactions&id=${id}`, {
+      method: 'PATCH',
+      body,
+    })
+
     // 인메모리 갱신 — 즉시 UI 반영
-    const car = cars.find(c => c.id === carId)
+    let matched_car_id: string | null = null
+    let matched_car_number: string | null = null
+    let matched_car_model: string | null = null
+    let matched_label: string | null = null
+
+    if (type === 'car' && entityId) {
+      const car = cars.find(c => c.id === entityId)
+      matched_car_id = entityId
+      matched_car_number = car?.number || null
+      matched_car_model = car ? `${car.brand || ''} ${car.model || ''}`.trim() : null
+      matched_label = matched_car_number
+    } else if (type && entityId) {
+      const cfg = MATCH_TYPES.find(t => t.type === type)
+      const ent = (matchEntities[type] || []).find((r: any) => String(r.id) === String(entityId))
+      matched_label = (cfg && ent) ? cfg.labelFn(ent) : null
+    }
+
     setReviewItems(prev => prev.map(i => i.id === id ? {
       ...i,
-      related_type: carId ? 'car' : null,
-      related_id: carId || null,
-      matched_car_id: carId || null,
-      matched_car_number: car?.number || null,
-      matched_car_model: car ? `${car.brand} ${car.model}`.trim() : null,
+      related_type: (type && entityId) ? type : null,
+      related_id: entityId || null,
+      matched_car_id,
+      matched_car_number,
+      matched_car_model,
+      matched_label,
     } : i))
+  }
+
+  // 하위 호환 — 기존 코드 호출처용
+  const changeItemCar = async (id: string, carId: string) => {
+    return changeItemMatch(id, carId ? 'car' : null, carId || null)
   }
 
   const loadGroupClassify = async () => {
@@ -3138,18 +3194,44 @@ export default function BankCardPage() {
                                                   {matchSubLabel}
                                                 </div>
                                               )}
-                                              {/* 차량 변경 dropdown — 사용자가 직접 매칭 수정 */}
-                                              <select
-                                                value={currentCarId}
-                                                onChange={(e) => changeItemCar(item.id, e.target.value)}
-                                                style={{ fontSize: 10, padding: '1px 4px', border: `1px solid ${COLORS.borderSubtle}`, borderRadius: 4, color: COLORS.textSecondary, cursor: 'pointer', maxWidth: 220, marginTop: 2 }}>
-                                                <option value="">— 차량 매칭 변경 —</option>
-                                                {cars.map(c => (
-                                                  <option key={c.id} value={c.id}>
-                                                    {c.number}{c.brand || c.model ? ` (${c.brand || ''} ${c.model || ''})`.trim() : ''}
-                                                  </option>
-                                                ))}
-                                              </select>
+                                              {/* 매칭 변경 — 2단 dropdown (type → entity) */}
+                                              <div style={{ display: 'flex', gap: 4, marginTop: 2, flexWrap: 'wrap' }}>
+                                                <select
+                                                  value={item.related_type || ''}
+                                                  onChange={(e) => {
+                                                    const newType = e.target.value
+                                                    if (!newType) {
+                                                      changeItemMatch(item.id, null, null)
+                                                      return
+                                                    }
+                                                    loadMatchEntities(newType)
+                                                    // type 만 임시 set — entity 는 다음 select 에서 결정
+                                                    setReviewItems(prev => prev.map(i => i.id === item.id ? { ...i, related_type: newType, related_id: null } : i))
+                                                  }}
+                                                  style={{ fontSize: 10, padding: '1px 4px', border: `1px solid ${COLORS.borderSubtle}`, borderRadius: 4, color: COLORS.textSecondary, cursor: 'pointer', minWidth: 80 }}>
+                                                  <option value="">— 매칭 변경 —</option>
+                                                  {MATCH_TYPES.map(t => (
+                                                    <option key={t.type} value={t.type}>{t.label}</option>
+                                                  ))}
+                                                </select>
+                                                {item.related_type && (() => {
+                                                  const cfg = MATCH_TYPES.find(t => t.type === item.related_type)
+                                                  if (!cfg) return null
+                                                  const list = matchEntities[item.related_type] || []
+                                                  const loading = !!matchEntityLoading[item.related_type]
+                                                  return (
+                                                    <select
+                                                      value={item.related_id || ''}
+                                                      onChange={(e) => changeItemMatch(item.id, item.related_type, e.target.value || null)}
+                                                      style={{ fontSize: 10, padding: '1px 4px', border: `1px solid ${COLORS.borderSubtle}`, borderRadius: 4, color: COLORS.textSecondary, cursor: 'pointer', maxWidth: 200 }}>
+                                                      <option value="">{loading ? '로드 중...' : `— ${cfg.label} 선택 —`}</option>
+                                                      {list.map((r: any) => (
+                                                        <option key={r.id} value={r.id}>{cfg.labelFn(r)}</option>
+                                                      ))}
+                                                    </select>
+                                                  )
+                                                })()}
+                                              </div>
                                             </td>
                                             <td style={{ padding: '6px 10px', textAlign: 'center' }}>
                                               <select
