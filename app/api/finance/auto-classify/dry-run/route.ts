@@ -54,6 +54,10 @@ interface Tx {
   card_holder_name: string | null
   card_company: string | null
   card_alias: string | null
+  // 차량 정보 (assigned_car_id → cars JOIN)
+  car_number: string | null
+  car_brand: string | null
+  car_model: string | null
 }
 
 function serialize<T>(data: T): T {
@@ -98,10 +102,14 @@ export async function POST(request: NextRequest) {
           cc.assigned_employee_id AS card_assigned_employee_id,
           cc.holder_name          AS card_holder_name,
           t.card_company,
-          sms.card_alias
+          sms.card_alias,
+          car.number              AS car_number,
+          car.brand               AS car_brand,
+          car.model               AS car_model
         FROM transactions t
         LEFT JOIN card_sms_transactions sms ON sms.transaction_id COLLATE utf8mb4_unicode_ci = t.id COLLATE utf8mb4_unicode_ci
         LEFT JOIN corporate_cards cc       ON cc.id COLLATE utf8mb4_unicode_ci = sms.card_id COLLATE utf8mb4_unicode_ci
+        LEFT JOIN cars car                 ON car.id COLLATE utf8mb4_unicode_ci = cc.assigned_car_id COLLATE utf8mb4_unicode_ci
         WHERE t.deleted_at IS NULL
           ${onlyUnclassified ? "AND (t.category IS NULL OR t.category = '')" : ''}
           ${source === 'card' ? "AND (t.imported_from = 'sms' OR t.imported_from LIKE 'excel_card%' OR t.imported_from LIKE 'pdf_card%')" : ''}
@@ -203,9 +211,13 @@ export async function POST(request: NextRequest) {
         description: desc,
         amount: tx.amount,
         type: tx.type,
+        imported_from: tx.imported_from,
         card_holder_name: tx.card_holder_name,
         card_company: tx.card_company,
         card_alias: tx.card_alias,
+        car_number: tx.car_number,
+        car_brand: tx.car_brand,
+        car_model: tx.car_model,
         rule_id: matched.id,
         category: matched.category,
         subcategory: matched.subcategory,

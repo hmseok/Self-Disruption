@@ -2758,10 +2758,53 @@ export default function BankCardPage() {
                             (룰 {ruleClassifyResult.rules_count || 0}개 활성)
                           </span>
                         </div>
-                        <button
-                          onClick={() => { setRuleClassifyResult(null); setExpandedGroup(null) }}
-                          style={{ ...BTN.sm, padding: '4px 10px', fontSize: 11, background: 'rgba(0,0,0,0.04)', color: COLORS.textSecondary, cursor: 'pointer' }}
-                        >✕ 닫기</button>
+                        <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                          <button
+                            onClick={async () => {
+                              const total = (ruleClassifyResult.counts?.high || 0) + (ruleClassifyResult.counts?.medium || 0) + (ruleClassifyResult.counts?.low || 0)
+                              if (total === 0) { alert('확정할 항목 없음'); return }
+                              if (!confirm(`⚠️ 전체 ${total}건 일괄 확정하시겠습니까?\n\n` +
+                                `· HIGH: ${ruleClassifyResult.counts?.high || 0}건 (확실)\n` +
+                                `· MEDIUM: ${ruleClassifyResult.counts?.medium || 0}건 (검수 권장)\n` +
+                                `· LOW: ${ruleClassifyResult.counts?.low || 0}건 (룰 매칭 안 됨 / 미분류)\n\n` +
+                                `※ MEDIUM/LOW 도 모두 적용됩니다 — 신중!`)) return
+                              const taskId = floaterProgress.start({ title: '🚀 전체 일괄 확정 진행 중', total })
+                              setRuleClassifyLoading(true)
+                              try {
+                                const allItems = [
+                                  ...(ruleClassifyResult.groups?.high || []),
+                                  ...(ruleClassifyResult.groups?.medium || []),
+                                  ...(ruleClassifyResult.groups?.low || []),
+                                ]
+                                const payload = allItems.map((it: any) => ({
+                                  id: it.id,
+                                  category: it.subcategory || it.category,
+                                  related_type: it.related_type || null,
+                                  related_id: it.related_id || null,
+                                }))
+                                const { json } = await fetchWithAuth('/api/finance/auto-classify/apply', { method: 'POST', body: { items: payload } })
+                                floaterProgress.update(taskId, { processed: total, applied: json?.applied || 0, failed: json?.failed || 0 })
+                                floaterProgress.finish(taskId, `✅ 전체 적용 ${json?.applied || 0}건 / 실패 ${json?.failed || 0}건`)
+                                await runRuleClassify()
+                                await Promise.all([loadSummary(), loadTransactions()])
+                              } catch (e: any) {
+                                floaterProgress.finish(taskId, `오류: ${e.message}`, 'error')
+                              } finally {
+                                setRuleClassifyLoading(false)
+                              }
+                            }}
+                            disabled={ruleClassifyLoading || (ruleClassifyResult.counts?.total || 0) === 0}
+                            title="HIGH + MEDIUM + LOW 전체 확정 (신중!)"
+                            style={{ ...BTN.sm, padding: '4px 14px', fontSize: 11, fontWeight: 700,
+                                     background: 'linear-gradient(90deg, #15803d, #0891b2)', color: '#fff',
+                                     border: '1px solid rgba(0,0,0,0.1)', cursor: ruleClassifyLoading ? 'wait' : 'pointer',
+                                     opacity: ruleClassifyLoading ? 0.6 : 1 }}
+                          >🚀 전체 확정</button>
+                          <button
+                            onClick={() => { setRuleClassifyResult(null); setExpandedGroup(null) }}
+                            style={{ ...BTN.sm, padding: '4px 10px', fontSize: 11, background: 'rgba(0,0,0,0.04)', color: COLORS.textSecondary, cursor: 'pointer' }}
+                          >✕ 닫기</button>
+                        </div>
                       </div>
 
                       {/* 3 그룹 카드 */}
@@ -2790,12 +2833,12 @@ export default function BankCardPage() {
                                   style={{ ...BTN.sm, padding: '4px 10px', fontSize: 11, fontWeight: 600,
                                            background: '#fff', color: meta.color, border: `1px solid ${meta.border}`, cursor: 'pointer' }}
                                 >{expanded ? '▾ 접기' : '▸ 펼치기'}</button>
-                                {conf === 'high' && items.length > 0 && (
+                                {items.length > 0 && (
                                   <button
-                                    onClick={() => applyRuleClassify('high')}
+                                    onClick={() => applyRuleClassify(conf)}
                                     disabled={ruleClassifyLoading}
                                     style={{ ...BTN.sm, padding: '4px 12px', fontSize: 11, fontWeight: 700,
-                                             background: '#15803d', color: '#fff', cursor: ruleClassifyLoading ? 'wait' : 'pointer' }}
+                                             background: meta.color, color: '#fff', cursor: ruleClassifyLoading ? 'wait' : 'pointer' }}
                                   >✓ 일괄 확정</button>
                                 )}
                               </div>
@@ -2816,6 +2859,7 @@ export default function BankCardPage() {
                                 <th style={{ padding: '6px 8px', textAlign: 'left', fontWeight: 600, color: COLORS.textSecondary }}>적요</th>
                                 <th style={{ padding: '6px 8px', textAlign: 'left', fontWeight: 600, color: COLORS.textSecondary }}>제안 카테고리</th>
                                 <th style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 600, color: COLORS.textSecondary }}>금액</th>
+                                <th style={{ padding: '6px 8px', textAlign: 'left', fontWeight: 600, color: COLORS.textSecondary }}>매칭</th>
                                 <th style={{ padding: '6px 8px', textAlign: 'left', fontWeight: 600, color: COLORS.textSecondary }}>사유</th>
                                 <th style={{ padding: '6px 8px', textAlign: 'center', fontWeight: 600, color: COLORS.textSecondary }}>액션</th>
                               </tr>
@@ -2833,8 +2877,11 @@ export default function BankCardPage() {
                                   </td>
                                   <td style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 600,
                                                 color: (() => {
-                                                  // 카드 거래 (sms): 승인=검정, 취소=빨강
-                                                  // 통장 거래 (sms_bank/excel_bank): 입금=녹색, 출금=빨강
+                                                  // 부호 정책 (CLAUDE.md 규칙 18):
+                                                  //   카드 승인 → 검정 (부호 X)
+                                                  //   카드 취소 → 빨강 (- 부호)
+                                                  //   통장 입금 → 녹색 (부호 X — 컬럼/색상이 의미)
+                                                  //   통장 출금 → 빨강 (부호 X — 컬럼/색상이 의미)
                                                   const isCard = it.imported_from === 'sms' || (it.imported_from || '').startsWith('excel_card') || (it.imported_from || '').startsWith('pdf_card')
                                                   if (isCard) {
                                                     return it.sms_transaction_type === 'canceled' ? COLORS.expense : COLORS.textPrimary
@@ -2842,12 +2889,23 @@ export default function BankCardPage() {
                                                   return it.type === 'income' ? COLORS.income : COLORS.expense
                                                 })() }}>
                                     {(() => {
+                                      // - 부호는 카드 취소에만. + 부호는 절대 X (CLAUDE.md 규칙 18)
                                       const isCard = it.imported_from === 'sms' || (it.imported_from || '').startsWith('excel_card') || (it.imported_from || '').startsWith('pdf_card')
-                                      const sign = isCard
-                                        ? (it.sms_transaction_type === 'canceled' ? '-' : '+')
-                                        : (it.type === 'income' ? '+' : '-')
-                                      return `${sign}${nf(Number(it.amount || 0))}`
+                                      const showMinus = isCard && it.sms_transaction_type === 'canceled'
+                                      return `${showMinus ? '-' : ''}${nf(Number(it.amount || 0))}`
                                     })()}
+                                  </td>
+                                  <td style={{ padding: '6px 8px', fontSize: 11 }}>
+                                    {it.related_type === 'car' && it.car_number ? (
+                                      <div>
+                                        <span style={{ color: '#1e40af', fontWeight: 600 }}>🚗 {it.car_number}</span>
+                                        {it.car_brand && it.car_model && <div style={{ color: COLORS.textMuted, fontSize: 10 }}>{it.car_brand} {it.car_model}</div>}
+                                      </div>
+                                    ) : it.card_holder_name ? (
+                                      <span style={{ color: '#7c3aed' }}>👤 {it.card_holder_name}</span>
+                                    ) : (
+                                      <span style={{ color: '#cbd5e1' }}>—</span>
+                                    )}
                                   </td>
                                   <td style={{ padding: '6px 8px', fontSize: 11, color: COLORS.textMuted }}>{it.reason}</td>
                                   <td style={{ padding: '6px 8px', textAlign: 'center' }}>

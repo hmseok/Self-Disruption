@@ -1,0 +1,26 @@
+{
+  "violations": [
+    {
+      "file": "app/cars/[id]/CarSettlementTab.tsx",
+      "line": 776
+    },
+    {
+      "file": "app/cars/[id]/PnlTab.tsx",
+      "line": 419
+    },
+    {
+      "file": "app/contracts/[id]/page.tsx",
+      "line": 651
+    },
+    {
+      "file": "app/finance/bank-card/page.tsx",
+      "line": 5048
+    },
+    {
+      "file": "app/report/ReportDashboard.tsx",
+      "line": 447
+    }
+  ],
+  "generatedAt": "2026-05-02T04:24:04.464Z",
+  "note": "기존 +/- 부호 위반 — known issue 로 처리. 새 위반만 lint fail."
+}

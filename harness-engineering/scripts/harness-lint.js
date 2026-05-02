@@ -29,6 +29,7 @@ const sqlLint = require('./sql-lint')
 const sqlFnLint = require('./sql-fn-lint')
 const apiTrace = require('./api-call-trace')
 const uiCoverage = require('./ui-data-coverage')
+const amountSignLint = require('./amount-sign-lint')
 
 const flags = new Set(process.argv.slice(2))
 
@@ -121,6 +122,23 @@ function main() {
     console.error(`  ❌ ${b.url}  ← ${b.callers.slice(0, 2).join(', ')}`)
   }
 
+  // [평가] 4-2. amount + 부호 사용 차단 (CLAUDE.md 규칙 18)
+  console.log('\n▸ [3.5] amount-sign-lint — + 부호 사용 차단')
+  const signR = amountSignLint.lint()
+  const signBaselinePath = path.join(KNOWLEDGE_DIR, 'amount-sign-lint.baseline.json')
+  let signBaselineSet = new Set()
+  if (fs.existsSync(signBaselinePath)) {
+    try {
+      const data = JSON.parse(fs.readFileSync(signBaselinePath, 'utf-8'))
+      signBaselineSet = new Set((data.violations || []).map(v => `${v.file}:${v.line}`))
+    } catch {}
+  }
+  const newSign = signR.violations.filter(v => !signBaselineSet.has(`${v.file}:${v.line}`))
+  console.log(`  ${signR.fileCount} files, total=${signR.violations.length}, new=${newSign.length}`)
+  for (const v of newSign.slice(0, 5)) {
+    console.error(`  ❌ ${v.file}:${v.line}  ${v.label}`)
+  }
+
   // [평가] 4. UI 화면 데이터 정합성
   console.log('\n▸ [4/4] ui-data-coverage — 같은 API 호출 page 들 사이 누락 필드')
   const uiR = uiCoverage.buildCoverage()
@@ -167,7 +185,7 @@ function main() {
   }
 
   // 결과 집계
-  const newCritical = newSqlViolations.length + fnR.violations.length + newApiBroken.length
+  const newCritical = newSqlViolations.length + fnR.violations.length + newApiBroken.length + newSign.length
   console.log('\n═══ 결과 ═══')
   console.log(`  새 critical 위반: ${newCritical}`)
   console.log(`  known issue: ${knownSqlViolations.length} SQL + ${apiR.brokenCalls.length - newApiBroken.length} broken-call`)
