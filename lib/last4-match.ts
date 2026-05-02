@@ -105,14 +105,16 @@ export function smsLast4Sql(smsAliasCol: string): string {
  */
 export function cardMappingJoinSql(ccAlias: string, smsAlias: string, txAlias?: string): string {
   const COLL = 'COLLATE utf8mb4_unicode_ci'
-  // tx.card_last4 fallback — 이전 파싱 거래 (card_alias NULL 또는 단순 발급사명) 강제 매칭용
+  // tx.raw_data 의 $.card_last4 JSON 추출 fallback — 이전 파싱 거래 강제 매칭용
+  // (transactions 테이블에 card_last4 컬럼은 없음 — raw_data JSON 안에 저장됨)
   const txLast4Match = txAlias ? `
         OR (
-          ${txAlias}.card_last4 IS NOT NULL
-          AND CHAR_LENGTH(TRIM(${txAlias}.card_last4)) = 4
+          ${txAlias}.raw_data IS NOT NULL
+          AND JSON_UNQUOTE(JSON_EXTRACT(${txAlias}.raw_data, '$.card_last4')) IS NOT NULL
+          AND CHAR_LENGTH(JSON_UNQUOTE(JSON_EXTRACT(${txAlias}.raw_data, '$.card_last4'))) = 4
           AND ${ccAlias}.card_number IS NOT NULL
           AND CHAR_LENGTH(TRIM(${ccAlias}.card_number)) >= 4
-          AND RIGHT(TRIM(${ccAlias}.card_number), 4) ${COLL} = TRIM(${txAlias}.card_last4) ${COLL}
+          AND RIGHT(TRIM(${ccAlias}.card_number), 4) ${COLL} = JSON_UNQUOTE(JSON_EXTRACT(${txAlias}.raw_data, '$.card_last4')) ${COLL}
         )` : ''
   return `(
     ${ccAlias}.id ${COLL} = ${smsAlias}.card_id ${COLL}
