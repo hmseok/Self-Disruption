@@ -336,6 +336,13 @@ export default function BankCardPage() {
   const [ruleClassifyLoading, setRuleClassifyLoading] = useState(false)
   const [expandedGroup, setExpandedGroup] = useState<'high' | 'medium' | 'low' | null>(null)
 
+  // 분류 룰 관리 (Phase 3-C)
+  const [rules, setRules] = useState<any[]>([])
+  const [rulesLoading, setRulesLoading] = useState(false)
+  const [editRule, setEditRule] = useState<any | null>(null)  // null=닫힘, {} = 신규, {id,...} = 수정
+  const [ruleFilter, setRuleFilter] = useState<'all' | 'system' | 'user'>('all')
+  const [ruleCategoryFilter, setRuleCategoryFilter] = useState<string>('')
+
   // SMS 탭 상태
   const [smsRows, setSmsRows] = useState<SmsRow[]>([])
   const [smsLoading, setSmsLoading] = useState(false)
@@ -1714,6 +1721,83 @@ export default function BankCardPage() {
     }
   }
 
+  // ── Phase 3-C — 분류 룰 관리 ──
+  const loadRules = async () => {
+    setRulesLoading(true)
+    try {
+      const { json } = await fetchWithAuth('/api/finance/classification-rules')
+      if (json?.data) setRules(json.data)
+    } catch (e: any) {
+      console.error('[loadRules]', e)
+    } finally {
+      setRulesLoading(false)
+    }
+  }
+
+  const saveRule = async (r: any) => {
+    if (!r.pattern || !r.category) {
+      alert('키워드(pattern) 와 대분류(category) 는 필수입니다')
+      return
+    }
+    try {
+      if (r.id) {
+        // 수정
+        await fetchWithAuth('/api/finance/classification-rules', { method: 'PATCH', body: r })
+      } else {
+        // 신규
+        await fetchWithAuth('/api/finance/classification-rules', { method: 'POST', body: r })
+      }
+      setEditRule(null)
+      await loadRules()
+    } catch (e: any) {
+      alert(`저장 오류: ${e.message}`)
+    }
+  }
+
+  const toggleRuleActive = async (id: string, current: number) => {
+    try {
+      await fetchWithAuth('/api/finance/classification-rules', {
+        method: 'PATCH',
+        body: { id, is_active: current ? 0 : 1 },
+      })
+      await loadRules()
+    } catch (e: any) {
+      alert(`토글 오류: ${e.message}`)
+    }
+  }
+
+  const deleteRule = async (id: string, isSystem: number) => {
+    if (isSystem) {
+      alert('시스템 룰은 삭제할 수 없습니다.\n비활성화 (is_active=0) 로 변경하세요.')
+      return
+    }
+    if (!confirm('이 룰을 삭제하시겠습니까?')) return
+    try {
+      await fetchWithAuth(`/api/finance/classification-rules?id=${id}`, { method: 'DELETE' })
+      await loadRules()
+    } catch (e: any) {
+      alert(`삭제 오류: ${e.message}`)
+    }
+  }
+
+  // 룰 탭 활성 시 자동 로드
+  useEffect(() => {
+    if (activeTab === 'rules' && rules.length === 0) loadRules()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab])
+
+  const filteredRules = useMemo(() => {
+    let list = rules
+    if (ruleFilter === 'system') list = list.filter(r => r.is_system === 1)
+    if (ruleFilter === 'user')   list = list.filter(r => r.is_system === 0)
+    if (ruleCategoryFilter)      list = list.filter(r => r.category === ruleCategoryFilter)
+    return list
+  }, [rules, ruleFilter, ruleCategoryFilter])
+
+  const ruleCategories = useMemo(() => {
+    return Array.from(new Set(rules.map(r => r.category))).sort()
+  }, [rules])
+
   // ── 은행 데이터 삭제 + 재업로드 안내 ──
   const deleteAndReupload = async (source: 'excel_bank' | 'excel_card') => {
     const label = source === 'excel_bank' ? '통장' : '카드'
@@ -1785,6 +1869,7 @@ export default function BankCardPage() {
     { key: 'settlement', label: '정산 연결', count: summary?.settlement.total },
     { key: 'sms', label: 'SMS 수집', count: summary?.sms?.total || 0 },
     { key: 'mapping', label: '매핑 관리' },
+    { key: 'rules', label: '분류 룰' },
   ]
 
   // ── 통계 카드 ─────────────────────────────────────────
@@ -3819,6 +3904,195 @@ export default function BankCardPage() {
                     {mappingBanks.length === 0 && <tr><td colSpan={6} style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>등록된 통장이 없습니다</td></tr>}
                   </tbody>
                 </table>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* ──── 분류 룰 탭 (Phase 3-C) ──── */}
+        {activeTab === 'rules' && (
+          <>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+              {(['all', 'system', 'user'] as const).map(f => (
+                <button key={f} onClick={() => setRuleFilter(f)} style={{
+                  padding: '6px 14px', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                  border: `1px solid ${ruleFilter === f ? 'rgba(59,110,181,0.4)' : 'rgba(0,0,0,0.06)'}`,
+                  background: ruleFilter === f ? 'rgba(191,219,254,0.5)' : 'rgba(255,255,255,0.72)',
+                  color: ruleFilter === f ? '#1e40af' : '#475569',
+                }}>{f === 'all' ? `전체 (${rules.length})` : f === 'system' ? `시스템 (${rules.filter(r => r.is_system === 1).length})` : `사용자 (${rules.filter(r => r.is_system === 0).length})`}</button>
+              ))}
+              <select
+                value={ruleCategoryFilter}
+                onChange={(e) => setRuleCategoryFilter(e.target.value)}
+                style={{ ...GLASS.L1, padding: '6px 10px', borderRadius: 8, fontSize: 12, border: `1px solid ${COLORS.borderSubtle}` }}
+              >
+                <option value="">대분류 전체</option>
+                {ruleCategories.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+              <button
+                onClick={loadRules}
+                disabled={rulesLoading}
+                style={{ ...BTN.sm, padding: '6px 12px', fontSize: 12, fontWeight: 600,
+                         background: 'rgba(0,0,0,0.04)', color: COLORS.textSecondary, cursor: 'pointer' }}
+              >🔄 새로고침</button>
+              <span style={{ flex: 1 }} />
+              <button onClick={() => setEditRule({ pattern: '', category: '', subcategory: '', match_car: 0, confidence: 'medium', tx_type: '' })} style={{
+                padding: '8px 14px', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                background: 'rgba(167,243,208,0.5)', color: '#065f46', border: '1px solid rgba(5,150,105,0.3)',
+              }}>+ 룰 추가</button>
+            </div>
+
+            <div style={{ ...GLASS.L4, borderRadius: 12, padding: 14, overflow: 'auto' }}>
+              <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse', minWidth: 1000 }}>
+                <thead>
+                  <tr style={{ background: 'rgba(0,0,0,0.03)' }}>
+                    <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, color: COLORS.textSecondary, width: 60 }}>출처</th>
+                    <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, color: COLORS.textSecondary }}>키워드</th>
+                    <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, color: COLORS.textSecondary }}>대분류</th>
+                    <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, color: COLORS.textSecondary }}>소분류</th>
+                    <th style={{ padding: '8px 10px', textAlign: 'center', fontWeight: 600, color: COLORS.textSecondary, width: 80 }}>차량매칭</th>
+                    <th style={{ padding: '8px 10px', textAlign: 'center', fontWeight: 600, color: COLORS.textSecondary, width: 80 }}>신뢰도</th>
+                    <th style={{ padding: '8px 10px', textAlign: 'center', fontWeight: 600, color: COLORS.textSecondary, width: 80 }}>거래유형</th>
+                    <th style={{ padding: '8px 10px', textAlign: 'center', fontWeight: 600, color: COLORS.textSecondary, width: 90 }}>금액 한도</th>
+                    <th style={{ padding: '8px 10px', textAlign: 'center', fontWeight: 600, color: COLORS.textSecondary, width: 80 }}>활성</th>
+                    <th style={{ padding: '8px 10px', textAlign: 'center', fontWeight: 600, color: COLORS.textSecondary, width: 110 }}>액션</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredRules.map(r => (
+                    <tr key={r.id} style={{ borderBottom: `1px solid ${COLORS.borderSubtle}`, opacity: r.is_active ? 1 : 0.5 }}>
+                      <td style={{ padding: '6px 10px' }}>
+                        {r.is_system === 1
+                          ? <span style={{ fontSize: 10, color: '#7c3aed', background: 'rgba(124,58,237,0.1)', padding: '2px 6px', borderRadius: 4, fontWeight: 600 }}>시스템</span>
+                          : <span style={{ fontSize: 10, color: '#0891b2', background: 'rgba(8,145,178,0.1)', padding: '2px 6px', borderRadius: 4, fontWeight: 600 }}>사용자</span>}
+                      </td>
+                      <td style={{ padding: '6px 10px', fontWeight: 600, color: COLORS.textPrimary }}>{r.pattern}</td>
+                      <td style={{ padding: '6px 10px', color: '#1e40af', fontWeight: 500 }}>{r.category}</td>
+                      <td style={{ padding: '6px 10px', color: COLORS.textSecondary }}>{r.subcategory || '-'}</td>
+                      <td style={{ padding: '6px 10px', textAlign: 'center' }}>{r.match_car ? '⭐' : '-'}</td>
+                      <td style={{ padding: '6px 10px', textAlign: 'center' }}>
+                        <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 4, fontWeight: 600,
+                                       color: r.confidence === 'high' ? '#15803d' : r.confidence === 'medium' ? '#b45309' : '#dc2626',
+                                       background: r.confidence === 'high' ? 'rgba(34,197,94,0.1)' : r.confidence === 'medium' ? 'rgba(245,158,11,0.1)' : 'rgba(239,68,68,0.1)' }}>
+                          {r.confidence}
+                        </span>
+                      </td>
+                      <td style={{ padding: '6px 10px', textAlign: 'center', fontSize: 11, color: COLORS.textSecondary }}>
+                        {r.tx_type === 'income' ? '입금' : r.tx_type === 'expense' ? '출금' : '양쪽'}
+                      </td>
+                      <td style={{ padding: '6px 10px', textAlign: 'center', fontSize: 11, color: COLORS.textSecondary }}>
+                        {r.amount_max ? `≤${nf(Number(r.amount_max))}` : r.amount_min ? `≥${nf(Number(r.amount_min))}` : '-'}
+                      </td>
+                      <td style={{ padding: '6px 10px', textAlign: 'center' }}>
+                        <button
+                          onClick={() => toggleRuleActive(r.id, r.is_active)}
+                          style={{ ...BTN.sm, padding: '3px 10px', fontSize: 10, fontWeight: 600,
+                                   background: r.is_active ? 'rgba(34,197,94,0.15)' : 'rgba(0,0,0,0.05)',
+                                   color: r.is_active ? '#15803d' : '#64748b',
+                                   border: `1px solid ${r.is_active ? 'rgba(34,197,94,0.3)' : 'rgba(0,0,0,0.1)'}`, cursor: 'pointer' }}
+                        >{r.is_active ? '✓ 활성' : '○ 비활성'}</button>
+                      </td>
+                      <td style={{ padding: '6px 10px', textAlign: 'center' }}>
+                        <button
+                          onClick={() => setEditRule(r)}
+                          style={{ padding: '3px 8px', borderRadius: 6, fontSize: 11, cursor: 'pointer',
+                                   background: 'rgba(191,219,254,0.5)', border: '1px solid rgba(59,110,181,0.2)', color: '#1e40af', marginRight: 4 }}
+                        >수정</button>
+                        <button
+                          onClick={() => deleteRule(r.id, r.is_system)}
+                          disabled={r.is_system === 1}
+                          style={{ padding: '3px 8px', borderRadius: 6, fontSize: 11,
+                                   cursor: r.is_system === 1 ? 'not-allowed' : 'pointer',
+                                   background: r.is_system === 1 ? 'rgba(0,0,0,0.04)' : 'rgba(254,202,202,0.5)',
+                                   border: `1px solid ${r.is_system === 1 ? 'rgba(0,0,0,0.06)' : 'rgba(239,68,68,0.2)'}`,
+                                   color: r.is_system === 1 ? '#94a3b8' : '#b91c1c' }}
+                        >삭제</button>
+                      </td>
+                    </tr>
+                  ))}
+                  {filteredRules.length === 0 && (
+                    <tr><td colSpan={10} style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>
+                      {rulesLoading ? '⏳ 로딩 중...' : '룰이 없습니다 — [+ 룰 추가] 클릭'}
+                    </td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* 룰 추가/수정 모달 */}
+            {editRule && (
+              <div onClick={() => setEditRule(null)} style={{
+                position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 999,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
+              }}>
+                <div onClick={(e) => e.stopPropagation()} style={{
+                  ...GLASS.L4, borderRadius: 14, padding: 20, width: 'min(560px, 100%)', maxHeight: '90vh', overflow: 'auto',
+                }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.textPrimary, marginBottom: 16 }}>
+                    {editRule.id ? '✏️ 룰 수정' : '+ 룰 추가'}
+                    {editRule.is_system === 1 && <span style={{ marginLeft: 8, fontSize: 11, color: '#7c3aed', fontWeight: 500 }}>(시스템 룰 — pattern/category 만 수정 권장)</span>}
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                    <label style={{ gridColumn: 'span 2', fontSize: 12, fontWeight: 600, color: COLORS.textSecondary }}>
+                      키워드 (description LIKE) *
+                      <input value={editRule.pattern || ''} onChange={(e) => setEditRule({ ...editRule, pattern: e.target.value })}
+                        placeholder="예: GS칼텍스, 주유, 한국도로공사" style={{ ...GLASS.L1, width: '100%', marginTop: 4, padding: '8px 10px', borderRadius: 8, fontSize: 13, border: `1px solid ${COLORS.borderSubtle}` }} />
+                    </label>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: COLORS.textSecondary }}>
+                      대분류 *
+                      <input value={editRule.category || ''} onChange={(e) => setEditRule({ ...editRule, category: e.target.value })}
+                        placeholder="예: 차량비, 운영비" style={{ ...GLASS.L1, width: '100%', marginTop: 4, padding: '8px 10px', borderRadius: 8, fontSize: 13, border: `1px solid ${COLORS.borderSubtle}` }} />
+                    </label>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: COLORS.textSecondary }}>
+                      소분류
+                      <input value={editRule.subcategory || ''} onChange={(e) => setEditRule({ ...editRule, subcategory: e.target.value })}
+                        placeholder="예: 유류비, 통행료" style={{ ...GLASS.L1, width: '100%', marginTop: 4, padding: '8px 10px', borderRadius: 8, fontSize: 13, border: `1px solid ${COLORS.borderSubtle}` }} />
+                    </label>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: COLORS.textSecondary }}>
+                      신뢰도
+                      <select value={editRule.confidence || 'medium'} onChange={(e) => setEditRule({ ...editRule, confidence: e.target.value })}
+                        style={{ ...GLASS.L1, width: '100%', marginTop: 4, padding: '8px 10px', borderRadius: 8, fontSize: 13, border: `1px solid ${COLORS.borderSubtle}` }}>
+                        <option value="high">HIGH (확실 — 일괄 확정 후보)</option>
+                        <option value="medium">MEDIUM (검수 권장)</option>
+                        <option value="low">LOW (수동/AI 검수)</option>
+                      </select>
+                    </label>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: COLORS.textSecondary }}>
+                      거래 유형
+                      <select value={editRule.tx_type || ''} onChange={(e) => setEditRule({ ...editRule, tx_type: e.target.value })}
+                        style={{ ...GLASS.L1, width: '100%', marginTop: 4, padding: '8px 10px', borderRadius: 8, fontSize: 13, border: `1px solid ${COLORS.borderSubtle}` }}>
+                        <option value="">양쪽 (수입/지출)</option>
+                        <option value="expense">지출만</option>
+                        <option value="income">수입만</option>
+                      </select>
+                    </label>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: COLORS.textSecondary, gridColumn: 'span 2', display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <input type="checkbox" checked={!!editRule.match_car} onChange={(e) => setEditRule({ ...editRule, match_car: e.target.checked ? 1 : 0 })} />
+                      ⭐ 카드 holder 의 차량 자동 매칭 (related_type=&apos;car&apos;)
+                    </label>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: COLORS.textSecondary }}>
+                      금액 상한 (선택)
+                      <input type="number" value={editRule.amount_max || ''} onChange={(e) => setEditRule({ ...editRule, amount_max: e.target.value })}
+                        placeholder="예: 30000 (이하만 매칭)" style={{ ...GLASS.L1, width: '100%', marginTop: 4, padding: '8px 10px', borderRadius: 8, fontSize: 13, border: `1px solid ${COLORS.borderSubtle}` }} />
+                    </label>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: COLORS.textSecondary }}>
+                      금액 하한 (선택)
+                      <input type="number" value={editRule.amount_min || ''} onChange={(e) => setEditRule({ ...editRule, amount_min: e.target.value })}
+                        placeholder="예: 100000 (이상만 매칭)" style={{ ...GLASS.L1, width: '100%', marginTop: 4, padding: '8px 10px', borderRadius: 8, fontSize: 13, border: `1px solid ${COLORS.borderSubtle}` }} />
+                    </label>
+                    <label style={{ gridColumn: 'span 2', fontSize: 12, fontWeight: 600, color: COLORS.textSecondary }}>
+                      메모
+                      <input value={editRule.notes || ''} onChange={(e) => setEditRule({ ...editRule, notes: e.target.value })}
+                        placeholder="이 룰의 사용 사유 / 주의사항" style={{ ...GLASS.L1, width: '100%', marginTop: 4, padding: '8px 10px', borderRadius: 8, fontSize: 13, border: `1px solid ${COLORS.borderSubtle}` }} />
+                    </label>
+                  </div>
+                  <div style={{ marginTop: 18, display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                    <button onClick={() => setEditRule(null)} style={{ padding: '8px 16px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                      background: 'rgba(0,0,0,0.04)', color: COLORS.textSecondary, border: `1px solid ${COLORS.borderSubtle}` }}>취소</button>
+                    <button onClick={() => saveRule(editRule)} style={{ padding: '8px 18px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                      background: 'rgba(34,197,94,0.18)', color: '#15803d', border: '1px solid rgba(34,197,94,0.4)' }}>{editRule.id ? '수정 저장' : '추가'}</button>
+                  </div>
+                </div>
               </div>
             )}
           </>
