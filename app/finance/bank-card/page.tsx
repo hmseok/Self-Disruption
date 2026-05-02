@@ -331,6 +331,11 @@ export default function BankCardPage() {
   const [reviewLoading, setReviewLoading] = useState(false)
   const [reviewTypeFilter, setReviewTypeFilter] = useState<'all' | 'income' | 'expense'>('all')
 
+  // 룰 기반 자동 분류 (Phase 3-A 신규 API 연동)
+  const [ruleClassifyResult, setRuleClassifyResult] = useState<any>(null)
+  const [ruleClassifyLoading, setRuleClassifyLoading] = useState(false)
+  const [expandedGroup, setExpandedGroup] = useState<'high' | 'medium' | 'low' | null>(null)
+
   // SMS 탭 상태
   const [smsRows, setSmsRows] = useState<SmsRow[]>([])
   const [smsLoading, setSmsLoading] = useState(false)
@@ -1613,6 +1618,102 @@ export default function BankCardPage() {
     }
   }
 
+  // ── Phase 3-A — 룰 기반 자동 분류 (dry-run + apply) ──
+  const runRuleClassify = async () => {
+    setRuleClassifyLoading(true)
+    setRuleClassifyResult(null)
+    setExpandedGroup(null)
+    try {
+      const { json } = await fetchWithAuth('/api/finance/auto-classify/dry-run', {
+        method: 'POST',
+        body: { source: 'all', limit: 5000 },
+      })
+      if (json?.error) {
+        alert(`자동 분류 오류: ${json.error}`)
+        return
+      }
+      setRuleClassifyResult(json)
+    } catch (e: any) {
+      alert(`자동 분류 오류: ${e.message}`)
+    } finally {
+      setRuleClassifyLoading(false)
+    }
+  }
+
+  const applyRuleClassify = async (confidence: 'high' | 'medium' | 'low') => {
+    if (!ruleClassifyResult?.groups) return
+    const items = ruleClassifyResult.groups[confidence] || []
+    if (items.length === 0) {
+      alert(`${confidence} 그룹에 적용할 항목 없음`)
+      return
+    }
+    if (!confirm(`${confidence.toUpperCase()} 그룹 ${items.length}건 일괄 확정하시겠습니까?\n(분류 적용 — 되돌리려면 분류 검수에서 직접 수정)`)) return
+
+    setRuleClassifyLoading(true)
+    try {
+      const payload = items.map((it: any) => ({
+        id: it.id,
+        category: it.subcategory || it.category,
+        related_type: it.related_type || null,
+        related_id: it.related_id || null,
+      }))
+      const { json } = await fetchWithAuth('/api/finance/auto-classify/apply', {
+        method: 'POST',
+        body: { items: payload },
+      })
+      alert(`✅ 적용: ${json?.applied || 0}건 / 실패: ${json?.failed || 0}건`)
+      // 재실행 — 적용된 거래 빠지고 남은 것만 다시 표시
+      await runRuleClassify()
+      // 통계 새로고침
+      await Promise.all([loadSummary(), loadTransactions()])
+    } catch (e: any) {
+      alert(`적용 오류: ${e.message}`)
+    } finally {
+      setRuleClassifyLoading(false)
+    }
+  }
+
+  const applyOneClassify = async (it: any) => {
+    setRuleClassifyLoading(true)
+    try {
+      const { json } = await fetchWithAuth('/api/finance/auto-classify/apply', {
+        method: 'POST',
+        body: { items: [{
+          id: it.id,
+          category: it.subcategory || it.category,
+          related_type: it.related_type || null,
+          related_id: it.related_id || null,
+        }]},
+      })
+      if ((json?.applied || 0) > 0) {
+        // 결과 인메모리 갱신 — 적용된 거래 제거
+        setRuleClassifyResult((prev: any) => {
+          if (!prev) return prev
+          const newGroups = { ...prev.groups }
+          for (const conf of ['high', 'medium', 'low'] as const) {
+            newGroups[conf] = newGroups[conf].filter((x: any) => x.id !== it.id)
+          }
+          return {
+            ...prev,
+            groups: newGroups,
+            counts: {
+              high: newGroups.high.length,
+              medium: newGroups.medium.length,
+              low: newGroups.low.length,
+              total: newGroups.high.length + newGroups.medium.length + newGroups.low.length,
+            },
+          }
+        })
+      } else {
+        alert(`적용 실패: ${json?.errors?.[0]?.error || '알 수 없음'}`)
+      }
+    } catch (e: any) {
+      alert(`적용 오류: ${e.message}`)
+    } finally {
+      setRuleClassifyLoading(false)
+    }
+  }
+
   // ── 은행 데이터 삭제 + 재업로드 안내 ──
   const deleteAndReupload = async (source: 'excel_bank' | 'excel_card') => {
     const label = source === 'excel_bank' ? '통장' : '카드'
@@ -2299,7 +2400,21 @@ export default function BankCardPage() {
                         </div>
                       </div>
                       <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-                        {/* 메인 — 풀 자동 매칭(+AI) 한 개로 충분. 검수 도구 1개 */}
+                        {/* 메인 ① — 룰 기반 자동 분류 (Phase 3-A 신규, 빠르고 안전) */}
+                        <button
+                          onClick={runRuleClassify}
+                          disabled={ruleClassifyLoading || autoClassifying}
+                          title="classification_rules 기반 분류 시도 (DB 변경 X — 결과 검수 후 일괄 확정)"
+                          style={{
+                            ...BTN.sm, padding: '6px 14px', fontSize: 12, fontWeight: 700,
+                            background: 'linear-gradient(90deg, rgba(34,197,94,0.18), rgba(16,185,129,0.18))',
+                            color: '#15803d',
+                            border: '1px solid rgba(34,197,94,0.45)',
+                            cursor: ruleClassifyLoading ? 'wait' : 'pointer',
+                            opacity: ruleClassifyLoading ? 0.6 : 1,
+                          }}
+                        >🤖 룰 자동 분류</button>
+                        {/* 메인 ② — 풀 자동 매칭(+AI) (구 인터페이스, 큰 작업) */}
                         <button
                           onClick={runFullAutoMatch}
                           disabled={autoClassifying}
@@ -2440,6 +2555,119 @@ export default function BankCardPage() {
                       </div>
                     )}
                   </div>
+
+                  {/* ──── Phase 3-A — 룰 기반 자동 분류 결과 ──── */}
+                  {ruleClassifyResult && (
+                    <div style={{
+                      ...GLASS.L4, border: `1px solid ${COLORS.borderSubtle}`,
+                      borderRadius: 12, padding: 16, marginBottom: 12,
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.textPrimary }}>
+                          🤖 룰 자동 분류 결과 — 총 {ruleClassifyResult.counts?.total || 0}건
+                          <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 8, fontWeight: 400 }}>
+                            (룰 {ruleClassifyResult.rules_count || 0}개 활성)
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => { setRuleClassifyResult(null); setExpandedGroup(null) }}
+                          style={{ ...BTN.sm, padding: '4px 10px', fontSize: 11, background: 'rgba(0,0,0,0.04)', color: COLORS.textSecondary, cursor: 'pointer' }}
+                        >✕ 닫기</button>
+                      </div>
+
+                      {/* 3 그룹 카드 */}
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10, marginBottom: 12 }}>
+                        {(['high', 'medium', 'low'] as const).map(conf => {
+                          const items = ruleClassifyResult.groups?.[conf] || []
+                          const meta = {
+                            high:   { label: '🟢 HIGH 확실 — 일괄 확정', color: '#15803d', bg: 'rgba(34,197,94,0.10)', border: 'rgba(34,197,94,0.4)' },
+                            medium: { label: '🟡 MEDIUM 검수 권장', color: '#b45309', bg: 'rgba(245,158,11,0.10)', border: 'rgba(245,158,11,0.4)' },
+                            low:    { label: '🔴 LOW 수동/AI 검수', color: '#dc2626', bg: 'rgba(239,68,68,0.10)', border: 'rgba(239,68,68,0.4)' },
+                          }[conf]
+                          const expanded = expandedGroup === conf
+                          return (
+                            <div key={conf} style={{
+                              padding: 12, borderRadius: 10, background: meta.bg, border: `1px solid ${meta.border}`,
+                            }}>
+                              <div style={{ fontSize: 12, fontWeight: 700, color: meta.color, marginBottom: 6 }}>
+                                {meta.label}
+                              </div>
+                              <div style={{ fontSize: 22, fontWeight: 800, color: meta.color, marginBottom: 8 }}>
+                                {items.length.toLocaleString()}건
+                              </div>
+                              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                                <button
+                                  onClick={() => setExpandedGroup(expanded ? null : conf)}
+                                  style={{ ...BTN.sm, padding: '4px 10px', fontSize: 11, fontWeight: 600,
+                                           background: '#fff', color: meta.color, border: `1px solid ${meta.border}`, cursor: 'pointer' }}
+                                >{expanded ? '▾ 접기' : '▸ 펼치기'}</button>
+                                {conf === 'high' && items.length > 0 && (
+                                  <button
+                                    onClick={() => applyRuleClassify('high')}
+                                    disabled={ruleClassifyLoading}
+                                    style={{ ...BTN.sm, padding: '4px 12px', fontSize: 11, fontWeight: 700,
+                                             background: '#15803d', color: '#fff', cursor: ruleClassifyLoading ? 'wait' : 'pointer' }}
+                                  >✓ 일괄 확정</button>
+                                )}
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+
+                      {/* 펼친 그룹의 거래 목록 */}
+                      {expandedGroup && ruleClassifyResult.groups?.[expandedGroup]?.length > 0 && (
+                        <div style={{
+                          marginTop: 12, padding: '8px 0', maxHeight: 400, overflow: 'auto',
+                          borderTop: `1px solid ${COLORS.borderSubtle}`,
+                        }}>
+                          <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
+                            <thead>
+                              <tr style={{ background: 'rgba(0,0,0,0.03)', position: 'sticky', top: 0 }}>
+                                <th style={{ padding: '6px 8px', textAlign: 'left', fontWeight: 600, color: COLORS.textSecondary }}>적요</th>
+                                <th style={{ padding: '6px 8px', textAlign: 'left', fontWeight: 600, color: COLORS.textSecondary }}>제안 카테고리</th>
+                                <th style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 600, color: COLORS.textSecondary }}>금액</th>
+                                <th style={{ padding: '6px 8px', textAlign: 'left', fontWeight: 600, color: COLORS.textSecondary }}>사유</th>
+                                <th style={{ padding: '6px 8px', textAlign: 'center', fontWeight: 600, color: COLORS.textSecondary }}>액션</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {(ruleClassifyResult.groups?.[expandedGroup] || []).slice(0, 200).map((it: any) => (
+                                <tr key={it.id} style={{ borderBottom: `1px solid ${COLORS.borderSubtle}` }}>
+                                  <td style={{ padding: '6px 8px' }}>
+                                    <div style={{ fontWeight: 500, color: COLORS.textPrimary }}>{(it.description || '-').slice(0, 50)}</div>
+                                    {it.card_alias && <div style={{ fontSize: 10, color: COLORS.textMuted }}>{it.card_alias}</div>}
+                                  </td>
+                                  <td style={{ padding: '6px 8px' }}>
+                                    <div style={{ fontWeight: 600, color: '#1e40af' }}>{it.category}</div>
+                                    {it.subcategory && <div style={{ fontSize: 10, color: COLORS.textSecondary }}>{it.subcategory}</div>}
+                                  </td>
+                                  <td style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 600,
+                                                color: it.type === 'income' ? COLORS.income : COLORS.expense }}>
+                                    {it.type === 'income' ? '+' : '-'}{nf(Number(it.amount || 0))}
+                                  </td>
+                                  <td style={{ padding: '6px 8px', fontSize: 11, color: COLORS.textMuted }}>{it.reason}</td>
+                                  <td style={{ padding: '6px 8px', textAlign: 'center' }}>
+                                    <button
+                                      onClick={() => applyOneClassify(it)}
+                                      disabled={ruleClassifyLoading}
+                                      style={{ ...BTN.sm, padding: '3px 10px', fontSize: 10, fontWeight: 600,
+                                               background: '#15803d', color: '#fff', cursor: ruleClassifyLoading ? 'wait' : 'pointer' }}
+                                    >✓ 확정</button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                          {ruleClassifyResult.groups?.[expandedGroup]?.length > 200 && (
+                            <div style={{ padding: '8px', textAlign: 'center', fontSize: 11, color: COLORS.textMuted }}>
+                              ⋯ {ruleClassifyResult.groups[expandedGroup].length - 200}건 더 (재실행으로 갱신)
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {/* 카테고리 카드 목록 — 클릭 시 인라인 확장 (선택된 카드 행 바로 아래에 상세 패널) */}
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 8 }}>
