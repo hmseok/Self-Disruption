@@ -26,11 +26,10 @@ export async function GET(request: NextRequest) {
   if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
 
   try {
-    // 1) 매핑 목록
+    // 1) 매핑 목록 — bank_account_mappings 는 deleted_at 컬럼 없음 (schema:BankAccountMapping)
     const mappings = await prisma.$queryRawUnsafe<any[]>(`
       SELECT id, bank_name, account_number, account_alias, account_holder, purpose, assigned_car_id
       FROM bank_account_mappings
-      WHERE deleted_at IS NULL OR deleted_at IS NULL
       ORDER BY bank_name, account_alias
     `)
 
