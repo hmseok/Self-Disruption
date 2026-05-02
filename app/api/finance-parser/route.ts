@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { requireAuth } from '../../utils/auth-guard'
+import { parseWooriBankExcel } from '@/lib/excel-bank-parsers/woori'
 
 export async function POST(req: NextRequest) {
   const auth = await requireAuth(req)
@@ -11,9 +12,40 @@ export async function POST(req: NextRequest) {
     if (!apiKey) return NextResponse.json({ error: "API 키 설정 필요" }, { status: 500 });
 
     const genAI = new GoogleGenerativeAI(apiKey);
-    const { data, mimeType, fileType } = await req.json();
+    const { data, mimeType, fileType, filename } = await req.json();
 
-    console.log('[finance-parser] fileType:', fileType, '| mimeType:', mimeType, '| dataLen:', data?.length);
+    console.log('[finance-parser] fileType:', fileType, '| mimeType:', mimeType, '| filename:', filename, '| dataLen:', data?.length);
+
+    // ── 우리은행 엑셀 자동 감지 → 직접 파서 (Gemini 우회) ──
+    // CLAUDE.md 규칙 8 — 검증된 직접 파서 사용 (LLM 추측 회피)
+    if (fileType === 'bank_statement' && (filename || '').includes('우리') && /xlsx|xls|sheet/i.test(mimeType || '')) {
+      try {
+        const buf = typeof data === 'string' ? Buffer.from(data, 'base64') : Buffer.from(data)
+        const result = parseWooriBankExcel(buf)
+        if (result.rows.length > 0) {
+          const parsed = result.rows.map((r: any) => ({
+            transaction_date: r.transaction_date,
+            type: r.deposit > 0 ? 'income' : 'expense',
+            amount: r.deposit > 0 ? r.deposit : r.withdrawal,
+            client_name: r.counterpart,           // 기재내용 = 거래처
+            description: r.description + (r.branch ? ` / ${r.branch}` : ''),  // 적요 / 취급점
+            bank_name: 'WOORI_BANK',
+            payment_method: 'Bank',
+            card_number: '',
+            balance_after: r.balance,
+            transaction_time: r.transaction_time,
+            // 메타 정보 → 자동 매핑용 (last4)
+            _account_number: result.meta.account_number,
+            _account_holder: result.meta.account_holder,
+            _account_last4: result.meta.last4,
+          }))
+          console.log(`[finance-parser] 우리은행 직접 파서 ${parsed.length}건 (last4=${result.meta.last4})`)
+          return NextResponse.json(parsed)
+        }
+      } catch (e: any) {
+        console.warn('[finance-parser] 우리은행 직접 파서 실패 → Gemini fallback:', e?.message?.slice(0, 200))
+      }
+    }
 
     const model = genAI.getGenerativeModel({
         model: "gemini-2.0-flash",

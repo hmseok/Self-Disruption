@@ -416,6 +416,31 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
         updateProgress(10);
         setLogs(`🏧 통장 거래 직접 파싱 중... ${file.name} (${bodyRows.length}행)`);
 
+        // ── 메타 정보 추출 (계좌번호/예금주 — 헤더 위 행들) ──
+        let metaAccountNumber = '';
+        let metaAccountHolder = '';
+        let metaLast4 = '';
+        for (let mi = 0; mi < headerIdx; mi++) {
+          const cell = String((jsonData[mi] || [])[0] || '');
+          const accM = cell.match(/계좌번호\s*[:：]\s*([0-9\-]+)/);
+          if (accM && !metaAccountNumber) metaAccountNumber = accM[1].trim();
+          const holdM = cell.match(/예금주\s*[:：]\s*([^\s].*?)(?:\s{2,}|$)/);
+          if (holdM && !metaAccountHolder) metaAccountHolder = holdM[1].trim();
+        }
+        if (metaAccountNumber) {
+          metaLast4 = metaAccountNumber.replace(/\D/g, '').slice(-4);
+          console.log(`[UploadContext] 통장 메타: 계좌=${metaAccountNumber} (last4=${metaLast4}) / 예금주=${metaAccountHolder}`);
+        }
+
+        // 은행 자동 감지 (파일명/제목)
+        const fileTitle = String((jsonData[0] || [])[0] || '');
+        let metaBankName = '';
+        if (/우리/.test(file.name) || /우리/.test(fileTitle)) metaBankName = 'WOORI_BANK';
+        else if (/KB|국민/.test(file.name) || /KB|국민/.test(fileTitle)) metaBankName = 'KB_BANK';
+        else if (/신한/.test(file.name) || /신한/.test(fileTitle)) metaBankName = 'SHINHAN_BANK';
+        else if (/하나/.test(file.name) || /하나/.test(fileTitle)) metaBankName = 'HANA_BANK';
+        else if (/농협/.test(file.name) || /농협/.test(fileTitle)) metaBankName = 'NH_BANK';
+
         // 헤더 컬럼 매핑 (다양한 은행 포맷 대응)
         const headers = (headerRow || []).map((h: any) => String(h || '').replace(/\n/g, ' ').trim());
         const findCol = (...keywords: string[]) => {
@@ -510,6 +535,12 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
               card_number: '',
               approval_number: '',
               currency: 'KRW',
+              // 메타 정보 — bank_account_mappings 자동 매칭용
+              bank_name: metaBankName,
+              _account_number: metaAccountNumber,
+              _account_holder: metaAccountHolder,
+              _account_last4: metaLast4,
+              _bank_alias: metaBankName && metaLast4 ? `${metaBankName} ${metaLast4}` : '',
             });
           }
 
