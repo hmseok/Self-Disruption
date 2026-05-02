@@ -175,6 +175,22 @@ export async function POST(req: NextRequest) {
 
   if (parsed && parsed.amount) {
     try {
+      // ── 재발 방지 dedup (규칙 15 — 거래 중복 N배 사고 차단) ──
+      // 같은 SMS row (id) 가 이미 transaction_id 를 가지고 있다면 skip.
+      // raw_hash dedup 은 위(line 89)에서 이미 한 번 했지만, 그 후 재파싱
+      // 루트 (sms-recanceled, sms-rebuild 등) 가 같은 sms id 에 대해 두 번
+      // INSERT 하지 못하도록 한 번 더 안전망.
+      const linkCheck = await prisma.$queryRaw<Array<{ transaction_id: string | null }>>`
+        SELECT transaction_id FROM card_sms_transactions WHERE id = ${id} LIMIT 1
+      `
+      if (linkCheck[0]?.transaction_id) {
+        return NextResponse.json({
+          status: 'already_linked',
+          id,
+          existing_transaction_id: linkCheck[0].transaction_id,
+        })
+      }
+
       const txDate = parsed.txAt || receivedAt
       // type 매핑 (회계 관점):
       //   deposit/canceled → income (입금/환불)

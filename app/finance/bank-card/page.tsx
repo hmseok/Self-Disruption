@@ -2471,6 +2471,46 @@ export default function BankCardPage() {
                   </button>
                   <button
                     onClick={async () => {
+                      // 1) DRY RUN — 거래 재생성
+                      const { json: dry } = await fetchWithAuth('/api/admin/sms-rebuild-transactions', {
+                        method: 'POST',
+                        body: { dryRun: true },
+                      })
+                      if (dry?.error) { alert(`오류: ${dry.error}`); return }
+                      const ok = confirm(
+                        `📛 SMS 거래 재생성\n\n` +
+                        `현재 transactions(SMS): ${dry?.current_tx_count || 0}건\n` +
+                        `card_sms_transactions(parsed): ${dry?.sms_count || 0}건\n` +
+                        `삭제 예정: ${dry?.will_delete || 0}건\n` +
+                        `재생성 예정: ${dry?.will_create || 0}건 (SMS 기준 1:1)\n\n` +
+                        `차이: ${dry?.delta > 0 ? '+' : ''}${dry?.delta || 0}건\n\n` +
+                        `※ 기존 transactions 는 soft-delete (deleted_at) — DB 에서 복원 가능\n` +
+                        `※ card_sms_transactions 는 그대로 유지\n` +
+                        `※ 차량/카테고리 분류는 「🤖 룰 자동 분류」 로 별도 진행\n\n` +
+                        `▶ 진행하시겠습니까?`
+                      )
+                      if (!ok) return
+                      // 2) APPLY
+                      const { json: applied } = await fetchWithAuth('/api/admin/sms-rebuild-transactions', {
+                        method: 'POST',
+                        body: { dryRun: false },
+                      })
+                      if (applied?.error) { alert(`적용 오류: ${applied.error}`); return }
+                      alert(
+                        `✅ 재생성 완료\n\n` +
+                        `· 삭제: ${applied?.deleted || 0}건\n` +
+                        `· 재생성: ${applied?.created || 0}건 (SMS 1:1)\n\n` +
+                        `이제 「🤖 룰 자동 분류」 클릭하시면 카테고리 + 차량 자동 매칭됩니다.`
+                      )
+                      await Promise.all([loadSummary(), loadTransactions()])
+                    }}
+                    title="SMS 기반 거래 전체 삭제 + card_sms_transactions 기준으로 1:1 재생성 (중복 N배 정리)"
+                    style={{ ...BTN.sm, background: 'rgba(239,68,68,0.10)', color: '#b91c1c', border: '1px solid rgba(239,68,68,0.4)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, fontWeight: 700 }}
+                  >
+                    📛 거래 재생성
+                  </button>
+                  <button
+                    onClick={async () => {
                       // 1) DRY RUN
                       const { json: dry } = await fetchWithAuth('/api/admin/sms-card-id-backfill', {
                         method: 'POST',
