@@ -3,22 +3,22 @@ import { verifyUser } from '@/lib/auth-server'
 import { prisma } from '@/lib/prisma'
 
 /**
- * /api/admin/bank-excel-backfill
+ * /api/admin/bank-excel-backfill — REVERT 전용 도구
  *
- * 기존에 업로드된 통장 엑셀 거래 (transactions.imported_from='excel_bank') 의
- * raw_data 에 _account_last4 / _account_number / _bank_alias 메타를 backfill.
+ * 배경:
+ *   초기 버전은 매핑 1개일 때 모든 통장 거래에 무조건 적용했음.
+ *   하지만 한 회사가 여러 통장 (8777, 3582 등) 을 가질 수 있고,
+ *   기존 거래는 어느 통장에서 온 건지 알 길이 없음 (raw_data 메타 없음).
+ *   "기준없이 그냥 매핑" 되는 부정확한 결과 → 사용자 명령으로 apply 모드 제거.
  *
- * 사용 시나리오:
- *   - 2026-05-02 BANK-FIX 이전에 업로드된 통장 거래는 raw_data 에 메타 없음
- *   - bank_account_mappings 의 매핑은 등록되어 있지만 last4 매칭이 SQL JOIN 시점에 실패
- *   - 이 API 가 매핑의 last4 를 raw_data 에 강제 backfill → JOIN 매칭 가능
+ * 정확한 흐름:
+ *   1. 이 API 로 잘못된 backfill 결과 정리 (revert)
+ *   2. 통장 엑셀 파일 그대로 재업로드
+ *   3. 새 코드가 파일 상단의 「계좌번호 : XXXX」 를 raw_data 에 정확하게 저장
+ *   4. SQL JOIN 이 자동 매칭
  *
- * 단일 회사 ERP 라서 매핑이 1~2개 일 가능성 높음.
- *   매핑 1개  → 모든 excel_bank 거래에 자동 적용
- *   매핑 N개  → bank_name 으로 매칭 (우리은행 거래 → 우리은행 매핑)
- *
- * GET  : 진단 (mappings 목록 + 거래 통계)
- * POST : apply
+ * GET  : 진단 (현재 raw_data 메타 보유 거래 수)
+ * POST { revert: true, dryRun?: bool } : raw_data 의 메타 키 제거
  */
 
 export async function GET(request: NextRequest) {
@@ -26,14 +26,7 @@ export async function GET(request: NextRequest) {
   if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
 
   try {
-    // 1) 매핑 목록 — bank_account_mappings 는 deleted_at 컬럼 없음 (schema:BankAccountMapping)
-    const mappings = await prisma.$queryRawUnsafe<any[]>(`
-      SELECT id, bank_name, account_number, account_alias, account_holder, purpose, assigned_car_id
-      FROM bank_account_mappings
-      ORDER BY bank_name, account_alias
-    `)
-
-    // 2) excel_bank 거래 통계 (raw_data 메타 보유 여부)
+    // raw_data 에 backfill 메타 키가 있는 통장 거래 통계
     const stats = await prisma.$queryRawUnsafe<any[]>(`
       SELECT
         bank_name,
@@ -46,7 +39,6 @@ export async function GET(request: NextRequest) {
       ORDER BY total DESC
     `)
 
-    // BigInt → Number 변환
     const statsNorm = stats.map(s => ({
       bank_name: s.bank_name,
       total: Number(s.total),
@@ -54,19 +46,7 @@ export async function GET(request: NextRequest) {
       missing_meta: Number(s.missing_meta),
     }))
 
-    return NextResponse.json({
-      mappings: mappings.map(m => ({
-        ...m,
-        last4: (() => {
-          const digits1 = String(m.account_number || '').replace(/\D/g, '')
-          const digits2 = String(m.account_alias || '').replace(/\D/g, '')
-          if (digits1.length >= 4) return digits1.slice(-4)
-          if (digits2.length >= 4) return digits2.slice(-4)
-          return null
-        })(),
-      })),
-      stats: statsNorm,
-    })
+    return NextResponse.json({ stats: statsNorm })
   } catch (e: any) {
     console.error('[bank-excel-backfill GET]', e)
     return NextResponse.json({ error: e.message || 'GET 실패' }, { status: 500 })
@@ -80,152 +60,51 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json().catch(() => ({}))
     const dryRun = !!body.dryRun
-    const explicitMappingId: string | null = body.mapping_id || null
     const revert = !!body.revert
 
-    // ─── REVERT 모드 — 기존 backfill 결과 rollback ─────────────────
-    // raw_data 에서 _account_last4 / _account_number / _bank_alias / _account_holder 만 제거
-    // (card_last4 등 다른 키는 유지)
-    if (revert) {
-      const targets = await prisma.$queryRawUnsafe<any[]>(`
-        SELECT id, raw_data
-        FROM transactions
-        WHERE deleted_at IS NULL
-          AND imported_from = 'excel_bank'
-          AND raw_data IS NOT NULL
-          AND (
-            JSON_UNQUOTE(JSON_EXTRACT(raw_data, '$._account_last4')) IS NOT NULL
-            OR JSON_UNQUOTE(JSON_EXTRACT(raw_data, '$._account_number')) IS NOT NULL
-            OR JSON_UNQUOTE(JSON_EXTRACT(raw_data, '$._bank_alias')) IS NOT NULL
-            OR JSON_UNQUOTE(JSON_EXTRACT(raw_data, '$._account_holder')) IS NOT NULL
-          )
-        LIMIT 5000
-      `)
-
-      let updated = 0
-      for (const tx of targets) {
-        let rawObj: any = {}
-        try {
-          rawObj = typeof tx.raw_data === 'string' ? JSON.parse(tx.raw_data) : tx.raw_data
-        } catch {
-          rawObj = {}
-        }
-        delete rawObj._account_last4
-        delete rawObj._account_number
-        delete rawObj._bank_alias
-        delete rawObj._account_holder
-
-        const newRaw = Object.keys(rawObj).length > 0 ? JSON.stringify(rawObj) : null
-
-        if (!dryRun) {
-          await prisma.$executeRawUnsafe(
-            `UPDATE transactions SET raw_data = ?, updated_at = NOW() WHERE id = ?`,
-            newRaw,
-            tx.id
-          )
-        }
-        updated++
-      }
-
+    // apply 모드는 의도적으로 제거 — 부정확한 추측 매핑 방지 (사용자 명령 2026-05-02)
+    if (!revert) {
       return NextResponse.json({
-        mode: 'revert',
-        dryRun,
-        target_count: targets.length,
-        updated,
-      })
-    }
-    // ─────────────────────────────────────────────────────────────
-
-    // 1) 매핑 조회
-    const mappings = await prisma.$queryRawUnsafe<any[]>(`
-      SELECT id, bank_name, account_number, account_alias, account_holder
-      FROM bank_account_mappings
-    `)
-    if (mappings.length === 0) {
-      return NextResponse.json({ error: '등록된 통장 매핑이 없습니다. 먼저 매핑을 등록하세요.' }, { status: 400 })
+        error: 'backfill apply 모드는 제거되었습니다. 정확한 매칭은 통장 엑셀 재업로드만 가능합니다. revert 만 지원합니다.',
+      }, { status: 400 })
     }
 
-    // 매핑별 last4 추출
-    const mappingsWithLast4 = mappings.map(m => {
-      const digits1 = String(m.account_number || '').replace(/\D/g, '')
-      const digits2 = String(m.account_alias || '').replace(/\D/g, '')
-      let last4: string | null = null
-      if (digits1.length >= 4) last4 = digits1.slice(-4)
-      else if (digits2.length >= 4) last4 = digits2.slice(-4)
-      return { ...m, last4 }
-    }).filter(m => m.last4) // last4 없는 매핑 제외
-
-    // 2) 매칭할 매핑 결정
-    let targetMapping: any = null
-    if (explicitMappingId) {
-      targetMapping = mappingsWithLast4.find(m => m.id === explicitMappingId)
-      if (!targetMapping) return NextResponse.json({ error: '지정한 매핑을 찾을 수 없습니다.' }, { status: 404 })
-    } else if (mappingsWithLast4.length === 1) {
-      targetMapping = mappingsWithLast4[0]
-    }
-    // else: 매핑 N개 → bank_name 으로 자동 매칭 (per-row)
-
-    // 3) backfill 대상 조회
+    // raw_data 에서 _account_last4 / _account_number / _bank_alias / _account_holder 제거
+    // (card_last4 등 다른 키는 유지)
     const targets = await prisma.$queryRawUnsafe<any[]>(`
-      SELECT id, bank_name, raw_data
+      SELECT id, raw_data
       FROM transactions
       WHERE deleted_at IS NULL
         AND imported_from = 'excel_bank'
-        AND (raw_data IS NULL OR JSON_UNQUOTE(JSON_EXTRACT(raw_data, '$._account_last4')) IS NULL)
+        AND raw_data IS NOT NULL
+        AND (
+          JSON_UNQUOTE(JSON_EXTRACT(raw_data, '$._account_last4')) IS NOT NULL
+          OR JSON_UNQUOTE(JSON_EXTRACT(raw_data, '$._account_number')) IS NOT NULL
+          OR JSON_UNQUOTE(JSON_EXTRACT(raw_data, '$._bank_alias')) IS NOT NULL
+          OR JSON_UNQUOTE(JSON_EXTRACT(raw_data, '$._account_holder')) IS NOT NULL
+        )
       LIMIT 5000
     `)
 
     let updated = 0
-    let skippedNoMatch = 0
-    const sampleUpdates: any[] = []
-    const sampleSkips: any[] = []
-
     for (const tx of targets) {
-      // 매핑 결정
-      let mapping = targetMapping
-      if (!mapping) {
-        // bank_name 으로 매핑 추측
-        mapping = mappingsWithLast4.find(m =>
-          m.bank_name && tx.bank_name &&
-          String(m.bank_name).replace(/은행$/, '') === String(tx.bank_name).replace(/은행$/, '')
-        )
-      }
-
-      if (!mapping) {
-        skippedNoMatch++
-        if (sampleSkips.length < 5) {
-          sampleSkips.push({ id: tx.id, bank_name: tx.bank_name, reason: 'no_matching_mapping' })
-        }
-        continue
-      }
-
-      // raw_data 갱신
       let rawObj: any = {}
-      if (tx.raw_data) {
-        try {
-          rawObj = typeof tx.raw_data === 'string' ? JSON.parse(tx.raw_data) : tx.raw_data
-        } catch {
-          rawObj = {}
-        }
+      try {
+        rawObj = typeof tx.raw_data === 'string' ? JSON.parse(tx.raw_data) : tx.raw_data
+      } catch {
+        rawObj = {}
       }
-      rawObj._account_last4 = mapping.last4
-      if (mapping.account_number) rawObj._account_number = String(mapping.account_number).trim()
-      if (mapping.account_holder) rawObj._account_holder = String(mapping.account_holder).trim()
-      if (mapping.bank_name) rawObj._bank_alias = `${mapping.bank_name} ${mapping.last4}`
+      delete rawObj._account_last4
+      delete rawObj._account_number
+      delete rawObj._bank_alias
+      delete rawObj._account_holder
 
-      if (sampleUpdates.length < 5) {
-        sampleUpdates.push({
-          id: tx.id,
-          bank_name: tx.bank_name,
-          mapping_id: mapping.id,
-          new_last4: mapping.last4,
-        })
-      }
+      const newRaw = Object.keys(rawObj).length > 0 ? JSON.stringify(rawObj) : null
 
       if (!dryRun) {
         await prisma.$executeRawUnsafe(
           `UPDATE transactions SET raw_data = ?, updated_at = NOW() WHERE id = ?`,
-          JSON.stringify(rawObj),
+          newRaw,
           tx.id
         )
       }
@@ -233,17 +112,10 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({
+      mode: 'revert',
       dryRun,
       target_count: targets.length,
       updated,
-      skipped_no_match: skippedNoMatch,
-      sample_updates: sampleUpdates,
-      sample_skips: sampleSkips,
-      target_mapping: targetMapping ? {
-        id: targetMapping.id,
-        bank_name: targetMapping.bank_name,
-        last4: targetMapping.last4,
-      } : 'auto-by-bank-name',
     })
   } catch (e: any) {
     console.error('[bank-excel-backfill POST]', e)
