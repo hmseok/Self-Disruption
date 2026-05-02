@@ -2011,12 +2011,12 @@ export default function BankCardPage() {
     { key: 'deposit', label: '입금', width: 110, align: 'right',
       sortBy: (r) => r.type === 'income' ? Number(r.amount || 0) : 0,
       render: (r) =>
-      r.type === 'income' ? <span style={{ color: COLORS.income, fontWeight: 600, fontSize: 13 }}>+{nf(r.amount)}</span> : <span style={{ color: COLORS.textMuted }}>-</span>
+      r.type === 'income' ? <span style={{ color: COLORS.income, fontWeight: 600, fontSize: 13 }}>{nf(r.amount)}</span> : <span style={{ color: COLORS.textMuted }}>-</span>
     },
     { key: 'withdrawal', label: '출금', width: 110, align: 'right',
       sortBy: (r) => r.type === 'expense' ? Number(r.amount || 0) : 0,
       render: (r) =>
-      r.type === 'expense' ? <span style={{ color: COLORS.expense, fontWeight: 600, fontSize: 13 }}>-{nf(r.amount)}</span> : <span style={{ color: COLORS.textMuted }}>-</span>
+      r.type === 'expense' ? <span style={{ color: COLORS.expense, fontWeight: 600, fontSize: 13 }}>{nf(r.amount)}</span> : <span style={{ color: COLORS.textMuted }}>-</span>
     },
     { key: 'balance', label: '잔액', width: 110, align: 'right',
       sortBy: (r) => r.balance_after != null ? Number(r.balance_after) : 0,
@@ -2065,7 +2065,7 @@ export default function BankCardPage() {
     subtitle: (r) => <span style={{ fontSize: 12, color: COLORS.textSecondary }}>{r.client_name || r.bank_name || ''}</span>,
     trailing: (r) => (
       <span style={{ fontWeight: 700, fontSize: 14, color: r.type === 'income' ? COLORS.income : COLORS.expense }}>
-        {r.type === 'income' ? '+' : '-'}{nf(r.amount)}
+        {nf(r.amount)}
       </span>
     ),
     badges: (r) => <MatchBadge matched={!!r.related_type} />,
