@@ -57,19 +57,23 @@ export function smsLast4(cardAlias: string | null | undefined): string | null {
  *       하나라도 매칭되면 JOIN 성공.
  */
 export function bankMappingJoinSql(bamAlias: string, smsAlias: string): string {
+  // 중요: bank_account_mappings (utf8mb4_0900_ai_ci) 와
+  //      card_sms_transactions (utf8mb4_unicode_ci) 의 collation 이 다름.
+  // 모든 string 비교에 COLLATE utf8mb4_unicode_ci 명시 — 1267 에러 회피.
+  const COLL = 'COLLATE utf8mb4_unicode_ci'
   return `(
-    ${bamAlias}.account_alias = ${smsAlias}.card_alias
+    ${bamAlias}.account_alias ${COLL} = ${smsAlias}.card_alias ${COLL}
     OR (
       ${smsAlias}.card_alias IS NOT NULL
       AND CHAR_LENGTH(TRIM(${smsAlias}.card_alias)) >= 4
       AND (
         (${bamAlias}.account_number IS NOT NULL
          AND CHAR_LENGTH(TRIM(${bamAlias}.account_number)) >= 4
-         AND RIGHT(TRIM(${bamAlias}.account_number), 4) = RIGHT(TRIM(${smsAlias}.card_alias), 4))
+         AND RIGHT(TRIM(${bamAlias}.account_number), 4) ${COLL} = RIGHT(TRIM(${smsAlias}.card_alias), 4) ${COLL})
         OR
         (${bamAlias}.account_alias IS NOT NULL
          AND CHAR_LENGTH(TRIM(${bamAlias}.account_alias)) >= 4
-         AND RIGHT(TRIM(${bamAlias}.account_alias), 4) = RIGHT(TRIM(${smsAlias}.card_alias), 4))
+         AND RIGHT(TRIM(${bamAlias}.account_alias), 4) ${COLL} = RIGHT(TRIM(${smsAlias}.card_alias), 4) ${COLL})
       )
     )
   )`
