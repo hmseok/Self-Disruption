@@ -77,19 +77,28 @@ function extractSqlCalls(src, file) {
 }
 
 // SQL 에서 FROM / JOIN 절 → alias 매핑 추출
+// + defaultTable: FROM 의 첫 테이블. JOIN 없으면 unprefixed column 의 default.
 function buildAliasMap(sql) {
   const aliases = {} // alias -> tableName
+  let defaultTable = null
+  let joinCount = 0
+
   // FROM table [AS] alias
   // JOIN table [AS] alias ON ...
-  const re = /\b(?:from|join)\s+`?([a-z_][a-z0-9_]*)`?(?:\s+(?:as\s+)?([a-z_][a-z0-9_]*))?(?=\s|$|,|\(|\))/gi
+  const re = /\b(from|join)\s+`?([a-z_][a-z0-9_]*)`?(?:\s+(?:as\s+)?([a-z_][a-z0-9_]*))?(?=\s|$|,|\(|\))/gi
   let m
   while ((m = re.exec(sql)) !== null) {
-    const table = m[1]
-    const alias = m[2] && !SQL_KEYWORDS.has(m[2].toLowerCase()) ? m[2] : null
+    const kind = m[1].toLowerCase()
+    const table = m[2]
+    const alias = m[3] && !SQL_KEYWORDS.has(m[3].toLowerCase()) ? m[3] : null
     aliases[table] = table  // 본명도 alias 로
     if (alias) aliases[alias] = table
+    if (kind === 'from' && !defaultTable) defaultTable = table
+    if (kind === 'join') joinCount++
   }
-  return aliases
+
+  // JOIN 이 있으면 unprefixed 컬럼 — ambiguous → defaultTable 검증 skip
+  return { aliases, defaultTable: joinCount === 0 ? defaultTable : null }
 }
 
 // SQL 에서 alias.column 패턴 추출
@@ -105,6 +114,21 @@ function extractColRefs(sql) {
     refs.push({ aliasOrTable, col })
   }
   return refs
+}
+
+// WHERE / SET / SELECT 등에서 unprefixed 컬럼 추출 (defaultTable 검증용)
+// — JOIN 없는 단일 테이블 SQL 의 unprefixed 컬럼만 대상
+function extractUnprefixedCols(sql) {
+  const cols = new Set()
+  // 1) WHERE / AND / OR 다음 column = / column IS / column IN / column LIKE 패턴
+  const re = /\b(?:where|and|or|set)\s+([a-z_][a-z0-9_]*)\s*(?:=|<|>|!=|<=|>=|<>|\bIS\b|\bIN\b|\bLIKE\b|\bBETWEEN\b)/gi
+  let m
+  while ((m = re.exec(sql)) !== null) {
+    const col = m[1].toLowerCase()
+    if (SQL_KEYWORDS.has(col)) continue
+    cols.add(m[1])
+  }
+  return [...cols]
 }
 
 function walkTs(dir, out = []) {
@@ -170,7 +194,7 @@ function lint() {
         }
       } else {
         // 기존 — $queryRaw 호출의 SQL — alias 매핑으로 정확 검증
-        const aliases = buildAliasMap(sql)
+        const { aliases, defaultTable } = buildAliasMap(sql)
         const refs = extractColRefs(sql)
         for (const { aliasOrTable, col } of refs) {
           const table = aliases[aliasOrTable]
@@ -186,6 +210,24 @@ function lint() {
               ref: `${aliasOrTable}.${col}`,
               knownCols: [...knownCols].sort().slice(0, 10),
             })
+          }
+        }
+        // ── unprefixed 컬럼 검증 (defaultTable 단일 테이블일 때만) ──
+        // 어제 사례: FROM bank_account_mappings WHERE deleted_at IS NULL → 못 잡음
+        // 이제 defaultTable 의 컬럼 목록과 대조
+        if (defaultTable && strict[defaultTable]) {
+          const knownCols = strict[defaultTable]
+          for (const col of extractUnprefixedCols(sql)) {
+            if (!knownCols.has(col)) {
+              violations.push({
+                file: path.relative(ROOT, file),
+                line: lineNo,
+                table: defaultTable,
+                column: col,
+                ref: `${col} (unprefixed)`,
+                knownCols: [...knownCols].sort().slice(0, 10),
+              })
+            }
           }
         }
       }

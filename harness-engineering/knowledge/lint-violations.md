@@ -397,3 +397,27 @@
 - sql-fn-lint: total=0
 - api-trace: broken=33, newBroken=0
 - ui-coverage: warnings=32
+
+## 2026-05-02 23:41:52
+- sql-lint: total=54, new=11, known=43
+- sql-fn-lint: total=0
+- api-trace: broken=33, newBroken=0
+- ui-coverage: warnings=32
+  - **새 SQL 컬럼 위반**:
+    - `app/api/auth/signup/route.ts:31` used_at (unprefixed) (table `member_invitations` 에 `used_at` 없음)
+    - `app/api/codes/route.ts:56` group_code (unprefixed) (table `common_codes` 에 `group_code` 없음)
+    - `app/api/finance/classify/route.ts:1004` deleted_at (unprefixed) (table `classification_queue` 에 `deleted_at` 없음)
+    - `app/api/finance/classify/route.ts:1010` deleted_at (unprefixed) (table `classification_queue` 에 `deleted_at` 없음)
+    - `app/api/finance/classify/route.ts:1211` deleted_at (unprefixed) (table `classification_queue` 에 `deleted_at` 없음)
+    - `app/api/payroll/generate/route.ts:122` transaction_date (unprefixed) (table `classification_queue` 에 `transaction_date` 없음)
+    - `app/api/payroll/meal-expenses/route.ts:38` is_active (unprefixed) (table `corporate_cards` 에 `is_active` 없음)
+    - `app/api/payroll/meal-expenses/route.ts:121` is_active (unprefixed) (table `corporate_cards` 에 `is_active` 없음)
+    - `app/api/upload-business-doc/route.ts:58` business_doc_url (unprefixed) (table `profiles` 에 `business_doc_url` 없음)
+    - `app/api/vehicle-market-prices/route.ts:72` ownership_type (unprefixed) (table `cars` 에 `ownership_type` 없음)
+    - `app/api/vehicle-market-prices/route.ts:72` purchase_price (unprefixed) (table `cars` 에 `purchase_price` 없음)
+
+## 2026-05-02 23:42:06
+- sql-lint: total=54, new=0, known=54
+- sql-fn-lint: total=0
+- api-trace: broken=33, newBroken=0
+- ui-coverage: warnings=32

@@ -19,12 +19,25 @@ const APP_DIR = path.join(ROOT, 'app')
 const LIB_DIR = path.join(ROOT, 'lib')
 
 // 회색 함수 — MySQL 8.0+ 전용 (5.7 미지원)
+//   안전 (5.7+): JSON_EXTRACT, JSON_UNQUOTE, JSON_REMOVE, JSON_SET,
+//                JSON_OBJECT, JSON_ARRAY, JSON_VALID, JSON_INSERT, JSON_REPLACE,
+//                JSON_LENGTH, JSON_TYPE, JSON_KEYS, JSON_CONTAINS, JSON_SEARCH
+//   8.0+ 전용 (아래 회색 목록 포함):
 const GREY_FUNCTIONS = [
+  // 정규식 (8.0+)
   'REGEXP_REPLACE',
   'REGEXP_LIKE',
   'REGEXP_INSTR',
   'REGEXP_SUBSTR',
+  // JSON 8.0+ 전용
   'JSON_TABLE',
+  'JSON_SCHEMA_VALID',
+  'JSON_PRETTY',
+  'JSON_VALUE',
+  'JSON_OVERLAPS',
+  'JSON_ARRAYAGG',
+  'JSON_OBJECTAGG',
+  // 윈도우 함수 (8.0+)
   'ROW_NUMBER',
   'RANK',
   'DENSE_RANK',

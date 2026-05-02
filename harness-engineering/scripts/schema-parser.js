@@ -24,10 +24,10 @@ function snakeCase(s) {
           .toLowerCase()
 }
 
-// 표준 컬럼 — 거의 모든 테이블이 가지므로 화이트리스트
-const STANDARD_COLS = new Set([
-  'id', 'created_at', 'updated_at', 'deleted_at',
-])
+// ⚠️ STANDARD_COLS 자동 추가는 false negative 의 원인 (2026-05-03 발견)
+// 어제 `bank_account_mappings.deleted_at` 1054 에러: 이 자동 추가 때문에 lint 가 못 잡음.
+// → STANDARD_COLS 제거. 모든 컬럼을 schema/migration 에서 명시적으로 정의해야 검증 가능.
+const STANDARD_COLS = new Set([])
 
 function parseSchemaPrisma() {
   if (!fs.existsSync(SCHEMA_FILE)) return {}

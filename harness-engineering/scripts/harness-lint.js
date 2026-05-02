@@ -31,6 +31,8 @@ const apiTrace = require('./api-call-trace')
 const uiCoverage = require('./ui-data-coverage')
 const amountSignLint = require('./amount-sign-lint')
 const helperCoverageLint = require('./helper-coverage-lint')
+const sqlReservedAliasLint = require('./sql-reserved-alias-lint')
+const sqlGroupByLint = require('./sql-group-by-lint')
 
 const flags = new Set(process.argv.slice(2))
 
@@ -123,6 +125,40 @@ function main() {
     console.error(`  ❌ ${b.url}  ← ${b.callers.slice(0, 2).join(', ')}`)
   }
 
+  // [평가] 3.2. SQL alias 예약어 검사 (어제 'AS desc' 사고 방지)
+  console.log('\n▸ [3.2] sql-reserved-alias-lint — alias 예약어 사용 차단')
+  const aliasR = sqlReservedAliasLint.lint()
+  const aliasBaselinePath = path.join(KNOWLEDGE_DIR, 'sql-reserved-alias-lint.baseline.json')
+  let aliasBaselineSet = new Set()
+  if (fs.existsSync(aliasBaselinePath)) {
+    try {
+      const data = JSON.parse(fs.readFileSync(aliasBaselinePath, 'utf-8'))
+      aliasBaselineSet = new Set((data.violations || []).map(v => `${v.file}:${v.line}:${v.alias}`))
+    } catch {}
+  }
+  const newAlias = aliasR.violations.filter(v => !aliasBaselineSet.has(`${v.file}:${v.line}:${v.alias}`))
+  console.log(`  ${aliasR.fileCount} files, total=${aliasR.violations.length}, new=${newAlias.length}`)
+  for (const v of newAlias.slice(0, 5)) {
+    console.error(`  ❌ ${v.file}:${v.line} AS ${v.alias} (예약어)`)
+  }
+
+  // [평가] 3.3. GROUP BY ↔ SELECT expression 정합성 (어제 only_full_group_by 사고 방지)
+  console.log('\n▸ [3.3] sql-group-by-lint — GROUP BY alias expression 정합성')
+  const gbR = sqlGroupByLint.lint()
+  const gbBaselinePath = path.join(KNOWLEDGE_DIR, 'sql-group-by-lint.baseline.json')
+  let gbBaselineSet = new Set()
+  if (fs.existsSync(gbBaselinePath)) {
+    try {
+      const data = JSON.parse(fs.readFileSync(gbBaselinePath, 'utf-8'))
+      gbBaselineSet = new Set((data.violations || []).map(v => `${v.file}:${v.line}:${v.alias}`))
+    } catch {}
+  }
+  const newGb = gbR.violations.filter(v => !gbBaselineSet.has(`${v.file}:${v.line}:${v.alias}`))
+  console.log(`  ${gbR.fileCount} files, total=${gbR.violations.length}, new=${newGb.length}`)
+  for (const v of newGb.slice(0, 5)) {
+    console.error(`  ❌ ${v.file}:${v.line} GROUP BY ${v.alias} → expression: ${v.expr}`)
+  }
+
   // [평가] 4-1. helper-coverage — corporate_cards / bank_account_mappings JOIN 헬퍼 사용 강제 (규칙 14, 15)
   console.log('\n▸ [3.4] helper-coverage-lint — JOIN 헬퍼 사용 강제')
   const helperR = helperCoverageLint.lint()
@@ -194,16 +230,24 @@ function main() {
   appendViolationLog(summary)
 
   // [개선] 누적 위반 패턴 분석 (선택적 — 통계만)
-  // baseline-update 모드
+  // baseline-update 모드 — sql-lint + alias + group-by 모두 동결
   if (flags.has('--baseline-update')) {
     saveBaseline(sqlR.violations)
-    console.log(`\n[harness-lint] baseline updated → ${path.relative(ROOT, BASELINE_FILE)}`)
-    console.log(`  ${sqlR.violations.length} violations frozen as known issue`)
+    fs.writeFileSync(aliasBaselinePath, JSON.stringify({
+      violations: aliasR.violations.map(v => ({ file: v.file, line: v.line, alias: v.alias })),
+      generatedAt: new Date().toISOString(),
+    }, null, 2))
+    fs.writeFileSync(gbBaselinePath, JSON.stringify({
+      violations: gbR.violations.map(v => ({ file: v.file, line: v.line, alias: v.alias })),
+      generatedAt: new Date().toISOString(),
+    }, null, 2))
+    console.log(`\n[harness-lint] baseline updated`)
+    console.log(`  sql: ${sqlR.violations.length} / alias: ${aliasR.violations.length} / group-by: ${gbR.violations.length}`)
     process.exit(0)
   }
 
   // 결과 집계
-  const newCritical = newSqlViolations.length + fnR.violations.length + newApiBroken.length + newSign.length + newHelper.length
+  const newCritical = newSqlViolations.length + fnR.violations.length + newApiBroken.length + newSign.length + newHelper.length + newAlias.length + newGb.length
   console.log('\n═══ 결과 ═══')
   console.log(`  새 critical 위반: ${newCritical}`)
   console.log(`  known issue: ${knownSqlViolations.length} SQL + ${apiR.brokenCalls.length - newApiBroken.length} broken-call`)

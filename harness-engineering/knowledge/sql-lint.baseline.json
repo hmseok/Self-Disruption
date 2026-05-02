@@ -55,6 +55,18 @@
       "column": "employee_name"
     },
     {
+      "file": "app/api/auth/signup/route.ts",
+      "ref": "used_at (unprefixed)",
+      "table": "member_invitations",
+      "column": "used_at"
+    },
+    {
+      "file": "app/api/codes/route.ts",
+      "ref": "group_code (unprefixed)",
+      "table": "common_codes",
+      "column": "group_code"
+    },
+    {
       "file": "app/api/contracts/send-email/route.ts",
       "ref": "p.employee_name",
       "table": "profiles",
@@ -107,6 +119,24 @@
       "ref": "t.card_company",
       "table": "transactions",
       "column": "card_company"
+    },
+    {
+      "file": "app/api/finance/classify/route.ts",
+      "ref": "deleted_at (unprefixed)",
+      "table": "classification_queue",
+      "column": "deleted_at"
+    },
+    {
+      "file": "app/api/finance/classify/route.ts",
+      "ref": "deleted_at (unprefixed)",
+      "table": "classification_queue",
+      "column": "deleted_at"
+    },
+    {
+      "file": "app/api/finance/classify/route.ts",
+      "ref": "deleted_at (unprefixed)",
+      "table": "classification_queue",
+      "column": "deleted_at"
     },
     {
       "file": "app/api/finance/mappings/route.ts",
@@ -235,6 +265,24 @@
       "column": "employee_name"
     },
     {
+      "file": "app/api/payroll/generate/route.ts",
+      "ref": "transaction_date (unprefixed)",
+      "table": "classification_queue",
+      "column": "transaction_date"
+    },
+    {
+      "file": "app/api/payroll/meal-expenses/route.ts",
+      "ref": "is_active (unprefixed)",
+      "table": "corporate_cards",
+      "column": "is_active"
+    },
+    {
+      "file": "app/api/payroll/meal-expenses/route.ts",
+      "ref": "is_active (unprefixed)",
+      "table": "corporate_cards",
+      "column": "is_active"
+    },
+    {
       "file": "app/api/payroll/route.ts",
       "ref": "p.employee_name",
       "table": "profiles",
@@ -257,8 +305,26 @@
       "ref": "p.employee_name",
       "table": "profiles",
       "column": "employee_name"
+    },
+    {
+      "file": "app/api/upload-business-doc/route.ts",
+      "ref": "business_doc_url (unprefixed)",
+      "table": "profiles",
+      "column": "business_doc_url"
+    },
+    {
+      "file": "app/api/vehicle-market-prices/route.ts",
+      "ref": "ownership_type (unprefixed)",
+      "table": "cars",
+      "column": "ownership_type"
+    },
+    {
+      "file": "app/api/vehicle-market-prices/route.ts",
+      "ref": "purchase_price (unprefixed)",
+      "table": "cars",
+      "column": "purchase_price"
     }
   ],
-  "generatedAt": "2026-05-02T01:01:59.569Z",
+  "generatedAt": "2026-05-02T23:41:52.089Z",
   "note": "기존 SQL 컬럼 위반 — known issue 로 처리. 새 위반만 lint fail."
 }
