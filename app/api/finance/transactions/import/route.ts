@@ -216,15 +216,31 @@ export async function POST(request: NextRequest) {
 
         const balanceAfter = row.balance != null ? Number(row.balance) || null : null
 
-        // ★ Excel 카드 거래의 카드번호 끝 4자리 → raw_data.card_last4 저장
-        //   추후 /api/finance/transactions/auto-match-card 에서 corporate_cards.card_number 와 매칭하여
-        //   transactions.related_type='car', related_id=car_id 자동 할당
+        // ★ Excel 카드/통장 거래의 메타 정보 → raw_data 저장
+        //   카드: card_last4 → corporate_cards 매칭
+        //   통장: _account_last4 / _account_number / _bank_alias → bank_account_mappings 매칭
+        //   bankMappingJoinSql / cardMappingJoinSql 안 JSON_EXTRACT 로 활용.
         let rawDataJson: string | null = null
+        const rawDataObj: Record<string, any> = {}
         if (source === 'excel_card' && row.card_last4) {
           const last4 = String(row.card_last4).replace(/\D/g, '').slice(-4)
           if (last4.length === 4) {
-            rawDataJson = JSON.stringify({ card_last4: last4 })
+            rawDataObj.card_last4 = last4
           }
+        }
+        if (source === 'excel_bank') {
+          if (row.account_last4) {
+            const last4 = String(row.account_last4).replace(/\D/g, '').slice(-4)
+            if (last4.length === 4) rawDataObj._account_last4 = last4
+          }
+          if (row.account_number) rawDataObj._account_number = String(row.account_number).trim()
+          if (row.account_holder) rawDataObj._account_holder = String(row.account_holder).trim()
+          if (row.bank_name && rawDataObj._account_last4) {
+            rawDataObj._bank_alias = `${row.bank_name} ${rawDataObj._account_last4}`
+          }
+        }
+        if (Object.keys(rawDataObj).length > 0) {
+          rawDataJson = JSON.stringify(rawDataObj)
         }
 
         await prisma.$executeRawUnsafe(

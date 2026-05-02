@@ -83,7 +83,7 @@ export async function GET(request: NextRequest) {
         LEFT JOIN corporate_cards cc       ON ${cardMappingJoinSql('cc', 'sms', 't')}
         LEFT JOIN cars car                 ON car.id COLLATE utf8mb4_unicode_ci = cc.assigned_car_id COLLATE utf8mb4_unicode_ci
         LEFT JOIN bank_account_mappings bam
-          ON ${bankMappingJoinSql('bam', 'sms')}
+          ON ${bankMappingJoinSql('bam', 'sms', 't')}
         LEFT JOIN cars bam_car             ON bam_car.id COLLATE utf8mb4_unicode_ci = bam.assigned_car_id COLLATE utf8mb4_unicode_ci
         WHERE t.deleted_at IS NULL
         ORDER BY t.created_at DESC

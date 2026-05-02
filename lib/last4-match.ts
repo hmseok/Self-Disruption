@@ -56,11 +56,31 @@ export function smsLast4(cardAlias: string | null | undefined): string | null {
  * 주의: 이 SQL 은 `account_number` / `account_alias` 둘 다에서 last4 추출.
  *       하나라도 매칭되면 JOIN 성공.
  */
-export function bankMappingJoinSql(bamAlias: string, smsAlias: string): string {
+export function bankMappingJoinSql(bamAlias: string, smsAlias: string, txAlias?: string): string {
   // 중요: bank_account_mappings (utf8mb4_0900_ai_ci) 와
   //      card_sms_transactions (utf8mb4_unicode_ci) 의 collation 이 다름.
   // 모든 string 비교에 COLLATE utf8mb4_unicode_ci 명시 — 1267 에러 회피.
   const COLL = 'COLLATE utf8mb4_unicode_ci'
+
+  // tx.raw_data.$._account_last4 fallback — 엑셀 통장 거래용 (sms 없음)
+  // UploadContext 가 통장 직접 파서 결과에 raw_data 메타 (_account_last4, _account_number) 포함.
+  // 카드와 동일 패턴 — 규칙 14 (동형 패턴 자동 확장).
+  const txExcelMatch = txAlias ? `
+        OR (
+          ${txAlias}.raw_data IS NOT NULL
+          AND JSON_UNQUOTE(JSON_EXTRACT(${txAlias}.raw_data, '$._account_last4')) IS NOT NULL
+          AND CHAR_LENGTH(JSON_UNQUOTE(JSON_EXTRACT(${txAlias}.raw_data, '$._account_last4'))) = 4
+          AND (
+            (${bamAlias}.account_number IS NOT NULL
+             AND CHAR_LENGTH(TRIM(${bamAlias}.account_number)) >= 4
+             AND RIGHT(TRIM(${bamAlias}.account_number), 4) ${COLL} = JSON_UNQUOTE(JSON_EXTRACT(${txAlias}.raw_data, '$._account_last4')) ${COLL})
+            OR
+            (${bamAlias}.account_alias IS NOT NULL
+             AND CHAR_LENGTH(TRIM(${bamAlias}.account_alias)) >= 4
+             AND RIGHT(TRIM(${bamAlias}.account_alias), 4) ${COLL} = JSON_UNQUOTE(JSON_EXTRACT(${txAlias}.raw_data, '$._account_last4')) ${COLL})
+          )
+        )` : ''
+
   return `(
     ${bamAlias}.account_alias ${COLL} = ${smsAlias}.card_alias ${COLL}
     OR (
@@ -75,7 +95,7 @@ export function bankMappingJoinSql(bamAlias: string, smsAlias: string): string {
          AND CHAR_LENGTH(TRIM(${bamAlias}.account_alias)) >= 4
          AND RIGHT(TRIM(${bamAlias}.account_alias), 4) ${COLL} = RIGHT(TRIM(${smsAlias}.card_alias), 4) ${COLL})
       )
-    )
+    )${txExcelMatch}
   )`
 }
 
@@ -105,12 +125,11 @@ export function smsLast4Sql(smsAliasCol: string): string {
  */
 export function cardMappingJoinSql(ccAlias: string, smsAlias: string, txAlias?: string): string {
   const COLL = 'COLLATE utf8mb4_unicode_ci'
+  // status 필터 제거 — 해지(canceled) 카드도 history 매칭 (사용자 명령)
   // tx.raw_data.$.card_last4 fallback — 엑셀 카드 거래용 (sms 없음)
-  // ※ raw_data 는 schema 의 Json 컬럼 — JSON_EXTRACT 안전.
   const txExcelMatch = txAlias ? `
         OR (
-          ${ccAlias}.status = 'active'
-          AND ${ccAlias}.card_number IS NOT NULL
+          ${ccAlias}.card_number IS NOT NULL
           AND CHAR_LENGTH(TRIM(${ccAlias}.card_number)) >= 4
           AND ${txAlias}.raw_data IS NOT NULL
           AND JSON_UNQUOTE(JSON_EXTRACT(${txAlias}.raw_data, '$.card_last4')) IS NOT NULL
@@ -120,8 +139,7 @@ export function cardMappingJoinSql(ccAlias: string, smsAlias: string, txAlias?: 
   return `(
     ${ccAlias}.id ${COLL} = ${smsAlias}.card_id ${COLL}
     OR (
-      ${ccAlias}.status = 'active'
-      AND ${smsAlias}.card_alias IS NOT NULL
+      ${smsAlias}.card_alias IS NOT NULL
       AND CHAR_LENGTH(TRIM(${smsAlias}.card_alias)) >= 4
       AND (
         (${ccAlias}.card_number IS NOT NULL

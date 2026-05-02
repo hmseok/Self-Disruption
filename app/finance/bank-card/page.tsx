@@ -742,7 +742,7 @@ export default function BankCardPage() {
     Promise.all(
       fileArr.map(
         (file) =>
-          new Promise<{ name: string; rows: any[]; columns: Record<string, string>; skipped?: boolean; year?: string } | null>((resolve) => {
+          new Promise<{ name: string; rows: any[]; columns: Record<string, string>; skipped?: boolean; year?: string; accountNumber?: string; accountLast4?: string; accountHolder?: string; bankName?: string } | null>((resolve) => {
             const reader = new FileReader()
             reader.onload = (ev) => {
               try {
@@ -764,18 +764,44 @@ export default function BankCardPage() {
                 // !ref를 변경하기 전에 복사
                 const origRef = ws['!ref']
 
-                // 메타데이터 행에서 기간(연도) 추출 (report 파일용)
+                // 메타데이터 행에서 기간(연도) + 계좌번호 + 예금주 + 은행명 추출
+                // 통장 파일: 상단에 "계좌번호 : 1005504828777   예금주 : 주식회사 에프엠아이" 같은 행 존재
+                // 카드 파일: report 파일은 "이용기간 : 2025.11.01 ~ 2025.11.30" 같은 행 존재
                 let extractedYear = ''
+                let extractedAccountNumber = ''
+                let extractedAccountLast4 = ''
+                let extractedAccountHolder = ''
+                let extractedBankName = ''
                 if (detectedTarget && detectedTarget.headerRowIdx > 0) {
                   const rng = XLSX.utils.decode_range(ws['!ref'] || 'A1')
-                  for (let r = 0; r < detectedTarget.headerRowIdx && !extractedYear; r++) {
+                  for (let r = 0; r < detectedTarget.headerRowIdx; r++) {
                     for (let c = rng.s.c; c <= rng.e.c; c++) {
                       const cell = ws[XLSX.utils.encode_cell({ r, c })]
-                      if (cell) {
-                        const v = String(cell.v || '')
-                        // "2025.11.01 ~ 2025.11.30" 패턴에서 시작 연도 추출
+                      if (!cell) continue
+                      const v = String(cell.v || '')
+                      // 기간 → 연도 추출
+                      if (!extractedYear) {
                         const m = v.match(/(\d{4})\.\d{2}\.\d{2}\s*~\s*(\d{4})\.\d{2}\.\d{2}/)
-                        if (m) { extractedYear = m[1]; break }
+                        if (m) extractedYear = m[1]
+                      }
+                      // 계좌번호 (통장 파일) — "계좌번호 : 1005-504-828777" 또는 "계좌번호 : 1005504828777"
+                      if (!extractedAccountNumber) {
+                        const m = v.match(/계좌번호\s*[::]\s*([0-9\-\s]+)/)
+                        if (m) {
+                          extractedAccountNumber = m[1].trim()
+                          const digits = extractedAccountNumber.replace(/\D/g, '')
+                          if (digits.length >= 4) extractedAccountLast4 = digits.slice(-4)
+                        }
+                      }
+                      // 예금주
+                      if (!extractedAccountHolder) {
+                        const m = v.match(/예금주\s*[::]\s*([^\s].*?)(?:\s{2,}|$)/)
+                        if (m) extractedAccountHolder = m[1].trim()
+                      }
+                      // 은행명 — "우리은행 거래내역조회" / "신한은행 ..." / "KB은행 ..."
+                      if (!extractedBankName) {
+                        const m = v.match(/(우리|신한|국민|KB|기업|IBK|하나|농협|NH|새마을금고|새마을|MG|씨티|카카오뱅크|토스뱅크|케이뱅크|SC제일|수협|우체국)(은행)?/)
+                        if (m) extractedBankName = `${m[1]}${m[1].endsWith('은행') || m[2] ? '' : '은행'}`.replace(/은행은행/, '은행')
                       }
                     }
                   }
@@ -838,7 +864,16 @@ export default function BankCardPage() {
                 }
                 console.groupEnd()
 
-                resolve({ name: file.name, rows, columns: mapping, year: extractedYear || undefined })
+                resolve({
+                  name: file.name,
+                  rows,
+                  columns: mapping,
+                  year: extractedYear || undefined,
+                  accountNumber: extractedAccountNumber || undefined,
+                  accountLast4: extractedAccountLast4 || undefined,
+                  accountHolder: extractedAccountHolder || undefined,
+                  bankName: extractedBankName || undefined,
+                })
               } catch (err) {
                 console.error(`[파일 업로드] ${file.name} 파싱 오류:`, err)
                 resolve(null)
@@ -954,7 +989,11 @@ export default function BankCardPage() {
             type: deposit ? 'income' : 'expense',
             balance: safeNum(row[reverse.balance]) || undefined,
             counterpart: rawCounterpart,
-            bank_name: '우리은행',
+            // 파일 상단 메타에서 추출 (모든 행에 동일하게 부여 — 매핑 매칭용)
+            bank_name: (file as any).bankName || '우리은행',
+            account_number: (file as any).accountNumber || undefined,
+            account_last4: (file as any).accountLast4 || undefined,
+            account_holder: (file as any).accountHolder || undefined,
           }
         } else {
           // 승인내역조회: 날짜+시간 분리 컬럼 처리
