@@ -2939,18 +2939,18 @@ export default function BankCardPage() {
         />
       </div>
 
-      {/* ──── BulkActionBar — 선택된 거래 일괄 작업 (sticky 상단) ──── */}
+      {/* ──── BulkActionBar — 선택된 거래 일괄 작업 (floating bottom — 거래 row 근처) ──── */}
       {selectedIds.size > 0 && (
         <div style={{
-          position: 'sticky', top: 56, zIndex: 100,
-          margin: '0 16px 8px',
-          padding: '10px 16px',
+          position: 'fixed', bottom: 16, left: 16, right: 16, zIndex: 100,
+          padding: '12px 18px',
           ...GLASS.L5,
           border: '1px solid rgba(124,58,237,0.4)',
-          borderRadius: 10,
-          boxShadow: '0 4px 20px rgba(124,58,237,0.15)',
-          background: 'linear-gradient(90deg, rgba(245,243,255,0.95), rgba(255,255,255,0.95))',
+          borderRadius: 12,
+          boxShadow: '0 -4px 24px rgba(124,58,237,0.20), 0 8px 32px rgba(0,0,0,0.08)',
+          background: 'linear-gradient(90deg, rgba(245,243,255,0.97), rgba(255,255,255,0.97))',
           display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
+          maxWidth: 1400, margin: '0 auto',
         }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: '#5b21b6' }}>
             ✓ 선택 {selectedIds.size}건
