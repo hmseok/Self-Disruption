@@ -127,10 +127,23 @@ export async function GET(request: NextRequest) {
         categories: String(r.categories || '').split('|'),
         count: Number(r.total_count),
       })),
-      user_overridden: userOverridden.map(r => ({
-        ai_category: r.ai_category,
-        final_category: r.final_category,
-        count: Number(r.cnt),
+      user_overridden: await Promise.all(userOverridden.map(async (r: any) => {
+        // sample description 추가 — 룰 자동 생성 위한 거래처 키워드 추출용
+        const samples = await prisma.$queryRaw<Array<{ description: string | null; client_name: string | null }>>`
+          SELECT description, client_name
+            FROM transactions
+           WHERE deleted_at IS NULL
+             AND category = ${r.ai_category}
+             AND final_category = ${r.final_category}
+             AND category != final_category
+           LIMIT 5
+        `
+        return {
+          ai_category: r.ai_category,
+          final_category: r.final_category,
+          count: Number(r.cnt),
+          samples: samples.map(s => s.client_name || (s.description || '').split(/[\s\(\)\[\]\/,\|]+/)[0]).filter(Boolean),
+        }
       })),
       top_unclassified_high_value: serialize(lowValueUnclassified),
     })

@@ -1868,6 +1868,21 @@ export default function BankCardPage() {
 
       await Promise.all([loadSummary(), loadTransactions()])
       if (reviewCategory) await loadReviewItems(reviewCategory)
+
+      // AIR.4 — AI 분류 검수 자동 호출 (사용자 검수 보조)
+      try {
+        const { json: rev } = await fetchWithAuth('/api/admin/ai-classify-review')
+        if (rev && !rev.error) {
+          setAiReviewResult({
+            summary: rev?.summary || {},
+            by_category: rev?.by_category || [],
+            inconsistent: rev?.inconsistent || [],
+            user_overridden: rev?.user_overridden || [],
+            top_unclassified_high_value: rev?.top_unclassified_high_value || [],
+            triggeredAt: new Date().toISOString(),
+          })
+        }
+      } catch { /* 검수 자동 호출 실패는 무시 — 사용자가 수동 클릭 가능 */ }
     } catch (e: any) {
       floaterProgress.finish(taskId, `오류: ${e?.message || String(e)}`, 'error')
     } finally { setAutoClassifying(false) }
@@ -3324,11 +3339,23 @@ export default function BankCardPage() {
                       {aiReviewResult.by_category.length === 0 && <div style={{ fontSize: 11, color: COLORS.textMuted }}>(없음)</div>}
                     </div>
 
-                    {/* 불일치 — 같은 적요인데 다른 카테고리 */}
+                    {/* 불일치 — 같은 적요인데 다른 카테고리 (AIR.1 — 클릭 시 그 적요로 검색) */}
                     <div style={{ ...GLASS.L3, padding: '10px 12px', borderRadius: 8, border: '1px solid rgba(245,158,11,0.25)', background: 'rgba(254,243,199,0.25)' }}>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: '#92400e', marginBottom: 6 }}>⚠ 불일치 — 같은 적요 다른 카테고리</div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: '#92400e', marginBottom: 6 }}>⚠ 불일치 — 같은 적요 다른 카테고리 <span style={{ fontSize: 10, fontWeight: 400, color: COLORS.textMuted }}>(클릭 = 검색 적용)</span></div>
                       {aiReviewResult.inconsistent.slice(0, 10).map((x: any, i: number) => (
-                        <div key={i} style={{ fontSize: 11, color: COLORS.textSecondary, padding: '2px 0' }}>
+                        <div
+                          key={i}
+                          onClick={() => {
+                            // 미분류 카테고리로 이동 + 검색 자동 적용 → 사용자 일괄 처리
+                            setReviewSearch((x.description || '').slice(0, 30))
+                            // 카테고리 미정해진 거라 — 미분류 카테고리 자동 펼침
+                            loadReviewItems('미분류')
+                            setAiReviewResult(null) // 패널 닫기
+                          }}
+                          style={{ fontSize: 11, color: COLORS.textSecondary, padding: '4px 6px', borderRadius: 4, cursor: 'pointer' }}
+                          onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(245,158,11,0.15)'}
+                          onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                        >
                           <span style={{ fontWeight: 500 }}>"{(x.description || '').slice(0, 30)}"</span> — {x.count}건 [{(x.categories || []).join(', ')}]
                         </div>
                       ))}
@@ -3338,20 +3365,51 @@ export default function BankCardPage() {
 
                   {/* 사용자 수정 패턴 + 미분류 고액 — 2 열 */}
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                    {/* AIR.3 — 사용자 수정 패턴 → 룰 자동 생성 */}
                     <div style={{ ...GLASS.L3, padding: '10px 12px', borderRadius: 8, border: '1px solid rgba(0,0,0,0.05)' }}>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: COLORS.textPrimary, marginBottom: 6 }}>✏️ 사용자 수정 (AI ≠ 사용자)</div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: COLORS.textPrimary, marginBottom: 6 }}>✏️ 사용자 수정 (AI ≠ 사용자) <span style={{ fontSize: 10, fontWeight: 400, color: COLORS.textMuted }}>(룰 추가 권장)</span></div>
                       {aiReviewResult.user_overridden.slice(0, 10).map((x: any, i: number) => (
-                        <div key={i} style={{ fontSize: 11, color: COLORS.textSecondary, padding: '2px 0' }}>
-                          <span style={{ color: '#dc2626' }}>{x.ai_category}</span> → <span style={{ color: '#15803d', fontWeight: 500 }}>{x.final_category}</span> · {x.count}건
+                        <div key={i} style={{ fontSize: 11, color: COLORS.textSecondary, padding: '4px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6 }}>
+                          <span style={{ flex: 1, overflow: 'hidden' }}>
+                            <span style={{ color: '#dc2626' }}>{x.ai_category}</span> → <span style={{ color: '#15803d', fontWeight: 500 }}>{x.final_category}</span> · {x.count}건
+                            {x.samples && x.samples.length > 0 && <div style={{ fontSize: 10, color: COLORS.textMuted, marginTop: 1 }}>예: {x.samples.slice(0, 3).join(', ')}</div>}
+                          </span>
+                          {x.samples && x.samples.length > 0 && (
+                            <button
+                              onClick={async () => {
+                                if (!confirm(`「${x.samples.slice(0, 3).join(', ')}」 → 「${x.final_category}」 룰 ${x.samples.length}개 추가?`)) return
+                                const items = x.samples.map((kw: string) => ({
+                                  keyword: kw, category: x.final_category, confidence: 'high',
+                                }))
+                                const { json } = await fetchWithAuth('/api/finance/classification-rules/learn', {
+                                  method: 'POST',
+                                  body: { items },
+                                })
+                                alert(`✅ 룰 추가: ${json?.added || 0}건 (중복 ${json?.already_existed || 0})`)
+                              }}
+                              style={{ ...BTN.sm, fontSize: 9, padding: '2px 6px', background: '#15803d', color: '#fff', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                            >+ 룰</button>
+                          )}
                         </div>
                       ))}
                       {aiReviewResult.user_overridden.length === 0 && <div style={{ fontSize: 11, color: COLORS.textMuted }}>(없음 — AI 분류 그대로 신뢰)</div>}
                     </div>
 
+                    {/* AIR.2 — 미분류 고액 클릭 → 「미분류」 카테고리로 이동 + 검색 적용 */}
                     <div style={{ ...GLASS.L3, padding: '10px 12px', borderRadius: 8, border: '1px solid rgba(220,38,38,0.2)', background: 'rgba(254,226,226,0.2)' }}>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: '#b91c1c', marginBottom: 6 }}>💰 미분류 고액 (top 10)</div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: '#b91c1c', marginBottom: 6 }}>💰 미분류 고액 (top 10) <span style={{ fontSize: 10, fontWeight: 400, color: COLORS.textMuted }}>(클릭 = 거래로 이동)</span></div>
                       {aiReviewResult.top_unclassified_high_value.slice(0, 10).map((x: any, i: number) => (
-                        <div key={i} style={{ fontSize: 11, color: COLORS.textSecondary, padding: '2px 0', display: 'flex', justifyContent: 'space-between', gap: 4 }}>
+                        <div
+                          key={i}
+                          onClick={() => {
+                            setReviewSearch((x.description || x.client_name || '').slice(0, 20))
+                            loadReviewItems('미분류')
+                            setAiReviewResult(null)
+                          }}
+                          style={{ fontSize: 11, color: COLORS.textSecondary, padding: '4px 6px', borderRadius: 4, cursor: 'pointer', display: 'flex', justifyContent: 'space-between', gap: 4 }}
+                          onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(220,38,38,0.1)'}
+                          onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                        >
                           <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{(x.description || '-').slice(0, 25)}</span>
                           <span style={{ whiteSpace: 'nowrap', fontWeight: 600, color: x.type === 'income' ? COLORS.income : COLORS.expense }}>
                             {(Number(x.amount) / 10000).toFixed(0)}만 [{x.type === 'income' ? '입' : '출'}]
