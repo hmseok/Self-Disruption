@@ -336,6 +336,52 @@ export default function BankCardPage() {
   const [reviewFilterTxType, setReviewFilterTxType] = useState<'all' | 'expense' | 'income' | 'canceled'>('all')
   const [reviewGroupByMerchant, setReviewGroupByMerchant] = useState(false)
 
+  // 다중 매칭 (transaction_assignments) — Phase 2: 한 거래 → N entity
+  const [assignmentsByTx, setAssignmentsByTx] = useState<Record<string, any[]>>({})
+  const loadAssignments = useCallback(async (txId: string) => {
+    if (assignmentsByTx[txId]) return
+    try {
+      const { json } = await fetchWithAuth(`/api/finance/transactions/${txId}/assignments`)
+      setAssignmentsByTx(prev => ({ ...prev, [txId]: json?.data || [] }))
+    } catch { /* skip */ }
+  }, [assignmentsByTx])
+
+  const addAssignment = async (txId: string, type: string, entityId: string) => {
+    try {
+      const { json } = await fetchWithAuth(`/api/finance/transactions/${txId}/assignments`, {
+        method: 'POST',
+        body: { assignment_type: type, assignment_id: entityId },
+      })
+      if (json?.error) { alert(`매칭 추가 실패: ${json.error}`); return }
+      if (json?.already_exists) { alert('이미 매칭됨'); return }
+      // UI 갱신 — 새 매칭 추가
+      const cfg = MATCH_TYPES.find(t => t.type === type)
+      const ent = (matchEntities[type] || []).find((r: any) => String(r.id) === String(entityId))
+      const newRow = {
+        id: json.id, transaction_id: txId,
+        assignment_type: type, assignment_id: entityId,
+        ratio: 100, source: 'manual',
+        _label: (cfg && ent) ? cfg.labelFn(ent) : entityId,
+        _typeLabel: cfg?.label || type,
+      }
+      setAssignmentsByTx(prev => ({ ...prev, [txId]: [...(prev[txId] || []), newRow] }))
+    } catch (e: any) {
+      alert(`매칭 추가 오류: ${e?.message}`)
+    }
+  }
+
+  const removeAssignment = async (txId: string, rowId: string) => {
+    try {
+      await fetchWithAuth(`/api/finance/transactions/${txId}/assignments?row_id=${rowId}`, { method: 'DELETE' })
+      setAssignmentsByTx(prev => ({
+        ...prev,
+        [txId]: (prev[txId] || []).filter((r: any) => r.id !== rowId),
+      }))
+    } catch (e: any) {
+      alert(`매칭 제거 오류: ${e?.message}`)
+    }
+  }
+
   // 일괄 선택 — 3 화면 가로질러 불규칙 체크 (분류 검수 / 매칭 검수 / LOW 그룹)
   // (CLAUDE.md 규칙 14 — 동형 패턴 통합)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -4722,6 +4768,73 @@ export default function BankCardPage() {
                                     )
                                   })()}
                                 </div>
+                                {/* 다중 매칭 (transaction_assignments) — Phase 2 */}
+                                <div style={{ marginTop: 4, display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
+                                  {(assignmentsByTx[it.id] || []).filter((a: any) => a.id !== 'legacy').map((a: any) => {
+                                    const cfg3 = MATCH_TYPES.find(t => t.type === a.assignment_type)
+                                    const ent = cfg3 ? (matchEntities[a.assignment_type] || []).find((r: any) => String(r.id) === String(a.assignment_id)) : null
+                                    const label = a._label || (cfg3 && ent ? cfg3.labelFn(ent) : a.assignment_id?.slice(0, 8))
+                                    return (
+                                      <span key={a.id} style={{
+                                        display: 'inline-flex', alignItems: 'center', gap: 3,
+                                        padding: '2px 6px', fontSize: 10, borderRadius: 10,
+                                        background: 'rgba(124,58,237,0.10)', color: '#7c3aed',
+                                        border: '1px solid rgba(124,58,237,0.25)',
+                                      }}>
+                                        {cfg3?.label || a.assignment_type} · {label}
+                                        <button
+                                          onClick={() => removeAssignment(it.id, a.id)}
+                                          title="매칭 제거"
+                                          style={{ marginLeft: 2, padding: 0, background: 'transparent', border: 'none', color: '#7c3aed', cursor: 'pointer', fontSize: 11, lineHeight: 1 }}
+                                        >×</button>
+                                      </span>
+                                    )
+                                  })}
+                                  <button
+                                    onClick={() => loadAssignments(it.id)}
+                                    style={{ ...BTN.sm, fontSize: 9, padding: '2px 6px', background: 'rgba(0,0,0,0.04)', color: COLORS.textMuted, border: `1px dashed ${COLORS.borderSubtle}`, cursor: 'pointer', borderRadius: 10 }}
+                                    title="추가 매칭 가능 (직원 + 차량 동시 등)"
+                                  >+ 더 추가</button>
+                                </div>
+                                {/* 추가 매칭 dropdown — 클릭 후 표시 */}
+                                {assignmentsByTx[it.id] !== undefined && (
+                                  <div style={{ marginTop: 4, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                                    <select
+                                      defaultValue=""
+                                      id={`add-assign-type-${it.id}`}
+                                      onChange={(e) => { if (e.target.value) loadMatchEntities(e.target.value) }}
+                                      style={{ fontSize: 10, padding: '1px 4px', borderRadius: 4, border: `1px solid ${COLORS.borderSubtle}`, cursor: 'pointer', minWidth: 80 }}
+                                    >
+                                      <option value="">+ 매칭 추가</option>
+                                      {MATCH_TYPES.map(t => (
+                                        <option key={t.type} value={t.type}>{t.label}</option>
+                                      ))}
+                                    </select>
+                                    <select
+                                      defaultValue=""
+                                      onChange={async (e) => {
+                                        const typeSel = document.getElementById(`add-assign-type-${it.id}`) as HTMLSelectElement
+                                        const type = typeSel?.value
+                                        if (!type || !e.target.value) return
+                                        await addAssignment(it.id, type, e.target.value)
+                                        e.target.value = ''
+                                        if (typeSel) typeSel.value = ''
+                                      }}
+                                      style={{ fontSize: 10, padding: '1px 4px', borderRadius: 4, border: `1px solid ${COLORS.borderSubtle}`, cursor: 'pointer', maxWidth: 160 }}
+                                    >
+                                      <option value="">— 대상 —</option>
+                                      {(() => {
+                                        const typeSel = typeof document !== 'undefined' ? (document.getElementById(`add-assign-type-${it.id}`) as HTMLSelectElement) : null
+                                        const type = typeSel?.value
+                                        if (!type) return null
+                                        const cfg4 = MATCH_TYPES.find(t => t.type === type)
+                                        if (!cfg4) return null
+                                        const list2 = matchEntities[type] || []
+                                        return list2.map((r: any) => <option key={r.id} value={r.id}>{cfg4.labelFn(r)}</option>)
+                                      })()}
+                                    </select>
+                                  </div>
+                                )}
                               </td>
                               <td style={{ padding: '6px 6px', textAlign: 'center' }}>
                                 <input type="checkbox" checked={selectedIds.has(it.id)} onChange={() => toggleSelect(it.id)} />
