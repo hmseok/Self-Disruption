@@ -430,6 +430,26 @@ model Transaction {
   @@map("transactions")
 }
 
+// 거래 다중 매칭 (5차원 분리) — 한 거래 → N개 entity 매칭
+// 2026-05-03 신설 — transactions.related_type/id 단일 슬롯 한계 해소
+model TransactionAssignment {
+  id              String   @id @default(uuid()) @db.Char(36)
+  transaction_id  String   @db.Char(36)
+  assignment_type String   @db.VarChar(32) // car|employee|salary|insurance|loan|jiip|invest|fmi_rental|rental|contract|freelancer|card
+  assignment_id   String   @db.Char(36)
+  ratio           Decimal  @default(100.00) @db.Decimal(5, 2)
+  note            String?  @db.VarChar(255)
+  created_by      String?  @db.Char(36)
+  source          String   @default("manual") @db.VarChar(16) // manual|auto|migrated
+  created_at      DateTime @default(now())
+  updated_at      DateTime @default(now()) @updatedAt
+
+  @@unique([transaction_id, assignment_type, assignment_id], map: "uniq_ta_tx_type_id")
+  @@index([transaction_id], map: "idx_ta_tx")
+  @@index([assignment_type, assignment_id], map: "idx_ta_type_id")
+  @@map("transaction_assignments")
+}
+
 model ClassificationQueue {
   id                 String   @id @default(uuid()) @db.Char(36)
   company_id         String?  @db.Char(36)
