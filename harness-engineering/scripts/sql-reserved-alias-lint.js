@@ -162,6 +162,24 @@ function lint() {
         const charBefore = sql[m.index + m[0].length - alias.length - 1]
         if (charBefore === '`' || charBefore === '"' || charBefore === "'") continue
 
+        // CAST(x AS TYPE) / CONVERT(x, TYPE) 안의 AS 는 alias 가 아닌 cast 타입 — skip
+        // 휴리스틱: m.index 이전 200자 안에 CAST( 또는 CONVERT( 가 있고, 그 뒤로
+        //         아직 닫히지 않은 ( 가 있으면 cast context.
+        const before = sql.slice(Math.max(0, m.index - 200), m.index)
+        const upBefore = before.toUpperCase()
+        // CAST/CONVERT 위치 (오른쪽 끝부터 가장 가까운)
+        const castIdx = Math.max(upBefore.lastIndexOf('CAST('), upBefore.lastIndexOf('CONVERT('))
+        if (castIdx >= 0) {
+          // CAST( 이후의 괄호 균형 — 아직 unbalanced 면 cast context
+          const after = before.slice(castIdx)
+          let depth = 0
+          for (const c of after) {
+            if (c === '(') depth++
+            else if (c === ')') depth--
+          }
+          if (depth > 0) continue // CAST 안 — 이건 type, alias 아님
+        }
+
         const lineInBlock = sql.slice(0, m.index).split('\n').length
         if (allowLines.has(lineInBlock)) continue
 

@@ -427,11 +427,22 @@ export default function BankCardPage() {
   const [matchEntities, setMatchEntities] = useState<Record<string, any[]>>({})
   const [matchEntityLoading, setMatchEntityLoading] = useState<Record<string, boolean>>({})
 
-  // ─── 「매칭 검수」 탭 ──────────────────────────────────────
-  // 분류된 거래 (category 가 미분류 아닌) 만 type 별 그룹 + 매칭 dropdown
-  const [matchReviewItems, setMatchReviewItems] = useState<any[]>([])
+  // ─── 「매칭 검수」 탭 (entity 중심 — C안) ──────────────────
+  // 분류된 거래의 entity 별 group (차량/직원/투자자/지입/보험/대출 등)
+  const [matchReviewByEntity, setMatchReviewByEntity] = useState<{
+    entities: Record<string, any[]>
+    unmatched: { count: number; totalAmount: number }
+    summary: { totalEntities: number; totalMatched: number; totalUnmatched: number }
+  } | null>(null)
   const [matchReviewLoading, setMatchReviewLoading] = useState(false)
   const [matchReviewTypeFilter, setMatchReviewTypeFilter] = useState<string>('all') // 'all' | 'unmatched' | type
+  const [expandedEntityId, setExpandedEntityId] = useState<string | null>(null) // 펼친 entity (type:id)
+  const [entityTransactions, setEntityTransactions] = useState<Record<string, any[]>>({}) // entity 별 거래 lazy load
+  // legacy — 일부 기존 코드 호환 (삭제 예정)
+  const matchReviewItems: any[] = useMemo(() => {
+    if (!matchReviewByEntity) return []
+    return Object.values(matchReviewByEntity.entities).flat()
+  }, [matchReviewByEntity])
 
   const loadMatchEntities = useCallback(async (type: string) => {
     if (matchEntities[type] || matchEntityLoading[type]) return
@@ -539,21 +550,31 @@ export default function BankCardPage() {
   const loadMatchReview = useCallback(async () => {
     setMatchReviewLoading(true)
     try {
-      // category 별 fetch — 분류 검수와 같은 list API 사용 + 카테고리 분류된 것만
-      const cats = (summary?.categoryBreakdown || [])
-        .map((c: any) => c.category)
-        .filter((c: string, i: number, a: string[]) => c && c !== '미분류' && a.indexOf(c) === i)
-      // 한 카테고리 당 최대 200건씩 — 모든 카테고리 합치기
-      const all: any[] = []
-      for (const cat of cats) {
-        const { json } = await fetchWithAuth(`/api/finance/transactions/list?category=${encodeURIComponent(cat)}&limit=500`)
-        if (Array.isArray(json?.data)) all.push(...json.data)
+      // entity 중심 — 신규 by-entity API
+      const { json } = await fetchWithAuth('/api/finance/match-review/by-entity')
+      if (json && !json.error) {
+        setMatchReviewByEntity(json)
       }
-      setMatchReviewItems(all)
     } finally {
       setMatchReviewLoading(false)
     }
-  }, [summary])
+  }, [])
+
+  // entity 클릭 시 거래 lazy load
+  const loadEntityTransactions = useCallback(async (entityType: string, entityId: string) => {
+    const key = `${entityType}:${entityId}`
+    if (entityTransactions[key]) return
+    try {
+      // related_id 또는 transaction_assignments 매칭으로 거래 조회
+      // 간단히 — 모든 분류된 거래 fetch 후 클라이언트 필터 (정확도 낮지만 빠름)
+      // TODO: 별도 API /api/finance/match-review/entity/[type]/[id]/transactions 권장
+      const { json } = await fetchWithAuth(`/api/finance/transactions/list?related_type=${entityType}&related_id=${entityId}&limit=500`)
+      const list = Array.isArray(json?.data)
+        ? json.data.filter((t: any) => t.related_type === entityType && t.related_id === entityId)
+        : []
+      setEntityTransactions(prev => ({ ...prev, [key]: list }))
+    } catch { /* skip */ }
+  }, [entityTransactions])
 
   const loadSmsData = useCallback(async () => {
     setSmsLoading(true)
@@ -1505,7 +1526,7 @@ export default function BankCardPage() {
       clearSelection()
       // UI 갱신
       setReviewItems(prev => prev.filter(i => !ids.includes(i.id)))
-      setMatchReviewItems(prev => prev.map(i => ids.includes(i.id) ? { ...i, category: newCategory } : i))
+      // 매칭 검수는 entity 중심 group — reload (lazy: 탭 전환 시 자동 갱신)
       await loadSummary()
     } catch (e: any) {
       floaterProgress.finish(taskId, `오류: ${e.message}`, 'error')
@@ -1541,7 +1562,7 @@ export default function BankCardPage() {
     // UI 갱신
     const updateFn = (i: any) => items.find(x => x.id === i.id) ? { ...i, related_type: type, related_id: entityId } : i
     setReviewItems(prev => prev.map(updateFn))
-    setMatchReviewItems(prev => prev.map(updateFn))
+    // 매칭 검수는 entity 중심 — 탭 진입 시 자동 reload
   }
 
   // 일괄 확정 (룰 자동 분류 LOW row)
@@ -4754,27 +4775,24 @@ export default function BankCardPage() {
           </>
         )}
 
-        {/* ──── 매칭 검수 탭 (분류된 거래만 — type 별 그룹 + 매칭 dropdown) ──── */}
+        {/* ──── 매칭 검수 탭 (entity 중심 — C안 재설계) ──── */}
         {activeTab === 'matchreview' && (() => {
-          // type 별 group + unmatched 그룹
-          const groups: Record<string, any[]> = { unmatched: [] }
-          for (const t of MATCH_TYPES) groups[t.type] = []
-          for (const it of matchReviewItems) {
-            const t = it.related_type || (it.matched_car_id_sms ? 'car' : null)
-            if (t && groups[t]) groups[t].push(it)
-            else groups.unmatched.push(it)
-          }
-          const filteredGroups = matchReviewTypeFilter === 'all'
-            ? Object.entries(groups)
-            : Object.entries(groups).filter(([k]) => k === matchReviewTypeFilter)
+          // entity 중심 — by-entity API 응답 사용
+          const data = matchReviewByEntity
+          const filteredEntityTypes = data
+            ? (matchReviewTypeFilter === 'all'
+              ? Object.entries(data.entities)
+              : Object.entries(data.entities).filter(([k]) => k === matchReviewTypeFilter))
+            : []
           return (
             <>
+              {/* 헤더 */}
               <div style={{ ...GLASS.L3, border: `1px solid ${COLORS.borderBlue}`, borderRadius: 12, padding: '14px 20px', marginBottom: 12 }}>
                 <div style={{ fontSize: 14, fontWeight: 600, color: COLORS.textPrimary, marginBottom: 4 }}>
-                  매칭 검수 — 분류된 거래 {matchReviewItems.length}건
+                  매칭 검수 — entity 중심 ({data?.summary.totalEntities || 0} entity · {data?.summary.totalMatched || 0} 매칭 · {data?.summary.totalUnmatched || 0} 미매칭)
                 </div>
                 <div style={{ fontSize: 12, color: COLORS.textMuted, marginBottom: 8 }}>
-                  분류 끝난 거래의 차량/직원/보험/대출 등 매칭 최종 점검. 미매칭 우선 처리.
+                  차량 / 직원 / 투자자 / 지입자 별로 묶어 매칭 정합성 검수. entity 카드 클릭 → 매칭된 거래 목록 펼침.
                 </div>
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                   <button
@@ -4787,197 +4805,110 @@ export default function BankCardPage() {
                     onChange={(e) => setMatchReviewTypeFilter(e.target.value)}
                     style={{ fontSize: 11, padding: '3px 8px', border: `1px solid ${COLORS.borderSubtle}`, borderRadius: 4 }}
                   >
-                    <option value="all">전체 ({matchReviewItems.length})</option>
-                    <option value="unmatched">🚧 미매칭 ({groups.unmatched.length})</option>
-                    {MATCH_TYPES.map(t => groups[t.type]?.length > 0 ? (
-                      <option key={t.type} value={t.type}>{t.label} ({groups[t.type].length})</option>
-                    ) : null)}
+                    <option value="all">전체</option>
+                    {data && Object.entries(data.entities).map(([type, list]) => (
+                      <option key={type} value={type}>{(list[0]?.typeLabel || type)} ({list.length})</option>
+                    ))}
                   </select>
                 </div>
               </div>
 
-              {filteredGroups.map(([type, items]) => {
-                if (items.length === 0) return null
-                const cfg = type === 'unmatched' ? null : MATCH_TYPES.find(t => t.type === type)
-                const groupLabel = type === 'unmatched' ? `🚧 미매칭 (${items.length}건)` : `${cfg?.label || type} (${items.length}건)`
-                const groupColor = type === 'unmatched' ? '#dc2626' : '#1e40af'
-                return (
-                  <div key={type} style={{ ...GLASS.L4, border: `1px solid ${COLORS.borderSubtle}`, borderRadius: 10, marginBottom: 12, overflow: 'hidden' }}>
-                    <div style={{ padding: '10px 16px', background: 'rgba(0,0,0,0.02)', fontWeight: 700, fontSize: 13, color: groupColor }}>
-                      {groupLabel}
-                    </div>
-                    <div style={{ overflowX: 'auto', maxHeight: 400, overflowY: 'auto' }}>
-                      <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
-                        <thead style={{ position: 'sticky', top: 0, background: 'rgba(255,255,255,0.95)', zIndex: 1 }}>
-                          <tr style={{ background: 'rgba(0,0,0,0.02)' }}>
-                            <th style={{ padding: '6px 6px', width: 32, textAlign: 'center' }}>
-                              <input
-                                type="checkbox"
-                                checked={items.length > 0 && items.every((i: any) => selectedIds.has(i.id))}
-                                onChange={(e) => toggleSelectMany(items.map((i: any) => i.id), e.target.checked)}
-                                title="그룹 전체 선택"
-                              />
-                            </th>
-                            <th style={{ padding: '6px 8px', textAlign: 'left', color: COLORS.textSecondary, fontWeight: 600 }}>날짜</th>
-                            <th style={{ padding: '6px 8px', textAlign: 'left', color: COLORS.textSecondary, fontWeight: 600 }}>거래처/적요</th>
-                            <th style={{ padding: '6px 8px', textAlign: 'left', color: COLORS.textSecondary, fontWeight: 600 }}>카테고리</th>
-                            <th style={{ padding: '6px 8px', textAlign: 'right', color: COLORS.textSecondary, fontWeight: 600 }}>금액</th>
-                            <th style={{ padding: '6px 8px', textAlign: 'left', color: COLORS.textSecondary, fontWeight: 600 }}>매칭 변경</th>
-                            <th style={{ padding: '6px 6px', width: 32, textAlign: 'center' }}>✓</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {items.slice(0, 200).map((it: any) => (
-                            <tr key={it.id} style={{ borderTop: '1px solid rgba(0,0,0,0.04)', background: selectedIds.has(it.id) ? 'rgba(245,243,255,0.5)' : undefined }}>
-                              <td style={{ padding: '6px 6px', textAlign: 'center' }}>
-                                <input type="checkbox" checked={selectedIds.has(it.id)} onChange={() => toggleSelect(it.id)} />
-                              </td>
-                              <td style={{ padding: '6px 8px', whiteSpace: 'nowrap', color: COLORS.textPrimary }}>
-                                {it.transaction_date ? String(it.transaction_date).slice(0, 10) : '-'}
-                              </td>
-                              <td style={{ padding: '6px 8px', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                <div style={{ fontWeight: 500 }}>{it.client_name || it.sms_holder || it.description || '-'}</div>
-                                {it.matched_card_alias && <div style={{ fontSize: 10, color: '#7c3aed' }}>💳 {it.matched_card_alias}{it.matched_holder_name ? ` · ${it.matched_holder_name}` : ''}</div>}
-                              </td>
-                              <td style={{ padding: '6px 8px', fontSize: 11, color: '#1e40af', fontWeight: 600 }}>
-                                {it.category || '-'}
-                              </td>
-                              <td style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 600, color: it.type === 'income' ? COLORS.income : COLORS.expense }}>
-                                {nf(Number(it.amount || 0))}
-                              </td>
-                              <td style={{ padding: '6px 8px', minWidth: 220 }}>
-                                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                                  <select
-                                    value={it.related_type || ''}
-                                    onChange={(e) => {
-                                      const newType = e.target.value
-                                      if (!newType) {
-                                        changeItemMatch(it.id, null, null)
-                                        setMatchReviewItems(prev => prev.map(i => i.id === it.id ? { ...i, related_type: null, related_id: null } : i))
-                                        return
-                                      }
-                                      loadMatchEntities(newType)
-                                      setMatchReviewItems(prev => prev.map(i => i.id === it.id ? { ...i, related_type: newType, related_id: null } : i))
-                                    }}
-                                    style={{ fontSize: 10, padding: '1px 4px', border: `1px solid ${COLORS.borderSubtle}`, borderRadius: 4, cursor: 'pointer', minWidth: 80 }}
-                                  >
-                                    <option value="">— 매칭 —</option>
-                                    {MATCH_TYPES.map(t => (
-                                      <option key={t.type} value={t.type}>{t.label}</option>
-                                    ))}
-                                  </select>
-                                  {it.related_type && (() => {
-                                    const cfg2 = MATCH_TYPES.find(t => t.type === it.related_type)
-                                    if (!cfg2) return null
-                                    const list = matchEntities[it.related_type] || []
-                                    const loading = !!matchEntityLoading[it.related_type]
-                                    return (
-                                      <select
-                                        value={it.related_id || ''}
-                                        onChange={async (e) => {
-                                          const newEntityId = e.target.value || null
-                                          await changeItemMatch(it.id, it.related_type, newEntityId)
-                                          setMatchReviewItems(prev => prev.map(i => i.id === it.id ? { ...i, related_id: newEntityId } : i))
-                                        }}
-                                        style={{ fontSize: 10, padding: '1px 4px', border: `1px solid ${COLORS.borderSubtle}`, borderRadius: 4, cursor: 'pointer', maxWidth: 180 }}
-                                      >
-                                        <option value="">{loading ? '로드 중...' : `— 선택 —`}</option>
-                                        {list.map((r: any) => (
-                                          <option key={r.id} value={r.id}>{cfg2.labelFn(r)}</option>
-                                        ))}
-                                      </select>
-                                    )
-                                  })()}
-                                </div>
-                                {/* 다중 매칭 (transaction_assignments) — Phase 2 */}
-                                <div style={{ marginTop: 4, display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
-                                  {(assignmentsByTx[it.id] || []).filter((a: any) => a.id !== 'legacy').map((a: any) => {
-                                    const cfg3 = MATCH_TYPES.find(t => t.type === a.assignment_type)
-                                    const ent = cfg3 ? (matchEntities[a.assignment_type] || []).find((r: any) => String(r.id) === String(a.assignment_id)) : null
-                                    const label = a._label || (cfg3 && ent ? cfg3.labelFn(ent) : a.assignment_id?.slice(0, 8))
-                                    return (
-                                      <span key={a.id} style={{
-                                        display: 'inline-flex', alignItems: 'center', gap: 3,
-                                        padding: '2px 6px', fontSize: 10, borderRadius: 10,
-                                        background: 'rgba(124,58,237,0.10)', color: '#7c3aed',
-                                        border: '1px solid rgba(124,58,237,0.25)',
-                                      }}>
-                                        {cfg3?.label || a.assignment_type} · {label}
-                                        <button
-                                          onClick={() => removeAssignment(it.id, a.id)}
-                                          title="매칭 제거"
-                                          style={{ marginLeft: 2, padding: 0, background: 'transparent', border: 'none', color: '#7c3aed', cursor: 'pointer', fontSize: 11, lineHeight: 1 }}
-                                        >×</button>
-                                      </span>
-                                    )
-                                  })}
-                                  <button
-                                    onClick={() => loadAssignments(it.id)}
-                                    style={{ ...BTN.sm, fontSize: 9, padding: '2px 6px', background: 'rgba(0,0,0,0.04)', color: COLORS.textMuted, border: `1px dashed ${COLORS.borderSubtle}`, cursor: 'pointer', borderRadius: 10 }}
-                                    title="추가 매칭 가능 (직원 + 차량 동시 등)"
-                                  >+ 더 추가</button>
-                                </div>
-                                {/* 추가 매칭 dropdown — 클릭 후 표시 */}
-                                {assignmentsByTx[it.id] !== undefined && (
-                                  <div style={{ marginTop: 4, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                                    <select
-                                      defaultValue=""
-                                      id={`add-assign-type-${it.id}`}
-                                      onChange={(e) => { if (e.target.value) loadMatchEntities(e.target.value) }}
-                                      style={{ fontSize: 10, padding: '1px 4px', borderRadius: 4, border: `1px solid ${COLORS.borderSubtle}`, cursor: 'pointer', minWidth: 80 }}
-                                    >
-                                      <option value="">+ 매칭 추가</option>
-                                      {MATCH_TYPES.map(t => (
-                                        <option key={t.type} value={t.type}>{t.label}</option>
-                                      ))}
-                                    </select>
-                                    <select
-                                      defaultValue=""
-                                      onChange={async (e) => {
-                                        const typeSel = document.getElementById(`add-assign-type-${it.id}`) as HTMLSelectElement
-                                        const type = typeSel?.value
-                                        if (!type || !e.target.value) return
-                                        await addAssignment(it.id, type, e.target.value)
-                                        e.target.value = ''
-                                        if (typeSel) typeSel.value = ''
-                                      }}
-                                      style={{ fontSize: 10, padding: '1px 4px', borderRadius: 4, border: `1px solid ${COLORS.borderSubtle}`, cursor: 'pointer', maxWidth: 160 }}
-                                    >
-                                      <option value="">— 대상 —</option>
-                                      {(() => {
-                                        const typeSel = typeof document !== 'undefined' ? (document.getElementById(`add-assign-type-${it.id}`) as HTMLSelectElement) : null
-                                        const type = typeSel?.value
-                                        if (!type) return null
-                                        const cfg4 = MATCH_TYPES.find(t => t.type === type)
-                                        if (!cfg4) return null
-                                        const list2 = matchEntities[type] || []
-                                        return list2.map((r: any) => <option key={r.id} value={r.id}>{cfg4.labelFn(r)}</option>)
-                                      })()}
-                                    </select>
-                                  </div>
-                                )}
-                              </td>
-                              <td style={{ padding: '6px 6px', textAlign: 'center' }}>
-                                <input type="checkbox" checked={selectedIds.has(it.id)} onChange={() => toggleSelect(it.id)} />
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                      {items.length > 200 && (
-                        <div style={{ padding: '6px', textAlign: 'center', fontSize: 11, color: COLORS.textMuted }}>
-                          ⋯ {items.length - 200}건 더
-                        </div>
-                      )}
-                    </div>
+              {/* 미매칭 안내 */}
+              {data && data.unmatched.count > 0 && (
+                <div style={{ ...GLASS.L4, padding: '10px 16px', borderRadius: 10, marginBottom: 12, border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(254,226,226,0.25)' }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#b91c1c' }}>
+                    🚧 미매칭 거래 {data.unmatched.count}건 ({nf(data.unmatched.totalAmount)}원)
                   </div>
-                )
-              })}
-              {!matchReviewLoading && matchReviewItems.length === 0 && (
-                <div style={{ ...GLASS.L4, padding: 40, textAlign: 'center', borderRadius: 10, color: COLORS.textMuted }}>
-                  분류된 거래가 없습니다 — 「분류 검수」 탭에서 먼저 카테고리 적용 후 진행
+                  <div style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 2 }}>
+                    분류는 됐지만 차량/직원 등 entity 매칭 안 된 거래 — 「분류 검수」 탭에서 카테고리 클릭 후 매칭 변경 권장
+                  </div>
                 </div>
               )}
+
+              {/* entity 카드 grid — type 별 그룹 */}
+              {filteredEntityTypes.map(([type, entityList]) => (
+                <div key={type} style={{ marginBottom: 14 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: COLORS.textSecondary, marginBottom: 6, padding: '0 4px' }}>
+                    {entityList[0]?.typeLabel || type} <span style={{ color: COLORS.textMuted, fontWeight: 400 }}>· {entityList.length} entity</span>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 8 }}>
+                    {entityList.map((ent: any) => {
+                      const key = `${type}:${ent.id}`
+                      const isExpanded = expandedEntityId === key
+                      const txs = entityTransactions[key] || []
+                      const topCats = Object.entries(ent.categories || {}).sort((a: any, b: any) => b[1] - a[1]).slice(0, 3)
+                      return (
+                        <div key={key} style={{
+                          ...GLASS.L4,
+                          border: `1px solid ${isExpanded ? '#7c3aed' : COLORS.borderSubtle}`,
+                          borderRadius: 10,
+                          padding: '10px 12px',
+                          cursor: 'pointer',
+                          background: isExpanded ? 'rgba(245,243,255,0.5)' : undefined,
+                        }}
+                          onClick={() => {
+                            const next = isExpanded ? null : key
+                            setExpandedEntityId(next)
+                            if (next) loadEntityTransactions(type, ent.id)
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 6, marginBottom: 4 }}>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }} title={ent.label}>
+                              {isExpanded ? '▼' : '▶'} {ent.label}
+                            </div>
+                            <span style={{ fontSize: 12, fontWeight: 700, color: '#1e40af', whiteSpace: 'nowrap' }}>{ent.count}건</span>
+                          </div>
+                          <div style={{ fontSize: 11, color: COLORS.textMuted, marginBottom: 4 }}>
+                            합계 {nf(ent.totalAmount)}원
+                          </div>
+                          {topCats.length > 0 && (
+                            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                              {topCats.map(([cat, cnt]: any) => (
+                                <span key={cat} style={{ fontSize: 10, padding: '1px 6px', borderRadius: 8, background: 'rgba(59,130,246,0.08)', color: '#1e40af', border: '1px solid rgba(59,130,246,0.15)' }}>
+                                  {cat} {cnt}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          {/* 펼침 — entity 의 거래 목록 */}
+                          {isExpanded && (
+                            <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px dashed rgba(0,0,0,0.1)' }} onClick={(e) => e.stopPropagation()}>
+                              {txs.length === 0 ? (
+                                <div style={{ fontSize: 11, color: COLORS.textMuted, padding: '8px 0', textAlign: 'center' }}>로드 중...</div>
+                              ) : (
+                                <div style={{ maxHeight: 240, overflowY: 'auto' }}>
+                                  {txs.slice(0, 50).map((t: any) => (
+                                    <div key={t.id} style={{ fontSize: 11, padding: '4px 0', borderBottom: '1px solid rgba(0,0,0,0.04)', display: 'flex', justifyContent: 'space-between', gap: 6 }}>
+                                      <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                        <span style={{ color: COLORS.textMuted }}>{t.transaction_date ? String(t.transaction_date).slice(5, 10) : ''}</span>
+                                        {' '}
+                                        <span style={{ color: '#1e40af' }}>{t.category}</span>
+                                        {' '}
+                                        <span>{t.client_name || (t.description || '').slice(0, 20)}</span>
+                                      </span>
+                                      <span style={{ fontWeight: 600, color: t.type === 'income' ? COLORS.income : COLORS.expense, whiteSpace: 'nowrap' }}>
+                                        {nf(Math.abs(Number(t.amount || 0)))}
+                                      </span>
+                                    </div>
+                                  ))}
+                                  {txs.length > 50 && <div style={{ fontSize: 10, color: COLORS.textMuted, textAlign: 'center', padding: 4 }}>⋯ {txs.length - 50}건 더</div>}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              ))}
+
+              {!matchReviewLoading && (!data || Object.keys(data.entities).length === 0) && (
+                <div style={{ ...GLASS.L4, padding: 40, textAlign: 'center', borderRadius: 10, color: COLORS.textMuted }}>
+                  매칭된 entity 가 없습니다 — 「분류 검수」 탭에서 카테고리 적용 + 매칭 변경 후 진행
+                </div>
+              )}
+
             </>
           )
         })()}
