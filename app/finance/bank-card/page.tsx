@@ -318,6 +318,16 @@ export default function BankCardPage() {
     triggeredAt: string
   } | null>(null)
 
+  // AI 분류 검수 결과 — 글래스 패널 (alert 대신, CLAUDE.md 규칙 20)
+  const [aiReviewResult, setAiReviewResult] = useState<{
+    summary: any
+    by_category: any[]
+    inconsistent: any[]
+    user_overridden: any[]
+    top_unclassified_high_value: any[]
+    triggeredAt: string
+  } | null>(null)
+
   // ─── 매칭 통합 (2단 dropdown) ──────────────────────────────
   // 모든 related_type 의 entity 목록 lazy load
   // (CLAUDE.md 규칙 14 — 동형 패턴 통합)
@@ -2886,6 +2896,98 @@ export default function BankCardPage() {
               )
             })()}
 
+            {/* AI 분류 검수 결과 패널 — 글래스 디자인 (CLAUDE.md 규칙 20) */}
+            {aiReviewResult && (() => {
+              const s = aiReviewResult.summary || {}
+              return (
+                <div style={{
+                  ...GLASS.L4,
+                  border: `1px solid rgba(168,85,247,0.35)`,
+                  borderRadius: 12,
+                  padding: '16px 20px',
+                  marginBottom: 12,
+                  background: 'linear-gradient(180deg, rgba(250,245,255,0.6), rgba(255,255,255,0.4))',
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: '#7e22ce' }}>
+                      🔍 AI 분류 검수 <span style={{ fontSize: 11, color: COLORS.textMuted, fontWeight: 400, marginLeft: 6 }}>{new Date(aiReviewResult.triggeredAt).toLocaleString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+                    </div>
+                    <button
+                      onClick={() => setAiReviewResult(null)}
+                      style={{ ...BTN.sm, fontSize: 11, padding: '4px 10px', background: 'rgba(0,0,0,0.04)', color: COLORS.textMuted, border: `1px solid ${COLORS.borderSubtle}`, cursor: 'pointer' }}
+                    >× 닫기</button>
+                  </div>
+
+                  {/* 요약 통계 - 4개 카드 */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 12 }}>
+                    {[
+                      { label: '전체', value: s.total || 0, color: COLORS.textPrimary },
+                      { label: '분류 완료', value: `${s.classified || 0} (${s.classification_rate || 0}%)`, color: '#15803d' },
+                      { label: '미분류', value: s.unclassified || 0, color: (s.unclassified || 0) > 0 ? '#d97706' : COLORS.textMuted },
+                      { label: '사용자 수정', value: s.user_overridden_count || 0, color: '#7c3aed' },
+                    ].map(card => (
+                      <div key={card.label} style={{ ...GLASS.L3, padding: '10px 12px', borderRadius: 8, border: '1px solid rgba(0,0,0,0.05)' }}>
+                        <div style={{ fontSize: 11, color: COLORS.textMuted, marginBottom: 2 }}>{card.label}</div>
+                        <div style={{ fontSize: 16, fontWeight: 700, color: card.color }}>{card.value}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* 카테고리 분포 + 의심 케이스 — 2 열 */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+                    {/* 카테고리 분포 top 10 */}
+                    <div style={{ ...GLASS.L3, padding: '10px 12px', borderRadius: 8, border: '1px solid rgba(0,0,0,0.05)' }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: COLORS.textPrimary, marginBottom: 6 }}>📁 카테고리 분포 (top 10)</div>
+                      {aiReviewResult.by_category.slice(0, 10).map((x: any, i: number) => (
+                        <div key={i} style={{ fontSize: 11, color: COLORS.textSecondary, padding: '2px 0', display: 'flex', justifyContent: 'space-between' }}>
+                          <span style={{ color: '#1e40af', fontWeight: 500 }}>{x.category}</span>
+                          <span>{x.count}건 · {(Number(x.total_amount) / 10000).toFixed(0)}만원</span>
+                        </div>
+                      ))}
+                      {aiReviewResult.by_category.length === 0 && <div style={{ fontSize: 11, color: COLORS.textMuted }}>(없음)</div>}
+                    </div>
+
+                    {/* 불일치 — 같은 적요인데 다른 카테고리 */}
+                    <div style={{ ...GLASS.L3, padding: '10px 12px', borderRadius: 8, border: '1px solid rgba(245,158,11,0.25)', background: 'rgba(254,243,199,0.25)' }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: '#92400e', marginBottom: 6 }}>⚠ 불일치 — 같은 적요 다른 카테고리</div>
+                      {aiReviewResult.inconsistent.slice(0, 10).map((x: any, i: number) => (
+                        <div key={i} style={{ fontSize: 11, color: COLORS.textSecondary, padding: '2px 0' }}>
+                          <span style={{ fontWeight: 500 }}>"{(x.description || '').slice(0, 30)}"</span> — {x.count}건 [{(x.categories || []).join(', ')}]
+                        </div>
+                      ))}
+                      {aiReviewResult.inconsistent.length === 0 && <div style={{ fontSize: 11, color: COLORS.textMuted }}>(없음 — 일관성 ✓)</div>}
+                    </div>
+                  </div>
+
+                  {/* 사용자 수정 패턴 + 미분류 고액 — 2 열 */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                    <div style={{ ...GLASS.L3, padding: '10px 12px', borderRadius: 8, border: '1px solid rgba(0,0,0,0.05)' }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: COLORS.textPrimary, marginBottom: 6 }}>✏️ 사용자 수정 (AI ≠ 사용자)</div>
+                      {aiReviewResult.user_overridden.slice(0, 10).map((x: any, i: number) => (
+                        <div key={i} style={{ fontSize: 11, color: COLORS.textSecondary, padding: '2px 0' }}>
+                          <span style={{ color: '#dc2626' }}>{x.ai_category}</span> → <span style={{ color: '#15803d', fontWeight: 500 }}>{x.final_category}</span> · {x.count}건
+                        </div>
+                      ))}
+                      {aiReviewResult.user_overridden.length === 0 && <div style={{ fontSize: 11, color: COLORS.textMuted }}>(없음 — AI 분류 그대로 신뢰)</div>}
+                    </div>
+
+                    <div style={{ ...GLASS.L3, padding: '10px 12px', borderRadius: 8, border: '1px solid rgba(220,38,38,0.2)', background: 'rgba(254,226,226,0.2)' }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: '#b91c1c', marginBottom: 6 }}>💰 미분류 고액 (top 10)</div>
+                      {aiReviewResult.top_unclassified_high_value.slice(0, 10).map((x: any, i: number) => (
+                        <div key={i} style={{ fontSize: 11, color: COLORS.textSecondary, padding: '2px 0', display: 'flex', justifyContent: 'space-between', gap: 4 }}>
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{(x.description || '-').slice(0, 25)}</span>
+                          <span style={{ whiteSpace: 'nowrap', fontWeight: 600, color: x.type === 'income' ? COLORS.income : COLORS.expense }}>
+                            {(Number(x.amount) / 10000).toFixed(0)}만 [{x.type === 'income' ? '입' : '출'}]
+                          </span>
+                        </div>
+                      ))}
+                      {aiReviewResult.top_unclassified_high_value.length === 0 && <div style={{ fontSize: 11, color: COLORS.textMuted }}>(없음 — 모두 분류됨)</div>}
+                    </div>
+                  </div>
+                </div>
+              )
+            })()}
+
             {/* 카테고리별 요약 카드 */}
             {summary?.categoryBreakdown && (() => {
               // 카테고리별 집계: 수입/지출 합산
@@ -2951,31 +3053,15 @@ export default function BankCardPage() {
                           onClick={async () => {
                             const { json } = await fetchWithAuth('/api/admin/ai-classify-review')
                             if (json?.error) { alert(`오류: ${json.error}`); return }
-                            const s = json?.summary || {}
-                            const fmtList = (arr: any[], fn: (x: any) => string) =>
-                              (arr || []).slice(0, 10).map(fn).join('\n') || '  (없음)'
-                            const top = fmtList(json?.by_category, (x: any) =>
-                              `  · ${x.category}: ${x.count}건 (${(x.total_amount/10000).toFixed(0)}만원)`)
-                            const inconsistent = fmtList(json?.inconsistent, (x: any) =>
-                              `  · "${(x.description || '').slice(0, 30)}" — ${x.count}건 [${x.categories.join(',')}]`)
-                            const overridden = fmtList(json?.user_overridden, (x: any) =>
-                              `  · ${x.ai_category} → ${x.final_category}: ${x.count}건`)
-                            const lowValue = fmtList(json?.top_unclassified_high_value, (x: any) =>
-                              `  · ${(x.description || '').slice(0, 25)} ${(Number(x.amount)/10000).toFixed(0)}만 [${x.type === 'income' ? '입' : '출'}]`)
-                            console.log('[AI 분류 검수]', json)
-                            alert(
-                              `🤖 AI 분류 검수\n\n` +
-                              `📊 요약\n` +
-                              `  · 전체: ${s.total || 0}건\n` +
-                              `  · 분류 완료: ${s.classified || 0}건 (${s.classification_rate || 0}%)\n` +
-                              `  · 미분류: ${s.unclassified || 0}건\n` +
-                              `  · 사용자 수정: ${s.user_overridden_count || 0}건\n\n` +
-                              `📁 카테고리 분포 (top 10)\n${top}\n\n` +
-                              `⚠ 불일치 — 같은 적요 다른 카테고리\n${inconsistent}\n\n` +
-                              `✏️ 사용자 수정 패턴\n${overridden}\n\n` +
-                              `💰 미분류 고액 거래 (top 10)\n${lowValue}\n\n` +
-                              `→ 콘솔(F12) 에서 전체 데이터 확인`
-                            )
+                            // alert 대신 state 저장 → 글래스 패널 표시 (규칙 20)
+                            setAiReviewResult({
+                              summary: json?.summary || {},
+                              by_category: json?.by_category || [],
+                              inconsistent: json?.inconsistent || [],
+                              user_overridden: json?.user_overridden || [],
+                              top_unclassified_high_value: json?.top_unclassified_high_value || [],
+                              triggeredAt: new Date().toISOString(),
+                            })
                           }}
                           disabled={autoClassifying}
                           title="AI 분류 결과 통계 + 의심 케이스 진단"
