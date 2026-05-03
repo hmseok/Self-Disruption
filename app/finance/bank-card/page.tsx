@@ -1423,11 +1423,13 @@ export default function BankCardPage() {
   }
 
   // 🔮 풀 자동 매칭 — 차량/보험/대출/정비/지입/투자/급여 + AI 일괄 분류 순차 실행
-  const runFullAutoMatch = async () => {
+  // force=true: AI 가 이미 시도한 [AI 추정%] 거래도 재시도 (강제 재분류)
+  const runFullAutoMatch = async (options?: { force?: boolean }) => {
+    const force = !!options?.force
     if (!confirm(
-      '통장 거래 전체 풀 자동 매칭 + AI 분류 실행:\n\n' +
+      `통장 거래 전체 풀 자동 매칭 + AI 분류${force ? ' (강제 재분류)' : ''} 실행:\n\n` +
       '1) 마스터 매칭: 차량 → 보험 → 대출 → 정비 → 지입 → 투자 → 급여\n' +
-      '2) AI 일괄 분류: Gemini 로 미분류 거래 자동 카테고리 부여\n\n' +
+      `2) AI 일괄 분류: Gemini 로 미분류 거래 자동 카테고리 부여${force ? '\n   ★ 이전 AI 시도 거래도 재처리 — 토큰 더 소모' : ''}\n\n` +
       '· 약 1~3분 소요\n· 토큰 비용 발생 (AI 분류 단계)\n· 중간 정지 불가\n\n' +
       '계속할까요?'
     )) return
@@ -1447,7 +1449,12 @@ export default function BankCardPage() {
       for (const c of calls) {
         try {
           const { ok, status, json } = await fetchWithAuth(c.url, { method: 'POST', body: c.body || {} })
-          if (!ok) { results.push(`❌ ${c.name}: HTTP ${status}`); continue }
+          if (!ok) {
+            // 실제 에러 메시지 노출 (HTTP 500 만 보면 진단 불가)
+            const errMsg = json?.error || '응답 없음'
+            results.push(`❌ ${c.name}: HTTP ${status} — ${String(errMsg).slice(0, 80)}`)
+            continue
+          }
           const applied = json.applied ?? json.applied_high_confidence ?? 0
           const total = json.total_candidates ?? json.total_unmatched ?? 0
           // 진단: skip 사유 노출 — 0건일 때 무엇이 문제인지 즉시 파악
@@ -1473,7 +1480,7 @@ export default function BankCardPage() {
           batches++
           const { ok, status, json } = await fetchWithAuth('/api/finance/transactions/auto-classify-ai', {
             method: 'POST',
-            body: { batchSize: 30, minConfidence: 70 },
+            body: { batchSize: 30, minConfidence: 70, force },
           })
           if (!ok) {
             aiError = `HTTP ${status} — ${json?.error || '응답 없음'}`
@@ -1513,16 +1520,18 @@ export default function BankCardPage() {
       }
 
       alert(
-        `✓ 풀 자동 매칭 + AI 분류 완료\n\n${results.join('\n')}\n\n` +
-        `💡 매칭 0건 사유:\n` +
-        `  · 매핑X = corporate_cards 에 카드 등록 X\n` +
-        `  · 차량X = 카드는 있지만 assigned_car_id 미설정\n` +
-        `  · 모호 = 같은 last4 카드 2개 이상\n\n` +
+        `${force ? '🔁 강제 재분류' : '✓ 풀 자동 매칭 + AI 분류'} 완료\n\n${results.join('\n')}\n\n` +
+        `💡 매칭 사유 (type 별로 다름):\n` +
+        `  · 차량(last4): 매핑X = corporate_cards 에 카드 등록 X / 차량X = assigned_car_id 미설정 / 모호 = 같은 last4 카드 2개 이상\n` +
+        `  · 보험/대출/정비/지입/투자/급여: 각 매칭 API 의 자체 사유 코드 ([매핑X], [차량X], [모호] 메시지는 의미 다를 수 있음)\n\n` +
         `💡 AI 분류 결과 해석:\n` +
         `  · "0/N" = AI 가 신뢰도 70% 이상 분류 X — 검토 큐로\n` +
-        `  · "❌ Gemini 응답 0건" = API 키 문제 또는 응답 파싱 실패\n` +
-        `  · "0건 (분류 대상 없음)" = 이미 다 분류됨\n\n` +
-        `→ 미분류 ${0}건 남음 — 분류 검수 탭에서 수동 처리`
+        `  · "0건 (분류 대상 없음)" = 미분류 거래 모두 이전 AI 시도됨 → 「🔁 AI 강제 재분류」 클릭\n` +
+        `  · "❌ Gemini 응답 0건" = API 키 문제 또는 응답 파싱 실패\n\n` +
+        `📌 차량 매칭 안 됨 ([차량X] N건) 일 때:\n` +
+        `  → 「매핑 관리」 탭에서 카드별 차량 할당 먼저 (assigned_car_id 설정)\n` +
+        `  → 그 다음 풀 자동 매칭 다시 실행\n\n` +
+        `→ 분류 검수 탭에서 LOW 그룹 직접 확인 권장`
       )
       await Promise.all([loadSummary(), loadTransactions()])
       if (reviewCategory) await loadReviewItems(reviewCategory)
@@ -2802,7 +2811,7 @@ export default function BankCardPage() {
                         >🤖 룰 자동 분류</button>
                         {/* 메인 ② — 풀 자동 매칭(+AI) (구 인터페이스, 큰 작업) */}
                         <button
-                          onClick={runFullAutoMatch}
+                          onClick={() => runFullAutoMatch()}
                           disabled={autoClassifying}
                           title="차량/보험/대출/정비/지입/투자/급여 매칭 + 룰 분류 + AI 일괄 분류 순차 실행 (1~3분)"
                           style={{
@@ -2813,6 +2822,19 @@ export default function BankCardPage() {
                             cursor: autoClassifying ? 'wait' : 'pointer', opacity: autoClassifying ? 0.6 : 1,
                           }}
                         >🔮 풀 자동 매칭 (+AI)</button>
+                        {/* 강제 재분류 — 이전에 AI 시도한 [AI 추정%] 거래도 재처리 */}
+                        <button
+                          onClick={() => runFullAutoMatch({ force: true })}
+                          disabled={autoClassifying}
+                          title="이전 AI 시도 거래([AI 추정%])도 재분류. 풀 자동 매칭으로 분류 안 된 LOW 그룹이 그대로 남아있을 때 사용. 토큰 더 소모."
+                          style={{
+                            ...BTN.sm, padding: '6px 14px', fontSize: 12, fontWeight: 700,
+                            background: 'rgba(245,158,11,0.12)',
+                            color: '#b45309',
+                            border: '1px solid rgba(245,158,11,0.45)',
+                            cursor: autoClassifying ? 'wait' : 'pointer', opacity: autoClassifying ? 0.6 : 1,
+                          }}
+                        >🔁 AI 강제 재분류</button>
                         <button
                           onClick={async () => {
                             const { json } = await fetchWithAuth('/api/admin/ai-classify-review')

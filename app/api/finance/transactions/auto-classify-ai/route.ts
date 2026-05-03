@@ -163,17 +163,35 @@ export async function POST(request: NextRequest) {
     const batchSize = Math.max(5, Math.min(80, Number(body.batchSize) || 30))
     const minConfidence = Math.max(0, Math.min(100, Number(body.minConfidence) || 70))
     const dryRun = body.dryRun === true
+    // ★ force: true → AI 가 이미 시도한 [AI 추정%] row 도 재시도 (사용자 강제 재분류)
+    //   기본 false — 토큰 낭비 방지
+    const force = body.force === true
+
+    // [AI 추정%] 제외 조건 — force 면 제외 안 함
+    const aiRetryFilter = force ? '' : `AND (final_category IS NULL OR final_category NOT LIKE '[AI 추정%')`
 
     // 미분류 총 개수 (진행률 표시용)
-    // ★ AI가 이미 한 번 시도한 row(final_category에 [AI 추정 N%] 표시됨)는 제외 — 재호출 차단
     const totalRow = await prisma.$queryRawUnsafe<Array<{ cnt: bigint | number }>>(`
       SELECT COUNT(*) AS cnt
         FROM transactions
        WHERE deleted_at IS NULL
          AND (category IS NULL OR category = '' OR category = '미분류')
-         AND (final_category IS NULL OR final_category NOT LIKE '[AI 추정%')
+         ${aiRetryFilter}
     `)
     const totalUnclassified = Number(totalRow?.[0]?.cnt || 0)
+
+    // 진단용 — 별도 카운트 (force 모드 OFF 시 [AI 추정] 으로 제외된 거래 수)
+    let excludedAlreadyTried = 0
+    if (!force) {
+      const excludedRow = await prisma.$queryRawUnsafe<Array<{ cnt: bigint | number }>>(`
+        SELECT COUNT(*) AS cnt
+          FROM transactions
+         WHERE deleted_at IS NULL
+           AND (category IS NULL OR category = '' OR category = '미분류')
+           AND final_category LIKE '[AI 추정%'
+      `)
+      excludedAlreadyTried = Number(excludedRow?.[0]?.cnt || 0)
+    }
 
     if (totalUnclassified === 0) {
       return NextResponse.json({
@@ -183,21 +201,24 @@ export async function POST(request: NextRequest) {
         ai_responses: 0,
         applied_high_confidence: 0,
         below_threshold: 0,
+        excluded_already_tried: excludedAlreadyTried,
+        force_mode: force,
         min_confidence: minConfidence,
         distribution: {},
         sample: [],
-        message: '미분류 거래 없음',
+        message: excludedAlreadyTried > 0
+          ? `미분류 거래 ${excludedAlreadyTried}건이 이미 AI 시도됨 — 강제 재분류는 force=true 옵션 사용`
+          : '미분류 거래 없음',
       })
     }
 
     // 한 batch만 가져오기
-    // ★ AI가 이미 시도한 row 제외 — 검토필요(<70%) row가 다음 batch에서 재fetch되는 토큰 낭비 방지
     const rows = await prisma.$queryRawUnsafe<UnclassifiedRow[]>(`
       SELECT id, type, client_name, description, card_company, bank_name, amount, transaction_date
         FROM transactions
        WHERE deleted_at IS NULL
          AND (category IS NULL OR category = '' OR category = '미분류')
-         AND (final_category IS NULL OR final_category NOT LIKE '[AI 추정%')
+         ${aiRetryFilter}
        ORDER BY transaction_date DESC
        LIMIT ${batchSize}
     `)
