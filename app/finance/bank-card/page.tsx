@@ -3425,18 +3425,48 @@ export default function BankCardPage() {
 
             {/* 카테고리별 요약 카드 */}
             {summary?.categoryBreakdown && (() => {
-              // 카테고리별 집계: 수입/지출 합산
-              const catMap = new Map<string, { count: number; income: number; expense: number; incomeAmt: number; expenseAmt: number }>()
+              // 카테고리별 집계: 5차원 분리 — 통장 (수입/지출) + 카드 (승인/취소)
+              // 카드는 모두 지출 영역, 취소는 음수로 차감
+              const catMap = new Map<string, {
+                count: number;
+                bankIncome: number; bankExpense: number; bankIncomeAmt: number; bankExpenseAmt: number;
+                cardApproved: number; cardCanceled: number; cardApprovedAmt: number; cardCanceledAmt: number;
+                netAmt: number; // 순합산 (canceled 차감)
+              }>()
               for (const row of summary.categoryBreakdown) {
                 const key = row.category
-                if (!catMap.has(key)) catMap.set(key, { count: 0, income: 0, expense: 0, incomeAmt: 0, expenseAmt: 0 })
+                if (!catMap.has(key)) catMap.set(key, {
+                  count: 0,
+                  bankIncome: 0, bankExpense: 0, bankIncomeAmt: 0, bankExpenseAmt: 0,
+                  cardApproved: 0, cardCanceled: 0, cardApprovedAmt: 0, cardCanceledAmt: 0,
+                  netAmt: 0,
+                })
                 const m = catMap.get(key)!
                 m.count += row.count
-                if (row.type === 'income') { m.income += row.count; m.incomeAmt += row.totalAmount }
-                else { m.expense += row.count; m.expenseAmt += row.totalAmount }
+                m.netAmt += (row.netAmount || 0)
+                if (row.source === 'card') {
+                  // 카드 — 승인 (count - canceled_count) + 취소 분리
+                  const approved = row.count - (row.canceledCount || 0)
+                  m.cardApproved += approved
+                  m.cardCanceled += (row.canceledCount || 0)
+                  m.cardApprovedAmt += (row.totalAmount - (row.canceledAmount || 0))
+                  m.cardCanceledAmt += (row.canceledAmount || 0)
+                } else {
+                  // 통장
+                  if (row.type === 'income') { m.bankIncome += row.count; m.bankIncomeAmt += row.totalAmount }
+                  else { m.bankExpense += row.count; m.bankExpenseAmt += row.totalAmount }
+                }
               }
+              // 호환성 — 기존 코드의 income/expense/incomeAmt/expenseAmt 도 채워줌 (legacy)
+              const enrichLegacy = (m: any) => ({
+                ...m,
+                income: m.bankIncome,
+                expense: m.bankExpense + m.cardApproved + m.cardCanceled,
+                incomeAmt: m.bankIncomeAmt,
+                expenseAmt: m.bankExpenseAmt + m.cardApprovedAmt - m.cardCanceledAmt,
+              })
               const catList = Array.from(catMap.entries())
-                .map(([cat, v]) => ({ category: cat, ...v }))
+                .map(([cat, v]) => ({ category: cat, ...enrichLegacy(v) }))
                 .filter(c => reviewTypeFilter === 'all' || (reviewTypeFilter === 'income' ? c.income > 0 : c.expense > 0))
                 .sort((a, b) => b.count - a.count)
 
@@ -3849,12 +3879,28 @@ export default function BankCardPage() {
                                 {cat.count.toLocaleString()}건
                               </span>
                             </div>
-                            <div style={{ display: 'flex', gap: 12, fontSize: 11, color: COLORS.textSecondary }}>
-                              {cat.income > 0 && <span style={{ color: '#2563eb' }}>수입 {cat.income}건 ({nf(cat.incomeAmt)}원)</span>}
-                              {cat.expense > 0 && <span style={{ color: '#dc2626' }}>지출 {cat.expense}건 ({nf(cat.expenseAmt)}원)</span>}
+                            {/* 통장 / 카드 분리 표시 — 5차원 분리 원칙 */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 2, fontSize: 11, color: COLORS.textSecondary }}>
+                              {/* 통장 거래 */}
+                              {(cat.bankIncome > 0 || cat.bankExpense > 0) && (
+                                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                                  <span style={{ fontSize: 10, color: COLORS.textMuted }}>💼 통장</span>
+                                  {cat.bankIncome > 0 && <span style={{ color: '#15803d' }}>입금 {cat.bankIncome}건 ({nf(cat.bankIncomeAmt)}원)</span>}
+                                  {cat.bankExpense > 0 && <span style={{ color: '#dc2626' }}>출금 {cat.bankExpense}건 ({nf(cat.bankExpenseAmt)}원)</span>}
+                                </div>
+                              )}
+                              {/* 카드 거래 — 승인 / 취소 (모두 지출 영역) */}
+                              {(cat.cardApproved > 0 || cat.cardCanceled > 0) && (
+                                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                                  <span style={{ fontSize: 10, color: COLORS.textMuted }}>💳 카드</span>
+                                  {cat.cardApproved > 0 && <span style={{ color: COLORS.textPrimary }}>승인 {cat.cardApproved}건 ({nf(cat.cardApprovedAmt)}원)</span>}
+                                  {cat.cardCanceled > 0 && <span style={{ color: '#dc2626' }}>취소 {cat.cardCanceled}건 (-{nf(cat.cardCanceledAmt)}원)</span>}
+                                </div>
+                              )}
                             </div>
                             <div style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 2 }}>
-                              합계 {nf(totalAmt)}원
+                              순합계 {nf(cat.netAmt)}원
+                              {(cat.bankIncomeAmt > 0 && cat.bankExpenseAmt > 0) && <span style={{ marginLeft: 6, fontSize: 10 }}>(통장 입출금 + 카드 순지출)</span>}
                             </div>
                           </div>
 

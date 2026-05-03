@@ -32,15 +32,33 @@ export async function GET(request: NextRequest) {
     `)
 
     // 카테고리별 통계 (분류 검수용)
+    // 카테고리별 통계 — 사용자 원칙 (5차원 분리):
+    //   카드 거래: 승인 / 취소 (취소는 지출 차감 — 수입 X)
+    //   통장 거래: 수입 / 지출
+    //   카드 취소는 sms_transaction_type='canceled' 로 식별 → effective type 강제 expense
     const categoryStats = await prisma.$queryRawUnsafe<any[]>(`
       SELECT
-        COALESCE(NULLIF(category, ''), '미분류') AS cat,
-        type,
+        COALESCE(NULLIF(t.category, ''), '미분류') AS cat,
+        CASE
+          WHEN s.transaction_type = 'canceled' THEN 'expense'
+          ELSE t.type
+        END AS type,
+        CASE
+          WHEN t.imported_from = 'sms' OR t.imported_from LIKE 'excel_card%' OR t.imported_from LIKE 'pdf_card%' THEN 'card'
+          ELSE 'bank'
+        END AS source,
         COUNT(*) AS cnt,
-        COALESCE(SUM(ABS(amount)), 0) AS total_amt
-      FROM transactions
-      WHERE deleted_at IS NULL
-      GROUP BY COALESCE(NULLIF(category, ''), '미분류'), type
+        COALESCE(SUM(ABS(t.amount)), 0) AS total_amt,
+        SUM(CASE WHEN s.transaction_type = 'canceled' THEN 1 ELSE 0 END) AS canceled_count,
+        COALESCE(SUM(CASE WHEN s.transaction_type = 'canceled' THEN ABS(t.amount) ELSE 0 END), 0) AS canceled_amt,
+        COALESCE(SUM(
+          CASE WHEN s.transaction_type = 'canceled' THEN -ABS(t.amount) ELSE ABS(t.amount) END
+        ), 0) AS net_amt
+      FROM transactions t
+      LEFT JOIN card_sms_transactions s
+        ON s.transaction_id COLLATE utf8mb4_unicode_ci = t.id COLLATE utf8mb4_unicode_ci
+      WHERE t.deleted_at IS NULL
+      GROUP BY cat, type, source
       ORDER BY cnt DESC
     `)
 
@@ -73,12 +91,16 @@ export async function GET(request: NextRequest) {
     const st = settlementStats[0] || {}
     const sms = smsStats[0] || {}
 
-    // 카테고리별 집계 변환
+    // 카테고리별 집계 변환 — source (card/bank) + canceled 정보 포함
     const categoryBreakdown = (categoryStats || []).map((row: any) => ({
       category: row.cat,
       type: row.type,
+      source: row.source,        // 'card' | 'bank'
       count: Number(row.cnt || 0),
       totalAmount: Number(row.total_amt || 0),
+      canceledCount: Number(row.canceled_count || 0),
+      canceledAmount: Number(row.canceled_amt || 0),
+      netAmount: Number(row.net_amt || 0),  // canceled 차감 순합산
     }))
 
     return NextResponse.json({
