@@ -450,6 +450,40 @@ export default function BankCardPage() {
       setMatchDiagnosticLoading(false)
     }
   }
+  // 대차건 보험 매칭 단독 실행 결과
+  const [fmiRentalMatchResult, setFmiRentalMatchResult] = useState<any | null>(null)
+  const [fmiRentalMatching, setFmiRentalMatching] = useState(false)
+  const runFmiRentalMatch = async (dryRun: boolean) => {
+    setFmiRentalMatching(true)
+    setFmiRentalMatchResult(null)
+    const taskId = floaterProgress.start({
+      title: dryRun ? '🔍 대차건 보험 매칭 dry-run' : '📥 대차건 보험 매칭',
+      total: 1,
+    })
+    try {
+      const { ok, json, status } = await fetchWithAuth('/api/finance/transactions/auto-match-fmi-rental', {
+        method: 'POST',
+        body: { mode: 'insurance', dryRun },
+      })
+      if (!ok) {
+        floaterProgress.finish(taskId, `오류: HTTP ${status} — ${json?.error || ''}`, 'error')
+        return
+      }
+      setFmiRentalMatchResult(json)
+      floaterProgress.update(taskId, { processed: 1, applied: json.applied || 0 })
+      floaterProgress.finish(
+        taskId,
+        dryRun
+          ? `🔍 dry-run 완료 — 매칭 가능 ${json.matched || 0}건`
+          : `✅ ${json.applied || 0}건 매칭 적용`,
+      )
+      if (!dryRun && json.applied > 0) await loadMatchReview()
+    } catch (e: any) {
+      floaterProgress.finish(taskId, `오류: ${e.message}`, 'error')
+    } finally {
+      setFmiRentalMatching(false)
+    }
+  }
   const [matchReviewTypeFilter, setMatchReviewTypeFilter] = useState<string>('all') // 'all' | 'unmatched' | type
   const [expandedEntityId, setExpandedEntityId] = useState<string | null>(null) // 펼친 entity (type:id)
   const [entityTransactions, setEntityTransactions] = useState<Record<string, any[]>>({}) // entity 별 거래 lazy load
@@ -4821,6 +4855,20 @@ export default function BankCardPage() {
                     disabled={matchDiagnosticLoading}
                     style={{ ...BTN.sm, padding: '4px 10px', fontSize: 11, background: '#fff', color: '#7c3aed', border: '1px solid rgba(124,58,237,0.3)', cursor: matchDiagnosticLoading ? 'wait' : 'pointer' }}
                   >{matchDiagnosticLoading ? '진단 중...' : '🩺 매칭 진단'}</button>
+                  <button
+                    onClick={() => runFmiRentalMatch(true)}
+                    disabled={fmiRentalMatching}
+                    style={{ ...BTN.sm, padding: '4px 10px', fontSize: 11, background: '#fff', color: '#1e40af', border: '1px solid rgba(59,130,246,0.3)', cursor: fmiRentalMatching ? 'wait' : 'pointer' }}
+                    title="실제 적용 안 함 — 매칭 가능 건수만 확인"
+                  >{fmiRentalMatching ? '진행 중...' : '🔍 대차건 dry-run'}</button>
+                  <button
+                    onClick={() => {
+                      if (!confirm('대차건 보험 매칭을 실제 적용하시겠습니까?\n(dry-run 결과 먼저 확인 권장)')) return
+                      runFmiRentalMatch(false)
+                    }}
+                    disabled={fmiRentalMatching}
+                    style={{ ...BTN.sm, padding: '4px 10px', fontSize: 11, background: '#1e40af', color: '#fff', border: 'none', cursor: fmiRentalMatching ? 'wait' : 'pointer' }}
+                  >{fmiRentalMatching ? '진행 중...' : '📥 대차건 매칭 적용'}</button>
                   <select
                     value={matchReviewTypeFilter}
                     onChange={(e) => setMatchReviewTypeFilter(e.target.value)}
@@ -4901,6 +4949,79 @@ export default function BankCardPage() {
                             <span style={{ fontWeight: 600, width: 100 }}>{t.client_name || '-'}</span>
                             <span style={{ flex: 1, color: COLORS.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.description || '-'}</span>
                             <span style={{ fontWeight: 600, color: COLORS.income }}>{nf(Math.abs(Number(t.amount || 0)))}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* 대차건 보험 매칭 결과 패널 (CLAUDE.md 규칙 20) */}
+              {fmiRentalMatchResult && (
+                <div style={{ ...GLASS.L4, border: '1px solid rgba(59,130,246,0.3)', borderRadius: 12, padding: '14px 18px', marginBottom: 12, background: 'rgba(239,246,255,0.4)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: '#1e40af' }}>
+                      {fmiRentalMatchResult.dry_run ? '🔍 대차건 보험 매칭 — dry-run 결과' : '📥 대차건 보험 매칭 — 적용 결과'}
+                    </div>
+                    <button onClick={() => setFmiRentalMatchResult(null)} style={{ background: 'transparent', border: 'none', color: COLORS.textMuted, cursor: 'pointer', fontSize: 12 }}>× 닫기</button>
+                  </div>
+                  {/* 통계 */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 6, marginBottom: 10 }}>
+                    <div style={{ fontSize: 11, padding: '6px 8px', background: 'rgba(255,255,255,0.6)', borderRadius: 6 }}>
+                      후보 거래 <span style={{ fontWeight: 700 }}>{fmiRentalMatchResult.total_candidates}건</span>
+                    </div>
+                    <div style={{ fontSize: 11, padding: '6px 8px', background: 'rgba(187,247,208,0.5)', borderRadius: 6 }}>
+                      ✅ 매칭 가능 <span style={{ fontWeight: 700 }}>{fmiRentalMatchResult.matched}건</span>
+                    </div>
+                    {!fmiRentalMatchResult.dry_run && (
+                      <div style={{ fontSize: 11, padding: '6px 8px', background: 'rgba(59,130,246,0.15)', borderRadius: 6 }}>
+                        📥 적용 <span style={{ fontWeight: 700 }}>{fmiRentalMatchResult.applied}건</span>
+                      </div>
+                    )}
+                    <div style={{ fontSize: 11, padding: '6px 8px', background: 'rgba(254,243,199,0.5)', borderRadius: 6 }}>
+                      🟡 다수 후보 <span style={{ fontWeight: 700 }}>{fmiRentalMatchResult.multi}건</span>
+                    </div>
+                    <div style={{ fontSize: 11, padding: '6px 8px', background: 'rgba(254,226,226,0.5)', borderRadius: 6 }}>
+                      ❌ 후보 없음 <span style={{ fontWeight: 700 }}>{fmiRentalMatchResult.no_candidate}건</span>
+                    </div>
+                    <div style={{ fontSize: 11, padding: '6px 8px', background: 'rgba(254,226,226,0.5)', borderRadius: 6 }}>
+                      ❌ 패턴 미일치 <span style={{ fontWeight: 700 }}>{fmiRentalMatchResult.no_pattern}건</span>
+                    </div>
+                  </div>
+                  {/* 동적 약어 */}
+                  {fmiRentalMatchResult.dynamic_abbrs_count > 0 && (
+                    <div style={{ fontSize: 11, color: COLORS.textMuted, marginBottom: 8 }}>
+                      🔤 동적 사전 {fmiRentalMatchResult.dynamic_abbrs_count}개 보험사 (DB 학습): {(fmiRentalMatchResult.dynamic_abbrs_sample || []).join(', ')}
+                    </div>
+                  )}
+                  {/* 매칭 성공 샘플 */}
+                  {fmiRentalMatchResult.samples?.length > 0 && (
+                    <>
+                      <div style={{ fontSize: 11, fontWeight: 600, color: '#059669', marginBottom: 4 }}>✅ 매칭 성공 샘플</div>
+                      <div style={{ marginBottom: 10 }}>
+                        {fmiRentalMatchResult.samples.slice(0, 6).map((s: any, i: number) => (
+                          <div key={i} style={{ fontSize: 11, padding: '3px 6px', borderBottom: '1px dashed rgba(0,0,0,0.05)' }}>
+                            <span style={{ fontWeight: 600 }}>{s.client_name}</span>
+                            {' → '}
+                            <span style={{ color: '#1e40af' }}>{s.insurance_company}</span>
+                            {' / '}
+                            <span style={{ color: '#7c3aed' }}>차량 {s.customer_car_number}</span>
+                            <span style={{ marginLeft: 6, fontSize: 9, padding: '0 4px', borderRadius: 4, background: s.confidence === 'HIGH' ? 'rgba(187,247,208,0.6)' : 'rgba(254,243,199,0.6)' }}>{s.confidence}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                  {/* 실패 샘플 */}
+                  {fmiRentalMatchResult.failed_samples?.length > 0 && (
+                    <>
+                      <div style={{ fontSize: 11, fontWeight: 600, color: '#b91c1c', marginBottom: 4 }}>❌ 매칭 실패 샘플 (검수)</div>
+                      <div>
+                        {fmiRentalMatchResult.failed_samples.slice(0, 6).map((f: any, i: number) => (
+                          <div key={i} style={{ fontSize: 11, padding: '3px 6px', borderBottom: '1px dashed rgba(0,0,0,0.05)' }}>
+                            <span style={{ fontWeight: 600 }}>{f.client_name || '-'}</span>
+                            <span style={{ color: COLORS.textMuted }}> — {f.reason}</span>
                           </div>
                         ))}
                       </div>

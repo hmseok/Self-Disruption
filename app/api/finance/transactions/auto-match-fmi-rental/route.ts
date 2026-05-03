@@ -56,33 +56,47 @@ interface ParsedClient {
 }
 
 /**
- * 입금자명 파싱:
- *   "하나5285"     → { abbr:'하나', last4:'5285' }
- *   "DB1234"       → { abbr:'DB',   last4:'1234' }
- *   "현대 1234"    → { abbr:'현대', last4:'1234' }
- *   "하나손해보험5285" → { abbr:'하나', last4:'5285' } (긴 형태도 prefix 매칭)
+ * 입금자명 파싱 (동적 사전 + 하드코딩 사전 + prefix 추출 3중):
+ *   "하나5285"             → { abbr:'하나', last4:'5285' }
+ *   "DB1234"               → { abbr:'DB',   last4:'1234' }
+ *   "현대 1234"            → { abbr:'현대', last4:'1234' }
+ *   "하나손해보험5285"      → { abbr:'하나', last4:'5285' } (긴 형태)
+ *   "삼성3513 펌뱅킹 [...]" → { abbr:'삼성', last4:'3513' } (부가정보 무시)
+ *   "택공54허3916"         → { abbr:'택공', last4:'3916' } (차량번호 풀 형태도 뒤 4자리)
  */
-function parseClientName(raw: string | null | undefined): ParsedClient | null {
+function parseClientName(raw: string | null | undefined, dynamicAbbrs: string[]): ParsedClient | null {
   if (!raw) return null
   const s = String(raw).trim()
-  // 4자리 숫자 추출 (마지막 등장)
-  const numMatch = s.match(/(\d{3,4})\s*$/) // 3~4자리 (3자리도 일부 차량)
+  // 첫 4자리 숫자 추출 (가장 빠른 등장 — 「삼성3513 펌뱅킹」 → 3513 잡힘)
+  // 또는 마지막 4자리 (「하나5285」 → 5285)
+  // 우선순위: 약어 prefix 직후 4자리 숫자
+  const dictAbbrs = Array.from(new Set([...dynamicAbbrs, ...Object.keys(INSURER_ABBR)]))
+    .sort((a, b) => b.length - a.length) // 긴 약어 우선 (DB 보다 디비)
+
+  for (const abbr of dictAbbrs) {
+    // abbr 직후 (공백 0~2개) 3~4자리 숫자
+    const reg = new RegExp('^' + abbr.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*(\\d{3,4})')
+    const m = s.match(reg)
+    if (m) {
+      // INSURER_ABBR 사전에 있으면 keywords 사용, 없으면 abbr 자체
+      const keywords = INSURER_ABBR[abbr] || [abbr]
+      return { abbr, last4: m[1], insurerKeywords: keywords }
+    }
+  }
+
+  // fallback: 마지막 4자리 숫자 + 그 앞 prefix 추출
+  const numMatch = s.match(/(\d{3,4})\s*(?:[\s\[\]].*)?$/)
   if (!numMatch) return null
   const last4 = numMatch[1]
   const beforeNum = s.slice(0, numMatch.index!).trim().replace(/[\s\-_]+$/, '')
   if (!beforeNum) return null
 
-  // 약어 사전에서 prefix 매칭 (긴 약어 우선)
-  const sortedAbbrs = Object.keys(INSURER_ABBR).sort((a, b) => b.length - a.length)
-  for (const abbr of sortedAbbrs) {
-    if (beforeNum.startsWith(abbr)) {
-      return { abbr, last4, insurerKeywords: INSURER_ABBR[abbr] }
-    }
-  }
-  // prefix 사전에 없으면 — 한글/영문 prefix 추출 시도 (정식 사명 직접 매칭)
+  // 한글/영문 prefix 추출
   const prefixMatch = beforeNum.match(/^([가-힣A-Za-z]+)/)
   if (prefixMatch) {
-    return { abbr: prefixMatch[1], last4, insurerKeywords: [prefixMatch[1]] }
+    const abbr = prefixMatch[1]
+    const keywords = INSURER_ABBR[abbr] || [abbr]
+    return { abbr, last4, insurerKeywords: keywords }
   }
   return null
 }
@@ -132,6 +146,22 @@ export async function POST(request: NextRequest) {
       })
     }
 
+    // ── 0) 동적 약어 사전 — fmi_rentals.insurance_company DISTINCT ──
+    //    실제 DB 에 저장된 보험사명을 약어 사전에 추가 (하드코딩 사전 보강)
+    let dynamicAbbrs: string[] = []
+    try {
+      const insurerRows = await prisma.$queryRawUnsafe<Array<any>>(
+        `SELECT DISTINCT insurance_company AS insurer
+           FROM fmi_rentals
+          WHERE insurance_company IS NOT NULL AND insurance_company != ''`
+      )
+      dynamicAbbrs = insurerRows
+        .map(r => String(r.insurer).trim())
+        .filter(s => s.length > 0 && s.length <= 16)
+    } catch (e: any) {
+      console.warn('[auto-match-fmi-rental] dynamic abbrs fetch failed:', e?.message)
+    }
+
     // ── 1) 매칭 후보 — 통장 입금 거래 미매칭 (보험대차 후보) ──
     //   - type='income' (보험금 입금)
     //   - related_type IS NULL (미매칭)
@@ -164,7 +194,7 @@ export async function POST(request: NextRequest) {
       const clientRaw = String(tx.client_name || '').trim()
       const descRaw = String(tx.description || '').trim()
       // client_name 우선, 못 잡으면 description
-      const parsed = parseClientName(clientRaw) || parseClientName(descRaw)
+      const parsed = parseClientName(clientRaw, dynamicAbbrs) || parseClientName(descRaw, dynamicAbbrs)
       if (!parsed) {
         result.no_pattern++
         if (result.failed_samples.length < 10) {
@@ -309,9 +339,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       mode,
       ...result,
+      dry_run: dryRun,
       verified_recently: verifiedCount,
+      dynamic_abbrs_count: dynamicAbbrs.length,
+      dynamic_abbrs_sample: dynamicAbbrs.slice(0, 20),
       message: dryRun
-        ? `dry-run — 매칭 후보 ${result.matched}건`
+        ? `dry-run — 매칭 가능 ${result.matched}건 (적용 안 함)`
         : `${result.applied}건 매칭 적용 (검증: ${verifiedCount}건)`,
     })
   } catch (e: any) {

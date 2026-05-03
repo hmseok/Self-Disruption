@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
 
     // 2) 마스터 데이터 (매칭 후보 풀)
     const masters = {
-      cars:                       await safeCount(`SELECT COUNT(*) AS cnt FROM cars WHERE deleted_at IS NULL`),
+      cars:                       await safeCount(`SELECT COUNT(*) AS cnt FROM cars`),
       profiles:                   await safeCount(`SELECT COUNT(*) AS cnt FROM profiles`),
       insurance_contracts:        await safeCount(`SELECT COUNT(*) AS cnt FROM insurance_contracts`),
       insurance_payment_schedule: await safeCount(`SELECT COUNT(*) AS cnt FROM insurance_payment_schedule`),
