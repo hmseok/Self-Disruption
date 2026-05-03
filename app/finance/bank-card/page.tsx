@@ -3678,16 +3678,23 @@ export default function BankCardPage() {
                                     {cardLabel && <div style={{ fontSize: 10, color: '#7c3aed', marginTop: 1 }}>{cardLabel}</div>}
                                   </td>
                                   <td style={{ padding: '6px 8px', minWidth: 140 }}>
-                                    {/* 카테고리 변경 dropdown — 미분류 → 다른 카테고리 직접 선택 */}
-                                    <select
-                                      value={it.subcategory || it.category || '미분류'}
-                                      onChange={(e) => updateRuleRow(it.id, { category: e.target.value, subcategory: null })}
-                                      style={{ fontSize: 11, padding: '2px 4px', border: `1px solid ${COLORS.borderSubtle}`, borderRadius: 4, color: '#1e40af', cursor: 'pointer', maxWidth: 130, fontWeight: 600 }}
-                                    >
-                                      {allCategories.map((c: string) => (
-                                        <option key={c} value={c}>{c}</option>
-                                      ))}
-                                    </select>
+                                    {/* 카테고리 변경 dropdown — 미분류 → 다른 카테고리 직접 선택
+                                        ★ subcategory ('개인사용 추정', '검토 필요' 등) 는 카테고리 옵션 X — 사유 정보일 뿐
+                                        value 는 it.category 만 사용. allCategories 에 없으면 '미분류' 강제 */}
+                                    {(() => {
+                                      const cat = it.category && allCategories.includes(it.category) ? it.category : '미분류'
+                                      return (
+                                        <select
+                                          value={cat}
+                                          onChange={(e) => updateRuleRow(it.id, { category: e.target.value, subcategory: null })}
+                                          style={{ fontSize: 11, padding: '2px 4px', border: `1px solid ${COLORS.borderSubtle}`, borderRadius: 4, color: cat === '미분류' ? COLORS.textMuted : '#1e40af', cursor: 'pointer', maxWidth: 130, fontWeight: 600 }}
+                                        >
+                                          {allCategories.map((c: string) => (
+                                            <option key={c} value={c}>{c}</option>
+                                          ))}
+                                        </select>
+                                      )
+                                    })()}
                                   </td>
                                   <td style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 600,
                                                 color: (() => {
