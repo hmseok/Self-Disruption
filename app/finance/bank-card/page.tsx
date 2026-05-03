@@ -328,6 +328,27 @@ export default function BankCardPage() {
     triggeredAt: string
   } | null>(null)
 
+  // 일괄 선택 — 3 화면 가로질러 불규칙 체크 (분류 검수 / 매칭 검수 / LOW 그룹)
+  // (CLAUDE.md 규칙 14 — 동형 패턴 통합)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+  const toggleSelectMany = (ids: string[], checked: boolean) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (checked) ids.forEach(id => next.add(id))
+      else ids.forEach(id => next.delete(id))
+      return next
+    })
+  }
+  const clearSelection = () => setSelectedIds(new Set())
+
   // ─── 매칭 통합 (2단 dropdown) ──────────────────────────────
   // 모든 related_type 의 entity 목록 lazy load
   // (CLAUDE.md 규칙 14 — 동형 패턴 통합)
@@ -1306,6 +1327,134 @@ export default function BankCardPage() {
     })
     setReviewItems(prev => prev.filter(i => i.id !== id))
     loadSummary() // 통계 갱신
+  }
+
+  // ─── 일괄 작업 헬퍼 (BulkActionBar 용) ─────────────────────────
+  // 선택된 거래 목록 가져오기 — 3 화면 모두에서 검색
+  const getSelectedTransactions = () => {
+    const all: any[] = []
+    const seen = new Set<string>()
+    const push = (it: any) => {
+      if (it?.id && !seen.has(it.id) && selectedIds.has(it.id)) {
+        seen.add(it.id)
+        all.push(it)
+      }
+    }
+    reviewItems.forEach(push)
+    matchReviewItems.forEach(push)
+    if (ruleClassifyResult?.groups) {
+      for (const conf of ['high', 'medium', 'low'] as const) {
+        ;(ruleClassifyResult.groups[conf] || []).forEach(push)
+      }
+    }
+    return all
+  }
+
+  // 일괄 카테고리 변경
+  const bulkChangeCategory = async (newCategory: string) => {
+    const items = getSelectedTransactions()
+    if (items.length === 0) { alert('선택된 거래 없음'); return }
+    if (!confirm(`선택 ${items.length}건 → 「${newCategory}」 카테고리 변경하시겠습니까?`)) return
+    const taskId = floaterProgress.start({ title: `📁 일괄 카테고리 변경 (${newCategory})`, total: items.length })
+    try {
+      const ids = items.map(i => i.id)
+      const { json } = await fetchWithAuth('/api/finance/transactions/group-classify', {
+        method: 'PATCH',
+        body: { transactionIds: ids, category: newCategory },
+      })
+      floaterProgress.finish(taskId, `✅ ${json?.data?.updated || items.length}건 카테고리 변경 완료`)
+      clearSelection()
+      // UI 갱신
+      setReviewItems(prev => prev.filter(i => !ids.includes(i.id)))
+      setMatchReviewItems(prev => prev.map(i => ids.includes(i.id) ? { ...i, category: newCategory } : i))
+      await loadSummary()
+    } catch (e: any) {
+      floaterProgress.finish(taskId, `오류: ${e.message}`, 'error')
+    }
+  }
+
+  // 일괄 매칭 변경
+  const bulkChangeMatch = async (type: string, entityId: string) => {
+    const items = getSelectedTransactions()
+    if (items.length === 0) { alert('선택된 거래 없음'); return }
+    const cfg = MATCH_TYPES.find(t => t.type === type)
+    const ent = (matchEntities[type] || []).find((r: any) => String(r.id) === String(entityId))
+    const label = (cfg && ent) ? cfg.labelFn(ent) : '?'
+    if (!confirm(`선택 ${items.length}건 → ${cfg?.label} ${label} 매칭하시겠습니까?`)) return
+    const taskId = floaterProgress.start({ title: `🔗 일괄 매칭 변경`, total: items.length })
+    let success = 0
+    let failed = 0
+    for (const it of items) {
+      try {
+        await fetchWithAuth(`/api/finance-upload?table=transactions&id=${it.id}`, {
+          method: 'PATCH',
+          body: { related_type: type, related_id: entityId },
+        })
+        success++
+        floaterProgress.update(taskId, { processed: success + failed, applied: success, failed })
+      } catch {
+        failed++
+        floaterProgress.update(taskId, { processed: success + failed, applied: success, failed })
+      }
+    }
+    floaterProgress.finish(taskId, `✅ ${success}건 매칭 / 실패 ${failed}건`)
+    clearSelection()
+    // UI 갱신
+    const updateFn = (i: any) => items.find(x => x.id === i.id) ? { ...i, related_type: type, related_id: entityId } : i
+    setReviewItems(prev => prev.map(updateFn))
+    setMatchReviewItems(prev => prev.map(updateFn))
+  }
+
+  // 일괄 확정 (룰 자동 분류 LOW row)
+  const bulkConfirmRule = async () => {
+    const items = getSelectedTransactions().filter(i => {
+      const cat = i.subcategory || i.category
+      return cat && cat !== '미분류'
+    })
+    if (items.length === 0) { alert('확정 가능 거래 없음 (카테고리 미분류 제외)'); return }
+    if (!confirm(`선택 ${items.length}건 일괄 확정하시겠습니까?`)) return
+    const taskId = floaterProgress.start({ title: `✓ 일괄 확정`, total: items.length })
+    try {
+      const payload = items.map(it => ({
+        id: it.id,
+        category: it.subcategory || it.category,
+        related_type: it.related_type || null,
+        related_id: it.related_id || null,
+      }))
+      const { json } = await fetchWithAuth('/api/finance/auto-classify/apply', {
+        method: 'POST',
+        body: { items: payload },
+      })
+      floaterProgress.finish(taskId, `✅ 적용 ${json?.applied || 0}건 / 실패 ${json?.failed || 0}건`)
+      clearSelection()
+      await runRuleClassify()
+      await Promise.all([loadSummary(), loadTransactions()])
+    } catch (e: any) {
+      floaterProgress.finish(taskId, `오류: ${e.message}`, 'error')
+    }
+  }
+
+  // 일괄 개인 처리
+  const bulkMarkPersonal = async () => {
+    const items = getSelectedTransactions()
+    if (items.length === 0) { alert('선택된 거래 없음'); return }
+    if (!confirm(`선택 ${items.length}건 「개인 사용」 처리하시겠습니까? (급여 차감 후보)`)) return
+    const taskId = floaterProgress.start({ title: `👤 일괄 개인 사용`, total: items.length })
+    let success = 0
+    for (const it of items) {
+      try {
+        await fetchWithAuth('/api/transactions/classify', {
+          method: 'PATCH',
+          body: { id: it.id, action: 'personal_use', reason: '일괄 처리' },
+        })
+        success++
+        floaterProgress.update(taskId, { processed: success, applied: success })
+      } catch { /* skip */ }
+    }
+    floaterProgress.finish(taskId, `✅ ${success}건 개인 사용 처리`)
+    clearSelection()
+    await Promise.all([loadSummary(), loadTransactions()])
+    if (reviewCategory) await loadReviewItems(reviewCategory)
   }
 
   // 분류 검수에서 매칭 변경 — 통합 (차량/직원/보험/대출/지입/투자/렌탈/계약/카드/급여)
@@ -2636,6 +2785,95 @@ export default function BankCardPage() {
         />
       </div>
 
+      {/* ──── BulkActionBar — 선택된 거래 일괄 작업 (sticky 상단) ──── */}
+      {selectedIds.size > 0 && (
+        <div style={{
+          position: 'sticky', top: 56, zIndex: 100,
+          margin: '0 16px 8px',
+          padding: '10px 16px',
+          ...GLASS.L5,
+          border: '1px solid rgba(124,58,237,0.4)',
+          borderRadius: 10,
+          boxShadow: '0 4px 20px rgba(124,58,237,0.15)',
+          background: 'linear-gradient(90deg, rgba(245,243,255,0.95), rgba(255,255,255,0.95))',
+          display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
+        }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#5b21b6' }}>
+            ✓ 선택 {selectedIds.size}건
+          </div>
+
+          {/* 카테고리 일괄 변경 */}
+          <select
+            value=""
+            onChange={(e) => { if (e.target.value) bulkChangeCategory(e.target.value); e.target.value = '' }}
+            style={{ fontSize: 11, padding: '5px 10px', border: `1px solid ${COLORS.borderSubtle}`, borderRadius: 6, color: '#1e40af', cursor: 'pointer', minWidth: 140, fontWeight: 600 }}
+          >
+            <option value="">📁 카테고리 변경 ▾</option>
+            {Array.from(new Set([...(summary?.categoryBreakdown || []).map((c: any) => c.category), '미분류'])).filter(Boolean).map((c: string) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+
+          {/* 매칭 일괄 변경 — 2단 (type → entity) */}
+          <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>
+            <select
+              id="bulk-match-type"
+              defaultValue=""
+              onChange={(e) => { if (e.target.value) loadMatchEntities(e.target.value) }}
+              style={{ fontSize: 11, padding: '5px 8px', border: `1px solid ${COLORS.borderSubtle}`, borderRadius: 6, cursor: 'pointer' }}
+            >
+              <option value="">🔗 매칭 ▾</option>
+              {MATCH_TYPES.map(t => (
+                <option key={t.type} value={t.type}>{t.label}</option>
+              ))}
+            </select>
+            <select
+              id="bulk-match-entity"
+              defaultValue=""
+              onChange={(e) => {
+                const typeSel = document.getElementById('bulk-match-type') as HTMLSelectElement
+                const type = typeSel?.value
+                if (!type || !e.target.value) return
+                bulkChangeMatch(type, e.target.value)
+                e.target.value = ''
+                if (typeSel) typeSel.value = ''
+              }}
+              style={{ fontSize: 11, padding: '5px 8px', border: `1px solid ${COLORS.borderSubtle}`, borderRadius: 6, cursor: 'pointer', maxWidth: 200 }}
+            >
+              <option value="">— 대상 선택 —</option>
+              {(() => {
+                const typeSel = typeof document !== 'undefined' ? (document.getElementById('bulk-match-type') as HTMLSelectElement) : null
+                const type = typeSel?.value
+                if (!type) return null
+                const cfg = MATCH_TYPES.find(t => t.type === type)
+                if (!cfg) return null
+                const list = matchEntities[type] || []
+                return list.map((r: any) => <option key={r.id} value={r.id}>{cfg.labelFn(r)}</option>)
+              })()}
+            </select>
+          </span>
+
+          {/* 일괄 확정 */}
+          <button
+            onClick={bulkConfirmRule}
+            style={{ ...BTN.sm, padding: '5px 12px', fontSize: 11, fontWeight: 600, background: '#15803d', color: '#fff', border: 'none', cursor: 'pointer' }}
+          >✓ 확정</button>
+
+          {/* 일괄 개인 */}
+          <button
+            onClick={bulkMarkPersonal}
+            style={{ ...BTN.sm, padding: '5px 12px', fontSize: 11, fontWeight: 600, background: '#ca8a04', color: '#fff', border: 'none', cursor: 'pointer' }}
+          >👤 개인</button>
+
+          <span style={{ flex: 1 }} />
+
+          <button
+            onClick={clearSelection}
+            style={{ ...BTN.sm, padding: '5px 10px', fontSize: 11, color: COLORS.textMuted, background: 'rgba(0,0,0,0.04)', border: `1px solid ${COLORS.borderSubtle}`, cursor: 'pointer' }}
+          >× 선택 해제</button>
+        </div>
+      )}
+
       {/* 탭별 콘텐츠 */}
       <div style={{ padding: '0 16px' }}>
 
@@ -3443,6 +3681,14 @@ export default function BankCardPage() {
                                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
                                     <thead style={{ position: 'sticky', top: 0, background: 'rgba(255,255,255,0.95)', zIndex: 1 }}>
                                       <tr style={{ background: 'rgba(0,0,0,0.02)' }}>
+                                        <th style={{ padding: '8px 6px', width: 32, textAlign: 'center' }}>
+                                          <input
+                                            type="checkbox"
+                                            checked={reviewItems.length > 0 && reviewItems.every((i: any) => selectedIds.has(i.id))}
+                                            onChange={(e) => toggleSelectMany(reviewItems.map((i: any) => i.id), e.target.checked)}
+                                            title="전체 선택"
+                                          />
+                                        </th>
                                         <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, color: COLORS.textSecondary }}>날짜</th>
                                         <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, color: COLORS.textSecondary }}>유형</th>
                                         <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, color: COLORS.textSecondary }}>거래처</th>
@@ -3451,6 +3697,7 @@ export default function BankCardPage() {
                                         <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, color: COLORS.textSecondary }}>소스</th>
                                         <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, color: COLORS.textSecondary }}>매칭</th>
                                         <th style={{ padding: '8px 10px', textAlign: 'center', fontWeight: 600, color: COLORS.textSecondary }}>변경</th>
+                                        <th style={{ padding: '8px 6px', width: 32, textAlign: 'center' }}>✓</th>
                                       </tr>
                                     </thead>
                                     <tbody>
@@ -3529,7 +3776,10 @@ export default function BankCardPage() {
                                         const amtSign = isCanceled || isWithdrawal ? '-' : isDeposit ? '+' : ''
                                         const amtColor = isCanceled ? '#dc2626' : isDeposit ? '#2563eb' : COLORS.textPrimary
                                         return (
-                                          <tr key={item.id} style={{ borderTop: '1px solid rgba(0,0,0,0.04)', background: isCanceled ? 'rgba(254,202,202,0.18)' : undefined }}>
+                                          <tr key={item.id} style={{ borderTop: '1px solid rgba(0,0,0,0.04)', background: selectedIds.has(item.id) ? 'rgba(245,243,255,0.5)' : isCanceled ? 'rgba(254,202,202,0.18)' : undefined }}>
+                                            <td style={{ padding: '6px 6px', textAlign: 'center' }}>
+                                              <input type="checkbox" checked={selectedIds.has(item.id)} onChange={() => toggleSelect(item.id)} />
+                                            </td>
                                             <td style={{ padding: '6px 10px', color: COLORS.textPrimary, whiteSpace: 'nowrap' }}>
                                               {item.transaction_date ? String(item.transaction_date instanceof Date ? item.transaction_date.toISOString() : item.transaction_date).slice(0, 10) : '-'}
                                             </td>
@@ -3607,6 +3857,9 @@ export default function BankCardPage() {
                                                   <option key={c2} value={c2}>{c2}</option>
                                                 ))}
                                               </select>
+                                            </td>
+                                            <td style={{ padding: '6px 6px', textAlign: 'center' }}>
+                                              <input type="checkbox" checked={selectedIds.has(item.id)} onChange={() => toggleSelect(item.id)} />
                                             </td>
                                           </tr>
                                         )
@@ -4191,16 +4444,28 @@ export default function BankCardPage() {
                       <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
                         <thead style={{ position: 'sticky', top: 0, background: 'rgba(255,255,255,0.95)', zIndex: 1 }}>
                           <tr style={{ background: 'rgba(0,0,0,0.02)' }}>
+                            <th style={{ padding: '6px 6px', width: 32, textAlign: 'center' }}>
+                              <input
+                                type="checkbox"
+                                checked={items.length > 0 && items.every((i: any) => selectedIds.has(i.id))}
+                                onChange={(e) => toggleSelectMany(items.map((i: any) => i.id), e.target.checked)}
+                                title="그룹 전체 선택"
+                              />
+                            </th>
                             <th style={{ padding: '6px 8px', textAlign: 'left', color: COLORS.textSecondary, fontWeight: 600 }}>날짜</th>
                             <th style={{ padding: '6px 8px', textAlign: 'left', color: COLORS.textSecondary, fontWeight: 600 }}>거래처/적요</th>
                             <th style={{ padding: '6px 8px', textAlign: 'left', color: COLORS.textSecondary, fontWeight: 600 }}>카테고리</th>
                             <th style={{ padding: '6px 8px', textAlign: 'right', color: COLORS.textSecondary, fontWeight: 600 }}>금액</th>
                             <th style={{ padding: '6px 8px', textAlign: 'left', color: COLORS.textSecondary, fontWeight: 600 }}>매칭 변경</th>
+                            <th style={{ padding: '6px 6px', width: 32, textAlign: 'center' }}>✓</th>
                           </tr>
                         </thead>
                         <tbody>
                           {items.slice(0, 200).map((it: any) => (
-                            <tr key={it.id} style={{ borderTop: '1px solid rgba(0,0,0,0.04)' }}>
+                            <tr key={it.id} style={{ borderTop: '1px solid rgba(0,0,0,0.04)', background: selectedIds.has(it.id) ? 'rgba(245,243,255,0.5)' : undefined }}>
+                              <td style={{ padding: '6px 6px', textAlign: 'center' }}>
+                                <input type="checkbox" checked={selectedIds.has(it.id)} onChange={() => toggleSelect(it.id)} />
+                              </td>
                               <td style={{ padding: '6px 8px', whiteSpace: 'nowrap', color: COLORS.textPrimary }}>
                                 {it.transaction_date ? String(it.transaction_date).slice(0, 10) : '-'}
                               </td>
@@ -4258,6 +4523,9 @@ export default function BankCardPage() {
                                     )
                                   })()}
                                 </div>
+                              </td>
+                              <td style={{ padding: '6px 6px', textAlign: 'center' }}>
+                                <input type="checkbox" checked={selectedIds.has(it.id)} onChange={() => toggleSelect(it.id)} />
                               </td>
                             </tr>
                           ))}
