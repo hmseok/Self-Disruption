@@ -36,6 +36,7 @@ export async function GET(request: NextRequest) {
     //   카드 거래: 승인 / 취소 (취소는 지출 차감 — 수입 X)
     //   통장 거래: 수입 / 지출
     //   카드 취소는 sms_transaction_type='canceled' 로 식별 → effective type 강제 expense
+    // GROUP BY 는 alias 가 아닌 expression 그대로 (only_full_group_by 호환 — CLAUDE.md 규칙)
     const categoryStats = await prisma.$queryRawUnsafe<any[]>(`
       SELECT
         COALESCE(NULLIF(t.category, ''), '미분류') AS cat,
@@ -58,7 +59,10 @@ export async function GET(request: NextRequest) {
       LEFT JOIN card_sms_transactions s
         ON s.transaction_id COLLATE utf8mb4_unicode_ci = t.id COLLATE utf8mb4_unicode_ci
       WHERE t.deleted_at IS NULL
-      GROUP BY cat, type, source
+      GROUP BY
+        COALESCE(NULLIF(t.category, ''), '미분류'),
+        CASE WHEN s.transaction_type = 'canceled' THEN 'expense' ELSE t.type END,
+        CASE WHEN t.imported_from = 'sms' OR t.imported_from LIKE 'excel_card%' OR t.imported_from LIKE 'pdf_card%' THEN 'card' ELSE 'bank' END
       ORDER BY cnt DESC
     `)
 
