@@ -4871,6 +4871,22 @@ export default function BankCardPage() {
                               ))}
                             </div>
                           )}
+                          {/* 매칭 출처 (sources) — 통계 가시화 */}
+                          {ent.sources && Object.keys(ent.sources).length > 0 && (
+                            <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginTop: 4 }}>
+                              {Object.entries(ent.sources).sort((a: any, b: any) => b[1] - a[1]).slice(0, 4).map(([src, cnt]: any) => {
+                                const srcLabel = src === 'assignment' ? '🔗 다중'
+                                  : src === 'related' ? '🎯 직접'
+                                  : src.startsWith('alloc:') ? `📊 ${src.slice(6)}`
+                                  : src
+                                return (
+                                  <span key={src} style={{ fontSize: 9, padding: '1px 5px', borderRadius: 6, background: 'rgba(124,58,237,0.06)', color: '#7c3aed', border: '1px solid rgba(124,58,237,0.15)' }}>
+                                    {srcLabel} {cnt}
+                                  </span>
+                                )
+                              })}
+                            </div>
+                          )}
                           {/* 펼침 — entity 의 거래 목록 */}
                           {isExpanded && (
                             <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px dashed rgba(0,0,0,0.1)' }} onClick={(e) => e.stopPropagation()}>

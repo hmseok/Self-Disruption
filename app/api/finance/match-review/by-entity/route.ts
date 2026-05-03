@@ -48,8 +48,13 @@ export async function GET(request: NextRequest) {
     const user = await verifyUser(request)
     if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
 
-    // 1) transaction_assignments + legacy 통합 → 매칭 정보 수집
-    //    한 거래가 여러 entity 에 매칭됐을 수 있음 (다중 슬롯)
+    // 1) 매칭 정보 수집 — 3개 소스 통합 (5차원 분리)
+    //    (a) transaction_assignments — Phase 2 다중 매칭 슬롯
+    //    (b) transactions.related_type/id — legacy 단일 슬롯
+    //    (c) transaction_vehicle_allocations — 보험/대출/지입/투자/직원/정비 매칭의 차량 분배 결과
+    //
+    //    (c) 가 핵심 — 모든 auto-match-* 도구가 이 테이블에 차량 매칭 적재.
+    //    한 거래가 여러 차량/entity 에 분배됐을 수 있음.
     const matchedRows = await prisma.$queryRawUnsafe<Array<any>>(`
       SELECT
         t.id           AS tx_id,
@@ -60,7 +65,8 @@ export async function GET(request: NextRequest) {
         t.client_name,
         t.description,
         ta.assignment_type AS entity_type,
-        ta.assignment_id   AS entity_id
+        ta.assignment_id   AS entity_id,
+        'assignment' AS source
       FROM transactions t
       INNER JOIN transaction_assignments ta
         ON ta.transaction_id COLLATE utf8mb4_unicode_ci = t.id COLLATE utf8mb4_unicode_ci
@@ -77,17 +83,31 @@ export async function GET(request: NextRequest) {
         t.client_name,
         t.description,
         t.related_type AS entity_type,
-        t.related_id   AS entity_id
+        t.related_id   AS entity_id,
+        'related' AS source
       FROM transactions t
       WHERE t.deleted_at IS NULL
         AND t.related_type IS NOT NULL
         AND t.related_id IS NOT NULL
-        AND NOT EXISTS (
-          SELECT 1 FROM transaction_assignments ta2
-          WHERE ta2.transaction_id COLLATE utf8mb4_unicode_ci = t.id COLLATE utf8mb4_unicode_ci
-            AND ta2.assignment_type = t.related_type
-            AND ta2.assignment_id COLLATE utf8mb4_unicode_ci = t.related_id COLLATE utf8mb4_unicode_ci
-        )
+
+      UNION ALL
+
+      SELECT
+        t.id           AS tx_id,
+        t.transaction_date,
+        t.amount,
+        t.type,
+        t.category,
+        t.client_name,
+        t.description,
+        'car' AS entity_type,
+        tva.car_id AS entity_id,
+        CONCAT('alloc:', COALESCE(tva.source_type, 'unknown')) AS source
+      FROM transactions t
+      INNER JOIN transaction_vehicle_allocations tva
+        ON tva.transaction_id COLLATE utf8mb4_unicode_ci = t.id COLLATE utf8mb4_unicode_ci
+      WHERE t.deleted_at IS NULL
+        AND tva.car_id IS NOT NULL
     `)
 
     // 2) entity 별 group + 통계 계산
@@ -104,11 +124,15 @@ export async function GET(request: NextRequest) {
           count: 0,
           totalAmount: 0,
           categories: {} as Record<string, number>,
+          sources: {} as Record<string, number>, // 매칭 출처 통계
           txIds: new Set<string>(),
         })
       }
       const e = m.get(id)
-      // 같은 거래 중복 카운트 방지 (legacy + assignments 양쪽 다 있을 수 있음)
+      // 매칭 출처 통계 — dedupe 와 별개 (한 거래가 여러 소스에서 매칭 가능)
+      const src = String(row.source || 'unknown')
+      e.sources[src] = (e.sources[src] || 0) + 1
+      // 같은 거래 중복 카운트 방지 (legacy + assignments + allocations 다 있을 수 있음)
       if (e.txIds.has(row.tx_id)) continue
       e.txIds.add(row.tx_id)
       e.count++
@@ -160,7 +184,8 @@ export async function GET(request: NextRequest) {
     }
 
     // 4) 미매칭 거래 (분류된 거래 중 어느 entity 에도 매칭 안 된 것)
-    //    카테고리 = 미분류 가 아닌 거래 중 transaction_assignments / related_id 둘 다 없는 것
+    //    카테고리 = 미분류 가 아닌 거래 중 3개 매칭 소스 다 없는 것
+    //    (a) transaction_assignments (b) related_type/id (c) transaction_vehicle_allocations
     const unmatchedRows = await prisma.$queryRawUnsafe<Array<any>>(`
       SELECT COUNT(*) AS cnt, COALESCE(SUM(ABS(amount)), 0) AS total
       FROM transactions t
@@ -169,6 +194,9 @@ export async function GET(request: NextRequest) {
         AND (t.related_type IS NULL OR t.related_id IS NULL)
         AND NOT EXISTS (
           SELECT 1 FROM transaction_assignments ta WHERE ta.transaction_id COLLATE utf8mb4_unicode_ci = t.id COLLATE utf8mb4_unicode_ci
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM transaction_vehicle_allocations tva WHERE tva.transaction_id COLLATE utf8mb4_unicode_ci = t.id COLLATE utf8mb4_unicode_ci
         )
     `)
     const unmatched = {
