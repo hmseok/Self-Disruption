@@ -30,14 +30,39 @@ interface MonthlyEntity {
   related_type: 'jiip' | 'invest' | 'employee'
 }
 
+// 실제 DB 컬럼 조회 — schema.prisma 와 sync 안 된 환경 안전장치 (legacy DB)
+async function getActualColumns(table: string): Promise<Set<string>> {
+  const cols = await prisma.$queryRawUnsafe<Array<{ COLUMN_NAME: string }>>(`
+    SELECT COLUMN_NAME
+      FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = ?
+  `, table)
+  return new Set(cols.map(c => String(c.COLUMN_NAME).toLowerCase()))
+}
+
 async function loadEntities(type: MatchType): Promise<MonthlyEntity[]> {
   if (type === 'jiip') {
+    // 동적 컬럼 검증 — admin_fee / monthly_management_fee 둘 중 실재하는 것만 사용
+    const cols = await getActualColumns('jiip_contracts')
+    const feeCols = ['admin_fee', 'monthly_management_fee'].filter(c => cols.has(c))
+    if (feeCols.length === 0) {
+      console.warn('[auto-match-monthly jiip] fee 컬럼 없음 — 빈 결과')
+      return []
+    }
+    const monthlyExpr = `COALESCE(${feeCols.join(', ')}, 0)`
+    const hasStatus = cols.has('status')
+    const hasPayout = cols.has('payout_day')
+    if (!cols.has('investor_name') || !cols.has('car_id') || !cols.has('id')) {
+      console.warn('[auto-match-monthly jiip] 필수 컬럼 (id/car_id/investor_name) 없음')
+      return []
+    }
     const rows = await prisma.$queryRawUnsafe<any[]>(`
       SELECT id, car_id, investor_name AS client_name,
-             COALESCE(admin_fee, monthly_management_fee, 0) AS monthly_amount,
-             payout_day AS payment_day
+             ${monthlyExpr} AS monthly_amount,
+             ${hasPayout ? 'payout_day' : '1'} AS payment_day
         FROM jiip_contracts
-       WHERE status = 'active' AND COALESCE(admin_fee, monthly_management_fee, 0) > 0
+       WHERE ${hasStatus ? "status = 'active' AND " : ''}${monthlyExpr} > 0
     `)
     return rows.map(r => ({
       id: r.id, car_id: r.car_id, monthly_amount: Number(r.monthly_amount),
@@ -46,30 +71,43 @@ async function loadEntities(type: MatchType): Promise<MonthlyEntity[]> {
     }))
   }
   if (type === 'invest') {
+    const cols = await getActualColumns('general_investments')
+    if (!cols.has('invest_amount') || !cols.has('interest_rate')) {
+      console.warn('[auto-match-monthly invest] 필수 컬럼 없음 — 빈 결과')
+      return []
+    }
+    const hasStatus = cols.has('status')
+    const hasPaymentDay = cols.has('payment_day')
     const rows = await prisma.$queryRawUnsafe<any[]>(`
       SELECT id, car_id, investor_name AS client_name,
              COALESCE(invest_amount, 0) AS invest_amount,
              COALESCE(interest_rate, 0) AS interest_rate,
-             payment_day
+             ${hasPaymentDay ? 'payment_day' : '1 AS payment_day'}
         FROM general_investments
-       WHERE status = 'active' AND invest_amount > 0 AND interest_rate > 0
+       WHERE ${hasStatus ? "status = 'active' AND " : ''}invest_amount > 0 AND interest_rate > 0
     `)
     return rows.map(r => ({
       id: r.id, car_id: r.car_id,
-      // 월 이자 = 원금 × 연이율 / 12 / 100
       monthly_amount: Math.round(Number(r.invest_amount) * Number(r.interest_rate) / 1200),
       payment_day: Number(r.payment_day) || 1, client_name: r.client_name,
       related_type: 'invest',
     }))
   }
   // salary
+  const cols = await getActualColumns('employee_salaries')
+  if (!cols.has('base_salary') || !cols.has('employee_id')) {
+    console.warn('[auto-match-monthly salary] 필수 컬럼 없음 — 빈 결과')
+    return []
+  }
+  const hasIsActive = cols.has('is_active')
+  const hasPaymentDay = cols.has('payment_day')
   const rows = await prisma.$queryRawUnsafe<any[]>(`
       SELECT es.id, p.name AS client_name,
              COALESCE(es.base_salary, 0) AS monthly_amount,
-             COALESCE(es.payment_day, 25) AS payment_day
+             ${hasPaymentDay ? 'COALESCE(es.payment_day, 25)' : '25'} AS payment_day
         FROM employee_salaries es
         LEFT JOIN profiles p ON p.id COLLATE utf8mb4_unicode_ci = es.employee_id COLLATE utf8mb4_unicode_ci
-       WHERE es.is_active = 1 AND es.base_salary > 0
+       WHERE ${hasIsActive ? 'es.is_active = 1 AND ' : ''}es.base_salary > 0
   `)
   return rows.map((r: any) => ({
     id: r.id, monthly_amount: Number(r.monthly_amount),

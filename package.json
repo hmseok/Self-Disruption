@@ -18,6 +18,7 @@
     "lint:sql-alias": "node harness-engineering/scripts/sql-reserved-alias-lint.js",
     "lint:sql-groupby": "node harness-engineering/scripts/sql-group-by-lint.js",
     "lint:helper": "node harness-engineering/scripts/helper-coverage-lint.js",
+    "lint:db-sync": "node harness-engineering/scripts/db-sync-check.js --skip-if-no-db",
     "lint:api": "node harness-engineering/scripts/api-call-trace.js",
     "lint:ui": "node harness-engineering/scripts/ui-data-coverage.js",
     "harness:install-hook": "node harness-engineering/scripts/install-hook.js"

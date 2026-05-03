@@ -1473,15 +1473,18 @@ export default function BankCardPage() {
       // ── Phase 2: AI 일괄 분류 (Gemini) ──
       let aiProcessed = 0, aiApplied = 0, aiBelow = 0, aiInitial = 0
       let aiError: string | undefined
+      let aiAutoForceTriggered = false
       const MAX_BATCHES = 50
       let batches = 0
+      // 사용자 의도: AI 한 번만 누르면 끝나야 — force 자동 fallback 내장
+      // 첫 batch 가 total_unclassified === 0 + excluded_already_tried > 0 면 자동으로 force=true 재시도
+      let currentForce = force
       try {
         while (batches < MAX_BATCHES) {
           batches++
           const { ok, status, json } = await fetchWithAuth('/api/finance/transactions/auto-classify-ai', {
             method: 'POST',
-            // batchSize 30 → 20 — Gemini MAX_TOKENS 사고 방지 (한글 reason 길어서 응답 한도 초과 사례)
-            body: { batchSize: 20, minConfidence: 70, force },
+            body: { batchSize: 20, minConfidence: 70, force: currentForce },
           })
           if (!ok) {
             aiError = `HTTP ${status} — ${json?.error || '응답 없음'}`
@@ -1489,7 +1492,16 @@ export default function BankCardPage() {
           }
           const total = Number(json.total_unclassified || 0)
           if (aiInitial === 0) aiInitial = total
-          if (total === 0) break
+          if (total === 0) {
+            // 자동 force fallback — 첫 호출이고 excluded_already_tried > 0 이면 한 번 더
+            const excluded = Number(json.excluded_already_tried || 0)
+            if (!currentForce && excluded > 0 && !aiAutoForceTriggered) {
+              aiAutoForceTriggered = true
+              currentForce = true
+              continue // force=true 로 재시도
+            }
+            break
+          }
 
           const procThis = Number(json.processed_this_batch || 0)
           const appliedThis = Number(json.applied_high_confidence || 0)
@@ -1517,22 +1529,17 @@ export default function BankCardPage() {
       } else if (aiInitial === 0) {
         results.push(`· AI 분류: 미분류 거래 0건 (분류 대상 없음)`)
       } else {
-        results.push(`${aiApplied > 0 ? '✓' : '·'} AI 분류: ${aiApplied}/${aiInitial}건 자동 적용 (검토 큐 ${aiBelow}, batch ${batches}회)`)
+        const forceTag = aiAutoForceTriggered ? ' [자동 force]' : ''
+        results.push(`${aiApplied > 0 ? '✓' : '·'} AI 분류: ${aiApplied}/${aiInitial}건 자동 적용 (검토 큐 ${aiBelow}, batch ${batches}회)${forceTag}`)
       }
 
       alert(
-        `${force ? '🔁 강제 재분류' : '✓ 풀 자동 매칭 + AI 분류'} 완료\n\n${results.join('\n')}\n\n` +
-        `💡 매칭 사유 (type 별로 다름):\n` +
-        `  · 차량(last4): 매핑X = corporate_cards 에 카드 등록 X / 차량X = assigned_car_id 미설정 / 모호 = 같은 last4 카드 2개 이상\n` +
-        `  · 보험/대출/정비/지입/투자/급여: 각 매칭 API 의 자체 사유 코드 ([매핑X], [차량X], [모호] 메시지는 의미 다를 수 있음)\n\n` +
-        `💡 AI 분류 결과 해석:\n` +
-        `  · "0/N" = AI 가 신뢰도 70% 이상 분류 X — 검토 큐로\n` +
-        `  · "0건 (분류 대상 없음)" = 미분류 거래 모두 이전 AI 시도됨 → 「🔁 AI 강제 재분류」 클릭\n` +
-        `  · "❌ Gemini 응답 0건" = API 키 문제 또는 응답 파싱 실패\n\n` +
+        `✓ 풀 자동 매칭 + AI 분류 완료\n\n${results.join('\n')}\n\n` +
         `📌 차량 매칭 안 됨 ([차량X] N건) 일 때:\n` +
-        `  → 「매핑 관리」 탭에서 카드별 차량 할당 먼저 (assigned_car_id 설정)\n` +
+        `  → 「매핑 관리」 탭에서 카드별 차량 할당 먼저\n` +
         `  → 그 다음 풀 자동 매칭 다시 실행\n\n` +
-        `→ 분류 검수 탭에서 LOW 그룹 직접 확인 권장`
+        `→ 분류 검수 탭 — 카테고리 검수\n` +
+        `→ 매칭 검수 탭 — 차량/사람 매칭 (분류 후)`
       )
       await Promise.all([loadSummary(), loadTransactions()])
       if (reviewCategory) await loadReviewItems(reviewCategory)
@@ -2823,19 +2830,6 @@ export default function BankCardPage() {
                             cursor: autoClassifying ? 'wait' : 'pointer', opacity: autoClassifying ? 0.6 : 1,
                           }}
                         >🔮 풀 자동 매칭 (+AI)</button>
-                        {/* 강제 재분류 — 이전에 AI 시도한 [AI 추정%] 거래도 재처리 */}
-                        <button
-                          onClick={() => runFullAutoMatch({ force: true })}
-                          disabled={autoClassifying}
-                          title="이전 AI 시도 거래([AI 추정%])도 재분류. 풀 자동 매칭으로 분류 안 된 LOW 그룹이 그대로 남아있을 때 사용. 토큰 더 소모."
-                          style={{
-                            ...BTN.sm, padding: '6px 14px', fontSize: 12, fontWeight: 700,
-                            background: 'rgba(245,158,11,0.12)',
-                            color: '#b45309',
-                            border: '1px solid rgba(245,158,11,0.45)',
-                            cursor: autoClassifying ? 'wait' : 'pointer', opacity: autoClassifying ? 0.6 : 1,
-                          }}
-                        >🔁 AI 강제 재분류</button>
                         <button
                           onClick={async () => {
                             const { json } = await fetchWithAuth('/api/admin/ai-classify-review')
@@ -3129,46 +3123,15 @@ export default function BankCardPage() {
                                       return `${showMinus ? '-' : ''}${nf(Number(it.amount || 0))}`
                                     })()}
                                   </td>
-                                  <td style={{ padding: '6px 8px', fontSize: 11, minWidth: 200 }}>
-                                    {/* 매칭 변경 — 분류 검수 거래 row 와 동일한 2단 dropdown */}
-                                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                                      <select
-                                        value={it.related_type || ''}
-                                        onChange={(e) => {
-                                          const newType = e.target.value
-                                          if (!newType) {
-                                            updateRuleRow(it.id, { related_type: null, related_id: null })
-                                            return
-                                          }
-                                          loadMatchEntities(newType)
-                                          updateRuleRow(it.id, { related_type: newType, related_id: null })
-                                        }}
-                                        style={{ fontSize: 10, padding: '1px 4px', border: `1px solid ${COLORS.borderSubtle}`, borderRadius: 4, cursor: 'pointer', minWidth: 80 }}
-                                      >
-                                        <option value="">— 매칭 —</option>
-                                        {MATCH_TYPES.map(t => (
-                                          <option key={t.type} value={t.type}>{t.label}</option>
-                                        ))}
-                                      </select>
-                                      {it.related_type && (() => {
-                                        const cfg = MATCH_TYPES.find(t => t.type === it.related_type)
-                                        if (!cfg) return null
-                                        const list = matchEntities[it.related_type] || []
-                                        const loading = !!matchEntityLoading[it.related_type]
-                                        return (
-                                          <select
-                                            value={it.related_id || ''}
-                                            onChange={(e) => updateRuleRow(it.id, { related_id: e.target.value || null })}
-                                            style={{ fontSize: 10, padding: '1px 4px', border: `1px solid ${COLORS.borderSubtle}`, borderRadius: 4, cursor: 'pointer', maxWidth: 160 }}
-                                          >
-                                            <option value="">{loading ? '로드 중...' : `— 선택 —`}</option>
-                                            {list.map((r: any) => (
-                                              <option key={r.id} value={r.id}>{cfg.labelFn(r)}</option>
-                                            ))}
-                                          </select>
-                                        )
-                                      })()}
-                                    </div>
+                                  <td style={{ padding: '6px 8px', fontSize: 11 }}>
+                                    {/* 매칭 표시만 (수정 X) — 매칭 검수 탭에서 처리 */}
+                                    {it.related_type === 'car' && it.car_number ? (
+                                      <span style={{ color: '#1e40af', fontWeight: 600 }}>🚗 {it.car_number}</span>
+                                    ) : it.card_holder_name ? (
+                                      <span style={{ color: '#7c3aed' }}>👤 {it.card_holder_name}</span>
+                                    ) : (
+                                      <span style={{ color: COLORS.textMuted }}>— (매칭 검수 탭에서)</span>
+                                    )}
                                   </td>
                                   <td style={{ padding: '6px 8px', fontSize: 11, color: COLORS.textMuted }}>{it.reason}</td>
                                   <td style={{ padding: '6px 8px', textAlign: 'center' }}>
