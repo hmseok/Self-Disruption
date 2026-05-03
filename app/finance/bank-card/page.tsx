@@ -328,6 +328,14 @@ export default function BankCardPage() {
     triggeredAt: string
   } | null>(null)
 
+  // 분류 검수 — 검색/필터/묶음 (사용자 명령: 200건 하나씩 X, 필터 + 묶음으로 일괄)
+  const [reviewSearch, setReviewSearch] = useState('')
+  const [reviewFilterCard, setReviewFilterCard] = useState<string>('all') // 카드 alias 또는 'all' / 'no_card'
+  const [reviewFilterMatch, setReviewFilterMatch] = useState<'all' | 'matched' | 'unmatched'>('all')
+  const [reviewFilterAmount, setReviewFilterAmount] = useState<'all' | 'lt10k' | '10k-50k' | '50k-100k' | 'gt100k'>('all')
+  const [reviewFilterTxType, setReviewFilterTxType] = useState<'all' | 'expense' | 'income' | 'canceled'>('all')
+  const [reviewGroupByMerchant, setReviewGroupByMerchant] = useState(false)
+
   // 일괄 선택 — 3 화면 가로질러 불규칙 체크 (분류 검수 / 매칭 검수 / LOW 그룹)
   // (CLAUDE.md 규칙 14 — 동형 패턴 통합)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -1314,10 +1322,95 @@ export default function BankCardPage() {
     setReviewCategory(category)
     setReviewLoading(true)
     setReviewItems([])
+    // 필터 초기화 (이전 카테고리 필터 잔존 방지)
+    setReviewSearch('')
+    setReviewFilterCard('all')
+    setReviewFilterMatch('all')
+    setReviewFilterAmount('all')
+    setReviewFilterTxType('all')
+    setReviewGroupByMerchant(false)
     const { json } = await fetchWithAuth(`/api/finance/transactions/list?category=${encodeURIComponent(category)}&limit=200`)
     if (json?.data) setReviewItems(json.data)
     setReviewLoading(false)
   }
+
+  // 필터 적용 — useMemo 로 reviewItems 가공
+  const filteredReviewItems = useMemo(() => {
+    let arr = reviewItems
+    // 검색 — client_name / description / sms_merchant
+    if (reviewSearch.trim()) {
+      const kw = reviewSearch.trim().toLowerCase()
+      arr = arr.filter((i: any) => {
+        const text = [i.client_name, i.description, i.sms_merchant, i.matched_card_alias].filter(Boolean).join(' ').toLowerCase()
+        return text.includes(kw)
+      })
+    }
+    // 카드 필터
+    if (reviewFilterCard !== 'all') {
+      if (reviewFilterCard === 'no_card') {
+        arr = arr.filter((i: any) => !i.matched_card_alias)
+      } else {
+        arr = arr.filter((i: any) => i.matched_card_alias === reviewFilterCard)
+      }
+    }
+    // 매칭 상태 필터
+    if (reviewFilterMatch === 'matched') {
+      arr = arr.filter((i: any) => i.related_type && i.related_id)
+    } else if (reviewFilterMatch === 'unmatched') {
+      arr = arr.filter((i: any) => !(i.related_type && i.related_id))
+    }
+    // 금액 범위
+    if (reviewFilterAmount !== 'all') {
+      arr = arr.filter((i: any) => {
+        const a = Math.abs(Number(i.amount || 0))
+        if (reviewFilterAmount === 'lt10k') return a < 10000
+        if (reviewFilterAmount === '10k-50k') return a >= 10000 && a < 50000
+        if (reviewFilterAmount === '50k-100k') return a >= 50000 && a < 100000
+        if (reviewFilterAmount === 'gt100k') return a >= 100000
+        return true
+      })
+    }
+    // 거래 유형
+    if (reviewFilterTxType !== 'all') {
+      arr = arr.filter((i: any) => {
+        const stType = i.sms_transaction_type
+        if (reviewFilterTxType === 'canceled') return stType === 'canceled'
+        if (reviewFilterTxType === 'income') return i.type === 'income' && stType !== 'canceled'
+        if (reviewFilterTxType === 'expense') return i.type !== 'income' && stType !== 'canceled'
+        return true
+      })
+    }
+    return arr
+  }, [reviewItems, reviewSearch, reviewFilterCard, reviewFilterMatch, reviewFilterAmount, reviewFilterTxType])
+
+  // 묶음 view — 통장: description, 카드: sms_merchant 기준 group
+  const reviewGroups = useMemo(() => {
+    if (!reviewGroupByMerchant) return null
+    const map = new Map<string, any[]>()
+    for (const it of filteredReviewItems) {
+      const isCard = it.imported_from === 'sms' || (it.imported_from || '').startsWith('excel_card') || (it.imported_from || '').startsWith('pdf_card')
+      const key = (isCard ? (it.sms_merchant || it.description) : (it.description || it.client_name)) || '(미상)'
+      if (!map.has(key)) map.set(key, [])
+      map.get(key)!.push(it)
+    }
+    return Array.from(map.entries())
+      .map(([key, items]) => ({
+        key,
+        items,
+        count: items.length,
+        totalAmount: items.reduce((s, i) => s + Math.abs(Number(i.amount || 0)), 0),
+      }))
+      .sort((a, b) => b.count - a.count)
+  }, [filteredReviewItems, reviewGroupByMerchant])
+
+  // 카드 옵션 추출 — 현재 카테고리 거래에 등장하는 카드만
+  const reviewCardOptions = useMemo(() => {
+    const set = new Set<string>()
+    for (const i of reviewItems) {
+      if (i.matched_card_alias) set.add(i.matched_card_alias)
+    }
+    return Array.from(set).sort()
+  }, [reviewItems])
 
   // 분류 검수에서 카테고리 변경
   const changeItemCategory = async (id: string, newCategory: string) => {
@@ -3668,15 +3761,121 @@ export default function BankCardPage() {
                                 marginBottom: 10, paddingBottom: 8, borderBottom: '1px solid rgba(0,0,0,0.06)',
                               }}>
                                 <span style={{ fontSize: 13, fontWeight: 600, color: COLORS.textPrimary }}>
-                                  「{cat.category}」 거래 목록 ({reviewItems.length}건)
+                                  「{cat.category}」 거래 목록 ({filteredReviewItems.length}{reviewItems.length !== filteredReviewItems.length ? ` / ${reviewItems.length}` : ''}건)
                                 </span>
-                                <button onClick={(e) => { e.stopPropagation(); setReviewCategory(null); setReviewItems([]) }}
+                                <button onClick={(e) => { e.stopPropagation(); setReviewCategory(null); setReviewItems([]); clearSelection() }}
                                   style={{ ...BTN.sm, background: '#fff', color: COLORS.textSecondary, border: `1px solid ${COLORS.borderSubtle}`, cursor: 'pointer' }}>
                                   닫기 ×
                                 </button>
                               </div>
-                              {reviewLoading && <div style={{ textAlign: 'center', padding: 20, color: COLORS.textMuted }}>불러오는 중...</div>}
+
+                              {/* 검색 + 필터 + 묶음 toolbar */}
                               {!reviewLoading && reviewItems.length > 0 && (
+                                <div style={{
+                                  ...GLASS.L3, border: `1px solid ${COLORS.borderSubtle}`, borderRadius: 8,
+                                  padding: '8px 10px', marginBottom: 10,
+                                  display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center',
+                                }}>
+                                  <input
+                                    type="text"
+                                    value={reviewSearch}
+                                    onChange={(e) => setReviewSearch(e.target.value)}
+                                    placeholder="🔍 거래처/적요/가맹점/카드"
+                                    style={{ ...GLASS.L1, fontSize: 11, padding: '5px 10px', borderRadius: 6, border: `1px solid ${COLORS.borderSubtle}`, minWidth: 200, flex: 1 }}
+                                  />
+                                  <select
+                                    value={reviewFilterCard}
+                                    onChange={(e) => setReviewFilterCard(e.target.value)}
+                                    style={{ fontSize: 11, padding: '5px 8px', borderRadius: 6, border: `1px solid ${COLORS.borderSubtle}`, cursor: 'pointer' }}
+                                  >
+                                    <option value="all">💳 카드 전체</option>
+                                    <option value="no_card">— 카드 정보 없음</option>
+                                    {reviewCardOptions.map(c => <option key={c} value={c}>{c}</option>)}
+                                  </select>
+                                  <select
+                                    value={reviewFilterMatch}
+                                    onChange={(e) => setReviewFilterMatch(e.target.value as any)}
+                                    style={{ fontSize: 11, padding: '5px 8px', borderRadius: 6, border: `1px solid ${COLORS.borderSubtle}`, cursor: 'pointer' }}
+                                  >
+                                    <option value="all">🔗 매칭 전체</option>
+                                    <option value="matched">● 매칭됨</option>
+                                    <option value="unmatched">○ 미매칭</option>
+                                  </select>
+                                  <select
+                                    value={reviewFilterAmount}
+                                    onChange={(e) => setReviewFilterAmount(e.target.value as any)}
+                                    style={{ fontSize: 11, padding: '5px 8px', borderRadius: 6, border: `1px solid ${COLORS.borderSubtle}`, cursor: 'pointer' }}
+                                  >
+                                    <option value="all">💰 금액 전체</option>
+                                    <option value="lt10k">1만원 미만</option>
+                                    <option value="10k-50k">1~5만원</option>
+                                    <option value="50k-100k">5~10만원</option>
+                                    <option value="gt100k">10만원 이상</option>
+                                  </select>
+                                  <select
+                                    value={reviewFilterTxType}
+                                    onChange={(e) => setReviewFilterTxType(e.target.value as any)}
+                                    style={{ fontSize: 11, padding: '5px 8px', borderRadius: 6, border: `1px solid ${COLORS.borderSubtle}`, cursor: 'pointer' }}
+                                  >
+                                    <option value="all">📋 유형 전체</option>
+                                    <option value="expense">지출</option>
+                                    <option value="income">수입</option>
+                                    <option value="canceled">취소</option>
+                                  </select>
+                                  <label style={{ fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4, cursor: 'pointer', padding: '5px 8px', borderRadius: 6, background: reviewGroupByMerchant ? 'rgba(124,58,237,0.1)' : 'transparent', color: reviewGroupByMerchant ? '#7c3aed' : COLORS.textSecondary, fontWeight: reviewGroupByMerchant ? 600 : 400 }}>
+                                    <input type="checkbox" checked={reviewGroupByMerchant} onChange={(e) => setReviewGroupByMerchant(e.target.checked)} />
+                                    📦 묶음 (통장:적요/카드:가맹점)
+                                  </label>
+                                  {(reviewSearch || reviewFilterCard !== 'all' || reviewFilterMatch !== 'all' || reviewFilterAmount !== 'all' || reviewFilterTxType !== 'all') && (
+                                    <button
+                                      onClick={() => { setReviewSearch(''); setReviewFilterCard('all'); setReviewFilterMatch('all'); setReviewFilterAmount('all'); setReviewFilterTxType('all') }}
+                                      style={{ ...BTN.sm, fontSize: 10, padding: '4px 8px', background: 'rgba(0,0,0,0.04)', color: COLORS.textMuted, border: `1px solid ${COLORS.borderSubtle}`, cursor: 'pointer' }}
+                                    >× 필터 해제</button>
+                                  )}
+                                </div>
+                              )}
+
+                              {reviewLoading && <div style={{ textAlign: 'center', padding: 20, color: COLORS.textMuted }}>불러오는 중...</div>}
+
+                              {/* 묶음 view — 거래처/가맹점별 group 카드 */}
+                              {!reviewLoading && reviewGroupByMerchant && reviewGroups && reviewGroups.length > 0 && (
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 8, marginBottom: 10 }}>
+                                  {reviewGroups.map(g => {
+                                    const allSelected = g.items.every(i => selectedIds.has(i.id))
+                                    const someSelected = g.items.some(i => selectedIds.has(i.id))
+                                    return (
+                                      <div
+                                        key={g.key}
+                                        onClick={() => toggleSelectMany(g.items.map(i => i.id), !allSelected)}
+                                        style={{
+                                          ...GLASS.L4,
+                                          padding: '10px 12px', borderRadius: 8, cursor: 'pointer',
+                                          border: `1px solid ${allSelected ? '#7c3aed' : someSelected ? 'rgba(124,58,237,0.3)' : COLORS.borderSubtle}`,
+                                          background: allSelected ? 'rgba(245,243,255,0.6)' : 'rgba(255,255,255,0.5)',
+                                        }}
+                                        title="클릭 — 그룹 모두 선택/해제"
+                                      >
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 6 }}>
+                                          <div style={{ fontSize: 12, fontWeight: 600, color: COLORS.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                                            {g.key}
+                                          </div>
+                                          <input type="checkbox" checked={allSelected} ref={el => { if (el) el.indeterminate = someSelected && !allSelected }} readOnly />
+                                        </div>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
+                                          <span style={{ fontSize: 11, color: COLORS.textMuted }}>{g.count}건</span>
+                                          <span style={{ fontSize: 12, fontWeight: 600, color: '#1e40af' }}>{nf(g.totalAmount)}원</span>
+                                        </div>
+                                      </div>
+                                    )
+                                  })}
+                                </div>
+                              )}
+
+                              {!reviewLoading && filteredReviewItems.length === 0 && reviewItems.length > 0 && (
+                                <div style={{ textAlign: 'center', padding: 20, color: COLORS.textMuted, fontSize: 13 }}>필터 조건에 일치하는 거래 없음 — 「× 필터 해제」 클릭</div>
+                              )}
+
+                              {!reviewLoading && filteredReviewItems.length > 0 && !reviewGroupByMerchant && (
                                 <div style={{ ...GLASS.L4, border: `1px solid ${COLORS.borderSubtle}`, borderRadius: 10, overflow: 'auto', maxHeight: 480 }}>
                                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
                                     <thead style={{ position: 'sticky', top: 0, background: 'rgba(255,255,255,0.95)', zIndex: 1 }}>
@@ -3685,7 +3884,7 @@ export default function BankCardPage() {
                                           <input
                                             type="checkbox"
                                             checked={reviewItems.length > 0 && reviewItems.every((i: any) => selectedIds.has(i.id))}
-                                            onChange={(e) => toggleSelectMany(reviewItems.map((i: any) => i.id), e.target.checked)}
+                                            onChange={(e) => toggleSelectMany(filteredReviewItems.map((i: any) => i.id), e.target.checked)}
                                             title="전체 선택"
                                           />
                                         </th>
@@ -3701,7 +3900,7 @@ export default function BankCardPage() {
                                       </tr>
                                     </thead>
                                     <tbody>
-                                      {reviewItems.map((item: any) => {
+                                      {filteredReviewItems.map((item: any) => {
                                         const srcLabel = String(item.imported_from || '').startsWith('excel_bank') ? '통장' : String(item.imported_from || '').startsWith('excel_card') ? '카드' : item.imported_from === 'sms' ? 'SMS' : item.imported_from === 'sms_bank' ? 'SMS통장' : '기타'
                                         // 매칭 우선순위: 직접(related_id) > SMS(card_sms_transactions) > last4 → corporate_cards 검색
                                         const directCarNumber = item.matched_car_number || null
