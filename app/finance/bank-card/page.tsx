@@ -311,6 +311,13 @@ export default function BankCardPage() {
   // 차량 목록 (분류 검수에서 차량 매칭 변경 dropdown 용)
   const [cars, setCars] = useState<Array<{ id: string; number: string; brand?: string; model?: string }>>([])
 
+  // 풀 자동 매칭 결과 — 글래스 패널로 표시 (alert 대신, CLAUDE.md 규칙 20)
+  const [fullMatchResult, setFullMatchResult] = useState<{
+    phase1: Array<{ name: string; ok: boolean; applied: number; total: number; skipStr: string; errMsg?: string }>
+    ai: { error?: string; initial: number; applied: number; below: number; batches: number; force: boolean }
+    triggeredAt: string
+  } | null>(null)
+
   // ─── 매칭 통합 (2단 dropdown) ──────────────────────────────
   // 모든 related_type 의 entity 목록 lazy load
   // (CLAUDE.md 규칙 14 — 동형 패턴 통합)
@@ -1434,7 +1441,13 @@ export default function BankCardPage() {
       '계속할까요?'
     )) return
     setAutoClassifying(true)
-    const results: string[] = []
+    setFullMatchResult(null) // 이전 결과 클리어
+    // 플로팅 진행률 (CLAUDE.md 규칙 16) — 사용자 다른 작업 가능, 블로킹 X
+    const taskId = floaterProgress.start({
+      title: '🔮 풀 자동 매칭 + AI 분류',
+      total: 7, // Phase 1 = 7개 매칭 (Phase 2 는 동적 추가)
+    })
+    const phase1Results: Array<{ name: string; ok: boolean; applied: number; total: number; skipStr: string; errMsg?: string }> = []
     try {
       // ── Phase 1: 마스터 데이터 매칭 ──
       const calls: { name: string; url: string; body?: any }[] = [
@@ -1446,27 +1459,33 @@ export default function BankCardPage() {
         { name: '투자(이자)',    url: '/api/finance/transactions/auto-match-monthly', body: { type: 'invest', dateTolerance: 3 } },
         { name: '급여',          url: '/api/finance/transactions/auto-match-monthly', body: { type: 'salary', dateTolerance: 3 } },
       ]
+      let phase1Done = 0
+      let totalApplied = 0
       for (const c of calls) {
         try {
           const { ok, status, json } = await fetchWithAuth(c.url, { method: 'POST', body: c.body || {} })
           if (!ok) {
-            // 실제 에러 메시지 노출 (HTTP 500 만 보면 진단 불가) — 전체 메시지 (잘림 X)
             const errMsg = json?.error || '응답 없음'
-            results.push(`❌ ${c.name}: HTTP ${status}\n   ${String(errMsg).slice(0, 500)}`)
+            phase1Results.push({ name: c.name, ok: false, applied: 0, total: 0, skipStr: '', errMsg: `HTTP ${status} — ${String(errMsg).slice(0, 200)}` })
+            phase1Done++
+            floaterProgress.update(taskId, { processed: phase1Done, applied: totalApplied, failed: 1 })
             continue
           }
-          const applied = json.applied ?? json.applied_high_confidence ?? 0
-          const total = json.total_candidates ?? json.total_unmatched ?? 0
-          // 진단: skip 사유 노출 — 0건일 때 무엇이 문제인지 즉시 파악
+          const applied = Number(json.applied ?? json.applied_high_confidence ?? 0)
+          const total = Number(json.total_candidates ?? json.total_unmatched ?? 0)
+          totalApplied += applied
           const skips: string[] = []
           if (json.skipped_no_match > 0) skips.push(`매핑X ${json.skipped_no_match}`)
           if (json.skipped_no_car > 0) skips.push(`차량X ${json.skipped_no_car}`)
           if (json.skipped_ambiguous > 0) skips.push(`모호 ${json.skipped_ambiguous}`)
           if (json.skipped_already > 0) skips.push(`이미매칭 ${json.skipped_already}`)
-          const skipStr = skips.length > 0 ? ` [${skips.join(', ')}]` : ''
-          results.push(`${applied > 0 ? '✓' : '·'} ${c.name}: ${applied}/${total}건${skipStr}`)
+          phase1Results.push({ name: c.name, ok: true, applied, total, skipStr: skips.join(', ') })
+          phase1Done++
+          floaterProgress.update(taskId, { processed: phase1Done, applied: totalApplied })
         } catch (e: any) {
-          results.push(`❌ ${c.name}: ${e?.message?.slice(0, 60)}`)
+          phase1Results.push({ name: c.name, ok: false, applied: 0, total: 0, skipStr: '', errMsg: e?.message?.slice(0, 200) || String(e) })
+          phase1Done++
+          floaterProgress.update(taskId, { processed: phase1Done, applied: totalApplied, failed: 1 })
         }
       }
 
@@ -1476,8 +1495,6 @@ export default function BankCardPage() {
       let aiAutoForceTriggered = false
       const MAX_BATCHES = 50
       let batches = 0
-      // 사용자 의도: AI 한 번만 누르면 끝나야 — force 자동 fallback 내장
-      // 첫 batch 가 total_unclassified === 0 + excluded_already_tried > 0 면 자동으로 force=true 재시도
       let currentForce = force
       try {
         while (batches < MAX_BATCHES) {
@@ -1491,14 +1508,19 @@ export default function BankCardPage() {
             break
           }
           const total = Number(json.total_unclassified || 0)
-          if (aiInitial === 0) aiInitial = total
+          if (aiInitial === 0) {
+            aiInitial = total
+            // Phase 2 시작 — total 미분류 추가 (Phase 1 7개 + Phase 2 N개)
+            if (aiInitial > 0) {
+              floaterProgress.update(taskId, { total: 7 + aiInitial, processed: phase1Done })
+            }
+          }
           if (total === 0) {
-            // 자동 force fallback — 첫 호출이고 excluded_already_tried > 0 이면 한 번 더
             const excluded = Number(json.excluded_already_tried || 0)
             if (!currentForce && excluded > 0 && !aiAutoForceTriggered) {
               aiAutoForceTriggered = true
               currentForce = true
-              continue // force=true 로 재시도
+              continue
             }
             break
           }
@@ -1510,7 +1532,12 @@ export default function BankCardPage() {
           aiApplied += appliedThis
           aiBelow += belowThis
 
-          // 안전망: DB write 0건이면 즉시 중단 (토큰 무한 소모 방지)
+          // 진행률 업데이트 — 사용자 화면에서 실시간 보임
+          floaterProgress.update(taskId, {
+            processed: phase1Done + aiProcessed,
+            applied: totalApplied + aiApplied,
+          })
+
           if (appliedThis + belowThis === 0) {
             const dbg = json?.gemini_debug || {}
             aiError = `Gemini 응답 0건 · finishReason=${dbg.finishReason || 'n/a'}`
@@ -1523,26 +1550,28 @@ export default function BankCardPage() {
       } catch (e: any) {
         aiError = e?.message?.slice(0, 60)
       }
-      results.push('') // 구분선
-      if (aiError) {
-        results.push(`❌ AI 분류: ${aiError}`)
-      } else if (aiInitial === 0) {
-        results.push(`· AI 분류: 미분류 거래 0건 (분류 대상 없음)`)
-      } else {
-        const forceTag = aiAutoForceTriggered ? ' [자동 force]' : ''
-        results.push(`${aiApplied > 0 ? '✓' : '·'} AI 분류: ${aiApplied}/${aiInitial}건 자동 적용 (검토 큐 ${aiBelow}, batch ${batches}회)${forceTag}`)
-      }
+      // 결과 state 저장 — 글래스 패널로 표시 (alert/console 대신)
+      setFullMatchResult({
+        phase1: phase1Results,
+        ai: { error: aiError, initial: aiInitial, applied: aiApplied, below: aiBelow, batches, force: aiAutoForceTriggered },
+        triggeredAt: new Date().toISOString(),
+      })
 
-      alert(
-        `✓ 풀 자동 매칭 + AI 분류 완료\n\n${results.join('\n')}\n\n` +
-        `📌 차량 매칭 안 됨 ([차량X] N건) 일 때:\n` +
-        `  → 「매핑 관리」 탭에서 카드별 차량 할당 먼저\n` +
-        `  → 그 다음 풀 자동 매칭 다시 실행\n\n` +
-        `→ 분류 검수 탭 — 카테고리 검수\n` +
-        `→ 매칭 검수 탭 — 차량/사람 매칭 (분류 후)`
-      )
+      // 마무리 — finish 에 핵심 결과 한 줄
+      const summary = [
+        `Phase 1: ${totalApplied}건 적용`,
+        aiInitial === 0
+          ? 'AI: 이미 모두 분류됨'
+          : aiError
+            ? `AI: ${aiError}`
+            : `AI: ${aiApplied}/${aiInitial}`,
+      ].join(' · ')
+      floaterProgress.finish(taskId, `✅ ${summary}`)
+
       await Promise.all([loadSummary(), loadTransactions()])
       if (reviewCategory) await loadReviewItems(reviewCategory)
+    } catch (e: any) {
+      floaterProgress.finish(taskId, `오류: ${e?.message || String(e)}`, 'error')
     } finally { setAutoClassifying(false) }
   }
 
@@ -2769,6 +2798,94 @@ export default function BankCardPage() {
         {/* ──── 분류 검수 탭 ──── */}
         {activeTab === 'classify' && (
           <>
+            {/* 풀 자동 매칭 결과 패널 — 글래스 디자인 (CLAUDE.md 규칙 20) */}
+            {fullMatchResult && (() => {
+              const totalP1 = fullMatchResult.phase1.reduce((s, r) => s + r.applied, 0)
+              const failedP1 = fullMatchResult.phase1.filter(r => !r.ok)
+              const ai = fullMatchResult.ai
+              return (
+                <div style={{
+                  ...GLASS.L4,
+                  border: `1px solid rgba(124,58,237,0.3)`,
+                  borderRadius: 12,
+                  padding: '16px 20px',
+                  marginBottom: 12,
+                  background: 'linear-gradient(180deg, rgba(245,243,255,0.6), rgba(255,255,255,0.4))',
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, flexWrap: 'wrap', gap: 8 }}>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: '#5b21b6' }}>
+                      🔮 풀 자동 매칭 결과 <span style={{ fontSize: 11, color: COLORS.textMuted, fontWeight: 400, marginLeft: 6 }}>{new Date(fullMatchResult.triggeredAt).toLocaleString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+                    </div>
+                    <button
+                      onClick={() => setFullMatchResult(null)}
+                      style={{ ...BTN.sm, fontSize: 11, padding: '4px 10px', background: 'rgba(0,0,0,0.04)', color: COLORS.textMuted, border: `1px solid ${COLORS.borderSubtle}`, cursor: 'pointer' }}
+                    >× 닫기</button>
+                  </div>
+
+                  {/* Phase 1 — 매칭 결과 그리드 */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 8, marginBottom: 12 }}>
+                    {fullMatchResult.phase1.map(r => (
+                      <div key={r.name} style={{
+                        ...GLASS.L3,
+                        border: `1px solid ${r.ok ? (r.applied > 0 ? 'rgba(34,197,94,0.35)' : 'rgba(0,0,0,0.05)') : 'rgba(239,68,68,0.4)'}`,
+                        borderRadius: 8, padding: '8px 12px',
+                        background: r.ok ? (r.applied > 0 ? 'rgba(240,253,244,0.5)' : 'rgba(255,255,255,0.4)') : 'rgba(254,226,226,0.4)',
+                      }}>
+                        <div style={{ fontSize: 11, fontWeight: 600, color: r.ok ? COLORS.textPrimary : '#b91c1c', marginBottom: 2 }}>
+                          {r.ok ? (r.applied > 0 ? '✓' : '·') : '❌'} {r.name}
+                        </div>
+                        {r.ok ? (
+                          <>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: r.applied > 0 ? '#15803d' : COLORS.textMuted }}>
+                              {r.applied}<span style={{ fontSize: 11, color: COLORS.textMuted, fontWeight: 400 }}>/{r.total}</span>
+                            </div>
+                            {r.skipStr && <div style={{ fontSize: 10, color: COLORS.textMuted, marginTop: 1 }}>[{r.skipStr}]</div>}
+                          </>
+                        ) : (
+                          <div style={{ fontSize: 10, color: '#b91c1c', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{r.errMsg}</div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* AI 분류 결과 */}
+                  <div style={{
+                    ...GLASS.L3,
+                    border: `1px solid ${ai.error ? 'rgba(239,68,68,0.4)' : ai.applied > 0 ? 'rgba(34,197,94,0.35)' : 'rgba(0,0,0,0.05)'}`,
+                    borderRadius: 8, padding: '10px 14px',
+                    background: ai.error ? 'rgba(254,226,226,0.4)' : ai.applied > 0 ? 'rgba(240,253,244,0.5)' : 'rgba(255,255,255,0.4)',
+                  }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: COLORS.textPrimary, marginBottom: 4 }}>
+                      🤖 AI 분류 (Gemini)
+                    </div>
+                    {ai.error ? (
+                      <div style={{ fontSize: 11, color: '#b91c1c' }}>❌ {ai.error}</div>
+                    ) : ai.initial === 0 ? (
+                      <div style={{ fontSize: 12, color: COLORS.textSecondary }}>
+                        미분류 거래 0건 — 모두 이미 분류됨. 결과 점검은 「🔍 AI 분류 검수」 클릭.
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: 12, color: COLORS.textPrimary, lineHeight: 1.6 }}>
+                        <span style={{ color: '#15803d', fontWeight: 700 }}>{ai.applied}</span> / {ai.initial}건 자동 적용
+                        <span style={{ color: COLORS.textMuted, marginLeft: 8 }}>(검토 큐 {ai.below} · batch {ai.batches}회{ai.force ? ' · 자동 force' : ''})</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 다음 작업 권장 */}
+                  <div style={{ marginTop: 10, padding: '8px 12px', background: 'rgba(254,243,199,0.3)', border: '1px solid rgba(245,158,11,0.25)', borderRadius: 6, fontSize: 11, color: '#78350f', lineHeight: 1.6 }}>
+                    📌 다음 작업: {(() => {
+                      const carResult = fullMatchResult.phase1.find(r => r.name === '차량(last4)')
+                      const noCarMatch = carResult && carResult.applied === 0 && carResult.total > 0
+                      if (noCarMatch) return '「매핑 관리」 탭에서 카드별 차량 할당 → 풀 자동 매칭 다시 실행'
+                      if (failedP1.length > 0) return '실패한 매칭 (붉은 카드) — 에러 메시지 확인 후 fix'
+                      return '「매칭 검수」 탭 — 차량/사람 매칭 최종 점검'
+                    })()}
+                  </div>
+                </div>
+              )
+            })()}
+
             {/* 카테고리별 요약 카드 */}
             {summary?.categoryBreakdown && (() => {
               // 카테고리별 집계: 수입/지출 합산

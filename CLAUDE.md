@@ -691,6 +691,57 @@ const cardColumns: TableColumn<Transaction>[] = [
    - 화이트리스트: 모달 / 카드 / 리스트 컨텐츠 영역
 ```
 
+### 규칙 20 — 결과 메시지 UI 의무 (2026-05-03 신설)
+
+> **사용자 명령**: "결과 메시지도 UI 적용해줘야지 기계적인 메세지창같은건 ERP수준을 떨어뜨리는일같은데"
+
+**원칙**: alert / confirm / 기계적 메시지 박스 최소화. 작업 결과는 **글래스 디자인 패널** 로.
+
+**금지 패턴**:
+- ❌ 작업 완료 시 alert(`✅ N건 적용 / 실패 M건...`) — 블로킹 + 못생김
+- ❌ console.log 만으로 결과 표시 (사용자 console 안 봄)
+- ❌ 기계적 박스 (border 단순 / 색상 무신경)
+
+**올바른 패턴**:
+- ✅ 결과를 React state 로 저장
+- ✅ 분류 검수 / 매칭 검수 등 적절한 탭에 글래스 패널 (Glass L3/L4) 로 표시
+- ✅ 사용자가 「× 닫기」 가능
+- ✅ 다음 권장 작업 자동 제시 (예: 「매핑 관리에서 카드 할당 먼저」)
+- ✅ 진행 중에는 AIProgressFloater (규칙 16)
+- ✅ 실패는 빨간 글래스 / 성공은 녹색 / 중립은 백색
+
+**예시** — 풀 자동 매칭 결과 패널:
+```tsx
+{fullMatchResult && (
+  <div style={{ ...GLASS.L4, border: 'rgba(124,58,237,0.3)', borderRadius: 12 }}>
+    <div>🔮 풀 자동 매칭 결과 <시간></div>
+    <button>× 닫기</button>
+    <Grid>
+      <Card ok={true} applied={5} total={875}>차량(last4)</Card>
+      ...
+    </Grid>
+    <NextActionHint>📌 매핑 관리에서 카드 할당 먼저</NextActionHint>
+  </div>
+)}
+```
+
+**적용해야 할 모든 화면 (동형 패턴 인덱스 — 규칙 14)**:
+- 풀 자동 매칭 결과 ✓ (5/3 적용)
+- 룰 자동 분류 결과 ✓ (이미 글래스 패널 — HIGH/MEDIUM/LOW 박스)
+- AI 분류 검수 결과 (확인 필요 — 현재 alert)
+- 차량 매칭 결과 (runCarMatch — 현재 alert)
+- 일괄 확정 결과 (현재 floater finish 만 — OK)
+- backfill 정리 결과 (이미 floater)
+- 통장 거래 재생성 (현재 floater)
+
+**자동화 안전장치 (TBD)**:
+```
+🔜 10. ui-alert-lint.js — alert(...) 호출 패턴 차단
+   - 단순 알림 (ok 버튼만) alert 는 글래스 토스트로 대체 권장
+   - confirm 은 dialog component 로 대체 권장
+   - 화이트리스트: 진짜 confirm 필요한 경우 (data-loss 위험 등)
+```
+
 ### 위반 시 자동 자가 기록 + 누적 시 시스템 안전장치
 
 이 조항을 위반하면 즉시 `knowledge/common-errors.md`에 사례 기록.
