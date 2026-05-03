@@ -4938,6 +4938,20 @@ export default function BankCardPage() {
                       </div>
                     </>
                   )}
+                  {/* customer_car_number 형식 샘플 — 매칭 LIKE 디버깅 핵심 */}
+                  {matchDiagnostic.car_number_samples?.length > 0 && (
+                    <>
+                      <div style={{ fontSize: 11, fontWeight: 600, color: COLORS.textSecondary, marginBottom: 4 }}>fmi_rentals.customer_car_number 형식 샘플 ★</div>
+                      <div style={{ marginBottom: 10, fontSize: 11 }}>
+                        {matchDiagnostic.car_number_samples.map((s: any, i: number) => (
+                          <div key={i} style={{ padding: '3px 6px', borderBottom: '1px dashed rgba(0,0,0,0.05)' }}>
+                            <span style={{ fontWeight: 600, color: '#1e40af', display: 'inline-block', minWidth: 100 }}>{s.insurance_company}</span>
+                            <span style={{ color: COLORS.textPrimary }}>{s.samples}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
                   {/* 미매칭 입금 거래 샘플 */}
                   {matchDiagnostic.sample_unmatched_income?.length > 0 && (
                     <>

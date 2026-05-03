@@ -124,7 +124,28 @@ export async function GET(request: NextRequest) {
       unmatchedIncomeBank = [{ error: e.message }]
     }
 
-    // 6) 진단 결론
+    // 6) fmi_rentals.customer_car_number 형식 샘플 (보험사별 3건)
+    let carNumberSamples: Array<any> = []
+    try {
+      const rows = await prisma.$queryRawUnsafe<Array<any>>(`
+        SELECT insurance_company,
+               GROUP_CONCAT(customer_car_number ORDER BY id LIMIT 3 SEPARATOR ' | ') AS samples
+          FROM fmi_rentals
+         WHERE customer_car_number IS NOT NULL AND customer_car_number != ''
+           AND insurance_company IS NOT NULL
+         GROUP BY insurance_company
+         ORDER BY COUNT(*) DESC
+         LIMIT 15
+      `)
+      carNumberSamples = rows.map(r => ({
+        insurance_company: String(r.insurance_company),
+        samples: String(r.samples),
+      }))
+    } catch (e: any) {
+      carNumberSamples = [{ error: e.message }]
+    }
+
+    // 7) 진단 결론
     const findings: string[] = []
     if (tables.transaction_vehicle_allocations === 0) {
       findings.push('🔴 transaction_vehicle_allocations 비어있음 → 보험/대출/지입 등 매칭 도구 모두 0건 매칭')
@@ -147,6 +168,7 @@ export async function GET(request: NextRequest) {
       masters: serialize(masters),
       sources: serialize(sources),
       fmi_rentals_by_insurer: serialize(fmiRentalsByInsurer),
+      car_number_samples: serialize(carNumberSamples),
       sample_unmatched_income: unmatchedIncomeBank,
       findings,
     })
