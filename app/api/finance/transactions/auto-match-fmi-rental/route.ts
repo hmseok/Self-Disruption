@@ -102,7 +102,8 @@ function parseClientName(raw: string | null | undefined, dynamicAbbrs: string[])
 }
 
 interface MatchResult {
-  matched: number
+  matched: number      // HIGH/MEDIUM 자동 매칭
+  low_confidence: number // LOW (보험사 mismatch — 자동 매칭 안 함, 검수용)
   multi: number
   no_candidate: number
   no_pattern: number
@@ -117,12 +118,19 @@ interface MatchResult {
     vehicle_id: string | null
     customer_car_number: string | null
     insurance_company: string | null
-    confidence: 'HIGH' | 'MEDIUM' | 'NONE'
+    confidence: 'HIGH' | 'MEDIUM' | 'LOW' | 'NONE'
   }>
   failed_samples: Array<{
     tx_id: string
     client_name: string
     reason: string
+  }>
+  low_confidence_samples: Array<{
+    tx_id: string
+    client_name: string
+    parsed_insurer: string
+    actual_insurer: string
+    customer_car_number: string
   }>
 }
 
@@ -179,6 +187,7 @@ export async function POST(request: NextRequest) {
 
     const result: MatchResult = {
       matched: 0,
+      low_confidence: 0,
       multi: 0,
       no_candidate: 0,
       no_pattern: 0,
@@ -187,6 +196,7 @@ export async function POST(request: NextRequest) {
       applied: 0,
       samples: [],
       failed_samples: [],
+      low_confidence_samples: [],
     }
 
     // ── 2) 각 거래 매칭 시도 ──
@@ -207,25 +217,25 @@ export async function POST(request: NextRequest) {
         continue
       }
 
-      // ── 3) fmi_rentals 검색 ──
-      // customer_car_number LIKE '%[last4]'
-      // AND insurance_company LIKE '%[keyword]%' (어느 keyword 든 일치)
-      const insurerLike = parsed.insurerKeywords.map(k => `'%${k}%'`).join(', ')
-      // SQL injection 방지 — 약어는 사전에서 온 값이므로 안전. 그래도 escape
+      // ── 3) fmi_rentals 검색 — 차량 우선 + 보험사 점수 ──
+      // 1단계: customer_car_number LIKE '%[last4]' 모든 차량 후보 검색
+      // 2단계: insurance_company 일치도 점수 — 일치 1, 불일치 0
+      // → 보험사 mismatch 케이스도 후보로 보존 (사용자 검수 가능)
       const safeInsurerKeywords = parsed.insurerKeywords.map(k => k.replace(/[%_'"\\]/g, ''))
       const carNumberLike = `%${parsed.last4.replace(/[%_'"\\]/g, '')}`
+      const insurerCaseClauses = safeInsurerKeywords.map(() => 'insurance_company LIKE ?').join(' OR ')
 
-      // 매칭 — sql-fn-lint-allow: REGEXP (단순 동일 약어 OR 검색 안전)
       const candidates = await prisma.$queryRawUnsafe<Array<any>>(
         `SELECT id, vehicle_id, customer_car_number, insurance_company,
-                final_claim_amount, total_rental_fee, dispatch_date, status
+                final_claim_amount, total_rental_fee, dispatch_date, status,
+                CASE WHEN ${insurerCaseClauses} THEN 1 ELSE 0 END AS insurer_match
            FROM fmi_rentals
           WHERE customer_car_number LIKE ?
-            AND (${safeInsurerKeywords.map(() => 'insurance_company LIKE ?').join(' OR ')})
-          ORDER BY ABS(DATEDIFF(COALESCE(dispatch_date, NOW()), ?)) ASC
-          LIMIT 5`,
-        carNumberLike,
+          ORDER BY insurer_match DESC,
+                   ABS(DATEDIFF(COALESCE(dispatch_date, NOW()), ?)) ASC
+          LIMIT 10`,
         ...safeInsurerKeywords.map(k => `%${k}%`),
+        carNumberLike,
         tx.transaction_date,
       )
 
@@ -235,29 +245,34 @@ export async function POST(request: NextRequest) {
           result.failed_samples.push({
             tx_id: tx.id,
             client_name: clientRaw,
-            reason: `대차건 없음 — 차량 ${parsed.last4} + 보험 ${parsed.abbr} 조합 매칭 안 됨`,
+            reason: `대차건 없음 — 차량 ${parsed.last4} 자체가 fmi_rentals 에 없음`,
           })
         }
         continue
       }
 
       // ── 4) 후보 평가 ──
+      // 보험사 일치 후보 (insurer_match=1) 우선
+      const insurerMatched = candidates.filter((c: any) => Number(c.insurer_match) === 1)
+      const insurerOnly = candidates.filter((c: any) => Number(c.insurer_match) === 0)
+
       let pick: any = null
-      let confidence: 'HIGH' | 'MEDIUM' | 'NONE' = 'NONE'
-      if (candidates.length === 1) {
-        pick = candidates[0]
+      let confidence: 'HIGH' | 'MEDIUM' | 'LOW' | 'NONE' = 'NONE'
+
+      if (insurerMatched.length === 1) {
+        pick = insurerMatched[0]
         confidence = 'HIGH'
-      } else {
-        // 다수 후보 — 입금금액 ≈ final_claim_amount 비교 (5% 오차)
+      } else if (insurerMatched.length > 1) {
+        // 보험사 일치 다수 — 금액 비교
         const txAmount = Math.abs(Number(tx.amount || 0))
-        const closest = candidates
-          .map((c) => ({
+        const closest = insurerMatched
+          .map((c: any) => ({
             row: c,
             amountDiff: c.final_claim_amount
               ? Math.abs(Number(c.final_claim_amount) - txAmount) / Math.max(txAmount, 1)
               : Infinity,
           }))
-          .sort((a, b) => a.amountDiff - b.amountDiff)[0]
+          .sort((a: any, b: any) => a.amountDiff - b.amountDiff)[0]
         if (closest.amountDiff <= amountTolerance) {
           pick = closest.row
           confidence = 'MEDIUM'
@@ -267,11 +282,27 @@ export async function POST(request: NextRequest) {
             result.failed_samples.push({
               tx_id: tx.id,
               client_name: clientRaw,
-              reason: `다수 후보 ${candidates.length}건 — 금액 일치 후보 없음 (입금=${txAmount})`,
+              reason: `다수 후보 ${insurerMatched.length}건 (보험사 일치) — 금액 mismatch (입금=${txAmount})`,
             })
           }
           continue
         }
+      } else if (insurerOnly.length > 0) {
+        // 보험사 mismatch 케이스 — LOW confidence (자동 매칭 안 함, 사용자 검수용)
+        result.low_confidence++
+        const sample = insurerOnly[0]
+        if (result.low_confidence_samples.length < 10) {
+          result.low_confidence_samples.push({
+            tx_id: tx.id,
+            client_name: clientRaw,
+            parsed_insurer: parsed.abbr,
+            actual_insurer: String(sample.insurance_company || '-'),
+            customer_car_number: String(sample.customer_car_number || '-'),
+          })
+        }
+        confidence = 'LOW'
+        // ★ LOW 는 적용 안 함 — 사용자가 dry-run 결과 보고 결정
+        continue
       }
 
       // ── 5) 매칭 적용 ──

@@ -4996,6 +4996,9 @@ export default function BankCardPage() {
                     <div style={{ fontSize: 11, padding: '6px 8px', background: 'rgba(254,243,199,0.5)', borderRadius: 6 }}>
                       🟡 다수 후보 <span style={{ fontWeight: 700 }}>{fmiRentalMatchResult.multi}건</span>
                     </div>
+                    <div style={{ fontSize: 11, padding: '6px 8px', background: 'rgba(253,224,71,0.4)', borderRadius: 6 }}>
+                      ⚠️ 보험사 mismatch <span style={{ fontWeight: 700 }}>{fmiRentalMatchResult.low_confidence || 0}건</span>
+                    </div>
                     <div style={{ fontSize: 11, padding: '6px 8px', background: 'rgba(254,226,226,0.5)', borderRadius: 6 }}>
                       ❌ 후보 없음 <span style={{ fontWeight: 700 }}>{fmiRentalMatchResult.no_candidate}건</span>
                     </div>
@@ -5022,6 +5025,25 @@ export default function BankCardPage() {
                             {' / '}
                             <span style={{ color: '#7c3aed' }}>차량 {s.customer_car_number}</span>
                             <span style={{ marginLeft: 6, fontSize: 9, padding: '0 4px', borderRadius: 4, background: s.confidence === 'HIGH' ? 'rgba(187,247,208,0.6)' : 'rgba(254,243,199,0.6)' }}>{s.confidence}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                  {/* 보험사 mismatch 샘플 — 차량은 있지만 보험사 다름 */}
+                  {fmiRentalMatchResult.low_confidence_samples?.length > 0 && (
+                    <>
+                      <div style={{ fontSize: 11, fontWeight: 600, color: '#a16207', marginBottom: 4 }}>⚠️ 보험사 mismatch — 차량 있는데 다른 보험사로 등록 (사용자 검수)</div>
+                      <div style={{ marginBottom: 10 }}>
+                        {fmiRentalMatchResult.low_confidence_samples.slice(0, 6).map((s: any, i: number) => (
+                          <div key={i} style={{ fontSize: 11, padding: '3px 6px', borderBottom: '1px dashed rgba(0,0,0,0.05)' }}>
+                            <span style={{ fontWeight: 600 }}>{s.client_name}</span>
+                            {' → 입금 보험사 '}
+                            <span style={{ color: '#a16207' }}>「{s.parsed_insurer}」</span>
+                            {' vs DB 등록 '}
+                            <span style={{ color: '#1e40af' }}>「{s.actual_insurer}」</span>
+                            {' / 차량 '}
+                            <span style={{ color: '#7c3aed' }}>{s.customer_car_number}</span>
                           </div>
                         ))}
                       </div>
