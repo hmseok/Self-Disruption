@@ -1450,9 +1450,9 @@ export default function BankCardPage() {
         try {
           const { ok, status, json } = await fetchWithAuth(c.url, { method: 'POST', body: c.body || {} })
           if (!ok) {
-            // 실제 에러 메시지 노출 (HTTP 500 만 보면 진단 불가)
+            // 실제 에러 메시지 노출 (HTTP 500 만 보면 진단 불가) — 전체 메시지 (잘림 X)
             const errMsg = json?.error || '응답 없음'
-            results.push(`❌ ${c.name}: HTTP ${status} — ${String(errMsg).slice(0, 80)}`)
+            results.push(`❌ ${c.name}: HTTP ${status}\n   ${String(errMsg).slice(0, 500)}`)
             continue
           }
           const applied = json.applied ?? json.applied_high_confidence ?? 0
@@ -1480,7 +1480,8 @@ export default function BankCardPage() {
           batches++
           const { ok, status, json } = await fetchWithAuth('/api/finance/transactions/auto-classify-ai', {
             method: 'POST',
-            body: { batchSize: 30, minConfidence: 70, force },
+            // batchSize 30 → 20 — Gemini MAX_TOKENS 사고 방지 (한글 reason 길어서 응답 한도 초과 사례)
+            body: { batchSize: 20, minConfidence: 70, force },
           })
           if (!ok) {
             aiError = `HTTP ${status} — ${json?.error || '응답 없음'}`
