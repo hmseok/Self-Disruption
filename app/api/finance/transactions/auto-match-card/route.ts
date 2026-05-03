@@ -234,22 +234,11 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // (b) 진짜 공용 (카드 매칭 됐지만 차량 미배정) → 공용카드사용 카테고리
-      if (gongyongIdsToCategorize.length > 0) {
-        const ph = gongyongIdsToCategorize.map(() => '?').join(',')
-        try {
-          await prisma.$executeRawUnsafe(
-            `UPDATE transactions
-               SET category = '공용카드사용', final_category = '공용카드사용',
-                   updated_at = NOW()
-             WHERE id IN (${ph})`,
-            ...gongyongIdsToCategorize
-          )
-          gongyongCategorized = gongyongIdsToCategorize.length
-        } catch (e: any) {
-          console.error('[auto-match-card] 공용 카테고리 UPDATE 실패:', e?.message)
-        }
-      }
+      // (b) 진짜 공용 (카드 매칭 됐지만 차량 미배정) → 카테고리 자동 부여 제거
+      // 사용자 명령 (5차원 분리 원칙): 카드 (공용/개인) 정보를 카테고리에 박지 않음.
+      // 카드 차원은 corporate_cards JOIN 으로 자동 표시. 카테고리는 거래처 키워드 룰 분류만.
+      // gongyongIdsToCategorize 는 카운트만 유지 (응답 정보용)
+      gongyongCategorized = 0  // 자동 부여 안 함
     } else {
       // dryRun: 카운트만
       categoryReset = plans.filter(p => p.need_category_reset).length
