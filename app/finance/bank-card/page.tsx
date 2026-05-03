@@ -4713,7 +4713,8 @@ export default function BankCardPage() {
               </>
             )}
 
-            {!groupData && matchResults.length === 0 && !matching && !groupLoading && !autoClassifyResult && (
+            {/* 빈 상태 안내 — 첫 진입 시만 (진행 중이면 floater 가 진행률 표시) */}
+            {!groupData && matchResults.length === 0 && !matching && !groupLoading && !autoClassifyResult && !autoClassifying && !ruleClassifyLoading && !ruleClassifyResult && (
               <div style={{
                 textAlign: 'center', padding: '60px 20px',
                 color: COLORS.textMuted, fontSize: 14,
@@ -4728,17 +4729,26 @@ export default function BankCardPage() {
                 <div style={{ marginTop: 16 }}>
                   <button
                     onClick={() => runAutoClassify(false)}
-                    disabled={autoClassifying}
                     style={{
                       ...BTN.md, padding: '10px 28px',
                       background: '#f59e0b', color: '#fff', border: 'none',
-                      cursor: autoClassifying ? 'wait' : 'pointer',
+                      cursor: 'pointer',
                       fontWeight: 600, fontSize: 14,
                     }}
-                  >
-                    {autoClassifying ? '분류 중...' : '⚡ 자동 분류 실행'}
-                  </button>
+                  >⚡ 자동 분류 실행</button>
                 </div>
+              </div>
+            )}
+
+            {/* 진행 중 안내 — 우측 하단 floater 안내 */}
+            {(autoClassifying || ruleClassifyLoading || groupLoading || matching) && !groupData && matchResults.length === 0 && (
+              <div style={{
+                textAlign: 'center', padding: '40px 20px',
+                color: COLORS.textMuted, fontSize: 13,
+              }}>
+                <div style={{ fontSize: 28, marginBottom: 8, opacity: 0.5 }}>⏳</div>
+                <div>분류 진행 중 — 우측 하단 진행률에서 상태 확인</div>
+                <div style={{ fontSize: 11, marginTop: 4, color: COLORS.textMuted }}>다른 탭으로 이동해도 진행은 계속됩니다</div>
               </div>
             )}
           </>
