@@ -1764,7 +1764,7 @@ export default function BankCardPage() {
     // 플로팅 진행률 (CLAUDE.md 규칙 16) — 사용자 다른 작업 가능, 블로킹 X
     const taskId = floaterProgress.start({
       title: '🔮 풀 자동 매칭 + AI 분류',
-      total: 7, // Phase 1 = 7개 매칭 (Phase 2 는 동적 추가)
+      total: 8, // Phase 1 = 8개 매칭 (Phase 2 는 동적 추가)
     })
     const phase1Results: Array<{ name: string; ok: boolean; applied: number; total: number; skipStr: string; errMsg?: string }> = []
     try {
@@ -1777,6 +1777,7 @@ export default function BankCardPage() {
         { name: '지입',          url: '/api/finance/transactions/auto-match-monthly', body: { type: 'jiip', dateTolerance: 3 } },
         { name: '투자(이자)',    url: '/api/finance/transactions/auto-match-monthly', body: { type: 'invest', dateTolerance: 3 } },
         { name: '급여',          url: '/api/finance/transactions/auto-match-monthly', body: { type: 'salary', dateTolerance: 3 } },
+        { name: '대차건 보험',   url: '/api/finance/transactions/auto-match-fmi-rental', body: { mode: 'insurance' } },
       ]
       let phase1Done = 0
       let totalApplied = 0
