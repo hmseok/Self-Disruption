@@ -335,6 +335,12 @@ export default function BankCardPage() {
   const [matchEntities, setMatchEntities] = useState<Record<string, any[]>>({})
   const [matchEntityLoading, setMatchEntityLoading] = useState<Record<string, boolean>>({})
 
+  // ─── 「매칭 검수」 탭 ──────────────────────────────────────
+  // 분류된 거래 (category 가 미분류 아닌) 만 type 별 그룹 + 매칭 dropdown
+  const [matchReviewItems, setMatchReviewItems] = useState<any[]>([])
+  const [matchReviewLoading, setMatchReviewLoading] = useState(false)
+  const [matchReviewTypeFilter, setMatchReviewTypeFilter] = useState<string>('all') // 'all' | 'unmatched' | type
+
   const loadMatchEntities = useCallback(async (type: string) => {
     if (matchEntities[type] || matchEntityLoading[type]) return
     const cfg = MATCH_TYPES.find(t => t.type === type)
@@ -437,6 +443,26 @@ export default function BankCardPage() {
     }
   }, [])
 
+  // 매칭 검수 — 분류된 거래만 (category 미분류 X)
+  const loadMatchReview = useCallback(async () => {
+    setMatchReviewLoading(true)
+    try {
+      // category 별 fetch — 분류 검수와 같은 list API 사용 + 카테고리 분류된 것만
+      const cats = (summary?.categoryBreakdown || [])
+        .map((c: any) => c.category)
+        .filter((c: string, i: number, a: string[]) => c && c !== '미분류' && a.indexOf(c) === i)
+      // 한 카테고리 당 최대 200건씩 — 모든 카테고리 합치기
+      const all: any[] = []
+      for (const cat of cats) {
+        const { json } = await fetchWithAuth(`/api/finance/transactions/list?category=${encodeURIComponent(cat)}&limit=500`)
+        if (Array.isArray(json?.data)) all.push(...json.data)
+      }
+      setMatchReviewItems(all)
+    } finally {
+      setMatchReviewLoading(false)
+    }
+  }, [summary])
+
   const loadSmsData = useCallback(async () => {
     setSmsLoading(true)
     try {
@@ -529,7 +555,8 @@ export default function BankCardPage() {
   useEffect(() => {
     if (activeTab === 'sms') loadSmsData()
     if (activeTab === 'mapping') loadMappings()
-  }, [activeTab, loadSmsData, loadMappings])
+    if (activeTab === 'matchreview') loadMatchReview()
+  }, [activeTab, loadSmsData, loadMappings, loadMatchReview])
 
   // 실패 건 재파싱
   const [reparsing, setReparsing] = useState(false)
@@ -1756,12 +1783,32 @@ export default function BankCardPage() {
       alert(`${confidence} 그룹에 적용할 항목 없음`)
       return
     }
-    if (!confirm(`${confidence.toUpperCase()} 그룹 ${items.length}건 일괄 확정하시겠습니까?\n(분류 적용 — 되돌리려면 분류 검수에서 직접 수정)`)) return
 
-    const taskId = floaterProgress.start({ title: `✓ ${confidence.toUpperCase()} 일괄 확정 진행 중`, total: items.length })
+    // 미분류 제외 — 카테고리 안 정한 거래는 일괄 확정 의미 없음
+    const validItems = items.filter((it: any) => {
+      const cat = it.subcategory || it.category
+      return cat && cat !== '미분류'
+    })
+    const skippedCount = items.length - validItems.length
+    if (validItems.length === 0) {
+      alert(`적용 가능한 항목 없음\n(미분류 ${items.length}건 — row 별 카테고리 dropdown 으로 먼저 변경)`)
+      return
+    }
+
+    // 룰 학습 옵션 — 일괄
+    const learnable = validItems.filter((it: any) => it.client_name || (it.description || '').trim())
+    const wantLearn = learnable.length > 0 ? confirm(
+      `${confidence.toUpperCase()} 그룹 ${validItems.length}건 일괄 확정${skippedCount > 0 ? ` (미분류 ${skippedCount}건 스킵)` : ''}\n\n` +
+      `이 거래들의 거래처 패턴을 룰로 일괄 학습하시겠습니까?\n` +
+      `(다음부터 같은 거래처 자동 분류 — ${learnable.length}건 후보)\n\n` +
+      `[확인] 룰 학습 + 확정\n[취소] 확정만 (학습 X)`
+    ) : false
+    if (!learnable.length && !confirm(`${validItems.length}건 일괄 확정 (학습 대상 없음)`)) return
+
+    const taskId = floaterProgress.start({ title: `✓ ${confidence.toUpperCase()} 일괄 확정${wantLearn ? ' + 학습' : ''} 진행 중`, total: validItems.length })
     setRuleClassifyLoading(true)
     try {
-      const payload = items.map((it: any) => ({
+      const payload = validItems.map((it: any) => ({
         id: it.id,
         category: it.subcategory || it.category,
         related_type: it.related_type || null,
@@ -1771,8 +1818,34 @@ export default function BankCardPage() {
         method: 'POST',
         body: { items: payload },
       })
-      floaterProgress.update(taskId, { processed: items.length, applied: json?.applied || 0, failed: json?.failed || 0 })
-      floaterProgress.finish(taskId, `✅ 적용 ${json?.applied || 0}건 / 실패 ${json?.failed || 0}건`)
+
+      // 룰 학습 — 일괄 batch
+      let learnAdded = 0
+      let learnSkipped = 0
+      if (wantLearn && learnable.length > 0) {
+        try {
+          const learnPayload = learnable.map((it: any) => ({
+            transaction_id: it.id,
+            description: it.description,
+            client_name: it.client_name,
+            category: it.subcategory || it.category,
+            tx_type: it.type,
+            confidence: 'high',
+          }))
+          const { json: lr } = await fetchWithAuth('/api/finance/classification-rules/learn', {
+            method: 'POST',
+            body: { items: learnPayload },
+          })
+          learnAdded = Number(lr?.added || 0)
+          learnSkipped = Number(lr?.already_existed || 0)
+        } catch (e: any) {
+          console.warn('[일괄 학습] 실패:', e?.message)
+        }
+      }
+
+      floaterProgress.update(taskId, { processed: validItems.length, applied: json?.applied || 0, failed: json?.failed || 0 })
+      const learnMsg = wantLearn ? ` · 학습 ${learnAdded}건 추가 (중복 ${learnSkipped})` : ''
+      floaterProgress.finish(taskId, `✅ 적용 ${json?.applied || 0}건 / 실패 ${json?.failed || 0}건${learnMsg}`)
       await runRuleClassify()
       await Promise.all([loadSummary(), loadTransactions()])
     } catch (e: any) {
@@ -1782,19 +1855,62 @@ export default function BankCardPage() {
     }
   }
 
-  const applyOneClassify = async (it: any) => {
+  // LOW 그룹 row 의 카테고리 / 매칭 인메모리 변경 (확정 전 사용자 수정)
+  const updateRuleRow = (id: string, patch: Record<string, any>) => {
+    setRuleClassifyResult((prev: any) => {
+      if (!prev) return prev
+      const newGroups = { ...prev.groups }
+      for (const conf of ['high', 'medium', 'low'] as const) {
+        newGroups[conf] = (newGroups[conf] || []).map((x: any) => x.id === id ? { ...x, ...patch } : x)
+      }
+      return { ...prev, groups: newGroups }
+    })
+  }
+
+  const applyOneClassify = async (it: any, options?: { withRule?: boolean }) => {
+    // 미분류 그대로 확정은 의미 없음 — 경고
+    const finalCategory = it.subcategory || it.category
+    if (!finalCategory || finalCategory === '미분류') {
+      alert('카테고리를 먼저 선택하세요. (드롭다운으로 변경)')
+      return
+    }
     setRuleClassifyLoading(true)
     try {
       const { json } = await fetchWithAuth('/api/finance/auto-classify/apply', {
         method: 'POST',
         body: { items: [{
           id: it.id,
-          category: it.subcategory || it.category,
+          category: finalCategory,
           related_type: it.related_type || null,
           related_id: it.related_id || null,
         }]},
       })
       if ((json?.applied || 0) > 0) {
+        // 룰 학습 옵션 — confirm dialog 또는 명시적 호출
+        if (options?.withRule) {
+          try {
+            const { json: lr } = await fetchWithAuth('/api/finance/classification-rules/learn', {
+              method: 'POST',
+              body: {
+                transaction_id: it.id,
+                description: it.description,
+                client_name: it.client_name,
+                category: finalCategory,
+                tx_type: it.type,
+                confidence: 'high',
+              },
+            })
+            if (lr?.already_exists) {
+              console.log('[학습] 같은 룰 이미 존재 — skip')
+            } else if (lr?.ok) {
+              console.log(`[학습] 룰 추가: "${lr.pattern}" → ${lr.category} (${lr.extracted_from})`)
+            } else if (lr?.error) {
+              console.warn(`[학습] 실패: ${lr.error}`)
+            }
+          } catch (e: any) {
+            console.warn('[학습] 룰 추가 실패:', e?.message)
+          }
+        }
         // 결과 인메모리 갱신 — 적용된 거래 제거
         setRuleClassifyResult((prev: any) => {
           if (!prev) return prev
@@ -2012,6 +2128,7 @@ export default function BankCardPage() {
     { key: 'card', label: '카드 거래', count: summary?.transactions.card },
     // 분류 검수 / 미분류 통합 — 한 탭에서 미분류 그룹 분류 + 분류 완료 카테고리 검수 모두 처리
     { key: 'classify', label: '분류 검수', count: (summary?.transactions.classified || 0) + (summary?.transactions.unclassified || 0) },
+    { key: 'matchreview', label: '매칭 검수', count: summary?.transactions.classified || 0 },
     { key: 'settlement', label: '정산 연결', count: summary?.settlement.total },
     { key: 'sms', label: 'SMS 수집', count: summary?.sms?.total || 0 },
     { key: 'mapping', label: '매핑 관리' },
@@ -2945,23 +3062,38 @@ export default function BankCardPage() {
                               </tr>
                             </thead>
                             <tbody>
-                              {(ruleClassifyResult.groups?.[expandedGroup] || []).slice(0, 200).map((it: any) => (
+                              {(ruleClassifyResult.groups?.[expandedGroup] || []).slice(0, 200).map((it: any) => {
+                                // 카드 정보 라벨 — 명확히 표시 (사용자 의문: "어떤 카드로 누가 썼는지 모름")
+                                const cardLabel = it.card_alias
+                                  ? `💳 ${it.card_alias}${it.card_holder_name ? ` · ${it.card_holder_name}` : ''}`
+                                  : it.card_holder_name
+                                    ? `👤 ${it.card_holder_name}`
+                                    : null
+                                // 카테고리 후보 — summary.categoryBreakdown 에서 + 「개인」 / 「미분류」 추가
+                                const allCategories = Array.from(new Set([
+                                  ...(summary?.categoryBreakdown || []).map((c: any) => c.category),
+                                  '미분류',
+                                ])).filter(Boolean)
+                                return (
                                 <tr key={it.id} style={{ borderBottom: `1px solid ${COLORS.borderSubtle}` }}>
                                   <td style={{ padding: '6px 8px' }}>
                                     <div style={{ fontWeight: 500, color: COLORS.textPrimary }}>{(it.description || '-').slice(0, 50)}</div>
-                                    {it.card_alias && <div style={{ fontSize: 10, color: COLORS.textMuted }}>{it.card_alias}</div>}
+                                    {cardLabel && <div style={{ fontSize: 10, color: '#7c3aed', marginTop: 1 }}>{cardLabel}</div>}
                                   </td>
-                                  <td style={{ padding: '6px 8px' }}>
-                                    <div style={{ fontWeight: 600, color: '#1e40af' }}>{it.category}</div>
-                                    {it.subcategory && <div style={{ fontSize: 10, color: COLORS.textSecondary }}>{it.subcategory}</div>}
+                                  <td style={{ padding: '6px 8px', minWidth: 140 }}>
+                                    {/* 카테고리 변경 dropdown — 미분류 → 다른 카테고리 직접 선택 */}
+                                    <select
+                                      value={it.subcategory || it.category || '미분류'}
+                                      onChange={(e) => updateRuleRow(it.id, { category: e.target.value, subcategory: null })}
+                                      style={{ fontSize: 11, padding: '2px 4px', border: `1px solid ${COLORS.borderSubtle}`, borderRadius: 4, color: '#1e40af', cursor: 'pointer', maxWidth: 130, fontWeight: 600 }}
+                                    >
+                                      {allCategories.map((c: string) => (
+                                        <option key={c} value={c}>{c}</option>
+                                      ))}
+                                    </select>
                                   </td>
                                   <td style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 600,
                                                 color: (() => {
-                                                  // 부호 정책 (CLAUDE.md 규칙 18):
-                                                  //   카드 승인 → 검정 (부호 X)
-                                                  //   카드 취소 → 빨강 (- 부호)
-                                                  //   통장 입금 → 녹색 (부호 X — 컬럼/색상이 의미)
-                                                  //   통장 출금 → 빨강 (부호 X — 컬럼/색상이 의미)
                                                   const isCard = it.imported_from === 'sms' || (it.imported_from || '').startsWith('excel_card') || (it.imported_from || '').startsWith('pdf_card')
                                                   if (isCard) {
                                                     return it.sms_transaction_type === 'canceled' ? COLORS.expense : COLORS.textPrimary
@@ -2969,44 +3101,87 @@ export default function BankCardPage() {
                                                   return it.type === 'income' ? COLORS.income : COLORS.expense
                                                 })() }}>
                                     {(() => {
-                                      // - 부호는 카드 취소에만. + 부호는 절대 X (CLAUDE.md 규칙 18)
                                       const isCard = it.imported_from === 'sms' || (it.imported_from || '').startsWith('excel_card') || (it.imported_from || '').startsWith('pdf_card')
                                       const showMinus = isCard && it.sms_transaction_type === 'canceled'
                                       return `${showMinus ? '-' : ''}${nf(Number(it.amount || 0))}`
                                     })()}
                                   </td>
-                                  <td style={{ padding: '6px 8px', fontSize: 11 }}>
-                                    {it.related_type === 'car' && it.car_number ? (
-                                      <div>
-                                        <span style={{ color: '#1e40af', fontWeight: 600 }}>🚗 {it.car_number}</span>
-                                        {it.car_brand && it.car_model && <div style={{ color: COLORS.textMuted, fontSize: 10 }}>{it.car_brand} {it.car_model}</div>}
-                                      </div>
-                                    ) : it.card_holder_name ? (
-                                      <span style={{ color: '#7c3aed' }}>👤 {it.card_holder_name}</span>
-                                    ) : (
-                                      <span style={{ color: '#cbd5e1' }}>—</span>
-                                    )}
+                                  <td style={{ padding: '6px 8px', fontSize: 11, minWidth: 200 }}>
+                                    {/* 매칭 변경 — 분류 검수 거래 row 와 동일한 2단 dropdown */}
+                                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                                      <select
+                                        value={it.related_type || ''}
+                                        onChange={(e) => {
+                                          const newType = e.target.value
+                                          if (!newType) {
+                                            updateRuleRow(it.id, { related_type: null, related_id: null })
+                                            return
+                                          }
+                                          loadMatchEntities(newType)
+                                          updateRuleRow(it.id, { related_type: newType, related_id: null })
+                                        }}
+                                        style={{ fontSize: 10, padding: '1px 4px', border: `1px solid ${COLORS.borderSubtle}`, borderRadius: 4, cursor: 'pointer', minWidth: 80 }}
+                                      >
+                                        <option value="">— 매칭 —</option>
+                                        {MATCH_TYPES.map(t => (
+                                          <option key={t.type} value={t.type}>{t.label}</option>
+                                        ))}
+                                      </select>
+                                      {it.related_type && (() => {
+                                        const cfg = MATCH_TYPES.find(t => t.type === it.related_type)
+                                        if (!cfg) return null
+                                        const list = matchEntities[it.related_type] || []
+                                        const loading = !!matchEntityLoading[it.related_type]
+                                        return (
+                                          <select
+                                            value={it.related_id || ''}
+                                            onChange={(e) => updateRuleRow(it.id, { related_id: e.target.value || null })}
+                                            style={{ fontSize: 10, padding: '1px 4px', border: `1px solid ${COLORS.borderSubtle}`, borderRadius: 4, cursor: 'pointer', maxWidth: 160 }}
+                                          >
+                                            <option value="">{loading ? '로드 중...' : `— 선택 —`}</option>
+                                            {list.map((r: any) => (
+                                              <option key={r.id} value={r.id}>{cfg.labelFn(r)}</option>
+                                            ))}
+                                          </select>
+                                        )
+                                      })()}
+                                    </div>
                                   </td>
                                   <td style={{ padding: '6px 8px', fontSize: 11, color: COLORS.textMuted }}>{it.reason}</td>
                                   <td style={{ padding: '6px 8px', textAlign: 'center' }}>
                                     <div style={{ display: 'flex', gap: 4, justifyContent: 'center', flexWrap: 'wrap' }}>
                                       <button
-                                        onClick={() => applyOneClassify(it)}
+                                        onClick={async () => {
+                                          // 카테고리 미분류면 경고는 applyOneClassify 안에서
+                                          const finalCat = it.subcategory || it.category
+                                          const canLearn = finalCat && finalCat !== '미분류' && (it.client_name || it.description)
+                                          const withRule = canLearn ? confirm(
+                                            `「${finalCat}」 로 확정합니다.\n\n` +
+                                            `이 거래처 패턴을 룰에 자동 추가하시겠습니까?\n` +
+                                            `(다음부터 같은 거래처가 자동 분류됩니다)\n\n` +
+                                            `· 거래처: ${it.client_name || (it.description || '').split(/\s/)[0]}\n` +
+                                            `· 카테고리: ${finalCat}\n\n` +
+                                            `[확인] 룰 추가 + 확정\n[취소] 확정만`
+                                          ) : false
+                                          await applyOneClassify(it, { withRule })
+                                        }}
                                         disabled={ruleClassifyLoading}
+                                        title="카테고리 확정 + 룰 학습 옵션"
                                         style={{ ...BTN.sm, padding: '3px 8px', fontSize: 10, fontWeight: 600,
                                                  background: '#15803d', color: '#fff', cursor: ruleClassifyLoading ? 'wait' : 'pointer' }}
                                       >✓ 확정</button>
                                       <button
                                         onClick={() => markAsPersonal(it)}
                                         disabled={ruleClassifyLoading}
-                                        title="직원 개인 사용 — 급여 차감 후보로 등록"
+                                        title="직원 개인 사용 — 급여 차감 후보"
                                         style={{ ...BTN.sm, padding: '3px 8px', fontSize: 10, fontWeight: 600,
                                                  background: '#ca8a04', color: '#fff', cursor: ruleClassifyLoading ? 'wait' : 'pointer' }}
                                       >👤 개인</button>
                                     </div>
                                   </td>
                                 </tr>
-                              ))}
+                                )
+                              })}
                             </tbody>
                           </table>
                           {ruleClassifyResult.groups?.[expandedGroup]?.length > 200 && (
@@ -3770,6 +3945,152 @@ export default function BankCardPage() {
             )}
           </>
         )}
+
+        {/* ──── 매칭 검수 탭 (분류된 거래만 — type 별 그룹 + 매칭 dropdown) ──── */}
+        {activeTab === 'matchreview' && (() => {
+          // type 별 group + unmatched 그룹
+          const groups: Record<string, any[]> = { unmatched: [] }
+          for (const t of MATCH_TYPES) groups[t.type] = []
+          for (const it of matchReviewItems) {
+            const t = it.related_type || (it.matched_car_id_sms ? 'car' : null)
+            if (t && groups[t]) groups[t].push(it)
+            else groups.unmatched.push(it)
+          }
+          const filteredGroups = matchReviewTypeFilter === 'all'
+            ? Object.entries(groups)
+            : Object.entries(groups).filter(([k]) => k === matchReviewTypeFilter)
+          return (
+            <>
+              <div style={{ ...GLASS.L3, border: `1px solid ${COLORS.borderBlue}`, borderRadius: 12, padding: '14px 20px', marginBottom: 12 }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: COLORS.textPrimary, marginBottom: 4 }}>
+                  매칭 검수 — 분류된 거래 {matchReviewItems.length}건
+                </div>
+                <div style={{ fontSize: 12, color: COLORS.textMuted, marginBottom: 8 }}>
+                  분류 끝난 거래의 차량/직원/보험/대출 등 매칭 최종 점검. 미매칭 우선 처리.
+                </div>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  <button
+                    onClick={loadMatchReview}
+                    disabled={matchReviewLoading}
+                    style={{ ...BTN.sm, padding: '4px 10px', fontSize: 11, background: COLORS.primary, color: '#fff', border: 'none', cursor: matchReviewLoading ? 'wait' : 'pointer' }}
+                  >{matchReviewLoading ? '로드 중...' : '🔄 새로고침'}</button>
+                  <select
+                    value={matchReviewTypeFilter}
+                    onChange={(e) => setMatchReviewTypeFilter(e.target.value)}
+                    style={{ fontSize: 11, padding: '3px 8px', border: `1px solid ${COLORS.borderSubtle}`, borderRadius: 4 }}
+                  >
+                    <option value="all">전체 ({matchReviewItems.length})</option>
+                    <option value="unmatched">🚧 미매칭 ({groups.unmatched.length})</option>
+                    {MATCH_TYPES.map(t => groups[t.type]?.length > 0 ? (
+                      <option key={t.type} value={t.type}>{t.label} ({groups[t.type].length})</option>
+                    ) : null)}
+                  </select>
+                </div>
+              </div>
+
+              {filteredGroups.map(([type, items]) => {
+                if (items.length === 0) return null
+                const cfg = type === 'unmatched' ? null : MATCH_TYPES.find(t => t.type === type)
+                const groupLabel = type === 'unmatched' ? `🚧 미매칭 (${items.length}건)` : `${cfg?.label || type} (${items.length}건)`
+                const groupColor = type === 'unmatched' ? '#dc2626' : '#1e40af'
+                return (
+                  <div key={type} style={{ ...GLASS.L4, border: `1px solid ${COLORS.borderSubtle}`, borderRadius: 10, marginBottom: 12, overflow: 'hidden' }}>
+                    <div style={{ padding: '10px 16px', background: 'rgba(0,0,0,0.02)', fontWeight: 700, fontSize: 13, color: groupColor }}>
+                      {groupLabel}
+                    </div>
+                    <div style={{ overflowX: 'auto', maxHeight: 400, overflowY: 'auto' }}>
+                      <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
+                        <thead style={{ position: 'sticky', top: 0, background: 'rgba(255,255,255,0.95)', zIndex: 1 }}>
+                          <tr style={{ background: 'rgba(0,0,0,0.02)' }}>
+                            <th style={{ padding: '6px 8px', textAlign: 'left', color: COLORS.textSecondary, fontWeight: 600 }}>날짜</th>
+                            <th style={{ padding: '6px 8px', textAlign: 'left', color: COLORS.textSecondary, fontWeight: 600 }}>거래처/적요</th>
+                            <th style={{ padding: '6px 8px', textAlign: 'left', color: COLORS.textSecondary, fontWeight: 600 }}>카테고리</th>
+                            <th style={{ padding: '6px 8px', textAlign: 'right', color: COLORS.textSecondary, fontWeight: 600 }}>금액</th>
+                            <th style={{ padding: '6px 8px', textAlign: 'left', color: COLORS.textSecondary, fontWeight: 600 }}>매칭 변경</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {items.slice(0, 200).map((it: any) => (
+                            <tr key={it.id} style={{ borderTop: '1px solid rgba(0,0,0,0.04)' }}>
+                              <td style={{ padding: '6px 8px', whiteSpace: 'nowrap', color: COLORS.textPrimary }}>
+                                {it.transaction_date ? String(it.transaction_date).slice(0, 10) : '-'}
+                              </td>
+                              <td style={{ padding: '6px 8px', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                <div style={{ fontWeight: 500 }}>{it.client_name || it.sms_holder || it.description || '-'}</div>
+                                {it.matched_card_alias && <div style={{ fontSize: 10, color: '#7c3aed' }}>💳 {it.matched_card_alias}{it.matched_holder_name ? ` · ${it.matched_holder_name}` : ''}</div>}
+                              </td>
+                              <td style={{ padding: '6px 8px', fontSize: 11, color: '#1e40af', fontWeight: 600 }}>
+                                {it.category || '-'}
+                              </td>
+                              <td style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 600, color: it.type === 'income' ? COLORS.income : COLORS.expense }}>
+                                {nf(Number(it.amount || 0))}
+                              </td>
+                              <td style={{ padding: '6px 8px', minWidth: 220 }}>
+                                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                                  <select
+                                    value={it.related_type || ''}
+                                    onChange={(e) => {
+                                      const newType = e.target.value
+                                      if (!newType) {
+                                        changeItemMatch(it.id, null, null)
+                                        setMatchReviewItems(prev => prev.map(i => i.id === it.id ? { ...i, related_type: null, related_id: null } : i))
+                                        return
+                                      }
+                                      loadMatchEntities(newType)
+                                      setMatchReviewItems(prev => prev.map(i => i.id === it.id ? { ...i, related_type: newType, related_id: null } : i))
+                                    }}
+                                    style={{ fontSize: 10, padding: '1px 4px', border: `1px solid ${COLORS.borderSubtle}`, borderRadius: 4, cursor: 'pointer', minWidth: 80 }}
+                                  >
+                                    <option value="">— 매칭 —</option>
+                                    {MATCH_TYPES.map(t => (
+                                      <option key={t.type} value={t.type}>{t.label}</option>
+                                    ))}
+                                  </select>
+                                  {it.related_type && (() => {
+                                    const cfg2 = MATCH_TYPES.find(t => t.type === it.related_type)
+                                    if (!cfg2) return null
+                                    const list = matchEntities[it.related_type] || []
+                                    const loading = !!matchEntityLoading[it.related_type]
+                                    return (
+                                      <select
+                                        value={it.related_id || ''}
+                                        onChange={async (e) => {
+                                          const newEntityId = e.target.value || null
+                                          await changeItemMatch(it.id, it.related_type, newEntityId)
+                                          setMatchReviewItems(prev => prev.map(i => i.id === it.id ? { ...i, related_id: newEntityId } : i))
+                                        }}
+                                        style={{ fontSize: 10, padding: '1px 4px', border: `1px solid ${COLORS.borderSubtle}`, borderRadius: 4, cursor: 'pointer', maxWidth: 180 }}
+                                      >
+                                        <option value="">{loading ? '로드 중...' : `— 선택 —`}</option>
+                                        {list.map((r: any) => (
+                                          <option key={r.id} value={r.id}>{cfg2.labelFn(r)}</option>
+                                        ))}
+                                      </select>
+                                    )
+                                  })()}
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                      {items.length > 200 && (
+                        <div style={{ padding: '6px', textAlign: 'center', fontSize: 11, color: COLORS.textMuted }}>
+                          ⋯ {items.length - 200}건 더
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+              {!matchReviewLoading && matchReviewItems.length === 0 && (
+                <div style={{ ...GLASS.L4, padding: 40, textAlign: 'center', borderRadius: 10, color: COLORS.textMuted }}>
+                  분류된 거래가 없습니다 — 「분류 검수」 탭에서 먼저 카테고리 적용 후 진행
+                </div>
+              )}
+            </>
+          )
+        })()}
 
         {/* ──── 정산 연결 탭 ──── */}
         {activeTab === 'settlement' && (
