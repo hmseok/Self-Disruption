@@ -34,7 +34,12 @@ function* walk(dir) {
 
 function extractTemplateBlocks(src) {
   const blocks = []
-  const tplRegex = /\$(?:queryRaw|executeRaw)(?:Unsafe)?(?:<[^>]*>)?\s*`/g
+  // 두 패턴 모두 매칭:
+  //   1. tagged template: prisma.$queryRaw`SELECT ...`
+  //   2. unsafe call:    prisma.$queryRawUnsafe<T>(`SELECT ...`)
+  // 후자가 못 잡혀서 2026-05-03 summary 사고 발생.
+  // \s*\(?\s* — 선택적 ( 허용
+  const tplRegex = /\$(?:queryRaw|executeRaw)(?:Unsafe)?(?:<[^>]*>)?\s*\(?\s*`/g
   let m
   while ((m = tplRegex.exec(src)) !== null) {
     let i = m.index + m[0].length

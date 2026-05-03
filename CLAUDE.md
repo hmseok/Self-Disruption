@@ -512,6 +512,31 @@ sql-lint 가 lib/*.ts 안 SQL helper 함수 (이름 *Sql 끝) 검사:
 검증: lib/_test-helper.ts 의 nonexistent_col_xyz → ❌ 차단 확인
 ```
 
+**2026-05-03 신설 자동화 (lint extractTemplateBlocks 강화)**:
+
+```
+사고: summary API 의 GROUP BY cat (alias) → 1055 only_full_group_by 위반
+     → API 500 → frontend 「분류 검수 0」 표시 (데이터 안 잃었지만 화면 panic)
+
+원인 분석:
+- sql-group-by-lint 의 extractTemplateBlocks regex:
+    /\$(?:queryRaw|executeRaw)(?:Unsafe)?(?:<[^>]*>)?\s*`/
+- $queryRawUnsafe<T>(`...`) 패턴: ( 가 끼어있어서 backtick 매칭 fail
+- 즉 Unsafe 호출의 SQL 은 lint 가 추출 못함 → 검사 skip → 사고 통과
+
+[자동화 신설 — 두 lint 동시 강화]
+1. sql-group-by-lint extractTemplateBlocks:
+   - regex \s*\(?\s*` — 선택적 ( 허용
+   - Unsafe 호출의 backtick template 도 추출
+2. sql-reserved-alias-lint extractSqlBlocks:
+   - ( ) 형식 처리 분기 — 다음 글자가 backtick 이면 template 으로 캡처
+   - 변수 인자 ($queryRawUnsafe(query, ...)) 는 skip 유지
+
+검증:
+- 임시 _test-gb-unsafe.ts 의 GROUP BY alias → ❌ 차단 ✓
+- 임시 _test-alias-unsafe.ts 의 AS desc → ❌ 차단 ✓
+```
+
 ### 규칙 16 — 시간 걸리는 작업은 플로팅 진행률 의무 (2026-05-02 신설)
 
 > **사용자 명령**: "AI 진행 관련은 공통컴포넌트로 진행율 표출. 시간도 걸리니 플로팅화."

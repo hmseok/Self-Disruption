@@ -88,10 +88,38 @@ function extractSqlBlocks(src) {
         i++
       }
     } else {
-      // ( ... ) 형식: prisma.$queryRawUnsafe(query, ...) 처럼 변수 첫 인자면 skip
-      // — 검사 대상은 SQL 자체 (template literal) 만
-      i++  // skip — backtick template 만 검사 대상
-      continue
+      // ( ... ) 형식 — 첫 인자가 backtick template 이면 검사 (Unsafe 호출의 SQL)
+      // 변수 인자면 skip (extractSqlBlocks 가 다른 위치에서 안 잡음)
+      // skip 공백
+      while (i < src.length && /\s/.test(src[i])) i++
+      if (src[i] === '`') {
+        // backtick template 시작 — 백틱 안 SQL 캡처
+        i++
+        while (i < src.length) {
+          const c = src[i]
+          if (c === '\\') { str += c + src[i+1]; i += 2; continue }
+          if (c === '$' && src[i+1] === '{') {
+            let braceDepth = 1
+            str += '${'
+            i += 2
+            while (i < src.length && braceDepth > 0) {
+              if (src[i] === '{') braceDepth++
+              else if (src[i] === '}') braceDepth--
+              if (braceDepth > 0) str += src[i]
+              i++
+            }
+            str += '}'
+            continue
+          }
+          if (c === '`') break
+          str += c
+          i++
+        }
+      } else {
+        // 변수 인자 — skip
+        i++
+        continue
+      }
     }
     const startLine = src.slice(0, m.index).split('\n').length
     blocks.push({ sql: str, startLine, startIndex: m.index })
