@@ -435,6 +435,21 @@ export default function BankCardPage() {
     summary: { totalEntities: number; totalMatched: number; totalUnmatched: number }
   } | null>(null)
   const [matchReviewLoading, setMatchReviewLoading] = useState(false)
+  // 매칭 시스템 진단 결과
+  const [matchDiagnostic, setMatchDiagnostic] = useState<any | null>(null)
+  const [matchDiagnosticLoading, setMatchDiagnosticLoading] = useState(false)
+  const runMatchDiagnostic = async () => {
+    setMatchDiagnosticLoading(true)
+    try {
+      const { json } = await fetchWithAuth('/api/finance/match-review/diagnostic')
+      if (json && !json.error) setMatchDiagnostic(json)
+      else alert('진단 실패: ' + (json?.error || '응답 없음'))
+    } catch (e: any) {
+      alert('진단 실패: ' + e.message)
+    } finally {
+      setMatchDiagnosticLoading(false)
+    }
+  }
   const [matchReviewTypeFilter, setMatchReviewTypeFilter] = useState<string>('all') // 'all' | 'unmatched' | type
   const [expandedEntityId, setExpandedEntityId] = useState<string | null>(null) // 펼친 entity (type:id)
   const [entityTransactions, setEntityTransactions] = useState<Record<string, any[]>>({}) // entity 별 거래 lazy load
@@ -4801,6 +4816,11 @@ export default function BankCardPage() {
                     disabled={matchReviewLoading}
                     style={{ ...BTN.sm, padding: '4px 10px', fontSize: 11, background: COLORS.primary, color: '#fff', border: 'none', cursor: matchReviewLoading ? 'wait' : 'pointer' }}
                   >{matchReviewLoading ? '로드 중...' : '🔄 새로고침'}</button>
+                  <button
+                    onClick={runMatchDiagnostic}
+                    disabled={matchDiagnosticLoading}
+                    style={{ ...BTN.sm, padding: '4px 10px', fontSize: 11, background: '#fff', color: '#7c3aed', border: '1px solid rgba(124,58,237,0.3)', cursor: matchDiagnosticLoading ? 'wait' : 'pointer' }}
+                  >{matchDiagnosticLoading ? '진단 중...' : '🩺 매칭 진단'}</button>
                   <select
                     value={matchReviewTypeFilter}
                     onChange={(e) => setMatchReviewTypeFilter(e.target.value)}
@@ -4813,6 +4833,81 @@ export default function BankCardPage() {
                   </select>
                 </div>
               </div>
+
+              {/* 진단 결과 글래스 패널 (CLAUDE.md 규칙 20) */}
+              {matchDiagnostic && (
+                <div style={{ ...GLASS.L4, border: '1px solid rgba(124,58,237,0.3)', borderRadius: 12, padding: '14px 18px', marginBottom: 12 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: '#7c3aed' }}>🩺 매칭 시스템 진단 결과</div>
+                    <button onClick={() => setMatchDiagnostic(null)} style={{ background: 'transparent', border: 'none', color: COLORS.textMuted, cursor: 'pointer', fontSize: 12 }}>× 닫기</button>
+                  </div>
+                  {/* findings (결론) */}
+                  <div style={{ marginBottom: 10 }}>
+                    {matchDiagnostic.findings?.map((f: string, i: number) => (
+                      <div key={i} style={{ fontSize: 12, color: COLORS.textPrimary, padding: '3px 0' }}>{f}</div>
+                    ))}
+                  </div>
+                  {/* 매칭 소스 테이블 */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 6, marginBottom: 10 }}>
+                    {Object.entries(matchDiagnostic.tables || {}).map(([k, v]: any) => (
+                      <div key={k} style={{ fontSize: 11, padding: '4px 8px', background: 'rgba(0,0,0,0.03)', borderRadius: 6 }}>
+                        <span style={{ color: COLORS.textMuted }}>{k}</span>: <span style={{ fontWeight: 600 }}>{Number(v).toLocaleString()}</span>
+                      </div>
+                    ))}
+                  </div>
+                  {/* 마스터 데이터 */}
+                  <div style={{ fontSize: 11, fontWeight: 600, color: COLORS.textSecondary, marginBottom: 4 }}>마스터 데이터 (매칭 후보 풀)</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 6, marginBottom: 10 }}>
+                    {Object.entries(matchDiagnostic.masters || {}).map(([k, v]: any) => (
+                      <div key={k} style={{ fontSize: 11, padding: '4px 8px', background: Number(v) === 0 ? 'rgba(254,226,226,0.5)' : 'rgba(0,0,0,0.03)', borderRadius: 6 }}>
+                        <span style={{ color: COLORS.textMuted }}>{k}</span>: <span style={{ fontWeight: 600, color: Number(v) === 0 ? '#b91c1c' : COLORS.textPrimary }}>{Number(v).toLocaleString()}</span>
+                      </div>
+                    ))}
+                  </div>
+                  {/* sources 분포 */}
+                  {matchDiagnostic.sources?.length > 0 && (
+                    <>
+                      <div style={{ fontSize: 11, fontWeight: 600, color: COLORS.textSecondary, marginBottom: 4 }}>transaction_vehicle_allocations source_type 분포</div>
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
+                        {matchDiagnostic.sources.map((s: any) => (
+                          <span key={s.source_type} style={{ fontSize: 11, padding: '2px 8px', borderRadius: 6, background: 'rgba(124,58,237,0.08)', color: '#7c3aed' }}>
+                            {s.source_type}: {s.cnt}건 ({nf(s.total_amount)}원)
+                          </span>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                  {/* fmi_rentals 보험사별 */}
+                  {matchDiagnostic.fmi_rentals_by_insurer?.length > 0 && (
+                    <>
+                      <div style={{ fontSize: 11, fontWeight: 600, color: COLORS.textSecondary, marginBottom: 4 }}>fmi_rentals 보험사별 (대차건 매칭 후보)</div>
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
+                        {matchDiagnostic.fmi_rentals_by_insurer.slice(0, 10).map((s: any, i: number) => (
+                          <span key={i} style={{ fontSize: 11, padding: '2px 8px', borderRadius: 6, background: 'rgba(59,130,246,0.08)', color: '#1e40af' }}>
+                            {s.insurance_company}: {s.cnt}건
+                          </span>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                  {/* 미매칭 입금 거래 샘플 */}
+                  {matchDiagnostic.sample_unmatched_income?.length > 0 && (
+                    <>
+                      <div style={{ fontSize: 11, fontWeight: 600, color: COLORS.textSecondary, marginBottom: 4 }}>미매칭 입금 거래 샘플 (입금자명 패턴 확인)</div>
+                      <div style={{ maxHeight: 200, overflowY: 'auto', fontSize: 11 }}>
+                        {matchDiagnostic.sample_unmatched_income.map((t: any) => (
+                          <div key={t.id} style={{ display: 'flex', gap: 8, padding: '3px 0', borderBottom: '1px dashed rgba(0,0,0,0.05)' }}>
+                            <span style={{ color: COLORS.textMuted, width: 80 }}>{t.date}</span>
+                            <span style={{ fontWeight: 600, width: 100 }}>{t.client_name || '-'}</span>
+                            <span style={{ flex: 1, color: COLORS.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.description || '-'}</span>
+                            <span style={{ fontWeight: 600, color: COLORS.income }}>{nf(Math.abs(Number(t.amount || 0)))}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
 
               {/* 미매칭 안내 */}
               {data && data.unmatched.count > 0 && (
