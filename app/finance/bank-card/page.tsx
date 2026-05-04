@@ -4784,33 +4784,6 @@ export default function BankCardPage() {
               </>
             )}
 
-            {/* 빈 상태 안내 — 첫 진입 시만 (진행 중이면 floater 가 진행률 표시) */}
-            {!groupData && matchResults.length === 0 && !matching && !groupLoading && !autoClassifyResult && !autoClassifying && !ruleClassifyLoading && !ruleClassifyResult && (
-              <div style={{
-                textAlign: 'center', padding: '60px 20px',
-                color: COLORS.textMuted, fontSize: 14,
-              }}>
-                <div style={{ fontSize: 40, marginBottom: 12 }}>📊</div>
-                <div style={{ marginBottom: 8 }}>
-                  <b>[⚡ 자동 분류]</b>를 먼저 실행하세요 — 키워드 매칭으로 분류 가능한 건을 한 번에 처리합니다
-                </div>
-                <div style={{ fontSize: 12, color: COLORS.textMuted }}>
-                  이후 남은 미분류 건은 [📊 그룹 분류 로드]로 거래처별 수동 분류가 가능합니다
-                </div>
-                <div style={{ marginTop: 16 }}>
-                  <button
-                    onClick={() => runAutoClassify(false)}
-                    style={{
-                      ...BTN.md, padding: '10px 28px',
-                      background: '#f59e0b', color: '#fff', border: 'none',
-                      cursor: 'pointer',
-                      fontWeight: 600, fontSize: 14,
-                    }}
-                  >⚡ 자동 분류 실행</button>
-                </div>
-              </div>
-            )}
-
             {/* 진행 중 안내 — 우측 하단 floater 안내 */}
             {(autoClassifying || ruleClassifyLoading || groupLoading || matching) && !groupData && matchResults.length === 0 && (
               <div style={{
