@@ -1,6 +1,6 @@
 {
-  "name": "Self-Disruption ERP",
-  "short_name": "Self-Disruption",
+  "name": "ERP hmseok",
+  "short_name": "ERP hmseok",
   "description": "Enterprise Business Solution",
   "start_url": "/dashboard",
   "display": "standalone",

@@ -53,12 +53,12 @@ export async function sendKakaoAlimtalk(params: SendKakaoAlimtalkParams): Promis
 export async function sendEmail(params: SendEmailParams): Promise<SendResult> {
   const { to, subject, html, text } = params
   const apiKey = process.env.RESEND_API_KEY
-  const fromEmail = process.env.RESEND_FROM_EMAIL || 'noreply@self-disruption.com'
+  const fromEmail = process.env.RESEND_FROM_EMAIL || 'noreply@hmseok.com'
   if (!apiKey) return { success: false, error: 'RESEND_API_KEY 미설정' }
   if (!html && !text) return { success: false, error: 'HTML 또는 TEXT 본문 필요' }
   try {
     const resend = new Resend(apiKey)
-    const result = await resend.emails.send({ from: `Self-Disruption <${fromEmail}>`, to, subject, ...(html ? { html } : { text: text! }) }) as any
+    const result = await resend.emails.send({ from: `ERP hmseok <${fromEmail}>`, to, subject, ...(html ? { html } : { text: text! }) }) as any
     return result.id ? { success: true, method: 'email', resultCode: result.id } : { success: false, error: result.error?.message || 'Email 발송 실패' }
   } catch (err: any) { return { success: false, error: err.message } }
 }

@@ -116,7 +116,7 @@ async function sendInviteMessages(params: {
       })
       const fallbackResult = await sendEmail({
         to: email,
-        subject: `[Self-Disruption] ${companyName}에서 초대합니다`,
+        subject: `[ERP hmseok] ${companyName}에서 초대합니다`,
         html: emailHtml,
       })
       emailSent = fallbackResult.success
@@ -129,7 +129,7 @@ async function sendInviteMessages(params: {
           templateKey: 'member_invite',
           channel: 'email',
           recipient: email,
-          subject: `[Self-Disruption] ${companyName}에서 초대합니다`,
+          subject: `[ERP hmseok] ${companyName}에서 초대합니다`,
           body: '(fallback HTML)',
           status: fallbackResult.success ? 'sent' : 'failed',
           resultCode: fallbackResult.resultCode,

@@ -93,7 +93,7 @@ export async function POST(request: NextRequest) {
 
   if (recipientEmail) {
     const apiKey = process.env.RESEND_API_KEY
-    const fromEmail = process.env.RESEND_FROM_EMAIL || 'noreply@self-disruption.com'
+    const fromEmail = process.env.RESEND_FROM_EMAIL || 'noreply@hmseok.com'
 
     if (!apiKey) {
       emailError = 'RESEND_API_KEY가 설정되지 않았습니다.'
@@ -104,13 +104,13 @@ export async function POST(request: NextRequest) {
         const expiresDate = new Date(expiresAt).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })
 
         await resend.emails.send({
-          from: `Self-Disruption <${fromEmail}>`,
+          from: `ERP hmseok <${fromEmail}>`,
           to: recipientEmail,
-          subject: '[Self-Disruption] 플랫폼 관리자 초대 코드',
+          subject: '[ERP hmseok] 플랫폼 관리자 초대 코드',
           html: `
             <div style="font-family: 'Apple SD Gothic Neo', -apple-system, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px; background: #f8fafc; border-radius: 16px;">
               <h2 style="color: #0f172a; margin: 0 0 8px;">플랫폼 관리자 초대</h2>
-              <p style="color: #64748b; font-size: 14px; margin: 0 0 24px;">Self-Disruption 플랫폼의 관리자로 초대되었습니다.</p>
+              <p style="color: #64748b; font-size: 14px; margin: 0 0 24px;">ERP hmseok 플랫폼의 관리자로 초대되었습니다.</p>
 
               <div style="background: white; border: 2px solid #0ea5e9; border-radius: 12px; padding: 24px; text-align: center; margin-bottom: 24px;">
                 <p style="color: #64748b; font-size: 12px; margin: 0 0 8px;">초대 코드</p>

@@ -82,13 +82,13 @@ export default function VerifiedPage() {
           {closed ? '이 탭을 수동으로 닫아주세요' : '이 탭 닫기'}
         </button>
 
-        {/* Self-Disruption 브랜딩 */}
+        {/* 브랜딩 */}
         <div className="mt-6 text-center">
           <div className="flex items-center justify-center gap-1.5 text-slate-600">
             <div className="w-5 h-5 bg-slate-200 rounded flex items-center justify-center">
-              <span className="text-slate-500 font-black text-[10px]">S</span>
+              <span className="text-slate-500 font-black text-[10px]">E</span>
             </div>
-            <span className="text-[11px] font-bold">Self-Disruption</span>
+            <span className="text-[11px] font-bold">ERP hmseok</span>
           </div>
         </div>
       </div>

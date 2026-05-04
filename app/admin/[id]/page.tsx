@@ -87,7 +87,7 @@ const [loading, setLoading] = useState(true)
           </div>
 
           <div className="mt-8 p-6 bg-steel-50/50 rounded-xl border border-steel-100">
-             <h4 className="font-bold text-steel-800 mb-2">💡 Self-Disruption Tip</h4>
+             <h4 className="font-bold text-steel-800 mb-2">💡 Tip</h4>
              <p className="text-sm text-steel-600">이번 달 차량 가동률이 지난달보다 1.2% 떨어졌습니다. 유휴 차량을 프로모션에 활용해보세요.</p>
           </div>
         </div>

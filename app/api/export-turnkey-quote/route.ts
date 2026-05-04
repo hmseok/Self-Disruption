@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
     // ExcelJS로 엑셀 생성 (브라우저 호환)
     const ExcelJS = (await import('exceljs')).default
     const wb = new ExcelJS.Workbook()
-    wb.creator = 'Self-Disruption 턴키 렌터'
+    wb.creator = 'ERP hmseok 턴키 렌터'
     wb.created = new Date()
 
     // ── 시트1: 단기대차 표준 단가표 ──
