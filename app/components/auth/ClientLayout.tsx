@@ -64,10 +64,13 @@ function toMenuItem(m: typeof REGISTRY_MENUS[number]) {
   return { name: getDisplayName(m), path: m.path, iconKey: m.iconKey, requirePermission: m.requirePermission !== false }
 }
 
+// sidebarHidden=true 인 entry 는 사이드바에서 제외 (권한 페이지는 노출 유지)
+const isSidebarVisible = (m: typeof REGISTRY_MENUS[number]) => !m.sidebarHidden
+
 // 직장인필수 / CX팀 / 설정 메뉴 — menu-registry 에서 자동 추출
-const WORK_ESSENTIALS_MENUS = getMenusByGroup('work-essentials').map(toMenuItem)
-const CX_TEAM_MENUS = getMenusByGroup('cx-team').map(toMenuItem)
-const SETTINGS_MENUS_ALL = getMenusByGroup('settings').map(toMenuItem)
+const WORK_ESSENTIALS_MENUS = getMenusByGroup('work-essentials').filter(isSidebarVisible).map(toMenuItem)
+const CX_TEAM_MENUS = getMenusByGroup('cx-team').filter(isSidebarVisible).map(toMenuItem)
+const SETTINGS_MENUS_ALL = getMenusByGroup('settings').filter(isSidebarVisible).map(toMenuItem)
 // 「회사 정보」를 첫 entry 로 분리 (legacy COMPANY_INFO_MENU 호환)
 const COMPANY_INFO_MENU = SETTINGS_MENUS_ALL.find(m => m.path === '/db/codes')
   || { name: '회사 정보', path: '/db/codes', iconKey: 'Setting', requirePermission: true }
@@ -203,6 +206,11 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
               if (HIDDEN_PATHS.has(item.path)) return false
               seen.add(item.path)
               return true
+            })
+            .filter((item: any) => {
+              // sidebarHidden 인 entry 는 사이드바 제외 (권한 페이지엔 노출)
+              const reg = REGISTRY_MENUS.find(m => m.path === item.path)
+              return !reg?.sidebarHidden
             })
             .map((item: any) => {
               // menu-registry 의 displayName (이모지 포함) 우선 사용

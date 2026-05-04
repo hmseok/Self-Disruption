@@ -29,7 +29,8 @@ export interface MenuEntry {
   iconKey: string                // 아이콘 키 (Icons[iconKey])
   group: string                  // GROUPS 의 id 와 매칭
   sortOrder: number
-  hidden?: boolean               // 사이드바 + 권한 페이지에서 숨김
+  hidden?: boolean               // 사이드바 + 권한 페이지 모두에서 숨김 (legacy 경로)
+  sidebarHidden?: boolean        // 사이드바만 숨김 (권한 페이지에는 노출) — 부모 페이지 안에서 sub-nav 로 접근
   requirePermission?: boolean    // 권한 부여 대상 (default: 'asset|operation|finance|sales|admin' = true / 그 외 false)
 }
 
@@ -97,8 +98,9 @@ export const MENUS: MenuEntry[] = [
   { id: 'mod-meetings',        name: '회의록', displayName: '📋 회의록', path: '/meetings', iconKey: 'Doc', group: 'work-essentials', sortOrder: 52, requirePermission: true },
 
   // ── CX팀 (cx-team) ── Employee of Ride Inc. > CX팀 — 권한 부여 대상 (CX팀원만)
-  { id: 'mod-call-scheduler',  name: '근무스케줄',    path: '/CallScheduler',  iconKey: 'Setting', group: 'cx-team', sortOrder: 60, requirePermission: true },
-  { id: 'mod-ride-employees',  name: '직원 마스터',   path: '/RideEmployees',  iconKey: 'Users',   group: 'cx-team', sortOrder: 61, requirePermission: true },
+  { id: 'mod-call-scheduler',  name: '근무시간표 분석 & 배포', displayName: '📅 근무시간표 분석 & 배포', path: '/CallScheduler', iconKey: 'Setting', group: 'cx-team', sortOrder: 60, requirePermission: true },
+  // 직원 마스터 — 사이드바 숨김. 근무스케줄 페이지 안에서 sub-nav 로 접근 (권한 페이지에는 노출 유지)
+  { id: 'mod-ride-employees',  name: '직원 마스터',   path: '/RideEmployees',  iconKey: 'Users',   group: 'cx-team', sortOrder: 61, requirePermission: true, sidebarHidden: true },
 
   // ── 설정 (settings) ── admin 전용 (사이드바 별도 섹션)
   // 권한 부여 대상 — 일부 사용자에게 회사 정보 / 메시지 센터 등 위임 가능
