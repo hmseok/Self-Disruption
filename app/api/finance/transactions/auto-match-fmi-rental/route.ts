@@ -243,7 +243,7 @@ export async function POST(request: NextRequest) {
       const parsed = parseClientName(clientRaw, dynamicAbbrs) || parseClientName(descRaw, dynamicAbbrs)
       if (!parsed) {
         result.no_pattern++
-        if (result.failed_samples.length < 10) {
+        if (result.failed_samples.length < 100) {
           result.failed_samples.push({
             tx_id: tx.id,
             client_name: clientRaw || descRaw,
@@ -280,7 +280,7 @@ export async function POST(request: NextRequest) {
 
       if (candidates.length === 0) {
         result.no_candidate++
-        if (result.failed_samples.length < 10) {
+        if (result.failed_samples.length < 100) {
           result.failed_samples.push({
             tx_id: tx.id,
             client_name: clientRaw,
@@ -317,7 +317,7 @@ export async function POST(request: NextRequest) {
           confidence = 'MEDIUM'
         } else {
           result.multi++
-          if (result.failed_samples.length < 10) {
+          if (result.failed_samples.length < 100) {
             result.failed_samples.push({
               tx_id: tx.id,
               client_name: clientRaw,
@@ -330,7 +330,7 @@ export async function POST(request: NextRequest) {
         // 보험사 mismatch 케이스 — LOW confidence (자동 매칭 안 함, 사용자 검수용)
         result.low_confidence++
         const sample = insurerOnly[0]
-        if (result.low_confidence_samples.length < 10) {
+        if (result.low_confidence_samples.length < 100) {
           result.low_confidence_samples.push({
             tx_id: tx.id,
             client_name: clientRaw,
@@ -383,7 +383,7 @@ export async function POST(request: NextRequest) {
       }
 
       result.matched++
-      if (result.samples.length < 10) {
+      if (result.samples.length < 100) {
         result.samples.push({
           tx_id: tx.id,
           client_name: clientRaw,
@@ -444,7 +444,7 @@ export async function POST(request: NextRequest) {
         result.applied++
       } catch (e: any) {
         console.error('[auto-match-fmi-rental] apply failed:', tx.id, e.message)
-        if (result.failed_samples.length < 10) {
+        if (result.failed_samples.length < 100) {
           result.failed_samples.push({
             tx_id: tx.id,
             client_name: clientRaw,

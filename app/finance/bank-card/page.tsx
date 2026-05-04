@@ -453,6 +453,10 @@ export default function BankCardPage() {
   // 대차건 보험 매칭 단독 실행 결과
   const [fmiRentalMatchResult, setFmiRentalMatchResult] = useState<any | null>(null)
   const [fmiRentalMatching, setFmiRentalMatching] = useState(false)
+  // 결과 패널 카테고리별 펼침 상태 (검수용 — 사용자 명시 「뭐가 매칭됐는지 따로 챙겨서 검수」)
+  const [fmiRentalExpand, setFmiRentalExpand] = useState<{
+    matched: boolean, mismatch: boolean, failed: boolean
+  }>({ matched: false, mismatch: false, failed: false })
   const runFmiRentalMatch = async (dryRun: boolean) => {
     setFmiRentalMatching(true)
     setFmiRentalMatchResult(null)
@@ -4985,12 +4989,23 @@ export default function BankCardPage() {
                       🔤 동적 사전 {fmiRentalMatchResult.dynamic_abbrs_count}개 보험사 (DB 학습): {(fmiRentalMatchResult.dynamic_abbrs_sample || []).join(', ')}
                     </div>
                   )}
-                  {/* 매칭 성공 샘플 */}
-                  {fmiRentalMatchResult.samples?.length > 0 && (
+                  {/* 매칭 성공 샘플 — 펼침 가능 (검수용) */}
+                  {fmiRentalMatchResult.samples?.length > 0 && (() => {
+                    const all = fmiRentalMatchResult.samples
+                    const expanded = fmiRentalExpand.matched
+                    const list = expanded ? all : all.slice(0, 6)
+                    return (
                     <>
-                      <div style={{ fontSize: 11, fontWeight: 600, color: '#059669', marginBottom: 4 }}>✅ 매칭 성공 샘플</div>
-                      <div style={{ marginBottom: 10 }}>
-                        {fmiRentalMatchResult.samples.slice(0, 6).map((s: any, i: number) => (
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                        <span style={{ fontSize: 11, fontWeight: 600, color: '#059669' }}>✅ 매칭 성공 ({all.length}건)</span>
+                        {all.length > 6 && (
+                          <button onClick={() => setFmiRentalExpand(s => ({ ...s, matched: !s.matched }))} style={{ background: 'transparent', border: '1px solid rgba(5,150,105,0.3)', color: '#059669', fontSize: 10, padding: '1px 8px', borderRadius: 4, cursor: 'pointer' }}>
+                            {expanded ? `▾ 접기` : `▸ 전체 ${all.length}건 보기`}
+                          </button>
+                        )}
+                      </div>
+                      <div style={{ marginBottom: 10, maxHeight: expanded ? 400 : 'none', overflowY: expanded ? 'auto' : 'visible' }}>
+                        {list.map((s: any, i: number) => (
                           <div key={i} style={{ fontSize: 11, padding: '3px 6px', borderBottom: '1px dashed rgba(0,0,0,0.05)' }}>
                             <span style={{ fontWeight: 600 }}>{s.client_name}</span>
                             {' → '}
@@ -5002,13 +5017,25 @@ export default function BankCardPage() {
                         ))}
                       </div>
                     </>
-                  )}
-                  {/* 보험사 mismatch 샘플 — 차량은 있지만 보험사 다름 */}
-                  {fmiRentalMatchResult.low_confidence_samples?.length > 0 && (
+                    )
+                  })()}
+                  {/* 보험사 mismatch — 차량은 있지만 보험사 다름 */}
+                  {fmiRentalMatchResult.low_confidence_samples?.length > 0 && (() => {
+                    const all = fmiRentalMatchResult.low_confidence_samples
+                    const expanded = fmiRentalExpand.mismatch
+                    const list = expanded ? all : all.slice(0, 6)
+                    return (
                     <>
-                      <div style={{ fontSize: 11, fontWeight: 600, color: '#a16207', marginBottom: 4 }}>⚠️ 보험사 mismatch — 차량 있는데 다른 보험사로 등록 (사용자 검수)</div>
-                      <div style={{ marginBottom: 10 }}>
-                        {fmiRentalMatchResult.low_confidence_samples.slice(0, 6).map((s: any, i: number) => (
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                        <span style={{ fontSize: 11, fontWeight: 600, color: '#a16207' }}>⚠️ 보험사 mismatch ({all.length}건) — 차량 있는데 다른 보험사로 등록 (사용자 검수 → 매핑 추가/수정)</span>
+                        {all.length > 6 && (
+                          <button onClick={() => setFmiRentalExpand(s => ({ ...s, mismatch: !s.mismatch }))} style={{ background: 'transparent', border: '1px solid rgba(161,98,7,0.3)', color: '#a16207', fontSize: 10, padding: '1px 8px', borderRadius: 4, cursor: 'pointer' }}>
+                            {expanded ? `▾ 접기` : `▸ 전체 ${all.length}건 보기`}
+                          </button>
+                        )}
+                      </div>
+                      <div style={{ marginBottom: 10, maxHeight: expanded ? 400 : 'none', overflowY: expanded ? 'auto' : 'visible' }}>
+                        {list.map((s: any, i: number) => (
                           <div key={i} style={{ fontSize: 11, padding: '3px 6px', borderBottom: '1px dashed rgba(0,0,0,0.05)' }}>
                             <span style={{ fontWeight: 600 }}>{s.client_name}</span>
                             {' → 입금 보험사 '}
@@ -5021,13 +5048,25 @@ export default function BankCardPage() {
                         ))}
                       </div>
                     </>
-                  )}
-                  {/* 실패 샘플 */}
-                  {fmiRentalMatchResult.failed_samples?.length > 0 && (
+                    )
+                  })()}
+                  {/* 매칭 실패 (no_pattern + no_candidate) — 사용자 검수용 */}
+                  {fmiRentalMatchResult.failed_samples?.length > 0 && (() => {
+                    const all = fmiRentalMatchResult.failed_samples
+                    const expanded = fmiRentalExpand.failed
+                    const list = expanded ? all : all.slice(0, 6)
+                    return (
                     <>
-                      <div style={{ fontSize: 11, fontWeight: 600, color: '#b91c1c', marginBottom: 4 }}>❌ 매칭 실패 샘플 (검수)</div>
-                      <div>
-                        {fmiRentalMatchResult.failed_samples.slice(0, 6).map((f: any, i: number) => (
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                        <span style={{ fontSize: 11, fontWeight: 600, color: '#b91c1c' }}>❌ 매칭 실패 ({all.length}건) — 사유별 검수 (대차건 없음 / 패턴 미일치 / cars 매칭 실패 등)</span>
+                        {all.length > 6 && (
+                          <button onClick={() => setFmiRentalExpand(s => ({ ...s, failed: !s.failed }))} style={{ background: 'transparent', border: '1px solid rgba(185,28,28,0.3)', color: '#b91c1c', fontSize: 10, padding: '1px 8px', borderRadius: 4, cursor: 'pointer' }}>
+                            {expanded ? `▾ 접기` : `▸ 전체 ${all.length}건 보기`}
+                          </button>
+                        )}
+                      </div>
+                      <div style={{ maxHeight: expanded ? 400 : 'none', overflowY: expanded ? 'auto' : 'visible' }}>
+                        {list.map((f: any, i: number) => (
                           <div key={i} style={{ fontSize: 11, padding: '3px 6px', borderBottom: '1px dashed rgba(0,0,0,0.05)' }}>
                             <span style={{ fontWeight: 600 }}>{f.client_name || '-'}</span>
                             <span style={{ color: COLORS.textMuted }}> — {f.reason}</span>
@@ -5035,7 +5074,8 @@ export default function BankCardPage() {
                         ))}
                       </div>
                     </>
-                  )}
+                    )
+                  })()}
                 </div>
               )}
 
