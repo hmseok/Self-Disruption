@@ -31,6 +31,9 @@ export default function CallSchedulerNewPage() {
   const [existing, setExisting] = useState<ExistingSchedule[]>([])
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // PR-2KK: 자동 채우기 (월 생성 + 자동 생성 통합)
+  const [autoFill, setAutoFill] = useState(true)
+  const [progressText, setProgressText] = useState('')
 
   useEffect(() => {
     let abort = false
@@ -57,6 +60,7 @@ export default function CallSchedulerNewPage() {
     }
     setCreating(true)
     setError(null)
+    setProgressText('월 생성 중...')
     try {
       const auth = await getAuthHeader()
       const res = await fetch('/api/call-scheduler/schedules', {
@@ -71,10 +75,38 @@ export default function CallSchedulerNewPage() {
       })
       const json = await res.json()
       if (!res.ok) throw new Error(json?.error || '생성 실패')
-      router.push(`/CallScheduler/${json.data.id}`)
+      const newId = json.data.id
+
+      // PR-2KK: 자동 채우기 옵션 — 그룹 셋팅 + 휴가 반영해서 한 번에 채움
+      if (autoFill && !cloneFromId) {
+        setProgressText('✨ 그룹 셋팅 기반 자동 생성 중...')
+        const autoRes = await fetch(`/api/call-scheduler/schedules/${newId}/auto-generate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...auth },
+          body: JSON.stringify({
+            mode: 'apply',
+            overwrite_existing: false,
+            clear_first: false,
+            skip_holidays: false,  // 24/365 운영 — 공휴일도 근무
+            mark_leaves: true,     // 직원 휴가 자동 반영
+          }),
+        })
+        const autoJson = await autoRes.json()
+        if (!autoRes.ok) {
+          // 자동 생성 실패해도 스케줄 자체는 생성됐으니 상세로 이동
+          console.warn('자동 생성 실패:', autoJson?.error)
+          setError(`스케줄 생성됨 (자동 채우기 실패: ${autoJson?.error || '오류'})`)
+          setTimeout(() => router.push(`/CallScheduler/${newId}`), 1500)
+          return
+        }
+        const summary = autoJson.data?.summary
+        setProgressText(`✅ ${summary?.to_insert || 0}건 생성 — 이동 중...`)
+      }
+      router.push(`/CallScheduler/${newId}`)
     } catch (e: any) {
       setError(e?.message || '생성 실패')
       setCreating(false)
+      setProgressText('')
     }
   }
 
@@ -184,6 +216,42 @@ export default function CallSchedulerNewPage() {
             style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }}
           />
         </Field>
+
+        {/* PR-2KK: 자동 채우기 (월 생성 + 자동 생성 통합) */}
+        <div style={{
+          padding: '12px 14px', borderRadius: 10,
+          background: autoFill ? COLORS.bgViolet : 'rgba(0,0,0,0.02)',
+          border: `1px solid ${autoFill ? COLORS.borderViolet : COLORS.borderFaint}`,
+          display: 'flex', alignItems: 'flex-start', gap: 10,
+        }}>
+          <input type="checkbox" checked={autoFill}
+                 disabled={!!cloneFromId}
+                 onChange={(e) => setAutoFill(e.target.checked)}
+                 style={{ marginTop: 2 }} />
+          <div style={{ flex: 1 }}>
+            <div style={{
+              fontSize: 13, fontWeight: 800,
+              color: autoFill ? '#7c3aed' : COLORS.textSecondary,
+            }}>
+              ✨ 그룹 셋팅 기반 자동 채우기
+            </div>
+            <div style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 4, lineHeight: 1.6 }}>
+              생성 직후 그룹 패턴 + 휴가 자동 반영. <strong>한 번에 매트릭스가 채워집니다.</strong><br />
+              {cloneFromId && '⚠ 전월 복제 선택 시 자동 채우기 비활성 (복제로 채워짐)'}
+              {!cloneFromId && '셋팅이 미흡하면 빈 칸이 많을 수 있습니다 — 셋팅 먼저 점검하세요.'}
+            </div>
+          </div>
+        </div>
+
+        {progressText && (
+          <div style={{
+            padding: '8px 12px', borderRadius: 8,
+            background: COLORS.bgBlue, border: `1px solid ${COLORS.borderBlue}`,
+            color: COLORS.info, fontSize: 13, fontWeight: 700,
+          }}>
+            ⏳ {progressText}
+          </div>
+        )}
 
         {error && (
           <div style={{

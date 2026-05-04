@@ -235,9 +235,19 @@ KPI/캘린더 즉시 갱신
 | **PR-2X** | 새 공지 배지 (7일 이내) | ✅ 완료 | 없음 |
 | **PR-2Y** | 시프트 교체 요청 (cs_swap_requests) | ✅ 완료 | cs_swap_requests |
 | **PR-2Z** | 결근/병가 즉석 (셀 우클릭) | ✅ 완료 | 없음 |
-| **PR-2AA** | 휴가 발급량 + 잔여 자동 차감 (cs_leave_quotas) | 🔄 진행 중 | cs_leave_quotas |
-| **24/365 재구성** | cs_holidays 디폴트 변경 + 휴가 종류 재정의 | 🔄 진행 중 | 없음 (디폴트만) |
-| **PR-2G** | 네비 등록 (Employee of Ride Inc.) — 다른 세션이 처리 | ✅ 완료 (commit d449a3f) | 없음 |
+| **PR-2AA** | 휴가 발급량 + 잔여 자동 차감 (cs_leave_quotas) | ✅ 완료 | cs_leave_quotas |
+| **24/365 재구성** | cs_holidays 디폴트 변경 + 휴가 종류 재정의 | ✅ 완료 | 없음 (디폴트만) |
+| **PR-2BB** | 휴가 신청/승인 흐름 (status pending/approved) | ✅ 완료 | cs_leaves_status |
+| **PR-2EE** | 작성 모드 폐기 + 자동생성 진입점 통합 | ✅ 완료 | 없음 |
+| **PR-2FF** | 휴가 엑셀 일괄 업로드 | ✅ 완료 | 없음 |
+| **PR-2GG** | 휴가 시간 단위 (custom hours) | ✅ 완료 | cs_leaves_hours |
+| **PR-2HH** | 종류별 default hours (회사 정책 자동) | ✅ 완료 | 없음 |
+| **PR-2II** | 마이페이지 휴가 신청 모달 (직원 셀프) | ✅ 완료 | 없음 |
+| **PR-2JJ** | RideEmployees 엑셀 일괄 등록 + 중복 정리 | ✅ 완료 | 없음 |
+| **Route Group** | app/(employees)/ 이동 (URL 변경 없음) | ✅ 완료 | 없음 |
+| **PR-2KK** | 월 생성 + 자동 채우기 통합 (한 클릭) | ✅ 완료 | 없음 |
+| **PR-2LL** | [⋯] 더보기에 셋팅 직접 진입 (사이드바 X) | ✅ 완료 | 없음 |
+| **PR-2G** | 네비 등록 (Employee of Ride Inc.) — 다른 세션 | ✅ 완료 (commit d449a3f) | 없음 |
 | **PR-2D** | 휴가 일괄 입력 도구 — PR-2P 흡수, 폐기 | 🚫 폐기 | - |
 | **PR-2K** | 연차 cs_leaves 모달 — PR-2P 흡수, 폐기 | 🚫 폐기 | - |
 

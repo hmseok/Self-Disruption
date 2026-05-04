@@ -1,10 +1,11 @@
 'use client'
 // ═══════════════════════════════════════════════════════════════════
-// /CallScheduler/settings — 설정 (시프트 / 워커 / 그룹)
-// PR-2I: 그룹 탭 우선, 시프트/워커는 추후
+// /CallScheduler/settings — 설정 (시프트 / 그룹 / 직원 / 휴일 / 휴가)
+// URL ?tab=... 으로 직접 진입 가능 (PR-2LL)
 // ═══════════════════════════════════════════════════════════════════
-import { useState } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { COLORS } from '@/app/utils/ui-tokens'
 import GroupsTab from './GroupsTab'
 import ShiftsTab from './ShiftsTab'
@@ -15,9 +16,27 @@ import LeavesTab from './LeavesTab'
 export const dynamic = 'force-dynamic'
 
 type Tab = 'shifts' | 'groups' | 'workers' | 'holidays' | 'leaves'
+const VALID_TABS: Tab[] = ['shifts', 'groups', 'workers', 'holidays', 'leaves']
 
 export default function SettingsPage() {
-  const [tab, setTab] = useState<Tab>('shifts')
+  return (
+    <Suspense fallback={<div style={{ padding: 40, textAlign: 'center', color: COLORS.textMuted }}>로딩 중...</div>}>
+      <SettingsInner />
+    </Suspense>
+  )
+}
+
+function SettingsInner() {
+  const sp = useSearchParams()
+  const initialTab = (sp?.get('tab') as Tab) || 'shifts'
+  const [tab, setTab] = useState<Tab>(VALID_TABS.includes(initialTab) ? initialTab : 'shifts')
+
+  // URL ?tab=... 변경 시 동기화 (헤더 더보기 메뉴에서 직접 진입 시)
+  useEffect(() => {
+    const t = sp?.get('tab') as Tab
+    if (t && VALID_TABS.includes(t) && t !== tab) setTab(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sp])
 
   return (
     <div style={{ padding: '16px 24px', maxWidth: 1280, margin: '0 auto' }}>

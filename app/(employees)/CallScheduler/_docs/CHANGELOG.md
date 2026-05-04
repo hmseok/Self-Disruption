@@ -1,9 +1,61 @@
 # CallScheduler — CHANGELOG
 
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
-> 본 세션 (2026-05-03 ~ 05-04) 의 14개 PR 누적분을 일괄 반영
+> 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
-## 2026-05-04
+## 2026-05-04 (저녁 — UX 보강)
+
+### PR-2MM — 자동 생성 모달 자동 미리보기
+- 모달 열림 시 자동으로 미리보기 실행 (300ms debounce)
+- 옵션 변경 시 자동 재계산 (overwrite/clear/skip-holidays/mark-leaves)
+- 적용 버튼 활성화 조건 완화 — `to_insert + to_update > 0` 이면 항상 활성
+- 변경 사항 0건 시 비활성 + tooltip "변경 사항 없음"
+- "✨ N건 적용" 버튼 라벨로 적용 분량 즉시 노출
+- 생성 안 눌리던 사용자 보고 즉시 반영
+
+### PR-2NN — 목록 페이지 [⋯] 더보기 메뉴
+- `/CallScheduler` 메인 헤더에 [⋯] 메뉴 추가 (상세 페이지와 동일 패턴)
+- 메뉴 항목: 시간 / 그룹 / 직원 / 직원마스터 / 공휴일 / 휴가 + 설정 페이지
+- 매월 새 월 만들기 전 / 후 셋팅 직접 진입 (목록 페이지에서도 가능)
+- 외부 클릭 시 자동 닫기 (mousedown 핸들러)
+
+## 2026-05-04 (오후 — 추가 정리)
+
+### Route Group 이동 — `app/(employees)/`
+- `app/CallScheduler/` → `app/(employees)/CallScheduler/`
+- `app/RideEmployees/` → `app/(employees)/RideEmployees/`
+- URL 변경 없음 (Route Group `()` 은 URL에 안 나타남)
+- import 경로 일괄 sed: `@/app/CallScheduler` → `@/app/(employees)/CallScheduler`
+- 직원 토큰 링크 유효 (`/CallScheduler/e/<token>` 그대로)
+
+### PR-2II — 직원 마이페이지 휴가 신청
+- `LeaveRequestDialog` 신설 (480px 모달)
+- 마이페이지 [🙋 휴가 신청] — 토큰 모드는 status='pending' 자동
+- 종류 선택 시 회사 정책 default 자동 (PR-2HH 활용)
+- 빠른 프리셋 (반차 4h / 패밀리 3h / 종일 8h) + 차감 미리보기
+
+### PR-2JJ — RideEmployees 엑셀 일괄 등록
+- API: `GET /template` (샘플 .xlsx) + `POST /bulk-upload` (preview/apply)
+- `BulkUploadDialog` 신설 (800px) — 5타일 결과 (전체/정상/중복/오류/빈)
+- 이름 중복 자동 skip + 안내 시트 포함
+- RideEmployees 목록에 [📤 일괄 등록] / [🔧 중복 정리] 버튼
+
+### PR-2KK — 월 생성 + 자동 채우기 통합
+- `/CallScheduler/new` 폼에 ☑ 자동 채우기 체크박스 (기본 ON, 보라색 배너)
+- 생성 직후 `auto-generate?mode=apply` 자동 호출 → 그룹 패턴 + 휴가 반영
+- 진행 상태 라벨 (월 생성 → 자동 생성 → 결과 N건 → 이동)
+- 전월 복제 선택 시 비활성 (복제로 채워지므로)
+
+### PR-2LL — [⋯] 더보기 메뉴 확장 (셋팅 직접 진입)
+- 상세 페이지 [⋯] 메뉴 재구성:
+  - 작업: 공지 / 자동 생성 / 직원 요청 / 분석
+  - **공통 셋팅 (월과 무관 — 한 번만)**: 시간 / 그룹 / 직원 / 직원마스터 / 공휴일 / 휴가 6개 직접 항목
+  - 위험: 삭제
+- `settings/page.tsx` `useSearchParams` + `Suspense` — `?tab=...` query 수신
+- 사이드바 변경 없음 (단일 진입점 유지) — 매월 셋팅 X
+- 운영 흐름: 셋팅 한 번 → 매월 [+ 새 월] (자동 채우기) → 미세 조정
+
+## 2026-05-04 (오전)
 
 ### PR-2AA — 휴가 발급량 + 잔여 자동 차감
 - 마이그레이션: `cs_leave_quotas` 테이블 신설 (worker × year × month × leave_type, 반차 0.5일 단위)
