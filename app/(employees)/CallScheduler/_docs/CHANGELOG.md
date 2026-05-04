@@ -3,6 +3,26 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-04 (밤 — 그룹 최소 인원 셋팅)
+
+### PR-2QQ-d-2 — cs_group_min_coverage (디폴트 + 요일 예외)
+- 운영 사실 (Rule 25): 그룹별로 매일 최소 N명 + 특정 요일만 다른 인원 (예: 금요일 피크 3명, 일요일 1명)
+- DB 마이그레이션: `2026-05-04_cs_group_min_coverage.sql`
+  - 신규 테이블 `cs_group_min_coverage` (id / group_id / dow nullable / min_workers)
+  - UNIQUE (group_id, dow) — dow=NULL = 매일 디폴트 1행 + 0~6 요일 예외 N행
+  - FK ON DELETE CASCADE
+  - max_workers 폐기 (사용자 결정 — 사용 안 함)
+- API:
+  - `GET /api/call-scheduler/shift-groups/[id]/min-coverage` — 행 모두 반환 (dow=NULL 우선)
+  - `PUT /api/call-scheduler/shift-groups/[id]/min-coverage` — 일괄 재정의 (DELETE + INSERT 패턴)
+  - graceful: 마이그 미적용 시 GET 빈 배열 + `_migration_pending: true`
+- UI `GroupEditor`:
+  - 좌측 패널 하단에 "⚖️ 최소 인원 (자동 생성용)" 섹션 추가
+  - 매일 디폴트 1칸 + 요일별 7칸 (빈 칸 = 디폴트 사용)
+  - 요일 라벨 색상 (일=빨강 / 토=파랑)
+  - graceful: 마이그 미적용 시 안내 배너
+- 자동 생성 알고리즘에서 활용 예정 (PR-2QQ-d-3)
+
 ## 2026-05-04 (밤 — 워커 제약 모델)
 
 ### PR-2QQ-d-1-fix — 일요일 비선호 자동 표시 버그

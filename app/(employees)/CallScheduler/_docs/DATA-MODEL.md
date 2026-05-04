@@ -13,9 +13,13 @@
 
 ```
 cs_shift_slots ──┐
-                 ├─< cs_assignments >── cs_workers
-cs_schedules ────┤
-                 └─< cs_distributions
+                 ├─< cs_assignments >── cs_workers (priority/dow_avoid/required/max/pattern)
+cs_schedules ────┤                          │
+                 └─< cs_distributions       │
+                                             │
+cs_shift_groups ──< cs_group_members ────────┘
+       │
+       └─< cs_group_min_coverage (PR-2QQ-d-2 — 그룹 × 요일 × 최소 인원)
 ```
 
 ## 2. 테이블 정의
@@ -131,6 +135,32 @@ LEFT JOIN cs_assignments a ON a.shift_slot_id=s.id AND a.worker_id IS NOT NULL A
 GROUP BY s.id, s.code, s.label
 ORDER BY s.sort_order;
 ```
+
+### 2.X `cs_group_min_coverage` — 그룹 최소 인원 (PR-2QQ-d-2)
+
+| 컬럼 | 타입 | NULL | 기본 | 설명 |
+|------|------|------|------|------|
+| id | CHAR(36) | NN | | PK |
+| group_id | CHAR(36) | NN | | FK → cs_shift_groups, ON DELETE CASCADE |
+| dow | TINYINT | Y | NULL | 0=일, 6=토. NULL=매일 디폴트 |
+| min_workers | TINYINT | NN | 1 | 최소 동시 근무자 |
+| created_at, updated_at | DATETIME | NN | NOW | |
+
+UNIQUE: `(group_id, dow)` — dow=NULL 1행 + 0~6 N행
+INDEX: `idx_cs_gmc_group (group_id)`
+
+**조회 우선순위**: 특정 dow 행 > NULL (디폴트)
+
+**입력 예시**:
+```sql
+-- 야간콜 그룹: 매일 2명, 금요일 3명, 일요일 1명
+INSERT INTO cs_group_min_coverage (id, group_id, dow, min_workers) VALUES
+  (UUID(), '<야간콜id>', NULL, 2),  -- 매일 디폴트
+  (UUID(), '<야간콜id>', 5,    3),  -- 금
+  (UUID(), '<야간콜id>', 0,    1);  -- 일
+```
+
+자동 생성 알고리즘 (PR-2QQ-d-3 예정) 에서 워커 풀 크기 결정에 사용.
 
 ## 4. computed_hours 계산 규칙
 

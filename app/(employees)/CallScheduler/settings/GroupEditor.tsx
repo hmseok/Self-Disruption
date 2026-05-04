@@ -48,23 +48,34 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
   const [memberIds, setMemberIds] = useState<string[]>([])
   // PR-2QQ-a: 카테고리
   const [category, setCategory] = useState('general')
+  // PR-2QQ-d-2: 최소 인원 (디폴트 + 요일별 예외)
+  const [defaultMin, setDefaultMin] = useState<string>('')        // 매일 디폴트 (빈 문자열 = 미설정)
+  const [dowMin, setDowMin] = useState<Record<number, string>>({}) // 요일별 예외 (0~6)
+  const [coverageLoading, setCoverageLoading] = useState(false)
+  const [coverageMissing, setCoverageMissing] = useState(false)   // 마이그 미적용 시
 
-  // 기존 그룹 로드
+  // 기존 그룹 로드 + 최소 인원 셋팅 로드 (PR-2QQ-d-2)
   useEffect(() => {
     if (isNew) return
     let abort = false
     ;(async () => {
       try {
         const auth = await getAuthHeader()
-        const res = await fetch(`/api/call-scheduler/shift-groups/${groupId}`, { headers: auth })
-        const json = await res.json()
-        if (!res.ok) throw new Error(json?.error || '조회 실패')
+        const [gRes, cRes] = await Promise.all([
+          fetch(`/api/call-scheduler/shift-groups/${groupId}`, { headers: auth }),
+          fetch(`/api/call-scheduler/shift-groups/${groupId}/min-coverage`, { headers: auth }),
+        ])
+        const json = await gRes.json()
+        if (!gRes.ok) throw new Error(json?.error || '조회 실패')
         if (abort) return
         const { group, members } = json.data
         setName(group.name); setSlotId(group.shift_slot_id)
         setPattern(group.pattern_type)
         if (group.custom_days) {
-          setCustomDays(new Set(String(group.custom_days).split(',').map(Number)))
+          setCustomDays(new Set(
+            String(group.custom_days).split(',').map(s => s.trim()).filter(s => s !== '').map(Number)
+              .filter(n => !isNaN(n) && n >= 0 && n <= 6)
+          ))
         }
         setStrategy(group.generation_strategy)
         setRotationSize(group.rotation_size || 1)
@@ -73,6 +84,19 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
         setDescription(group.description || '')
         setCategory(group.category || 'general')
         setMemberIds(members.map((m: any) => m.worker_id))
+        // 최소 인원 (graceful — 마이그 미적용 시 빈 배열)
+        const cJson = await cRes.json()
+        if (cRes.ok && Array.isArray(cJson.data)) {
+          if (cJson._migration_pending) setCoverageMissing(true)
+          const dowMap: Record<number, string> = {}
+          let def = ''
+          for (const row of cJson.data) {
+            if (row.dow == null) def = String(row.min_workers)
+            else dowMap[row.dow] = String(row.min_workers)
+          }
+          setDefaultMin(def)
+          setDowMin(dowMap)
+        }
       } catch (e: any) { setError(e?.message || '오류') }
       finally { if (!abort) setLoading(false) }
     })()
@@ -141,6 +165,32 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
         })
         const mJ = await mRes.json()
         if (!mRes.ok) throw new Error(mJ?.error || '멤버 저장 실패')
+      }
+      // PR-2QQ-d-2 — 최소 인원 셋팅 저장 (신규/편집 공통)
+      if (!coverageMissing && id) {
+        const coverageRows: Array<{ dow: number | null; min_workers: number }> = []
+        const defNum = defaultMin === '' ? 0 : Math.max(0, Math.floor(Number(defaultMin) || 0))
+        if (defNum > 0) coverageRows.push({ dow: null, min_workers: defNum })
+        for (const [dowStr, vStr] of Object.entries(dowMin)) {
+          const dow = Number(dowStr)
+          if (isNaN(dow) || dow < 0 || dow > 6) continue
+          const n = vStr === '' ? 0 : Math.max(0, Math.floor(Number(vStr) || 0))
+          if (n > 0) coverageRows.push({ dow, min_workers: n })
+        }
+        const cRes = await fetch(`/api/call-scheduler/shift-groups/${id}/min-coverage`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', ...auth },
+          body: JSON.stringify({ coverage: coverageRows }),
+        })
+        const cJ = await cRes.json()
+        if (!cRes.ok) {
+          // graceful — 마이그 미적용 시 무시
+          if (cJ?.error?.includes('마이그레이션')) {
+            setCoverageMissing(true)
+          } else {
+            throw new Error(cJ?.error || '최소 인원 저장 실패')
+          }
+        }
       }
       onSaved()
     } catch (e: any) { setError(e?.message || '저장 실패') }
@@ -369,6 +419,78 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
           <Field label="설명">
             <input type="text" value={description} onChange={(e) => setDescription(e.target.value)}
                    style={inputStyle} placeholder="자유 메모" />
+          </Field>
+
+          {/* PR-2QQ-d-2 — 최소 인원 셋팅 (디폴트 + 요일별 예외) */}
+          <Field label="⚖️ 최소 인원 (자동 생성용)"
+                 sub="매일 디폴트를 입력하고, 요일별로 다르면 따로 입력. 빈 칸 = 디폴트 사용.">
+            {coverageMissing ? (
+              <div style={{
+                padding: '8px 12px', borderRadius: 6, fontSize: 11,
+                background: COLORS.bgAmber, border: `1px solid ${COLORS.borderAmber}`,
+                color: COLORS.warning,
+              }}>
+                ⚠ 마이그레이션이 적용되지 않았습니다 (cs_group_min_coverage)
+              </div>
+            ) : (
+              <div style={{
+                ...GLASS.L1, borderRadius: 8, padding: 10,
+                display: 'flex', flexDirection: 'column', gap: 8,
+              }}>
+                {/* 매일 디폴트 */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{
+                    fontSize: 11, fontWeight: 700, color: COLORS.textPrimary, width: 60,
+                  }}>매일</span>
+                  <input type="number" min={0} max={99}
+                         value={defaultMin}
+                         onChange={(e) => setDefaultMin(e.target.value)}
+                         placeholder="없음"
+                         style={{
+                           width: 60, padding: '4px 8px', borderRadius: 6, fontSize: 12,
+                           border: `1px solid ${COLORS.borderFaint}`,
+                           background: 'rgba(255,255,255,0.85)',
+                         }} />
+                  <span style={{ fontSize: 10, color: COLORS.textMuted }}>명 (디폴트)</span>
+                </div>
+
+                {/* 요일별 예외 */}
+                <div style={{
+                  display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4,
+                }}>
+                  {DOW_LABELS.map((label, dow) => {
+                    const isWeekend = dow === 0 || dow === 6
+                    return (
+                      <div key={dow} style={{
+                        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
+                      }}>
+                        <div style={{
+                          fontSize: 10, fontWeight: 700,
+                          color: dow === 0 ? COLORS.danger
+                            : dow === 6 ? COLORS.info
+                            : COLORS.textSecondary,
+                        }}>
+                          {label}
+                        </div>
+                        <input type="number" min={0} max={99}
+                               value={dowMin[dow] || ''}
+                               onChange={(e) => setDowMin({ ...dowMin, [dow]: e.target.value })}
+                               placeholder="-"
+                               style={{
+                                 width: '100%', padding: '3px', borderRadius: 4, fontSize: 11,
+                                 textAlign: 'center',
+                                 border: `1px solid ${COLORS.borderFaint}`,
+                                 background: isWeekend ? COLORS.bgGray : 'rgba(255,255,255,0.85)',
+                               }} />
+                      </div>
+                    )
+                  })}
+                </div>
+                <div style={{ fontSize: 10, color: COLORS.textMuted }}>
+                  💡 빈 칸 = 매일 디폴트 적용. 예: 매일 2명 + 금요일 3명 + 일요일 1명
+                </div>
+              </div>
+            )}
           </Field>
         </div>
 
