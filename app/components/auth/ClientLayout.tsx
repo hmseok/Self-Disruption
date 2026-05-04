@@ -167,6 +167,11 @@ const WORK_ESSENTIALS_MENUS = [
   { name: '📋 회의록', path: '/meetings', iconKey: 'Doc' },
 ]
 
+// CX팀 메뉴 (Employee of Ride Inc. > CX팀)
+const CX_TEAM_MENUS = [
+  { name: '근무스케줄', path: '/CallScheduler', iconKey: 'Setting' },
+]
+
 // admin 전용 설정 메뉴
 const SETTINGS_MENUS_BASE = [
   { name: '조직/권한 관리', path: '/admin/employees', iconKey: 'Users' },
@@ -513,6 +518,16 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
               </div>
               <div className="space-y-0.5">
                 {WORK_ESSENTIALS_MENUS.map(item => (
+                  <MenuItem key={item.path} item={item} pathname={pathname} allPaths={allMenuPaths} />
+                ))}
+              </div>
+
+              {/* CX팀 sub-section */}
+              <div className="px-4 mt-2 mb-0.5">
+                <span className="text-[9px] font-semibold text-slate-500 tracking-wider">▸ CX팀</span>
+              </div>
+              <div className="space-y-0.5 ml-2">
+                {CX_TEAM_MENUS.map(item => (
                   <MenuItem key={item.path} item={item} pathname={pathname} allPaths={allMenuPaths} />
                 ))}
               </div>

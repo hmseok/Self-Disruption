@@ -1,0 +1,131 @@
+# CallScheduler — UI 스펙
+
+> 본 모듈은 부모 프로젝트 디자인 시스템을 따른다 (`app/utils/ui-tokens` 의 COLORS / GLASS / BTN / pillStyle).
+> 페이지 패턴: `'use client'` + `export const dynamic = 'force-dynamic'` + Provider 래퍼.
+
+## 1. 라우팅 맵
+
+| 경로 | 파일 | 역할 |
+|------|------|------|
+| `/CallScheduler` | `app/CallScheduler/page.tsx` | 월별 스케줄 목록 + 분석 KPI |
+| `/CallScheduler/new` | `app/CallScheduler/new/page.tsx` | 신규 월 스케줄 생성 (빈 그리드 또는 전월 복제) |
+| `/CallScheduler/[id]` | `app/CallScheduler/[id]/page.tsx` | 캘린더 뷰 + 인라인 편집 + 배포 |
+
+> 기존 모듈 다수가 lowercase URL이지만 `app/CallScheduler/` 폴더명을 그대로 살려 동일 PascalCase URL 유지. 상위 라우터에 영향 없음.
+
+## 2. 컴포넌트 구조
+
+```
+app/CallScheduler/
+├─ page.tsx                  ← 목록(월 카드) + KPI
+├─ new/page.tsx              ← 신규 생성 폼
+├─ [id]/page.tsx             ← 상세(캘린더+편집)
+├─ CallSchedulerContext.tsx  ← Provider/Context
+├─ components/
+│  ├─ MonthCard.tsx          ← 월 단위 카드 (목록 페이지)
+│  ├─ KpiStrip.tsx           ← 인당시간/충원율/F카운트/야간편차 4타일
+│  ├─ ScheduleGrid.tsx       ← 13행×7~31열 캘린더 그리드 (메인)
+│  ├─ AssignmentCell.tsx     ← 셀 1개 (근무자 칩 + special 배지)
+│  ├─ WorkerPicker.tsx       ← 셀 클릭 시 드롭다운 (인원 선택 + special 코드)
+│  ├─ SlotLegend.tsx         ← 좌측 시프트 레전드 (시간대 표)
+│  ├─ DistributionDialog.tsx ← 배포 모달 (채널 선택 + 미리보기)
+│  └─ AnalyticsPanel.tsx     ← 인당 분석 테이블 (상세 하단)
+├─ utils/
+│  ├─ hours.ts               ← computed_hours 계산
+│  ├─ palette.ts             ← color_tone → COLORS.bg* 매핑
+│  └─ types.ts               ← Worker / Slot / Assignment / Schedule
+└─ _docs/                    ← 설계 문서
+```
+
+## 3. 페이지별 디자인
+
+### 3.1 목록 `/CallScheduler`
+
+레이아웃: GLASS.L5 사이드 헤더 + GLASS.L4 본문
+- 상단: PageTitle + 우측 `[+ 새 월 만들기]`(BTN.lg primary)
+- KPI Strip (GLASS.L3 4타일): 활성 스케줄 수 / 현재월 충원율 / 인당 평균시간 / 미배포 건수
+- 본문: `MonthCard` 그리드 — `2026년 5월 (publish ●)` `근무자 16` `충원 92%` `[열기]`
+- 빈 상태: GLASS.L4 안내 + 새 만들기 CTA
+
+### 3.2 신규 생성 `/CallScheduler/new`
+
+폼 (GLASS.L4 카드, GLASS.L1 인풋 오목):
+- 연/월 선택 (default = 다음 달)
+- 시작 모드: ① 빈 그리드 ② 전월 복제 ③ Excel 업로드 (Phase 2)
+- 슬롯 선택 (체크박스 13개, 전체 선택 default)
+- 메모
+- 하단 `[취소]`(BTN.md ghost) `[생성]`(BTN.md primary)
+
+### 3.3 상세/편집 `/CallScheduler/[id]`
+
+3-zone 레이아웃 (1280px 기준):
+```
+┌──────────────────────────────────────────────────────────────┐
+│  PageTitle  [draft ●]   [복제] [엑셀 내보내기] [⚡ 배포하기]   │
+├──────────┬───────────────────────────────────────┬────────────┤
+│ Slot     │  ScheduleGrid (메인)                   │ Analytics  │
+│ Legend   │   - 13행×요일/일자                     │ Panel      │
+│ (L2)     │   - 셀 클릭 → WorkerPicker 팝오버       │  (L3)      │
+│          │   - 색상=worker.color_tone             │            │
+│ 13행     │   - special_code 배지 (pillStyle)      │ 인당 KPI   │
+│ 시간대   │                                         │ 그래프     │
+└──────────┴───────────────────────────────────────┴────────────┘
+```
+
+#### 셀 인터랙션
+- 빈 셀 hover → 옅은 GLASS.L1 강조
+- 클릭 → `WorkerPicker` 팝오버 (현재 슬롯 시간 표시 + 근무자 검색 + 특수코드 라디오)
+- 저장은 낙관적 업데이트 (PATCH 후 실패 시 롤백)
+
+#### 색상 매핑 (palette.ts)
+```ts
+export const TONE_BG: Record<ColorTone, string> = {
+  blue:   COLORS.bgBlue,
+  gray:   COLORS.bgGray,
+  green:  COLORS.bgGreen,
+  amber:  COLORS.bgAmber,
+  violet: COLORS.bgViolet,
+  red:    COLORS.bgRed,
+  none:   'transparent',
+}
+```
+
+#### special_code 배지
+`pillStyle('info')` = 오전F/오후F (휴무 자유)
+`pillStyle('warning')` = 오전반차/오후반차
+`pillStyle('neutral')` = 휴무(off)
+
+#### 배포 모달 (`DistributionDialog`)
+- 채널 선택: 잔디 / 이메일 / 공유링크
+- 수신자 미리보기 테이블 (worker.email/phone 누락 시 빨간 행)
+- 메시지 템플릿 미리보기 (월/근무 일수/링크)
+- `[보내기]`(BTN.lg primary) — POST `/api/call-scheduler/distributions`
+
+## 4. 분석 패널 (AnalyticsPanel)
+
+- 인당 행: 이름 / 시프트 수 / 총 시간 / 야간 일수 / 반차 / F
+- 색상: 평균 ±20% 벗어나면 amber/red 배지
+- 정렬: 기본 총시간 내림차순 (CLAUDE.md 규칙 18 — sortBy 정의 의무)
+
+## 5. 네비게이션 등록
+
+CallScheduler를 사이드바에 노출하려면 다음 4곳 동기화 (CLAUDE.md 규칙 4):
+
+1. `app/api/system_modules/route.ts` — DEFAULT_MODULES에 `{ id:'mod-call-scheduler', name:'근무시간표', path:'/CallScheduler', icon_key:'Clock', sort_order:14 }`
+2. `app/components/auth/ClientLayout.tsx` — PATH_TO_GROUP에 `'/CallScheduler': 'admin'` (또는 'operation')
+3. `app/components/PageTitle.tsx` — PAGE_NAMES + PATH_TO_GROUP 매핑
+4. (선택) NAME_OVERRIDES — `'⏰ 근무시간표'`
+
+> MVP 1차 PR에선 **네비 등록은 보류**(URL 직진입으로만 검증), 사용자 확인 후 별도 커밋으로 추가.
+
+## 6. 접근성/반응형
+
+- 그리드는 1280px 미만에서 가로 스크롤 (overflow-x:auto)
+- 셀 키보드 포커스 → Enter로 picker 열기 (Phase 2)
+- 색약 사용자: color_tone 만으론 식별 불가, 셀에 항상 worker.name 표시
+
+## 7. 미해결 질문 (사용자 확인 대기)
+
+1. "체크 배포"가 (A) 스케줄 공지 vs (B) 출퇴근 체크인 중 어느 쪽? — 본 MVP는 (A) 가설 진행
+2. 시프트 슬롯·근무자 마스터를 사용자가 UI에서 직접 편집할 수 있어야 하는가? — Phase 2 admin 화면으로 분리 가정
+3. 권한: 누구나 편집/배포 가능 vs 매니저 권한만? — 현재 `verifyUser()` 통과만 요구, role 가드는 Phase 2
