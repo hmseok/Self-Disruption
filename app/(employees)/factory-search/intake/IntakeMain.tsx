@@ -7,6 +7,7 @@ import {
 } from '../_components/ui'
 import { ensureKakao, geocode } from '../_lib/kakao'
 import { fPhone } from '../_lib/format'
+import SubNav from '../_components/SubNav'
 
 // ───────────────────────────────────────────────────────────────
 // 사고 접수 → 추천 공장 + 카카오맵 길찾기 deeplink
@@ -278,6 +279,7 @@ export default function IntakeMain() {
         title="사고 접수 → 추천 공장"
         emoji="🚨"
       />
+      <SubNav />
 
       <KpiRow>
         <KpiCard label="추천 공장" value={stats.total} tone="emerald" icon="🔧" hint="등록 즐겨찾기 중 가까운 3곳" />

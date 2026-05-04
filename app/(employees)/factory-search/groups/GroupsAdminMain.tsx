@@ -6,6 +6,7 @@ import {
   StatusBadge, TextInput,
 } from '../_components/ui'
 import merged from '../_data/factories-merged.json'
+import SubNav from '../_components/SubNav'
 import { DEFAULT_AXES, type CodeAxis, type CodeItem } from './defaults'
 
 // ───────────────────────────────────────────────────────────────
@@ -134,6 +135,7 @@ export default function GroupsAdminMain() {
           </>
         }
       />
+      <SubNav />
 
       <KpiRow>
         <KpiCard label="분류 축" value={stats.axes} tone="emerald" icon="🧩" hint="6축 종합 관리" />

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useCodeMaster } from './_hooks/useCodeMaster'
 import { ensureKakao } from './_lib/kakao'
 import { Cell, FilterPill, KpiCard, KpiRow, PageHeader, ScreenWrap, Section, Spinner, StatusBadge, Toolbar } from './_components/ui'
+import SubNav from './_components/SubNav'
 import { fD, fT, fPhone } from './_lib/format'
 
 // ───────────────────────────────────────────────────────────────
@@ -361,6 +362,7 @@ export default function FactoryMapMain() {
         title="협력공장 지도"
         emoji="🗺️"
       />
+      <SubNav />
 
       <KpiRow>
         <KpiCard label="전체 업체" value={stats.total} tone="emerald" icon="🔧" />

@@ -1,9 +1,9 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import Link from 'next/link'
 import { useCodeMaster } from '../_hooks/useCodeMaster'
 import { Cell, KpiCard, KpiRow, PageHeader, ScreenWrap, Spinner, Toolbar } from '../_components/ui'
+import SubNav from '../_components/SubNav'
 import { fPhone } from '../_lib/format'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -48,12 +48,8 @@ export default function FactoryMgmtMain() {
         breadcrumb={['Employee of Ride Inc.', '협력공장 목록']}
         title="협력공장 목록"
         emoji="🔧"
-        right={
-          <Link href="/fleet/factory-map" className="px-4 py-2 bg-blue-600 text-white text-[13px] font-semibold rounded-lg hover:bg-blue-700">
-            🗺️ 지도에서 보기
-          </Link>
-        }
       />
+      <SubNav />
 
       <KpiRow>
         <KpiCard label="전체 업체" value={stats.전체} tone="emerald" icon="🔧" />
