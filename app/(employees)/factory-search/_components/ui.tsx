@@ -1,38 +1,24 @@
 'use client'
 
 import { useState } from 'react'
+import { COLORS, GLASS, BTN, pillStyle, type PillTone } from '@/app/utils/ui-tokens'
 
 // ───────────────────────────────────────────────────────────────
-// 공용 UI 컴포넌트 (FMI ERP 톤 정렬)
-// PageHeader: breadcrumb + 이모지 타이틀
-// KpiCard: 흰 배경 + 컬러 링 + 큰 숫자
-// FilterPill: 진한 네이비 활성 필 + 카운트 뱃지
-// Toolbar / Section / Cell / Spinner / StatusBadge
+// 공용 UI 컴포넌트 — 메인 ERP Soft Ice 디자인 시스템 (CLAUDE.md §10) 통일본
+//   COLORS / GLASS L1~L5 / BTN sm·md·lg / pillStyle 사용
+//   API 시그니처는 기존 ScreenWrap·PageHeader·KpiCard·Toolbar 등과 동일 → 4페이지 import 그대로
 // ───────────────────────────────────────────────────────────────
 
+// ── ScreenWrap : 메인 layout 이 padding/배경 처리하므로 단순 콘텐츠 패딩만 ─
 export function ScreenWrap({ children }: { children: React.ReactNode }) {
-  // FMI ERP 패턴: 본문 전체를 흰 카드(rounded-2xl ring) 컨테이너로 감싸기
   return (
-    <div className="min-h-screen bg-[var(--bg)] p-4 lg:p-6">
-      <div className="bg-white rounded-2xl ring-1 ring-slate-200 overflow-hidden">
-        <TrafficLights />
-        {children}
-      </div>
+    <div style={{ padding: '0', width: '100%' }}>
+      {children}
     </div>
   )
 }
 
-function TrafficLights() {
-  // 페이지 본문 카드 좌상단의 macOS 스타일 트래픽 라이트 점 (장식 — 이식 시 제거 가능)
-  return (
-    <div className="px-5 pt-4 pb-1 flex items-center gap-1.5">
-      <span className="w-3 h-3 rounded-full bg-red-400" />
-      <span className="w-3 h-3 rounded-full bg-amber-400" />
-      <span className="w-3 h-3 rounded-full bg-emerald-400" />
-    </div>
-  )
-}
-
+// ── PageHeader : 글래스 L5 헤더 ─
 export function PageHeader({ breadcrumb, title, emoji = '📄', right }: {
   breadcrumb: string[]
   title: string
@@ -40,60 +26,93 @@ export function PageHeader({ breadcrumb, title, emoji = '📄', right }: {
   right?: React.ReactNode
 }) {
   return (
-    <div className="px-6 pt-2 pb-2">
-      <nav className="flex items-center gap-1.5 text-[13px] text-slate-500 mb-3">
+    <div style={{
+      padding: '14px 24px 10px',
+      borderBottom: `1px solid ${COLORS.borderSubtle}`,
+    }}>
+      <nav style={{
+        display: 'flex', alignItems: 'center', gap: 6,
+        fontSize: 12, color: COLORS.textSecondary, marginBottom: 8, flexWrap: 'wrap',
+      }}>
         {breadcrumb.map((b, i) => (
-          <span key={i} className="flex items-center gap-1.5">
-            <span className={i === breadcrumb.length - 1 ? 'text-slate-800 font-semibold' : ''}>{b}</span>
-            {i < breadcrumb.length - 1 && <span className="text-slate-300">›</span>}
+          <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <span style={{
+              color: i === breadcrumb.length - 1 ? COLORS.textPrimary : COLORS.textSecondary,
+              fontWeight: i === breadcrumb.length - 1 ? 700 : 500,
+            }}>{b}</span>
+            {i < breadcrumb.length - 1 && <span style={{ color: COLORS.textDim, fontSize: 11 }}>›</span>}
           </span>
         ))}
       </nav>
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <h1 className="text-[24px] font-bold text-slate-900 tracking-tight">
-          <span className="mr-2">{emoji}</span>{title}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        gap: 12, flexWrap: 'wrap',
+      }}>
+        <h1 style={{
+          fontSize: 22, fontWeight: 800, color: COLORS.textPrimary,
+          margin: 0, letterSpacing: '-0.01em',
+        }}>
+          <span style={{ marginRight: 8 }}>{emoji}</span>{title}
         </h1>
-        {right && <div className="flex gap-2 flex-wrap items-center">{right}</div>}
+        {right && (
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>{right}</div>
+        )}
       </div>
     </div>
   )
 }
 
-const KPI_TONE: Record<string, { ring: string; text: string; bg: string }> = {
-  emerald: { ring: 'ring-emerald-200', text: 'text-emerald-700', bg: 'bg-emerald-50' },
-  blue:    { ring: 'ring-blue-200',    text: 'text-blue-700',    bg: 'bg-blue-50' },
-  violet:  { ring: 'ring-violet-200',  text: 'text-violet-700',  bg: 'bg-violet-50' },
-  amber:   { ring: 'ring-amber-200',   text: 'text-amber-700',   bg: 'bg-amber-50' },
-  red:     { ring: 'ring-red-200',     text: 'text-red-700',     bg: 'bg-red-50' },
-  slate:   { ring: 'ring-slate-200',   text: 'text-slate-700',   bg: 'bg-slate-50' },
+// ── KpiCard : Glass L3 + 색 틴트 ─
+const KPI_TONE_MAP: Record<string, { bg: string; border: string; color: string }> = {
+  emerald: { bg: COLORS.bgGreen, border: COLORS.borderGreen, color: COLORS.success },
+  blue:    { bg: COLORS.bgBlue,  border: COLORS.borderBlue,  color: COLORS.info },
+  violet:  { bg: COLORS.bgViolet, border: COLORS.borderViolet, color: '#7c3aed' },
+  amber:   { bg: COLORS.bgAmber, border: COLORS.borderAmber, color: COLORS.warning },
+  red:     { bg: COLORS.bgRed,   border: COLORS.borderRed,   color: COLORS.danger },
+  slate:   { bg: COLORS.bgGray,  border: COLORS.borderFaint, color: COLORS.textMuted },
 }
 
 export function KpiCard({ label, value, tone = 'slate', icon, hint }: {
   label: string
   value: number | string
-  tone?: keyof typeof KPI_TONE
+  tone?: keyof typeof KPI_TONE_MAP
   icon?: string
   hint?: string
 }) {
-  const t = KPI_TONE[tone] ?? KPI_TONE.slate
+  const t = KPI_TONE_MAP[tone] ?? KPI_TONE_MAP.slate
+  const display = typeof value === 'number' ? value.toLocaleString() : value
   return (
-    <div className={`bg-white rounded-2xl ring-1 ${t.ring} px-5 py-4 min-w-[160px] flex-1`}>
-      <div className={`text-[12px] font-semibold ${t.text} flex items-center gap-1.5 mb-1`}>
+    <div style={{
+      ...GLASS.L3, background: t.bg, border: `1px solid ${t.border}`,
+      borderRadius: 12, padding: '12px 14px',
+      display: 'flex', flexDirection: 'column', gap: 2,
+      minWidth: 160, flex: 1,
+    }}>
+      <div style={{ fontSize: 12, color: COLORS.textSecondary, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
         {icon && <span>{icon}</span>}
-        {label}
+        <span>{label}</span>
       </div>
-      <div className={`text-[28px] font-bold ${t.text} leading-tight`}>
-        {typeof value === 'number' ? value.toLocaleString() : value}
-      </div>
-      {hint && <div className={`text-[11px] ${t.text} opacity-70 mt-0.5`}>{hint}</div>}
+      <div style={{ fontSize: 22, fontWeight: 800, color: t.color, lineHeight: 1.1 }}>{display}</div>
+      {hint && (
+        <div style={{
+          fontSize: 11, color: COLORS.textMuted,
+          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+        }}>{hint}</div>
+      )}
     </div>
   )
 }
 
 export function KpiRow({ children }: { children: React.ReactNode }) {
-  return <div className="px-8 pt-2 pb-4 flex gap-3 flex-wrap">{children}</div>
+  return (
+    <div style={{
+      padding: '12px 24px',
+      display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12,
+    }}>{children}</div>
+  )
 }
 
+// ── FilterPill : 활성 navy/primary / 비활성 Glass L4 ─
 export function FilterPill({ active, count, onClick, children, tone = 'navy' }: {
   active?: boolean
   count?: number
@@ -101,106 +120,141 @@ export function FilterPill({ active, count, onClick, children, tone = 'navy' }: 
   children: React.ReactNode
   tone?: 'navy' | 'plain'
 }) {
+  const activeStyle: React.CSSProperties = active
+    ? {
+        background: tone === 'navy' ? COLORS.textPrimary : COLORS.primary,
+        color: '#fff',
+        border: `1px solid ${tone === 'navy' ? COLORS.textPrimary : COLORS.primary}`,
+      }
+    : {
+        ...GLASS.L4,
+        color: COLORS.textSecondary,
+      }
   return (
     <button
       onClick={onClick}
-      className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-[13px] font-semibold transition-colors
-        ${active
-          ? (tone === 'navy' ? 'bg-slate-900 text-white' : 'bg-blue-600 text-white')
-          : 'bg-white text-slate-600 hover:bg-slate-50 ring-1 ring-slate-200'}`}
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: 8,
+        padding: '6px 14px', borderRadius: 999,
+        fontSize: 13, fontWeight: 700,
+        cursor: 'pointer', transition: 'all 0.15s',
+        ...activeStyle,
+      }}
     >
-      {children}
+      <span>{children}</span>
       {typeof count === 'number' && (
-        <span className={`text-[11px] font-bold px-1.5 py-0.5 rounded-md
-          ${active ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'}`}>
-          {count}
-        </span>
+        <span style={{
+          fontSize: 11, fontWeight: 800,
+          padding: '1px 6px', borderRadius: 6,
+          background: active ? 'rgba(255,255,255,0.20)' : COLORS.bgGray,
+          color: active ? '#fff' : COLORS.textMuted,
+        }}>{count}</span>
       )}
     </button>
   )
 }
 
+// ── Toolbar : Glass L4 카드 행 ─
 export function Toolbar({ children }: { children: React.ReactNode }) {
   return (
-    <div className="px-6 py-3">
-      <div className="bg-slate-50 rounded-2xl ring-1 ring-slate-200 px-4 py-3 flex items-center gap-3 flex-wrap">
-        {children}
-      </div>
+    <div style={{ padding: '8px 24px' }}>
+      <div style={{
+        ...GLASS.L4, borderRadius: 12, padding: '10px 14px',
+        display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
+      }}>{children}</div>
     </div>
   )
 }
 
+// ── Cell : 라벨 + 값 컬럼 ─
 export function Cell({ label, children, span = 1 }: {
   label: string
   children?: React.ReactNode
   span?: number
 }) {
   return (
-    <div className={span > 1 ? `col-span-${span}` : ''}>
-      <div className="text-[10px] font-medium text-slate-400 mb-0.5 tracking-wide uppercase">{label}</div>
-      <div className="text-[13px] text-slate-800 font-medium leading-snug min-h-[18px]">
-        {children || <span className="text-slate-300">-</span>}
+    <div style={{ gridColumn: span > 1 ? `span ${span}` : undefined }}>
+      <div style={{
+        fontSize: 10, fontWeight: 600, textTransform: 'uppercase',
+        letterSpacing: '0.04em', color: COLORS.textMuted, marginBottom: 2,
+      }}>{label}</div>
+      <div style={{
+        fontSize: 13, fontWeight: 500, lineHeight: 1.4,
+        color: COLORS.textPrimary, minHeight: 18,
+      }}>
+        {children || <span style={{ color: COLORS.textDim }}>-</span>}
       </div>
     </div>
   )
 }
 
-export function Section({ title, color = 'border-slate-300', defaultOpen = true, children }: {
+// ── Section : 접기 가능한 카드 (Glass L4 + 좌측 컬러 보더) ─
+export function Section({ title, color = COLORS.borderFaint, defaultOpen = true, children }: {
   title: string
   color?: string
   defaultOpen?: boolean
   children: React.ReactNode
 }) {
   const [open, setOpen] = useState(defaultOpen)
+  // Tailwind 클래스 폴백 처리
+  const borderColor = color.startsWith('border-') ? COLORS.primary : color
   return (
-    <div className={`border-l-[3px] ${color} bg-white rounded-r-xl ring-1 ring-slate-100 mb-3 overflow-hidden`}>
-      <button onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-slate-50 transition-colors">
-        <span className="text-[13px] font-bold text-slate-700 tracking-tight">{title}</span>
-        <svg className={`w-4 h-4 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`}
-          fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
+    <div style={{
+      ...GLASS.L4, borderRadius: 12, marginBottom: 12,
+      borderLeft: `3px solid ${borderColor}`, overflow: 'hidden',
+    }}>
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        style={{
+          width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '10px 14px', background: 'transparent', border: 0, cursor: 'pointer',
+        }}
+      >
+        <span style={{ fontSize: 13, fontWeight: 700, color: COLORS.textSecondary, letterSpacing: '-0.01em' }}>
+          {title}
+        </span>
+        <span style={{ fontSize: 12, color: COLORS.textMuted, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }}>▾</span>
       </button>
-      {open && <div className="px-4 pb-3 pt-1">{children}</div>}
+      {open && <div style={{ padding: '4px 14px 12px' }}>{children}</div>}
     </div>
   )
 }
 
-const BADGE_PRESET: Record<string, { dot: string; bg: string }> = {
-  ok: { dot: 'bg-emerald-400', bg: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200' },
-  info: { dot: 'bg-blue-400', bg: 'bg-blue-50 text-blue-700 ring-1 ring-blue-200' },
-  cyan: { dot: 'bg-cyan-400', bg: 'bg-cyan-50 text-cyan-700 ring-1 ring-cyan-200' },
-  warn: { dot: 'bg-amber-400', bg: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200' },
-  danger: { dot: 'bg-red-400', bg: 'bg-red-50 text-red-700 ring-1 ring-red-200' },
-  muted: { dot: 'bg-slate-400', bg: 'bg-slate-100 text-slate-600 ring-1 ring-slate-200' },
+// ── StatusBadge : pillStyle 기반 ─
+const TONE_TO_PILL: Record<string, PillTone> = {
+  ok: 'success', info: 'info', cyan: 'info', warn: 'warning', danger: 'danger', muted: 'neutral',
 }
 
 export function StatusBadge({ tone = 'muted', children }: {
-  tone?: keyof typeof BADGE_PRESET
+  tone?: 'ok' | 'info' | 'cyan' | 'warn' | 'danger' | 'muted'
   children: React.ReactNode
 }) {
-  const st = BADGE_PRESET[tone] ?? BADGE_PRESET.muted
-  return (
-    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold ${st.bg}`}>
-      <span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} />
-      {children}
-    </span>
-  )
+  const pTone = TONE_TO_PILL[tone] ?? 'neutral'
+  return <span style={pillStyle(pTone)}>{children}</span>
 }
 
+// ── Spinner ─
 export function Spinner({ label = '불러오는 중...' }: { label?: string }) {
   return (
-    <div className="flex flex-col items-center justify-center h-48 gap-3">
-      <div className="w-8 h-8 border-2 border-blue-500/20 border-t-blue-500 rounded-full animate-spin" />
-      <span className="text-sm text-slate-500 font-medium">{label}</span>
+    <div style={{
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+      height: 192, gap: 12,
+    }}>
+      <div style={{
+        width: 32, height: 32,
+        border: `2px solid ${COLORS.borderBlue}`,
+        borderTopColor: COLORS.primary,
+        borderRadius: '50%',
+        animation: 'fs-spin 0.8s linear infinite',
+      }} />
+      <span style={{ fontSize: 13, color: COLORS.textSecondary, fontWeight: 500 }}>{label}</span>
+      <style>{`@keyframes fs-spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   )
 }
 
-// ───────────────────────────────────────────────────────────────
-// Form 컴포넌트 (하네스 통일)
-// ───────────────────────────────────────────────────────────────
+// ── Form 컴포넌트 ──────────────────────────────────────────────
 
 export function Field({ label, hint, required, children }: {
   label: string
@@ -209,56 +263,82 @@ export function Field({ label, hint, required, children }: {
   children: React.ReactNode
 }) {
   return (
-    <label className="block">
-      <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1 block">
-        {label}{required && <span className="text-red-500 ml-1">*</span>}
+    <label style={{ display: 'block' }}>
+      <span style={{
+        display: 'block', fontSize: 10, fontWeight: 700, textTransform: 'uppercase',
+        letterSpacing: '0.04em', color: COLORS.textMuted, marginBottom: 4,
+      }}>
+        {label}{required && <span style={{ color: COLORS.danger, marginLeft: 4 }}>*</span>}
       </span>
       {children}
-      {hint && <span className="text-[11px] text-slate-400 mt-1 block">{hint}</span>}
+      {hint && (
+        <span style={{ display: 'block', fontSize: 11, color: COLORS.textMuted, marginTop: 4 }}>
+          {hint}
+        </span>
+      )}
     </label>
   )
 }
 
-const inputBase =
-  'w-full px-3 py-2.5 text-[13px] bg-slate-50 border border-slate-200 rounded-lg ' +
-  'focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-300 ' +
-  'placeholder:text-slate-400 transition-colors'
+const inputBase: React.CSSProperties = {
+  ...GLASS.L1,
+  width: '100%',
+  padding: '7px 12px',
+  fontSize: 13,
+  borderRadius: 8,
+  color: COLORS.textPrimary,
+  outline: 'none',
+}
 
 export function TextInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
-  return <input {...props} className={`${inputBase} ${props.className || ''}`} />
+  const { style, className, ...rest } = props
+  void className
+  return (
+    <input
+      {...rest}
+      style={{ ...inputBase, ...(rest.disabled ? { opacity: 0.5 } : {}), ...style }}
+    />
+  )
 }
 
 export function Select({ options, ...rest }: {
   options: { value: string; label: string }[]
 } & React.SelectHTMLAttributes<HTMLSelectElement>) {
+  const { style, className, ...selRest } = rest
+  void className
   return (
-    <select {...rest} className={`${inputBase} ${rest.className || ''}`}>
+    <select
+      {...selRest}
+      style={{ ...inputBase, ...(selRest.disabled ? { opacity: 0.5 } : {}), ...style }}
+    >
       {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
     </select>
   )
 }
 
-export function Button({ variant = 'primary', size = 'md', className = '', children, ...rest }: {
+export function Button({ variant = 'primary', size = 'md', children, ...rest }: {
   variant?: 'primary' | 'danger' | 'ghost' | 'secondary'
   size?: 'sm' | 'md' | 'lg'
-  className?: string
   children: React.ReactNode
-} & Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'className'>) {
-  const sizes: Record<string, string> = {
-    sm: 'px-3 py-1.5 text-[12px]',
-    md: 'px-5 py-2.5 text-[13px]',
-    lg: 'px-6 py-3 text-[14px]',
-  }
-  const variants: Record<string, string> = {
-    primary: 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm',
-    danger: 'bg-red-600 text-white hover:bg-red-700 shadow-sm',
-    secondary: 'bg-slate-50 text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100',
-    ghost: 'text-slate-600 hover:text-slate-900 hover:bg-slate-100',
-  }
+} & Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'style'>) {
+  const sizeStyle = BTN[size]
+  const variantStyle: React.CSSProperties = (() => {
+    switch (variant) {
+      case 'primary':   return { background: COLORS.primary, color: '#fff', border: `1px solid ${COLORS.primary}` }
+      case 'danger':    return { background: COLORS.danger,  color: '#fff', border: `1px solid ${COLORS.danger}` }
+      case 'secondary': return { ...GLASS.L4, color: COLORS.textPrimary }
+      case 'ghost':     return { background: 'transparent', color: COLORS.textSecondary, border: '1px solid transparent' }
+    }
+  })()
   return (
     <button
       {...rest}
-      className={`inline-flex items-center justify-center gap-1.5 font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${sizes[size]} ${variants[variant]} ${className}`}
+      style={{
+        ...sizeStyle, ...variantStyle,
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+        cursor: rest.disabled ? 'not-allowed' : 'pointer', opacity: rest.disabled ? 0.5 : 1,
+        transition: 'all 0.15s',
+      }}
     >
       {children}
     </button>

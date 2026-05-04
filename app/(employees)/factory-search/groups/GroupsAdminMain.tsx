@@ -144,7 +144,11 @@ export default function GroupsAdminMain() {
   const removeAxis = (axisKey: string) => {
     const target = axes.find(a => a.key === axisKey)
     if (!target) return
-    if (!confirm(`"${target.title}" 축을 삭제할까요? 그 안의 ${target.items.length}개 항목도 함께 사라집니다.`)) return
+    const isDefault = !target.axisCustom
+    const warn = isDefault
+      ? `⚠️ 기본 축 "${target.title}" 을 삭제합니다.\n\n그 안의 ${target.items.length}개 항목과 함께 사라지며, 다른 페이지(지도/공장 목록/추천)에서 이 축으로 매핑/필터하던 기능에 영향이 갑니다.\n\n복원: "초기 설정" 버튼.\n\n계속할까요?`
+      : `사용자 정의 축 "${target.title}" 을 삭제합니다.\n\n그 안의 ${target.items.length}개 항목도 함께 사라집니다.\n\n계속할까요?`
+    if (!confirm(warn)) return
     setAxes(prev => {
       const next = prev.filter(a => a.key !== axisKey)
       if (activeAxis === axisKey) setActiveAxis(next[0]?.key || '')
@@ -370,7 +374,8 @@ function AxisPanel({ axis, index, total, getCount, onUpdateItem, onAddItem, onRe
   const emojiEditable = axis.editable === 'all'
   const hiddenEditable = axis.editable === 'all' || axis.editable === 'label-only'
   const canDeleteItem = axis.custom
-  const canDeleteAxis = axis.axisCustom === true
+  // 모든 축 삭제 가능 — 기본 축은 confirm 에서 강한 경고로 안내
+  const canDeleteAxis = true
 
   return (
     <div className="bg-white rounded-2xl ring-1 ring-slate-200 overflow-hidden">

@@ -2,35 +2,43 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { COLORS } from '@/app/utils/ui-tokens'
 
 // ───────────────────────────────────────────────────────────────
-// SubNav — factory-search 4개 페이지 공통 탭 라인
-// 지도 / 목록 / 사고 추천 / 분류 셋팅
-// 활성 탭은 파란 underline 강조
+// SubNav — factory-search 5개 페이지 공통 탭 라인 (메인 ui-tokens)
+//   공장 추천(메인) / 지도 / 공장 목록 / 그룹 구성 / 매핑
+//   활성 탭은 primary underline + 연한 배경 강조
 // ───────────────────────────────────────────────────────────────
 
 const TABS = [
-  { href: '/factory-search',         label: '공장 추천', emoji: '🚨' },  // 메인 — 사고 발생 시 가까운 공장 추천
-  { href: '/factory-search/map',     label: '지도',      emoji: '🗺️' },
-  { href: '/factory-search/mgmt',    label: '공장 목록', emoji: '🔧' },
-  { href: '/factory-search/groups',  label: '그룹 구성', emoji: '🏷' },
+  { href: '/factory-search',          label: '공장 추천', emoji: '🚨' },  // 메인
+  { href: '/factory-search/map',      label: '지도',      emoji: '🗺️' },
+  { href: '/factory-search/mgmt',     label: '공장 목록', emoji: '🔧' },
+  { href: '/factory-search/groups',   label: '그룹 구성', emoji: '🏷' },
+  { href: '/factory-search/mapping',  label: '매핑',      emoji: '🔗' },
 ]
 
 export default function SubNav() {
   const pathname = usePathname()
   return (
-    <div className="px-6 pb-1">
-      <div className="flex gap-0 border-b border-slate-200 -mb-px">
+    <div style={{ padding: '0 24px', borderBottom: `1px solid ${COLORS.borderSubtle}` }}>
+      <div style={{ display: 'flex', gap: 0, marginBottom: -1 }}>
         {TABS.map(tab => {
           const isActive = pathname === tab.href
           return (
             <Link
               key={tab.href}
               href={tab.href}
-              className={`inline-flex items-center gap-1.5 px-4 py-2.5 text-[13px] font-semibold transition-colors border-b-2 -mb-px
-                ${isActive
-                  ? 'border-blue-600 text-blue-700 bg-blue-50/40'
-                  : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300'}`}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+                padding: '10px 16px',
+                fontSize: 13, fontWeight: 700,
+                textDecoration: 'none',
+                borderBottom: `2px solid ${isActive ? COLORS.primary : 'transparent'}`,
+                color: isActive ? COLORS.primary : COLORS.textSecondary,
+                background: isActive ? COLORS.bgBlue : 'transparent',
+                transition: 'all 0.15s',
+              }}
             >
               <span>{tab.emoji}</span>
               <span>{tab.label}</span>
