@@ -33,6 +33,7 @@ const amountSignLint = require('./amount-sign-lint')
 const helperCoverageLint = require('./helper-coverage-lint')
 const sqlReservedAliasLint = require('./sql-reserved-alias-lint')
 const sqlGroupByLint = require('./sql-group-by-lint')
+const menuSyncLint = require('./menu-sync-lint')
 
 const flags = new Set(process.argv.slice(2))
 
@@ -193,6 +194,14 @@ function main() {
     console.error(`  ❌ ${v.file}:${v.line}  ${v.label}`)
   }
 
+  // [평가] 3.6. menu-sync — app/**/page.tsx ↔ menu-registry 동기화 (CLAUDE.md 자동 동기화 규칙)
+  console.log('\n▸ [3.6] menu-sync-lint — app/**/page.tsx ↔ menu-registry 등록 강제')
+  const menuR = menuSyncLint.lint()
+  console.log(`  ${menuR.allPages.length} pages, registry=${menuR.registryMenus} + hidden=${menuR.hiddenPaths}, violations=${menuR.violations.length}`)
+  for (const v of menuR.violations.slice(0, 5)) {
+    console.error(`  ❌ menu-registry 에 등록 안 된 페이지: ${v}/page.tsx`)
+  }
+
   // [평가] 4. UI 화면 데이터 정합성
   console.log('\n▸ [4/4] ui-data-coverage — 같은 API 호출 page 들 사이 누락 필드')
   const uiR = uiCoverage.buildCoverage()
@@ -247,7 +256,7 @@ function main() {
   }
 
   // 결과 집계
-  const newCritical = newSqlViolations.length + fnR.violations.length + newApiBroken.length + newSign.length + newHelper.length + newAlias.length + newGb.length
+  const newCritical = newSqlViolations.length + fnR.violations.length + newApiBroken.length + newSign.length + newHelper.length + newAlias.length + newGb.length + menuR.violations.length
   console.log('\n═══ 결과 ═══')
   console.log(`  새 critical 위반: ${newCritical}`)
   console.log(`  known issue: ${knownSqlViolations.length} SQL + ${apiR.brokenCalls.length - newApiBroken.length} broken-call`)

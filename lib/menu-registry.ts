@@ -41,18 +41,20 @@ export interface MenuGroup {
 }
 
 // ─── 그룹 정의 ───────────────────────────────────────────
+// label = 권한 페이지 / 초대 페이지 표시명 (구체적)
+// shortLabel = 사이드바 표시명 (짧음, 미정의 시 label 사용)
 export const GROUPS: MenuGroup[] = [
   // 비즈니스 메뉴 (admin 권한 부여 대상)
-  { id: 'asset',           label: '자산',        section: 'business',         sortOrder: 1 },
-  { id: 'operation',       label: '운영',        section: 'business',         sortOrder: 2 },
-  { id: 'finance',         label: '재무',        section: 'business',         sortOrder: 3 },
-  { id: 'sales',           label: '영업/계약',    section: 'business',         sortOrder: 4 },
-  { id: 'admin',           label: '관리',        section: 'business',         sortOrder: 5 },
+  { id: 'asset',           label: '차량 자산',     section: 'business',         sortOrder: 1 },
+  { id: 'operation',       label: '차량 운영',     section: 'business',         sortOrder: 2 },
+  { id: 'finance',         label: '재무/경영지원', section: 'business',         sortOrder: 3 },
+  { id: 'sales',           label: '영업/계약',     section: 'business',         sortOrder: 4 },
+  { id: 'admin',           label: '관리/HR',      section: 'business',         sortOrder: 5 },
   // 직장인필수 (Employee of Ride Inc. — 모든 로그인 사용자)
-  { id: 'work-essentials', label: '직장인필수',   section: 'work-essentials', sortOrder: 10 },
-  { id: 'cx-team',         label: 'CX팀',        section: 'work-essentials', sortOrder: 11 },
+  { id: 'work-essentials', label: '직장인필수',    section: 'work-essentials', sortOrder: 10 },
+  { id: 'cx-team',         label: 'CX팀',         section: 'work-essentials', sortOrder: 11 },
   // 설정 (admin 전용 — 사이드바 별도 섹션)
-  { id: 'settings',        label: '설정',        section: 'settings',         sortOrder: 20 },
+  { id: 'settings',        label: '설정',         section: 'settings',         sortOrder: 20 },
 ]
 
 // ─── 메뉴 정의 ───────────────────────────────────────────
@@ -129,6 +131,11 @@ export const HIDDEN_PATHS = new Set<string>([
   '/finance/review', '/finance/freelancers', '/admin/freelancers',
   // ── FMI 단일회사 — 플랫폼 관리 메뉴 숨김 ──
   '/system-admin', '/admin/developer', '/admin/contracts',
+  // ── 미사용 admin 페이지 (legacy / 통합 완료) ──
+  '/admin', '/admin/cards', '/admin/codes', '/admin/locations',
+  '/admin/market-prices', '/admin/model', '/admin/permissions',
+  // ── 인증 콜백 / 대시보드 / 미사용 모듈 ──
+  '/auth', '/dashboard', '/loans-out',
 ])
 
 // ─── 권한 부여 대상 결정 (requirePermission 명시 안 했으면 group 기준) ───
