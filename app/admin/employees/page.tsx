@@ -32,26 +32,25 @@ const DATA_SCOPES = [
 
 type ActiveModule = { path: string; name: string; group: string }
 
-const NAME_OVERRIDES: Record<string, string> = {
-  '/invest': '투자 정산 관리',
-  '/insurance': '보험/가입',
-  '/finance/upload': '카드/통장 관리',
-  '/admin/payroll': '급여 관리',
-  '/quotes': '견적 관리',
-  '/quotes/create': '견적 작성',
-}
+// menu-registry 단일 SOURCE — 그룹 라벨 / 매핑 / 표시명 자동 추출
+// 새 페이지 추가 시 lib/menu-registry.ts MENUS 배열에만 entry 추가하면
+// 본 권한 페이지에 자동 노출 (NAME_OVERRIDES / MODULE_GROUPS hardcoded 제거)
+import { GROUPS as REGISTRY_GROUPS, MENUS as REGISTRY_MENUS } from '@/lib/menu-registry'
 
-const MODULE_GROUPS: Record<string, string> = {
-  '/cars': '차량 자산', '/registration': '차량 자산', '/insurance': '차량 자산',
-  '/operations': '차량 운영', '/maintenance': '차량 운영', '/accidents': '차량 운영',
-  '/quotes': '대고객 영업', '/quotes/create': '대고객 영업',
-  '/customers': '대고객 영업', '/contracts': '대고객 영업', '/e-contract': '대고객 영업',
-  '/finance': '경영 지원', '/finance/collections': '경영 지원', '/finance/settlement': '경영 지원',
-  '/finance/upload': '경영 지원', '/finance/review': '경영 지원', '/finance/freelancers': '경영 지원',
-  '/finance/cards': '경영 지원', '/admin/payroll': '경영 지원', '/report': '경영 지원',
-  '/jiip': '파트너 자금', '/invest': '파트너 자금', '/loans': '파트너 자금',
-  '/db/pricing-standards': '데이터 관리', '/db/lotte': '데이터 관리',
-}
+// path → 그룹 라벨 (menu-registry 자동 생성)
+const PATH_TO_GROUP_LABEL: Record<string, string> = Object.fromEntries(
+  REGISTRY_MENUS
+    .filter(m => !m.hidden)
+    .map(m => {
+      const g = REGISTRY_GROUPS.find(gr => gr.id === m.group)
+      return [m.path, g?.label || '기타']
+    })
+)
+
+// path → 표시명 (displayName 우선)
+const PATH_TO_NAME: Record<string, string> = Object.fromEntries(
+  REGISTRY_MENUS.filter(m => !m.hidden).map(m => [m.path, m.displayName || m.name])
+)
 
 type UserPermMap = {
   [pagePath: string]: {
@@ -165,15 +164,22 @@ export default function OrgManagementPage() {
       const data = Array.isArray(json) ? json : (json.data || [])
       if (data.length > 0) {
         setActiveModules(data.filter((m: any) => m.path).map((m: any) => ({
-          path: m.path, name: NAME_OVERRIDES[m.path] || m.name,
-          group: MODULE_GROUPS[m.path] || '기타',
+          path: m.path,
+          name: PATH_TO_NAME[m.path] || m.name,
+          group: PATH_TO_GROUP_LABEL[m.path] || '기타',
         })))
         return
       }
     } catch {}
-    setActiveModules(Object.entries(MODULE_GROUPS).map(([path, group]) => ({
-      path, name: NAME_OVERRIDES[path] || path.split('/').pop() || path, group,
-    })))
+    // menu-registry 의 모든 권한 부여 대상 메뉴를 fallback 으로
+    setActiveModules(REGISTRY_MENUS
+      .filter(m => !m.hidden)
+      .filter(m => ['asset', 'operation', 'finance', 'sales', 'admin'].includes(m.group))
+      .map(m => ({
+        path: m.path,
+        name: m.displayName || m.name,
+        group: REGISTRY_GROUPS.find(g => g.id === m.group)?.label || '기타',
+      })))
   }
 
   const loadAllUserPermissions = async () => {
@@ -586,7 +592,12 @@ export default function OrgManagementPage() {
     { key: 'permissions', label: '페이지 권한', count: assignableEmployees.length },
   ]
 
-  const GROUP_ORDER = ['차량 자산', '차량 운영', '대고객 영업', '경영 지원', '파트너 자금', '데이터 관리', '기타']
+  // menu-registry 의 비즈니스 그룹 순서 (자산/운영/재무/영업/관리)
+  const GROUP_ORDER = REGISTRY_GROUPS
+    .filter(g => g.section === 'business')
+    .sort((a, b) => a.sortOrder - b.sortOrder)
+    .map(g => g.label)
+    .concat(['기타'])
   const moduleGroups = GROUP_ORDER.filter(g => activeModules.some(m => m.group === g))
 
   // ===== Glass 스타일 상수 =====
