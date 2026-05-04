@@ -94,6 +94,12 @@ export default function RideEmployeesListPage() {
         marginBottom: 14, flexWrap: 'wrap', gap: 12,
       }}>
         <div>
+          <Link href="/CallScheduler" style={{
+            fontSize: 12, color: COLORS.info, textDecoration: 'none',
+            display: 'inline-flex', alignItems: 'center', gap: 4, marginBottom: 6,
+          }}>
+            ← 근무시간표
+          </Link>
           <h1 style={{ fontSize: 22, fontWeight: 800, color: COLORS.textPrimary, margin: 0 }}>
             👥 라이드 직원 관리
           </h1>
