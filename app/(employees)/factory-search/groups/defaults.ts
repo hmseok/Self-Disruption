@@ -15,14 +15,17 @@ export type CodeItem = {
 }
 
 export type CodeAxis = {
-  key: string                 // 'group' | 'insurance' | 'facttype' | 'vehicle' | 'tag' | 'settlement'
+  key: string                 // 'group' | 'insurance' | 'facttype' | 'vehicle' | 'tag' | 'settlement' | 'custom-axis-{ts}'
   title: string
   emoji: string
   description: string
-  editable: EditableLevel     // 어디까지 편집 가능
-  custom: boolean             // 사용자 추가 가능 (custom 축은 신규 항목 add/delete)
+  editable: EditableLevel     // 어디까지 편집 가능 (항목 단위)
+  custom: boolean             // 항목 단위 추가 가능 (custom 축은 신규 항목 add/delete)
   match: 'groups' | 'insurance' | 'facttype' | 'tags' | 'custom'  // 데이터에서 어디 보고 카운트할지
   items: CodeItem[]
+  // ── 축 자체 메타 (분류 셋팅 페이지에서 편집) ──
+  axisHidden?: boolean        // 페이지 탭/패널에서 숨김 (기본 false = 노출)
+  axisCustom?: boolean        // 사용자 정의 축 (true 면 삭제 버튼 노출, default 13축은 false)
 }
 
 // ── 1. 즐겨찾기 그룹 ─────────────────────────────────────────

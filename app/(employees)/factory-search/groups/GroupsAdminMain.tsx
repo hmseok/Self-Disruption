@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import {
-  Button, KpiCard, KpiRow, PageHeader, ScreenWrap, Section, Spinner,
+  Button, KpiCard, KpiRow, PageHeader, ScreenWrap, Section,
   StatusBadge, TextInput,
 } from '../_components/ui'
 import merged from '../_data/factories-merged.json'
@@ -10,7 +10,7 @@ import SubNav from '../_components/SubNav'
 import { DEFAULT_AXES, type CodeAxis, type CodeItem } from './defaults'
 
 // ───────────────────────────────────────────────────────────────
-// 분류 셋팅 — 13축 종합 관리 (모든 축 전체 편집 + 사용자 정의 추가 가능)
+// 분류 셋팅 — 13축 종합 관리 + 축 자체 편집 (추가/메타/순서/숨김/삭제)
 // localStorage('ride_op_classifications_v2') 에 저장
 // ───────────────────────────────────────────────────────────────
 
@@ -22,18 +22,32 @@ function loadAxes(): CodeAxis[] {
     const raw = window.localStorage.getItem(STORAGE_KEY)
     if (!raw) return DEFAULT_AXES
     const parsed = JSON.parse(raw) as CodeAxis[]
-    // 누락 축 보강 (스키마 진화 대응)
-    return DEFAULT_AXES.map(d => {
-      const saved = parsed.find(p => p.key === d.key)
-      if (!saved) return d
-      // items 도 누락 보강
-      const items = d.items.map(di => saved.items.find(si => si.key === di.key) || di)
-      // 사용자가 추가한 custom 항목도 보존
-      const customItems = d.custom
-        ? saved.items.filter(si => !d.items.some(di => di.key === si.key))
-        : []
-      return { ...d, items: [...items, ...customItems] }
-    })
+
+    // 1) saved 의 순서를 우선 — DEFAULT_AXES 와 saved 를 key 단위 머지
+    const byKey = new Map<string, CodeAxis>()
+    for (const d of DEFAULT_AXES) byKey.set(d.key, d)
+
+    const result: CodeAxis[] = []
+    const seenKeys = new Set<string>()
+
+    for (const s of parsed) {
+      const d = byKey.get(s.key)
+      if (d) {
+        // default axis: items 보강 + 메타 saved 우선
+        const items = d.items.map(di => s.items.find(si => si.key === di.key) || di)
+        const customItems = s.items.filter(si => !d.items.some(di => di.key === si.key))
+        result.push({ ...d, ...s, items: [...items, ...customItems] })
+      } else {
+        // 사용자 정의 axis
+        result.push({ ...s, axisCustom: true })
+      }
+      seenKeys.add(s.key)
+    }
+    // saved 에 없는 default axis 추가 (스키마 진화 대응)
+    for (const d of DEFAULT_AXES) {
+      if (!seenKeys.has(d.key)) result.push(d)
+    }
+    return result
   } catch { return DEFAULT_AXES }
 }
 
@@ -61,9 +75,8 @@ function buildCounts(): Record<string, Record<string, number>> {
     for (const t of f.tags || []) counts.tags[t] = (counts.tags[t] || 0) + 1
     if (f.facttype) counts.facttype[f.facttype] = (counts.facttype[f.facttype] || 0) + 1
   }
-  // 차량 분류 — tags 의 일부 + 'domestic' (테슬라/수입차 둘 다 아니면 국산으로 가정)
   const dom = (merged as { factories: { tags?: string[] }[] }).factories.filter(
-    f => !f.tags?.includes('tesla-only') && !f.tags?.includes('foreign-only')
+    f => !f.tags?.includes('tesla-only') && !f.tags?.includes('foreign-only'),
   ).length
   counts.tags.domestic = dom
   return counts
@@ -73,18 +86,19 @@ export default function GroupsAdminMain() {
   const [axes, setAxes] = useState<CodeAxis[]>(DEFAULT_AXES)
   const [savedAt, setSavedAt] = useState<string | null>(null)
   const [activeAxis, setActiveAxis] = useState<string>('group')
+  const [showHiddenAxes, setShowHiddenAxes] = useState(false)
   const counts = useMemo(() => buildCounts(), [])
   const totalFactories = (merged as { factories: unknown[] }).factories.length
 
   useEffect(() => { setAxes(loadAxes()) }, [])
 
+  // ── 항목 단위 ─────────────────────────────────────────
   const updateItem = (axisKey: string, itemKey: string, patch: Partial<CodeItem>) => {
     setAxes(prev => prev.map(a => a.key === axisKey
       ? { ...a, items: a.items.map(i => i.key === itemKey ? { ...i, ...patch } : i) }
       : a))
   }
   const addItem = (axisKey: string) => {
-    // 이벤트 핸들러 내부에서만 호출되므로 render 중 호출 아님
     // eslint-disable-next-line react-hooks/purity
     const newKey = `custom-${Date.now()}`
     setAxes(prev => prev.map(a => a.key === axisKey
@@ -96,18 +110,66 @@ export default function GroupsAdminMain() {
       ? { ...a, items: a.items.filter(i => i.key !== itemKey) }
       : a))
   }
+
+  // ── 축 단위 ─────────────────────────────────────────
+  const updateAxis = (axisKey: string, patch: Partial<CodeAxis>) => {
+    setAxes(prev => prev.map(a => a.key === axisKey ? { ...a, ...patch } : a))
+  }
+  const addAxis = () => {
+    const newKey = `custom-axis-${Date.now()}`
+    const newAxis: CodeAxis = {
+      key: newKey,
+      title: '새 분류 축',
+      emoji: '➕',
+      description: '운영 정의 분류 축. 라벨/색상/항목 모두 편집 가능.',
+      editable: 'all',
+      custom: true,
+      match: 'custom',
+      items: [],
+      axisCustom: true,
+      axisHidden: false,
+    }
+    setAxes(prev => [...prev, newAxis])
+    setActiveAxis(newKey)
+  }
+  const removeAxis = (axisKey: string) => {
+    const target = axes.find(a => a.key === axisKey)
+    if (!target) return
+    if (!confirm(`"${target.title}" 축을 삭제할까요? 그 안의 ${target.items.length}개 항목도 함께 사라집니다.`)) return
+    setAxes(prev => {
+      const next = prev.filter(a => a.key !== axisKey)
+      if (activeAxis === axisKey) setActiveAxis(next[0]?.key || '')
+      return next
+    })
+  }
+  const moveAxis = (axisKey: string, direction: 'up' | 'down') => {
+    setAxes(prev => {
+      const idx = prev.findIndex(a => a.key === axisKey)
+      if (idx === -1) return prev
+      const target = direction === 'up' ? idx - 1 : idx + 1
+      if (target < 0 || target >= prev.length) return prev
+      const next = [...prev]
+      ;[next[idx], next[target]] = [next[target], next[idx]]
+      return next
+    })
+  }
+
+  // ── 저장 / 초기화 ─────────────────────────────────────────
   const persist = () => {
     saveAxes(axes)
     setSavedAt(new Date().toLocaleTimeString('ko-KR'))
   }
   const reset = () => {
+    if (!confirm('초기 13축 + 항목으로 복원합니다. 사용자 정의 축/항목은 모두 사라집니다. 계속할까요?')) return
     setAxes(DEFAULT_AXES)
     saveAxes(DEFAULT_AXES)
     setSavedAt(new Date().toLocaleTimeString('ko-KR'))
+    setActiveAxis(DEFAULT_AXES[0]?.key || '')
   }
 
   const stats = useMemo(() => ({
     axes: axes.length,
+    visibleAxes: axes.filter(a => !a.axisHidden).length,
     totalItems: axes.reduce((s, a) => s + a.items.length, 0),
     visibleItems: axes.reduce((s, a) => s + a.items.filter(i => !i.hidden).length, 0),
     factories: totalFactories,
@@ -118,8 +180,16 @@ export default function GroupsAdminMain() {
     if (axis.match === 'insurance') return counts.insurance[item.key] || 0
     if (axis.match === 'facttype') return counts.facttype[item.key] || 0
     if (axis.match === 'tags') return counts.tags[item.key] || 0
-    return 0   // custom 축 (정산 구분 등) — 데이터에 매핑 전
+    return 0
   }
+
+  // 표시할 축 목록 (숨김 토글에 따라)
+  const visibleAxes = showHiddenAxes ? axes : axes.filter(a => !a.axisHidden)
+
+  // 활성 축이 숨김 처리되거나 사라진 경우 처음 축으로
+  const safeActiveAxis = visibleAxes.some(a => a.key === activeAxis)
+    ? activeAxis
+    : visibleAxes[0]?.key || ''
 
   return (
     <ScreenWrap>
@@ -138,60 +208,83 @@ export default function GroupsAdminMain() {
       <SubNav />
 
       <KpiRow>
-        <KpiCard label="분류 축" value={stats.axes} tone="emerald" icon="🧩" hint="13축 종합 관리" />
+        <KpiCard label="분류 축" value={`${stats.visibleAxes}/${stats.axes}`} tone="emerald" icon="🧩" hint="표시 / 전체" />
         <KpiCard label="전체 항목" value={stats.totalItems} tone="blue" icon="🏷" />
-        <KpiCard label="표시 중" value={stats.visibleItems} tone="violet" icon="👁" />
+        <KpiCard label="표시 중 항목" value={stats.visibleItems} tone="violet" icon="👁" />
         <KpiCard label="등록 공장" value={stats.factories} tone="amber" icon="🏭" />
       </KpiRow>
 
-      {/* 축 탭 */}
+      {/* 축 탭 + 새 축 추가 + 숨김 토글 */}
       <div className="px-6 pb-3">
-        <div className="flex gap-2 flex-wrap">
-          {axes.map(a => (
+        <div className="flex gap-2 flex-wrap items-center">
+          {visibleAxes.map(a => (
             <button
               key={a.key}
               onClick={() => setActiveAxis(a.key)}
               className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-[13px] font-semibold transition-colors
-                ${activeAxis === a.key
+                ${safeActiveAxis === a.key
                   ? 'bg-slate-900 text-white'
-                  : 'bg-white text-slate-600 hover:bg-slate-50 ring-1 ring-slate-200'}`}
+                  : 'bg-white text-slate-600 hover:bg-slate-50 ring-1 ring-slate-200'}
+                ${a.axisHidden ? 'opacity-50' : ''}`}
             >
               <span>{a.emoji}</span>
               <span>{a.title}</span>
               <span className={`text-[11px] font-bold px-1.5 py-0.5 rounded-md
-                ${activeAxis === a.key ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'}`}>
+                ${safeActiveAxis === a.key ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'}`}>
                 {a.items.length}
               </span>
+              {a.axisHidden && <span className="text-[10px]">🚫</span>}
             </button>
           ))}
+          <button
+            onClick={addAxis}
+            className="inline-flex items-center gap-1 px-4 py-2 rounded-full text-[13px] font-semibold bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+            title="새 분류 축 추가"
+          >
+            <span>＋</span>
+            <span>새 축 추가</span>
+          </button>
+          <label className="ml-auto inline-flex items-center gap-1.5 text-[12px] text-slate-600 select-none cursor-pointer">
+            <input
+              type="checkbox"
+              checked={showHiddenAxes}
+              onChange={e => setShowHiddenAxes(e.target.checked)}
+              className="w-3.5 h-3.5 accent-slate-600"
+            />
+            숨김 축 표시
+          </label>
         </div>
       </div>
 
       {/* 활성 축 패널 */}
       <div className="px-6 pb-8">
-        {axes.filter(a => a.key === activeAxis).map(axis => (
-          <AxisPanel
-            key={axis.key}
-            axis={axis}
-            getCount={item => getCountFor(axis, item)}
-            onUpdateItem={(itemKey, patch) => updateItem(axis.key, itemKey, patch)}
-            onAddItem={() => addItem(axis.key)}
-            onRemoveItem={itemKey => removeItem(axis.key, itemKey)}
-          />
-        ))}
+        {axes.filter(a => a.key === safeActiveAxis).map(axis => {
+          const realIdx = axes.findIndex(a => a.key === axis.key)
+          return (
+            <AxisPanel
+              key={axis.key}
+              axis={axis}
+              index={realIdx}
+              total={axes.length}
+              getCount={item => getCountFor(axis, item)}
+              onUpdateItem={(itemKey, patch) => updateItem(axis.key, itemKey, patch)}
+              onAddItem={() => addItem(axis.key)}
+              onRemoveItem={itemKey => removeItem(axis.key, itemKey)}
+              onUpdateAxis={patch => updateAxis(axis.key, patch)}
+              onMoveAxis={dir => moveAxis(axis.key, dir)}
+              onRemoveAxis={() => removeAxis(axis.key)}
+            />
+          )
+        })}
 
         <Section title="셋팅 가이드" color="border-blue-500" defaultOpen={false}>
           <ul className="text-[12px] text-slate-600 space-y-1 list-disc list-inside leading-6">
-            <li><b>편집 가능 범위</b>는 축마다 다름:
-              <ul className="list-disc list-inside ml-4 mt-1">
-                <li><b>전체 편집</b>: 즐겨찾기 그룹, 차량 분류, 정산 구분 (라벨/색상/이모지/표시/추가 모두 가능)</li>
-                <li><b>라벨만 편집</b>: 보험 입고, 공장 유형, 특수 태그 (키는 데이터 매핑 때문에 고정)</li>
-              </ul>
-            </li>
-            <li><b>표시</b> 끄면 카카오 지도/필터/리스트에서 해당 코드 값이 기본 숨겨짐.</li>
-            <li><b>색상</b>은 마커/뱃지 표시색에 반영 (즐겨찾기 메타 우선순위가 더 높을 때는 그쪽이 우선).</li>
-            <li><b>저장</b>은 브라우저 localStorage 에만 보관 — 서버 동기화는 hmseok.com 이식 시 카페24 코드 마스터에 반영.</li>
-            <li><b>정산 구분</b>은 현재 데이터에 매핑 안됨. 등록 후 차후 단계에서 공장별 정산 방식 부여 — 사고 접수 페이지에서 활용.</li>
+            <li><b>13개 기본 축 + 사용자 정의 축</b> 모두 동일한 권한 (라벨/색상/이모지/표시/추가/삭제 모두 가능).</li>
+            <li><b>키 (READONLY)</b> 는 데이터 매핑 때문에 변경 불가 — 새로 추가한 항목/축은 자유롭게 키 부여 (auto: <code>custom-{`{timestamp}`}</code>).</li>
+            <li><b>축 메타</b> (제목/이모지/설명) 은 카드 헤더에서 인플레이스 편집. 순서는 ↑/↓ 버튼.</li>
+            <li><b>숨김 축</b> 은 기본 탭에서 안 보이고, 「숨김 축 표시」 체크 시 흐리게 노출.</li>
+            <li><b>삭제</b> 는 사용자 정의 축만 가능 (기본 13축은 데이터 매핑 보호).</li>
+            <li><b>저장</b> 은 브라우저 localStorage 보관 — 메인 ERP 코드 마스터 동기화는 별도 단계.</li>
           </ul>
         </Section>
       </div>
@@ -200,38 +293,89 @@ export default function GroupsAdminMain() {
 }
 
 // ───────────────────────────────────────────────────────────────
-// AxisPanel — 한 축의 항목들을 편집
+// AxisPanel — 한 축의 메타 + 항목들 편집
 // ───────────────────────────────────────────────────────────────
-function AxisPanel({ axis, getCount, onUpdateItem, onAddItem, onRemoveItem }: {
+function AxisPanel({ axis, index, total, getCount, onUpdateItem, onAddItem, onRemoveItem, onUpdateAxis, onMoveAxis, onRemoveAxis }: {
   axis: CodeAxis
+  index: number
+  total: number
   getCount: (item: CodeItem) => number
   onUpdateItem: (key: string, patch: Partial<CodeItem>) => void
   onAddItem: () => void
   onRemoveItem: (key: string) => void
+  onUpdateAxis: (patch: Partial<CodeAxis>) => void
+  onMoveAxis: (dir: 'up' | 'down') => void
+  onRemoveAxis: () => void
 }) {
   const labelEditable = axis.editable === 'all' || axis.editable === 'label-only'
   const colorEditable = axis.editable === 'all'
   const emojiEditable = axis.editable === 'all'
   const hiddenEditable = axis.editable === 'all' || axis.editable === 'label-only'
-  const canDelete = axis.custom
+  const canDeleteItem = axis.custom
+  const canDeleteAxis = axis.axisCustom === true
 
   return (
     <div className="bg-white rounded-2xl ring-1 ring-slate-200 overflow-hidden">
-      {/* 축 헤더 */}
-      <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="text-[18px]">{axis.emoji}</span>
-            <h2 className="text-[15px] font-bold text-slate-900">{axis.title}</h2>
-            <span className="text-[10px] font-bold bg-slate-100 text-slate-500 px-2 py-0.5 rounded">
-              {axis.editable === 'all' ? '전체 편집' : axis.editable === 'label-only' ? '라벨만 편집' : '읽기 전용'}
-            </span>
-          </div>
-          <p className="text-[12px] text-slate-500 mt-1">{axis.description}</p>
+      {/* 축 헤더 — 인플레이스 편집 */}
+      <div className="px-5 py-4 border-b border-slate-100">
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* 이모지 */}
+          <TextInput
+            value={axis.emoji}
+            onChange={e => onUpdateAxis({ emoji: e.target.value })}
+            className="w-12 text-center text-[18px]"
+            maxLength={2}
+          />
+          {/* 제목 */}
+          <TextInput
+            value={axis.title}
+            onChange={e => onUpdateAxis({ title: e.target.value })}
+            className="flex-1 min-w-[200px] font-bold text-[15px]"
+          />
+          {/* 사용자 정의 axis 표식 */}
+          {axis.axisCustom && (
+            <span className="text-[10px] font-bold bg-blue-100 text-blue-700 px-2 py-0.5 rounded">사용자 정의</span>
+          )}
+          {/* 순서 ↑ ↓ */}
+          <button
+            onClick={() => onMoveAxis('up')}
+            disabled={index === 0}
+            className="w-8 h-8 flex items-center justify-center rounded-md ring-1 ring-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed"
+            title="위로"
+          >↑</button>
+          <button
+            onClick={() => onMoveAxis('down')}
+            disabled={index === total - 1}
+            className="w-8 h-8 flex items-center justify-center rounded-md ring-1 ring-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed"
+            title="아래로"
+          >↓</button>
+          {/* 표시/숨김 */}
+          <label className="inline-flex items-center gap-1.5 text-[12px] text-slate-600 select-none cursor-pointer ml-1">
+            <input
+              type="checkbox"
+              checked={!axis.axisHidden}
+              onChange={e => onUpdateAxis({ axisHidden: !e.target.checked })}
+              className="w-4 h-4 accent-blue-600"
+            />
+            표시
+          </label>
+          {/* 삭제 (사용자 정의 axis 만) */}
+          {canDeleteAxis && (
+            <Button variant="danger" size="sm" onClick={onRemoveAxis}>🗑 축 삭제</Button>
+          )}
+          {/* 항목 추가 */}
+          {axis.custom && (
+            <Button variant="secondary" size="sm" onClick={onAddItem}>＋ 항목 추가</Button>
+          )}
         </div>
-        {axis.custom && (
-          <Button variant="secondary" size="sm" onClick={onAddItem}>+ 항목 추가</Button>
-        )}
+        {/* 설명 — 인플레이스 */}
+        <textarea
+          value={axis.description}
+          onChange={e => onUpdateAxis({ description: e.target.value })}
+          rows={1}
+          className="mt-2 w-full px-3 py-2 text-[12px] bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-300 placeholder:text-slate-400 transition-colors resize-y"
+          placeholder="축에 대한 설명 (운영자 안내용)"
+        />
       </div>
 
       {/* 항목 그리드 헤더 */}
@@ -246,7 +390,11 @@ function AxisPanel({ axis, getCount, onUpdateItem, onAddItem, onRemoveItem }: {
       </div>
 
       {/* 항목들 */}
-      {axis.items.map(item => (
+      {axis.items.length === 0 ? (
+        <div className="px-5 py-10 text-center text-[12px] text-slate-400">
+          항목이 없습니다. 위 ＋ 항목 추가 버튼으로 새 항목을 만드세요.
+        </div>
+      ) : axis.items.map(item => (
         <div key={item.key} className="px-5 py-2.5 grid grid-cols-12 gap-3 items-center border-b border-slate-100 last:border-b-0 hover:bg-slate-50/40">
           <div className="col-span-1 text-center">
             <input
@@ -268,7 +416,7 @@ function AxisPanel({ axis, getCount, onUpdateItem, onAddItem, onRemoveItem }: {
           </div>
           <div className="col-span-2 flex items-center gap-1.5">
             <span className="font-mono text-[11px] text-slate-500 bg-slate-50 ring-1 ring-slate-200 rounded-md px-2 py-1">{item.key}</span>
-            {canDelete && (
+            {canDeleteItem && (
               <button
                 onClick={() => {
                   if (confirm(`"${item.label}" 항목을 삭제할까요?`)) onRemoveItem(item.key)
@@ -296,7 +444,14 @@ function AxisPanel({ axis, getCount, onUpdateItem, onAddItem, onRemoveItem }: {
               maxLength={2}
             />
           </div>
-          <div className="col-span-3 text-[12px] text-slate-500">{item.description}</div>
+          <div className="col-span-3">
+            <TextInput
+              value={item.description}
+              disabled={!labelEditable}
+              onChange={e => onUpdateItem(item.key, { description: e.target.value })}
+              className="text-[12px]"
+            />
+          </div>
           <div className="col-span-1 text-center">
             <StatusBadge tone={getCount(item) > 0 ? 'info' : axis.match === 'custom' ? 'muted' : 'warn'}>
               {getCount(item)}
