@@ -829,6 +829,193 @@ const cardColumns: TableColumn<Transaction>[] = [
    - 위치: harness-engineering/scripts/cowork-staging-lint.js (TBD)
 ```
 
+### 규칙 22 — 모듈 _docs 갱신 의무 (2026-05-04 신설, 강력)
+
+> **본 세션 사고 (2026-05-04)**: PR-2A 부터 PR-2Z 까지 14개 PR 진행하면서 모듈
+> `_docs/` 갱신을 일괄 빠뜨림. V2-RESTRUCTURE.md 의 PR 체크 상태 옛날 그대로,
+> 신규 데이터 모델·UI 변경이 _docs 에 반영 안 됨 → 운영 회고 / 다른 세션 인계 어려움.
+
+**원칙**: **PR 코드 변경 = _docs 갱신 한 세트**. 코드만 변경하고 _docs 안 건드리면 위반.
+
+**다음 중 하나라도 해당하면 _docs 갱신 의무**:
+
+```
+✓ 새 마이그레이션 SQL 추가 → _docs/DATA-MODEL.md 갱신
+✓ 새 API 라우트 → _docs/API.md 또는 모듈 README 갱신
+✓ 새 UI 페이지/모드/컴포넌트 → _docs/UI-SPEC.md 갱신
+✓ 운영 사실 / 도메인 규칙 변경 → _docs/OPERATIONS.md 갱신 (없으면 신설)
+✓ 새 PR 종료 → _docs/CHANGELOG.md (없으면 신설) 한 줄 이상 추가
+✓ 페르소나/시나리오 변경 → _docs/SCENARIOS.md 갱신
+```
+
+**필수 파일 (모듈 _docs/ 표준 세트)**:
+```
+app/<Module>/_docs/
+├─ CLAUDE-<Module>.md     본 모듈 한정 보조 규칙
+├─ DATA-MODEL.md           테이블/컬럼/관계
+├─ UI-SPEC.md              레이아웃/컴포넌트/페르소나
+├─ OPERATIONS.md           운영 사실 (24/365 등)
+├─ SCENARIOS.md            페르소나별 흐름 시나리오
+├─ CHANGELOG.md            매 PR 한 줄 (날짜 + PR 코드 + 한 줄 요약)
+├─ V2-RESTRUCTURE.md       (선택) 큰 재구성 설계
+└─ VERIFICATION.md         lint/빌드 검증 로그
+```
+
+**자동화 (TBD)**:
+```
+🔜 12. docs-coverage-lint.js — 코드 변경 PR 에 _docs 변경 없으면 경고
+   - migrations/* 신규 → DATA-MODEL.md 갱신 검증
+   - app/<Module>/api/ 신규 → 모듈 _docs 갱신 검증
+   - app/<Module>/components/ 신규 → UI-SPEC.md 갱신 검증
+   - 위치: harness-engineering/scripts/docs-coverage-lint.js (TBD)
+```
+
+### 규칙 23 — 마이그레이션 SQL 적용 검증 (2026-05-04 신설)
+
+> **본 세션 사고**: cs_holidays, cs_leaves, cs_swap_requests, cs_leave_quotas 등
+> 새 마이그레이션 만들고 UI 까지 같이 진행했는데, 사용자가 SQL 적용 안 한 상태에서
+> 화면이 500 에러로 깨짐. 사용자 시각 검수 시 작업 정상 동작 확인 못 함.
+
+**다음 중 하나라도 해당하면 의무**:
+
+```
+✓ 새 마이그레이션 SQL 파일 생성
+✓ 기존 테이블에 컬럼/인덱스 추가하는 ALTER
+✓ 기존 시드 변경 또는 추가
+```
+
+**의무 절차**:
+
+```
+[A] 마이그레이션 만들 때 즉시 사용자에게 적용 안내
+   "다음 SQL 을 DBeaver/CLI 에서 실행 후 진행:
+    mysql -h ... < migrations/YYYY-MM-DD_xxx.sql"
+   적용 확인 받기 전 UI 까지 만들지 말 것 (또는 만들더라도 시각 검수 보류)
+
+[B] API 라우트 측 graceful fallback
+   try {
+     const rows = await prisma.$queryRaw`SELECT ... FROM cs_xxx ...`
+   } catch (e) {
+     // 테이블 미적용 시 빈 배열 반환 + 에러 로그만
+     return NextResponse.json({ data: [], error: null, _migration_pending: true })
+   }
+   → UI 에서 _migration_pending 받으면 "⚠ 마이그레이션 미적용" 배너 표시
+
+[C] 멱등 적용
+   IF NOT EXISTS / @col_exists 체크 패턴으로 여러 번 실행 안전성 보장 (이미 패턴화)
+
+[D] 검증 SQL 같이 제공
+   매 마이그레이션 파일 하단에 검증 SELECT 주석으로 포함
+   -- 검증: SELECT COUNT(*) FROM cs_xxx; -- 기대치 N
+```
+
+### 규칙 24 — 시드 데이터 멱등성 의무 (2026-05-04 신설)
+
+> **본 세션 사고**: 사용자가 cs_workers 마이그레이션을 여러 번 적용 → 16명 시드가
+> 3중복으로 48 row → 자동 생성 시 박혜정 한 명에 31일 모두 배정되는 등 운영 마비.
+
+**모든 시드 INSERT 는 다음 중 하나로**:
+
+```
+[A] INSERT IGNORE (UNIQUE 제약 필요)
+   INSERT IGNORE INTO cs_workers (id, name, ...) VALUES (UUID(), '박지훈', ...);
+   → 테이블에 UNIQUE KEY (name) 또는 비즈니스 키 명시 필수
+
+[B] ON DUPLICATE KEY UPDATE
+   INSERT INTO cs_workers (id, name, ...) VALUES (UUID(), '박지훈', ...)
+   ON DUPLICATE KEY UPDATE updated_at = NOW();
+
+[C] NOT EXISTS 가드
+   INSERT INTO cs_workers (...)
+   SELECT UUID(), '박지훈', ... FROM dual
+   WHERE NOT EXISTS (SELECT 1 FROM cs_workers WHERE name = '박지훈');
+```
+
+**시드 대상 테이블에 비즈니스 UNIQUE 키 의무**:
+- cs_workers: `UNIQUE KEY uq_cs_worker_name (name)` (동명이인은 별칭 사용)
+- cs_shift_slots: `UNIQUE KEY uq_cs_slot_code (code)` (이미 적용)
+- cs_shift_groups: `UNIQUE KEY uq_cs_group_name (name)` (TBD)
+- ride_employees: 동명이인 가능 → `UNIQUE (name, hire_date)` 같은 복합
+
+**자동화 (TBD)**:
+```
+🔜 13. seed-idempotency-lint.js — 마이그레이션 SQL 안 INSERT 검사
+   - 'INSERT INTO ... VALUES' 만 있고 IGNORE / ON DUPLICATE / NOT EXISTS 없으면 차단
+   - 시드 대상 테이블에 UNIQUE KEY 없으면 경고
+```
+
+### 규칙 25 — 도메인 운영 사실 우선 인지 (2026-05-04 신설)
+
+> **본 세션 사고**: 24/365 콜센터 운영이라는 핵심 사실을 처음에 놓침.
+> cs_holidays.exclude_auto 디폴트가 true 였고, 패밀리데이를 회사 휴일로 분류하는 등
+> 데이터 모델이 잘못 잡혔다가 후반에 큰 폭으로 재구성.
+
+**새 모듈/기능 시작 전 의무 질문 (운영 사실 인터뷰)**:
+
+```
+[A] 운영 시간
+   "이 모듈은 24/365 운영인가, 9-18 사무 시간인가?"
+   "공휴일에도 누군가 일하나? 아니면 회사 전체 휴무?"
+
+[B] 부서/그룹 차이
+   "콜센터·영업·관리 등 부서마다 다른 패턴인가?"
+   "같은 시프트라도 직원마다 다른 휴일 적용 가능한가?"
+
+[C] 마스터 데이터 변동
+   "직원이 자주 추가/퇴사되는가?"
+   "시프트 시간대가 자주 변경되는가?"
+
+[D] 권한 차이
+   "매니저/직원이 보는 데이터가 다른가?"
+   "직원이 본인 외 다른 사람 일정도 볼 수 있나?"
+```
+
+**답변을 _docs/OPERATIONS.md (또는 SOURCE-ANALYSIS.md) 에 기록 의무**.
+이 문서가 데이터 모델 / 디폴트 값 / 자동 로직의 근거.
+
+### 규칙 26 — 페르소나·시나리오 사전 워크-스루 (2026-05-04 신설)
+
+> **본 세션 사고**: 처음에 "캘린더 그리드 한 화면" 만 만들고 작성자 vs 직원 분리,
+> 휴가 발급량, 시프트 교체 요청 등이 빠짐. 사용자 운영하면서 추가 피드백 → 큰 폭 변경 누적.
+
+**새 모듈 설계 전 _docs/SCENARIOS.md 작성 의무**:
+
+```
+페르소나 1: 매니저 (작성자)
+  Step 1. 월 시작 — 셋팅 점검 (시프트 / 그룹 / 워커 / 휴가)
+  Step 2. 자동 생성 → 미리보기 → 적용
+  Step 3. 빈자리/균형 검토 → 수동 조정
+  Step 4. 공지됨 → 직원에게 배포
+
+페르소나 2: 직원
+  Step 1. 영구 토큰 링크 또는 로그인 → 본인 일정
+  Step 2. 같은 날 동료 확인
+  Step 3. 캘린더 다운로드 (휴대폰 동기화)
+  Step 4. (필요 시) 시프트 교체 요청
+
+페르소나 3: 관리자
+  ... (생략)
+```
+
+각 Step 마다:
+- 어느 페이지/탭/버튼을 누르는가?
+- 어느 데이터가 필요한가?
+- 어떤 권한 체크가 있는가?
+
+**시나리오 검수 후** 데이터 모델/UI/API 결정.
+
+### 본 세션 사고 회고 누적 (2026-05-04)
+
+```
+사고 1: _docs 갱신 14 PR 누락 → 규칙 22 신설
+사고 2: 마이그레이션 미적용 → 규칙 23 신설
+사고 3: cs_workers 3중복 (시드 멱등성 부재) → 규칙 24 신설
+사고 4: 24/365 운영 사실 인지 부족 → 규칙 25 신설
+사고 5: 페르소나/시나리오 사전 점검 부족 → 규칙 26 신설
+```
+
+향후 같은 부류 사고 발생 시 → 자동화 hook 즉시 신설 (규칙 15 적용).
+
 ### 위반 시 자동 자가 기록 + 누적 시 시스템 안전장치
 
 이 조항을 위반하면 즉시 `knowledge/common-errors.md`에 사례 기록.

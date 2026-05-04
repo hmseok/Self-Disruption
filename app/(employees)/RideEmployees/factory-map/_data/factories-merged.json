@@ -1,0 +1,3302 @@
+{
+  "stats": {
+    "total": 113,
+    "byGroup": {
+      "backup-list": 41,
+      "mg-only": 53,
+      "main-incoming": 65,
+      "autohands": 42,
+      "meritz-only": 5,
+      "terminated": 6
+    },
+    "insurance": {
+      "mgOk": 56,
+      "turnkeyOk": 62,
+      "meritzOk": 39,
+      "autohandsOk": 44,
+      "allOk": 13
+    },
+    "tags": {
+      "kia-autoq": 10,
+      "tesla-only": 3,
+      "samsung-pyeongtaek": 1,
+      "foreign-only": 1,
+      "samsung-card": 1,
+      "samsung-return": 1,
+      "unassignable": 1,
+      "hyundai-bluehands": 8
+    },
+    "terminated": 6,
+    "geocoded": 113,
+    "geocodeMiss": 0
+  },
+  "factories": [
+    {
+      "placeId": "975855805",
+      "allPlaceIds": [
+        "975855805"
+      ],
+      "name": "1급 대명모터스 자동차검사",
+      "cleanName": "1급 대명모터스 자동차검사",
+      "address": "경기 포천시 소흘읍 호국로 301-7 자동차검사 대명모터스 (소흘읍)",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": null,
+        "turnkey": null,
+        "meritz": null,
+        "autohands": null
+      },
+      "tags": [],
+      "groups": [
+        "backup-list"
+      ],
+      "terminated": false,
+      "factcode": "K5855805",
+      "lat": 37.8008151819756,
+      "lng": 127.128661663175,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "992563521",
+      "allPlaceIds": [
+        "992563521",
+        "992563560"
+      ],
+      "name": "1급 상당모터스(엠실비,턴키O/메리츠,오토핸즈X)",
+      "cleanName": "1급 상당모터스",
+      "address": "충북 청주시 상당구 1순환로1480번길 3 1층 (용정동)",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": true,
+        "turnkey": true,
+        "meritz": false,
+        "autohands": false
+      },
+      "tags": [],
+      "groups": [
+        "mg-only",
+        "main-incoming"
+      ],
+      "terminated": false,
+      "factcode": "K2563521",
+      "lat": 36.6245221103623,
+      "lng": 127.519869733607,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "992546967",
+      "allPlaceIds": [
+        "992546967",
+        "992547030",
+        "975857209",
+        "967438326"
+      ],
+      "name": "1급다해자동차공업사(엠실비,턴키,메리츠,오토핸즈O)",
+      "cleanName": "1급다해 자동차공업사",
+      "address": "대전 서구 계룡로232번길 163 (월평동)",
+      "aliases": [
+        "1급다해 자동차공업사",
+        "1급다해 자동차공업사/전체입고O/오토핸즈입고가능"
+      ],
+      "addresses": [],
+      "insurance": {
+        "mg": true,
+        "turnkey": true,
+        "meritz": true,
+        "autohands": true
+      },
+      "tags": [],
+      "groups": [
+        "mg-only",
+        "main-incoming",
+        "backup-list",
+        "autohands"
+      ],
+      "terminated": false,
+      "factcode": "K2546967",
+      "lat": 36.3444684790695,
+      "lng": 127.354876883778,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "967437450",
+      "allPlaceIds": [
+        "967437450"
+      ],
+      "name": "21세기 자동차공업사/오토핸즈입고가능",
+      "cleanName": "21세기 자동차공업사",
+      "address": "강원특별자치도 태백시 동태백로 1147 (통동)",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": null,
+        "turnkey": null,
+        "meritz": null,
+        "autohands": true
+      },
+      "tags": [],
+      "groups": [
+        "autohands"
+      ],
+      "terminated": false,
+      "factcode": "K7437450",
+      "lat": 37.1654791434878,
+      "lng": 129.031198435194,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "992553247",
+      "allPlaceIds": [
+        "992553247",
+        "992553307"
+      ],
+      "name": "가능현대공업사(엠실비,턴키O/메리츠,오토핸즈X)",
+      "cleanName": "가능현대공업사",
+      "address": "경기 의정부시 입석로55번길 21 (가능동)",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": true,
+        "turnkey": true,
+        "meritz": false,
+        "autohands": false
+      },
+      "tags": [],
+      "groups": [
+        "mg-only",
+        "main-incoming"
+      ],
+      "terminated": false,
+      "factcode": "K2553247",
+      "lat": 37.7539843718313,
+      "lng": 127.019316864271,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "967435501",
+      "allPlaceIds": [
+        "967435501"
+      ],
+      "name": "강릉모터스/오토핸즈입고가능",
+      "cleanName": "강릉모터스",
+      "address": "대전동 206-3",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": null,
+        "turnkey": null,
+        "meritz": null,
+        "autohands": true
+      },
+      "tags": [],
+      "groups": [
+        "autohands"
+      ],
+      "terminated": false,
+      "factcode": "K7435501",
+      "lat": 37.7970186015757,
+      "lng": 128.861672526542,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "1092313088",
+      "allPlaceIds": [
+        "1092313088",
+        "1109861516",
+        "992537788",
+        "967432713"
+      ],
+      "name": "고경모터스(엠실비,턴키,메리츠실비O/오토핸즈X)",
+      "cleanName": "고경모터스",
+      "address": "경기 수원시 영통구 중부대로448번길 61 (원천동)",
+      "aliases": [
+        "고경모터스",
+        "고경모터스/전체입고O/오토핸즈입고가능"
+      ],
+      "addresses": [],
+      "insurance": {
+        "mg": true,
+        "turnkey": true,
+        "meritz": true,
+        "autohands": true
+      },
+      "tags": [],
+      "groups": [
+        "mg-only",
+        "main-incoming",
+        "backup-list",
+        "autohands"
+      ],
+      "terminated": false,
+      "factcode": "K2313088",
+      "lat": 37.2672367388843,
+      "lng": 127.061125807564,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "1081494110",
+      "allPlaceIds": [
+        "1081494110"
+      ],
+      "name": "골드자동차(오토핸즈O)",
+      "cleanName": "골드자동차",
+      "address": "강원특별자치도 원주시 강변로 655 (학성동)",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": null,
+        "turnkey": null,
+        "meritz": null,
+        "autohands": true
+      },
+      "tags": [],
+      "groups": [
+        "autohands"
+      ],
+      "terminated": false,
+      "factcode": "K1494110",
+      "lat": 37.362137495713,
+      "lng": 127.948924535883,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "381131274",
+      "allPlaceIds": [
+        "381131274"
+      ],
+      "name": "공신기업(기아) / 메리츠실비만 입고O",
+      "cleanName": "공신기업",
+      "address": "강원 춘천시 춘천로 427 (후평동)",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": null,
+        "turnkey": null,
+        "meritz": true,
+        "autohands": null
+      },
+      "tags": [],
+      "groups": [
+        "meritz-only"
+      ],
+      "terminated": false,
+      "factcode": "K1131274",
+      "lat": 37.8917129141772,
+      "lng": 127.752480236283,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "967450900",
+      "allPlaceIds": [
+        "967450900"
+      ],
+      "name": "광명1급종합정비검사/오토핸즈입고가능",
+      "cleanName": "광명1급종합정비검사",
+      "address": "경북 구미시 비산로7길 14-55 (비산동)",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": null,
+        "turnkey": null,
+        "meritz": null,
+        "autohands": true
+      },
+      "tags": [],
+      "groups": [
+        "autohands"
+      ],
+      "terminated": false,
+      "factcode": "K7450900",
+      "lat": 36.121183932233,
+      "lng": 128.384609894966,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "967483807",
+      "allPlaceIds": [
+        "967483807"
+      ],
+      "name": "군산서비스기아오토큐/오토핸즈입고가능",
+      "cleanName": "군산서비스기아오토큐",
+      "address": "전북특별자치도 군산시 미성로 502-2 (미룡동)",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": null,
+        "turnkey": null,
+        "meritz": null,
+        "autohands": true
+      },
+      "tags": [
+        "kia-autoq"
+      ],
+      "groups": [
+        "autohands"
+      ],
+      "terminated": false,
+      "factcode": "K7483807",
+      "lat": 35.9538475638499,
+      "lng": 126.67579112165,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "967431652",
+      "allPlaceIds": [
+        "967431652"
+      ],
+      "name": "규석카독크/오토핸즈입고가능",
+      "cleanName": "규석카독크",
+      "address": "마조로18길 2",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": null,
+        "turnkey": null,
+        "meritz": null,
+        "autohands": true
+      },
+      "tags": [],
+      "groups": [
+        "autohands"
+      ],
+      "terminated": false,
+      "factcode": "K7431652",
+      "lat": 37.5648696848559,
+      "lng": 127.042091755278,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "992544467",
+      "allPlaceIds": [
+        "992544467",
+        "992544518",
+        "975853309",
+        "967429292"
+      ],
+      "name": "그린서비스(엠실비,턴키,메리츠,오토핸즈O)",
+      "cleanName": "그린서비스",
+      "address": "서울 강서구 남부순환로19길 48-37 (외발산동)",
+      "aliases": [
+        "그린서비스",
+        "그린서비스/전체입고O/오토핸즈입고가능"
+      ],
+      "addresses": [],
+      "insurance": {
+        "mg": true,
+        "turnkey": true,
+        "meritz": true,
+        "autohands": true
+      },
+      "tags": [],
+      "groups": [
+        "mg-only",
+        "main-incoming",
+        "backup-list",
+        "autohands"
+      ],
+      "terminated": false,
+      "factcode": "K2544467",
+      "lat": 37.546599084634,
+      "lng": 126.824944296488,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "975854260",
+      "allPlaceIds": [
+        "975854260",
+        "967448918"
+      ],
+      "name": "그린오토정비",
+      "cleanName": "그린오토정비",
+      "address": "부산 사상구 낙동대로1048번길 52 (감전동)",
+      "aliases": [
+        "그린오토정비/전체입고O/오토핸즈입고가능"
+      ],
+      "addresses": [],
+      "insurance": {
+        "mg": true,
+        "turnkey": true,
+        "meritz": true,
+        "autohands": true
+      },
+      "tags": [],
+      "groups": [
+        "backup-list",
+        "autohands"
+      ],
+      "terminated": false,
+      "factcode": "K5854260",
+      "lat": 35.1530219322492,
+      "lng": 128.975719912356,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "727730635",
+      "allPlaceIds": [
+        "727730635"
+      ],
+      "name": "글로벌모터스",
+      "cleanName": "글로벌모터스",
+      "address": "경기 남양주시 화도읍 폭포로 192 (화도읍)",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": null,
+        "turnkey": null,
+        "meritz": null,
+        "autohands": null
+      },
+      "tags": [],
+      "groups": [
+        "terminated"
+      ],
+      "terminated": true,
+      "factcode": "K7730635",
+      "lat": 37.6344221078205,
+      "lng": 127.311725026785,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "1081589570",
+      "allPlaceIds": [
+        "1081589570",
+        "992568160",
+        "980108416"
+      ],
+      "name": "기아오토큐 1급진보정비공장(턴키,메리츠,엠실비O,오토핸즈X)",
+      "cleanName": "기아오토큐 1급진보정비공장",
+      "address": "경북 청송군 진보면 영양로 34-35 (진보면)",
+      "aliases": [
+        "기아오토큐 1급진보정비공장(턴키,메리츠O/엠실비,오토핸즈X)",
+        "기아오토큐 1급진보정비공장"
+      ],
+      "addresses": [],
+      "insurance": {
+        "mg": false,
+        "turnkey": true,
+        "meritz": true,
+        "autohands": false
+      },
+      "tags": [
+        "kia-autoq"
+      ],
+      "groups": [
+        "mg-only",
+        "main-incoming",
+        "backup-list"
+      ],
+      "terminated": false,
+      "factcode": "K1589570",
+      "lat": 36.54198651571,
+      "lng": 129.08165684449,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "975851690",
+      "allPlaceIds": [
+        "975851690"
+      ],
+      "name": "기아오토큐 공신기업",
+      "cleanName": "기아오토큐 공신기업",
+      "address": "강원특별자치도 춘천시 춘천로 427 (후평동)",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": null,
+        "turnkey": null,
+        "meritz": null,
+        "autohands": null
+      },
+      "tags": [
+        "kia-autoq"
+      ],
+      "groups": [
+        "backup-list"
+      ],
+      "terminated": false,
+      "factcode": "K5851690",
+      "lat": 37.8917129141772,
+      "lng": 127.752480236283,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "1085594764",
+      "allPlaceIds": [
+        "1085594764",
+        "1085594876"
+      ],
+      "name": "기아오토큐 남도봉서비스(엠실비,턴키O/오토핸즈,메리츠실비X)",
+      "cleanName": "기아오토큐 남도봉서비스",
+      "address": "서울 도봉구 도봉로140길 32 (창동)",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": true,
+        "turnkey": true,
+        "meritz": false,
+        "autohands": false
+      },
+      "tags": [
+        "kia-autoq"
+      ],
+      "groups": [
+        "mg-only",
+        "main-incoming"
+      ],
+      "terminated": false,
+      "factcode": "K5594764",
+      "lat": 37.6608364863571,
+      "lng": 127.043926003372,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "975857416",
+      "allPlaceIds": [
+        "975857416"
+      ],
+      "name": "기아오토큐 대림자동차정비서비스",
+      "cleanName": "기아오토큐 대림자동차정비서비스",
+      "address": "경기 성남시 수정구 사송로77번길 72 (사송동)",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": null,
+        "turnkey": null,
+        "meritz": null,
+        "autohands": null
+      },
+      "tags": [
+        "kia-autoq"
+      ],
+      "groups": [
+        "backup-list"
+      ],
+      "terminated": false,
+      "factcode": "K5857416",
+      "lat": 37.408965661686,
+      "lng": 127.114468668226,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "992543223",
+      "allPlaceIds": [
+        "992543223",
+        "992543267",
+        "975853408"
+      ],
+      "name": "기아오토큐 삼척서비스(엠실비,턴키,메리츠O/오토핸즈X)",
+      "cleanName": "기아오토큐 삼척서비스",
+      "address": "강원특별자치도 삼척시 동해대로 4303 (갈천동)",
+      "aliases": [
+        "기아오토큐 삼척서비스"
+      ],
+      "addresses": [],
+      "insurance": {
+        "mg": true,
+        "turnkey": true,
+        "meritz": true,
+        "autohands": false
+      },
+      "tags": [
+        "kia-autoq"
+      ],
+      "groups": [
+        "mg-only",
+        "main-incoming",
+        "backup-list"
+      ],
+      "terminated": false,
+      "factcode": "K2543223",
+      "lat": 37.4569277581274,
+      "lng": 129.163417093927,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "975856261",
+      "allPlaceIds": [
+        "975856261"
+      ],
+      "name": "기아오토큐 서대전서비스",
+      "cleanName": "기아오토큐 서대전서비스",
+      "address": "대전 서구 도안동로12번길 26 서대전정비공장 (도안동)",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": null,
+        "turnkey": null,
+        "meritz": null,
+        "autohands": null
+      },
+      "tags": [
+        "kia-autoq"
+      ],
+      "groups": [
+        "backup-list"
+      ],
+      "terminated": false,
+      "factcode": "K5856261",
+      "lat": 36.3062998772666,
+      "lng": 127.354254043655,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "992566901",
+      "allPlaceIds": [
+        "992566901",
+        "975851790"
+      ],
+      "name": "기아오토큐 속초서비스(턴키,메리츠O/엠실비,오토핸즈X)",
+      "cleanName": "기아오토큐 속초서비스",
+      "address": "강원특별자치도 속초시 동해대로 4179 (조양동)",
+      "aliases": [
+        "기아오토큐 속초서비스"
+      ],
+      "addresses": [],
+      "insurance": {
+        "mg": false,
+        "turnkey": true,
+        "meritz": true,
+        "autohands": false
+      },
+      "tags": [
+        "kia-autoq"
+      ],
+      "groups": [
+        "main-incoming",
+        "backup-list"
+      ],
+      "terminated": false,
+      "factcode": "K2566901",
+      "lat": 38.1924381140139,
+      "lng": 128.578377749817,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "1049557333",
+      "allPlaceIds": [
+        "1049557333",
+        "992581105",
+        "975857113"
+      ],
+      "name": "기아오토큐 에이플러스모터스(턴키,메리츠,엠실비O/오토핸즈X)",
+      "cleanName": "기아오토큐 에이플러스모터스",
+      "address": "부산 금정구 공단로 49 (금사동)",
+      "aliases": [
+        "기아오토큐 에이플러스모터스"
+      ],
+      "addresses": [],
+      "insurance": {
+        "mg": true,
+        "turnkey": true,
+        "meritz": true,
+        "autohands": false
+      },
+      "tags": [
+        "kia-autoq"
+      ],
+      "groups": [
+        "mg-only",
+        "main-incoming",
+        "backup-list"
+      ],
+      "terminated": false,
+      "factcode": "K9557333",
+      "lat": 35.2184472804579,
+      "lng": 129.1129017754,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "1086957626",
+      "allPlaceIds": [
+        "1086957626"
+      ],
+      "name": "기아오토큐군포점(메리츠실비만 입고)",
+      "cleanName": "기아오토큐군포점",
+      "address": "호계동 1028-12",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": null,
+        "turnkey": null,
+        "meritz": null,
+        "autohands": null
+      },
+      "tags": [
+        "kia-autoq"
+      ],
+      "groups": [
+        "backup-list"
+      ],
+      "terminated": false,
+      "factcode": "K6957626",
+      "lat": 37.3705470511005,
+      "lng": 126.950320551114,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "967451180",
+      "allPlaceIds": [
+        "967451180"
+      ],
+      "name": "남대구 서비스/오토핸즈입고가능",
+      "cleanName": "남대구 서비스",
+      "address": "대구 달서구 성서공단로61길 12 (장동)",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": null,
+        "turnkey": null,
+        "meritz": null,
+        "autohands": true
+      },
+      "tags": [],
+      "groups": [
+        "autohands"
+      ],
+      "terminated": false,
+      "factcode": "K7451180",
+      "lat": 35.8371912775495,
+      "lng": 128.517130143484,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "967432908",
+      "allPlaceIds": [
+        "967432908"
+      ],
+      "name": "다온모터스/오토핸즈입고가능",
+      "cleanName": "다온모터스",
+      "address": "엠티브이24로 18-13",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": null,
+        "turnkey": null,
+        "meritz": null,
+        "autohands": true
+      },
+      "tags": [],
+      "groups": [
+        "autohands"
+      ],
+      "terminated": false,
+      "factcode": "K7432908",
+      "lat": 37.3141463685668,
+      "lng": 126.715162197439,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "967432524",
+      "allPlaceIds": [
+        "967432524"
+      ],
+      "name": "대림자동차정비서비스/실비제외전체입고가능/오토핸즈입고가능",
+      "cleanName": "대림자동차정비서비스",
+      "address": "경기 성남시 수정구 사송로77번길 72 (사송동)",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": true,
+        "turnkey": true,
+        "meritz": true,
+        "autohands": true
+      },
+      "tags": [],
+      "groups": [
+        "autohands"
+      ],
+      "terminated": false,
+      "factcode": "K7432524",
+      "lat": 37.408965661686,
+      "lng": 127.114468668226,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "992545351",
+      "allPlaceIds": [
+        "992545351",
+        "992545408",
+        "967434489"
+      ],
+      "name": "대명모터스(엠실비,턴키,메리츠,오토핸즈O)",
+      "cleanName": "대명모터스",
+      "address": "경기 포천시 소흘읍 호국로 301-7 자동차검사 대명모터스 (소흘읍)",
+      "aliases": [
+        "대명모터스/전체입고가능/오토핸즈입고가능"
+      ],
+      "addresses": [],
+      "insurance": {
+        "mg": true,
+        "turnkey": true,
+        "meritz": true,
+        "autohands": true
+      },
+      "tags": [],
+      "groups": [
+        "mg-only",
+        "main-incoming",
+        "autohands"
+      ],
+      "terminated": false,
+      "factcode": "K2545351",
+      "lat": 37.8008151819756,
+      "lng": 127.128661663175,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "1096147523",
+      "allPlaceIds": [
+        "1096147523"
+      ],
+      "name": "대명종합자동차정비/오토핸즈O",
+      "cleanName": "대명종합자동차정비",
+      "address": "우현동 443",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": null,
+        "turnkey": null,
+        "meritz": null,
+        "autohands": true
+      },
+      "tags": [],
+      "groups": [
+        "autohands"
+      ],
+      "terminated": false,
+      "factcode": "K6147523",
+      "lat": 36.067516109939,
+      "lng": 129.349939487189,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "967472350",
+      "allPlaceIds": [
+        "967472350"
+      ],
+      "name": "대양산단1급자동차/오토핸즈입고가능",
+      "cleanName": "대양산단1급자동차",
+      "address": "전남 목포시 대양산단로56번길 12-10 목포종합운동장.목포야구장 건너편 (대양동)",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": null,
+        "turnkey": null,
+        "meritz": null,
+        "autohands": true
+      },
+      "tags": [],
+      "groups": [
+        "autohands"
+      ],
+      "terminated": false,
+      "factcode": "K7472350",
+      "lat": 34.8262412160472,
+      "lng": 126.401248625748,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "992556797",
+      "allPlaceIds": [
+        "992556797",
+        "992556859"
+      ],
+      "name": "도동종합자동차정비공업사(엠실비,턴키O/메리츠,오토핸즈X)",
+      "cleanName": "도동종합자동차정비공업사",
+      "address": "경남 진주시 돗골로 13 (상평동)",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": true,
+        "turnkey": true,
+        "meritz": false,
+        "autohands": false
+      },
+      "tags": [],
+      "groups": [
+        "mg-only",
+        "main-incoming"
+      ],
+      "terminated": false,
+      "factcode": "K2556797",
+      "lat": 35.169068908136,
+      "lng": 128.112070772339,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "992550488",
+      "allPlaceIds": [
+        "992550488",
+        "992550594"
+      ],
+      "name": "도동종합정비(엠실비,턴키O/메리츠,오토핸즈X)",
+      "cleanName": "도동종합정비",
+      "address": "상평동 249-1",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": true,
+        "turnkey": true,
+        "meritz": false,
+        "autohands": false
+      },
+      "tags": [],
+      "groups": [
+        "mg-only",
+        "main-incoming"
+      ],
+      "terminated": false,
+      "factcode": "K2550488",
+      "lat": 35.5612639656227,
+      "lng": 126.834389599406,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "967449176",
+      "allPlaceIds": [
+        "967449176"
+      ],
+      "name": "동신공업사/오토핸즈입고가능",
+      "cleanName": "동신공업사",
+      "address": "울산 북구 효자로 146 (연암동)",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": null,
+        "turnkey": null,
+        "meritz": null,
+        "autohands": true
+      },
+      "tags": [],
+      "groups": [
+        "autohands"
+      ],
+      "terminated": false,
+      "factcode": "K7449176",
+      "lat": 35.5742176345301,
+      "lng": 129.367948195418,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "967449319",
+      "allPlaceIds": [
+        "967449319",
+        "968809808"
+      ],
+      "name": "동진주현대서비스(구 태성종합정비)/전체입고O/오토핸즈입고가능",
+      "cleanName": "동진주현대서비스",
+      "address": "경남 진주시 대신로109번길 9 (상평동)",
+      "aliases": [
+        "동진주현대서비스/메리츠실비,오토핸즈입고가능"
+      ],
+      "addresses": [],
+      "insurance": {
+        "mg": null,
+        "turnkey": null,
+        "meritz": true,
+        "autohands": true
+      },
+      "tags": [],
+      "groups": [
+        "autohands",
+        "meritz-only"
+      ],
+      "terminated": false,
+      "factcode": "K7449319",
+      "lat": 35.1699452952702,
+      "lng": 128.117392630172,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "992564834",
+      "allPlaceIds": [
+        "992564834"
+      ],
+      "name": "루이모터스(메리츠턴키,아이엠테슬라전용)",
+      "cleanName": "루이모터스",
+      "address": "신장동 438-1",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": null,
+        "turnkey": null,
+        "meritz": null,
+        "autohands": null
+      },
+      "tags": [
+        "tesla-only"
+      ],
+      "groups": [
+        "main-incoming"
+      ],
+      "terminated": false,
+      "factcode": "K2564834",
+      "lat": 37.0913612935856,
+      "lng": 127.060366976423,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "992558928",
+      "allPlaceIds": [
+        "992558928",
+        "992558978",
+        "967449560"
+      ],
+      "name": "마스터자동차정비(엠실비,턴키,오토핸즈O/메리츠X)",
+      "cleanName": "마스터자동차정비",
+      "address": "경남 창원시 의창구 무역로503번길 5-8 (팔용동)",
+      "aliases": [
+        "마스터자동차정비/턴키전용/오토핸즈입고가능"
+      ],
+      "addresses": [],
+      "insurance": {
+        "mg": true,
+        "turnkey": true,
+        "meritz": false,
+        "autohands": true
+      },
+      "tags": [],
+      "groups": [
+        "mg-only",
+        "main-incoming",
+        "autohands"
+      ],
+      "terminated": false,
+      "factcode": "K2558928",
+      "lat": 35.2246541474394,
+      "lng": 128.635028195482,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "992544765",
+      "allPlaceIds": [
+        "992544765",
+        "992545013",
+        "975855740",
+        "967442298"
+      ],
+      "name": "문성자동차종합정비(엠실비,턴키,메리츠,오토핸즈)",
+      "cleanName": "문성자동차종합정비",
+      "address": "경남 거제시 옥포성안로 67 (옥포동)",
+      "aliases": [
+        "문성자동차종합정비",
+        "문성자동차종합정비/오토핸즈입고가능"
+      ],
+      "addresses": [],
+      "insurance": {
+        "mg": true,
+        "turnkey": null,
+        "meritz": null,
+        "autohands": true
+      },
+      "tags": [],
+      "groups": [
+        "mg-only",
+        "main-incoming",
+        "backup-list",
+        "autohands"
+      ],
+      "terminated": false,
+      "factcode": "K2544765",
+      "lat": 34.8923119131496,
+      "lng": 128.694462161639,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "992549823",
+      "allPlaceIds": [
+        "992549823",
+        "992551253"
+      ],
+      "name": "미소자동차(엠실비,턴키,메리츠O/오토핸즈X)",
+      "cleanName": "미소자동차",
+      "address": "안양동 220",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": true,
+        "turnkey": true,
+        "meritz": true,
+        "autohands": false
+      },
+      "tags": [],
+      "groups": [
+        "mg-only",
+        "main-incoming"
+      ],
+      "terminated": false,
+      "factcode": "K2549823",
+      "lat": 37.3821509054527,
+      "lng": 126.937421237742,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "992562006",
+      "allPlaceIds": [
+        "992562006",
+        "992562048"
+      ],
+      "name": "밀성자동차(엠실비,턴키,오토핸즈O/메리츠X)",
+      "cleanName": "밀성자동차",
+      "address": "내이동 83",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": true,
+        "turnkey": true,
+        "meritz": false,
+        "autohands": true
+      },
+      "tags": [],
+      "groups": [
+        "mg-only",
+        "main-incoming"
+      ],
+      "terminated": false,
+      "factcode": "K2562006",
+      "lat": 35.5092593359573,
+      "lng": 128.731107458027,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "992540030",
+      "allPlaceIds": [
+        "992540030",
+        "992540087"
+      ],
+      "name": "보성중앙1급(엠실비,턴키O/메리츠,오토핸즈X)",
+      "cleanName": "보성중앙1급",
+      "address": "보성리 295-3",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": true,
+        "turnkey": true,
+        "meritz": false,
+        "autohands": false
+      },
+      "tags": [],
+      "groups": [
+        "mg-only",
+        "main-incoming"
+      ],
+      "terminated": false,
+      "factcode": "K2540030",
+      "lat": 34.7765171984565,
+      "lng": 127.079932433407,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "1101245620",
+      "allPlaceIds": [
+        "1101245620",
+        "1101245667",
+        "967438764"
+      ],
+      "name": "삼성모터스(엠실비,턴키O/오토핸즈,메리츠실비X)",
+      "cleanName": "삼성모터스",
+      "address": "충남 천안시 동남구 충절로 472 (삼룡동)",
+      "aliases": [
+        "삼성모터스/오토핸즈입고가능"
+      ],
+      "addresses": [],
+      "insurance": {
+        "mg": true,
+        "turnkey": true,
+        "meritz": false,
+        "autohands": true
+      },
+      "tags": [],
+      "groups": [
+        "mg-only",
+        "main-incoming",
+        "autohands"
+      ],
+      "terminated": false,
+      "factcode": "K1245620",
+      "lat": 36.780285299654,
+      "lng": 127.173198055368,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "727729680",
+      "allPlaceIds": [
+        "727729680"
+      ],
+      "name": "삼일공업사2급정비공장",
+      "cleanName": "삼일공업사2급정비공장",
+      "address": "충남 천안시 서북구 수레터1길 23 (차암동)",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": null,
+        "turnkey": null,
+        "meritz": null,
+        "autohands": null
+      },
+      "tags": [],
+      "groups": [
+        "terminated"
+      ],
+      "terminated": true,
+      "factcode": "K7729680",
+      "lat": 36.8514453196644,
+      "lng": 127.116322159585,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "727729337",
+      "allPlaceIds": [
+        "727729337"
+      ],
+      "name": "삼일자동차공업사",
+      "cleanName": "삼일자동차공업사",
+      "address": "충남 아산시 실옥로 150 (실옥동)",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": null,
+        "turnkey": null,
+        "meritz": null,
+        "autohands": null
+      },
+      "tags": [],
+      "groups": [
+        "terminated"
+      ],
+      "terminated": true,
+      "factcode": "K7729337",
+      "lat": 36.7932831707889,
+      "lng": 126.983929557567,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "967435216",
+      "allPlaceIds": [
+        "967435216",
+        "381131279"
+      ],
+      "name": "삼일자동차써비스/오토핸즈입고가능",
+      "cleanName": "삼일자동차써비스",
+      "address": "인천 중구 축항대로290번길 120 (신흥동3가)",
+      "aliases": [
+        "삼일자동차써비스(현대)/ 메리츠실비만 입고O"
+      ],
+      "addresses": [],
+      "insurance": {
+        "mg": null,
+        "turnkey": null,
+        "meritz": true,
+        "autohands": true
+      },
+      "tags": [],
+      "groups": [
+        "autohands",
+        "meritz-only"
+      ],
+      "terminated": false,
+      "factcode": "K7435216",
+      "lat": 37.4389037470724,
+      "lng": 126.620535064951,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "992543828",
+      "allPlaceIds": [
+        "992543828",
+        "992543884",
+        "975854148"
+      ],
+      "name": "삼화자동차공업사(엠실비,턴키,메리츠O/오토핸즈X)",
+      "cleanName": "삼화자동차공업사",
+      "address": "제주특별자치도 제주시 선반로 19 (화북일동)",
+      "aliases": [
+        "삼화자동차공업사"
+      ],
+      "addresses": [],
+      "insurance": {
+        "mg": true,
+        "turnkey": true,
+        "meritz": true,
+        "autohands": false
+      },
+      "tags": [],
+      "groups": [
+        "mg-only",
+        "main-incoming",
+        "backup-list"
+      ],
+      "terminated": false,
+      "factcode": "K2543828",
+      "lat": 33.5150784716793,
+      "lng": 126.560224710785,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "992541063",
+      "allPlaceIds": [
+        "992541063",
+        "992541109",
+        "975856931"
+      ],
+      "name": "상주기아종합정비(엠실비,턴키,메리츠O/오토핸즈X)",
+      "cleanName": "상주기아종합정비",
+      "address": "만산동 484-6",
+      "aliases": [
+        "상주기아종합정비"
+      ],
+      "addresses": [],
+      "insurance": {
+        "mg": true,
+        "turnkey": true,
+        "meritz": true,
+        "autohands": false
+      },
+      "tags": [],
+      "groups": [
+        "mg-only",
+        "main-incoming",
+        "backup-list"
+      ],
+      "terminated": false,
+      "factcode": "K2541063",
+      "lat": 36.4339883585949,
+      "lng": 128.152656999051,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "1102569736",
+      "allPlaceIds": [
+        "1102569736",
+        "1102571784"
+      ],
+      "name": "서초현대모터스(엠실비,턴키O/오토핸즈,메리츠실비X)",
+      "cleanName": "서초현대모터스",
+      "address": "서울 서초구 형촌2길 26 (우면동)",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": true,
+        "turnkey": true,
+        "meritz": false,
+        "autohands": false
+      },
+      "tags": [],
+      "groups": [
+        "mg-only",
+        "main-incoming"
+      ],
+      "terminated": false,
+      "factcode": "K2569736",
+      "lat": 37.4649147880516,
+      "lng": 127.021577020637,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "1105363546",
+      "allPlaceIds": [
+        "1105363546",
+        "1011982048"
+      ],
+      "name": "성우자동차(턴키,메리츠O/엠실비,오토핸즈X)",
+      "cleanName": "성우자동차",
+      "address": "서울 성동구 왕십리로16길 26 (성수동1가)",
+      "aliases": [
+        "성우자동차"
+      ],
+      "addresses": [],
+      "insurance": {
+        "mg": false,
+        "turnkey": true,
+        "meritz": true,
+        "autohands": false
+      },
+      "tags": [],
+      "groups": [
+        "main-incoming",
+        "backup-list"
+      ],
+      "terminated": false,
+      "factcode": "K5363546",
+      "lat": 37.5512068010485,
+      "lng": 127.047056965219,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "992561362",
+      "allPlaceIds": [
+        "992561362",
+        "992561437"
+      ],
+      "name": "수정모터스(엠실비,턴키O/메리츠,오토핸즈X)",
+      "cleanName": "수정모터스",
+      "address": "서울 영등포구 경인로77길 9 (문래동2가)",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": true,
+        "turnkey": true,
+        "meritz": false,
+        "autohands": false
+      },
+      "tags": [],
+      "groups": [
+        "mg-only",
+        "main-incoming"
+      ],
+      "terminated": false,
+      "factcode": "K2561362",
+      "lat": 37.5125038218827,
+      "lng": 126.892761183273,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "992546340",
+      "allPlaceIds": [
+        "992546340",
+        "992546430",
+        "975855019",
+        "967472173"
+      ],
+      "name": "스마일카관리서비스(엠실비,턴키,메리츠,오토핸즈O)",
+      "cleanName": "스마일카관리서비스",
+      "address": "광주 광산구 북문대로 629-15 1층 (수완동)",
+      "aliases": [
+        "스마일카관리서비스",
+        "스마일카관리서비스/전체입고O/오토핸즈입고가능"
+      ],
+      "addresses": [],
+      "insurance": {
+        "mg": true,
+        "turnkey": true,
+        "meritz": true,
+        "autohands": true
+      },
+      "tags": [],
+      "groups": [
+        "mg-only",
+        "main-incoming",
+        "backup-list",
+        "autohands"
+      ],
+      "terminated": false,
+      "factcode": "K2546340",
+      "lat": 35.207393092477,
+      "lng": 126.831908009877,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "992539132",
+      "allPlaceIds": [
+        "992539132",
+        "992539822",
+        "975852314"
+      ],
+      "name": "스카이자동차(엠실비,턴키,메리츠O/오토핸즈X)",
+      "cleanName": "스카이자동차",
+      "address": "원동 586",
+      "aliases": [
+        "스카이자동차"
+      ],
+      "addresses": [],
+      "insurance": {
+        "mg": true,
+        "turnkey": true,
+        "meritz": true,
+        "autohands": false
+      },
+      "tags": [],
+      "groups": [
+        "mg-only",
+        "main-incoming",
+        "backup-list"
+      ],
+      "terminated": false,
+      "factcode": "K2539132",
+      "lat": 37.1372810558339,
+      "lng": 127.078975909147,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "992547332",
+      "allPlaceIds": [
+        "992547332",
+        "992547411",
+        "975857495",
+        "967440817"
+      ],
+      "name": "승광자동차정비(엠실비,턴키,메리츠,오토핸즈O)",
+      "cleanName": "승광자동차정비",
+      "address": "충북 충주시 동량면 대전리1길 11 (동량면)",
+      "aliases": [
+        "승광자동차정비",
+        "승광자동차정비/전체입고O/오토핸즈입고가능"
+      ],
+      "addresses": [],
+      "insurance": {
+        "mg": true,
+        "turnkey": true,
+        "meritz": true,
+        "autohands": true
+      },
+      "tags": [],
+      "groups": [
+        "mg-only",
+        "main-incoming",
+        "backup-list",
+        "autohands"
+      ],
+      "terminated": false,
+      "factcode": "K2547332",
+      "lat": 37.0521593611467,
+      "lng": 127.931677489808,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "992580862",
+      "allPlaceIds": [
+        "992580862"
+      ],
+      "name": "신성모터스(삼성전자 평택캠퍼스차량만 배정)",
+      "cleanName": "신성모터스",
+      "address": "경기 평택시 삼봉로 39-5 (독곡동)",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": null,
+        "turnkey": null,
+        "meritz": null,
+        "autohands": null
+      },
+      "tags": [
+        "samsung-pyeongtaek"
+      ],
+      "groups": [
+        "main-incoming"
+      ],
+      "terminated": false,
+      "factcode": "K2580862",
+      "lat": 37.0902716542744,
+      "lng": 127.067034814749,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "967484968",
+      "allPlaceIds": [
+        "967484968"
+      ],
+      "name": "신성자동차공업사 / 오토핸즈 입고가능",
+      "cleanName": "신성자동차공업사",
+      "address": "전북특별자치도 정읍시 충정로 501 (공평동)",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": null,
+        "turnkey": null,
+        "meritz": null,
+        "autohands": true
+      },
+      "tags": [],
+      "groups": [
+        "autohands"
+      ],
+      "terminated": false,
+      "factcode": "K7484968",
+      "lat": 35.5813658512253,
+      "lng": 126.832166466898,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "992557156",
+      "allPlaceIds": [
+        "992557156",
+        "992557213"
+      ],
+      "name": "신우자동차(엠실비,턴키O/메리츠,오토핸즈X)",
+      "cleanName": "신우자동차",
+      "address": "인천 서구 건지로153번길 25-20 (석남동)",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": true,
+        "turnkey": true,
+        "meritz": false,
+        "autohands": false
+      },
+      "tags": [],
+      "groups": [
+        "mg-only",
+        "main-incoming"
+      ],
+      "terminated": false,
+      "factcode": "K2557156",
+      "lat": 37.5016212215068,
+      "lng": 126.655809360409,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "992551686",
+      "allPlaceIds": [
+        "992551686",
+        "992551733"
+      ],
+      "name": "신원모터스(엠실비,턴키O/메리츠,오토핸즈X)",
+      "cleanName": "신원모터스",
+      "address": "대구 서구 국채보상로20길 6 (중리동)",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": true,
+        "turnkey": true,
+        "meritz": false,
+        "autohands": false
+      },
+      "tags": [],
+      "groups": [
+        "mg-only",
+        "main-incoming"
+      ],
+      "terminated": false,
+      "factcode": "K2551686",
+      "lat": 35.8681237516761,
+      "lng": 128.54063899249,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "1097514925",
+      "allPlaceIds": [
+        "1097514925",
+        "1097514969"
+      ],
+      "name": "아우토 파브릭 더블유(엠실비,턴키O/오토핸즈,메리츠실비X)",
+      "cleanName": "아우토 파브릭 더블유",
+      "address": "경기 김포시 통진읍 서암로183번길 134 (통진읍)",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": true,
+        "turnkey": true,
+        "meritz": false,
+        "autohands": false
+      },
+      "tags": [],
+      "groups": [
+        "mg-only",
+        "main-incoming"
+      ],
+      "terminated": false,
+      "factcode": "K7514925",
+      "lat": 37.7032743831054,
+      "lng": 126.597611234604,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "727729133",
+      "allPlaceIds": [
+        "727729133"
+      ],
+      "name": "에이원모터스",
+      "cleanName": "에이원모터스",
+      "address": "경기 부천시 원미구 원미로 193 (원미동)",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": null,
+        "turnkey": null,
+        "meritz": null,
+        "autohands": null
+      },
+      "tags": [],
+      "groups": [
+        "terminated"
+      ],
+      "terminated": true,
+      "factcode": "K7729133",
+      "lat": 37.4996358084866,
+      "lng": 126.792648024992,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "992560697",
+      "allPlaceIds": [
+        "992560697"
+      ],
+      "name": "에이젠모터스(엠실비,턴키O/메리츠,오토핸즈X)",
+      "cleanName": "에이젠모터스",
+      "address": "충남 천안시 서북구 성거읍 소댕이3길 9 (성거읍)",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": true,
+        "turnkey": true,
+        "meritz": false,
+        "autohands": false
+      },
+      "tags": [],
+      "groups": [
+        "mg-only"
+      ],
+      "terminated": false,
+      "factcode": "K2560697",
+      "lat": 36.8710507598299,
+      "lng": 127.196361206093,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "992552368",
+      "allPlaceIds": [
+        "992552368",
+        "992552447"
+      ],
+      "name": "오토엠플러스(엠실비,턴키O/메리츠,오토핸즈X)",
+      "cleanName": "오토엠플러스",
+      "address": "오남동 559-7",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": true,
+        "turnkey": true,
+        "meritz": false,
+        "autohands": false
+      },
+      "tags": [],
+      "groups": [
+        "mg-only",
+        "main-incoming"
+      ],
+      "terminated": false,
+      "factcode": "K2552368",
+      "lat": 36.7583738665997,
+      "lng": 126.471713853018,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "1108216611",
+      "allPlaceIds": [
+        "1108216611",
+        "1108216337"
+      ],
+      "name": "*외제차만입고*와이에이치모터스엔오토파츠(엠실비,턴키O/메리츠,오토핸즈X)",
+      "cleanName": "와이에이치모터스엔오토파츠",
+      "address": "부산 남구 신선로 199-7 (감만동)",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": true,
+        "turnkey": true,
+        "meritz": false,
+        "autohands": false
+      },
+      "tags": [
+        "foreign-only"
+      ],
+      "groups": [
+        "mg-only",
+        "main-incoming"
+      ],
+      "terminated": false,
+      "factcode": "K8216611",
+      "lat": 35.1111630635934,
+      "lng": 129.085704808745,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "1007674936",
+      "allPlaceIds": [
+        "1007674936"
+      ],
+      "name": "와이오토성수점(삼성카드테슬라전용)",
+      "cleanName": "와이오토성수점",
+      "address": "성수동2가 236-1",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": null,
+        "turnkey": null,
+        "meritz": null,
+        "autohands": null
+      },
+      "tags": [
+        "tesla-only",
+        "samsung-card"
+      ],
+      "groups": [
+        "main-incoming"
+      ],
+      "terminated": false,
+      "factcode": "K7674936",
+      "lat": 37.5388468485616,
+      "lng": 127.061643623959,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "1088926524",
+      "allPlaceIds": [
+        "1088926524",
+        "992538893",
+        "1088926576"
+      ],
+      "name": "와이오토원주(엠실비,턴키,메리츠실비O/오토핸즈X)",
+      "cleanName": "와이오토원주",
+      "address": "단계동 664",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": true,
+        "turnkey": true,
+        "meritz": true,
+        "autohands": false
+      },
+      "tags": [],
+      "groups": [
+        "mg-only",
+        "main-incoming",
+        "backup-list"
+      ],
+      "terminated": false,
+      "factcode": "K8926524",
+      "lat": 37.3499404502762,
+      "lng": 127.922846789042,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "967434231",
+      "allPlaceIds": [
+        "967434231"
+      ],
+      "name": "우석공업사/오토핸즈입고가능",
+      "cleanName": "우석공업사",
+      "address": "장당동 52-12",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": null,
+        "turnkey": null,
+        "meritz": null,
+        "autohands": true
+      },
+      "tags": [],
+      "groups": [
+        "autohands"
+      ],
+      "terminated": false,
+      "factcode": "K7434231",
+      "lat": 37.0445442225025,
+      "lng": 127.06378740424,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "975854833",
+      "allPlaceIds": [
+        "975854833"
+      ],
+      "name": "우성자동차",
+      "cleanName": "우성자동차",
+      "address": "가양동 449-9",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": null,
+        "turnkey": null,
+        "meritz": null,
+        "autohands": null
+      },
+      "tags": [],
+      "groups": [
+        "backup-list"
+      ],
+      "terminated": false,
+      "factcode": "K5854833",
+      "lat": 37.5589977578548,
+      "lng": 126.859657733778,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "992564387",
+      "allPlaceIds": [
+        "992564387",
+        "992564430",
+        "975853683"
+      ],
+      "name": "우신종합정비공장(엠실비,턴키,메리츠O/오토핸즈X)",
+      "cleanName": "우신종합정비공장",
+      "address": "경북 경주시 외외1길 166 (충효동)",
+      "aliases": [
+        "우신종합정비공장"
+      ],
+      "addresses": [],
+      "insurance": {
+        "mg": true,
+        "turnkey": true,
+        "meritz": true,
+        "autohands": false
+      },
+      "tags": [],
+      "groups": [
+        "mg-only",
+        "main-incoming",
+        "backup-list"
+      ],
+      "terminated": false,
+      "factcode": "K2564387",
+      "lat": 35.8337825565742,
+      "lng": 129.162789580581,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "992566107",
+      "allPlaceIds": [
+        "992566107",
+        "975856139",
+        "980107735"
+      ],
+      "name": "원진엠엔에스(턴키,메리츠,오토핸즈O/엠실비X)",
+      "cleanName": "원진엠엔에스",
+      "address": "서울 도봉구 도봉로140길 38 (창동)",
+      "aliases": [
+        "원진엠엔에스"
+      ],
+      "addresses": [],
+      "insurance": {
+        "mg": false,
+        "turnkey": true,
+        "meritz": true,
+        "autohands": true
+      },
+      "tags": [],
+      "groups": [
+        "main-incoming",
+        "backup-list",
+        "autohands"
+      ],
+      "terminated": false,
+      "factcode": "K2566107",
+      "lat": 37.6605281811648,
+      "lng": 127.044378925765,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "992579066",
+      "allPlaceIds": [
+        "992579066",
+        "980107190",
+        "1081485402"
+      ],
+      "name": "위너즈오토팩토리(턴키,메리츠,오토핸즈O/엠실비X)",
+      "cleanName": "위너즈오토팩토리",
+      "address": "경기 파주시 소라지로195번길 110 (신촌동)",
+      "aliases": [
+        "위너즈오토팩토리",
+        "위너즈오토팩토리(턴키,메리츠실비,오토핸즈O,MG실비X)"
+      ],
+      "addresses": [],
+      "insurance": {
+        "mg": false,
+        "turnkey": true,
+        "meritz": true,
+        "autohands": true
+      },
+      "tags": [],
+      "groups": [
+        "main-incoming",
+        "backup-list",
+        "autohands"
+      ],
+      "terminated": false,
+      "factcode": "K2579066",
+      "lat": 37.7382951735464,
+      "lng": 126.688862347246,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "992554135",
+      "allPlaceIds": [
+        "992554135",
+        "992554198"
+      ],
+      "name": "위례자동차서비스(엠실비,턴키O/메리츠,오토핸즈X)",
+      "cleanName": "위례자동차서비스",
+      "address": "서울 강남구 헌릉로757길 27 (율현동)",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": true,
+        "turnkey": true,
+        "meritz": false,
+        "autohands": false
+      },
+      "tags": [],
+      "groups": [
+        "mg-only",
+        "main-incoming"
+      ],
+      "terminated": false,
+      "factcode": "K2554135",
+      "lat": 37.4697533801795,
+      "lng": 127.120071399023,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "1081484420",
+      "allPlaceIds": [
+        "1081484420"
+      ],
+      "name": "의왕중부현대서비스(오토핸즈O)",
+      "cleanName": "의왕중부현대서비스",
+      "address": "경기 의왕시 경수대로391번길 11 (오전동)",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": null,
+        "turnkey": null,
+        "meritz": null,
+        "autohands": true
+      },
+      "tags": [],
+      "groups": [
+        "autohands"
+      ],
+      "terminated": false,
+      "factcode": "K1484420",
+      "lat": 37.3587980096748,
+      "lng": 126.963373876515,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "967437088",
+      "allPlaceIds": [
+        "967437088"
+      ],
+      "name": "인제명성자동차공업사/오토핸즈입고가능",
+      "cleanName": "인제명성자동차공업사",
+      "address": "강원특별자치도 인제군 인제읍 비봉로15번길 5 (인제읍)",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": null,
+        "turnkey": null,
+        "meritz": null,
+        "autohands": true
+      },
+      "tags": [],
+      "groups": [
+        "autohands"
+      ],
+      "terminated": false,
+      "factcode": "K7437088",
+      "lat": 38.0681953596564,
+      "lng": 128.173189987928,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "967438959",
+      "allPlaceIds": [
+        "967438959"
+      ],
+      "name": "일급서울정비공업사/오토핸즈입고가능",
+      "cleanName": "일급서울정비공업사",
+      "address": "충북 청주시 서원구 남이면 양촌4길 5 (남이면)",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": null,
+        "turnkey": null,
+        "meritz": null,
+        "autohands": true
+      },
+      "tags": [],
+      "groups": [
+        "autohands"
+      ],
+      "terminated": false,
+      "factcode": "K7438959",
+      "lat": 36.593787656332,
+      "lng": 127.474784365107,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "727730486",
+      "allPlaceIds": [
+        "727730486"
+      ],
+      "name": "제일 자동차정비공업사",
+      "cleanName": "제일 자동차정비공업사",
+      "address": "경북 상주시 함창읍 함창로 503 (함창읍)",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": null,
+        "turnkey": null,
+        "meritz": null,
+        "autohands": null
+      },
+      "tags": [],
+      "groups": [
+        "terminated"
+      ],
+      "terminated": true,
+      "factcode": "K7730486",
+      "lat": 36.5739108504346,
+      "lng": 128.185585860617,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "967450613",
+      "allPlaceIds": [
+        "967450613"
+      ],
+      "name": "제일자동차정비/오토핸즈입고가능",
+      "cleanName": "제일자동차정비",
+      "address": "경북 경주시 충효4길 10-3 (충효동)",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": null,
+        "turnkey": null,
+        "meritz": null,
+        "autohands": true
+      },
+      "tags": [],
+      "groups": [
+        "autohands"
+      ],
+      "terminated": false,
+      "factcode": "K7450613",
+      "lat": 35.8436429564091,
+      "lng": 129.182829523596,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "967435778",
+      "allPlaceIds": [
+        "967435778"
+      ],
+      "name": "제일자동차정비/오토핸즈입고가능",
+      "cleanName": "제일자동차정비",
+      "address": "강원특별자치도 동해시 강원남부로 4745 (단봉동)",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": null,
+        "turnkey": null,
+        "meritz": null,
+        "autohands": true
+      },
+      "tags": [],
+      "groups": [
+        "autohands"
+      ],
+      "terminated": false,
+      "factcode": "K7435778",
+      "lat": 37.4739448445801,
+      "lng": 129.117795353607,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "1081494665",
+      "allPlaceIds": [
+        "1081494665"
+      ],
+      "name": "제주자일서비스센터(오토핸즈O)",
+      "cleanName": "제주자일서비스센터",
+      "address": "제주특별자치도 제주시 선반남2길 63 1-3층 (화북일동)",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": null,
+        "turnkey": null,
+        "meritz": null,
+        "autohands": true
+      },
+      "tags": [],
+      "groups": [
+        "autohands"
+      ],
+      "terminated": false,
+      "factcode": "K1494665",
+      "lat": 33.5128608856935,
+      "lng": 126.56612238824927,
+      "geoSource": "keyword"
+    },
+    {
+      "placeId": "992540311",
+      "allPlaceIds": [
+        "992540311",
+        "992540384"
+      ],
+      "name": "중앙1급자동차공업사(엠실비,턴키O/메리츠,오토핸즈X)",
+      "cleanName": "중앙1급자동차공업사",
+      "address": "전남 목포시 대양로13번길 6 1층 (연산동)",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": true,
+        "turnkey": true,
+        "meritz": false,
+        "autohands": false
+      },
+      "tags": [],
+      "groups": [
+        "mg-only",
+        "main-incoming"
+      ],
+      "terminated": false,
+      "factcode": "K2540311",
+      "lat": 34.8228137473757,
+      "lng": 126.382934732587,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "967434717",
+      "allPlaceIds": [
+        "967434717"
+      ],
+      "name": "지성자동차공업사/오토핸즈입고가능",
+      "cleanName": "지성자동차공업사",
+      "address": "푸른들판로 596",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": null,
+        "turnkey": null,
+        "meritz": null,
+        "autohands": true
+      },
+      "tags": [],
+      "groups": [
+        "autohands"
+      ],
+      "terminated": false,
+      "factcode": "K7434717",
+      "lat": 37.1623544860847,
+      "lng": 126.898024899183,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "992581351",
+      "allPlaceIds": [
+        "992581351",
+        "967437272"
+      ],
+      "name": "진성부란자1급종합정비공장(턴키,오토핸즈O/엠실비,메리츠X)",
+      "cleanName": "진성부란자1급종합정비공장",
+      "address": "강원특별자치도 춘천시 동면 한솔만천로 34 (동면)",
+      "aliases": [
+        "진성부란자1급종합정비공장/턴키전용/오토핸즈입고가능"
+      ],
+      "addresses": [],
+      "insurance": {
+        "mg": false,
+        "turnkey": true,
+        "meritz": false,
+        "autohands": true
+      },
+      "tags": [],
+      "groups": [
+        "main-incoming",
+        "autohands"
+      ],
+      "terminated": false,
+      "factcode": "K2581351",
+      "lat": 37.8756993606247,
+      "lng": 127.775636043666,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "1092314864",
+      "allPlaceIds": [
+        "1092314864",
+        "1092315133"
+      ],
+      "name": "카프리즘(엠실비,턴키,메리츠실비O/오토핸즈X)",
+      "cleanName": "카프리즘",
+      "address": "경기 화성시 만세구 향남읍 발안공단로 92-19 (향남읍)",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": true,
+        "turnkey": true,
+        "meritz": true,
+        "autohands": false
+      },
+      "tags": [],
+      "groups": [
+        "mg-only",
+        "main-incoming"
+      ],
+      "terminated": false,
+      "factcode": "K2314864",
+      "lat": 37.086758321118,
+      "lng": 126.907655735078,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "992538202",
+      "allPlaceIds": [
+        "992538202",
+        "992538282"
+      ],
+      "name": "케이모터스(엠실비,턴키,메리츠O/오토핸즈X)",
+      "cleanName": "케이모터스",
+      "address": "시흥동 984-2",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": true,
+        "turnkey": true,
+        "meritz": true,
+        "autohands": false
+      },
+      "tags": [],
+      "groups": [
+        "mg-only",
+        "main-incoming"
+      ],
+      "terminated": false,
+      "factcode": "K2538202",
+      "lat": 37.445344833121,
+      "lng": 126.903376731958,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "975855524",
+      "allPlaceIds": [
+        "975855524"
+      ],
+      "name": "케이자동차",
+      "cleanName": "케이자동차",
+      "address": "시흥동 984-2",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": null,
+        "turnkey": null,
+        "meritz": null,
+        "autohands": null
+      },
+      "tags": [],
+      "groups": [
+        "backup-list"
+      ],
+      "terminated": false,
+      "factcode": "K5855524",
+      "lat": 37.445344833121,
+      "lng": 126.903376731958,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "967432208",
+      "allPlaceIds": [
+        "967432208"
+      ],
+      "name": "케이현대자동차공업사/오토핸즈입고가능",
+      "cleanName": "케이현대자동차공업사",
+      "address": "재재기로 40",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": null,
+        "turnkey": null,
+        "meritz": null,
+        "autohands": true
+      },
+      "tags": [],
+      "groups": [
+        "autohands"
+      ],
+      "terminated": false,
+      "factcode": "K7432208",
+      "lat": 37.6299852234764,
+      "lng": 127.301882909497,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "980096252",
+      "allPlaceIds": [
+        "980096252"
+      ],
+      "name": "태림정비공장(삼성반납차량)",
+      "cleanName": "태림정비공장",
+      "address": "대구 서구 문화로 37 (이현동)",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": null,
+        "turnkey": null,
+        "meritz": null,
+        "autohands": null
+      },
+      "tags": [
+        "samsung-return"
+      ],
+      "groups": [
+        "main-incoming"
+      ],
+      "terminated": false,
+      "factcode": "K0096252",
+      "lat": 35.8750861999898,
+      "lng": 128.537032393388,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "992561040",
+      "allPlaceIds": [
+        "992561040",
+        "992561100"
+      ],
+      "name": "태재자동차공업사(엠실비,턴키O/메리츠,오토핸즈X)",
+      "cleanName": "태재자동차공업사",
+      "address": "경기 광주시 능평로 102 (능평동)",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": true,
+        "turnkey": true,
+        "meritz": false,
+        "autohands": false
+      },
+      "tags": [],
+      "groups": [
+        "mg-only",
+        "main-incoming"
+      ],
+      "terminated": false,
+      "factcode": "K2561040",
+      "lat": 37.3498497811344,
+      "lng": 127.168902738061,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "1092313803",
+      "allPlaceIds": [
+        "1092313803",
+        "1089064422"
+      ],
+      "name": "트루모터스*배정불가*",
+      "cleanName": "트루모터스",
+      "address": "보정동 547-26",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": true,
+        "turnkey": null,
+        "meritz": null,
+        "autohands": null
+      },
+      "tags": [
+        "unassignable"
+      ],
+      "groups": [
+        "mg-only",
+        "main-incoming"
+      ],
+      "terminated": false,
+      "factcode": "K2313803",
+      "lat": 37.3175097007456,
+      "lng": 127.105814850664,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "975854933",
+      "allPlaceIds": [
+        "975854933"
+      ],
+      "name": "팔마 자동차검사정비업체",
+      "cleanName": "팔마 자동차검사정비업체",
+      "address": "전남 순천시 양율길 71 1층 (야흥동)",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": null,
+        "turnkey": null,
+        "meritz": null,
+        "autohands": null
+      },
+      "tags": [],
+      "groups": [
+        "backup-list"
+      ],
+      "terminated": false,
+      "factcode": "K5854933",
+      "lat": 34.9118878594899,
+      "lng": 127.483631699697,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "992553598",
+      "allPlaceIds": [
+        "992553598",
+        "992553808"
+      ],
+      "name": "팔마자동차(엠실비,턴키,메리츠,오토핸즈O)",
+      "cleanName": "팔마자동차",
+      "address": "전남 순천시 양율길 71 1층 (야흥동)",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": true,
+        "turnkey": true,
+        "meritz": true,
+        "autohands": true
+      },
+      "tags": [],
+      "groups": [
+        "mg-only",
+        "main-incoming"
+      ],
+      "terminated": false,
+      "factcode": "K2553598",
+      "lat": 34.9118878594899,
+      "lng": 127.483631699697,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "967482660",
+      "allPlaceIds": [
+        "967482660"
+      ],
+      "name": "팔마자동차정비공업사/전체입고O,오토핸즈입고가능",
+      "cleanName": "팔마자동차정비공업사",
+      "address": "전남 순천시 양율길 71 1층 (야흥동)",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": true,
+        "turnkey": true,
+        "meritz": true,
+        "autohands": true
+      },
+      "tags": [],
+      "groups": [
+        "autohands"
+      ],
+      "terminated": false,
+      "factcode": "K7482660",
+      "lat": 34.9118878594899,
+      "lng": 127.483631699697,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "1104871224",
+      "allPlaceIds": [
+        "1104871224",
+        "1104871390",
+        "975853514",
+        "878476532"
+      ],
+      "name": "퍼펙트모터스(엠실비,턴키,메리츠실비O/오토핸즈)",
+      "cleanName": "퍼펙트모터스",
+      "address": "서울 강남구 논현로10길 7 (개포동)",
+      "aliases": [
+        "퍼펙트모터스",
+        "퍼펙트모터스/메리츠실비만입고O"
+      ],
+      "addresses": [],
+      "insurance": {
+        "mg": true,
+        "turnkey": true,
+        "meritz": true,
+        "autohands": null
+      },
+      "tags": [],
+      "groups": [
+        "mg-only",
+        "main-incoming",
+        "backup-list",
+        "meritz-only"
+      ],
+      "terminated": false,
+      "factcode": "K4871224",
+      "lat": 37.4741664198474,
+      "lng": 127.049111364223,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "992542797",
+      "allPlaceIds": [
+        "992542797",
+        "992542913",
+        "975853009"
+      ],
+      "name": "하나정비(엠실비,턴키,메리츠O/오토핸즈X)",
+      "cleanName": "하나정비",
+      "address": "대구 동구 안심로55길 25 (동호동)",
+      "aliases": [
+        "하나정비"
+      ],
+      "addresses": [],
+      "insurance": {
+        "mg": true,
+        "turnkey": true,
+        "meritz": true,
+        "autohands": false
+      },
+      "tags": [],
+      "groups": [
+        "mg-only",
+        "main-incoming",
+        "backup-list"
+      ],
+      "terminated": false,
+      "factcode": "K2542797",
+      "lat": 35.8683962400986,
+      "lng": 128.715637968941,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "967435954",
+      "allPlaceIds": [
+        "967435954"
+      ],
+      "name": "한성자동차공업사/오토핸즈입고가능",
+      "cleanName": "한성자동차공업사",
+      "address": "강원특별자치도 속초시 설악산로 43 (도문동)",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": null,
+        "turnkey": null,
+        "meritz": null,
+        "autohands": true
+      },
+      "tags": [],
+      "groups": [
+        "autohands"
+      ],
+      "terminated": false,
+      "factcode": "K7435954",
+      "lat": 38.1616886099753,
+      "lng": 128.603302785249,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "992562835",
+      "allPlaceIds": [
+        "992562835",
+        "992562906"
+      ],
+      "name": "현대그린자동차공업사(엠실비,턴키O/메리츠,오토핸즈X)",
+      "cleanName": "현대그린자동차공업사",
+      "address": "경기 양주시 백석읍 부흥로1204번길 35 (백석읍)",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": true,
+        "turnkey": true,
+        "meritz": false,
+        "autohands": false
+      },
+      "tags": [],
+      "groups": [
+        "mg-only",
+        "main-incoming"
+      ],
+      "terminated": false,
+      "factcode": "K2562835",
+      "lat": 37.7909139328214,
+      "lng": 127.009598751243,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "992545649",
+      "allPlaceIds": [
+        "992545649",
+        "992545710",
+        "975856698"
+      ],
+      "name": "현대동부모터스(엠실비,턴키,메리츠O/오토핸즈X)",
+      "cleanName": "현대동부모터스",
+      "address": "경기 양평군 양평읍 백운길 87 (양평읍)",
+      "aliases": [
+        "현대동부모터스"
+      ],
+      "addresses": [],
+      "insurance": {
+        "mg": true,
+        "turnkey": true,
+        "meritz": true,
+        "autohands": false
+      },
+      "tags": [],
+      "groups": [
+        "mg-only",
+        "main-incoming",
+        "backup-list"
+      ],
+      "terminated": false,
+      "factcode": "K2545649",
+      "lat": 37.4989663701497,
+      "lng": 127.508896001932,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "992554868",
+      "allPlaceIds": [
+        "992554868",
+        "992554986"
+      ],
+      "name": "현대오토종합정비(엠실비,턴키O/메리츠,오토핸즈X)",
+      "cleanName": "현대오토종합정비",
+      "address": "경북 포항시 북구 아치로 189 1층 (우현동)",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": true,
+        "turnkey": true,
+        "meritz": false,
+        "autohands": false
+      },
+      "tags": [],
+      "groups": [
+        "mg-only",
+        "main-incoming"
+      ],
+      "terminated": false,
+      "factcode": "K2554868",
+      "lat": 36.0590809715237,
+      "lng": 129.346122715487,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "975857862",
+      "allPlaceIds": [
+        "975857862"
+      ],
+      "name": "현대자동차블루핸즈 동진주현대서비스",
+      "cleanName": "현대자동차블루핸즈 동진주현대서비스",
+      "address": "경남 진주시 대신로109번길 9 (상평동)",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": null,
+        "turnkey": null,
+        "meritz": null,
+        "autohands": null
+      },
+      "tags": [
+        "hyundai-bluehands"
+      ],
+      "groups": [
+        "backup-list"
+      ],
+      "terminated": false,
+      "factcode": "K5857862",
+      "lat": 35.1699452952702,
+      "lng": 128.117392630172,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "975855599",
+      "allPlaceIds": [
+        "975855599"
+      ],
+      "name": "현대자동차블루핸즈 별내현대서비스",
+      "cleanName": "현대자동차블루핸즈 별내현대서비스",
+      "address": "경기 남양주시 송산로 356 (별내동)",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": null,
+        "turnkey": null,
+        "meritz": null,
+        "autohands": null
+      },
+      "tags": [
+        "hyundai-bluehands"
+      ],
+      "groups": [
+        "backup-list"
+      ],
+      "terminated": false,
+      "factcode": "K5855599",
+      "lat": 37.6733894311345,
+      "lng": 127.134360465042,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "975850827",
+      "allPlaceIds": [
+        "975850827"
+      ],
+      "name": "현대자동차블루핸즈 삼일자동차써비스",
+      "cleanName": "현대자동차블루핸즈 삼일자동차써비스",
+      "address": "인천 중구 축항대로290번길 120 (신흥동3가)",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": null,
+        "turnkey": null,
+        "meritz": null,
+        "autohands": null
+      },
+      "tags": [
+        "hyundai-bluehands"
+      ],
+      "groups": [
+        "backup-list"
+      ],
+      "terminated": false,
+      "factcode": "K5850827",
+      "lat": 37.4389037470724,
+      "lng": 126.620535064951,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "992566433",
+      "allPlaceIds": [
+        "992566433",
+        "975853121"
+      ],
+      "name": "현대자동차블루핸즈 서대전현대서비스(턴키,메리츠O/엠실비,오토핸즈X)",
+      "cleanName": "현대자동차블루핸즈 서대전현대서비스",
+      "address": "대전 서구 가수원로 103-13 (가수원동)",
+      "aliases": [
+        "현대자동차블루핸즈 서대전현대서비스"
+      ],
+      "addresses": [],
+      "insurance": {
+        "mg": false,
+        "turnkey": true,
+        "meritz": true,
+        "autohands": false
+      },
+      "tags": [
+        "hyundai-bluehands"
+      ],
+      "groups": [
+        "main-incoming",
+        "backup-list"
+      ],
+      "terminated": false,
+      "factcode": "K2566433",
+      "lat": 36.3030794772413,
+      "lng": 127.348621113155,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "992578111",
+      "allPlaceIds": [
+        "992578111",
+        "975855654",
+        "967438628"
+      ],
+      "name": "현대자동차블루핸즈 서산현대서비스(턴키,메리츠,오토핸즈O/엠실비X)",
+      "cleanName": "현대자동차블루핸즈 서산현대서비스",
+      "address": "충남 서산시 수석순환로 5 (수석동)",
+      "aliases": [
+        "현대자동차블루핸즈 서산현대서비스",
+        "현대자동차블루핸즈 서산현대서비스/전체입고O/오토핸즈입고가능"
+      ],
+      "addresses": [],
+      "insurance": {
+        "mg": true,
+        "turnkey": true,
+        "meritz": true,
+        "autohands": true
+      },
+      "tags": [
+        "hyundai-bluehands"
+      ],
+      "groups": [
+        "main-incoming",
+        "backup-list",
+        "autohands"
+      ],
+      "terminated": false,
+      "factcode": "K2578111",
+      "lat": 36.7814711167955,
+      "lng": 126.497397228667,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "727730061",
+      "allPlaceIds": [
+        "727730061"
+      ],
+      "name": "현대자동차블루핸즈 서원주현대서비스",
+      "cleanName": "현대자동차블루핸즈 서원주현대서비스",
+      "address": "강원특별자치도 원주시 봉화로 145 (단계동)",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": null,
+        "turnkey": null,
+        "meritz": null,
+        "autohands": null
+      },
+      "tags": [
+        "hyundai-bluehands"
+      ],
+      "groups": [
+        "terminated"
+      ],
+      "terminated": true,
+      "factcode": "K7730061",
+      "lat": 37.357807396891,
+      "lng": 127.92795112658,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "975853877",
+      "allPlaceIds": [
+        "975853877",
+        "929359782"
+      ],
+      "name": "현대자동차블루핸즈 서천안현대서비스",
+      "cleanName": "현대자동차블루핸즈 서천안현대서비스",
+      "address": "충남 천안시 서북구 두정공단1길 143 (두정동)",
+      "aliases": [
+        "현대자동차블루핸즈 서천안현대서비스 / 메리츠 실비만O"
+      ],
+      "addresses": [],
+      "insurance": {
+        "mg": null,
+        "turnkey": null,
+        "meritz": true,
+        "autohands": null
+      },
+      "tags": [
+        "hyundai-bluehands"
+      ],
+      "groups": [
+        "backup-list",
+        "meritz-only"
+      ],
+      "terminated": false,
+      "factcode": "K5853877",
+      "lat": 36.8385727317264,
+      "lng": 127.154204643618,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "975851475",
+      "allPlaceIds": [
+        "975851475"
+      ],
+      "name": "현대자동차블루핸즈 화성상용서비스",
+      "cleanName": "현대자동차블루핸즈 화성상용서비스",
+      "address": "경기 화성시 양감면 암소고개로 255-18 (양감면)",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": null,
+        "turnkey": null,
+        "meritz": null,
+        "autohands": null
+      },
+      "tags": [
+        "hyundai-bluehands"
+      ],
+      "groups": [
+        "backup-list"
+      ],
+      "terminated": false,
+      "factcode": "K5851475",
+      "lat": 37.0765588188725,
+      "lng": 126.914472691643,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "1089628646",
+      "allPlaceIds": [
+        "1089628646"
+      ],
+      "name": "협신사상(테슬라전용 / MG실비X)",
+      "cleanName": "협신사상",
+      "address": "학장동 286-5",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": false,
+        "turnkey": null,
+        "meritz": null,
+        "autohands": null
+      },
+      "tags": [
+        "tesla-only"
+      ],
+      "groups": [
+        "main-incoming"
+      ],
+      "terminated": false,
+      "factcode": "K9628646",
+      "lat": 35.1492478355914,
+      "lng": 128.992310225128,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "992547665",
+      "allPlaceIds": [
+        "992547665",
+        "992547732",
+        "975857607"
+      ],
+      "name": "형제자동차정비(엠실비,턴키,메리츠O/오토핸즈X)",
+      "cleanName": "형제자동차정비",
+      "address": "경기 안산시 상록구 안산천서로6길 6 1층 (월피동)",
+      "aliases": [
+        "형제자동차정비"
+      ],
+      "addresses": [],
+      "insurance": {
+        "mg": true,
+        "turnkey": true,
+        "meritz": true,
+        "autohands": false
+      },
+      "tags": [],
+      "groups": [
+        "mg-only",
+        "main-incoming",
+        "backup-list"
+      ],
+      "terminated": false,
+      "factcode": "K2547665",
+      "lat": 37.3380197161103,
+      "lng": 126.850013983319,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "1080280413",
+      "allPlaceIds": [
+        "1080280413",
+        "1080281047"
+      ],
+      "name": "혜성모터스(엠실비,턴키O/오토핸즈,메리츠실비X)",
+      "cleanName": "혜성모터스",
+      "address": "경기 부천시 오정구 오정로39번길 28 (삼정동)",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": true,
+        "turnkey": true,
+        "meritz": false,
+        "autohands": false
+      },
+      "tags": [],
+      "groups": [
+        "mg-only",
+        "main-incoming"
+      ],
+      "terminated": false,
+      "factcode": "K0280413",
+      "lat": 37.5271017002383,
+      "lng": 126.764668549238,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "1092314441",
+      "allPlaceIds": [
+        "1092314441"
+      ],
+      "name": "화성상용(턴키,메리츠실비O/엠실비,오토핸즈X)",
+      "cleanName": "화성상용",
+      "address": "경기 화성시 만세구 양감면 암소고개로 255-18 (양감면)",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": false,
+        "turnkey": true,
+        "meritz": true,
+        "autohands": false
+      },
+      "tags": [],
+      "groups": [
+        "main-incoming"
+      ],
+      "terminated": false,
+      "factcode": "K2314441",
+      "lat": 37.0765588188725,
+      "lng": 126.914472691643,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "992554497",
+      "allPlaceIds": [
+        "992554497",
+        "992554565"
+      ],
+      "name": "화양정비(엠실비,턴키O/메리츠,오토핸즈X)",
+      "cleanName": "화양정비",
+      "address": "경북 청도군 화양읍 청려로 1832-5 (화양읍)",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": true,
+        "turnkey": true,
+        "meritz": false,
+        "autohands": false
+      },
+      "tags": [],
+      "groups": [
+        "mg-only",
+        "main-incoming"
+      ],
+      "terminated": false,
+      "factcode": "K2554497",
+      "lat": 35.6509214978729,
+      "lng": 128.718874099956,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "992563742",
+      "allPlaceIds": [
+        "992563742",
+        "992563791",
+        "975857023",
+        "1081484910"
+      ],
+      "name": "효성1급자동차공업사(엠실비,턴키,메리츠,오토핸즈O)",
+      "cleanName": "효성1급자동차공업사",
+      "address": "경기 이천시 호법면 중부대로 920 (호법면)",
+      "aliases": [
+        "효성1급자동차공업사",
+        "효성1급자동차공업사(오토핸즈,MG실비,턴키,메리츠실비O)"
+      ],
+      "addresses": [],
+      "insurance": {
+        "mg": true,
+        "turnkey": true,
+        "meritz": true,
+        "autohands": true
+      },
+      "tags": [],
+      "groups": [
+        "mg-only",
+        "main-incoming",
+        "backup-list",
+        "autohands"
+      ],
+      "terminated": false,
+      "factcode": "K2563742",
+      "lat": 37.2436909208278,
+      "lng": 127.433650825094,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "992544192",
+      "allPlaceIds": [
+        "992544192",
+        "992544252",
+        "975855276",
+        "967484761"
+      ],
+      "name": "효성모터스(엠실비,턴키,메리츠,오토핸즈O)",
+      "cleanName": "효성모터스",
+      "address": "팔복동2가 834-3",
+      "aliases": [
+        "효성모터스",
+        "효성모터스/전체입고O/오토핸즈입고가능"
+      ],
+      "addresses": [],
+      "insurance": {
+        "mg": true,
+        "turnkey": true,
+        "meritz": true,
+        "autohands": true
+      },
+      "tags": [],
+      "groups": [
+        "mg-only",
+        "main-incoming",
+        "backup-list",
+        "autohands"
+      ],
+      "terminated": false,
+      "factcode": "K2544192",
+      "lat": 35.8598729985904,
+      "lng": 127.087297871174,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "992545972",
+      "allPlaceIds": [
+        "992545972",
+        "992546049",
+        "975862318"
+      ],
+      "name": "JK자동차공업사(엠실비,턴키,메리츠O/오토핸즈X)",
+      "cleanName": "JK자동차공업사",
+      "address": "강원특별자치도 강릉시 성덕포남로 166 (포남동)",
+      "aliases": [
+        "JK자동차공업사"
+      ],
+      "addresses": [],
+      "insurance": {
+        "mg": true,
+        "turnkey": true,
+        "meritz": true,
+        "autohands": false
+      },
+      "tags": [],
+      "groups": [
+        "mg-only",
+        "main-incoming",
+        "backup-list"
+      ],
+      "terminated": false,
+      "factcode": "K2545972",
+      "lat": 37.767074525778,
+      "lng": 128.910436590389,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "992560066",
+      "allPlaceIds": [
+        "992560066",
+        "992560120"
+      ],
+      "name": "K자동차(엠실비,턴키O/메리츠,오토핸즈X)",
+      "cleanName": "K자동차",
+      "address": "울산 북구 진장1길 16 (진장동)",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": true,
+        "turnkey": true,
+        "meritz": false,
+        "autohands": false
+      },
+      "tags": [],
+      "groups": [
+        "mg-only",
+        "main-incoming"
+      ],
+      "terminated": false,
+      "factcode": "K2560066",
+      "lat": 35.5691299504433,
+      "lng": 129.358319454211,
+      "geoSource": "address"
+    },
+    {
+      "placeId": "1101245081",
+      "allPlaceIds": [
+        "1101245081",
+        "1101245176"
+      ],
+      "name": "YM모터스(엠실비,턴키O/오토핸즈,메리츠실비X)",
+      "cleanName": "YM모터스",
+      "address": "충북 청주시 흥덕구 직지대로 116 (지동동)",
+      "aliases": [],
+      "addresses": [],
+      "insurance": {
+        "mg": true,
+        "turnkey": true,
+        "meritz": false,
+        "autohands": false
+      },
+      "tags": [],
+      "groups": [
+        "mg-only",
+        "main-incoming"
+      ],
+      "terminated": false,
+      "factcode": "K1245081",
+      "lat": 36.6463946467042,
+      "lng": 127.405854805618,
+      "geoSource": "address"
+    }
+  ]
+}

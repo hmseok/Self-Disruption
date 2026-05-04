@@ -1329,6 +1329,9 @@ model CsWorker {
 
   assignments   CsAssignment[]
   group_memberships CsGroupMember[]
+  leaves        CsLeave[]
+  leave_quotas  CsLeaveQuota[]
+  swap_requests CsSwapRequest[]
   employee      RideEmployee? @relation(fields: [employee_id], references: [id], onDelete: SetNull)
 
   @@index([is_active, group_label], map: "idx_cs_worker_active")
@@ -1352,6 +1355,7 @@ model CsSchedule {
 
   assignments    CsAssignment[]
   distributions  CsDistribution[]
+  swap_requests  CsSwapRequest[]
 
   @@unique([year, month], map: "uq_cs_sched_ym")
   @@index([status, year, month], map: "idx_cs_sched_status")
@@ -1423,6 +1427,105 @@ model CsGroupMember {
   @@index([group_id, priority], map: "idx_cs_grp_member_group")
   @@index([worker_id], map: "idx_cs_grp_member_worker")
   @@map("cs_group_members")
+}
+
+// ── 휴일 / 패밀리데이 마스터 (PR-2O 2026-05-04) ────────────────────
+model CsHoliday {
+  id            String    @id @default(uuid()) @db.Char(36)
+  holiday_date  DateTime  @db.Date
+  name          String    @db.VarChar(64)
+  type          String    @default("national") @db.VarChar(16)
+  // national | company | family | custom
+  is_paid       Boolean   @default(true)
+  exclude_auto  Boolean   @default(true)
+  color_tone    String    @default("red") @db.VarChar(16)
+  memo          String?   @db.VarChar(255)
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @default(now()) @updatedAt
+
+  @@unique([holiday_date, name], map: "uq_cs_holiday_date_name")
+  @@index([holiday_date], map: "idx_cs_holiday_date")
+  @@index([type, holiday_date], map: "idx_cs_holiday_type")
+  @@map("cs_holidays")
+}
+
+// ── 연차 / 휴가 마스터 (PR-2P 2026-05-04) ──────────────────────────
+model CsLeave {
+  id              String    @id @default(uuid()) @db.Char(36)
+  worker_id       String    @db.Char(36)
+  leave_type      String    @default("annual") @db.VarChar(16)
+  // annual | familyday | sick | unpaid | family | holiday | other
+  start_date      DateTime  @db.Date
+  end_date        DateTime  @db.Date
+  am_pm           String    @default("full") @db.VarChar(8)
+  // full | am | pm | custom (PR-2GG)
+  hours           Decimal?  @db.Decimal(4, 2) // custom 일 때 사용 시간
+  reason          String?   @db.VarChar(255)
+  // PR-2BB 신청/승인 흐름 (2026-05-04) — 기존 row 는 'approved'
+  status          String    @default("approved") @db.VarChar(16)
+  // pending | approved | rejected | canceled
+  applied_at      DateTime?
+  applied_by      String?   @db.Char(36)
+  requested_by    String?   @db.Char(36)
+  approved_at     DateTime?
+  approved_by     String?   @db.Char(36)
+  resolution_note String?   @db.VarChar(255)
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @default(now()) @updatedAt
+
+  worker          CsWorker  @relation(fields: [worker_id], references: [id], onDelete: Cascade)
+
+  @@index([worker_id, start_date, end_date], map: "idx_cs_leave_worker_date")
+  @@index([start_date, end_date], map: "idx_cs_leave_range")
+  @@index([status, start_date], map: "idx_cs_leave_status")
+  @@map("cs_leaves")
+}
+
+// ── 휴가 발급량 (PR-2AA 2026-05-04) ────────────────────────────────
+model CsLeaveQuota {
+  id                String    @id @default(uuid()) @db.Char(36)
+  worker_id         String    @db.Char(36)
+  year              Int       @db.SmallInt
+  month             Int?      @db.TinyInt  // NULL=연 단위 / 1-12=특정 월 (패밀리데이)
+  leave_type        String    @db.VarChar(16)
+  // annual | familyday | sick | unpaid | family | other
+  granted_days      Decimal   @default(0) @db.Decimal(4, 1)
+  carried_over_days Decimal   @default(0) @db.Decimal(4, 1)
+  memo              String?   @db.VarChar(255)
+  created_at        DateTime  @default(now())
+  updated_at        DateTime  @default(now()) @updatedAt
+
+  worker            CsWorker  @relation(fields: [worker_id], references: [id], onDelete: Cascade)
+
+  @@unique([worker_id, year, month, leave_type], map: "uq_cs_quota_main")
+  @@index([year, leave_type], map: "idx_cs_quota_year_type")
+  @@map("cs_leave_quotas")
+}
+
+// ── 시프트 교체 요청 (PR-2Y 2026-05-04) ────────────────────────────
+model CsSwapRequest {
+  id              String    @id @default(uuid()) @db.Char(36)
+  schedule_id     String    @db.Char(36)
+  assignment_id   String?   @db.Char(36)
+  worker_id       String    @db.Char(36)
+  request_date    DateTime  @db.Date
+  reason          String?   @db.VarChar(255)
+  preferred_swap  String?   @db.Char(36)
+  status          String    @default("pending") @db.VarChar(16)
+  // pending | approved | rejected | canceled
+  resolution_note String?   @db.VarChar(255)
+  resolved_at     DateTime?
+  resolved_by     String?   @db.Char(36)
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @default(now()) @updatedAt
+
+  schedule        CsSchedule @relation(fields: [schedule_id], references: [id], onDelete: Cascade)
+  worker          CsWorker   @relation(fields: [worker_id], references: [id], onDelete: Cascade)
+
+  @@index([status, created_at], map: "idx_cs_swap_status")
+  @@index([schedule_id, request_date], map: "idx_cs_swap_schedule")
+  @@index([worker_id, request_date], map: "idx_cs_swap_worker")
+  @@map("cs_swap_requests")
 }
 
 model CsDistribution {
