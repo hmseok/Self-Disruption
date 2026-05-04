@@ -25,10 +25,15 @@ export default function ScheduleGrid({ detail, onChanged }: Props) {
     [schedule.year, schedule.month],
   )
 
-  // (date, slot_id) → assignment 매핑
+  // (date, slot_id) → assignment[] 매핑 (PR-2OO: 1셀 N워커)
   const cellMap = useMemo(() => {
-    const m = new Map<string, Assignment>()
-    for (const a of assignments) m.set(`${a.work_date}_${a.shift_slot_id}`, a)
+    const m = new Map<string, Assignment[]>()
+    for (const a of assignments) {
+      const k = `${a.work_date}_${a.shift_slot_id}`
+      const arr = m.get(k) || []
+      arr.push(a)
+      m.set(k, arr)
+    }
     return m
   }, [assignments])
 
@@ -40,6 +45,8 @@ export default function ScheduleGrid({ detail, onChanged }: Props) {
 
   const [pickerSlot, setPickerSlot] = useState<ShiftSlot | null>(null)
   const [pickerDate, setPickerDate] = useState<string>('')
+  // PR-2OO: 편집 중인 assignment id (null=새 워커 추가, 존재=기존 row 수정)
+  const [pickerAssignmentId, setPickerAssignmentId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   // 빈자리 강조 모드 (PR-2S)
   const [emptyOnly, setEmptyOnly] = useState(false)
@@ -47,8 +54,9 @@ export default function ScheduleGrid({ detail, onChanged }: Props) {
   const [swapMode, setSwapMode] = useState(false)
   const [swapFirst, setSwapFirst] = useState<{ a: Assignment | null; slotId: string; date: string } | null>(null)
 
-  const currentAssignment = pickerSlot && pickerDate
-    ? cellMap.get(`${pickerDate}_${pickerSlot.id}`) || null
+  // PR-2OO: 멀티 워커 — pickerAssignmentId 로 특정 row 추적
+  const currentAssignment = pickerSlot && pickerDate && pickerAssignmentId
+    ? (cellMap.get(`${pickerDate}_${pickerSlot.id}`) || []).find(a => a.id === pickerAssignmentId) || null
     : null
 
   const handleSave = async (workerId: string | null, special: SpecialCode) => {
@@ -64,6 +72,8 @@ export default function ScheduleGrid({ detail, onChanged }: Props) {
           shift_slot_id: pickerSlot!.id,
           worker_id: workerId,
           special_code: special,
+          // PR-2OO: 기존 row 명시 (수정 모드)
+          assignment_id: pickerAssignmentId || undefined,
         }),
       })
       const json = await res.json()
@@ -95,23 +105,21 @@ export default function ScheduleGrid({ detail, onChanged }: Props) {
     }
   }
 
-  // PR-2R 워커 swap — 두 셀의 worker_id 교환
+  // PR-2R 워커 swap — 두 셀의 worker_id 교환 (PR-2OO: 특정 row id 기준)
   const handleSwap = async (
     second: { a: Assignment | null; slotId: string; date: string },
   ) => {
     if (!swapFirst) return
     const first = swapFirst
     setSwapFirst(null)
+    if (!first.a || !second.a) {
+      alert('swap 은 두 워커가 모두 배정된 셀끼리만 가능합니다.')
+      return
+    }
     setSaving(true)
     try {
       const auth = await getAuthHeader()
-      // 두 셀의 worker_id 와 special_code 를 서로 교환
-      const firstWorker = first.a?.worker_id || null
-      const firstSpecial = first.a?.special_code || 'none'
-      const secondWorker = second.a?.worker_id || null
-      const secondSpecial = second.a?.special_code || 'none'
-
-      // first 위치에 second 의 워커 입력
+      // first row 에 second 워커, second row 에 first 워커
       await fetch('/api/call-scheduler/assignments', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', ...auth },
@@ -119,11 +127,11 @@ export default function ScheduleGrid({ detail, onChanged }: Props) {
           schedule_id: schedule.id,
           work_date: first.date,
           shift_slot_id: first.slotId,
-          worker_id: secondWorker,
-          special_code: secondSpecial,
+          worker_id: second.a.worker_id,
+          special_code: second.a.special_code,
+          assignment_id: first.a.id,
         }),
       })
-      // second 위치에 first 의 워커 입력
       await fetch('/api/call-scheduler/assignments', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', ...auth },
@@ -131,8 +139,9 @@ export default function ScheduleGrid({ detail, onChanged }: Props) {
           schedule_id: schedule.id,
           work_date: second.date,
           shift_slot_id: second.slotId,
-          worker_id: firstWorker,
-          special_code: firstSpecial,
+          worker_id: first.a.worker_id,
+          special_code: first.a.special_code,
+          assignment_id: second.a.id,
         }),
       })
       onChanged()
@@ -161,7 +170,7 @@ export default function ScheduleGrid({ detail, onChanged }: Props) {
         const json = await res.json()
         if (!res.ok) throw new Error(json?.error || '삭제 실패')
       } else {
-        // workerId 는 기존 유지 (없으면 null)
+        // workerId 는 기존 유지 (없으면 null) — PR-2OO: 특정 row id 기준
         const res = await fetch('/api/call-scheduler/assignments', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json', ...auth },
@@ -171,6 +180,7 @@ export default function ScheduleGrid({ detail, onChanged }: Props) {
             shift_slot_id: slot.id,
             worker_id: a?.worker_id || null,
             special_code: action,
+            assignment_id: a?.id,
           }),
         })
         const json = await res.json()
@@ -299,38 +309,71 @@ export default function ScheduleGrid({ detail, onChanged }: Props) {
                 {slot.label}
               </td>
               {days.map(d => {
-                const a = cellMap.get(`${d}_${slot.id}`) || null
-                const w = a?.worker_id ? workerMap.get(a.worker_id) || null : null
-                const isEmpty = !a || (!a.worker_id && a.special_code !== 'off')
-                // 빈자리 강조 모드: 빈 셀에 빨간 점 + 배경
+                // PR-2OO: 1셀에 N워커 가능 — 모든 row 표시
+                const arr = cellMap.get(`${d}_${slot.id}`) || []
+                const isEmpty = arr.length === 0
+                  || arr.every(a => !a.worker_id && a.special_code !== 'off')
                 const cellTdStyle: React.CSSProperties = emptyOnly && isEmpty ? {
-                  padding: 0, minWidth: 44,
+                  padding: 0, minWidth: 44, verticalAlign: 'top',
                   background: COLORS.bgRed,
                   border: `2px dashed ${COLORS.borderRed}`,
                   borderRadius: 4,
-                } : { padding: 0, minWidth: 44 }
+                } : { padding: 0, minWidth: 44, verticalAlign: 'top' }
                 const isSwapFirst = swapFirst && swapFirst.slotId === slot.id && swapFirst.date === d
                 const finalCellStyle: React.CSSProperties = isSwapFirst
                   ? { ...cellTdStyle, background: COLORS.bgViolet, border: `2px solid #7c3aed`, borderRadius: 4 }
                   : cellTdStyle
                 return (
                   <td key={d} style={finalCellStyle}>
-                    <AssignmentCell
-                      assignment={a}
-                      worker={w}
-                      onClick={() => {
-                        if (swapMode) {
-                          if (!swapFirst) {
-                            setSwapFirst({ a, slotId: slot.id, date: d })
-                          } else {
-                            handleSwap({ a, slotId: slot.id, date: d })
-                          }
-                        } else {
-                          setPickerSlot(slot); setPickerDate(d)
-                        }
-                      }}
-                      onQuickAction={swapMode ? undefined : (action) => handleQuickAction(a, slot, d, action)}
-                    />
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                      {arr.length === 0 ? (
+                        <AssignmentCell
+                          assignment={null}
+                          worker={null}
+                          onClick={() => {
+                            if (swapMode) return  // 빈 셀 swap 비활성
+                            setPickerSlot(slot); setPickerDate(d); setPickerAssignmentId(null)
+                          }}
+                          onQuickAction={undefined}
+                        />
+                      ) : (
+                        arr.map(a => {
+                          const w = a.worker_id ? workerMap.get(a.worker_id) || null : null
+                          return (
+                            <AssignmentCell
+                              key={a.id}
+                              assignment={a}
+                              worker={w}
+                              onClick={() => {
+                                if (swapMode) {
+                                  if (!swapFirst) {
+                                    setSwapFirst({ a, slotId: slot.id, date: d })
+                                  } else {
+                                    handleSwap({ a, slotId: slot.id, date: d })
+                                  }
+                                } else {
+                                  setPickerSlot(slot); setPickerDate(d); setPickerAssignmentId(a.id)
+                                }
+                              }}
+                              onQuickAction={swapMode ? undefined : (action) => handleQuickAction(a, slot, d, action)}
+                            />
+                          )
+                        })
+                      )}
+                      {/* 워커 추가 버튼 — 항상 노출 (1셀 N워커) */}
+                      {!swapMode && arr.length > 0 && (
+                        <button type="button"
+                          onClick={() => { setPickerSlot(slot); setPickerDate(d); setPickerAssignmentId(null) }}
+                          style={{
+                            height: 14, padding: 0, border: `1px dashed ${COLORS.borderFaint}`,
+                            background: 'transparent', borderRadius: 3, cursor: 'pointer',
+                            fontSize: 9, color: COLORS.textMuted, lineHeight: 1,
+                          }}
+                          title="워커 추가">
+                          +
+                        </button>
+                      )}
+                    </div>
                   </td>
                 )
               })}
@@ -341,7 +384,7 @@ export default function ScheduleGrid({ detail, onChanged }: Props) {
 
       <WorkerPicker
         open={!!pickerSlot}
-        onClose={() => { setPickerSlot(null); setPickerDate('') }}
+        onClose={() => { setPickerSlot(null); setPickerDate(''); setPickerAssignmentId(null) }}
         workers={workers}
         slot={pickerSlot}
         workDate={pickerDate}

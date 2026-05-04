@@ -3,6 +3,26 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-04 (밤 — 동시 근무 허용)
+
+### PR-2OO — 1셀 N워커 동시 근무 (운영 사실 반영, Rule 25)
+- 운영 사실: 같은 그룹 안 멤버가 같은 시간 슬롯에 동시 출근 (예: 야간콜 4명 모두 22-08)
+- DB 마이그레이션: `cs_assignments` UNIQUE KEY 변경
+  - 이전: `(schedule_id, work_date, shift_slot_id)` — 1셀 1워커 강제
+  - 변경: `(schedule_id, work_date, shift_slot_id, worker_id)` — 1셀 N워커 허용
+- API `auto-generate`: existingMap 키를 `(date, slot, worker)` 단위로 변경
+- API `assignments PUT`: `assignment_id` 옵션 인자 추가 — 특정 row UPDATE 명시
+  - `worker_id` + (date, slot) 키로 upsert (멀티 워커 지원)
+- 매트릭스 UI: 1셀에 워커 chip 세로 stack + [+] 추가 버튼
+  - `cellMap`: `Map<string, Assignment>` → `Map<string, Assignment[]>`
+  - 빈 셀 클릭 → 새 워커 추가 picker
+  - 기존 chip 클릭 → 그 워커 수정 picker
+- 버그: 자동 생성 시 `Duplicate entry '...' for key 'uq_cs_asn_cell'` 1062 에러 해결
+
+### PR-2NN-fix — 목록 페이지 헤더 단순화
+- [⋯] 드롭다운 폐기 (6개 셋팅 탭 = 모두 같은 settings 페이지로 → 중복)
+- [📋 직원 마스터] + [⚙️ 설정] 2개 직접 버튼만 노출
+
 ## 2026-05-04 (저녁 — UX 보강)
 
 ### PR-2MM — 자동 생성 모달 자동 미리보기

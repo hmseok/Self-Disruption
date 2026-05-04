@@ -3,7 +3,7 @@
 // /CallScheduler — 월별 스케줄 목록
 // CLAUDE.md §10 Soft Ice 글래스 + 규칙 18 정렬 적용
 // ═══════════════════════════════════════════════════════════════════
-import { useEffect, useState, useMemo, useRef } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
 import { COLORS, GLASS, BTN, pillStyle } from '@/app/utils/ui-tokens'
 import { getAuthHeader } from '@/app/utils/auth-client'
@@ -35,20 +35,6 @@ export default function CallSchedulerListPage() {
   const [error, setError] = useState<string | null>(null)
   const [sortKey, setSortKey] = useState<SortKey>('year_month')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
-  const [menuOpen, setMenuOpen] = useState(false)
-  const menuRef = useRef<HTMLDivElement>(null)
-
-  // 메뉴 외부 클릭 시 닫기
-  useEffect(() => {
-    if (!menuOpen) return
-    const onClick = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', onClick)
-    return () => document.removeEventListener('mousedown', onClick)
-  }, [menuOpen])
 
   useEffect(() => {
     let abort = false
@@ -118,6 +104,30 @@ export default function CallSchedulerListPage() {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <Link
+            href="/RideEmployees"
+            style={{
+              ...BTN.md, background: 'transparent',
+              color: COLORS.textSecondary,
+              border: `1px solid ${COLORS.borderFaint}`,
+              textDecoration: 'none', display: 'inline-block',
+            }}
+            title="직원 마스터 — Ride 직원 관리"
+          >
+            📋 직원 마스터
+          </Link>
+          <Link
+            href="/CallScheduler/settings"
+            style={{
+              ...BTN.md, background: 'transparent',
+              color: COLORS.textSecondary,
+              border: `1px solid ${COLORS.borderFaint}`,
+              textDecoration: 'none', display: 'inline-block',
+            }}
+            title="시간 / 그룹 / 직원 / 공휴일 / 휴가"
+          >
+            ⚙️ 설정
+          </Link>
+          <Link
             href="/CallScheduler/new"
             style={{
               ...BTN.lg, background: COLORS.primary, color: '#fff',
@@ -126,55 +136,6 @@ export default function CallSchedulerListPage() {
           >
             + 새 월 만들기
           </Link>
-          <div ref={menuRef} style={{ position: 'relative' }}>
-            <button
-              type="button"
-              onClick={() => setMenuOpen(v => !v)}
-              style={{
-                ...BTN.lg, background: 'transparent',
-                color: COLORS.textSecondary,
-                border: `1px solid ${COLORS.borderFaint}`,
-                cursor: 'pointer', fontSize: 18, lineHeight: 1,
-                padding: '8px 14px',
-              }}
-              title="더보기"
-            >
-              ⋯
-            </button>
-            {menuOpen && (
-              <div style={{
-                ...GLASS.L4,
-                position: 'absolute', top: '100%', right: 0, marginTop: 6,
-                minWidth: 240, borderRadius: 12, padding: 6, zIndex: 50,
-                boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
-              }}>
-                <MenuLabel>공통 셋팅 (월과 무관 — 한 번만)</MenuLabel>
-                <MenuItem href="/CallScheduler/settings?tab=shifts" icon="⏰" onClick={() => setMenuOpen(false)}>
-                  시간 (시프트)
-                </MenuItem>
-                <MenuItem href="/CallScheduler/settings?tab=groups" icon="🧑‍🤝‍🧑" onClick={() => setMenuOpen(false)}>
-                  그룹
-                </MenuItem>
-                <MenuItem href="/CallScheduler/settings?tab=workers" icon="👥" onClick={() => setMenuOpen(false)}>
-                  직원 (콜센터)
-                </MenuItem>
-                <MenuItem href="/RideEmployees" icon="📋" onClick={() => setMenuOpen(false)}>
-                  직원 마스터 (Ride)
-                </MenuItem>
-                <MenuItem href="/CallScheduler/settings?tab=holidays" icon="🏖" onClick={() => setMenuOpen(false)}>
-                  공휴일 (참고)
-                </MenuItem>
-                <MenuItem href="/CallScheduler/settings?tab=leaves" icon="🙋" onClick={() => setMenuOpen(false)}>
-                  직원 휴가
-                </MenuItem>
-                <MenuDivider />
-                <MenuLabel>전체</MenuLabel>
-                <MenuItem href="/CallScheduler/settings" icon="⚙️" onClick={() => setMenuOpen(false)}>
-                  설정 페이지 열기
-                </MenuItem>
-              </div>
-            )}
-          </div>
         </div>
       </div>
 
@@ -307,49 +268,6 @@ function Th({ children, sortKey, current, dir, onClick, align = 'left' }: {
     >
       {children}{current === sortKey ? (dir === 'asc' ? ' ▲' : ' ▼') : ''}
     </th>
-  )
-}
-
-function MenuLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <div style={{
-      padding: '6px 10px 4px', fontSize: 10, fontWeight: 700,
-      color: COLORS.textMuted, textTransform: 'uppercase', letterSpacing: 0.4,
-    }}>
-      {children}
-    </div>
-  )
-}
-
-function MenuDivider() {
-  return (
-    <div style={{
-      height: 1, background: COLORS.borderFaint, margin: '4px 6px',
-    }} />
-  )
-}
-
-function MenuItem({ href, icon, children, onClick }: {
-  href: string
-  icon: string
-  children: React.ReactNode
-  onClick?: () => void
-}) {
-  return (
-    <Link
-      href={href}
-      onClick={onClick}
-      style={{
-        display: 'flex', alignItems: 'center', gap: 10,
-        padding: '8px 10px', borderRadius: 8,
-        color: COLORS.textPrimary, fontSize: 13, textDecoration: 'none',
-      }}
-      onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = COLORS.bgGray }}
-      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent' }}
-    >
-      <span style={{ fontSize: 14 }}>{icon}</span>
-      <span style={{ flex: 1 }}>{children}</span>
-    </Link>
   )
 }
 

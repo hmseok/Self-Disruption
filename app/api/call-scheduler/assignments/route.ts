@@ -1,7 +1,13 @@
 // ═══════════════════════════════════════════════════════════════════
-// PUT    /api/call-scheduler/assignments — 셀 upsert
-//   body: { schedule_id, work_date, shift_slot_id, worker_id|null, special_code }
-//   동작: (schedule_id, work_date, shift_slot_id) 키로 INSERT or UPDATE
+// PUT    /api/call-scheduler/assignments — 셀 upsert (PR-2OO 멀티 워커)
+//   body: {
+//     schedule_id, work_date, shift_slot_id,
+//     worker_id|null, special_code, note?,
+//     assignment_id?  ← 기존 row 명시 (수정 모드)
+//   }
+//   동작:
+//     - assignment_id 있으면 → 그 row UPDATE
+//     - 없으면 → (schedule, date, slot, worker_id) 키 upsert (1셀 N워커 허용)
 // DELETE /api/call-scheduler/assignments?id=...
 // ═══════════════════════════════════════════════════════════════════
 import { NextRequest, NextResponse } from 'next/server'
@@ -29,6 +35,7 @@ export async function PUT(request: NextRequest) {
     const worker_id: string | null = body?.worker_id || null
     const special_code: Special = SPECIAL_CODES.includes(body?.special_code) ? body.special_code : 'none'
     const note: string | null = body?.note ?? null
+    const assignment_id: string | null = body?.assignment_id || null
 
     if (!schedule_id || !work_date || !shift_slot_id) {
       return NextResponse.json({ error: 'schedule_id, work_date, shift_slot_id 필수' }, { status: 400 })
@@ -52,14 +59,25 @@ export async function PUT(request: NextRequest) {
       slot.start_time, slot.end_time, Boolean(slot.is_overnight), special_code,
     )
 
-    // 기존 셀 조회
-    const existing = await prisma.$queryRaw<any[]>`
-      SELECT id FROM cs_assignments
-      WHERE schedule_id = ${schedule_id}
-        AND work_date = ${work_date}
-        AND shift_slot_id = ${shift_slot_id}
-      LIMIT 1
-    `
+    // 기존 row 조회 — PR-2OO: assignment_id 있으면 그 row, 없으면 (schedule, date, slot, worker) 키
+    let existing: any[]
+    if (assignment_id) {
+      existing = await prisma.$queryRaw<any[]>`
+        SELECT id FROM cs_assignments WHERE id = ${assignment_id} LIMIT 1
+      `
+    } else if (worker_id) {
+      existing = await prisma.$queryRaw<any[]>`
+        SELECT id FROM cs_assignments
+        WHERE schedule_id = ${schedule_id}
+          AND work_date = ${work_date}
+          AND shift_slot_id = ${shift_slot_id}
+          AND worker_id = ${worker_id}
+        LIMIT 1
+      `
+    } else {
+      // worker_id null 인 빈 셀 — 항상 새 row 로 처리 (멀티 NULL 허용)
+      existing = []
+    }
 
     let id: string
     if (existing.length > 0) {

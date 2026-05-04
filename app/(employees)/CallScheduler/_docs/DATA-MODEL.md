@@ -84,7 +84,10 @@ UNIQUE: `(year, month)` — 한 달 한 스케줄 (재작성 시 덮어쓰기 / 
 | note | VARCHAR(255) | Y | | |
 | created_at, updated_at | DATETIME | NN | NOW | |
 
-UNIQUE: `(schedule_id, work_date, shift_slot_id)` — 한 셀 한 배정
+UNIQUE: `(schedule_id, work_date, shift_slot_id, worker_id)` — **PR-2OO**: 1셀 N워커 허용 (같은 그룹 멤버 동시 근무)
+- 이전: `uq_cs_asn_cell (schedule_id, work_date, shift_slot_id)` — 1셀 1워커
+- 현재: `uq_cs_asn_cell_worker (schedule_id, work_date, shift_slot_id, worker_id)` — 1셀 N워커
+- NULL worker_id 다중 row 허용 (InnoDB NULL semantics) — 빈 셀 표현
 INDEX: `(work_date)`, `(worker_id, work_date)`
 
 ### 2.5 `cs_distributions` — 체크/배포 이력

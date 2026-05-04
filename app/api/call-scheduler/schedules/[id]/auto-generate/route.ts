@@ -228,10 +228,10 @@ export async function POST(
              shift_slot_id, worker_id, special_code
       FROM cs_assignments WHERE schedule_id = ${scheduleId}
     ` as any
-    // (date, slot) → assignment
+    // (date, slot, worker) → assignment — PR-2OO: 1셀 N워커 허용 (worker_id 포함)
     const existingMap = new Map<string, AssignmentRow>()
     for (const a of existingRows) {
-      existingMap.set(`${a.work_date}_${a.shift_slot_id}`, a)
+      existingMap.set(`${a.work_date}_${a.shift_slot_id}_${a.worker_id || 'null'}`, a)
     }
 
     // ── 7) 계획 산출 ────────────────────────────────────────────────
@@ -303,8 +303,13 @@ export async function POST(
           assignWorkers = [...gMembers]
         }
 
+        // 같은 그룹 안 멤버 중복 방지 (rotation 시 size > members.length 가능성)
+        const seenWorkersThisCell = new Set<string>()
         for (const wId of assignWorkers) {
-          const key = `${isoDate}_${g.shift_slot_id}`
+          if (seenWorkersThisCell.has(wId)) continue
+          seenWorkersThisCell.add(wId)
+          // PR-2OO: (date, slot, worker) 키 — 1셀 N워커 허용
+          const key = `${isoDate}_${g.shift_slot_id}_${wId}`
           const existing = existingMap.get(key)
 
           // 연차 표시
@@ -391,11 +396,11 @@ export async function POST(
               (${newId}, ${scheduleId}, ${p.work_date}, ${p.shift_slot_id}, ${p.worker_id}, ${p.special_code}, ${hours}, NOW(), NOW())
           `
         } else {
-          // update
-          const existing = existingMap.get(`${p.work_date}_${p.shift_slot_id}`)!
+          // update — PR-2OO: (date, slot, worker) 키
+          const existing = existingMap.get(`${p.work_date}_${p.shift_slot_id}_${p.worker_id || 'null'}`)!
           await prisma.$executeRaw`
             UPDATE cs_assignments
-            SET worker_id = ${p.worker_id}, special_code = ${p.special_code},
+            SET special_code = ${p.special_code},
                 computed_hours = ${hours}, updated_at = NOW()
             WHERE id = ${existing.id}
           `
