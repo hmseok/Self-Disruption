@@ -341,10 +341,30 @@ export async function POST(request: NextRequest) {
       }
 
       // ── 5) 매칭 적용 ──
-      if (!pick.vehicle_id) {
+      // vehicle_id 가 비어있으면 vehicle_car_number 로 cars (FmiVehicle) 자동 lookup
+      let vehicleId: string | null = pick.vehicle_id ? String(pick.vehicle_id).trim() : null
+      if (!vehicleId && pick.vehicle_car_number) {
+        try {
+          const car = await prisma.fmiVehicle.findUnique({
+            where: { car_number: String(pick.vehicle_car_number).trim() },
+            select: { id: true },
+          })
+          if (car?.id) vehicleId = String(car.id)
+        } catch {}
+      }
+      if (!vehicleId) {
         result.no_candidate++
+        if (result.failed_samples.length < 10) {
+          result.failed_samples.push({
+            tx_id: tx.id,
+            client_name: clientRaw,
+            reason: `vehicle_id 없음 — fmi_rental.vehicle_car_number=「${pick.vehicle_car_number || '-'}」 cars 테이블 매칭 실패`,
+          })
+        }
         continue
       }
+      // pick 객체에 lookup 결과 반영 (이후 로직에서 사용)
+      pick.vehicle_id = vehicleId
 
       result.matched++
       if (result.samples.length < 10) {
