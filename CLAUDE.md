@@ -767,6 +767,68 @@ const cardColumns: TableColumn<Transaction>[] = [
    - 화이트리스트: 진짜 confirm 필요한 경우 (data-loss 위험 등)
 ```
 
+### 규칙 21 — Cowork 멀티 세션 협업 (2026-05-03 신설)
+
+> **사용자 명령**: "이거 하네스에 매번"
+> 동시에 여러 코워크 세션이 같은 git repo 작업 시 conflict / 침범 회피 의무.
+> 코워크 세션은 같은 workspace 폴더를 공유하므로, 한 세션의 commit 은 다른 세션 디스크에 즉시 반영됨.
+
+**다음 중 하나라도 해당하면 협업 모드 발동**:
+
+```
+✓ 사용자가 「다른 코워크에서 작업중」 명시
+✓ git status 에 자기 영역 외 modified/untracked 파일 보임
+✓ prisma/schema.prisma / ClientLayout.tsx 같은 공통 파일이 modified
+✓ 같은 시각 다른 세션이 동일 repo 진행 중인 정황
+```
+
+**작업 절차** (코드 작성 / staging 전 의무):
+
+```
+[A] 작업 영역 인덱스 (코드 작성 전)
+   1. 자기 작업 영역 명시 (예: app/CallScheduler/, app/api/call-scheduler/)
+   2. 다른 세션 영역 식별 — git status untracked 중 자기 영역 외 모두
+   3. 공통 파일 (schema.prisma / ClientLayout.tsx / migrations 등) 정리 책임 합의
+      → 사용자에게 "어느 세션이 정리할지" 확인 의무
+   4. 보고서:
+      "본 세션 staging:  app/X/ + 공통 파일 N
+       다른 세션 영역:    app/Y/ — 절대 staging X"
+
+[B] staging 원칙
+   1. ❌ git add . / git add -A 절대 금지 — 다른 세션 작업물 침범
+   2. ✅ 명시적 폴더 add — git add app/CallScheduler/ app/api/call-scheduler/ 등
+   3. 공통 파일은 합의된 세션만 staging
+   4. git status 결과 사용자 보고:
+      - staged 목록 (자기 영역만)
+      - unstaged 목록 (안 건드림)
+      - untracked 목록 (다른 세션 영역 — 절대 안 건드림)
+
+[C] 순차 push (병렬 push 회피)
+   1. 한 세션이 push 끝날 때까지 다른 세션은 commit 만 준비, push 대기
+   2. 두 번째 세션은 git status 로 첫 번째 commit 반영 확인 후 push
+   3. conflict 시: git checkout HEAD -- <공통파일> 로 main 우선 + 자기 영역만 다시 add
+
+[D] 사용자 보고 의무 (CLAUDE.md 규칙 5 보강)
+   1. 어느 파일 staging 했는지 명시
+   2. 어느 파일은 다른 세션 영역이라 안 했는지 명시
+   3. 공통 파일 (schema.prisma 등) 누가 정리하는지
+   4. 마이그레이션 SQL 누가 실행할지 결정 (보통 사용자 직접)
+```
+
+**금지 사항**:
+- ❌ git add . / git add -A — 다른 세션 작업물 침범 위험
+- ❌ 공통 파일 임의 수정 후 commit — 다른 세션과 충돌
+- ❌ 다른 세션 작업 영역 (Untracked 폴더) 자기 commit 에 포함
+- ❌ 다른 세션 push 안 끝났는데 force push / 동시 push
+
+**자동화 안전장치 (TBD)**:
+```
+🔜 11. cowork-staging-lint — 한 commit 안에 여러 「모듈」 동시 staging 감지
+   - app/CallScheduler/ + app/RideEmployees/ 같이 staging 시 경고
+   - 사용자 명시적 GO 없으면 commit 차단
+   - 위치: harness-engineering/scripts/cowork-staging-lint.js (TBD)
+```
+
 ### 위반 시 자동 자가 기록 + 누적 시 시스템 안전장치
 
 이 조항을 위반하면 즉시 `knowledge/common-errors.md`에 사례 기록.
