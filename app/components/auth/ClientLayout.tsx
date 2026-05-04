@@ -39,146 +39,37 @@ const Icons: any = {
 // ============================================
 
 // ═══════════════════════════════════════════════════════════════════
-// ⚠️ 사이드바 메뉴 추가 가이드 — 4곳 동기화 필수
+// 사이드바 메뉴 추가 — lib/menu-registry.ts 가 단일 SOURCE OF TRUTH
 // ═══════════════════════════════════════════════════════════════════
-// 새 메뉴를 추가하려면 다음 4곳을 모두 갱신해야 사이드바에 표시됩니다.
-// 한 곳이라도 누락되면 사이드바에서 사라집니다.
+// 새 메뉴 추가 절차:
+//   1. lib/menu-registry.ts 의 MENUS 배열에 entry 추가
+//   2. 빌드 — 사이드바 / 권한 페이지 / 초대 페이지 자동 반영
 //
-//   1. /api/system_modules/route.ts → DEFAULT_MODULES 에 entry 추가
-//   2. ClientLayout HIDDEN_PATHS 에서 제거 확인 (없어야 함)
-//   3. ClientLayout PATH_TO_GROUP 에 path → group 매핑 추가
-//   4. (선택) ClientLayout NAME_OVERRIDES 에 표시 이름 (없으면 system_modules.name 사용)
-//
-// 정합성 검증: ClientLayout 마운트 시 console.warn 로 누락 자동 감지 (아래)
+// 본 ClientLayout 은 menu-registry 에서 모든 메뉴 정의를 import 합니다.
+// PATH_TO_GROUP / NAME_OVERRIDES / HIDDEN_PATHS 는 모두 menu-registry 가 관리.
 // ═══════════════════════════════════════════════════════════════════
+import {
+  MENUS as REGISTRY_MENUS,
+  HIDDEN_PATHS,
+  BUSINESS_GROUPS,
+  PATH_TO_GROUP,
+  getDisplayName,
+  getMenusByGroup,
+} from '@/lib/menu-registry'
 
-// 동적 메뉴 → 그룹 매핑 (v4 — 자산/운영/재무/영업/관리 5그룹)
-// 사용자 비전: 차량을 자산으로 묶고, 운영-재무 시점 분리
-const PATH_TO_GROUP: Record<string, string> = {
-  // ── 자산 (asset) — 차량을 어떻게 소유·보호하는가 ──
-  '/cars': 'asset',
-  '/loans': 'asset',
-  '/insurance': 'asset',
-  // ── 운영 (operation) — 차량을 어떻게 굴리는가 ──
-  '/maintenance': 'operation',
-  '/operations': 'operation',
-  '/operations/intake': 'operation',
-  // ── 재무 (finance) — 통장 거래 진입점 + 손익/정산/지입/투자 ──
-  '/finance/bank-card': 'finance',
-  '/finance/fleet': 'finance',
-  '/finance/settlement': 'finance',
-  '/finance/investor': 'finance',
-  '/finance/cost-analysis': 'finance',
-  '/finance/classify': 'finance',
-  '/finance/sms': 'finance',
-  // ── 영업/계약 (sales) ──
-  '/quotes': 'sales',
-  '/quotes/operational-learning': 'sales',
-  '/contracts': 'sales',
-  // ── 관리 (admin) ──
-  '/admin/payroll': 'admin',
+// menu-registry 의 MenuEntry → ClientLayout 호환 형식 (legacy MenuItem 의 { name, path, iconKey })
+function toMenuItem(m: typeof REGISTRY_MENUS[number]) {
+  return { name: getDisplayName(m), path: m.path, iconKey: m.iconKey }
 }
 
-// 메뉴명 오버라이드 (v4 — 5그룹 구조)
-const NAME_OVERRIDES: Record<string, string> = {
-  // 자산 (asset)
-  '/cars': '🚗 차량',
-  '/loans': '💰 대출',
-  '/insurance': '🛡 보험',
-  // 운영 (operation)
-  '/maintenance': '🔧 정비',
-  '/operations': '📅 차량 일정',
-  '/operations/intake': '📋 접수/오더',
-  // 재무 (finance)
-  '/finance/bank-card': '💳 통장/카드',
-  '/finance/fleet': '📊 차량 손익',
-  '/finance/settlement': '💵 정산/수금',
-  '/finance/investor': '👥 투자자 정산',
-  '/finance/cost-analysis': '📈 원가 분석',
-  '/finance/classify': '🏷 거래 분류',
-  '/finance/sms': '📨 SMS 수집',
-  // 영업/계약
-  '/quotes': '📝 견적 관리',
-  '/quotes/operational-learning': '📚 운영학습',
-  '/contracts': '📑 계약/고객',
-  // 관리
-  '/admin/payroll': '💼 급여 관리',
-}
-
-// 숨길 메뉴 경로 (v3 — 삭제된 모듈 + 미사용 메뉴 제거)
-const HIDDEN_PATHS = new Set([
-  // ── 삭제된 모듈 (코드 제거됨) ──
-  '/jiip',                   // 삭제됨
-  '/invest',                 // 삭제됨
-  '/accidents',              // 삭제됨 (Track 추후 부활 예정)
-  '/rental',                 // 삭제됨
-  '/registration',           // 2026-04-29 — /cars/[id] 등록증 탭으로 통합
-  // '/insurance',           // 2026-04-29 부활 — 보험 청약서 기반 다중 차량 분배 시스템
-  '/claims/accident-mgmt',   // 삭제됨
-  '/claims/billing-mgmt',    // 삭제됨
-  '/claims/intake', '/claims/investigation',
-  '/claims/assessment', '/claims/billing', '/claims/rental',
-  '/fleet/factory-mgmt',     // 삭제됨
-  '/fleet/vehicle-lookup',   // 삭제됨
-  '/db/depreciation', '/db/maintenance', '/db/models', // 삭제됨
-  // ── 중복/통합 완료 ──
-  '/e-contract',             // → 계약 관리에 흡수
-  '/quotes/pricing',         // → /quotes/create 통합
-  '/quotes/short-term',      // → /quotes/create 통합
-  '/customers',              // → 계약 관리 탭으로 통합
-  '/finance/collections',    // → 정산 관리 탭으로 통합
-  '/db/pricing-standards',   // → 견적 허브 요율 관리 탭으로 통합
-  '/finance',                // → /finance/bank-card 통합
-  '/finance/transactions',   // → /finance/bank-card 통합 (입출금+분류+매칭)
-  '/finance/upload',         // → /finance/bank-card 엑셀 업로드로 통합
-  '/finance/uploads',        // → /finance/bank-card 엑셀 업로드로 통합
-  '/finance/codef',          // → /finance/bank-card 자동수집으로 통합
-  '/finance/cards',          // → /finance/bank-card 카드 거래 탭으로 통합
-  // '/finance/sms',         // 2026-04-29 활성화 — system_modules에 등록되어 있고 페이지 실재
-  '/finance/openbanking',    // → /finance/bank-card 통장 탭으로 통합
-  '/db/lotte',               // → 미사용 (경쟁사 벤치마크)
-  '/admin/code-master',      // → 미사용 (기초코드)
-  '/db/codes',               // → 미사용
-  // ── 통합/축소 ──
-  '/finance/tax',              // → 세금: 추후 별도 구성 예정
-  '/report',                   // → 보고서: 추후 별도 구성 예정
-  // ── 미사용/불필요 ──
-  '/finance/review', '/finance/freelancers', '/admin/freelancers',
-  // ★ FMI 단일회사 — 플랫폼 관리 메뉴 숨김
-  '/system-admin',           // 모듈 구독관리
-  '/admin/developer',        // 개발자 도구
-  '/admin/contracts',        // 회사/가입 관리 (플랫폼)
-])
-
-// 비즈니스 그룹 (v5 — 자산/운영/재무/영업/관리 5그룹)
-// 사용자 비전: 차량을 자산으로 묶고, 운영-재무 시점 분리
-const BUSINESS_GROUPS = [
-  { id: 'asset',     label: '자산' },        // 차량 + 대출 + 보험
-  { id: 'operation', label: '운영' },        // 정비 + 일정 + 접수
-  { id: 'finance',   label: '재무' },        // 통장/손익/정산/투자
-  { id: 'sales',     label: '영업/계약' },
-  { id: 'admin',     label: '관리' },
-]
-
-// 직장인필수 메뉴 (모든 로그인 사용자에게 표시)
-const WORK_ESSENTIALS_MENUS = [
-  { name: '내 정보', path: '/work-essentials/my-info', iconKey: 'Users' },
-  { name: '영수증제출', path: '/work-essentials/receipts', iconKey: 'Clipboard' },
-  { name: '📋 회의록', path: '/meetings', iconKey: 'Doc' },
-]
-
-// CX팀 메뉴 (Employee of Ride Inc. > CX팀)
-const CX_TEAM_MENUS = [
-  { name: '근무스케줄', path: '/CallScheduler', iconKey: 'Setting' },
-]
-
-// admin 전용 설정 메뉴
-const SETTINGS_MENUS_BASE = [
-  { name: '조직/권한 관리', path: '/admin/employees', iconKey: 'Users' },
-  { name: '계약 약관 관리', path: '/admin/contract-terms', iconKey: 'Doc' },
-  { name: '메시지 센터', path: '/admin/message-templates', iconKey: 'Clipboard' },
-]
-const COMPANY_INFO_MENU = { name: '회사 정보', path: '/db/codes', iconKey: 'Setting' }
+// 직장인필수 / CX팀 / 설정 메뉴 — menu-registry 에서 자동 추출
+const WORK_ESSENTIALS_MENUS = getMenusByGroup('work-essentials').map(toMenuItem)
+const CX_TEAM_MENUS = getMenusByGroup('cx-team').map(toMenuItem)
+const SETTINGS_MENUS_ALL = getMenusByGroup('settings').map(toMenuItem)
+// 「회사 정보」를 첫 entry 로 분리 (legacy COMPANY_INFO_MENU 호환)
+const COMPANY_INFO_MENU = SETTINGS_MENUS_ALL.find(m => m.path === '/db/codes')
+  || { name: '회사 정보', path: '/db/codes', iconKey: 'Setting' }
+const SETTINGS_MENUS_BASE = SETTINGS_MENUS_ALL.filter(m => m.path !== '/db/codes')
 
 // ============================================
 // 메뉴 아이템 렌더링 헬퍼
@@ -309,12 +200,16 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
               seen.add(item.path)
               return true
             })
-            .map((item: any) => ({
-              id: item.id,
-              name: NAME_OVERRIDES[item.path] || item.name,
-              path: item.path,
-              iconKey: item.icon_key,
-            }))
+            .map((item: any) => {
+              // menu-registry 의 displayName (이모지 포함) 우선 사용
+              const reg = REGISTRY_MENUS.find(m => m.path === item.path)
+              return {
+                id: item.id,
+                name: reg ? getDisplayName(reg) : item.name,
+                path: item.path,
+                iconKey: item.icon_key,
+              }
+            })
 
           // admin → 전체 메뉴, user → 권한 있는 메뉴만
           setDynamicMenus(

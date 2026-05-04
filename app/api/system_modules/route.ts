@@ -1,66 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyUser } from '@/lib/auth-server'
-import { prisma } from '@/lib/prisma'
-
-function serialize<T>(data: T): T {
-  return JSON.parse(JSON.stringify(data, (_, v) =>
-    typeof v === 'bigint' ? v.toString() : v
-  ))
-}
+import { toSystemModules } from '@/lib/menu-registry'
 
 // ═══════════════════════════════════════════════════════════════════
-// ⚠️ 사이드바 메뉴 추가 가이드 — 4곳 동기화 필수
-// ═══════════════════════════════════════════════════════════════════
-// 새 메뉴 추가 시 다음 4곳 모두 갱신 필수 (한 곳이라도 누락되면 사이드바 표시 X)
+// /api/system_modules — 시스템 모듈 목록 (권한 페이지 / 초대 페이지 데이터)
 //
-//   1. ⬇️  여기 (DEFAULT_MODULES) 에 entry 추가
-//   2. app/components/auth/ClientLayout.tsx HIDDEN_PATHS 에서 제거 확인
-//   3. app/components/auth/ClientLayout.tsx PATH_TO_GROUP 에 그룹 매핑 추가
-//   4. (선택) ClientLayout NAME_OVERRIDES 에 표시 이름 (없으면 아래 name 사용)
+// ★ 단일 SOURCE: lib/menu-registry.ts (toSystemModules)
+// 새 페이지 추가 시 lib/menu-registry.ts 의 MENUS 배열에만 entry 추가하면
+// 본 API + 사이드바 + 권한 페이지 모두 자동 동기화.
 //
-// ClientLayout 마운트 시 console.warn 로 누락 자동 감지 (개발 환경)
+// 본 API 가 반환하는 메뉴 = 권한 부여 대상 (requirePermission=true 또는
+// group=asset/operation/finance/sales/admin)
+// 직장인필수 / CX팀 / 설정 메뉴는 권한 부여 대상 X (모든 사용자 또는 admin 코드 처리)
 // ═══════════════════════════════════════════════════════════════════
 
-// FMI ERP 기본 모듈 — v5 5그룹 구조 (자산/운영/재무/영업/관리)
-// HIDDEN_PATHS에 해당하는 경로는 제거 완료 (ClientLayout에서 이중 필터 방지)
-// sort_order: 자산 1~9 / 운영 10~19 / 재무 20~29 / 영업 30~39 / 관리 40~49
-const DEFAULT_MODULES = [
-  // ── 자산 (asset) ──
-  { id: 'mod-cars',      name: '차량',  path: '/cars',     icon_key: 'Car',   sort_order: 1 },
-  { id: 'mod-loans',     name: '대출',  path: '/loans',    icon_key: 'Money', sort_order: 2 },
-  { id: 'mod-insurance', name: '보험',  path: '/insurance', icon_key: 'Money', sort_order: 3 },
-
-  // ── 운영 (operation) ──
-  { id: 'mod-maint',  name: '정비',       path: '/maintenance',       icon_key: 'WrenchScrewdriver', sort_order: 10 },
-  { id: 'mod-ops',    name: '차량 일정',  path: '/operations',        icon_key: 'Wrench',            sort_order: 11 },
-  { id: 'mod-intake', name: '접수/오더',  path: '/operations/intake', icon_key: 'Clipboard',         sort_order: 12 },
-
-  // ── 재무 (finance) ── 통장 진입점 + 손익/정산/투자
-  { id: 'mod-bank-card',     name: '통장/카드',  path: '/finance/bank-card',     icon_key: 'Money', sort_order: 20 },
-  { id: 'mod-fleet-fin',     name: '차량 손익',  path: '/finance/fleet',         icon_key: 'Chart', sort_order: 21 },
-  { id: 'mod-settlement',    name: '정산/수금',  path: '/finance/settlement',    icon_key: 'Chart', sort_order: 22 },
-  { id: 'mod-investor',      name: '투자자 정산', path: '/finance/investor',      icon_key: 'Money', sort_order: 23 },
-  { id: 'mod-cost-analysis', name: '원가 분석',  path: '/finance/cost-analysis', icon_key: 'Chart', sort_order: 24 },
-  { id: 'mod-classify',      name: '거래 분류',  path: '/finance/classify',      icon_key: 'Chart', sort_order: 25 },
-  { id: 'mod-sms',           name: 'SMS 수집',   path: '/finance/sms',           icon_key: 'Doc',   sort_order: 26 },
-
-  // ── 영업/계약 (sales) ──
-  { id: 'mod-quotes',                  name: '견적 관리', path: '/quotes',                      icon_key: 'Doc',   sort_order: 30 },
-  { id: 'mod-operational-learning',    name: '운영학습',  path: '/quotes/operational-learning', icon_key: 'Chart', sort_order: 31 },
-  { id: 'mod-contracts',               name: '계약/고객', path: '/contracts',                   icon_key: 'Doc',   sort_order: 32 },
-
-  // ── 관리 (admin) ──
-  { id: 'mod-payroll', name: '급여 관리', path: '/admin/payroll', icon_key: 'Money', sort_order: 40 },
-]
-
-// GET /api/system_modules — 시스템 모듈 목록
-// ★ v3: DEFAULT_MODULES가 유일한 소스 (DB 테이블은 무시 — 오래된 데이터 문제 방지)
 export async function GET(request: NextRequest) {
   try {
     const user = await verifyUser(request)
     if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
 
-    return NextResponse.json({ data: DEFAULT_MODULES, error: null })
+    return NextResponse.json({ data: toSystemModules(), error: null })
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
