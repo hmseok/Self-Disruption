@@ -257,16 +257,19 @@ export async function POST(request: NextRequest) {
       const carNumberLike = `%${parsed.last4.replace(/[%_'"\\]/g, '')}`
       const insurerCaseClauses = safeInsurerKeywords.map(() => 'insurance_company LIKE ?').join(' OR ')
 
+      // customer_car_number (사고 차량) OR vehicle_car_number (FMI 보유 차량) 양쪽 검색
+      // 입금자명의 last4 가 어느 쪽이든 매칭되도록 확장
       const candidates = await prisma.$queryRawUnsafe<Array<any>>(
-        `SELECT id, vehicle_id, customer_car_number, insurance_company,
+        `SELECT id, vehicle_id, customer_car_number, vehicle_car_number, insurance_company,
                 final_claim_amount, total_rental_fee, dispatch_date, status,
                 CASE WHEN ${insurerCaseClauses} THEN 1 ELSE 0 END AS insurer_match
            FROM fmi_rentals
-          WHERE customer_car_number LIKE ?
+          WHERE (customer_car_number LIKE ? OR vehicle_car_number LIKE ?)
           ORDER BY insurer_match DESC,
                    ABS(DATEDIFF(COALESCE(dispatch_date, NOW()), ?)) ASC
           LIMIT 10`,
         ...safeInsurerKeywords.map(k => `%${k}%`),
+        carNumberLike,
         carNumberLike,
         tx.transaction_date,
       )
