@@ -86,6 +86,7 @@ export const MENUS: MenuEntry[] = [
   { id: 'mod-contracts',               name: '계약/고객', displayName: '📑 계약/고객', path: '/contracts',                   iconKey: 'Doc',   group: 'sales', sortOrder: 32 },
 
   // ── 관리 (admin) ──
+  { id: 'mod-dashboard', name: '대시보드', displayName: '🏠 대시보드', path: '/dashboard', iconKey: 'Setting', group: 'admin', sortOrder: 39, requirePermission: true },
   { id: 'mod-payroll', name: '급여 관리', displayName: '💼 급여 관리', path: '/admin/payroll', iconKey: 'Money', group: 'admin', sortOrder: 40 },
 
   // ── 직장인필수 (work-essentials) ──
@@ -137,8 +138,8 @@ export const HIDDEN_PATHS = new Set<string>([
   // ── 미사용 admin 페이지 (legacy / 통합 완료) ──
   '/admin', '/admin/cards', '/admin/codes', '/admin/locations',
   '/admin/market-prices', '/admin/model', '/admin/permissions',
-  // ── 인증 콜백 / 대시보드 / 미사용 모듈 ──
-  '/auth', '/dashboard', '/loans-out',
+  // ── 인증 콜백 / 미사용 모듈 ──
+  '/auth', '/loans-out',
 ])
 
 // ─── 권한 부여 대상 결정 (requirePermission 명시 안 했으면 group 기준) ───

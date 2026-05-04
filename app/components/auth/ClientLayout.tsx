@@ -347,7 +347,8 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
           {/* 메뉴 영역 */}
           <nav className="flex-1 px-3 pb-4 overflow-y-auto">
 
-            {/* 대시보드 */}
+            {/* 대시보드 — admin 또는 권한 보유자만 (보안) */}
+            {(role === 'admin' || hasPageAccess('/dashboard')) && (
             <div className="mb-2">
               <Link
                 href="/dashboard"
@@ -365,8 +366,10 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
                 대시보드
               </Link>
             </div>
+            )}
 
-            {/* Phase I (#85) — 빠른 입금/출금 입력 (전역 진입점) */}
+            {/* 빠른 입력 — 거래 등록 권한 보유자만 (보안: /finance/bank-card create) */}
+            {(role === 'admin' || hasPageAccess('/finance/bank-card')) && (
             <div className="mb-4">
               <button
                 type="button"
@@ -395,6 +398,7 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
                 <span>빠른 입력</span>
               </button>
             </div>
+            )}
 
             {/* 비즈니스 메뉴 그룹 */}
             {businessGroups.map(group => (
