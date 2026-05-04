@@ -10,7 +10,7 @@ import SubNav from '../_components/SubNav'
 import { DEFAULT_AXES, type CodeAxis, type CodeItem } from './defaults'
 
 // ───────────────────────────────────────────────────────────────
-// 분류 셋팅 — 6축 종합 관리
+// 분류 셋팅 — 13축 종합 관리 (모든 축 전체 편집 + 사용자 정의 추가 가능)
 // localStorage('ride_op_classifications_v2') 에 저장
 // ───────────────────────────────────────────────────────────────
 
@@ -138,7 +138,7 @@ export default function GroupsAdminMain() {
       <SubNav />
 
       <KpiRow>
-        <KpiCard label="분류 축" value={stats.axes} tone="emerald" icon="🧩" hint="6축 종합 관리" />
+        <KpiCard label="분류 축" value={stats.axes} tone="emerald" icon="🧩" hint="13축 종합 관리" />
         <KpiCard label="전체 항목" value={stats.totalItems} tone="blue" icon="🏷" />
         <KpiCard label="표시 중" value={stats.visibleItems} tone="violet" icon="👁" />
         <KpiCard label="등록 공장" value={stats.factories} tone="amber" icon="🏭" />
