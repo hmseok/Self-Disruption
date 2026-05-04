@@ -82,8 +82,14 @@ export default function WorkersTab() {
     setEditingId(w.id); setEditTone(w.color_tone); setEditGroup(w.group_label)
     setEditIsExternal(!!w.is_external)
     setEditPriority(w.priority_level || 2)
+    // PR-2QQ-d-1 버그 fix: 빈 문자열이 Number('') === 0 (일요일) 으로 잘못 파싱되던 문제
     setEditAvoidDow(new Set(
-      (w.preferred_dow_avoid || '').split(',').map(s => Number(s.trim())).filter(n => !isNaN(n))
+      (w.preferred_dow_avoid || '')
+        .split(',')
+        .map(s => s.trim())
+        .filter(s => s !== '')           // ✅ 빈 토큰 먼저 제거
+        .map(Number)
+        .filter(n => !isNaN(n) && n >= 0 && n <= 6)
     ))
     setEditRequired(w.required_days_per_month != null ? String(w.required_days_per_month) : '')
     setEditMax(w.max_days_per_month != null ? String(w.max_days_per_month) : '')
