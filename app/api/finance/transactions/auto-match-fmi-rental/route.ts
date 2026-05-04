@@ -25,29 +25,53 @@ export const maxDuration = 120
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
-// 보험사 약어 사전 (실제 입금자명에 들어오는 약어)
-// insurance_company 컬럼은 정식 명칭이므로 LIKE '%약어%' 로 부분 일치
+// 보험사 약어 사전 (입금자명 약어 → fmi_rentals.insurance_company 매핑)
+// 사용자 확인 매핑 (2026-05-03):
+//   택공 → 택시공제 (개인택시공제 / 법인택시공제 둘 다 매칭)
+//   DB손보 / DB / 디비 → 디비
+//   인터넷 / 라이드 → 비-보험금 (skip — 일반 송금)
 const INSURER_ABBR: Record<string, string[]> = {
-  '하나':   ['하나'],          // 하나손해보험
-  'DB':    ['DB', '디비'],     // DB손해보험
-  '디비':   ['DB', '디비'],
-  '현대':   ['현대해상', '현대'],
-  'KB':    ['KB'],             // KB손해보험
-  '케이비': ['KB'],
-  '삼성':   ['삼성화재', '삼성'],
+  // ── 사용자 확인 매핑 ──
+  'DB손보': ['디비'],
+  'DB':    ['디비'],
+  '디비':   ['디비'],
+  '택공':   ['택시공제', '개인택시공제', '법인택시공제'],
+  // ── 일반 보험사 (DB 학습 사전과 자동 매칭 됨) ──
+  '하나':   ['하나'],
+  '현대':   ['현대'],
+  '삼성':   ['삼성'],
+  'KB':    ['kb', 'KB'],
+  'kb':    ['kb'],
+  '케이비': ['kb'],
   '메리츠': ['메리츠'],
   '롯데':   ['롯데'],
   '흥국':   ['흥국'],
   '악사':   ['악사', 'AXA'],
-  'AXA':   ['AXA', '악사'],
+  'AXA':   ['악사', 'AXA'],
   '한화':   ['한화'],
   '농협':   ['농협', 'NH'],
   'NH':    ['NH', '농협'],
   '캐롯':   ['캐롯'],
-  '공제':   ['공제'],          // 전국렌터카공제조합
-  '렌터카': ['공제', '렌터카'],
+  '한화캐롯': ['한화', '캐롯'],
+  // ── 공제 ──
+  '렌공':   ['렌공'],
+  '공제':   ['공제'],
+  '화물공제': ['화물공제'],
+  '버스공제': ['버스공제'],
+  '배달공제': ['배달공제'],
+  // ── 기타 ──
   'KRMA':  ['KRMA', '공제'],
+  '루이':   ['루이'],
+  '미청구': ['미청구'],
 }
+
+// 비-보험금 입금 — 매칭 시도 자체 skip (오탐 방지)
+const NON_INSURER_PREFIXES = new Set([
+  '인터넷', '라이드', '라이드주식회사', '카드자동집금', '페이플',
+  '카드사', '뱅킹', '펌뱅킹', '타행', '타행건별', '타행대량',
+  '정산', '월정', '월급', '급여', '인세', '세금', '국세', '지방세',
+  '카카오', '네이버', '토스', '페이코',
+])
 
 interface ParsedClient {
   abbr: string
@@ -67,19 +91,25 @@ interface ParsedClient {
 function parseClientName(raw: string | null | undefined, dynamicAbbrs: string[]): ParsedClient | null {
   if (!raw) return null
   const s = String(raw).trim()
-  // 첫 4자리 숫자 추출 (가장 빠른 등장 — 「삼성3513 펌뱅킹」 → 3513 잡힘)
-  // 또는 마지막 4자리 (「하나5285」 → 5285)
-  // 우선순위: 약어 prefix 직후 4자리 숫자
+
+  // 비-보험금 prefix 차단 (인터넷/라이드/카드자동집금/페이플 등)
+  for (const skip of NON_INSURER_PREFIXES) {
+    if (s.startsWith(skip)) return null
+  }
+
+  // 약어 사전 — 사용자 확정 + 동적 (긴 약어 우선)
   const dictAbbrs = Array.from(new Set([...dynamicAbbrs, ...Object.keys(INSURER_ABBR)]))
-    .sort((a, b) => b.length - a.length) // 긴 약어 우선 (DB 보다 디비)
+    .sort((a, b) => b.length - a.length) // 「DB손보」 「하나손해보험」 처럼 긴 약어 우선
 
   for (const abbr of dictAbbrs) {
     // abbr 직후 (공백 0~2개) 3~4자리 숫자
     const reg = new RegExp('^' + abbr.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*(\\d{3,4})')
     const m = s.match(reg)
     if (m) {
-      // INSURER_ABBR 사전에 있으면 keywords 사용, 없으면 abbr 자체
+      // INSURER_ABBR 사전에 있으면 keywords 사용, 없으면 abbr 자체 (동적 사전은 DB 약어와 일치)
       const keywords = INSURER_ABBR[abbr] || [abbr]
+      // skip 사전에 명시된 abbr 은 매칭 시도 안 함
+      if (NON_INSURER_PREFIXES.has(abbr)) return null
       return { abbr, last4: m[1], insurerKeywords: keywords }
     }
   }
@@ -95,6 +125,7 @@ function parseClientName(raw: string | null | undefined, dynamicAbbrs: string[])
   const prefixMatch = beforeNum.match(/^([가-힣A-Za-z]+)/)
   if (prefixMatch) {
     const abbr = prefixMatch[1]
+    if (NON_INSURER_PREFIXES.has(abbr)) return null
     const keywords = INSURER_ABBR[abbr] || [abbr]
     return { abbr, last4, insurerKeywords: keywords }
   }
