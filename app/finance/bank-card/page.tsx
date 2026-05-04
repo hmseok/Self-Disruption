@@ -457,6 +457,40 @@ export default function BankCardPage() {
   const [fmiRentalExpand, setFmiRentalExpand] = useState<{
     matched: boolean, mismatch: boolean, failed: boolean
   }>({ matched: false, mismatch: false, failed: false })
+
+  // 투자자/지입자 입금자명 매칭 결과
+  const [investorJiipResult, setInvestorJiipResult] = useState<any | null>(null)
+  const [investorJiipLoading, setInvestorJiipLoading] = useState(false)
+  const [investorJiipExpand, setInvestorJiipExpand] = useState<{ matched: boolean; multi: boolean; failed: boolean }>({ matched: false, multi: false, failed: false })
+  const runInvestorJiipMatch = async (dryRun: boolean) => {
+    setInvestorJiipLoading(true)
+    setInvestorJiipResult(null)
+    const taskId = floaterProgress.start({
+      title: dryRun ? '🔍 투자/지입 매칭 dry-run' : '💼 투자/지입 매칭',
+      total: 1,
+    })
+    try {
+      const { ok, json, status } = await fetchWithAuth('/api/finance/transactions/auto-match-investor-jiip', {
+        method: 'POST',
+        body: { mode: 'both', dryRun },
+      })
+      if (!ok) {
+        floaterProgress.finish(taskId, `오류: HTTP ${status} — ${json?.error || ''}`, 'error')
+        return
+      }
+      setInvestorJiipResult(json)
+      floaterProgress.update(taskId, { processed: 1, applied: json.applied || 0 })
+      floaterProgress.finish(
+        taskId,
+        dryRun ? `🔍 dry-run — 매칭 가능 ${json.matched || 0}건` : `✅ ${json.applied || 0}건 매칭 적용`,
+      )
+      if (!dryRun && json.applied > 0) await loadMatchReview()
+    } catch (e: any) {
+      floaterProgress.finish(taskId, `오류: ${e.message}`, 'error')
+    } finally {
+      setInvestorJiipLoading(false)
+    }
+  }
   const runFmiRentalMatch = async (dryRun: boolean) => {
     setFmiRentalMatching(true)
     setFmiRentalMatchResult(null)
@@ -4846,6 +4880,20 @@ export default function BankCardPage() {
                     disabled={fmiRentalMatching}
                     style={{ ...BTN.sm, padding: '4px 10px', fontSize: 11, background: '#1e40af', color: '#fff', border: 'none', cursor: fmiRentalMatching ? 'wait' : 'pointer' }}
                   >{fmiRentalMatching ? '진행 중...' : '📥 대차건 매칭 적용'}</button>
+                  <button
+                    onClick={() => runInvestorJiipMatch(true)}
+                    disabled={investorJiipLoading}
+                    style={{ ...BTN.sm, padding: '4px 10px', fontSize: 11, background: '#fff', color: '#7c3aed', border: '1px solid rgba(124,58,237,0.3)', cursor: investorJiipLoading ? 'wait' : 'pointer' }}
+                    title="투자자/지입자 입금자명 매칭 — 양방향 (입금+지급)"
+                  >{investorJiipLoading ? '진행 중...' : '🔍 투자/지입 dry-run'}</button>
+                  <button
+                    onClick={() => {
+                      if (!confirm('투자자/지입자 매칭을 실제 적용하시겠습니까?\n(dry-run 결과 먼저 확인 권장)')) return
+                      runInvestorJiipMatch(false)
+                    }}
+                    disabled={investorJiipLoading}
+                    style={{ ...BTN.sm, padding: '4px 10px', fontSize: 11, background: '#7c3aed', color: '#fff', border: 'none', cursor: investorJiipLoading ? 'wait' : 'pointer' }}
+                  >{investorJiipLoading ? '진행 중...' : '💼 투자/지입 매칭 적용'}</button>
                   <select
                     value={matchReviewTypeFilter}
                     onChange={(e) => setMatchReviewTypeFilter(e.target.value)}
@@ -5075,6 +5123,90 @@ export default function BankCardPage() {
                       </div>
                     </>
                     )
+                  })()}
+                </div>
+              )}
+
+              {/* 투자/지입 매칭 결과 패널 (CLAUDE.md 규칙 20) */}
+              {investorJiipResult && (
+                <div style={{ ...GLASS.L4, border: '1px solid rgba(124,58,237,0.3)', borderRadius: 12, padding: '14px 18px', marginBottom: 12, background: 'rgba(245,243,255,0.4)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: '#7c3aed' }}>
+                      {investorJiipResult.dry_run ? '🔍 투자/지입 매칭 — dry-run 결과' : '💼 투자/지입 매칭 — 적용 결과'}
+                    </div>
+                    <button onClick={() => setInvestorJiipResult(null)} style={{ background: 'transparent', border: 'none', color: COLORS.textMuted, cursor: 'pointer', fontSize: 12 }}>× 닫기</button>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 6, marginBottom: 10 }}>
+                    <div style={{ fontSize: 11, padding: '6px 8px', background: 'rgba(255,255,255,0.6)', borderRadius: 6 }}>후보 거래 <b>{investorJiipResult.total_candidates}건</b></div>
+                    <div style={{ fontSize: 11, padding: '6px 8px', background: 'rgba(187,247,208,0.5)', borderRadius: 6 }}>✅ 매칭 가능 <b>{investorJiipResult.matched}건</b></div>
+                    {!investorJiipResult.dry_run && <div style={{ fontSize: 11, padding: '6px 8px', background: 'rgba(124,58,237,0.15)', borderRadius: 6 }}>📥 적용 <b>{investorJiipResult.applied}건</b></div>}
+                    <div style={{ fontSize: 11, padding: '6px 8px', background: 'rgba(254,243,199,0.5)', borderRadius: 6 }}>🟡 동명 다수 <b>{investorJiipResult.multi}건</b></div>
+                    <div style={{ fontSize: 11, padding: '6px 8px', background: 'rgba(254,226,226,0.5)', borderRadius: 6 }}>❌ 사전 없음 <b>{investorJiipResult.no_candidate}건</b></div>
+                    <div style={{ fontSize: 11, padding: '6px 8px', background: 'rgba(254,226,226,0.5)', borderRadius: 6 }}>❌ 비-인명 <b>{investorJiipResult.no_pattern}건</b></div>
+                  </div>
+                  <div style={{ fontSize: 11, color: COLORS.textMuted, marginBottom: 8 }}>👥 투자자/지입자 사전 {investorJiipResult.investors_loaded}명 로드</div>
+                  {/* 매칭 성공 */}
+                  {investorJiipResult.samples?.length > 0 && (() => {
+                    const all = investorJiipResult.samples
+                    const expanded = investorJiipExpand.matched
+                    const list = expanded ? all : all.slice(0, 6)
+                    return (<>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                        <span style={{ fontSize: 11, fontWeight: 600, color: '#059669' }}>✅ 매칭 성공 ({all.length}건)</span>
+                        {all.length > 6 && <button onClick={() => setInvestorJiipExpand(s => ({ ...s, matched: !s.matched }))} style={{ background: 'transparent', border: '1px solid rgba(5,150,105,0.3)', color: '#059669', fontSize: 10, padding: '1px 8px', borderRadius: 4, cursor: 'pointer' }}>{expanded ? '▾ 접기' : `▸ 전체 ${all.length}건`}</button>}
+                      </div>
+                      <div style={{ marginBottom: 10, maxHeight: expanded ? 400 : 'none', overflowY: expanded ? 'auto' : 'visible' }}>
+                        {list.map((s: any, i: number) => (
+                          <div key={i} style={{ fontSize: 11, padding: '3px 6px', borderBottom: '1px dashed rgba(0,0,0,0.05)' }}>
+                            <span style={{ fontWeight: 600 }}>{s.client_name}</span>
+                            {' → '}
+                            <span style={{ color: '#7c3aed' }}>{s.matched_type === 'invest' ? '📈 투자' : '🤝 지입'}</span>
+                            {' / '}
+                            <span style={{ color: '#1e40af' }}>{s.investor_name}</span>
+                            <span style={{ marginLeft: 6, fontSize: 9, color: COLORS.textMuted }}>{s.tx_type === 'income' ? '↓입금' : '↑지급'} {nf(Math.abs(s.amount))}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </>)
+                  })()}
+                  {/* 동명 다수 (multi) */}
+                  {investorJiipResult.multi_samples?.length > 0 && (() => {
+                    const all = investorJiipResult.multi_samples
+                    const expanded = investorJiipExpand.multi
+                    const list = expanded ? all : all.slice(0, 6)
+                    return (<>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                        <span style={{ fontSize: 11, fontWeight: 600, color: '#a16207' }}>🟡 동명 다수 ({all.length}건) — 자동 매칭 보류 (수동 검수)</span>
+                        {all.length > 6 && <button onClick={() => setInvestorJiipExpand(s => ({ ...s, multi: !s.multi }))} style={{ background: 'transparent', border: '1px solid rgba(161,98,7,0.3)', color: '#a16207', fontSize: 10, padding: '1px 8px', borderRadius: 4, cursor: 'pointer' }}>{expanded ? '▾ 접기' : `▸ 전체 ${all.length}건`}</button>}
+                      </div>
+                      <div style={{ marginBottom: 10, maxHeight: expanded ? 400 : 'none', overflowY: expanded ? 'auto' : 'visible' }}>
+                        {list.map((s: any, i: number) => (
+                          <div key={i} style={{ fontSize: 11, padding: '3px 6px', borderBottom: '1px dashed rgba(0,0,0,0.05)' }}>
+                            <span style={{ fontWeight: 600 }}>{s.client_name}</span> — 후보 {s.candidates?.length || 0}건 ({s.candidates?.map((c: any) => c.type).join(', ')})
+                          </div>
+                        ))}
+                      </div>
+                    </>)
+                  })()}
+                  {/* 매칭 실패 */}
+                  {investorJiipResult.failed_samples?.length > 0 && (() => {
+                    const all = investorJiipResult.failed_samples
+                    const expanded = investorJiipExpand.failed
+                    const list = expanded ? all : all.slice(0, 6)
+                    return (<>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                        <span style={{ fontSize: 11, fontWeight: 600, color: '#b91c1c' }}>❌ 매칭 실패 ({all.length}건)</span>
+                        {all.length > 6 && <button onClick={() => setInvestorJiipExpand(s => ({ ...s, failed: !s.failed }))} style={{ background: 'transparent', border: '1px solid rgba(185,28,28,0.3)', color: '#b91c1c', fontSize: 10, padding: '1px 8px', borderRadius: 4, cursor: 'pointer' }}>{expanded ? '▾ 접기' : `▸ 전체 ${all.length}건`}</button>}
+                      </div>
+                      <div style={{ maxHeight: expanded ? 400 : 'none', overflowY: expanded ? 'auto' : 'visible' }}>
+                        {list.map((f: any, i: number) => (
+                          <div key={i} style={{ fontSize: 11, padding: '3px 6px', borderBottom: '1px dashed rgba(0,0,0,0.05)' }}>
+                            <span style={{ fontWeight: 600 }}>{f.client_name || '-'}</span>
+                            <span style={{ color: COLORS.textMuted }}> — {f.reason}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </>)
                   })()}
                 </div>
               )}
