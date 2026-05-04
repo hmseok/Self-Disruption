@@ -20,6 +20,8 @@ COPY . .
 ENV NEXT_TELEMETRY_DISABLED 1
 
 ENV NEXT_PUBLIC_BASE_URL=https://hmseok.com
+ENV NEXT_PUBLIC_KAKAO_MAP_KEY='135d9cd3a7f586bb1aaa95384ef41434'
+ENV KAKAO_REST_API_KEY='d7cbfaa843b0f20c627d9bbd558ff7a0'
 
 # Prisma 클라이언트 생성 (빌드 전 필수)
 RUN npx prisma generate
