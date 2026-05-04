@@ -342,13 +342,35 @@ export async function POST(request: NextRequest) {
 
       // ── 5) 매칭 적용 ──
       // vehicle_id 가 비어있으면 vehicle_car_number 로 cars (FmiVehicle) 자동 lookup
+      // 1) 정확 일치 → 2) 공백 제거 후 LIKE → 3) last4 매칭 (점진 fallback)
       let vehicleId: string | null = pick.vehicle_id ? String(pick.vehicle_id).trim() : null
       if (!vehicleId && pick.vehicle_car_number) {
+        const rawCarNum = String(pick.vehicle_car_number).trim()
+        const normalized = rawCarNum.replace(/\s+/g, '') // 공백 제거
+        const last4 = rawCarNum.match(/\d{3,4}$/)?.[0] || ''
         try {
-          const car = await prisma.fmiVehicle.findUnique({
-            where: { car_number: String(pick.vehicle_car_number).trim() },
+          // 1) 정확 일치
+          let car = await prisma.fmiVehicle.findUnique({
+            where: { car_number: rawCarNum },
             select: { id: true },
           })
+          // 2) 공백 제거 후 LIKE
+          if (!car && normalized !== rawCarNum) {
+            const fuzzy = await prisma.$queryRawUnsafe<Array<any>>(
+              `SELECT id FROM cars WHERE REPLACE(car_number, ' ', '') = ? LIMIT 1`, // sql-lint-allow: car_number — FmiVehicle.car_number @@map("cars")
+              normalized,
+            )
+            if (fuzzy[0]?.id) car = { id: String(fuzzy[0].id) }
+          }
+          // 3) last4 매칭 — 차량번호 뒷 4자리 일치 (단, 같은 last4 의 차량이 1대일 때만)
+          if (!car && last4) {
+            const last4Cars = await prisma.fmiVehicle.findMany({
+              where: { car_number: { endsWith: last4 } },
+              select: { id: true },
+              take: 2,
+            })
+            if (last4Cars.length === 1) car = { id: String(last4Cars[0].id) }
+          }
           if (car?.id) vehicleId = String(car.id)
         } catch {}
       }
@@ -383,20 +405,48 @@ export async function POST(request: NextRequest) {
       if (dryRun) continue
 
       try {
-        // (a) transactions.related_type='fmi_rental'
+        // (a) 1차 매칭 — transactions.related_type='fmi_rental' (사고 대차건)
         await prisma.$executeRaw`
           UPDATE transactions
              SET related_type = 'fmi_rental', related_id = ${pick.id}, updated_at = NOW()
            WHERE id = ${tx.id}
         `
-        // (b) transaction_assignments INSERT — 차량 매칭 추가 (다중)
-        // UNIQUE (transaction_id, assignment_type, assignment_id) 위반 방지: ON DUPLICATE 무시
+        // (b) 2차 매칭 — transaction_assignments INSERT 차량 (FMI 보유 차량)
         await prisma.$executeRaw`
           INSERT IGNORE INTO transaction_assignments
             (id, transaction_id, assignment_type, assignment_id, ratio, source, created_at, updated_at)
           VALUES
             (${randomUUID()}, ${tx.id}, 'car', ${pick.vehicle_id}, 100.00, 'auto', NOW(), NOW())
         `
+        // (c) 3차 매칭 — 그 차량의 지입/투자 계약 자동 추가 (있는 경우)
+        try {
+          const jiip = await prisma.jiipContract.findFirst({
+            where: { car_id: String(pick.vehicle_id), status: 'active' },
+            select: { id: true },
+          })
+          if (jiip?.id) {
+            await prisma.$executeRaw`
+              INSERT IGNORE INTO transaction_assignments
+                (id, transaction_id, assignment_type, assignment_id, ratio, source, created_at, updated_at)
+              VALUES
+                (${randomUUID()}, ${tx.id}, 'jiip', ${jiip.id}, 100.00, 'auto', NOW(), NOW())
+            `
+          }
+        } catch {}
+        try {
+          const invest = await prisma.generalInvestment.findFirst({
+            where: { car_id: String(pick.vehicle_id), status: 'active' },
+            select: { id: true },
+          })
+          if (invest?.id) {
+            await prisma.$executeRaw`
+              INSERT IGNORE INTO transaction_assignments
+                (id, transaction_id, assignment_type, assignment_id, ratio, source, created_at, updated_at)
+              VALUES
+                (${randomUUID()}, ${tx.id}, 'invest', ${invest.id}, 100.00, 'auto', NOW(), NOW())
+            `
+          }
+        } catch {}
         result.applied++
       } catch (e: any) {
         console.error('[auto-match-fmi-rental] apply failed:', tx.id, e.message)
