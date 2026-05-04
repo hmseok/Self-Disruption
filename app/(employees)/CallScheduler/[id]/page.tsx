@@ -318,51 +318,8 @@ function DetailInner({ id }: { id: string }) {
                   active={drawerOpen}
                   onClick={() => { setMoreOpen(false); setDrawerOpen(o => !o) }}
                 />
-                <div style={{ height: 1, background: COLORS.borderFaint, margin: '6px 0 4px' }} />
-                <div style={{
-                  padding: '4px 10px', fontSize: 9, fontWeight: 800, color: COLORS.textMuted,
-                  textTransform: 'uppercase', letterSpacing: 0.5,
-                }}>
-                  공통 셋팅 (월과 무관 — 한 번만)
-                </div>
-                <MenuItem
-                  icon="⏰"
-                  label="시간 (시프트)"
-                  sub="13개 시프트 라인 정의"
-                  href="/CallScheduler/settings?tab=shifts"
-                />
-                <MenuItem
-                  icon="🧑‍🤝‍🧑"
-                  label="그룹"
-                  sub="시프트 + 멤버 + 패턴/전략"
-                  href="/CallScheduler/settings?tab=groups"
-                />
-                <MenuItem
-                  icon="👥"
-                  label="직원 (콜센터)"
-                  sub="활성/비활성 + 컬러 토큰"
-                  href="/CallScheduler/settings?tab=workers"
-                />
-                <MenuItem
-                  icon="📋"
-                  label="직원 마스터"
-                  sub="전체 직원 + 영구 토큰 발급"
-                  href="/RideEmployees"
-                />
-                <MenuItem
-                  icon="🏖"
-                  label="공휴일 (참고)"
-                  sub="2026 공휴일 + 자동 마커"
-                  href="/CallScheduler/settings?tab=holidays"
-                />
-                <MenuItem
-                  icon="🙋"
-                  label="직원 휴가 마스터"
-                  sub="발급량 / 신청 / 일괄 업로드"
-                  href="/CallScheduler/settings?tab=leaves"
-                />
                 <div style={{ height: 1, background: COLORS.borderFaint, margin: '4px 0' }} />
-                {/* 삭제 */}
+                {/* 삭제 — 본 월 한정 위험 작업 */}
                 <MenuItem
                   icon="🗑"
                   label="삭제"
