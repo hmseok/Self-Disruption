@@ -56,6 +56,7 @@ import {
   getDisplayName,
   getMenusByGroup,
 } from '@/lib/menu-registry'
+import { getOrgBrandConfig } from '@/lib/org-brand'
 
 // menu-registry 의 MenuEntry → ClientLayout 호환 형식 (legacy MenuItem 의 { name, path, iconKey })
 // requirePermission 정보를 함께 보존 — 사이드바 권한 필터 시 사용
@@ -119,7 +120,9 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
 function ClientLayoutInner({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
-  const { user, role, position, permissions, loading, menuRefreshKey } = useApp()
+  const { user, role, position, department, permissions, loading, menuRefreshKey } = useApp()
+  // 조직 브랜드 — 부서명 따라 헤더 동적 변경 (예: 'CX팀' → RIDE CARE / 라이드주식회사)
+  const orgBrand = getOrgBrandConfig(department?.name)
   const { hasPageAccess } = usePermission()
 
   const [dynamicMenus, setDynamicMenus] = useState<any[]>([])
@@ -286,10 +289,10 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
             </button>
 
             {/* 로고 */}
-            <span className="text-sm font-bold tracking-tight flex-shrink-0" style={{ color: '#3b6eb5' }}>FMI ERP</span>
+            <span className="text-sm font-bold tracking-tight flex-shrink-0" style={{ color: '#3b6eb5' }}>{orgBrand.primaryLabel}</span>
 
-            {/* FMI 단일회사 표시 */}
-            <span className="ml-auto text-xs font-medium truncate" style={{ color: '#64748b' }}>주식회사 에프엠아이</span>
+            {/* 회사 표시 (부서별 동적) */}
+            <span className="ml-auto text-xs font-medium truncate" style={{ color: '#64748b' }}>{orgBrand.companyLabel}</span>
           </div>
         </div>
       )}
@@ -307,7 +310,7 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
           {/* 로고 */}
           <div className="px-5 py-4 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
             <span className="tracking-tight cursor-pointer" onClick={() => router.push('/dashboard')} style={{ fontSize: 18, fontWeight: 900, background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-              FMI ERP
+              {orgBrand.primaryLabel}
             </span>
             <button onClick={() => setIsSidebarOpen(false)} className="text-slate-400 hover:text-slate-700" title="사이드바 닫기">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
@@ -319,8 +322,8 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
             <div className="rounded-lg px-3 py-3" style={{ background: 'rgba(0,0,0,0.02)', border: '1px solid rgba(0,0,0,0.06)', boxShadow: 'inset 2px 2px 6px rgba(140,170,210,0.08), inset -2px -2px 6px rgba(255,255,255,0.25)' }}>
               {/* 회사명 + 플랜 뱃지 */}
               <div className="flex items-center justify-between gap-2">
-                <div className="font-bold text-sm truncate" style={{ color: '#0f2440' }}>주식회사 에프엠아이</div>
-                <span className="text-[9px] font-black px-1.5 py-0.5 rounded text-white flex-shrink-0" style={{ background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)' }}>FMI</span>
+                <div className="font-bold text-sm truncate" style={{ color: '#0f2440' }}>{orgBrand.companyLabel}</div>
+                <span className="text-[9px] font-black px-1.5 py-0.5 rounded text-white flex-shrink-0" style={{ background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)' }}>{orgBrand.brand}</span>
               </div>
               {/* 역할 + 직급 */}
               <div className="mt-2 flex gap-1 flex-wrap">
