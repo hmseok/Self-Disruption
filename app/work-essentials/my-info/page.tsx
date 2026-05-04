@@ -24,9 +24,13 @@ const CARD_COMPANIES = [
   'NH농협카드', 'BC카드', '하나카드', '우리카드', '기업은행', '기타',
 ]
 
+import { getOrgBrandConfig } from '@/lib/org-brand'
+
 export default function MyInfoPage() {
-  const { user, company, role } = useApp()
+  const { user, company, role, department } = useApp()
   const effectiveCompanyId = company?.id
+  // 부서별 회사명 동적 — 라이드 부서 또는 라이드 이메일 도메인 직원이면 「라이드주식회사」 표시
+  const orgBrand = getOrgBrandConfig(department?.name, user?.email)
 
   // 프로필
   const [name, setName] = useState('')
@@ -222,11 +226,11 @@ export default function MyInfoPage() {
             />
           </div>
 
-          {/* 회사 (읽기전용) */}
+          {/* 회사 (읽기전용) — 부서별 동적 표기 */}
           <div>
             <label style={{ fontSize: 12, fontWeight: 700, color: '#475569', marginBottom: 6, display: 'block' }}>소속 회사</label>
             <input
-              value={company?.name || '미배정'}
+              value={orgBrand.companyLabel || company?.name || '미배정'}
               disabled
               style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '1px solid #e2e8f0', fontSize: 14, background: '#f8fafc', color: '#94a3b8', boxSizing: 'border-box' }}
             />

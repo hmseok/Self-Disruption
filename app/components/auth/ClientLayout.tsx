@@ -124,8 +124,9 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
   const { user, role, position, department, permissions, loading, menuRefreshKey } = useApp()
-  // 조직 브랜드 — 부서명 따라 헤더 동적 변경 (예: 'CX팀' → RIDE CARE / 라이드주식회사)
-  const orgBrand = getOrgBrandConfig(department?.name)
+  // 조직 브랜드 — 부서명 + 이메일 도메인 따라 헤더 동적 변경
+  // (예: 'CX팀' 또는 @rideoffice.kr → RIDE CARE / 라이드주식회사)
+  const orgBrand = getOrgBrandConfig(department?.name, user?.email)
   const { hasPageAccess } = usePermission()
 
   const [dynamicMenus, setDynamicMenus] = useState<any[]>([])

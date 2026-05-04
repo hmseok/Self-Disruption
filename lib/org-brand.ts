@@ -47,9 +47,16 @@ export const RIDE_DEPARTMENTS_KEYWORDS: string[] = [
   'CX팀',           // 라이드 소속 콜센터/CX
 ]
 
+// 라이드 소속 이메일 도메인 사전
+// 부서 정보 없어도 이메일 도메인으로 라이드 직원 식별 가능
+export const RIDE_EMAIL_DOMAINS: string[] = [
+  'rideoffice.kr',
+  'rideoffice.com',
+  'ride.co.kr',
+]
+
 /**
  * 부서명이 라이드 소속인지 판별 (부분 일치).
- * 예: 'CX팀' → true / '라이드 영업팀' → true / '재무팀' → false
  */
 export function isRideDepartment(deptName?: string | null): boolean {
   if (!deptName) return false
@@ -59,16 +66,27 @@ export function isRideDepartment(deptName?: string | null): boolean {
 }
 
 /**
- * 부서명 → org_brand 결정.
- * department 정보 없으면 기본 'FMI'.
+ * 이메일이 라이드 도메인인지 판별.
  */
-export function detectOrgBrand(deptName?: string | null): OrgBrand {
-  return isRideDepartment(deptName) ? 'RIDE' : 'FMI'
+export function isRideEmail(email?: string | null): boolean {
+  if (!email) return false
+  const lc = String(email).toLowerCase().trim()
+  return RIDE_EMAIL_DOMAINS.some(d => lc.endsWith('@' + d) || lc.endsWith('.' + d))
 }
 
 /**
- * 부서명 → 헤더 설정 (편의 함수).
+ * org_brand 결정 — 부서명 OR 이메일 도메인 매칭.
+ * 둘 중 하나라도 라이드 소속이면 RIDE.
  */
-export function getOrgBrandConfig(deptName?: string | null): OrgBrandConfig {
-  return ORG_BRAND_CONFIGS[detectOrgBrand(deptName)]
+export function detectOrgBrand(deptName?: string | null, email?: string | null): OrgBrand {
+  if (isRideDepartment(deptName)) return 'RIDE'
+  if (isRideEmail(email)) return 'RIDE'
+  return 'FMI'
+}
+
+/**
+ * 헤더 설정 (편의 함수) — 부서명 + 이메일 모두 고려.
+ */
+export function getOrgBrandConfig(deptName?: string | null, email?: string | null): OrgBrandConfig {
+  return ORG_BRAND_CONFIGS[detectOrgBrand(deptName, email)]
 }
