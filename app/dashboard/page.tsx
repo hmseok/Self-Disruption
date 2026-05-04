@@ -17,6 +17,7 @@ async function getAuthHeader(): Promise<Record<string, string>> {
   }
 }
 import { useApp } from '../context/AppContext'
+import { getOrgBrandConfig } from '@/lib/org-brand'
 import { usePermission } from '../hooks/usePermission'
 
 // ============================================
@@ -50,7 +51,9 @@ type OpsStats = {
 
 export default function DashboardPage() {
   const router = useRouter()
-  const { user, role, position, loading: appLoading } = useApp()
+  const { user, role, position, department, loading: appLoading } = useApp()
+  // 부서/이메일 따라 회사명 + 배지 동적 (라이드 직원이면 「라이드주식회사」 / 「RIDE」)
+  const orgBrand = getOrgBrandConfig(department?.name, user?.email)
   const { hasPageAccess } = usePermission()
   const [stats, setStats] = useState<DashboardStats>({
     totalCars: 0, availableCars: 0, rentedCars: 0, maintenanceCars: 0,
@@ -189,11 +192,11 @@ export default function DashboardPage() {
             {currentTime.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })}
           </p>
           <h1 className="text-2xl md:text-3xl font-black text-slate-800 tracking-tight mt-1">
-            {getGreeting()}, <span className="text-blue-600">주식회사 에프엠아이</span>
+            {getGreeting()}, <span className="text-blue-600">{orgBrand.companyLabel}</span>
           </h1>
         </div>
         <div className="flex gap-2 items-center">
-          <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-blue-500/10 text-blue-600">FMI</span>
+          <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-blue-500/10 text-blue-600">{orgBrand.brand}</span>
           {position && (
             <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-600">{position.name}</span>
           )}
