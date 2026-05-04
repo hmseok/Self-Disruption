@@ -91,10 +91,9 @@ export const MENUS: MenuEntry[] = [
   { id: 'mod-payroll', name: '급여 관리', displayName: '💼 급여 관리', path: '/admin/payroll', iconKey: 'Money', group: 'admin', sortOrder: 40 },
 
   // ── 직장인필수 (work-essentials) ──
-  // 「내 정보」 / 「영수증 제출」 은 본인 정보 — 권한 부여 대상 X (모든 사용자)
-  // 「회의록」 은 권한 부여 대상 — 일부 사용자만 보이도록 가능
-  { id: 'mod-my-info',         name: '내 정보',     path: '/work-essentials/my-info',  iconKey: 'Users',     group: 'work-essentials', sortOrder: 50, requirePermission: false },
-  { id: 'mod-receipts',        name: '영수증제출',   path: '/work-essentials/receipts', iconKey: 'Clipboard', group: 'work-essentials', sortOrder: 51, requirePermission: false },
+  // 모두 권한 부여 대상 — 권한 페이지에서 ON/OFF 토글 (사용자 요청: 「실제 적용 페이지만 표출」)
+  { id: 'mod-my-info',         name: '내 정보',     path: '/work-essentials/my-info',  iconKey: 'Users',     group: 'work-essentials', sortOrder: 50, requirePermission: true },
+  { id: 'mod-receipts',        name: '영수증제출',   path: '/work-essentials/receipts', iconKey: 'Clipboard', group: 'work-essentials', sortOrder: 51, requirePermission: true },
   { id: 'mod-meetings',        name: '회의록', displayName: '📋 회의록', path: '/meetings', iconKey: 'Doc', group: 'work-essentials', sortOrder: 52, requirePermission: true },
 
   // ── CX팀 (cx-team) ── Employee of Ride Inc. > CX팀 — 권한 부여 대상 (CX팀원만)
