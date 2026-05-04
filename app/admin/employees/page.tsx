@@ -592,9 +592,9 @@ export default function OrgManagementPage() {
     { key: 'permissions', label: '페이지 권한', count: assignableEmployees.length },
   ]
 
-  // menu-registry 의 비즈니스 그룹 순서 (자산/운영/재무/영업/관리)
+  // menu-registry 의 모든 그룹 순서 (비즈니스 5 + 직장인필수 + CX팀 + 설정)
+  // requirePermission=true 인 메뉴가 있는 그룹은 모두 권한 페이지에 표시
   const GROUP_ORDER = REGISTRY_GROUPS
-    .filter(g => g.section === 'business')
     .sort((a, b) => a.sortOrder - b.sortOrder)
     .map(g => g.label)
     .concat(['기타'])
