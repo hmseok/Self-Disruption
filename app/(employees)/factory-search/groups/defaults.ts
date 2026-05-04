@@ -3,6 +3,12 @@
 // 데이터 소스 / 편집 가능 범위 / 매핑 규칙을 한 곳에 모음
 // ───────────────────────────────────────────────────────────────
 
+// ── 메인/부가 영역 분리 (그룹 구성·매핑 페이지에서 공통 사용) ─────
+// 메인 (공장 그룹화 핵심): 즐겨찾기 그룹 / 보험 입고 / 공장 유형 / 특수 태그 / 차량 분류
+export const PRIMARY_AXIS_KEYS = new Set(['group', 'insurance', 'facttype', 'tag', 'vehicle'])
+// 부가 (운영·사고 분류): 정산 / 고객사 / 관리유형 / 사고유형 / 처리상태 / 손해 / 견인 / 서비스
+export const SECONDARY_AXIS_KEYS = new Set(['settlement', 'capital', 'manageType', 'accidentType', 'claimStatus', 'damage', 'towing', 'servicePlan'])
+
 export type EditableLevel = 'all' | 'label-only' | 'readonly'
 
 export type CodeItem = {

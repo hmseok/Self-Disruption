@@ -7,7 +7,7 @@ import {
 } from '../_components/ui'
 import merged from '../_data/factories-merged.json'
 import SubNav from '../_components/SubNav'
-import { DEFAULT_AXES, type CodeAxis, type CodeItem } from './defaults'
+import { DEFAULT_AXES, PRIMARY_AXIS_KEYS, SECONDARY_AXIS_KEYS, type CodeAxis, type CodeItem } from './defaults'
 
 // ───────────────────────────────────────────────────────────────
 // 그룹 구성 — 13축 + 사용자 정의 축
@@ -18,11 +18,6 @@ import { DEFAULT_AXES, type CodeAxis, type CodeItem } from './defaults'
 // ───────────────────────────────────────────────────────────────
 
 const STORAGE_KEY = 'ride_op_classifications_v2'
-
-// 메인 영역에 노출할 기본 axis key 들 (공장 그룹화 핵심)
-const PRIMARY_AXIS_KEYS = new Set(['group', 'insurance', 'facttype', 'tag', 'vehicle'])
-// 부가 영역(접기)에 노출할 기본 axis key 들 (운영·사고)
-const SECONDARY_AXIS_KEYS = new Set(['settlement', 'capital', 'manageType', 'accidentType', 'claimStatus', 'damage', 'towing', 'servicePlan'])
 
 function loadAxes(): CodeAxis[] {
   if (typeof window === 'undefined') return DEFAULT_AXES

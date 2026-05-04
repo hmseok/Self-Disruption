@@ -6,7 +6,7 @@ import {
   Button, KpiCard, KpiRow, PageHeader, ScreenWrap, Section, Spinner, TextInput,
 } from '../_components/ui'
 import SubNav from '../_components/SubNav'
-import { DEFAULT_AXES, type CodeAxis } from '../groups/defaults'
+import { DEFAULT_AXES, PRIMARY_AXIS_KEYS, SECONDARY_AXIS_KEYS, type CodeAxis } from '../groups/defaults'
 
 // ───────────────────────────────────────────────────────────────
 // 공장 ↔ 분류 매핑 — 매니저 부여 UI
@@ -136,8 +136,13 @@ export default function MappingMain() {
     })
   }
 
-  // 표시할 axis — 숨김 처리되지 않은 것만
+  // 표시할 axis — 숨김 처리되지 않은 것만, 메인/부가 영역 분리 (그룹 구성과 동일 패턴)
   const visibleAxes = axes.filter(a => !a.axisHidden)
+  const primaryAxes = visibleAxes.filter(a =>
+    PRIMARY_AXIS_KEYS.has(a.key) || (a.axisCustom === true) || (!PRIMARY_AXIS_KEYS.has(a.key) && !SECONDARY_AXIS_KEYS.has(a.key) && !a.axisCustom),
+  )
+  const secondaryAxes = visibleAxes.filter(a => SECONDARY_AXIS_KEYS.has(a.key))
+  const [showSecondaryMapping, setShowSecondaryMapping] = useState(false)
 
   // 공장의 부여 카운트
   const factoryCount = (factcode: string): number => {
@@ -249,45 +254,34 @@ export default function MappingMain() {
                 )}
               </div>
 
-              {/* axis 별 부여 — 각 축의 항목을 칩 multi-select */}
-              {visibleAxes.map(axis => {
-                const assigned = mapping[selected.factcode]?.[axis.key] || []
-                return (
-                  <Section key={axis.key} title={`${axis.emoji} ${axis.title} ${assigned.length > 0 ? `(${assigned.length})` : ''}`} color={COLORS.borderBlue}>
-                    {axis.items.length === 0 ? (
-                      <div style={{ fontSize: 12, color: COLORS.textMuted, padding: '6px 0' }}>
-                        이 축에 항목이 없습니다. <a href="/factory-search/groups" style={{ color: COLORS.primary }}>그룹 구성</a>에서 항목을 먼저 추가하세요.
-                      </div>
-                    ) : (
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                        {axis.items.filter(i => !i.hidden).map(item => {
-                          const on = assigned.includes(item.key)
-                          return (
-                            <button
-                              key={item.key}
-                              onClick={() => toggleItem(selected.factcode, axis.key, item.key)}
-                              style={{
-                                display: 'inline-flex', alignItems: 'center', gap: 4,
-                                padding: '5px 12px', borderRadius: 999,
-                                fontSize: 12, fontWeight: 700,
-                                cursor: 'pointer', transition: 'all 0.1s',
-                                border: `1px solid ${on ? item.color : COLORS.borderFaint}`,
-                                background: on ? item.color : '#fff',
-                                color: on ? '#fff' : COLORS.textSecondary,
-                              }}
-                              title={item.description}
-                            >
-                              <span>{item.emoji}</span>
-                              <span>{item.label}</span>
-                              {on && <span style={{ marginLeft: 2 }}>✓</span>}
-                            </button>
-                          )
-                        })}
-                      </div>
-                    )}
-                  </Section>
-                )
-              })}
+              {/* 공장 분류 (메인 5축) */}
+              <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSecondary, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                공장 분류 ({primaryAxes.length})
+              </div>
+              {primaryAxes.map(axis => renderAxisSection(axis, selected.factcode, mapping, toggleItem))}
+
+              {/* 운영·사고 분류 (8축, 접기) */}
+              {secondaryAxes.length > 0 && (
+                <div style={{ borderLeft: `2px solid ${COLORS.borderFaint}`, paddingLeft: 12 }}>
+                  <button
+                    onClick={() => setShowSecondaryMapping(s => !s)}
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 6,
+                      fontSize: 11, fontWeight: 700, color: COLORS.textSecondary,
+                      letterSpacing: '0.04em', textTransform: 'uppercase',
+                      background: 'transparent', border: 0, cursor: 'pointer', padding: 0,
+                    }}
+                  >
+                    <span>{showSecondaryMapping ? '▾' : '▸'}</span>
+                    <span>운영·사고 분류 ({secondaryAxes.length})</span>
+                  </button>
+                  {showSecondaryMapping && (
+                    <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {secondaryAxes.map(axis => renderAxisSection(axis, selected.factcode, mapping, toggleItem))}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* 안내 */}
               <div style={{ ...GLASS.L2, borderRadius: 12, padding: 12, fontSize: 11, color: COLORS.textMuted, lineHeight: 1.6 }}>
@@ -305,6 +299,55 @@ export default function MappingMain() {
         }
       `}</style>
     </ScreenWrap>
+  )
+}
+
+// ── axis 한 영역 렌더 (메인·부가 공통) ──────────────────────────
+function renderAxisSection(
+  axis: CodeAxis,
+  factcode: string,
+  mapping: FactoryMapping,
+  toggleItem: (factcode: string, axisKey: string, itemKey: string) => void,
+) {
+  const assigned = mapping[factcode]?.[axis.key] || []
+  return (
+    <Section
+      key={axis.key}
+      title={`${axis.emoji} ${axis.title} ${assigned.length > 0 ? `(${assigned.length})` : ''}`}
+      color={COLORS.borderBlue}
+    >
+      {axis.items.length === 0 ? (
+        <div style={{ fontSize: 12, color: COLORS.textMuted, padding: '6px 0' }}>
+          이 축에 항목이 없습니다. <a href="/factory-search/groups" style={{ color: COLORS.primary }}>그룹 구성</a>에서 항목을 먼저 추가하세요.
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {axis.items.filter(i => !i.hidden).map(item => {
+            const on = assigned.includes(item.key)
+            return (
+              <button
+                key={item.key}
+                onClick={() => toggleItem(factcode, axis.key, item.key)}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 4,
+                  padding: '5px 12px', borderRadius: 999,
+                  fontSize: 12, fontWeight: 700,
+                  cursor: 'pointer', transition: 'all 0.1s',
+                  border: `1px solid ${on ? item.color : COLORS.borderFaint}`,
+                  background: on ? item.color : '#fff',
+                  color: on ? '#fff' : COLORS.textSecondary,
+                }}
+                title={item.description}
+              >
+                <span>{item.emoji}</span>
+                <span>{item.label}</span>
+                {on && <span style={{ marginLeft: 2 }}>✓</span>}
+              </button>
+            )
+          })}
+        </div>
+      )}
+    </Section>
   )
 }
 
