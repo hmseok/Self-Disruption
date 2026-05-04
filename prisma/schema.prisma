@@ -1246,3 +1246,199 @@ model UserPagePermission {
   @@index([user_id])
   @@map("user_page_permissions")
 }
+
+// ============================================================
+// Ride Inc. 직원 마스터 (2026-05-03)
+// migrations/2026-05-03_ride_employees_init.sql
+// 그룹: Employee of Ride Inc. — CallScheduler 외 향후 직원 페이지 공통
+// ============================================================
+model RideEmployee {
+  id              String    @id @default(uuid()) @db.Char(36)
+  name            String    @db.VarChar(64)
+  profile_id      String?   @db.Char(36) // profiles.id 옵션 FK
+
+  department      String?   @db.VarChar(32)  // 부서 (콜센터, 운영, 정비)
+  position        String?   @db.VarChar(32)  // 직급/직책
+  employment_type String?   @db.VarChar(16)  // 정규|계약|파트|용역
+  hire_date       DateTime? @db.Date
+  resign_date     DateTime? @db.Date
+
+  phone           String?   @db.VarChar(32)
+  email           String?   @db.VarChar(128)
+
+  color_tone      String    @default("none") @db.VarChar(16) // CallScheduler 호환
+  group_label     String?   @db.VarChar(32)                  // 주간|야간|저녁|관리|기타
+
+  memo            String?   @db.VarChar(500)
+
+  // 직원 영구 토큰 (PR-2B 2026-05-03)
+  public_token            String?   @unique @db.Char(32) // crypto.randomBytes(16).toString('hex')
+  public_token_issued_at  DateTime?
+
+  is_active       Boolean   @default(true)
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @default(now()) @updatedAt
+
+  cs_workers      CsWorker[]  // CallScheduler 콜센터 워커 1:N
+
+  @@index([is_active, department], map: "idx_ride_emp_active")
+  @@index([profile_id], map: "idx_ride_emp_profile")
+  @@index([name], map: "idx_ride_emp_name")
+  @@map("ride_employees")
+}
+
+// ============================================================
+// CallScheduler — 근무시간표 분석 & 체크 배포 (2026-05-03)
+// migrations/2026-05-03_call_scheduler_init.sql
+// 모듈 격리: 모든 테이블 prefix `cs_`
+// 상세 설계: app/CallScheduler/_docs/DATA-MODEL.md
+// ============================================================
+
+model CsShiftSlot {
+  id            String    @id @default(uuid()) @db.Char(36)
+  code          String    @unique @db.VarChar(16) // "L01"..."L13"
+  label         String    @db.VarChar(64)         // "07:30~16:30"
+  start_time    DateTime  @db.Time(0)
+  end_time      DateTime  @db.Time(0)
+  is_overnight  Boolean   @default(false)         // 1=익일 종료
+  category      String    @default("day") @db.VarChar(16) // day|evening|overnight
+  sort_order    Int       @default(0)
+  is_active     Boolean   @default(true)
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @default(now()) @updatedAt
+
+  assignments   CsAssignment[]
+  groups        CsShiftGroup[]
+
+  @@index([sort_order, is_active], map: "idx_cs_slot_sort")
+  @@map("cs_shift_slots")
+}
+
+model CsWorker {
+  id            String    @id @default(uuid()) @db.Char(36)
+  name          String    @db.VarChar(32)         // ⚠ deprecated 예정 — ride_employees.name 사용 권장
+  profile_id    String?   @db.Char(36)            // profiles.id 옵션 FK
+  employee_id   String?   @db.Char(36)            // ride_employees.id FK (2026-05-03 신설)
+  color_tone    String    @default("none") @db.VarChar(16) // blue|gray|green|amber|violet|red|none
+  group_label   String?   @db.VarChar(16)                  // 주간|야간|저녁
+  phone         String?   @db.VarChar(32)         // ⚠ deprecated 예정
+  email         String?   @db.VarChar(128)        // ⚠ deprecated 예정
+  is_active     Boolean   @default(true)
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @default(now()) @updatedAt
+
+  assignments   CsAssignment[]
+  group_memberships CsGroupMember[]
+  employee      RideEmployee? @relation(fields: [employee_id], references: [id], onDelete: SetNull)
+
+  @@index([is_active, group_label], map: "idx_cs_worker_active")
+  @@index([profile_id], map: "idx_cs_worker_profile")
+  @@index([employee_id], map: "idx_cs_worker_employee")
+  @@map("cs_workers")
+}
+
+model CsSchedule {
+  id             String    @id @default(uuid()) @db.Char(36)
+  year           Int       @db.SmallInt
+  month          Int       @db.TinyInt
+  title          String?   @db.VarChar(128)
+  status         String    @default("draft") @db.VarChar(16)  // draft|published|archived
+  source         String    @default("manual") @db.VarChar(16) // manual|excel
+  published_at   DateTime?
+  published_by   String?   @db.Char(36)
+  note           String?   @db.Text
+  created_at     DateTime  @default(now())
+  updated_at     DateTime  @default(now()) @updatedAt
+
+  assignments    CsAssignment[]
+  distributions  CsDistribution[]
+
+  @@unique([year, month], map: "uq_cs_sched_ym")
+  @@index([status, year, month], map: "idx_cs_sched_status")
+  @@map("cs_schedules")
+}
+
+model CsAssignment {
+  id              String       @id @default(uuid()) @db.Char(36)
+  schedule_id     String       @db.Char(36)
+  work_date       DateTime     @db.Date
+  shift_slot_id   String       @db.Char(36)
+  worker_id       String?      @db.Char(36) // NULL=공석/F-only
+  special_code    String       @default("none") @db.VarChar(16)
+  // none|am_free|pm_free|am_half|pm_half|off
+  computed_hours  Decimal      @default(0) @db.Decimal(4, 2)
+  note            String?      @db.VarChar(255)
+  created_at      DateTime     @default(now())
+  updated_at      DateTime     @default(now()) @updatedAt
+
+  schedule        CsSchedule   @relation(fields: [schedule_id], references: [id], onDelete: Cascade)
+  shift_slot      CsShiftSlot  @relation(fields: [shift_slot_id], references: [id])
+  worker          CsWorker?    @relation(fields: [worker_id], references: [id], onDelete: SetNull)
+
+  @@unique([schedule_id, work_date, shift_slot_id], map: "uq_cs_asn_cell")
+  @@index([work_date], map: "idx_cs_asn_date")
+  @@index([worker_id, work_date], map: "idx_cs_asn_worker")
+  @@index([shift_slot_id], map: "idx_cs_asn_slot")
+  @@map("cs_assignments")
+}
+
+// ── 그룹 마스터 (PR-2I 2026-05-03) ─────────────────────────────────
+model CsShiftGroup {
+  id                    String        @id @default(uuid()) @db.Char(36)
+  name                  String        @db.VarChar(64)
+  shift_slot_id         String        @db.Char(36)
+  pattern_type          String        @default("all_weekdays") @db.VarChar(16)
+  // all_days|all_weekdays|weekends_only|custom
+  custom_days           String?       @db.VarChar(32) // "0,1,2,3,4,5,6"
+  generation_strategy   String        @default("all_members") @db.VarChar(16)
+  // all_members|rotation
+  rotation_size         Int?          @db.TinyInt
+  rotation_period_days  Int           @default(1) @db.TinyInt
+  color_tone            String        @default("none") @db.VarChar(16)
+  description           String?       @db.VarChar(255)
+  sort_order            Int           @default(0)
+  is_active             Boolean       @default(true)
+  created_at            DateTime      @default(now())
+  updated_at            DateTime      @default(now()) @updatedAt
+
+  shift_slot            CsShiftSlot   @relation(fields: [shift_slot_id], references: [id])
+  members               CsGroupMember[]
+
+  @@index([is_active, sort_order], map: "idx_cs_grp_active")
+  @@index([shift_slot_id], map: "idx_cs_grp_slot")
+  @@map("cs_shift_groups")
+}
+
+model CsGroupMember {
+  id          String       @id @default(uuid()) @db.Char(36)
+  group_id    String       @db.Char(36)
+  worker_id   String       @db.Char(36)
+  priority    Int          @default(0)
+  created_at  DateTime     @default(now())
+
+  group       CsShiftGroup @relation(fields: [group_id], references: [id], onDelete: Cascade)
+  worker      CsWorker     @relation(fields: [worker_id], references: [id], onDelete: Cascade)
+
+  @@unique([group_id, worker_id], map: "uq_cs_grp_member")
+  @@index([group_id, priority], map: "idx_cs_grp_member_group")
+  @@index([worker_id], map: "idx_cs_grp_member_worker")
+  @@map("cs_group_members")
+}
+
+model CsDistribution {
+  id                  String    @id @default(uuid()) @db.Char(36)
+  schedule_id         String    @db.Char(36)
+  channel             String    @default("manual") @db.VarChar(16) // jandi|email|link|manual
+  recipient_count     Int       @default(0)
+  recipients_snapshot Json?
+  status              String    @default("queued") @db.VarChar(16) // queued|sent|partial|failed
+  response_meta       Json?
+  sent_at             DateTime?
+  sent_by             String?   @db.Char(36)
+  created_at          DateTime  @default(now())
+
+  schedule            CsSchedule @relation(fields: [schedule_id], references: [id], onDelete: Cascade)
+
+  @@index([schedule_id, sent_at], map: "idx_cs_dist_sched")
+  @@map("cs_distributions")
+}
