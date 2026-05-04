@@ -45,8 +45,8 @@ export default function FactoryMgmtMain() {
   return (
     <ScreenWrap>
       <PageHeader
-        breadcrumb={['Employee of Ride Inc.', '협력공장 목록']}
-        title="협력공장 목록"
+        breadcrumb={['Employee of Ride Inc.', '협력공장 추천', '공장 목록']}
+        title="공장 목록"
         emoji="🔧"
       />
       <SubNav />

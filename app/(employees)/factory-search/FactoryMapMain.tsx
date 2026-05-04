@@ -358,8 +358,8 @@ export default function FactoryMapMain() {
   return (
     <ScreenWrap>
       <PageHeader
-        breadcrumb={['Employee of Ride Inc.', '협력공장 지도']}
-        title="협력공장 지도"
+        breadcrumb={['Employee of Ride Inc.', '협력공장 추천', '지도']}
+        title="지도"
         emoji="🗺️"
       />
       <SubNav />

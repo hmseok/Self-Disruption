@@ -275,8 +275,8 @@ export default function IntakeMain() {
   return (
     <ScreenWrap>
       <PageHeader
-        breadcrumb={['Employee of Ride Inc.', '사고 접수 추천']}
-        title="사고 접수 → 추천 공장"
+        breadcrumb={['Employee of Ride Inc.', '협력공장 추천']}
+        title="공장 추천"
         emoji="🚨"
       />
       <SubNav />

@@ -10,11 +10,19 @@ import SubNav from '../_components/SubNav'
 import { DEFAULT_AXES, type CodeAxis, type CodeItem } from './defaults'
 
 // ───────────────────────────────────────────────────────────────
-// 분류 셋팅 — 13축 종합 관리 + 축 자체 편집 (추가/메타/순서/숨김/삭제)
+// 그룹 구성 — 13축 + 사용자 정의 축
+//   메인 (공장 분류 5축): 즐겨찾기 그룹 / 보험 입고 / 공장 유형 / 특수 태그 / 차량 분류
+//   부가 (운영·사고 분류 8축, 접기): 정산 / 고객사 / 관리유형 / 사고유형 / 처리상태 / 손해 / 견인 / 서비스
+//   사용자 정의 축: 메인 영역에 함께 표출 (사용자가 직접 만든 것이라 우선 노출)
 // localStorage('ride_op_classifications_v2') 에 저장
 // ───────────────────────────────────────────────────────────────
 
 const STORAGE_KEY = 'ride_op_classifications_v2'
+
+// 메인 영역에 노출할 기본 axis key 들 (공장 그룹화 핵심)
+const PRIMARY_AXIS_KEYS = new Set(['group', 'insurance', 'facttype', 'tag', 'vehicle'])
+// 부가 영역(접기)에 노출할 기본 axis key 들 (운영·사고)
+const SECONDARY_AXIS_KEYS = new Set(['settlement', 'capital', 'manageType', 'accidentType', 'claimStatus', 'damage', 'towing', 'servicePlan'])
 
 function loadAxes(): CodeAxis[] {
   if (typeof window === 'undefined') return DEFAULT_AXES
@@ -87,6 +95,7 @@ export default function GroupsAdminMain() {
   const [savedAt, setSavedAt] = useState<string | null>(null)
   const [activeAxis, setActiveAxis] = useState<string>('group')
   const [showHiddenAxes, setShowHiddenAxes] = useState(false)
+  const [showSecondary, setShowSecondary] = useState(false)
   const counts = useMemo(() => buildCounts(), [])
   const totalFactories = (merged as { factories: unknown[] }).factories.length
 
@@ -186,6 +195,12 @@ export default function GroupsAdminMain() {
   // 표시할 축 목록 (숨김 토글에 따라)
   const visibleAxes = showHiddenAxes ? axes : axes.filter(a => !a.axisHidden)
 
+  // 메인 (공장 분류 5축) + 사용자 정의 축 / 부가 (운영·사고 8축)
+  const primaryAxes = visibleAxes.filter(a =>
+    PRIMARY_AXIS_KEYS.has(a.key) || (a.axisCustom === true) || (!PRIMARY_AXIS_KEYS.has(a.key) && !SECONDARY_AXIS_KEYS.has(a.key) && !a.axisCustom),
+  )
+  const secondaryAxes = visibleAxes.filter(a => SECONDARY_AXIS_KEYS.has(a.key))
+
   // 활성 축이 숨김 처리되거나 사라진 경우 처음 축으로
   const safeActiveAxis = visibleAxes.some(a => a.key === activeAxis)
     ? activeAxis
@@ -194,9 +209,9 @@ export default function GroupsAdminMain() {
   return (
     <ScreenWrap>
       <PageHeader
-        breadcrumb={['Employee of Ride Inc.', '분류 셋팅']}
-        title="분류/태그 셋팅"
-        emoji="🧩"
+        breadcrumb={['Employee of Ride Inc.', '협력공장 추천', '그룹 구성']}
+        title="그룹 구성"
+        emoji="🏷"
         right={
           <>
             {savedAt && <span className="text-[11px] text-emerald-600">✓ {savedAt} 저장됨</span>}
@@ -214,46 +229,58 @@ export default function GroupsAdminMain() {
         <KpiCard label="등록 공장" value={stats.factories} tone="amber" icon="🏭" />
       </KpiRow>
 
-      {/* 축 탭 + 새 축 추가 + 숨김 토글 */}
-      <div className="px-6 pb-3">
-        <div className="flex gap-2 flex-wrap items-center">
-          {visibleAxes.map(a => (
+      {/* 축 탭 — 메인(공장 분류) 영역 + 부가(운영·사고) 접기 */}
+      <div className="px-6 pb-3 space-y-3">
+        {/* 메인 영역 — 공장 분류 + 사용자 정의 */}
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+              공장 분류 ({primaryAxes.length})
+            </div>
+            <label className="inline-flex items-center gap-1.5 text-[12px] text-slate-600 select-none cursor-pointer">
+              <input
+                type="checkbox"
+                checked={showHiddenAxes}
+                onChange={e => setShowHiddenAxes(e.target.checked)}
+                className="w-3.5 h-3.5 accent-slate-600"
+              />
+              숨김 축 표시
+            </label>
+          </div>
+          <div className="flex gap-2 flex-wrap items-center">
+            {primaryAxes.map(a => (
+              <AxisTab key={a.key} axis={a} active={safeActiveAxis === a.key} onClick={() => setActiveAxis(a.key)} />
+            ))}
             <button
-              key={a.key}
-              onClick={() => setActiveAxis(a.key)}
-              className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-[13px] font-semibold transition-colors
-                ${safeActiveAxis === a.key
-                  ? 'bg-slate-900 text-white'
-                  : 'bg-white text-slate-600 hover:bg-slate-50 ring-1 ring-slate-200'}
-                ${a.axisHidden ? 'opacity-50' : ''}`}
+              onClick={addAxis}
+              className="inline-flex items-center gap-1 px-4 py-2 rounded-full text-[13px] font-semibold bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+              title="새 분류 축 추가"
             >
-              <span>{a.emoji}</span>
-              <span>{a.title}</span>
-              <span className={`text-[11px] font-bold px-1.5 py-0.5 rounded-md
-                ${safeActiveAxis === a.key ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'}`}>
-                {a.items.length}
-              </span>
-              {a.axisHidden && <span className="text-[10px]">🚫</span>}
+              <span>＋</span>
+              <span>새 축 추가</span>
             </button>
-          ))}
-          <button
-            onClick={addAxis}
-            className="inline-flex items-center gap-1 px-4 py-2 rounded-full text-[13px] font-semibold bg-blue-600 text-white hover:bg-blue-700 transition-colors"
-            title="새 분류 축 추가"
-          >
-            <span>＋</span>
-            <span>새 축 추가</span>
-          </button>
-          <label className="ml-auto inline-flex items-center gap-1.5 text-[12px] text-slate-600 select-none cursor-pointer">
-            <input
-              type="checkbox"
-              checked={showHiddenAxes}
-              onChange={e => setShowHiddenAxes(e.target.checked)}
-              className="w-3.5 h-3.5 accent-slate-600"
-            />
-            숨김 축 표시
-          </label>
+          </div>
         </div>
+
+        {/* 부가 영역 — 운영·사고 분류 (접기) */}
+        {secondaryAxes.length > 0 && (
+          <div className="border-l-2 border-slate-200 pl-3">
+            <button
+              onClick={() => setShowSecondary(s => !s)}
+              className="inline-flex items-center gap-1.5 text-[11px] font-bold text-slate-500 uppercase tracking-wider hover:text-slate-800 transition-colors"
+            >
+              <span>{showSecondary ? '▾' : '▸'}</span>
+              <span>운영·사고 분류 ({secondaryAxes.length})</span>
+            </button>
+            {showSecondary && (
+              <div className="flex gap-2 flex-wrap items-center mt-2">
+                {secondaryAxes.map(a => (
+                  <AxisTab key={a.key} axis={a} active={safeActiveAxis === a.key} onClick={() => setActiveAxis(a.key)} small />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* 활성 축 패널 */}
@@ -289,6 +316,37 @@ export default function GroupsAdminMain() {
         </Section>
       </div>
     </ScreenWrap>
+  )
+}
+
+// ───────────────────────────────────────────────────────────────
+// AxisTab — 축 탭 칩 (메인/부가 공통)
+// ───────────────────────────────────────────────────────────────
+function AxisTab({ axis, active, onClick, small }: {
+  axis: CodeAxis
+  active: boolean
+  onClick: () => void
+  small?: boolean
+}) {
+  const padX = small ? 'px-3 py-1.5' : 'px-4 py-2'
+  const fontSize = small ? 'text-[12px]' : 'text-[13px]'
+  return (
+    <button
+      onClick={onClick}
+      className={`inline-flex items-center gap-2 ${padX} rounded-full ${fontSize} font-semibold transition-colors
+        ${active
+          ? 'bg-slate-900 text-white'
+          : 'bg-white text-slate-600 hover:bg-slate-50 ring-1 ring-slate-200'}
+        ${axis.axisHidden ? 'opacity-50' : ''}`}
+    >
+      <span>{axis.emoji}</span>
+      <span>{axis.title}</span>
+      <span className={`text-[11px] font-bold px-1.5 py-0.5 rounded-md
+        ${active ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'}`}>
+        {axis.items.length}
+      </span>
+      {axis.axisHidden && <span className="text-[10px]">🚫</span>}
+    </button>
   )
 }
 

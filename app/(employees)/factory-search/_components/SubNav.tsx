@@ -10,10 +10,10 @@ import { usePathname } from 'next/navigation'
 // ───────────────────────────────────────────────────────────────
 
 const TABS = [
-  { href: '/factory-search',         label: '지도',       emoji: '🗺️' },
-  { href: '/factory-search/mgmt',    label: '목록',       emoji: '🔧' },
-  { href: '/factory-search/intake',  label: '사고 추천',  emoji: '🚨' },
-  { href: '/factory-search/groups',  label: '분류 셋팅',  emoji: '🧩' },
+  { href: '/factory-search',         label: '공장 추천', emoji: '🚨' },  // 메인 — 사고 발생 시 가까운 공장 추천
+  { href: '/factory-search/map',     label: '지도',      emoji: '🗺️' },
+  { href: '/factory-search/mgmt',    label: '공장 목록', emoji: '🔧' },
+  { href: '/factory-search/groups',  label: '그룹 구성', emoji: '🏷' },
 ]
 
 export default function SubNav() {
