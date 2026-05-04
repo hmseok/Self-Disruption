@@ -37,6 +37,10 @@ function* walkPages(dir, urlPath = '') {
       if (entry.name.startsWith('[')) continue
       // 공개 페이지 — 권한 부여 대상 X
       if (['public', 'sign', 'invite', 's', 'preview'].includes(entry.name)) continue
+      // 공백 포함 폴더 (다른 세션 작업 중 임시 그룹 폴더 등) — URL path 로 부적합
+      if (entry.name.includes(' ')) continue
+      // Next.js route group — (그룹명) 형태는 URL 에 영향 X
+      if (entry.name.startsWith('(') && entry.name.endsWith(')')) continue
       yield* walkPages(path.join(dir, entry.name), urlPath + '/' + entry.name)
     }
   }

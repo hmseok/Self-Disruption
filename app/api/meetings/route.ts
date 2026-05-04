@@ -216,14 +216,22 @@ export async function PATCH(request: NextRequest) {
     const body = await request.json()
     const { meeting, attendees, minutes, action_items } = body
 
-    // 권한 체크 — organizer 또는 admin
+    // 권한 체크 — admin/master + 권한 페이지 can_edit + 본인 작성
     const existing = await prisma.$queryRawUnsafe<any[]>(
       `SELECT organizer_id, created_by FROM meetings WHERE id = ? LIMIT 1`, id
     )
     if (!existing[0]) return NextResponse.json({ error: '회의 없음' }, { status: 404 })
-    const canEdit = existing[0].organizer_id === user.id
+    // 권한 페이지의 /meetings can_edit ON 인 사용자는 타인 회의록도 수정 가능
+    const editPerm = await prisma.$queryRaw<any[]>`
+      SELECT can_edit FROM user_page_permissions
+       WHERE user_id = ${user.id} AND page_path = '/meetings' LIMIT 1
+    `
+    const hasEditPagePerm = !!(editPerm[0]?.can_edit)
+    const canEdit = user.role === 'admin'
+                  || user.role === 'master'
+                  || hasEditPagePerm
+                  || existing[0].organizer_id === user.id
                   || existing[0].created_by === user.id
-                  || user.role === 'admin'
     if (!canEdit) return NextResponse.json({ error: '편집 권한 없음' }, { status: 403 })
 
     if (meeting) {
@@ -294,14 +302,21 @@ export async function DELETE(request: NextRequest) {
     const id = searchParams.get('id')
     if (!id) return NextResponse.json({ error: 'id 필요' }, { status: 400 })
 
-    // 권한 체크
+    // 권한 체크 — admin/master + 권한 페이지 can_delete + 본인 작성
     const existing = await prisma.$queryRawUnsafe<any[]>(
       `SELECT organizer_id, created_by FROM meetings WHERE id = ? LIMIT 1`, id
     )
     if (!existing[0]) return NextResponse.json({ error: '회의 없음' }, { status: 404 })
-    const canDelete = existing[0].organizer_id === user.id
+    const delPerm = await prisma.$queryRaw<any[]>`
+      SELECT can_delete FROM user_page_permissions
+       WHERE user_id = ${user.id} AND page_path = '/meetings' LIMIT 1
+    `
+    const hasDeletePagePerm = !!(delPerm[0]?.can_delete)
+    const canDelete = user.role === 'admin'
+                   || user.role === 'master'
+                   || hasDeletePagePerm
+                   || existing[0].organizer_id === user.id
                    || existing[0].created_by === user.id
-                   || user.role === 'admin'
     if (!canDelete) return NextResponse.json({ error: '삭제 권한 없음' }, { status: 403 })
 
     // soft delete
