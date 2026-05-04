@@ -55,6 +55,9 @@ export interface Worker {
   phone: string | null
   email: string | null
   is_active: boolean
+  // PR-2QQ-b — 외부 직원
+  is_external?: boolean
+  external_pattern?: string | null
 }
 
 export interface Schedule {
@@ -80,6 +83,8 @@ export interface Assignment {
   special_code: SpecialCode
   computed_hours: number
   note: string | null
+  // PR-2QQ-b — 수동 lock (외부 직원 일정 등 자동 생성이 보존)
+  manual_lock?: boolean
 }
 
 export interface Distribution {
@@ -107,6 +112,11 @@ export interface WorkerKpi {
   half_count: number
   free_count: number
   off_count: number
+  // PR-2QQ-c — 균형도 상세
+  fri_overnight: number   // 금요일 야간 횟수
+  sun_overnight: number   // 일요일 야간 횟수
+  weekend_count: number   // 주말 (토+일) 근무 횟수
+  weekday_count: number   // 평일 근무 횟수
 }
 
 export interface SlotFillRate {

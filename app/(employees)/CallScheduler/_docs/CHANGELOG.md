@@ -3,6 +3,42 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-04 (밤 — 외부 직원 + manual_lock)
+
+### PR-2QQ-b — 외부 직원 + manual_lock + 엑셀 업로드
+- 운영 사실 (Rule 25): 야간 슬롯 L13 외부 직원 정동민(1명, 2-on-2-off)이 1순위. 매월 매니저가 엑셀로 외부 일정 업로드.
+- DB 마이그레이션: `2026-05-04_cs_external_workers.sql`
+  - `cs_workers.is_external TINYINT(1)` (1순위 표식)
+  - `cs_workers.external_pattern VARCHAR(128)` (자유 메타)
+  - `cs_assignments.manual_lock TINYINT(1)` (자동 생성 보존)
+  - 인덱스: `idx_cs_asn_lock (schedule_id, manual_lock)`
+- API:
+  - `/api/call-scheduler/workers` GET/POST: is_external + external_pattern 지원 (graceful)
+  - `/api/call-scheduler/workers/[id]` PATCH 신설 (cs_workers 직접 수정, RideEmployees 와 분리)
+  - `/api/call-scheduler/schedules/[id]/external-schedule` POST/GET 신설:
+    - GET = 엑셀 템플릿 다운로드 (외부 직원 + 야간 슬롯 자동 샘플)
+    - POST = 엑셀 업로드 → manual_lock=1 upsert (preview/apply)
+  - `/api/call-scheduler/schedules/[id]` GET: manual_lock + is_external 응답 (graceful)
+  - `/api/call-scheduler/schedules/[id]/auto-generate`:
+    - manual_lock 셀 항상 skip-existing (overwrite 무시)
+    - clear_first 시 manual_lock=1 보존 (조건부 DELETE)
+- UI:
+  - `ExternalScheduleDialog` 신설 (720px) — 템플릿 → 업로드 → preview → apply
+  - 상세 [⋯] 메뉴: [🔒 외부 직원 일정] 항목 추가
+  - `AssignmentCell`: manual_lock=1 셀에 🔒 아이콘 prefix
+
+## 2026-05-04 (밤 — KPI 균형도 상세)
+
+### PR-2QQ-c — KPI 균형도 상세 (야간/금야간/일야간)
+- WorkerKpi 확장: `fri_overnight`, `sun_overnight`, `weekend_count`, `weekday_count`
+- API `/api/call-scheduler/schedules/[id]`: work_date 의 day-of-week 로 카운트
+- AnalyticsPanel:
+  - 균형도 카드 4개 (전체 야간 / 시간 편차 / 금야간 / 일야간) — max-min range + min/avg/max
+  - 인당 분석 테이블 컬럼 확장: 금야 / 일야 / 주말 추가 (10 컬럼)
+  - 편차 알림: 금/일 야간 range >= 3 시 빨간 배너
+  - 워커별 금/일 야간 빨강 강조 (평균의 1.5배 초과)
+- 운영 사실 (Rule 25): 야간 워커는 금/일 비선호 → 균등 분배 시각화
+
 ## 2026-05-04 (밤 — 그룹 마스터 강화)
 
 ### PR-2QQ-a — 그룹 마스터 UI 강화 (카테고리/카드/색상)

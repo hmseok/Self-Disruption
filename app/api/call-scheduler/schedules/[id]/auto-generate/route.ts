@@ -68,6 +68,7 @@ interface AssignmentRow {
   shift_slot_id: string
   worker_id: string | null
   special_code: string
+  manual_lock?: number  // PR-2QQ-b — 1=수동 lock 셀
 }
 
 // "HH:MM:SS" → 분
@@ -222,16 +223,35 @@ export async function POST(
       }
     }
 
-    // 6) 기존 배정 조회
-    const existingRows: AssignmentRow[] = await prisma.$queryRaw<any[]>`
-      SELECT id, DATE_FORMAT(work_date, '%Y-%m-%d') AS work_date,
-             shift_slot_id, worker_id, special_code
-      FROM cs_assignments WHERE schedule_id = ${scheduleId}
-    ` as any
+    // 6) 기존 배정 조회 — PR-2QQ-b: manual_lock 컬럼 graceful
+    let hasLockCol = true
+    try {
+      await prisma.$queryRaw<any[]>`SELECT manual_lock FROM cs_assignments LIMIT 1`
+    } catch { hasLockCol = false }
+
+    const existingRows: AssignmentRow[] = hasLockCol
+      ? (await prisma.$queryRaw<any[]>`
+          SELECT id, DATE_FORMAT(work_date, '%Y-%m-%d') AS work_date,
+                 shift_slot_id, worker_id, special_code, manual_lock
+          FROM cs_assignments WHERE schedule_id = ${scheduleId}
+        ` as any)
+      : (await prisma.$queryRaw<any[]>`
+          SELECT id, DATE_FORMAT(work_date, '%Y-%m-%d') AS work_date,
+                 shift_slot_id, worker_id, special_code
+          FROM cs_assignments WHERE schedule_id = ${scheduleId}
+        ` as any)
     // (date, slot, worker) → assignment — PR-2OO: 1셀 N워커 허용 (worker_id 포함)
     const existingMap = new Map<string, AssignmentRow>()
+    // (date, slot) → 모든 워커 — PR-2QQ-b: lock 셀 검사용
+    const lockedSlotMap = new Map<string, Set<string>>()  // (date_slot) → Set<worker_id>
     for (const a of existingRows) {
       existingMap.set(`${a.work_date}_${a.shift_slot_id}_${a.worker_id || 'null'}`, a)
+      if (a.manual_lock && a.worker_id) {
+        const k = `${a.work_date}_${a.shift_slot_id}`
+        const set = lockedSlotMap.get(k) || new Set<string>()
+        set.add(a.worker_id)
+        lockedSlotMap.set(k, set)
+      }
     }
 
     // ── 7) 계획 산출 ────────────────────────────────────────────────
@@ -321,7 +341,9 @@ export async function POST(
             }
           }
 
-          if (existing && !overwriteExisting) {
+          // PR-2QQ-b: lock 셀이거나 기존 보존
+          const isLocked = existing?.manual_lock === 1
+          if (existing && (isLocked || !overwriteExisting)) {
             plan.push({
               work_date: isoDate, shift_slot_id: g.shift_slot_id, worker_id: wId,
               special_code: special, action: 'skip-existing',
@@ -366,7 +388,15 @@ export async function POST(
 
     // ── 8) APPLY ────────────────────────────────────────────────────
     if (clearFirst) {
-      await prisma.$executeRaw`DELETE FROM cs_assignments WHERE schedule_id = ${scheduleId}`
+      // PR-2QQ-b: manual_lock=1 셀은 보존
+      if (hasLockCol) {
+        await prisma.$executeRaw`
+          DELETE FROM cs_assignments
+          WHERE schedule_id = ${scheduleId} AND (manual_lock IS NULL OR manual_lock = 0)
+        `
+      } else {
+        await prisma.$executeRaw`DELETE FROM cs_assignments WHERE schedule_id = ${scheduleId}`
+      }
       // 클리어 후엔 모두 insert
       for (const p of plan) {
         if (p.action === 'skip-holiday' || p.action === 'skip-no-member') continue

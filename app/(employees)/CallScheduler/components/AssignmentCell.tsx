@@ -81,6 +81,10 @@ export default function AssignmentCell({ assignment, worker, onClick, onQuickAct
         overflow: 'hidden',
         textOverflow: 'ellipsis',
       }}>
+        {/* PR-2QQ-b — 수동 lock 셀 표시 */}
+        {assignment?.manual_lock && (
+          <span style={{ marginRight: 2, fontSize: 9 }} title="수동 lock — 자동 생성 보존">🔒</span>
+        )}
         {worker?.name || (isOff ? '휴' : '')}
       </span>
       {special !== 'none' && special !== 'off' && (

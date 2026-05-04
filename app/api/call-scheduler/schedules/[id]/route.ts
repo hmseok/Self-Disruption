@@ -52,24 +52,58 @@ export async function GET(
     }))
 
     // 3) 근무자
-    const workersRows = await prisma.$queryRaw<any[]>`
-      SELECT id, name, profile_id, color_tone, group_label, phone, email, is_active
-      FROM cs_workers WHERE is_active = 1 ORDER BY group_label DESC, name ASC
-    `
-    const workers = workersRows.map(r => ({ ...r, is_active: Boolean(r.is_active) }))
+    // PR-2QQ-b: is_external 컬럼 graceful
+    let hasExtCol = true
+    try {
+      await prisma.$queryRaw<any[]>`SELECT is_external FROM cs_workers LIMIT 1`
+    } catch { hasExtCol = false }
+
+    const workersRows = hasExtCol
+      ? await prisma.$queryRaw<any[]>`
+          SELECT id, name, profile_id, color_tone, group_label, phone, email, is_active,
+                 is_external, external_pattern
+          FROM cs_workers WHERE is_active = 1
+          ORDER BY is_external DESC, group_label DESC, name ASC
+        `
+      : await prisma.$queryRaw<any[]>`
+          SELECT id, name, profile_id, color_tone, group_label, phone, email, is_active
+          FROM cs_workers WHERE is_active = 1 ORDER BY group_label DESC, name ASC
+        `
+    const workers = workersRows.map(r => ({
+      ...r,
+      is_active: Boolean(r.is_active),
+      is_external: hasExtCol ? Boolean(r.is_external) : false,
+      external_pattern: hasExtCol ? (r.external_pattern ?? null) : null,
+    }))
+
+    // PR-2QQ-b: manual_lock 컬럼 graceful
+    let hasLockCol = true
+    try {
+      await prisma.$queryRaw<any[]>`SELECT manual_lock FROM cs_assignments LIMIT 1`
+    } catch { hasLockCol = false }
 
     // 4) 배정 (그리드)
-    const assignRows = await prisma.$queryRaw<any[]>`
-      SELECT id, schedule_id,
-             DATE_FORMAT(work_date, '%Y-%m-%d') AS work_date,
-             shift_slot_id, worker_id, special_code,
-             CAST(computed_hours AS DECIMAL(4,2)) AS computed_hours,
-             note
-      FROM cs_assignments WHERE schedule_id = ${id}
-    `
+    const assignRows = hasLockCol
+      ? await prisma.$queryRaw<any[]>`
+          SELECT id, schedule_id,
+                 DATE_FORMAT(work_date, '%Y-%m-%d') AS work_date,
+                 shift_slot_id, worker_id, special_code,
+                 CAST(computed_hours AS DECIMAL(4,2)) AS computed_hours,
+                 note, manual_lock
+          FROM cs_assignments WHERE schedule_id = ${id}
+        `
+      : await prisma.$queryRaw<any[]>`
+          SELECT id, schedule_id,
+                 DATE_FORMAT(work_date, '%Y-%m-%d') AS work_date,
+                 shift_slot_id, worker_id, special_code,
+                 CAST(computed_hours AS DECIMAL(4,2)) AS computed_hours,
+                 note
+          FROM cs_assignments WHERE schedule_id = ${id}
+        `
     const assignments = assignRows.map(r => ({
       ...r,
       computed_hours: Number(r.computed_hours || 0),
+      manual_lock: hasLockCol ? Boolean(r.manual_lock) : false,
     }))
 
     // 5) 배포 이력
@@ -184,6 +218,11 @@ function computeKpi(scheduleId: string, slots: any[], workers: any[], assignment
       half_count: 0,
       free_count: 0,
       off_count: 0,
+      // PR-2QQ-c — 균형도 상세
+      fri_overnight: 0,
+      sun_overnight: 0,
+      weekend_count: 0,
+      weekday_count: 0,
     })
   }
 
@@ -222,7 +261,21 @@ function computeKpi(scheduleId: string, slots: any[], workers: any[], assignment
       if (a.special_code !== 'off') {
         wk.shift_count++
         wk.total_hours += Number(a.computed_hours || 0)
-        if (slot.is_overnight) wk.overnight_count++
+        // PR-2QQ-c — 요일별 카운트 (work_date 의 day-of-week)
+        // work_date 는 'YYYY-MM-DD' 또는 Date 객체 (Prisma raw 결과)
+        const dow = (() => {
+          const ds = String(a.work_date).slice(0, 10)
+          // UTC 노출 회피 — 로컬 새벽 0시
+          return new Date(ds + 'T00:00:00').getDay()  // 0=일, 5=금, 6=토
+        })()
+        const isWeekend = dow === 0 || dow === 6
+        if (isWeekend) wk.weekend_count++
+        else wk.weekday_count++
+        if (slot.is_overnight) {
+          wk.overnight_count++
+          if (dow === 5) wk.fri_overnight++
+          if (dow === 0) wk.sun_overnight++
+        }
       }
       if (a.special_code === 'am_half' || a.special_code === 'pm_half') wk.half_count++
       if (a.special_code === 'am_free' || a.special_code === 'pm_free') wk.free_count++
