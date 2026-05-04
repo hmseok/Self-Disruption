@@ -341,52 +341,42 @@ export async function POST(request: NextRequest) {
       }
 
       // ── 5) 매칭 적용 ──
-      // vehicle_id 가 비어있으면 vehicle_car_number 로 cars (FmiVehicle) 자동 lookup
-      // 1) 정확 일치 → 2) 공백 제거 후 LIKE → 3) last4 매칭 (점진 fallback)
+      // 1차 (fmi_rental) 매칭은 항상 진행 — 사고 대차건 자체는 매칭됨
+      // 2차 (우리 차량 cars lookup) 실패해도 1차는 그대로 — 「미지급」 으로 별도 카운트
+      // cars 실제 컬럼명: 'number' (schema.prisma 의 car_number 는 stale)
       let vehicleId: string | null = pick.vehicle_id ? String(pick.vehicle_id).trim() : null
+      let vehicleLookupFailed = false
       if (!vehicleId && pick.vehicle_car_number) {
         const rawCarNum = String(pick.vehicle_car_number).trim()
-        const normalized = rawCarNum.replace(/\s+/g, '') // 공백 제거
+        const normalized = rawCarNum.replace(/\s+/g, '')
         const last4 = rawCarNum.match(/\d{3,4}$/)?.[0] || ''
         try {
-          // 1) 정확 일치
-          let car = await prisma.fmiVehicle.findUnique({
-            where: { car_number: rawCarNum },
-            select: { id: true },
-          })
-          // 2) 공백 제거 후 LIKE
-          if (!car && normalized !== rawCarNum) {
-            const fuzzy = await prisma.$queryRawUnsafe<Array<any>>(
-              `SELECT id FROM cars WHERE REPLACE(car_number, ' ', '') = ? LIMIT 1`, // sql-lint-allow: car_number — FmiVehicle.car_number @@map("cars")
+          // 1) 정확 일치 — cars.number 컬럼 (raw SQL — schema.prisma stale)
+          let carRows = await prisma.$queryRawUnsafe<Array<any>>(
+            `SELECT id FROM cars WHERE number = ? LIMIT 1`, // sql-lint-allow: number — cars 실제 컬럼 (schema 와 다름)
+            rawCarNum,
+          )
+          // 2) 공백 제거 후 비교
+          if (!carRows[0] && normalized !== rawCarNum) {
+            carRows = await prisma.$queryRawUnsafe<Array<any>>(
+              `SELECT id FROM cars WHERE REPLACE(number, ' ', '') = ? LIMIT 1`, // sql-lint-allow: number
               normalized,
             )
-            if (fuzzy[0]?.id) car = { id: String(fuzzy[0].id) }
           }
-          // 3) last4 매칭 — 차량번호 뒷 4자리 일치 (단, 같은 last4 의 차량이 1대일 때만)
-          if (!car && last4) {
-            const last4Cars = await prisma.fmiVehicle.findMany({
-              where: { car_number: { endsWith: last4 } },
-              select: { id: true },
-              take: 2,
-            })
-            if (last4Cars.length === 1) car = { id: String(last4Cars[0].id) }
+          // 3) last4 매칭 — 1대일 때만
+          if (!carRows[0] && last4) {
+            const last4Rows = await prisma.$queryRawUnsafe<Array<any>>(
+              `SELECT id FROM cars WHERE number LIKE ? LIMIT 2`, // sql-lint-allow: number
+              `%${last4}`,
+            )
+            if (last4Rows.length === 1) carRows = last4Rows
           }
-          if (car?.id) vehicleId = String(car.id)
-        } catch {}
-      }
-      if (!vehicleId) {
-        result.no_candidate++
-        if (result.failed_samples.length < 10) {
-          result.failed_samples.push({
-            tx_id: tx.id,
-            client_name: clientRaw,
-            reason: `vehicle_id 없음 — fmi_rental.vehicle_car_number=「${pick.vehicle_car_number || '-'}」 cars 테이블 매칭 실패`,
-          })
+          if (carRows[0]?.id) vehicleId = String(carRows[0].id)
+        } catch (e: any) {
+          console.warn('[fmi-rental] cars lookup error:', e?.message)
         }
-        continue
+        if (!vehicleId) vehicleLookupFailed = true
       }
-      // pick 객체에 lookup 결과 반영 (이후 로직에서 사용)
-      pick.vehicle_id = vehicleId
 
       result.matched++
       if (result.samples.length < 10) {
