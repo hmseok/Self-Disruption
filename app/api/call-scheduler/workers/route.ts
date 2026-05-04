@@ -23,26 +23,44 @@ type Tone = typeof COLOR_TONES[number]
 interface FeatureFlags {
   hasExternal: boolean
   hasConstraints: boolean
+  hasPattern: boolean  // PR-2QQ-d-3
 }
 
 async function detectFeatures(): Promise<FeatureFlags> {
-  let hasExternal = true, hasConstraints = true
+  let hasExternal = true, hasConstraints = true, hasPattern = true
   try {
     await prisma.$queryRaw<any[]>`SELECT is_external FROM cs_workers LIMIT 1`
   } catch { hasExternal = false }
   try {
     await prisma.$queryRaw<any[]>`SELECT priority_level, preferred_dow_avoid, work_pattern_text FROM cs_workers LIMIT 1`
   } catch { hasConstraints = false }
-  return { hasExternal, hasConstraints }
+  try {
+    await prisma.$queryRaw<any[]>`SELECT cycle_days_on, preferred_dow_only FROM cs_workers LIMIT 1`
+  } catch { hasPattern = false }
+  return { hasExternal, hasConstraints, hasPattern }
 }
 
 export async function GET(request: NextRequest) {
   const user = await verifyUser(request)
   if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
   try {
-    const { hasExternal, hasConstraints } = await detectFeatures()
+    const { hasExternal, hasConstraints, hasPattern } = await detectFeatures()
     let rows: any[]
-    if (hasConstraints) {
+    if (hasPattern) {
+      rows = await prisma.$queryRaw<any[]>`
+        SELECT id, name, profile_id, color_tone, group_label, phone, email, is_active,
+               is_external, external_pattern,
+               priority_level, preferred_dow_avoid,
+               required_days_per_month, max_days_per_month,
+               work_pattern_text,
+               cycle_days_on, cycle_days_off,
+               DATE_FORMAT(cycle_start_date, '%Y-%m-%d') AS cycle_start_date,
+               preferred_dow_only
+        FROM cs_workers
+        WHERE is_active = 1
+        ORDER BY priority_level ASC, is_external DESC, group_label DESC, name ASC
+      `
+    } else if (hasConstraints) {
       rows = await prisma.$queryRaw<any[]>`
         SELECT id, name, profile_id, color_tone, group_label, phone, email, is_active,
                is_external, external_pattern,
@@ -81,6 +99,11 @@ export async function GET(request: NextRequest) {
       max_days_per_month: hasConstraints && r.max_days_per_month != null
         ? Number(r.max_days_per_month) : null,
       work_pattern_text: hasConstraints ? (r.work_pattern_text ?? null) : null,
+      // PR-2QQ-d-3 — 자동 근무 패턴
+      cycle_days_on: hasPattern && r.cycle_days_on != null ? Number(r.cycle_days_on) : null,
+      cycle_days_off: hasPattern && r.cycle_days_off != null ? Number(r.cycle_days_off) : null,
+      cycle_start_date: hasPattern ? (r.cycle_start_date ?? null) : null,
+      preferred_dow_only: hasPattern ? (r.preferred_dow_only ?? null) : null,
     }))
     return NextResponse.json({ data: serialize(data), error: null })
   } catch (e: any) {

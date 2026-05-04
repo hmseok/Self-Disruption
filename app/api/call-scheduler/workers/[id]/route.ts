@@ -14,6 +14,9 @@ const ALLOWED = new Set([
   'priority_level', 'preferred_dow_avoid',
   'required_days_per_month', 'max_days_per_month',
   'work_pattern_text',
+  // PR-2QQ-d-3 — 자동 근무 패턴
+  'cycle_days_on', 'cycle_days_off', 'cycle_start_date',
+  'preferred_dow_only',
 ])
 const COLOR_TONES = new Set([
   'blue', 'gray', 'green', 'amber', 'violet', 'red', 'none',
@@ -31,17 +34,23 @@ export async function PATCH(
     const body = await request.json()
 
     // 컬럼 존재 확인 (graceful)
-    let hasExt = true, hasConstraints = true
+    let hasExt = true, hasConstraints = true, hasPattern = true
     try {
       await prisma.$queryRaw<any[]>`SELECT is_external FROM cs_workers LIMIT 1`
     } catch { hasExt = false }
     try {
       await prisma.$queryRaw<any[]>`SELECT priority_level FROM cs_workers LIMIT 1`
     } catch { hasConstraints = false }
+    try {
+      await prisma.$queryRaw<any[]>`SELECT cycle_days_on FROM cs_workers LIMIT 1`
+    } catch { hasPattern = false }
 
     const CONSTRAINT_COLS = new Set([
       'priority_level', 'preferred_dow_avoid',
       'required_days_per_month', 'max_days_per_month', 'work_pattern_text',
+    ])
+    const PATTERN_COLS = new Set([
+      'cycle_days_on', 'cycle_days_off', 'cycle_start_date', 'preferred_dow_only',
     ])
 
     const sets: string[] = []
@@ -50,6 +59,7 @@ export async function PATCH(
       if (!ALLOWED.has(k)) continue
       if ((k === 'is_external' || k === 'external_pattern') && !hasExt) continue
       if (CONSTRAINT_COLS.has(k) && !hasConstraints) continue
+      if (PATTERN_COLS.has(k) && !hasPattern) continue
       if (k === 'color_tone' && !COLOR_TONES.has(String(v))) continue
       if (k === 'is_external') {
         sets.push(`${k} = ?`); params.push(v ? 1 : 0); continue
@@ -58,7 +68,8 @@ export async function PATCH(
         const n = Math.min(3, Math.max(1, Number(v) || 2))
         sets.push(`${k} = ?`); params.push(n); continue
       }
-      if (k === 'required_days_per_month' || k === 'max_days_per_month') {
+      if (k === 'required_days_per_month' || k === 'max_days_per_month'
+          || k === 'cycle_days_on' || k === 'cycle_days_off') {
         sets.push(`${k} = ?`); params.push(v == null || v === '' ? null : Number(v)); continue
       }
       sets.push(`${k} = ?`); params.push(v ?? null)

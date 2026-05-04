@@ -136,6 +136,29 @@ GROUP BY s.id, s.code, s.label
 ORDER BY s.sort_order;
 ```
 
+### 2.W `cs_workers` 추가 컬럼 (PR-2QQ-d-1 + d-3)
+
+| 컬럼 | 타입 | NULL | 기본 | PR | 설명 |
+|------|------|------|------|-----|------|
+| is_external | TINYINT(1) | NN | 0 | d-b | 외부 직원 표식 (🔒) |
+| priority_level | TINYINT | NN | 2 | d-1 | 1=최우선 / 2=일반 / 3=백업 |
+| preferred_dow_avoid | VARCHAR(16) | Y | NULL | d-1 | 비선호 요일 ('0,5' = 일·금) |
+| required_days_per_month | TINYINT | Y | NULL | d-1 | 월 필수 일수 |
+| max_days_per_month | TINYINT | Y | NULL | d-1 | 월 최대 일수 |
+| work_pattern_text | VARCHAR(64) | Y | NULL | d-1 | 자유 패턴 메모 |
+| cycle_days_on | TINYINT | Y | NULL | d-3 | 연속 근무일 |
+| cycle_days_off | TINYINT | Y | NULL | d-3 | 연속 휴무일 |
+| cycle_start_date | DATE | Y | NULL | d-3 | cycle 1일차 |
+| preferred_dow_only | VARCHAR(16) | Y | NULL | d-3 | 한정 요일 ('1,3,5' = 월수금만) |
+
+INDEX: `idx_cs_w_priority (priority_level, is_active)`
+
+**자동 생성 알고리즘 활용** (PR-2QQ-d-3):
+1. `cycle_*` 정의 시: `(date - cycle_start_date) % (on+off) < on` 인 날만 후보
+2. `preferred_dow_only` 정의 시: 그 요일만 후보 (한정)
+3. `preferred_dow_avoid` 정의 시: 그 요일 후순위 (피함, 부족 시 들어감)
+4. `priority_level` ASC + `required` 미달 우선 + by_dow/total ASC + last_date 거리 DESC
+
 ### 2.X `cs_group_min_coverage` — 그룹 최소 인원 (PR-2QQ-d-2)
 
 | 컬럼 | 타입 | NULL | 기본 | 설명 |
