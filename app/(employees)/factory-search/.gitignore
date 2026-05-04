@@ -1,0 +1,4 @@
+# Factory Search 격리 영역 — 메인 빌드/git 추적 제외 대상
+_meta-archive/
+*.tsbuildinfo
+.DS_Store

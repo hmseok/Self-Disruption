@@ -100,6 +100,8 @@ export const MENUS: MenuEntry[] = [
   { id: 'mod-call-scheduler',  name: '근무시간표 분석 & 배포', displayName: '📅 근무시간표 분석 & 배포', path: '/CallScheduler', iconKey: 'Setting', group: 'cx-team', sortOrder: 60, requirePermission: true },
   // 직원 마스터 — 사이드바 숨김. 근무스케줄 페이지 안에서 sub-nav 로 접근 (권한 페이지에는 노출 유지)
   { id: 'mod-ride-employees',  name: '직원 마스터',   path: '/RideEmployees',  iconKey: 'Users',   group: 'cx-team', sortOrder: 61, requirePermission: true, sidebarHidden: true },
+  // 협력공장 검색 — 카카오맵 기반 공장/사고 운영. 서브: /factory-search/{mgmt,intake,groups} (페이지 내 진입)
+  { id: 'mod-factory-search',  name: '협력공장 검색', displayName: '🗺️ 협력공장 검색', path: '/factory-search', iconKey: 'Wrench', group: 'cx-team', sortOrder: 62, requirePermission: true },
 
   // ── 설정 (settings) ── admin 전용 (사이드바 별도 섹션)
   // 권한 부여 대상 — 일부 사용자에게 회사 정보 / 메시지 센터 등 위임 가능

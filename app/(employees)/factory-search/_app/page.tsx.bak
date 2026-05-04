@@ -1,0 +1,29 @@
+import Link from 'next/link'
+import { PageHeader, ScreenWrap } from './components/ui'
+
+export default function Home() {
+  return (
+    <ScreenWrap>
+      <PageHeader breadcrumb={['Ride OP', '대시보드']} title="대시보드" emoji="🏠" />
+
+      <div className="px-6 pb-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Link href="/fleet/factory-map"
+          className="bg-white rounded-2xl ring-1 ring-slate-200 p-5 hover:ring-blue-300 hover:shadow-sm transition">
+          <div className="text-[28px]">🗺️</div>
+          <div className="text-[15px] font-bold text-slate-800 mt-2">협력공장 지도</div>
+          <div className="text-[12px] text-slate-500 mt-1">카카오맵 기반 운영 — 공장 마커 + 사고 현장 오버레이</div>
+        </Link>
+        <Link href="/fleet/factory-mgmt"
+          className="bg-white rounded-2xl ring-1 ring-slate-200 p-5 hover:ring-blue-300 hover:shadow-sm transition">
+          <div className="text-[28px]">🔧</div>
+          <div className="text-[15px] font-bold text-slate-800 mt-2">협력공장 목록</div>
+          <div className="text-[12px] text-slate-500 mt-1">확장형 테이블, 검색·필터·상세</div>
+        </Link>
+      </div>
+
+      <div className="px-8 text-[11px] text-slate-400">
+        ENV: <code className="font-mono bg-white ring-1 ring-slate-200 rounded px-1.5 py-0.5">NEXT_PUBLIC_KAKAO_MAP_KEY</code> 미설정 시 지도 영역에 안내 배너가 노출됩니다.
+      </div>
+    </ScreenWrap>
+  )
+}

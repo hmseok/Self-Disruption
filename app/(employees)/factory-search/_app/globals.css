@@ -1,0 +1,33 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #f9fafb;        /* slate-50 (FMI ERP 실측 body bg) */
+  --bg-soft: #f7f7f7;
+  --fg: #171717;
+  --muted: #64748b;     /* slate-500 */
+  --primary: #2563eb;   /* blue-600 */
+  --accent-warn: #f59e0b;
+  --accent-danger: #dc2626;
+  --accent-ok: #10b981;
+  --accent-violet: #7c3aed;
+  --sidebar-w: 240px;
+}
+
+html, body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: 'IBM Plex Sans KR', -apple-system, BlinkMacSystemFont, 'Segoe UI',
+               'Apple SD Gothic Neo', 'Pretendard', 'Noto Sans KR', 'Malgun Gothic', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#__next, body, html { height: 100%; }
+
+/* 스크롤바 슬림 */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 8px; }
+::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
+
+/* 카카오맵 인포윈도우 기본 화살표 제거 */
+.kakao-iw-clean .info-window-bubble::after { display: none; }
