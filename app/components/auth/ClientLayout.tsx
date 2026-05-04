@@ -58,8 +58,9 @@ import {
 } from '@/lib/menu-registry'
 
 // menu-registry 의 MenuEntry → ClientLayout 호환 형식 (legacy MenuItem 의 { name, path, iconKey })
+// requirePermission 정보를 함께 보존 — 사이드바 권한 필터 시 사용
 function toMenuItem(m: typeof REGISTRY_MENUS[number]) {
-  return { name: getDisplayName(m), path: m.path, iconKey: m.iconKey }
+  return { name: getDisplayName(m), path: m.path, iconKey: m.iconKey, requirePermission: m.requirePermission !== false }
 }
 
 // 직장인필수 / CX팀 / 설정 메뉴 — menu-registry 에서 자동 추출
@@ -68,7 +69,7 @@ const CX_TEAM_MENUS = getMenusByGroup('cx-team').map(toMenuItem)
 const SETTINGS_MENUS_ALL = getMenusByGroup('settings').map(toMenuItem)
 // 「회사 정보」를 첫 entry 로 분리 (legacy COMPANY_INFO_MENU 호환)
 const COMPANY_INFO_MENU = SETTINGS_MENUS_ALL.find(m => m.path === '/db/codes')
-  || { name: '회사 정보', path: '/db/codes', iconKey: 'Setting' }
+  || { name: '회사 정보', path: '/db/codes', iconKey: 'Setting', requirePermission: true }
 const SETTINGS_MENUS_BASE = SETTINGS_MENUS_ALL.filter(m => m.path !== '/db/codes')
 
 // ============================================
@@ -412,20 +413,30 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
                 <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">Employee of Ride Inc.</span>
               </div>
               <div className="space-y-0.5">
-                {WORK_ESSENTIALS_MENUS.map(item => (
-                  <MenuItem key={item.path} item={item} pathname={pathname} allPaths={allMenuPaths} />
-                ))}
+                {WORK_ESSENTIALS_MENUS
+                  .filter(item => !item.requirePermission || role === 'admin' || hasPageAccess(item.path))
+                  .map(item => (
+                    <MenuItem key={item.path} item={item} pathname={pathname} allPaths={allMenuPaths} />
+                  ))}
               </div>
 
-              {/* CX팀 sub-section */}
-              <div className="px-4 mt-2 mb-0.5">
-                <span className="text-[9px] font-semibold text-slate-500 tracking-wider">▸ CX팀</span>
-              </div>
-              <div className="space-y-0.5 ml-2">
-                {CX_TEAM_MENUS.map(item => (
-                  <MenuItem key={item.path} item={item} pathname={pathname} allPaths={allMenuPaths} />
-                ))}
-              </div>
+              {/* CX팀 sub-section — 권한 있는 사용자만 표시 */}
+              {(() => {
+                const visibleCxMenus = CX_TEAM_MENUS.filter(item => !item.requirePermission || role === 'admin' || hasPageAccess(item.path))
+                if (visibleCxMenus.length === 0) return null
+                return (
+                  <>
+                    <div className="px-4 mt-2 mb-0.5">
+                      <span className="text-[9px] font-semibold text-slate-500 tracking-wider">▸ CX팀</span>
+                    </div>
+                    <div className="space-y-0.5 ml-2">
+                      {visibleCxMenus.map(item => (
+                        <MenuItem key={item.path} item={item} pathname={pathname} allPaths={allMenuPaths} />
+                      ))}
+                    </div>
+                  </>
+                )
+              })()}
             </div>
 
             {/* 구분선 + 관리 영역 */}

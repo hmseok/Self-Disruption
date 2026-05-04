@@ -88,20 +88,23 @@ export const MENUS: MenuEntry[] = [
   // ── 관리 (admin) ──
   { id: 'mod-payroll', name: '급여 관리', displayName: '💼 급여 관리', path: '/admin/payroll', iconKey: 'Money', group: 'admin', sortOrder: 40 },
 
-  // ── 직장인필수 (work-essentials) ── 모든 로그인 사용자 (권한 부여 X)
+  // ── 직장인필수 (work-essentials) ──
+  // 「내 정보」 / 「영수증 제출」 은 본인 정보 — 권한 부여 대상 X (모든 사용자)
+  // 「회의록」 은 권한 부여 대상 — 일부 사용자만 보이도록 가능
   { id: 'mod-my-info',         name: '내 정보',     path: '/work-essentials/my-info',  iconKey: 'Users',     group: 'work-essentials', sortOrder: 50, requirePermission: false },
   { id: 'mod-receipts',        name: '영수증제출',   path: '/work-essentials/receipts', iconKey: 'Clipboard', group: 'work-essentials', sortOrder: 51, requirePermission: false },
-  { id: 'mod-meetings',        name: '회의록', displayName: '📋 회의록', path: '/meetings', iconKey: 'Doc', group: 'work-essentials', sortOrder: 52, requirePermission: false },
+  { id: 'mod-meetings',        name: '회의록', displayName: '📋 회의록', path: '/meetings', iconKey: 'Doc', group: 'work-essentials', sortOrder: 52, requirePermission: true },
 
-  // ── CX팀 (cx-team) ── Employee of Ride Inc. > CX팀
-  { id: 'mod-call-scheduler',  name: '근무스케줄',    path: '/CallScheduler',  iconKey: 'Setting', group: 'cx-team', sortOrder: 60, requirePermission: false },
-  { id: 'mod-ride-employees',  name: '직원 마스터',   path: '/RideEmployees',  iconKey: 'Users',   group: 'cx-team', sortOrder: 61, requirePermission: false },
+  // ── CX팀 (cx-team) ── Employee of Ride Inc. > CX팀 — 권한 부여 대상 (CX팀원만)
+  { id: 'mod-call-scheduler',  name: '근무스케줄',    path: '/CallScheduler',  iconKey: 'Setting', group: 'cx-team', sortOrder: 60, requirePermission: true },
+  { id: 'mod-ride-employees',  name: '직원 마스터',   path: '/RideEmployees',  iconKey: 'Users',   group: 'cx-team', sortOrder: 61, requirePermission: true },
 
   // ── 설정 (settings) ── admin 전용 (사이드바 별도 섹션)
-  { id: 'mod-company-info',     name: '회사 정보',     path: '/db/codes',                iconKey: 'Setting',   group: 'settings', sortOrder: 70, requirePermission: false },
-  { id: 'mod-employees',        name: '조직/권한 관리', path: '/admin/employees',         iconKey: 'Users',     group: 'settings', sortOrder: 71, requirePermission: false },
-  { id: 'mod-contract-terms',   name: '계약 약관 관리', path: '/admin/contract-terms',    iconKey: 'Doc',       group: 'settings', sortOrder: 72, requirePermission: false },
-  { id: 'mod-message-templates',name: '메시지 센터',    path: '/admin/message-templates', iconKey: 'Clipboard', group: 'settings', sortOrder: 73, requirePermission: false },
+  // 권한 부여 대상 — 일부 사용자에게 회사 정보 / 메시지 센터 등 위임 가능
+  { id: 'mod-company-info',     name: '회사 정보',     path: '/db/codes',                iconKey: 'Setting',   group: 'settings', sortOrder: 70, requirePermission: true },
+  { id: 'mod-employees',        name: '조직/권한 관리', path: '/admin/employees',         iconKey: 'Users',     group: 'settings', sortOrder: 71, requirePermission: true },
+  { id: 'mod-contract-terms',   name: '계약 약관 관리', path: '/admin/contract-terms',    iconKey: 'Doc',       group: 'settings', sortOrder: 72, requirePermission: true },
+  { id: 'mod-message-templates',name: '메시지 센터',    path: '/admin/message-templates', iconKey: 'Clipboard', group: 'settings', sortOrder: 73, requirePermission: true },
 ]
 
 // ─── 숨김 경로 (legacy + 통합/축소 / 미사용) ───
