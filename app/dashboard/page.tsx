@@ -370,12 +370,42 @@ export default function DashboardPage() {
             </div>
           )}
 
-          {/* 모듈 없음 */}
+          {/* 모듈 없음 — 라이드 직원이면 라이드 홈, 그 외 메시지 */}
           {!showCars && !showCustomers && !showInvest && !showFinance && (
-            <div className="si-card rounded-2xl p-6 border border-black/[0.06] text-center" style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(241,245,249,0.98) 100%)' }}>
-              <p className="text-lg font-black text-slate-600">활성화된 모듈이 없습니다</p>
-              <p className="text-slate-500 text-sm mt-1">관리자에게 모듈 활성화를 요청해주세요</p>
-            </div>
+            orgBrand.brand === 'RIDE' ? (
+              <div className="si-card rounded-2xl p-5 border border-black/[0.06]" style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(241,245,249,0.98) 100%)' }}>
+                <div className="flex items-center justify-between mb-4">
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">라이드 홈</span>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <Link href="/CallScheduler" className="block p-4 rounded-xl border border-black/[0.06] hover:border-blue-300 transition-all" style={{ background: 'linear-gradient(135deg, rgba(59,130,246,0.05) 0%, rgba(99,102,241,0.05) 100%)' }}>
+                    <div className="text-2xl mb-2">📅</div>
+                    <div className="text-sm font-bold text-slate-700">근무시간표</div>
+                    <div className="text-[11px] text-slate-500 mt-0.5">이번 달 일정 확인 / 작성</div>
+                  </Link>
+                  <Link href="/meetings" className="block p-4 rounded-xl border border-black/[0.06] hover:border-blue-300 transition-all" style={{ background: 'linear-gradient(135deg, rgba(168,85,247,0.05) 0%, rgba(217,70,239,0.05) 100%)' }}>
+                    <div className="text-2xl mb-2">📋</div>
+                    <div className="text-sm font-bold text-slate-700">회의록</div>
+                    <div className="text-[11px] text-slate-500 mt-0.5">최근 회의 기록 보기</div>
+                  </Link>
+                  <Link href="/work-essentials/receipts" className="block p-4 rounded-xl border border-black/[0.06] hover:border-blue-300 transition-all" style={{ background: 'linear-gradient(135deg, rgba(245,158,11,0.05) 0%, rgba(251,146,60,0.05) 100%)' }}>
+                    <div className="text-2xl mb-2">🧾</div>
+                    <div className="text-sm font-bold text-slate-700">영수증 제출</div>
+                    <div className="text-[11px] text-slate-500 mt-0.5">법인카드 사용 내역 등록</div>
+                  </Link>
+                  <Link href="/work-essentials/my-info" className="block p-4 rounded-xl border border-black/[0.06] hover:border-blue-300 transition-all" style={{ background: 'linear-gradient(135deg, rgba(16,185,129,0.05) 0%, rgba(20,184,166,0.05) 100%)' }}>
+                    <div className="text-2xl mb-2">👤</div>
+                    <div className="text-sm font-bold text-slate-700">내 정보</div>
+                    <div className="text-[11px] text-slate-500 mt-0.5">프로필 / 카드 등록</div>
+                  </Link>
+                </div>
+              </div>
+            ) : (
+              <div className="si-card rounded-2xl p-6 border border-black/[0.06] text-center" style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(241,245,249,0.98) 100%)' }}>
+                <p className="text-lg font-black text-slate-600">활성화된 모듈이 없습니다</p>
+                <p className="text-slate-500 text-sm mt-1">관리자에게 모듈 활성화를 요청해주세요</p>
+              </div>
+            )
           )}
         </div>
 
