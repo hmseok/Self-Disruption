@@ -76,27 +76,42 @@ export async function POST(request: NextRequest) {
     const mode: 'invest' | 'jiip' | 'both' = body.mode || 'both'
 
     // ── 0) 마스터 데이터 — 투자자 / 지입자 이름 사전 ──
+    // schema.prisma 가 stale (id 가 String 으로 정의됐지만 실제 DB 는 INT) — raw SQL 사용
     const investors: InvestorRow[] = []
     if (mode === 'invest' || mode === 'both') {
-      const rows = await prisma.generalInvestment.findMany({
-        where: { status: 'active', investor_name: { not: null } },
-        select: { id: true, investor_name: true, car_id: true },
-      })
-      for (const r of rows) {
-        if (r.investor_name) investors.push({
-          id: r.id, type: 'invest', investor_name: r.investor_name, car_id: r.car_id || null
-        })
+      try {
+        const rows = await prisma.$queryRawUnsafe<Array<any>>(
+          `SELECT id, investor_name, car_id FROM general_investments
+            WHERE status = 'active' AND investor_name IS NOT NULL AND investor_name != ''`
+        )
+        for (const r of rows) {
+          investors.push({
+            id: String(r.id),
+            type: 'invest',
+            investor_name: String(r.investor_name),
+            car_id: r.car_id ? String(r.car_id) : null,
+          })
+        }
+      } catch (e: any) {
+        console.warn('[investor-jiip] general_investments load failed:', e?.message)
       }
     }
     if (mode === 'jiip' || mode === 'both') {
-      const rows = await prisma.jiipContract.findMany({
-        where: { status: 'active', investor_name: { not: null } },
-        select: { id: true, investor_name: true, car_id: true },
-      })
-      for (const r of rows) {
-        if (r.investor_name) investors.push({
-          id: r.id, type: 'jiip', investor_name: r.investor_name, car_id: r.car_id || null
-        })
+      try {
+        const rows = await prisma.$queryRawUnsafe<Array<any>>(
+          `SELECT id, investor_name, car_id FROM jiip_contracts
+            WHERE status = 'active' AND investor_name IS NOT NULL AND investor_name != ''`
+        )
+        for (const r of rows) {
+          investors.push({
+            id: String(r.id),
+            type: 'jiip',
+            investor_name: String(r.investor_name),
+            car_id: r.car_id ? String(r.car_id) : null,
+          })
+        }
+      } catch (e: any) {
+        console.warn('[investor-jiip] jiip_contracts load failed:', e?.message)
       }
     }
 
