@@ -5,6 +5,7 @@ import { COLORS, GLASS, pillStyle } from '@/app/utils/ui-tokens'
 import {
   Button, KpiCard, KpiRow, PageHeader, ScreenWrap, Section, Spinner, TextInput,
 } from '../_components/ui'
+import { getAuthHeader } from '@/app/utils/auth-client'
 import SubNav from '../_components/SubNav'
 import { DEFAULT_AXES, PRIMARY_AXIS_KEYS, SECONDARY_AXIS_KEYS, type CodeAxis } from '../groups/defaults'
 
@@ -15,9 +16,6 @@ import { DEFAULT_AXES, PRIMARY_AXIS_KEYS, SECONDARY_AXIS_KEYS, type CodeAxis } f
 //   저장: localStorage('ride_op_factory_classifications')
 //     형태: { [factcode]: { [axisKey]: string[] /* itemKeys */ } }
 // ───────────────────────────────────────────────────────────────
-
-const AXES_STORAGE_KEY = 'ride_op_classifications_v2'
-const MAPPING_STORAGE_KEY = 'ride_op_factory_classifications'
 
 type FactoryMapping = Record<string, Record<string, string[]>>
 
@@ -30,28 +28,49 @@ type Factory = {
   [key: string]: any
 }
 
-function loadAxes(): CodeAxis[] {
-  if (typeof window === 'undefined') return DEFAULT_AXES
+async function fetchAxes(): Promise<CodeAxis[]> {
   try {
-    const raw = window.localStorage.getItem(AXES_STORAGE_KEY)
-    if (!raw) return DEFAULT_AXES
-    const parsed = JSON.parse(raw) as CodeAxis[]
-    return parsed.length > 0 ? parsed : DEFAULT_AXES
-  } catch { return DEFAULT_AXES }
+    const auth = await getAuthHeader()
+    const res = await fetch('/factory-search/api/axes', { headers: auth, cache: 'no-store' })
+    const json = await res.json()
+    if (json?.success && Array.isArray(json.data) && json.data.length > 0) return json.data
+  } catch { /* ignore */ }
+  return DEFAULT_AXES
 }
 
-function loadMapping(): FactoryMapping {
-  if (typeof window === 'undefined') return {}
+async function fetchAllMappings(): Promise<FactoryMapping> {
   try {
-    const raw = window.localStorage.getItem(MAPPING_STORAGE_KEY)
-    if (!raw) return {}
-    return JSON.parse(raw) as FactoryMapping
-  } catch { return {} }
+    const auth = await getAuthHeader()
+    const res = await fetch('/factory-search/api/mappings', { headers: auth, cache: 'no-store' })
+    const json = await res.json()
+    if (json?.success && json.data) return json.data as FactoryMapping
+  } catch { /* ignore */ }
+  return {}
 }
 
-function saveMapping(m: FactoryMapping) {
-  if (typeof window === 'undefined') return
-  window.localStorage.setItem(MAPPING_STORAGE_KEY, JSON.stringify(m))
+async function postFactoryMapping(factcode: string, mapping: Record<string, string[]>): Promise<boolean> {
+  try {
+    const auth = await getAuthHeader()
+    const res = await fetch('/factory-search/api/mappings', {
+      method: 'POST',
+      headers: { ...auth, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ factcode, mapping }),
+    })
+    const json = await res.json()
+    return !!json?.success
+  } catch { return false }
+}
+
+async function deleteFactoryMapping(factcode: string): Promise<boolean> {
+  try {
+    const auth = await getAuthHeader()
+    const res = await fetch(`/factory-search/api/mappings/${encodeURIComponent(factcode)}`, {
+      method: 'DELETE',
+      headers: auth,
+    })
+    const json = await res.json()
+    return !!json?.success
+  } catch { return false }
 }
 
 export default function MappingMain() {
@@ -62,10 +81,18 @@ export default function MappingMain() {
   const [axes, setAxes] = useState<CodeAxis[]>(DEFAULT_AXES)
   const [mapping, setMapping] = useState<FactoryMapping>({})
   const [savedAt, setSavedAt] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
 
+  // 첫 진입: axes + 전체 매핑 DB 로드
   useEffect(() => {
-    setAxes(loadAxes())
-    setMapping(loadMapping())
+    let cancelled = false
+    ;(async () => {
+      const [a, m] = await Promise.all([fetchAxes(), fetchAllMappings()])
+      if (cancelled) return
+      setAxes(a)
+      setMapping(m)
+    })()
+    return () => { cancelled = true }
   }, [])
 
   // 공장 목록 로드 — 즐겨찾기 우선 (factcode K* 시작)
@@ -122,18 +149,31 @@ export default function MappingMain() {
     })
   }
 
-  const persist = () => {
-    saveMapping(mapping)
-    setSavedAt(new Date().toLocaleTimeString('ko-KR'))
+  const persist = async () => {
+    if (!selectedCode) {
+      alert('저장할 공장을 좌측에서 선택하세요.')
+      return
+    }
+    setSaving(true)
+    const ok = await postFactoryMapping(selectedCode, mapping[selectedCode] || {})
+    setSaving(false)
+    if (ok) setSavedAt(new Date().toLocaleTimeString('ko-KR'))
+    else alert('저장 실패 — 잠시 후 다시 시도해주세요.')
   }
 
-  const clearFactory = (factcode: string) => {
+  const clearFactory = async (factcode: string) => {
     if (!confirm('이 공장의 모든 분류 부여를 초기화할까요?')) return
-    setMapping(prev => {
-      const next = { ...prev }
-      delete next[factcode]
-      return next
-    })
+    const ok = await deleteFactoryMapping(factcode)
+    if (ok) {
+      setMapping(prev => {
+        const next = { ...prev }
+        delete next[factcode]
+        return next
+      })
+      setSavedAt(new Date().toLocaleTimeString('ko-KR'))
+    } else {
+      alert('초기화 실패 — 잠시 후 다시 시도해주세요.')
+    }
   }
 
   // 표시할 axis — 숨김 처리되지 않은 것만, 메인/부가 영역 분리 (그룹 구성과 동일 패턴)
@@ -160,7 +200,9 @@ export default function MappingMain() {
         right={
           <>
             {savedAt && <span style={{ fontSize: 11, color: COLORS.success }}>✓ {savedAt} 저장됨</span>}
-            <Button variant="primary" size="md" onClick={persist}>저장</Button>
+            <Button variant="primary" size="md" onClick={persist} disabled={saving || !selectedCode}>
+              {saving ? '저장 중…' : selectedCode ? '이 공장 저장' : '공장 선택'}
+            </Button>
           </>
         }
       />

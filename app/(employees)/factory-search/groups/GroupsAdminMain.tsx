@@ -5,58 +5,54 @@ import {
   Button, KpiCard, KpiRow, PageHeader, ScreenWrap, Section,
   StatusBadge, TextInput,
 } from '../_components/ui'
+import { getAuthHeader } from '@/app/utils/auth-client'
 import merged from '../_data/factories-merged.json'
 import SubNav from '../_components/SubNav'
 import { DEFAULT_AXES, PRIMARY_AXIS_KEYS, SECONDARY_AXIS_KEYS, type CodeAxis, type CodeItem } from './defaults'
 
 // ───────────────────────────────────────────────────────────────
-// 그룹 구성 — 13축 + 사용자 정의 축
+// 그룹 구성 — 13축 + 사용자 정의 축 (DB 연결, Phase 5)
 //   메인 (공장 분류 5축): 즐겨찾기 그룹 / 보험 입고 / 공장 유형 / 특수 태그 / 차량 분류
 //   부가 (운영·사고 분류 8축, 접기): 정산 / 고객사 / 관리유형 / 사고유형 / 처리상태 / 손해 / 견인 / 서비스
 //   사용자 정의 축: 메인 영역에 함께 표출 (사용자가 직접 만든 것이라 우선 노출)
-// localStorage('ride_op_classifications_v2') 에 저장
+// 저장: /factory-search/api/axes (DB factory_axis_definitions)
 // ───────────────────────────────────────────────────────────────
 
-const STORAGE_KEY = 'ride_op_classifications_v2'
-
-function loadAxes(): CodeAxis[] {
-  if (typeof window === 'undefined') return DEFAULT_AXES
+async function fetchAxes(): Promise<{ axes: CodeAxis[]; pending: boolean }> {
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY)
-    if (!raw) return DEFAULT_AXES
-    const parsed = JSON.parse(raw) as CodeAxis[]
-
-    // 1) saved 의 순서를 우선 — DEFAULT_AXES 와 saved 를 key 단위 머지
-    const byKey = new Map<string, CodeAxis>()
-    for (const d of DEFAULT_AXES) byKey.set(d.key, d)
-
-    const result: CodeAxis[] = []
-    const seenKeys = new Set<string>()
-
-    for (const s of parsed) {
-      const d = byKey.get(s.key)
-      if (d) {
-        // default axis: items 보강 + 메타 saved 우선
-        const items = d.items.map(di => s.items.find(si => si.key === di.key) || di)
-        const customItems = s.items.filter(si => !d.items.some(di => di.key === si.key))
-        result.push({ ...d, ...s, items: [...items, ...customItems] })
-      } else {
-        // 사용자 정의 axis
-        result.push({ ...s, axisCustom: true })
-      }
-      seenKeys.add(s.key)
+    const auth = await getAuthHeader()
+    const res = await fetch('/factory-search/api/axes', { headers: auth, cache: 'no-store' })
+    const json = await res.json()
+    if (json?.success && Array.isArray(json.data)) {
+      return { axes: json.data, pending: !!json._migration_pending }
     }
-    // saved 에 없는 default axis 추가 (스키마 진화 대응)
-    for (const d of DEFAULT_AXES) {
-      if (!seenKeys.has(d.key)) result.push(d)
-    }
-    return result
-  } catch { return DEFAULT_AXES }
+  } catch { /* ignore */ }
+  return { axes: [], pending: false }
 }
 
-function saveAxes(axes: CodeAxis[]) {
-  if (typeof window === 'undefined') return
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(axes))
+async function postAxes(axes: CodeAxis[]): Promise<boolean> {
+  try {
+    const auth = await getAuthHeader()
+    const res = await fetch('/factory-search/api/axes', {
+      method: 'POST',
+      headers: { ...auth, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ axes }),
+    })
+    const json = await res.json()
+    return !!json?.success
+  } catch { return false }
+}
+
+async function postReset(): Promise<boolean> {
+  try {
+    const auth = await getAuthHeader()
+    const res = await fetch('/factory-search/api/axes/reset', {
+      method: 'POST',
+      headers: { ...auth, 'Content-Type': 'application/json' },
+    })
+    const json = await res.json()
+    return !!json?.success
+  } catch { return false }
 }
 
 // 데이터에서 각 코드 값 카운트
@@ -91,10 +87,31 @@ export default function GroupsAdminMain() {
   const [activeAxis, setActiveAxis] = useState<string>('group')
   const [showHiddenAxes, setShowHiddenAxes] = useState(false)
   const [showSecondary, setShowSecondary] = useState(false)
+  const [pending, setPending] = useState(false)
+  const [migrationPending, setMigrationPending] = useState(false)
   const counts = useMemo(() => buildCounts(), [])
   const totalFactories = (merged as { factories: unknown[] }).factories.length
 
-  useEffect(() => { setAxes(loadAxes()) }, [])
+  // 첫 진입: GET /axes — 빈 배열이면 reset(13축 시드) 후 재조회
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      setPending(true)
+      const { axes: db, pending: pen } = await fetchAxes()
+      if (cancelled) return
+      setMigrationPending(pen)
+      if (db.length === 0 && !pen) {
+        // 첫 진입 — 13축 시드
+        await postReset()
+        const { axes: seeded } = await fetchAxes()
+        if (!cancelled) setAxes(seeded.length > 0 ? seeded : DEFAULT_AXES)
+      } else {
+        setAxes(db.length > 0 ? db : DEFAULT_AXES)
+      }
+      setPending(false)
+    })()
+    return () => { cancelled = true }
+  }, [])
 
   // ── 항목 단위 ─────────────────────────────────────────
   const updateItem = (axisKey: string, itemKey: string, patch: Partial<CodeItem>) => {
@@ -162,17 +179,27 @@ export default function GroupsAdminMain() {
     })
   }
 
-  // ── 저장 / 초기화 ─────────────────────────────────────────
-  const persist = () => {
-    saveAxes(axes)
-    setSavedAt(new Date().toLocaleTimeString('ko-KR'))
+  // ── 저장 / 초기화 (DB 연동) ─────────────────────────────
+  const persist = async () => {
+    setPending(true)
+    const ok = await postAxes(axes)
+    setPending(false)
+    if (ok) setSavedAt(new Date().toLocaleTimeString('ko-KR'))
+    else alert('저장 실패 — 잠시 후 다시 시도해주세요.')
   }
-  const reset = () => {
-    if (!confirm('초기 13축 + 항목으로 복원합니다. 사용자 정의 축/항목은 모두 사라집니다. 계속할까요?')) return
-    setAxes(DEFAULT_AXES)
-    saveAxes(DEFAULT_AXES)
-    setSavedAt(new Date().toLocaleTimeString('ko-KR'))
-    setActiveAxis(DEFAULT_AXES[0]?.key || '')
+  const reset = async () => {
+    if (!confirm('초기 13축 + 항목으로 복원합니다. 사용자 정의 축/항목은 모두 사라집니다.\n공장에 부여된 모든 분류도 함께 초기화됩니다. 계속할까요?')) return
+    setPending(true)
+    const ok = await postReset()
+    if (ok) {
+      const { axes: seeded } = await fetchAxes()
+      setAxes(seeded.length > 0 ? seeded : DEFAULT_AXES)
+      setActiveAxis((seeded[0] || DEFAULT_AXES[0])?.key || '')
+      setSavedAt(new Date().toLocaleTimeString('ko-KR'))
+    } else {
+      alert('초기화 실패 — 잠시 후 다시 시도해주세요.')
+    }
+    setPending(false)
   }
 
   const stats = useMemo(() => ({
@@ -213,9 +240,10 @@ export default function GroupsAdminMain() {
         emoji="🏷"
         right={
           <>
-            {savedAt && <span className="text-[11px] text-emerald-600">✓ {savedAt} 저장됨</span>}
-            <Button variant="secondary" size="md" onClick={reset}>초기 설정</Button>
-            <Button variant="primary" size="md" onClick={persist}>저장</Button>
+            {migrationPending && <span style={{ fontSize: 11, color: '#dc2626' }}>⚠ 마이그레이션 미적용</span>}
+            {savedAt && <span style={{ fontSize: 11, color: '#10b981' }}>✓ {savedAt} 저장됨</span>}
+            <Button variant="secondary" size="md" onClick={reset} disabled={pending}>초기 설정</Button>
+            <Button variant="primary" size="md" onClick={persist} disabled={pending}>{pending ? '저장 중…' : '저장'}</Button>
           </>
         }
       />
