@@ -238,18 +238,26 @@ export default function WorkersTab() {
                       </td>
                       <td style={tdStyle}>
                         {isEditing ? (
+                          // PR-2QQ-a — 14 색상 dot picker
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
-                            {COLOR_TONE_OPTIONS.map(opt => (
-                              <button key={opt.value} type="button"
-                                      onClick={() => setEditTone(opt.value)}
-                                      style={{
-                                        padding: '2px 6px', fontSize: 10, fontWeight: 700, borderRadius: 4,
-                                        background: editTone === opt.value ? TONE_BG[opt.value] : 'transparent',
-                                        color: editTone === opt.value ? TONE_TEXT[opt.value] : COLORS.textSecondary,
-                                        border: `1px solid ${editTone === opt.value ? COLORS.borderBlue : COLORS.borderFaint}`,
-                                        cursor: 'pointer',
-                                      }}>{opt.label}</button>
-                            ))}
+                            {COLOR_TONE_OPTIONS.map(opt => {
+                              const active = editTone === opt.value
+                              return (
+                                <button key={opt.value} type="button"
+                                        onClick={() => setEditTone(opt.value)}
+                                        title={opt.label}
+                                        style={{
+                                          width: 18, height: 18, borderRadius: '50%',
+                                          background: opt.value === 'none' ? '#fff' : opt.hex,
+                                          border: active ? `2px solid ${COLORS.primary}` : `1px solid ${COLORS.borderFaint}`,
+                                          cursor: 'pointer', padding: 0,
+                                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                          fontSize: 10, color: '#fff', fontWeight: 700,
+                                        }}>
+                                  {active ? '✓' : ''}
+                                </button>
+                              )
+                            })}
                           </div>
                         ) : (
                           <span style={{

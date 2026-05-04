@@ -3,6 +3,31 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-04 (밤 — 그룹 마스터 강화)
+
+### PR-2QQ-a — 그룹 마스터 UI 강화 (카테고리/카드/색상)
+- DB 마이그레이션: `2026-05-04_cs_shift_groups_category.sql`
+  - `cs_shift_groups.category VARCHAR(32)` 추가 (default 'general')
+  - `cs_shift_groups.color_tone` ENUM 7→14 (indigo/sky/teal/lime/orange/pink/slate 추가)
+  - `cs_workers.color_tone` 동일 14개로 확장
+  - 인덱스: `idx_cs_grp_category (category, sort_order)`
+- API:
+  - `/api/call-scheduler/shift-groups` GET: 멤버 chip 정보 + category 응답 (graceful — 컬럼 없어도 'general' fallback)
+  - POST/PATCH: category 인자 지원 + color_tone 14개 화이트리스트
+- UI `GroupsTab`:
+  - 카테고리 필터 pill (전체 / 주간 / 야간 / 특수 / 일반 / 사용자 정의)
+  - 정렬 옵션 (커스텀 순서 / 시작 시간 / 이름 / 멤버 수)
+  - 카테고리별 섹션 표시 (sort_order 모드 + 전체 필터 시)
+  - 그룹 카드 상세화: 좌측 색상바 + 시간/익일 배지 + 패턴 detail (custom 요일 명시) + 멤버 chip stack (워커 색상 적용) + 설명
+  - 카드 안 [▲▼] 순서 변경 버튼 (sort_order 모드)
+- UI `GroupEditor`:
+  - 카테고리 선택 (pill + 직접 입력)
+  - 색상 picker → 14 dot swatches (그룹 색상)
+- UI `WorkersTab`:
+  - 직원 색상 picker → 14 dot swatches
+- 유틸 `palette.ts`: 14개 토큰 매핑 (TONE_BG/BORDER/TEXT/SOLID)
+- 유틸 `types.ts`: ColorTone union 14개 + COLOR_TONE_OPTIONS hex 동봉
+
 ## 2026-05-04 (밤 — 메뉴 정리 추가)
 
 ### PR-2PP — 상세 [⋯] 메뉴 단순화

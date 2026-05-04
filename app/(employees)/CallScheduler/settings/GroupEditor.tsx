@@ -46,6 +46,8 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
   const [colorTone, setColorTone] = useState<ColorTone>('none')
   const [description, setDescription] = useState('')
   const [memberIds, setMemberIds] = useState<string[]>([])
+  // PR-2QQ-a: 카테고리
+  const [category, setCategory] = useState('general')
 
   // 기존 그룹 로드
   useEffect(() => {
@@ -69,6 +71,7 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
         setRotationPeriod(group.rotation_period_days || 1)
         setColorTone(group.color_tone)
         setDescription(group.description || '')
+        setCategory(group.category || 'general')
         setMemberIds(members.map((m: any) => m.worker_id))
       } catch (e: any) { setError(e?.message || '오류') }
       finally { if (!abort) setLoading(false) }
@@ -101,6 +104,7 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
       const auth = await getAuthHeader()
       const payload: any = {
         name: name.trim(),
+        category: category.trim() || 'general',  // PR-2QQ-a
         shift_slot_id: slotId,
         pattern_type: pattern,
         custom_days: pattern === 'custom' ? Array.from(customDays).sort().join(',') : null,
@@ -207,6 +211,33 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
                    style={inputStyle} placeholder="예: 주간 09-18" />
           </Field>
 
+          {/* PR-2QQ-a — 카테고리 */}
+          <Field label="카테고리" sub="그룹 분류 — 같은 카테고리끼리 묶여 표시됩니다">
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {['주간', '야간', '특수', 'general'].map(cat => (
+                <button key={cat} type="button" onClick={() => setCategory(cat)}
+                        style={{
+                          padding: '4px 12px', borderRadius: 999, fontSize: 11, fontWeight: 700,
+                          background: category === cat ? COLORS.bgBlue : 'transparent',
+                          border: `1px solid ${category === cat ? COLORS.borderBlue : COLORS.borderFaint}`,
+                          color: category === cat ? COLORS.info : COLORS.textSecondary,
+                          cursor: 'pointer',
+                        }}>
+                  {cat === 'general' ? '일반' : cat}
+                </button>
+              ))}
+              <input type="text" value={!['주간','야간','특수','general'].includes(category) ? category : ''}
+                     onChange={(e) => setCategory(e.target.value)}
+                     placeholder="직접 입력..."
+                     style={{
+                       padding: '4px 10px', borderRadius: 999, fontSize: 11,
+                       border: `1px solid ${COLORS.borderFaint}`,
+                       background: !['주간','야간','특수','general'].includes(category) ? COLORS.bgBlue : 'transparent',
+                       width: 100,
+                     }} />
+            </div>
+          </Field>
+
           <Field label="시프트 (시간대)" required>
             <div style={{
               display: 'flex', flexWrap: 'wrap', gap: 4,
@@ -306,20 +337,32 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
             )}
           </Field>
 
-          <Field label="식별 색상">
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-              {COLOR_TONE_OPTIONS.map(opt => (
-                <button key={opt.value} type="button" onClick={() => setColorTone(opt.value)}
-                        style={{
-                          padding: '4px 10px', borderRadius: 999, fontSize: 11, fontWeight: 700,
-                          background: colorTone === opt.value ? TONE_BG[opt.value] : 'transparent',
-                          border: `1px solid ${colorTone === opt.value ? COLORS.borderBlue : COLORS.borderFaint}`,
-                          color: colorTone === opt.value ? TONE_TEXT[opt.value] : COLORS.textSecondary,
-                          cursor: 'pointer',
-                        }}>
-                  {opt.label}
-                </button>
-              ))}
+          <Field label="식별 색상" sub="14개 색상 중 선택">
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {COLOR_TONE_OPTIONS.map(opt => {
+                const active = colorTone === opt.value
+                return (
+                  <button key={opt.value} type="button" onClick={() => setColorTone(opt.value)}
+                          title={opt.label}
+                          style={{
+                            width: 28, height: 28, borderRadius: '50%',
+                            background: opt.value === 'none' ? '#fff' : opt.hex,
+                            border: active
+                              ? `3px solid ${COLORS.primary}`
+                              : `1px solid ${COLORS.borderFaint}`,
+                            boxShadow: active ? `0 0 0 2px rgba(255,255,255,0.9)` : 'none',
+                            cursor: 'pointer', padding: 0,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            fontSize: 14, color: opt.value === 'none' ? COLORS.textMuted : '#fff',
+                            fontWeight: 700,
+                          }}>
+                    {opt.value === 'none' ? '∅' : (active ? '✓' : '')}
+                  </button>
+                )
+              })}
+            </div>
+            <div style={{ fontSize: 10, color: COLORS.textMuted, marginTop: 4 }}>
+              현재: {COLOR_TONE_OPTIONS.find(o => o.value === colorTone)?.label || '없음'}
             </div>
           </Field>
 

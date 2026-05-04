@@ -11,6 +11,14 @@ export type ColorTone =
   | 'violet'
   | 'red'
   | 'none'
+  // PR-2QQ-a 확장 (총 14개)
+  | 'indigo'
+  | 'sky'
+  | 'teal'
+  | 'lime'
+  | 'orange'
+  | 'pink'
+  | 'slate'
 
 export type SpecialCode =
   | 'none'      // 일반 근무
@@ -145,12 +153,19 @@ export const SPECIAL_LABEL: Record<SpecialCode, string> = {
   off: '휴무',
 }
 
-export const COLOR_TONE_OPTIONS: { value: ColorTone; label: string }[] = [
-  { value: 'none', label: '없음' },
-  { value: 'blue', label: '파랑' },
-  { value: 'gray', label: '회색' },
-  { value: 'green', label: '녹색' },
-  { value: 'amber', label: '노랑' },
-  { value: 'violet', label: '보라' },
-  { value: 'red', label: '빨강' },
+export const COLOR_TONE_OPTIONS: { value: ColorTone; label: string; hex: string }[] = [
+  { value: 'none',   label: '없음',   hex: '#e5e7eb' },
+  { value: 'blue',   label: '파랑',   hex: '#3b82f6' },
+  { value: 'sky',    label: '하늘',   hex: '#0ea5e9' },
+  { value: 'indigo', label: '인디고', hex: '#6366f1' },
+  { value: 'violet', label: '보라',   hex: '#7c3aed' },
+  { value: 'pink',   label: '핑크',   hex: '#ec4899' },
+  { value: 'red',    label: '빨강',   hex: '#ef4444' },
+  { value: 'orange', label: '오렌지', hex: '#f97316' },
+  { value: 'amber',  label: '노랑',   hex: '#f59e0b' },
+  { value: 'lime',   label: '라임',   hex: '#84cc16' },
+  { value: 'green',  label: '녹색',   hex: '#22c55e' },
+  { value: 'teal',   label: '틸',     hex: '#14b8a6' },
+  { value: 'gray',   label: '회색',   hex: '#9ca3af' },
+  { value: 'slate',  label: '슬레이트', hex: '#64748b' },
 ]
