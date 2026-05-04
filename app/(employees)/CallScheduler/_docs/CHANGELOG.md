@@ -3,6 +3,31 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-04 (밤 — 워커 제약 모델)
+
+### PR-2QQ-d-1 — 워커 제약 모델 + WorkersTab UI 강화
+- 운영 사실 (Rule 25): 외부/내부 통합 모델. priority + 비선호 요일 + 필수/최대 일수 + 자유 패턴.
+- DB 마이그레이션: `2026-05-04_cs_workers_constraints.sql`
+  - `cs_workers.priority_level TINYINT DEFAULT 2` (1=최우선, 2=일반, 3=백업)
+  - `cs_workers.preferred_dow_avoid VARCHAR(16)` ('0,5' = 일·금)
+  - `cs_workers.required_days_per_month TINYINT NULL`
+  - `cs_workers.max_days_per_month TINYINT NULL`
+  - `cs_workers.work_pattern_text VARCHAR(64)` (외부 + 일반 통합 — 자유 메모)
+  - 인덱스: `idx_cs_w_priority (priority_level, is_active)`
+  - external_pattern → work_pattern_text 자동 마이그
+- API:
+  - `/api/call-scheduler/workers` GET/POST: 새 컬럼 graceful 추가
+  - `/api/call-scheduler/workers/[id]` PATCH: 새 컬럼 화이트리스트
+- UI `WorkersTab`:
+  - 편집 모드 시 ConstraintsPanel 펼침 (colSpan row)
+  - 좌측: 우선순위 (P1/P2/P3) + 외부 직원 토글 + 비선호 요일 (7 button)
+  - 우측: 월 필수/최대 일수 + 자유 패턴 메모
+  - 비편집 모드: 외부 직원 🔒 배지 + P1 빨간 배지 표시
+  - 저장 시 RideEmployees PATCH (color/group) + cs_workers PATCH (constraints) 동시
+- **외부 직원 엑셀 업로드 폐기** — `ExternalScheduleDialog` + `external-schedule` API orphan
+  - 상세 [⋯] 메뉴에서 항목 제거
+  - 코드 파일 자체는 남아있음 (commit 시 git rm 필요)
+
 ## 2026-05-04 (밤 — 사소한 UX 보강)
 
 ### PR-2QQ-fix1 — RideEmployees 목록 헤더 뒤로가기

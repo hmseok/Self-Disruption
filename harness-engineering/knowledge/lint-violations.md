@@ -941,3 +941,67 @@
 - sql-fn-lint: total=0
 - api-trace: broken=33, newBroken=0
 - ui-coverage: warnings=33
+
+## 2026-05-04 11:44:15
+- sql-lint: total=54, new=0, known=54
+- sql-fn-lint: total=0
+- api-trace: broken=33, newBroken=0
+- ui-coverage: warnings=33
+
+## 2026-05-04 11:48:58
+- sql-lint: total=54, new=0, known=54
+- sql-fn-lint: total=0
+- api-trace: broken=33, newBroken=0
+- ui-coverage: warnings=33
+
+## 2026-05-04 11:52:41
+- sql-lint: total=55, new=1, known=54
+- sql-fn-lint: total=0
+- api-trace: broken=33, newBroken=0
+- ui-coverage: warnings=33
+  - **새 SQL 컬럼 위반**:
+    - `app/api/finance/transactions/auto-match-fmi-rental/route.ts:348` car_number (unprefixed) (table `cars` 에 `car_number` 없음)
+
+## 2026-05-04 11:54:04
+- sql-lint: total=55, new=1, known=54
+- sql-fn-lint: total=0
+- api-trace: broken=33, newBroken=0
+- ui-coverage: warnings=33
+  - **새 SQL 컬럼 위반**:
+    - `app/api/finance/transactions/auto-match-fmi-rental/route.ts:348` car_number (unprefixed) (table `cars` 에 `car_number` 없음)
+
+## 2026-05-04 11:54:55
+- sql-lint: total=54, new=0, known=54
+- sql-fn-lint: total=0
+- api-trace: broken=33, newBroken=0
+- ui-coverage: warnings=33
+
+## 2026-05-04 11:58:30
+- sql-lint: total=54, new=0, known=54
+- sql-fn-lint: total=0
+- api-trace: broken=33, newBroken=0
+- ui-coverage: warnings=33
+
+## 2026-05-04 12:08:35
+- sql-lint: total=54, new=0, known=54
+- sql-fn-lint: total=0
+- api-trace: broken=33, newBroken=0
+- ui-coverage: warnings=33
+
+## 2026-05-04 12:10:35
+- sql-lint: total=54, new=0, known=54
+- sql-fn-lint: total=0
+- api-trace: broken=33, newBroken=0
+- ui-coverage: warnings=33
+
+## 2026-05-04 12:10:49
+- sql-lint: total=54, new=0, known=54
+- sql-fn-lint: total=0
+- api-trace: broken=33, newBroken=0
+- ui-coverage: warnings=33
+
+## 2026-05-04 12:14:35
+- sql-lint: total=54, new=0, known=54
+- sql-fn-lint: total=0
+- api-trace: broken=33, newBroken=0
+- ui-coverage: warnings=33

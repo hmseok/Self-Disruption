@@ -37,6 +37,13 @@ export default function WorkersTab() {
   const [editTone, setEditTone] = useState<ColorTone>('none')
   const [editGroup, setEditGroup] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  // PR-2QQ-d-1 — 워커 제약 셋팅
+  const [editIsExternal, setEditIsExternal] = useState(false)
+  const [editPriority, setEditPriority] = useState(2)
+  const [editAvoidDow, setEditAvoidDow] = useState<Set<number>>(new Set())
+  const [editRequired, setEditRequired] = useState<string>('')
+  const [editMax, setEditMax] = useState<string>('')
+  const [editPattern, setEditPattern] = useState<string>('')
 
   const load = async () => {
     setLoading(true); setError(null)
@@ -73,6 +80,14 @@ export default function WorkersTab() {
 
   const startEdit = (w: Worker) => {
     setEditingId(w.id); setEditTone(w.color_tone); setEditGroup(w.group_label)
+    setEditIsExternal(!!w.is_external)
+    setEditPriority(w.priority_level || 2)
+    setEditAvoidDow(new Set(
+      (w.preferred_dow_avoid || '').split(',').map(s => Number(s.trim())).filter(n => !isNaN(n))
+    ))
+    setEditRequired(w.required_days_per_month != null ? String(w.required_days_per_month) : '')
+    setEditMax(w.max_days_per_month != null ? String(w.max_days_per_month) : '')
+    setEditPattern(w.work_pattern_text || '')
   }
   const cancelEdit = () => { setEditingId(null) }
 
@@ -80,9 +95,7 @@ export default function WorkersTab() {
     setSaving(true); setActionMsg(null)
     try {
       const auth = await getAuthHeader()
-      // workers PATCH 엔드포인트 부재 — 임시로 PUT/POST 대신 RideEmployees PATCH 사용
-      // (cs_workers 의 color_tone/group_label 도 업데이트 필요 — 별도 API 신설 권장)
-      // 본 PR 에서는 RideEmployees 측 업데이트만 (마스터 우선)
+      // 1. RideEmployees 마스터 (color/group) — 사람 정보
       const emp = employees.find(e => e.id === (w as any).employee_id) || employees.find(e => e.name === w.name)
       if (emp) {
         const res = await fetch(`/api/ride-employees/${emp.id}`, {
@@ -91,10 +104,27 @@ export default function WorkersTab() {
           body: JSON.stringify({ color_tone: editTone, group_label: editGroup }),
         })
         const json = await res.json()
-        if (!res.ok) throw new Error(json?.error || '저장 실패')
-      } else {
-        throw new Error('연결된 라이드 직원이 없습니다. RideEmployees 마스터에서 먼저 등록하세요.')
+        if (!res.ok) throw new Error(json?.error || 'RideEmployees 저장 실패')
       }
+      // 2. cs_workers (PR-2QQ-d-1: 제약 셋팅)
+      const avoidStr = Array.from(editAvoidDow).sort().join(',')
+      const wRes = await fetch(`/api/call-scheduler/workers/${w.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...auth },
+        body: JSON.stringify({
+          color_tone: editTone,
+          group_label: editGroup,
+          is_external: editIsExternal,
+          priority_level: editPriority,
+          preferred_dow_avoid: avoidStr || null,
+          required_days_per_month: editRequired ? Number(editRequired) : null,
+          max_days_per_month: editMax ? Number(editMax) : null,
+          work_pattern_text: editPattern.trim() || null,
+        }),
+      })
+      const wJson = await wRes.json()
+      if (!wRes.ok) throw new Error(wJson?.error || 'cs_workers 저장 실패')
+
       setActionMsg({ ok: true, text: `${w.name} 변경 저장됨` })
       setEditingId(null)
       await load()
@@ -190,7 +220,8 @@ export default function WorkersTab() {
                   const isEditing = editingId === worker.id
                   const tone = isEditing ? editTone : worker.color_tone
                   return (
-                    <tr key={worker.id} style={{ borderBottom: `1px solid ${COLORS.borderFaint}` }}>
+                    <>
+                    <tr key={worker.id} style={{ borderBottom: isEditing ? 'none' : `1px solid ${COLORS.borderFaint}` }}>
                       <td style={tdStyle}>
                         <span style={{
                           color: TONE_TEXT[tone],
@@ -297,8 +328,36 @@ export default function WorkersTab() {
                                     border: `1px solid ${COLORS.borderBlue}`, cursor: 'pointer',
                                   }}>편집</button>
                         )}
+                        {!isEditing && worker.is_external && (
+                          <span style={{
+                            marginLeft: 6, fontSize: 9, padding: '1px 5px', borderRadius: 4,
+                            background: COLORS.bgViolet, color: '#7c3aed', fontWeight: 800,
+                          }} title="외부 직원">🔒 외부</span>
+                        )}
+                        {!isEditing && worker.priority_level === 1 && (
+                          <span style={{
+                            marginLeft: 4, fontSize: 9, padding: '1px 5px', borderRadius: 4,
+                            background: COLORS.bgRed, color: COLORS.danger, fontWeight: 800,
+                          }} title="1순위">P1</span>
+                        )}
                       </td>
                     </tr>
+                    {/* PR-2QQ-d-1 — 편집 시 제약 셋팅 펼침 */}
+                    {isEditing && (
+                      <tr key={`${worker.id}-edit`} style={{ borderBottom: `1px solid ${COLORS.borderFaint}`, background: 'rgba(59,130,246,0.04)' }}>
+                        <td colSpan={7} style={{ padding: '12px 14px' }}>
+                          <ConstraintsPanel
+                            isExternal={editIsExternal} setIsExternal={setEditIsExternal}
+                            priority={editPriority} setPriority={setEditPriority}
+                            avoidDow={editAvoidDow} setAvoidDow={setEditAvoidDow}
+                            required={editRequired} setRequired={setEditRequired}
+                            max={editMax} setMax={setEditMax}
+                            pattern={editPattern} setPattern={setEditPattern}
+                          />
+                        </td>
+                      </tr>
+                    )}
+                    </>
                   )
                 })}
               </tbody>
@@ -346,4 +405,165 @@ const thStyle: React.CSSProperties = {
 }
 const tdStyle: React.CSSProperties = {
   padding: '8px 10px', whiteSpace: 'nowrap', color: COLORS.textPrimary,
+}
+
+// PR-2QQ-d-1 — 워커 제약 패널 (편집 시 펼침)
+function ConstraintsPanel({
+  isExternal, setIsExternal,
+  priority, setPriority,
+  avoidDow, setAvoidDow,
+  required, setRequired,
+  max, setMax,
+  pattern, setPattern,
+}: {
+  isExternal: boolean; setIsExternal: (v: boolean) => void
+  priority: number; setPriority: (v: number) => void
+  avoidDow: Set<number>; setAvoidDow: (v: Set<number>) => void
+  required: string; setRequired: (v: string) => void
+  max: string; setMax: (v: string) => void
+  pattern: string; setPattern: (v: string) => void
+}) {
+  const DOW = ['일', '월', '화', '수', '목', '금', '토']
+  const toggleDow = (d: number) => {
+    const next = new Set(avoidDow)
+    if (next.has(d)) next.delete(d); else next.add(d)
+    setAvoidDow(next)
+  }
+  return (
+    <div style={{
+      display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14,
+      ...GLASS.L1, borderRadius: 8, padding: 12,
+    }}>
+      {/* 좌측 — 우선순위 + 외부 + 비선호 요일 */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div>
+          <FieldLabel>🏷 우선순위</FieldLabel>
+          <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
+            {[1, 2, 3].map(n => (
+              <button key={n} type="button" onClick={() => setPriority(n)}
+                      style={{
+                        flex: 1, padding: '6px 8px', borderRadius: 6, fontSize: 11, fontWeight: 700,
+                        background: priority === n
+                          ? (n === 1 ? COLORS.bgRed : n === 2 ? COLORS.bgBlue : COLORS.bgGray)
+                          : 'transparent',
+                        color: priority === n
+                          ? (n === 1 ? COLORS.danger : n === 2 ? COLORS.info : COLORS.textSecondary)
+                          : COLORS.textSecondary,
+                        border: `1px solid ${
+                          priority === n
+                            ? (n === 1 ? COLORS.borderRed : n === 2 ? COLORS.borderBlue : COLORS.borderFaint)
+                            : COLORS.borderFaint
+                        }`,
+                        cursor: 'pointer',
+                      }}>
+                {n === 1 ? 'P1 최우선' : n === 2 ? 'P2 일반' : 'P3 백업'}
+              </button>
+            ))}
+          </div>
+          <div style={{ fontSize: 10, color: COLORS.textMuted, marginTop: 3 }}>
+            자동 생성 시 P1 부터 우선 배정 (외부 직원은 보통 P1)
+          </div>
+        </div>
+
+        <div>
+          <FieldLabel>🔒 외부 직원</FieldLabel>
+          <label style={{
+            display: 'flex', alignItems: 'center', gap: 6, marginTop: 4,
+            cursor: 'pointer', userSelect: 'none',
+          }}>
+            <input type="checkbox" checked={isExternal}
+                   onChange={(e) => setIsExternal(e.target.checked)} />
+            <span style={{ fontSize: 12, color: COLORS.textPrimary }}>
+              외부 직원으로 표시 (🔒 아이콘 + 자동 P1 권장)
+            </span>
+          </label>
+        </div>
+
+        <div>
+          <FieldLabel>🚫 비선호 요일</FieldLabel>
+          <div style={{ display: 'flex', gap: 3, marginTop: 4 }}>
+            {DOW.map((label, i) => {
+              const active = avoidDow.has(i)
+              const isWeekend = i === 0 || i === 6
+              return (
+                <button key={i} type="button" onClick={() => toggleDow(i)}
+                        style={{
+                          flex: 1, padding: '6px 0', borderRadius: 4, fontSize: 11, fontWeight: 700,
+                          background: active ? COLORS.bgRed : 'transparent',
+                          color: active
+                            ? COLORS.danger
+                            : (isWeekend ? COLORS.textSecondary : COLORS.textMuted),
+                          border: `1px solid ${active ? COLORS.borderRed : COLORS.borderFaint}`,
+                          cursor: 'pointer',
+                        }}>
+                  {label}
+                </button>
+              )
+            })}
+          </div>
+          <div style={{ fontSize: 10, color: COLORS.textMuted, marginTop: 3 }}>
+            자동 생성 시 이 요일 후순위 (예: 야간 워커 금·일 회피)
+          </div>
+        </div>
+      </div>
+
+      {/* 우측 — 필수/최대 + 패턴 메모 */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+          <div>
+            <FieldLabel>📊 월 필수 일수</FieldLabel>
+            <input type="number" min={0} max={31} value={required}
+                   onChange={(e) => setRequired(e.target.value)}
+                   placeholder="없음"
+                   style={{
+                     width: '100%', padding: '6px 8px', borderRadius: 6, fontSize: 12,
+                     border: `1px solid ${COLORS.borderFaint}`,
+                     background: 'rgba(255,255,255,0.85)', marginTop: 4,
+                   }} />
+            <div style={{ fontSize: 10, color: COLORS.textMuted, marginTop: 3 }}>
+              미달 시 자동 생성에 우선 배정
+            </div>
+          </div>
+          <div>
+            <FieldLabel>🛑 월 최대 일수</FieldLabel>
+            <input type="number" min={0} max={31} value={max}
+                   onChange={(e) => setMax(e.target.value)}
+                   placeholder="없음"
+                   style={{
+                     width: '100%', padding: '6px 8px', borderRadius: 6, fontSize: 12,
+                     border: `1px solid ${COLORS.borderFaint}`,
+                     background: 'rgba(255,255,255,0.85)', marginTop: 4,
+                   }} />
+            <div style={{ fontSize: 10, color: COLORS.textMuted, marginTop: 3 }}>
+              초과 시 자동 생성에서 제외
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <FieldLabel>📝 패턴 메모</FieldLabel>
+          <input type="text" value={pattern}
+                 onChange={(e) => setPattern(e.target.value)}
+                 placeholder="예: 2-on-2-off, 평일만, 주말만"
+                 maxLength={64}
+                 style={{
+                   width: '100%', padding: '6px 8px', borderRadius: 6, fontSize: 12,
+                   border: `1px solid ${COLORS.borderFaint}`,
+                   background: 'rgba(255,255,255,0.85)', marginTop: 4,
+                 }} />
+          <div style={{ fontSize: 10, color: COLORS.textMuted, marginTop: 3 }}>
+            매니저 메모 (자동 생성 알고리즘에 직접 영향 X — 참고용)
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function FieldLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSecondary }}>
+      {children}
+    </div>
+  )
 }

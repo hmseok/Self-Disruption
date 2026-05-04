@@ -10,6 +10,10 @@ import { prisma } from '@/lib/prisma'
 const ALLOWED = new Set([
   'color_tone', 'group_label', 'phone', 'email',
   'is_external', 'external_pattern',
+  // PR-2QQ-d-1 — 워커 제약 모델
+  'priority_level', 'preferred_dow_avoid',
+  'required_days_per_month', 'max_days_per_month',
+  'work_pattern_text',
 ])
 const COLOR_TONES = new Set([
   'blue', 'gray', 'green', 'amber', 'violet', 'red', 'none',
@@ -26,20 +30,36 @@ export async function PATCH(
     const { id } = await context.params
     const body = await request.json()
 
-    // is_external/external_pattern 컬럼 존재 확인 (graceful)
-    let hasExt = true
+    // 컬럼 존재 확인 (graceful)
+    let hasExt = true, hasConstraints = true
     try {
       await prisma.$queryRaw<any[]>`SELECT is_external FROM cs_workers LIMIT 1`
     } catch { hasExt = false }
+    try {
+      await prisma.$queryRaw<any[]>`SELECT priority_level FROM cs_workers LIMIT 1`
+    } catch { hasConstraints = false }
+
+    const CONSTRAINT_COLS = new Set([
+      'priority_level', 'preferred_dow_avoid',
+      'required_days_per_month', 'max_days_per_month', 'work_pattern_text',
+    ])
 
     const sets: string[] = []
     const params: any[] = []
     for (const [k, v] of Object.entries(body || {})) {
       if (!ALLOWED.has(k)) continue
       if ((k === 'is_external' || k === 'external_pattern') && !hasExt) continue
+      if (CONSTRAINT_COLS.has(k) && !hasConstraints) continue
       if (k === 'color_tone' && !COLOR_TONES.has(String(v))) continue
       if (k === 'is_external') {
         sets.push(`${k} = ?`); params.push(v ? 1 : 0); continue
+      }
+      if (k === 'priority_level') {
+        const n = Math.min(3, Math.max(1, Number(v) || 2))
+        sets.push(`${k} = ?`); params.push(n); continue
+      }
+      if (k === 'required_days_per_month' || k === 'max_days_per_month') {
+        sets.push(`${k} = ?`); params.push(v == null || v === '' ? null : Number(v)); continue
       }
       sets.push(`${k} = ?`); params.push(v ?? null)
     }

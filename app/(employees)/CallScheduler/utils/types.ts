@@ -55,9 +55,15 @@ export interface Worker {
   phone: string | null
   email: string | null
   is_active: boolean
-  // PR-2QQ-b — 외부 직원
+  // PR-2QQ-b — 외부 직원 표식 (시각적)
   is_external?: boolean
-  external_pattern?: string | null
+  external_pattern?: string | null  // (deprecated — work_pattern_text 로 통합)
+  // PR-2QQ-d-1 — 워커 제약 모델
+  priority_level?: number              // 1=최우선 / 2=일반 / 3=백업
+  preferred_dow_avoid?: string | null  // '0,5' = 일·금 회피
+  required_days_per_month?: number | null
+  max_days_per_month?: number | null
+  work_pattern_text?: string | null    // '2-on-2-off' 같은 자유 메모
 }
 
 export interface Schedule {
