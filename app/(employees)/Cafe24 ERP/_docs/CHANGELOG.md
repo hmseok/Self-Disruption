@@ -5,6 +5,65 @@
 
 ---
 
+## 2026-05-05 | PR-6.2 | Generator — `lib/cafe24-db.ts` mysql2 read-only pool 단일 진입점
+
+### 산출물
+
+- **`lib/cafe24-db.ts`** (신규, 215 라인) — 본 프로젝트 카페24 DB 접근 *유일* 통로
+- **`_docs/API.md`** (신규) — cafe24Db 사용법 + API 라우트 로드맵 + 호출 예시
+
+### 주요 기능
+
+```ts
+cafe24Db.query<T>(sql, params)      // 다건 SELECT
+cafe24Db.queryOne<T>(sql, params)   // 단건 SELECT (없으면 null)
+cafe24Db.count(sql, params)         // COUNT(*) 첫 컬럼 number 강제
+cafe24Db.probe()                    // 헬스체크 + 환경 정보
+cafe24Db.end()                      // pool 종료 (테스트만)
+```
+
+### 정책 강제
+
+- **Read-only**: `INSERT/UPDATE/DELETE/REPLACE/DROP/ALTER/TRUNCATE/CREATE/RENAME/GRANT/REVOKE/LOCK/UNLOCK/CALL/LOAD DATA` 정규식 차단 — 즉시 throw
+- **Charset**: `'utf8'` (mysql2 가 utf8mb3 미인식 — PR-6.1 검증)
+- **typeCast**: STRING/VAR_STRING/BLOB → utf8 string 강제 (한글 Buffer 회피)
+- **Pool**: connectionLimit=5, idleTimeout=60s (Q7=A 분당 변동 정책)
+- **graceful 환경변수 검증**: 5개 키 누락 시 명확한 에러 throw
+- **lazy singleton**: 첫 호출 시 pool 생성, process 종료 시 자동 정리
+
+### GATE 진행 상태
+
+```
+✅ G3 Planner — 설계서 v2 + 사용자 GO ("a — 지금 시작")
+✅ G5 Generator — tsc --noEmit lib/cafe24-db.ts PASS (회귀 0건)
+✅ G6 Reviewer  — npm run lint:harness 새 critical 위반 0건
+                  · sql-lint: violations=0 / new=0
+                  · sql-fn-lint: violations=0
+                  · api-call-trace: newBroken=0
+                  · sql-reserved-alias-lint: total=0
+                  · sql-group-by-lint: total=0
+                  · helper-coverage-lint: total=0
+                  · amount-sign-lint: new=0
+                  · menu-sync-lint: violations=0
+                  · ui-data-coverage: warnings=33 (정보성)
+⏭ G7 Designer — UI 변경 없음 (skip)
+⏭ G8 Evaluator — lib 모듈만, 다음 PR-6.3 (UI 추가) 통합 평가
+✅ Rule 21 Cowork — 본 세션 영역만 staging (lib/cafe24-db.ts + Cafe24 ERP/_docs)
+✅ Rule 22 _docs 갱신 (API.md 신설 + CHANGELOG.md 추가)
+✅ Rule 13 외부 시스템 호환성 — PR-6.1 검증 결과 코드에 반영 (charset / typeCast / sql_mode)
+```
+
+### 영향 범위
+
+- **신규 파일만** — 다른 파일 수정 X
+- broken call (`/api/cafe24/accidents`) 은 PR-6.3 에서 본 lib 사용해 해소
+
+### 다음 PR
+
+- **PR-6.3** — `/api/cafe24/probe` (헬스체크 디버그) + `/api/cafe24/accidents` (broken call 해소) + `/Cafe24 ERP/accidents` 페이지
+
+---
+
 ## 2026-05-05 | PR-6.1 | Planner 단계 — 운영 인터뷰 + 실 DB 검증 결과 _docs 갱신
 
 ### Part A — 운영 인터뷰 (규칙 25 + 26)
