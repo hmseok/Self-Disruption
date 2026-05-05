@@ -353,28 +353,12 @@ export default function PayrollPage() {
     alert('저장 완료'); setShowModal(false); setEditing(null); fetchSettings()
   }
 
-  const openSettingModal = (s?: EmployeeSalary) => {
-    if (s) {
-      setEditing(s); setFEmpId(s.employee_id); setFBase(String(s.base_salary))
-      setFTax(s.tax_type); setFPayDay(String(s.payment_day)); setFBank(s.bank_name || '')
-      setFAccNum(s.account_number || ''); setFAccName(s.account_holder || '')
-      setFEmpType(s.employment_type || '정규직'); setFSalType(s.salary_type || '월급제')
-      setFAnnual(String(s.annual_salary || '')); setFHourly(String(s.hourly_rate || ''))
-      setFDep(String(s.dependents_count || 1)); setFNetMode(!!s.net_salary_mode)
-      setFNetTarget(String(s.target_net_salary || ''))
-      const a = s.allowances || {}
-      setFAllow({ '식대': String(a['식대'] || 200000), '교통비': String(a['교통비'] || 0), '직책수당': String(a['직책수당'] || 0), '자가운전보조금': String(a['자가운전보조금'] || 0), '가족수당': String(a['가족수당'] || 0), '야간수당': String(a['야간수당'] || 0), '연장수당': String(a['연장수당'] || 0), '연차수당': String(a['연차수당'] || 0), '상여금': String(a['상여금'] || 0) })
-      const d = s.custom_deductions || {}
-      const dd: Record<string, string> = {}; for (const [k, v] of Object.entries(d)) dd[k] = String(v)
-      setFDeductions(dd)
-    } else {
-      setEditing(null); setFEmpId(''); setFBase(''); setFTax('근로소득'); setFPayDay('25')
-      setFBank(''); setFAccNum(''); setFAccName(''); setFEmpType('정규직'); setFSalType('월급제')
-      setFAnnual(''); setFHourly(''); setFDep('1'); setFNetMode(false); setFNetTarget('')
-      setFAllow({ '식대': '200000', '교통비': '0', '직책수당': '0', '자가운전보조금': '0', '가족수당': '0', '야간수당': '0', '연장수당': '0', '연차수당': '0', '상여금': '0' })
-      setFDeductions({})
-    }
-    setMSec(0); setReversedBase(null); setShowModal(true)
+  // 2026-05-05 — 5단계 마법사 모달 폐기 (PR-5)
+  // 급여 설정 입력은 /admin/employees 의 모달 § 급여 설정 탭으로 이관
+  // 본 함수는 dead code 가 아니라 「조직/권한으로 redirect」 wrapper 로 변환
+  // 향후 settings 탭 안에서 행 클릭 시 employees 페이지로 자동 이동 + 직원 선택 highlight
+  const openSettingModal = (_s?: EmployeeSalary) => {
+    router.push('/admin/employees')
   }
 
   // 역계산
@@ -738,12 +722,34 @@ export default function PayrollPage() {
         </div>
       )}
 
-      {/* ══════════ 탭2: 급여설정 (테이블 — 복잡도 높으므로 커스텀 유지) ══════════ */}
+      {/* ══════════ 탭2: 급여설정 (조회 only — 편집은 조직/권한에서) ══════════ */}
       {tab === 'settings' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          {/* 안내 배너 — 편집은 /admin/employees 에서 */}
+          <div style={{
+            background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.25)',
+            borderRadius: 12, padding: '14px 18px', display: 'flex',
+            alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap',
+          }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#1e40af', marginBottom: 4 }}>
+                💡 급여 설정 입력은 「조직/권한 관리」 페이지로 통합되었습니다
+              </div>
+              <div style={{ fontSize: 11, color: '#64748b', lineHeight: 1.5 }}>
+                직원 행 클릭 → 모달의 「💼 급여 설정」 탭에서 기본급·식대·계좌 입력.<br />
+                정밀 4대보험·소득세 계산은 외부 세무사 영역 — 본 ERP 는 관리용 기본 정보만 다룹니다.
+              </div>
+            </div>
+            <button
+              onClick={() => router.push('/admin/employees')}
+              style={{ ...btnPrimary(), flexShrink: 0 }}
+            >
+              → 조직/권한 관리로 이동
+            </button>
+          </div>
+
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h3 style={{ fontSize: 16, fontWeight: 800, color: C.gray900, margin: 0 }}>직원 급여 설정 ({settings.length}명)</h3>
-            <button onClick={() => openSettingModal()} style={btnPrimary()}>+ 급여설정 추가</button>
+            <h3 style={{ fontSize: 16, fontWeight: 800, color: C.gray900, margin: 0 }}>직원 급여 설정 (조회 — {settings.length}명)</h3>
           </div>
           <div style={{ ...sectionCard, overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 700 }}>
@@ -764,10 +770,23 @@ export default function PayrollPage() {
                       <td style={{ ...tdStyle, textAlign: 'right' }}>{n(s.base_salary)}</td>
                       <td style={{ ...tdStyle, textAlign: 'right' }}>{n(totalAllow)}</td>
                       <td style={{ ...tdStyle, fontSize: 13 }}>매월 {s.payment_day}일</td>
-                      <td style={tdStyle}><button onClick={() => openSettingModal(s)} style={btnSecondary}>편집</button></td>
+                      <td style={tdStyle}>
+                        <button
+                          onClick={() => router.push(`/admin/employees`)}
+                          style={btnSecondary}
+                          title="조직/권한 관리에서 직원 행 클릭 → 「💼 급여 설정」 탭"
+                        >→ 조직/권한에서 편집</button>
+                      </td>
                     </tr>
                   )
                 })}
+                {settings.length === 0 && (
+                  <tr>
+                    <td colSpan={8} style={{ ...tdStyle, textAlign: 'center', padding: '32px 16px', color: C.gray400, fontSize: 13 }}>
+                      등록된 급여 설정이 없습니다 — 「조직/권한 관리」 페이지에서 직원 선택 후 「💼 급여 설정」 탭에서 입력하세요.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
