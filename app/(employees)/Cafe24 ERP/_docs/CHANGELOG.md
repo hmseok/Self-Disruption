@@ -5,6 +5,82 @@
 
 ---
 
+## 2026-05-05 | PR-6.3 | Generator — broken call 해소 + 사고 접수 페이지
+
+### 산출물
+
+- **`app/api/cafe24/probe/route.ts`** (신규) — 헬스체크 (admin 전용)
+- **`app/api/cafe24/accidents/route.ts`** (신규) — 사고 접수 read-only API
+  - `aceesosh` 직접 read (raw 컬럼 — pmccustm/pmccarsm 조인은 PR-6.3.b)
+  - Query: `limit / offset / from / to / rgst / q`
+  - admin role 체크 + graceful fallback (cafe24-unavailable 200 응답)
+- **`app/(employees)/Cafe24 ERP/accidents/page.tsx`** (신규) — UI
+  - Glass L5 헤더 + L2 필터바 + L4 NeuDataTable
+  - 모든 컬럼 sortBy 의무 (규칙 18) — 8 컬럼
+  - 'C24' 보라 배지 (카페24 데이터 출처 명시)
+  - stale 인디케이터 (60s/300s 임계 색상 변경)
+  - admin role 권한 차단 (page client 측 + API server 측 이중)
+- **`_docs/CHANGELOG.md`** (수정) — PR-6.3 항목 추가
+
+### Broken call 해소 ✅
+
+```
+이전: app/operations/intake/page.tsx:170
+        fetch('/api/cafe24/accidents?limit=200')   ← 라우트 미존재 → 500
+이후: 본 PR 의 /api/cafe24/accidents 라우트 신설로 동작
+        api-call-trace lint: broken=33 → 32 (1건 해소 확인)
+```
+
+### GATE 진행 상태
+
+```
+✅ G3 Planner — 설계서 v2 + 사용자 GO ("a — 지금 시작")
+✅ G5 Generator — tsc --noEmit 본 세션 변경 파일 에러 0건 (회귀 0)
+✅ G6 Reviewer  — npm run lint:harness 새 critical 0건
+                  · sql-lint: violations=0 / new=0
+                  · sql-fn-lint: violations=0
+                  · api-call-trace: newBroken=0 (broken 33→32 해소!)
+                  · sql-reserved-alias-lint: total=0
+                  · sql-group-by-lint: total=0
+                  · helper-coverage-lint: total=0
+                  · amount-sign-lint: new=0
+                  · menu-sync-lint: violations=0 (baseline 갱신)
+⏭ G7 Designer — 사용자 시각 검수 권장 (Chrome MCP 미연결 / 사용자 스크린샷)
+                 첫 화면이라 디자인 시스템 일치 + 빈 상태 / 에러 배너 / stale 인디케이터 검수 의무
+⏭ G8 Evaluator — 다음 PR-6.4 통합 평가
+✅ Rule 21 Cowork — 본 세션 영역만 staging
+                    ⚠ menu-registry 는 staging 제외 (다른 세션 PR-B1 동시 작업 중)
+                    → cafe24-accidents 사이드바 등록은 PR-6.3.b 별도 진행
+✅ Rule 22 _docs 갱신 (CHANGELOG.md)
+✅ Rule 13 외부 시스템 호환성 — PR-6.1 검증 결과 + cafe24-db 단일 진입점 사용
+✅ Rule 18 NeuDataTable 모든 컬럼 sortBy 정의 (8 컬럼 모두)
+```
+
+### 영향 범위
+
+```
+신규 파일:
+  app/api/cafe24/probe/route.ts
+  app/api/cafe24/accidents/route.ts
+  app/(employees)/Cafe24 ERP/accidents/page.tsx
+
+자동 해소:
+  app/operations/intake/page.tsx:170 broken call (코드 변경 X — API 라우트 신설로 해소)
+
+본 PR 미포함 (PR-6.3.b):
+  lib/menu-registry.ts cafe24-accidents entry 등록 — 다른 세션 PR-B1 push 후 별도 진행
+  → 사용자가 사이드바에서 "🚨 카페24 사고접수" 메뉴 보이려면 PR-6.3.b 후
+  → 그 전에는 직접 URL `/Cafe24 ERP/accidents` 입력으로 접근 가능
+```
+
+### 다음 PR
+
+- **PR-6.3.b** — 다른 세션 PR-B1 push 후 menu-registry 에 cafe24-accidents entry 추가
+- **PR-6.4** — `/Cafe24 ERP/dashboard` + 5 KPI 위젯 + 일별 추이 차트
+- **PR-6.5** — pmccustm/pmccarsm/pmcfactm 조인 + 코드 마스터 (bscddesc) 매핑
+
+---
+
 ## 2026-05-05 | PR-6.2 | Generator — `lib/cafe24-db.ts` mysql2 read-only pool 단일 진입점
 
 ### 산출물
