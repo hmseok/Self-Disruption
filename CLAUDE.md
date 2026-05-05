@@ -1004,6 +1004,91 @@ app/<Module>/_docs/
 
 **시나리오 검수 후** 데이터 모델/UI/API 결정.
 
+### 규칙 27 — PR 시작 시 GATE 체크리스트 + 사용자 가시화 의무 (2026-05-04 신설, 강력)
+
+> **본 세션 사고 (2026-05-04 밤)**: PR-2QQ-a/b/c/d-1 누적 진행 중 GATE 3/6/7/8 일괄 누락.
+> Rule 6 시각 검수 안 해서 **사용자가 일요일 비선호 자동 표시 버그 직접 발견**.
+> "쭉쭉 가달라" 라는 일괄 GO 받았다고 PR 단위 상세 설계 + 시각 검수 생략한 게 사고의 직접 원인.
+
+**원칙**: "쭉쭉" 일괄 GO 가 있어도 **PR 단위로는 매번 GATE 체크리스트 가시화 + 시각 검수 의무**.
+일괄 GO 는 "방향 동의" 일 뿐 "PR 별 절차 면제" 가 아님.
+
+**다음 중 하나라도 해당하면 PR 시작 전 GATE 체크리스트 의무 표시**:
+
+```
+✓ 마이그레이션 포함
+✓ 알고리즘 변경 (자동 생성, batch 처리, 가중치 등)
+✓ 새 데이터 모델 / 컬럼 추가
+✓ 사용자 운영 흐름 변경
+✓ UI 컴포넌트 변경 (CSS / className / style / JSX 구조)
+✓ 새 페이지 / 탭 / 모달 신설
+```
+
+**의무 절차** — 매 PR 시작 시 사용자에게 다음 형식으로 보고:
+
+```
+[PR-XXX 시작 — GATE 체크리스트]
+
+GATE 3 (Planner) ───────────────────────────
+  □ Researcher 보고서 (영향 범위 / 재사용 / 위험)
+  □ 설계서 v2 (데이터 모델 / API / UI / 알고리즘 의사코드)
+  □ 시뮬레이션 (Rule 8) — 실제 데이터 1건으로 흐름 검증
+  □ 사용자 GO 키워드 대기 (Rule 7)
+
+GATE 5 (Generator + 영향 검증) ─────────────
+  □ tsc --noEmit PASS
+  □ 큰 변경 시 next build 부분 PASS
+  □ 영향 받는 파일 목록 명시
+
+GATE 6 (Reviewer 자체) ─────────────────────
+  □ 하네스 lint (sql / sql-fn / api-trace / ui-coverage / menu-sync) PASS
+  □ 동형 패턴 인덱스 (Rule 14) — 같은 부류 영역 모두 동시 적용
+
+GATE 7 (Designer 시각 검수 — 의무) ─────────
+  □ Chrome MCP 시도 (가능 시: navigate → screenshot → 분석)
+  □ 또는 사용자 스크린샷 명시 요청
+  □ "빌드 PASS = 검수 완료" 절대 금지 (Rule 6)
+
+GATE 8 (Evaluator) ─────────────────────────
+  □ evaluate.js 실행 (있으면)
+  □ 8.0/10 이상 확인
+
+규칙 22 (_docs 동기화) ─────────────────────
+  □ CHANGELOG.md (필수)
+  □ DATA-MODEL.md (DB 변경 시)
+  □ UI-SPEC.md (UI 변경 시)
+  □ OPERATIONS.md (운영 사실 변경 시)
+  □ SCENARIOS.md (페르소나 흐름 변경 시)
+```
+
+**commit 메시지에 GATE 진행 상태 명시** (스킵 시 사유):
+
+```
+GATE 진행 상태:
+✅ G3 설계서 + 사용자 GO
+✅ G5 tsc PASS / next build (영향 페이지 N개 PASS)
+✅ G6 lint:harness 새 위반 0건
+⚠ G7 Designer — 사용자 스크린샷 검수 (Chrome MCP 미연결)
+✅ G8 evaluate.js 8.5/10
+✅ Rule 22 _docs 갱신 (CHANGELOG / DATA-MODEL / UI-SPEC)
+```
+
+**위반 시 자동 페널티** (Rule 0-1 의 누적 카운터 적용):
+
+| 위반 누적 | 액션 |
+|----------|------|
+| 1회 | 자가 기록 + regression-cases 추가 |
+| 2회 (같은 GATE 누락) | 다음 PR 자동 동결 — 사용자 명시 OK 받기 전 진행 금지 |
+| 3회+ | 자동화 hook 신설 (예: PR 시작 시 GATE 체크리스트 자동 출력 prompt 강제) |
+
+**자동화 안전장치 (TBD)**:
+```
+🔜 14. pr-gate-checklist-lint — commit 메시지 안 GATE 명시 자동 검증
+   - commit 메시지에 "GATE 진행 상태:" 섹션 없으면 차단
+   - 단, 단순 typo / docs-only commit 화이트리스트
+   - 위치: harness-engineering/scripts/pr-gate-lint.js (TBD)
+```
+
 ### 본 세션 사고 회고 누적 (2026-05-04)
 
 ```
@@ -1012,6 +1097,9 @@ app/<Module>/_docs/
 사고 3: cs_workers 3중복 (시드 멱등성 부재) → 규칙 24 신설
 사고 4: 24/365 운영 사실 인지 부족 → 규칙 25 신설
 사고 5: 페르소나/시나리오 사전 점검 부족 → 규칙 26 신설
+사고 6: PR-2QQ 시리즈 GATE 3/6/7/8 일괄 누락
+        → 일요일 비선호 버그 사용자가 직접 발견
+        → 규칙 27 신설 (PR 단위 GATE 체크리스트 + 가시화 의무)
 ```
 
 향후 같은 부류 사고 발생 시 → 자동화 hook 즉시 신설 (규칙 15 적용).

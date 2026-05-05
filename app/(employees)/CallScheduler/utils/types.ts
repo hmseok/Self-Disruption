@@ -64,11 +64,12 @@ export interface Worker {
   required_days_per_month?: number | null
   max_days_per_month?: number | null
   work_pattern_text?: string | null    // '2-on-2-off' 같은 자유 메모
-  // PR-2QQ-d-3 — 자동 근무 패턴
-  cycle_days_on?: number | null        // 연속 근무일
-  cycle_days_off?: number | null       // 연속 휴무일
-  cycle_start_date?: string | null     // 'YYYY-MM-DD' 사이클 1일차
-  preferred_dow_only?: string | null   // '1,3,5' = 월수금만 근무 (한정)
+  // PR-2QQ-d-revert — 외부 근무 cycle (정동민 같은 외부 일정 워커)
+  // cycle on phase = 외부 근무 (당사 X) / cycle off phase = 외부 휴무 (당사 가능)
+  cycle_days_on?: number | null        // 외부 연속 근무일
+  cycle_days_off?: number | null       // 외부 연속 휴무일
+  cycle_start_date?: string | null     // 'YYYY-MM-DD' 사이클 1일차 (외부 근무 첫째 날)
+  // preferred_dow_only 폐기 (실제 사용 사례 없음 — 데이터 분석 결과)
 }
 
 export interface Schedule {

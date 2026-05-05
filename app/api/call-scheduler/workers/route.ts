@@ -35,7 +35,7 @@ async function detectFeatures(): Promise<FeatureFlags> {
     await prisma.$queryRaw<any[]>`SELECT priority_level, preferred_dow_avoid, work_pattern_text FROM cs_workers LIMIT 1`
   } catch { hasConstraints = false }
   try {
-    await prisma.$queryRaw<any[]>`SELECT cycle_days_on, preferred_dow_only FROM cs_workers LIMIT 1`
+    await prisma.$queryRaw<any[]>`SELECT cycle_days_on FROM cs_workers LIMIT 1`
   } catch { hasPattern = false }
   return { hasExternal, hasConstraints, hasPattern }
 }
@@ -54,8 +54,7 @@ export async function GET(request: NextRequest) {
                required_days_per_month, max_days_per_month,
                work_pattern_text,
                cycle_days_on, cycle_days_off,
-               DATE_FORMAT(cycle_start_date, '%Y-%m-%d') AS cycle_start_date,
-               preferred_dow_only
+               DATE_FORMAT(cycle_start_date, '%Y-%m-%d') AS cycle_start_date
         FROM cs_workers
         WHERE is_active = 1
         ORDER BY priority_level ASC, is_external DESC, group_label DESC, name ASC
@@ -103,7 +102,7 @@ export async function GET(request: NextRequest) {
       cycle_days_on: hasPattern && r.cycle_days_on != null ? Number(r.cycle_days_on) : null,
       cycle_days_off: hasPattern && r.cycle_days_off != null ? Number(r.cycle_days_off) : null,
       cycle_start_date: hasPattern ? (r.cycle_start_date ?? null) : null,
-      preferred_dow_only: hasPattern ? (r.preferred_dow_only ?? null) : null,
+      // PR-2QQ-d-revert: preferred_dow_only 폐기
     }))
     return NextResponse.json({ data: serialize(data), error: null })
   } catch (e: any) {

@@ -44,11 +44,10 @@ export default function WorkersTab() {
   const [editRequired, setEditRequired] = useState<string>('')
   const [editMax, setEditMax] = useState<string>('')
   const [editPattern, setEditPattern] = useState<string>('')
-  // PR-2QQ-d-3 — 자동 근무 패턴
+  // PR-2QQ-d-revert — 외부 근무 cycle (dow_only 폐기)
   const [editCycleOn, setEditCycleOn] = useState<string>('')
   const [editCycleOff, setEditCycleOff] = useState<string>('')
   const [editCycleStart, setEditCycleStart] = useState<string>('')
-  const [editDowOnly, setEditDowOnly] = useState<Set<number>>(new Set())
 
   const load = async () => {
     setLoading(true); setError(null)
@@ -103,11 +102,7 @@ export default function WorkersTab() {
     setEditCycleOn(w.cycle_days_on != null ? String(w.cycle_days_on) : '')
     setEditCycleOff(w.cycle_days_off != null ? String(w.cycle_days_off) : '')
     setEditCycleStart(w.cycle_start_date || '')
-    setEditDowOnly(new Set(
-      (w.preferred_dow_only || '')
-        .split(',').map(s => s.trim()).filter(s => s !== '')
-        .map(Number).filter(n => !isNaN(n) && n >= 0 && n <= 6)
-    ))
+    // PR-2QQ-d-revert: preferred_dow_only 폐기
   }
   const cancelEdit = () => { setEditingId(null) }
 
@@ -126,9 +121,8 @@ export default function WorkersTab() {
         const json = await res.json()
         if (!res.ok) throw new Error(json?.error || 'RideEmployees 저장 실패')
       }
-      // 2. cs_workers (PR-2QQ-d-1: 제약 + d-3: 패턴)
+      // 2. cs_workers (PR-2QQ-d-1 + d-revert: dow_only 폐기)
       const avoidStr = Array.from(editAvoidDow).sort().join(',')
-      const dowOnlyStr = Array.from(editDowOnly).sort().join(',')
       const wRes = await fetch(`/api/call-scheduler/workers/${w.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', ...auth },
@@ -141,11 +135,10 @@ export default function WorkersTab() {
           required_days_per_month: editRequired ? Number(editRequired) : null,
           max_days_per_month: editMax ? Number(editMax) : null,
           work_pattern_text: editPattern.trim() || null,
-          // PR-2QQ-d-3
+          // PR-2QQ-d-revert: 외부 cycle (당사 X)
           cycle_days_on: editCycleOn ? Number(editCycleOn) : null,
           cycle_days_off: editCycleOff ? Number(editCycleOff) : null,
           cycle_start_date: editCycleStart || null,
-          preferred_dow_only: dowOnlyStr || null,
         }),
       })
       const wJson = await wRes.json()
@@ -382,7 +375,6 @@ export default function WorkersTab() {
                             cycleOn={editCycleOn} setCycleOn={setEditCycleOn}
                             cycleOff={editCycleOff} setCycleOff={setEditCycleOff}
                             cycleStart={editCycleStart} setCycleStart={setEditCycleStart}
-                            dowOnly={editDowOnly} setDowOnly={setEditDowOnly}
                           />
                         </td>
                       </tr>
@@ -437,7 +429,7 @@ const tdStyle: React.CSSProperties = {
   padding: '8px 10px', whiteSpace: 'nowrap', color: COLORS.textPrimary,
 }
 
-// PR-2QQ-d-1 + d-3 — 워커 제약 패널 (편집 시 펼침)
+// PR-2QQ-d-1 + d-revert — 워커 제약 패널 (dow_only 폐기)
 function ConstraintsPanel({
   isExternal, setIsExternal,
   priority, setPriority,
@@ -445,11 +437,10 @@ function ConstraintsPanel({
   required, setRequired,
   max, setMax,
   pattern, setPattern,
-  // PR-2QQ-d-3 패턴
+  // PR-2QQ-d-revert: 외부 cycle (dow_only 폐기)
   cycleOn, setCycleOn,
   cycleOff, setCycleOff,
   cycleStart, setCycleStart,
-  dowOnly, setDowOnly,
 }: {
   isExternal: boolean; setIsExternal: (v: boolean) => void
   priority: number; setPriority: (v: number) => void
@@ -460,18 +451,12 @@ function ConstraintsPanel({
   cycleOn: string; setCycleOn: (v: string) => void
   cycleOff: string; setCycleOff: (v: string) => void
   cycleStart: string; setCycleStart: (v: string) => void
-  dowOnly: Set<number>; setDowOnly: (v: Set<number>) => void
 }) {
   const DOW = ['일', '월', '화', '수', '목', '금', '토']
   const toggleDow = (d: number) => {
     const next = new Set(avoidDow)
     if (next.has(d)) next.delete(d); else next.add(d)
     setAvoidDow(next)
-  }
-  const toggleDowOnly = (d: number) => {
-    const next = new Set(dowOnly)
-    if (next.has(d)) next.delete(d); else next.add(d)
-    setDowOnly(next)
   }
   return (
     <div style={{
@@ -600,21 +585,21 @@ function ConstraintsPanel({
           </div>
         </div>
 
-        {/* PR-2QQ-d-3 — 자동 근무 패턴 (cycle + 요일 한정) */}
+        {/* PR-2QQ-d-revert — 외부 근무 cycle (당사 X) — dow_only 폐기 */}
         <div style={{
           ...GLASS.L1, borderRadius: 8, padding: 10, marginTop: 4,
           border: `1px solid ${COLORS.borderViolet}`,
           background: COLORS.bgViolet,
         }}>
-          <FieldLabel>🔁 자동 근무 패턴</FieldLabel>
+          <FieldLabel>🏢 외부 근무 cycle (당사 X)</FieldLabel>
           <div style={{ fontSize: 10, color: COLORS.textMuted, marginTop: 3, marginBottom: 6 }}>
-            cycle 또는 요일 한정 — 자동 생성이 패턴에 따라 근무/휴무 결정
+            다른 회사 근무 일정 — 외부 근무일은 자동 생성에서 당사 후보 제외
           </div>
 
           {/* cycle 패턴 */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.4fr', gap: 6, marginBottom: 6 }}>
             <div>
-              <div style={{ fontSize: 10, color: COLORS.textSecondary, fontWeight: 700 }}>근무일</div>
+              <div style={{ fontSize: 10, color: COLORS.textSecondary, fontWeight: 700 }}>외부 근무일</div>
               <input type="number" min={0} max={30} value={cycleOn}
                      onChange={(e) => setCycleOn(e.target.value)}
                      placeholder="-"
@@ -625,7 +610,7 @@ function ConstraintsPanel({
                      }} />
             </div>
             <div>
-              <div style={{ fontSize: 10, color: COLORS.textSecondary, fontWeight: 700 }}>휴무일</div>
+              <div style={{ fontSize: 10, color: COLORS.textSecondary, fontWeight: 700 }}>외부 휴무일</div>
               <input type="number" min={0} max={30} value={cycleOff}
                      onChange={(e) => setCycleOff(e.target.value)}
                      placeholder="-"
@@ -647,37 +632,7 @@ function ConstraintsPanel({
             </div>
           </div>
           <div style={{ fontSize: 10, color: COLORS.textMuted, marginBottom: 6 }}>
-            예: 근무2 / 휴무2 / 시작 2026-05-01 → 5/1·2 근무, 5/3·4 휴무, 5/5·6 근무 ...
-          </div>
-
-          {/* 요일 한정 */}
-          <div style={{ marginTop: 4 }}>
-            <div style={{ fontSize: 10, color: COLORS.textSecondary, fontWeight: 700, marginBottom: 3 }}>
-              요일 한정 (선택 — 이 요일만 근무)
-            </div>
-            <div style={{ display: 'flex', gap: 3 }}>
-              {DOW.map((label, i) => {
-                const active = dowOnly.has(i)
-                const isWeekend = i === 0 || i === 6
-                return (
-                  <button key={i} type="button" onClick={() => toggleDowOnly(i)}
-                          style={{
-                            flex: 1, padding: '4px 0', borderRadius: 4, fontSize: 11, fontWeight: 700,
-                            background: active ? COLORS.bgViolet : 'rgba(255,255,255,0.5)',
-                            color: active
-                              ? '#7c3aed'
-                              : (isWeekend ? COLORS.textSecondary : COLORS.textMuted),
-                            border: `1px solid ${active ? COLORS.borderViolet : COLORS.borderFaint}`,
-                            cursor: 'pointer',
-                          }}>
-                    {label}
-                  </button>
-                )
-              })}
-            </div>
-            <div style={{ fontSize: 10, color: COLORS.textMuted, marginTop: 3 }}>
-              비어있으면 모든 요일 가능. 예: 월·수·금만 → 월수금 선택
-            </div>
+            예: 외부 근무 2일 / 외부 휴무 2일 / 시작 2026-05-01 → 5/1·2 외부 근무 (당사 X), 5/3·4 외부 휴무 (당사 가능)
           </div>
         </div>
       </div>

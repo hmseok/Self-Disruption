@@ -3,6 +3,30 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-05 (새벽 — d-3 회귀 + 데이터 분석 기반 단순화)
+
+### PR-2QQ-d-revert — preferred_dow_only 폐기 + cycle 의미 반전
+- **데이터 분석** (17개월 실 운영 데이터): dow_only 사용 사례 없음 → 폐기
+- 정동민 cycle 5/1 start 2-on-2-off 패턴 검증 ✓ (외부 회사 일정 = 1년 고정)
+- DB 마이그레이션: `2026-05-05_cs_workers_dow_only_drop.sql`
+  - `cs_workers.preferred_dow_only` 컬럼 DROP (data 비어있음 — 안전)
+- API:
+  - `workers GET/POST/PATCH`: dow_only 필드 제거 (graceful)
+- UI `WorkersTab` ConstraintsPanel:
+  - "요일 한정" 7-button 영역 제거
+  - "🔁 자동 근무 패턴" → "🏢 외부 근무 cycle (당사 X)" 라벨 변경
+  - 입력 라벨: "근무일/휴무일" → "외부 근무일/외부 휴무일"
+  - 안내: "외부 근무일은 자동 생성에서 당사 후보 제외"
+- 자동 생성 알고리즘:
+  - `cycleAllows()` → `isAvailableOnCycle()` 함수명 변경
+  - 의미 반전: cycle on phase = 외부 근무 = 당사 X / cycle off phase = 외부 휴무 = 당사 가능
+  - `dowOnlyAllows()` 함수 제거
+  - 기존 알고리즘 흐름은 동일, cycle 의미만 운영 사실에 맞게 반전
+- 운영 사실 (Rule 25):
+  - 정동민 외부 cycle = 1년 고정 → 한 번 입력 후 매월 자동 적용
+  - 외부 휴무일 16일 = 정동민 후보 풀
+  - 매월 9-10일 = 매니저 협의 후 manual_lock (의견 수렴 도구는 PR-2RR 시리즈)
+
 ## 2026-05-04 (밤 — 자동 생성 알고리즘 v3)
 
 ### PR-2QQ-d-3 — 자동 생성 v3 + 패턴 모델 (cycle + 요일 한정)

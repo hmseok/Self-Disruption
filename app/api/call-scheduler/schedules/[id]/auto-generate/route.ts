@@ -73,17 +73,16 @@ interface AssignmentRow {
   special_code: string
   manual_lock?: number  // PR-2QQ-b — 1=수동 lock 셀
 }
-// PR-2QQ-d-3 — 워커 제약 + 패턴
+// PR-2QQ-d-3 → d-revert — 워커 제약 + 외부 cycle (dow_only 폐기)
 interface WorkerConstraint {
   id: string
   priority_level: number
   preferred_dow_avoid: number[]
-  preferred_dow_only: number[]
   required_days_per_month: number | null
   max_days_per_month: number | null
-  cycle_days_on: number | null
-  cycle_days_off: number | null
-  cycle_start_date: string | null  // 'YYYY-MM-DD'
+  cycle_days_on: number | null      // 외부 근무일 수 (이 phase = 당사 X)
+  cycle_days_off: number | null     // 외부 휴무일 수 (이 phase = 당사 가능)
+  cycle_start_date: string | null   // 'YYYY-MM-DD' 외부 cycle 1일차
 }
 interface CoverageRow {
   group_id: string
@@ -125,9 +124,11 @@ function parseDowList(s: string | null | undefined): number[] {
     .filter(n => !isNaN(n) && n >= 0 && n <= 6)
 }
 
-// PR-2QQ-d-3 — cycle 패턴이 그 날짜에 근무 phase 인지
-function cycleAllows(w: WorkerConstraint, isoDate: string): boolean {
-  if (!w.cycle_days_on || !w.cycle_start_date) return true
+// PR-2QQ-d-revert — cycle 의미: 외부 근무 일정
+// cycle on phase = 외부 근무 (당사 X) → 후보 제외
+// cycle off phase = 외부 휴무 (당사 가능) → 후보 OK
+function isAvailableOnCycle(w: WorkerConstraint, isoDate: string): boolean {
+  if (!w.cycle_days_on || !w.cycle_start_date) return true  // cycle 미정의 → 제약 없음
   const start = new Date(w.cycle_start_date + 'T00:00:00').getTime()
   const cur = new Date(isoDate + 'T00:00:00').getTime()
   const elapsed = Math.floor((cur - start) / (24 * 60 * 60 * 1000))
@@ -135,13 +136,8 @@ function cycleAllows(w: WorkerConstraint, isoDate: string): boolean {
   const cycle = (w.cycle_days_on || 0) + (w.cycle_days_off || 0)
   if (cycle <= 0) return true
   const phase = ((elapsed % cycle) + cycle) % cycle
-  return phase < w.cycle_days_on
-}
-
-// PR-2QQ-d-3 — dow_only 한정 (있으면 그 요일만)
-function dowOnlyAllows(w: WorkerConstraint, dow: number): boolean {
-  if (!w.preferred_dow_only.length) return true
-  return w.preferred_dow_only.includes(dow)
+  // phase >= cycle_days_on 이면 외부 휴무 phase (= 당사 가능)
+  return phase >= w.cycle_days_on
 }
 
 // PR-2QQ-d-3 — 그룹 × 요일별 min_workers 결정 (디폴트 fallback)
@@ -297,7 +293,7 @@ export async function POST(
     if (usePriority) {
       try {
         const wcRows = await prisma.$queryRaw<any[]>`
-          SELECT id, priority_level, preferred_dow_avoid, preferred_dow_only,
+          SELECT id, priority_level, preferred_dow_avoid,
                  required_days_per_month, max_days_per_month,
                  cycle_days_on, cycle_days_off,
                  DATE_FORMAT(cycle_start_date, '%Y-%m-%d') AS cycle_start_date
@@ -308,7 +304,6 @@ export async function POST(
             id: r.id,
             priority_level: Number(r.priority_level || 2),
             preferred_dow_avoid: parseDowList(r.preferred_dow_avoid),
-            preferred_dow_only: parseDowList(r.preferred_dow_only),
             required_days_per_month: r.required_days_per_month != null ? Number(r.required_days_per_month) : null,
             max_days_per_month: r.max_days_per_month != null ? Number(r.max_days_per_month) : null,
             cycle_days_on: r.cycle_days_on != null ? Number(r.cycle_days_on) : null,
@@ -483,8 +478,8 @@ export async function POST(
                 const cn = counter.get(wId)
                 if (cn && cn.total >= wc.max_days_per_month) return false
               }
-              if (!cycleAllows(wc, isoDate)) return false
-              if (!dowOnlyAllows(wc, dow)) return false
+              // PR-2QQ-d-revert: 외부 cycle 의 외부 근무 phase 면 당사 후보 X
+              if (!isAvailableOnCycle(wc, isoDate)) return false
             }
             return true
           })

@@ -14,9 +14,8 @@ const ALLOWED = new Set([
   'priority_level', 'preferred_dow_avoid',
   'required_days_per_month', 'max_days_per_month',
   'work_pattern_text',
-  // PR-2QQ-d-3 — 자동 근무 패턴
+  // PR-2QQ-d-3 → d-revert — 외부 근무 cycle (preferred_dow_only 폐기)
   'cycle_days_on', 'cycle_days_off', 'cycle_start_date',
-  'preferred_dow_only',
 ])
 const COLOR_TONES = new Set([
   'blue', 'gray', 'green', 'amber', 'violet', 'red', 'none',
@@ -50,7 +49,7 @@ export async function PATCH(
       'required_days_per_month', 'max_days_per_month', 'work_pattern_text',
     ])
     const PATTERN_COLS = new Set([
-      'cycle_days_on', 'cycle_days_off', 'cycle_start_date', 'preferred_dow_only',
+      'cycle_days_on', 'cycle_days_off', 'cycle_start_date',
     ])
 
     const sets: string[] = []
