@@ -35,3 +35,19 @@
 
 사용자 요구의 핵심 (직원 dropdown 정상화 + 통합 1화면) 은 PR-1 ~ PR-3 으로 달성.
 PR-4 / PR-5 는 매칭 검수 작업 진행 후 필요 시 별도 진행.
+
+---
+
+## 2026-05-05 — 매칭 작업 재개 (M-EMP)
+
+### M-EMP — 직원 자동 매칭 도구 신설
+- 트리거: 「김준수 직원인데 직원 사전 없음 → 매칭 실패」 발견 (이전 세션)
+- 신설: `app/api/finance/transactions/auto-match-employee/route.ts`
+  - 사전: `profiles` (계정 직원) + `ride_employees` (라이드 인력)
+  - 양방향: 입금 (회수/정산) + 지급 (급여/식대/경비/대여)
+  - 동명 다수: profile 우선 (ride 는 보통 profile 의 직원 mapping 가능성)
+  - NON_PERSON_PREFIXES 보험사 / 카드사 / 페이 skip
+- UI: `app/finance/bank-card/page.tsx` 에 「🔍 직원 dry-run」 + 「👥 직원 매칭 적용」 버튼
+  - 결과 글래스 패널 (Rule 20) — cyan 색상 (#0891b2)
+  - 등록 명단 표시 + 매칭 성공/동명 다수/실패 분류
+  - 사람별 분산 정렬 (라운드 로빈) — 한 직원 100건 외 다른 사람도 보이도록
