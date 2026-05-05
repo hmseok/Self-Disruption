@@ -156,8 +156,8 @@ export const HIDDEN_PATHS = new Set<string>([
 // ─── 권한 부여 대상 결정 (requirePermission 명시 안 했으면 group 기준) ───
 function isRequirePermission(menu: MenuEntry): boolean {
   if (typeof menu.requirePermission === 'boolean') return menu.requirePermission
-  // 비즈니스 그룹 (asset/operation/finance/sales/admin) 은 기본 권한 부여 대상
-  return ['asset', 'operation', 'finance', 'sales', 'admin'].includes(menu.group)
+  // 비즈니스 그룹 (asset/operation/finance/sales/hr/admin) 은 기본 권한 부여 대상
+  return ['asset', 'operation', 'finance', 'sales', 'hr', 'admin'].includes(menu.group)
 }
 
 // ─── 헬퍼: system_modules API 응답 형식 ───
@@ -200,6 +200,6 @@ export function getDisplayName(menu: MenuEntry): string {
 
 // ─── 헬퍼: path → group ID 매핑 (legacy PATH_TO_GROUP 호환) ───
 export const PATH_TO_GROUP: Record<string, string> = Object.fromEntries(
-  MENUS.filter(m => !m.hidden && ['asset', 'operation', 'finance', 'sales', 'admin'].includes(m.group))
+  MENUS.filter(m => !m.hidden && ['asset', 'operation', 'finance', 'sales', 'hr', 'admin'].includes(m.group))
     .map(m => [m.path, m.group])
 )

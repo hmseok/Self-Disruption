@@ -197,7 +197,7 @@ export default function HRPeoplePage() {
     // menu-registry 의 모든 권한 부여 대상 메뉴를 fallback 으로
     setActiveModules(REGISTRY_MENUS
       .filter(m => !m.hidden)
-      .filter(m => ['asset', 'operation', 'finance', 'sales', 'admin'].includes(m.group))
+      .filter(m => ['asset', 'operation', 'finance', 'sales', 'hr', 'admin'].includes(m.group))
       .map(m => ({
         path: m.path,
         name: m.displayName || m.name,
