@@ -51,8 +51,52 @@
 | `LEFT, RIGHT, SUBSTRING, INSTR, REPLACE, LENGTH` | ✅ |
 | `DATE_FORMAT, DATE_SUB, DATE_ADD, NOW, CURDATE` | ✅ |
 | `GROUP_CONCAT` | ✅ |
+| `STR_TO_DATE(col, '%Y%m%d')` | ✅ — VARCHAR(8) YYYYMMDD 변환 (자주 사용) |
 
 **필수**: 카페24 DB 향한 SQL 작성 시 `// cafe24-db: MariaDB 10.1` 주석 필수.
+
+### 2.1 sql_mode (PR-6.1 검증 — 카페24 측 = ONLY_FULL_GROUP_BY 미적용)
+
+```
+sql_mode: IGNORE_SPACE, NO_AUTO_CREATE_USER, NO_ENGINE_SUBSTITUTION
+```
+
+→ 카페24 측 SQL 은 **ONLY_FULL_GROUP_BY 없는 환경 가정** 으로 작성 가능.
+→ 그러나 FMI 측 SQL 은 ONLY_FULL_GROUP_BY 적용 — 본 모듈 SQL 도 GROUP BY 표준 준수 권장 (이식성).
+
+### 2.2 charset 함정 (mysql2 driver 한정)
+
+```
+❌ charset: 'utf8mb3'                  → Unknown charset
+❌ charset: 'utf8mb3_general_ci'       → Unknown charset
+✅ charset: 'utf8'                     → OK (mysql2 가 utf8 = utf8mb3 매핑)
+
+또한 한글 응답 Buffer 문제:
+✅ typeCast option 으로 STRING/VAR_STRING/BLOB 을 utf8 string 으로 강제
+```
+
+### 2.3 collation mismatch 주의
+
+```
+카페24 측: utf8_general_ci
+FMI 측 (Cloud SQL): utf8mb4 또는 다른 collation 가능
+→ 데이터를 FMI DB 에 복사 시 collation 명시 의무 (CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci)
+```
+
+### 2.4 날짜 / 시간 컬럼
+
+```
+카페24 측 패턴:
+  - VARCHAR(8) YYYYMMDD (예: '20240315')      → 날짜
+  - VARCHAR(4) HHMM (예: '1430')              → 시각
+
+FMI 변환:
+  - SQL 측: STR_TO_DATE(col, '%Y%m%d') AS date
+  - JS 측: `${str.slice(0,4)}-${str.slice(4,6)}-${str.slice(6,8)}`
+
+time_zone: SYSTEM (한국 KST 추정 — UTC+9)
+  → JS Date 객체로 변환 시 시간대 명시 의무
+```
 
 ---
 

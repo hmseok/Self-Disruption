@@ -94,18 +94,36 @@ PK: custcode
 
 함수 `fs_picsvrmm_get` 존재.
 
-### 2.9 `aceesosh` — 협력업체 접수 헤더
+### 2.9 `aceesosh` — 협력업체 접수 헤더 ✅ 실 DDL 확정 (PR-6.1)
 
+```sql
+CREATE TABLE aceesosh (
+  esosidno  VARCHAR(8)    NOT NULL,    -- PK 1: 식별 ID
+  esosmddt  VARCHAR(8)    NOT NULL,    -- PK 2: 날짜 YYYYMMDD
+  esossrno  INT(11)       NOT NULL,    -- PK 3: 일련번호
+  esosacdt  VARCHAR(8),                -- accept date YYYYMMDD
+  esosactm  VARCHAR(4),                -- accept time HHMM
+  esosrgst  VARCHAR(1),                -- ★ 상태 코드 (R/C/X 등 — 다양)
+  esosrslt  VARCHAR(1),                -- 결과 코드
+  esosrstx  VARCHAR(2000),             -- 결과 텍스트 (한글 메모)
+  esostypp  VARCHAR(1),                -- 타입
+  esosbate  VARCHAR(1),                -- 배터리
+  esostire  VARCHAR(1),                -- 타이어
+  esosoils  VARCHAR(1),                -- 오일
+  esoslock  VARCHAR(1),                -- 잠김
+  esosmove  ...                        -- (더 많은 컬럼 — 잘림, 다음 PR 에서 전체 수집)
+  PRIMARY KEY (esosidno, esosmddt, esossrno)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+
+행 수: 77,463
+샘플: { esosidno:'10000001', esosmddt:'20240315', esossrno:50033, esosrgst:'C' }
 ```
-PK: (esosidno, esosmddt, esossrno) + esosrgst='R' (등록상태)
-주석: "협력업체 접수"
-쿼리 패턴:
-  SELECT * FROM aceesosh
-   WHERE esosidno = ?
-     AND esosmddt = ?
-     AND esossrno = ?
-     AND esosrgst = 'R'
-```
+
+**중요 변경**:
+- 이전 추정: `esosrgst='R'` 만 → ❌ **틀림**. C/X 등 다양한 코드.
+- esosrgst 는 **상태 코드** — bscddesc 에서 코드 의미 매핑 필요
+- esosrstx VARCHAR(2000) — 결과 텍스트 (한국어 자유 메모)
+- 모든 1자 코드 컬럼 (rgst/rslt/typp/bate/tire/oils/lock) 은 코드 마스터 조인 필요
 
 ### 2.10 `ajaoderh` — 사고차 대차 주문 헤더 ★
 
@@ -309,6 +327,33 @@ seqn = sequence (라인/버전)
 | `ajrpinsh` (정산 워크플로우) | `/api/cafe24/settlements` | 메인 비즈니스 — 신중 설계 |
 
 ---
+
+## 6.5 모듈 prefix 갯수 (PR-6.1 실 DB 확정)
+
+```
+ajr   77 tables  ★ 메인 워크플로우 (운영/정산)
+pmc   48          마스터 (차량/고객/협력업체)
+pic   43 tables  ★ 사용자/정비 마스터 (큰 모듈)
+ajc   12          보험
+plu   12 tables  ★ 신규 발견 — 의미 미확인
+ins   12          보험 (별도 모듈)
+pie   10          정비/청구
+cha   10 tables  ★ 신규 — charger 추정
+acr    8          ACR (사고차)
+put    7         ★ 신규
+pmo    7         ★ 신규
+fil    6          파일
+com    5          공통
+crm    5          CRM
+imr    5          imrwon
+gfc    5         ★ 신규
+aja    5          사고차 대차 주문
+zip    4          우편번호
+gpb    4
+```
+
+총 382 tables — Top 20 prefix 가 약 290개 차지.
+신규 발견 (plu/cha/put/pmo/gfc) 의미는 별도 PR 에서 정밀 분석.
 
 ## 7. 검증 필요 항목 (★)
 

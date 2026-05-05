@@ -290,10 +290,132 @@ package.json: "mysql2": "^3.20.0"
 
 ---
 
-## 10. 본 보고서 한계
+## 10. 본 보고서 한계 (PR-6.1 갱신)
 
-- ✗ DB 실 connection 미수행 — 추정에 의존, 정확한 컬럼 타입/사이즈 미확인
+- ✅ DB 실 connection 검증 완료 (PR-6.1) — 핵심 사실 확정 (§ 11)
 - ✗ PB `.pbd/.pbl` 바이너리 미해독 — 데스크톱 측 비즈니스 로직 분석 불가
-- ✗ 모듈 prefix 의미 (gpb/inf/pie/pin) 일부 추정 — 사용자 확인 필요
-- ✗ 운영 시간 / 부서 차이 / 마스터 변동 / 권한 차이 — 규칙 25 인터뷰 미진행
-- ✗ 페르소나/시나리오 — 규칙 26 미작성
+- ✅ 모듈 prefix 의미 — 테이블 갯수 확정 (§ 11.4) + 일부 추정 유지
+- ✅ 운영 시간 / 부서 차이 / 마스터 변동 / 권한 차이 — 규칙 25 인터뷰 완료 (OPERATIONS.md)
+- ✅ 페르소나 / 시나리오 — 규칙 26 워크-스루 완료 (SCENARIOS.md)
+- ❓ 잔여: 카페24 측 백업 정책 / 마이그레이션 타임라인 / 동명이인 처리
+
+---
+
+## 11. 실 DB connection 검증 결과 (PR-6.1, 2026-05-05)
+
+### 11.1 Connection 성공
+
+```
+✅ Host:       skyautosvc.co.kr (외부 IP 접근 이미 허용)
+✅ Port:       3306
+✅ Auth:       OK (.env.local 의 5개 변수)
+✅ TimeZone:   SYSTEM (호스트 KST 추정)
+```
+
+### 11.2 DB 환경 확정
+
+| 항목 | 값 |
+|------|---|
+| version | `10.1.13-MariaDB` (확정 — 추정과 일치) |
+| version_comment | `MariaDB Server` |
+| sql_mode | `IGNORE_SPACE, NO_AUTO_CREATE_USER, NO_ENGINE_SUBSTITUTION` |
+| **ONLY_FULL_GROUP_BY** | ❌ 미적용 — GROUP BY alias 자유 사용 가능 (FMI 측 lint 와 다름) |
+| collation_database | `utf8_general_ci` (utf8mb3) |
+| time_zone | `SYSTEM` |
+| 총 테이블 수 | **382개** |
+
+### 11.3 ⚠ mysql2 charset 함정
+
+```
+mysql2 driver 는 'utf8mb3' / 'utf8mb3_general_ci' 인식 못 함:
+  ❌ charset: 'utf8mb3'                  → Unknown charset
+  ❌ charset: 'utf8mb3_general_ci'       → Unknown charset
+  ✅ charset: 'utf8'                     → OK (mysql2 가 utf8 = utf8mb3 매핑)
+
+또한 한글 응답이 Buffer 로 오는 문제:
+  → typeCast option 으로 STRING/VAR_STRING/BLOB 을 utf8 string 으로 강제
+```
+
+→ PR-6.2 `lib/cafe24-db.ts` 작성 시 **반드시 적용**.
+
+### 11.4 모듈 prefix 갯수 (Top 20)
+
+| prefix | tables | 의미 (확정/추정) |
+|--------|--------|-----------------|
+| **ajr** | **77** | ★ 운영/정산 (메인 워크플로우 — ajrpinsh 등) |
+| **pmc** | **48** | 마스터 (Personal Master Code — 차량/고객/협력업체) |
+| **pic** | **43** | 마스터 (Personal Identity — 사용자/정비/서버) |
+| ajc | 12 | 보험 |
+| **plu** | **12** | ★ 신규 발견 — 의미 미확인 (plus? plug-in?) |
+| ins | 12 | 보험 (별도 모듈) |
+| pie | 10 | 정비/청구? |
+| **cha** | **10** | ★ 신규 발견 — charger? (충전 — root 의 `charger/` 모듈 연관) |
+| tmp | 9 | 임시 |
+| acr | 8 | ACR (사고차) |
+| **put** | **7** | ★ 신규 — 의미 미확인 |
+| **pmo** | **7** | ★ 신규 — 의미 미확인 |
+| fil | 6 | 파일 |
+| com | 5 | 공통 |
+| crm | 5 | CRM |
+| **imr** | **5** | imrwon (root 의 `imrwon/` 모듈 연관) |
+| **gfc** | **5** | ★ 신규 — 의미 미확인 |
+| aja | 5 | 사고차 대차 주문 |
+| zip | 4 | 우편번호 |
+| gpb | 4 | (확인 필요) |
+
+→ **ajr 모듈이 가장 큼** (77 tables). FMI 마이그레이션 시 가장 신중 설계 영역.
+
+### 11.5 데이터 규모 (운영중인 대형 ERP)
+
+```
+aceesosh (사고 접수)        : 77,463 row
+ajaoderh (대차 주문 헤더)    : 38,461 row
+pmccarsm (차량 마스터 + 이력) : 160,148 row
+총 382 테이블 — 4년 이상 누적된 운영 데이터
+```
+
+### 11.6 aceesosh DDL (사고 협력업체 접수 — 확정)
+
+```sql
+CREATE TABLE aceesosh (
+  esosidno  VARCHAR(8)    NOT NULL,    -- PK 1: 식별 ID (8자리)
+  esosmddt  VARCHAR(8)    NOT NULL,    -- PK 2: 날짜 YYYYMMDD
+  esossrno  INT(11)       NOT NULL,    -- PK 3: 일련번호
+  esosacdt  VARCHAR(8),                -- accept date YYYYMMDD
+  esosactm  VARCHAR(4),                -- accept time HHMM
+  esosrgst  VARCHAR(1),                -- 상태 코드 (R / C / X 등 1자)
+  esosrslt  VARCHAR(1),                -- 결과 코드
+  esosrstx  VARCHAR(2000),             -- 결과 텍스트 (한글 메모)
+  esostypp  VARCHAR(1),                -- 타입
+  esosbate  VARCHAR(1),                -- 배터리?
+  esostire  VARCHAR(1),                -- 타이어
+  esosoils  VARCHAR(1),                -- 오일
+  esoslock  VARCHAR(1),                -- 잠김?
+  esosmove  ...                        -- (잘림 — 추가 컬럼 더 있음)
+  PRIMARY KEY (esosidno, esosmddt, esossrno)
+);
+```
+
+**중요 발견**:
+- `esosrgst='C'` 샘플 발견 — PHP 코드의 `R` 만 본 것과 다름 → **다양한 코드 존재**
+- 1자 코드 컬럼 풍부 (rgst/rslt/typp/bate/tire/oils/lock/...) → 코드 마스터 (`bscddesc` 등) 조인 필요
+- 날짜 = `VARCHAR(8) YYYYMMDD` 문자열 — FMI 변환 시 `STR_TO_DATE` 또는 클라이언트 파싱
+
+### 11.7 다음 PR 결정 사항 (확정 정보 기반)
+
+```
+PR-6.2 lib/cafe24-db.ts 필수:
+  ✅ charset: 'utf8'  (utf8mb3 X)
+  ✅ typeCast — STRING/VAR_STRING/BLOB → utf8 강제
+  ✅ Read-only — SET TRANSACTION READ ONLY 명시
+  ✅ Connection pool — keep-alive 짧게 (idle 60s)
+  ✅ collation: utf8_general_ci 인지 (JOIN 시 mismatch 회피)
+  ✅ time_zone: SYSTEM 인지 (한국시간대 변환 고려)
+
+PR-6.3 /api/cafe24/accidents 필수:
+  ✅ esosrgst 코드별 필터 (R/C/X 등 - 코드 마스터 조회 같이)
+  ✅ 날짜 변환: VARCHAR(8) YYYYMMDD → ISO YYYY-MM-DD
+  ✅ 한국어 컬럼 안전 (esosrstx varchar 2000)
+  ✅ 페이지네이션 (77,463 row → LIMIT/OFFSET 의무)
+```
+

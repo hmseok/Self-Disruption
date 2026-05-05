@@ -5,7 +5,74 @@
 
 ---
 
-## 2026-05-05 | PR-6.1 | Planner 단계 — 운영 인터뷰 결과 _docs 갱신
+## 2026-05-05 | PR-6.1 | Planner 단계 — 운영 인터뷰 + 실 DB 검증 결과 _docs 갱신
+
+### Part A — 운영 인터뷰 (규칙 25 + 26)
+(위 PR-6.1 인터뷰 결과 — Q1=A, Q2=B, Q3=A,D, Q4=B, Q5=D, Q6=D, Q7=A, Q8=D)
+
+### Part B — 실 DB connection 검증 (★ 큰 발견)
+
+```
+✅ Host:     skyautosvc.co.kr (외부 IP 접근 이미 허용 — PB 데스크톱 동시 사용)
+✅ Port:     3306
+✅ DB ver:   10.1.13-MariaDB
+✅ Charset:  utf8 / utf8_general_ci
+✅ Mode:     IGNORE_SPACE,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION
+              ← ONLY_FULL_GROUP_BY 미적용 (FMI 측과 차이)
+✅ TimeZone: SYSTEM
+✅ 총 테이블: 382개
+✅ 데이터 규모:
+   - aceesosh 77,463 row
+   - ajaoderh 38,461 row
+   - pmccarsm 160,148 row
+✅ aceesosh DDL 확정:
+   - PK (esosidno VARCHAR(8), esosmddt VARCHAR(8), esossrno INT(11))
+   - esosrgst VARCHAR(1) — 다양한 상태 코드 (R/C/X 등 — PHP 코드 R 만 본 것 X)
+   - esosrstx VARCHAR(2000) — 한글 메모
+✅ Top prefix 그룹:
+   - ajr 77 / pmc 48 / pic 43 / ajc/plu/ins 12 / pie 10 / cha 10 / acr 8 ...
+   - 신규 발견: plu, cha, put, pmo, gfc — 의미 별도 분석 필요
+
+⚠ mysql2 driver 함정:
+   - charset='utf8mb3' / 'utf8mb3_general_ci' 는 Unknown — 'utf8' 만 인식
+   - 한글 응답이 Buffer 로 옴 → typeCast option 으로 강제 변환 의무
+```
+
+### Part C — _docs 갱신 (5 파일)
+
+- `OPERATIONS.md` (+157 라인) — Q1~Q8 답변 + 실 DB 검증 결과 추가
+- `SCENARIOS.md` (+181 라인) — Persona 1~4 + Scenario A,D 명세
+- `UI-SPEC.md` (+258 라인) — PR-6.3 사고 접수 + PR-6.4 대시보드 화면 사양
+- `CLAUDE-Cafe24.md` (+50+ 라인) — 캐시/권한/단계별 source-of-truth + charset 함정 + sql_mode + 날짜 변환 패턴
+- `SOURCE-ANALYSIS.md` (+170 라인) — § 11 실 DB 검증 결과 신설
+- `DATA-MODEL.md` (+50 라인) — aceesosh 실 DDL 확정 + 모듈 prefix 갯수 확정
+
+### Part D — 다음 PR 예고 (PR-6.2 즉시 진입 가능)
+
+```
+PR-6.2 — lib/cafe24-db.ts (mysql2 read-only pool 단일 진입점)
+   사전 작업 ✅ 모두 완료:
+     - 외부 IP 허용: 이미 OK (검증됨)
+     - DB 호환성: 확정 (MariaDB 10.1, charset 함정 인지)
+     - Connection 패턴: SOURCE-ANALYSIS § 11.7 + OPERATIONS § 8.1 명시
+
+PR-6.3 — /api/cafe24/accidents + /Cafe24 ERP/accidents 페이지
+PR-6.4 — /Cafe24 ERP/dashboard + 5 KPI 위젯 + 일별 추이
+```
+
+### GATE 진행 상태
+
+- ✅ G3 Planner — 운영 인터뷰 4축 + 실 DB 검증 (이중 단계)
+- ⏭ G5/G6/G7/G8 — 코드 변경 없음, 문서 only PR
+- ✅ Rule 21 Cowork — 본 세션 영역만 staging
+- ✅ Rule 22 _docs 갱신 (6 파일)
+- ✅ Rule 25 운영 사실 인터뷰
+- ✅ Rule 26 페르소나 / 시나리오 워크-스루
+- ✅ Rule 13 외부 시스템 호환성 사전 검증 (실 connection 까지)
+
+---
+
+## 2026-05-05 | PR-6.1-old | Planner 단계 — 운영 인터뷰 결과 _docs 갱신 (Part A 만)
 
 운영 사실 인터뷰 (규칙 25 + 26) 완료. 코드 변경 없음.
 

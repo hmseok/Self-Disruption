@@ -121,17 +121,54 @@ PR-6.X 진행 시 모든 카페24 페이지에:
 
 ---
 
-## 8. 기술 운영 사실 (확정)
+## 8. 기술 운영 사실 (PR-6.1 실 connection 검증 완료)
 
 ```
-✅ DB 종류: MariaDB 10.1.13 (Distrib 10.0.21)
-✅ Charset: utf8 (utf8mb3 추정)
-✅ TIME_ZONE: '+00:00' (UTC) — 한국 시간 변환 시 +9시간
-✅ 자격증명: .env.local 의 CAFE24_DB_* (5개 키)
-✅ 호스트: PHP 측 localhost / FMI 측 외부 IP 필요 (사용자 액션)
-✅ 포트: ❓ 3306 가정 (PR-6.2 connection 시 검증)
-✅ 동시 사용: PB 데스크톱 + PHP 웹 + FMI ERP (3중)
+✅ DB 종류: MariaDB 10.1.13 (Distrib 10.0.21) — 확정
+✅ Charset: utf8mb3 (collation utf8_general_ci) — 확정
+✅ TIME_ZONE: SYSTEM (호스트 KST 추정 UTC+9) — 확정
+✅ 자격증명: .env.local 의 CAFE24_DB_* (5개 키) — 확정
+✅ 호스트: skyautosvc.co.kr (외부 IP 접근 이미 허용) — 확정
+✅ 포트: 3306 — 확정
+✅ 외부 IP 접근: ✅ 이미 허용됨 (PB 데스크톱이 이미 외부 사용)
+✅ 총 테이블: 382개
+✅ sql_mode: IGNORE_SPACE, NO_AUTO_CREATE_USER, NO_ENGINE_SUBSTITUTION
+   - ONLY_FULL_GROUP_BY 미적용 — GROUP BY alias 자유
+✅ 데이터 규모:
+   - aceesosh (사고 접수)        77,463 row
+   - ajaoderh (대차 주문 헤더)    38,461 row
+   - pmccarsm (차량 마스터 + 이력) 160,148 row
+✅ 동시 사용: PB 데스크톱 + PHP 웹 + (이번 추가) FMI ERP
 ✅ MariaDB 10.1 호환 함수만 (CLAUDE-Cafe24.md § 2)
+✅ mysql2 driver 함정: charset='utf8' (utf8mb3 X) + typeCast 명시
+```
+
+### 8.1 PR-6.2 connection 적용 의무 옵션
+
+```typescript
+// lib/cafe24-db.ts 작성 시 필수 옵션
+{
+  host: env.CAFE24_DB_HOST,
+  port: parseInt(env.CAFE24_DB_PORT || '3306'),
+  user: env.CAFE24_DB_USER,
+  password: env.CAFE24_DB_PASSWORD,
+  database: env.CAFE24_DB_NAME,
+
+  charset: 'utf8',  // ← utf8mb3 X — mysql2 미인식
+  typeCast: function (field, next) {
+    if (field.type === 'VAR_STRING' || field.type === 'STRING' || field.type === 'BLOB') {
+      return field.string('utf8');  // 한글 Buffer → string 강제
+    }
+    return next();
+  },
+  connectTimeout: 10000,
+  // Pool 설정
+  connectionLimit: 5,
+  queueLimit: 10,
+  idleTimeout: 60000,  // 60초 idle 후 종료
+  // Read-only
+  // ※ Pool 옵션에 readOnly 직접 없음 — 매 connection 시작 시 SET TRANSACTION READ ONLY 의무
+}
 ```
 
 ---
