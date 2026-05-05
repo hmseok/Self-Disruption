@@ -250,13 +250,37 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // 매칭 성공 — 사람별 분산 정렬 (석호민 100건 외 다른 사람도 보이도록)
+    if (result.samples.length > 0) {
+      const byName: Record<string, any[]> = {}
+      for (const s of result.samples) {
+        const k = s.investor_name || s.client_name
+        if (!byName[k]) byName[k] = []
+        byName[k].push(s)
+      }
+      // 라운드 로빈 — 각 사람 1건씩 순환 추출
+      const balanced: any[] = []
+      const keys = Object.keys(byName)
+      let idx = 0
+      while (balanced.length < result.samples.length) {
+        const k = keys[idx % keys.length]
+        const list = byName[k]
+        if (list.length > 0) balanced.push(list.shift())
+        if (keys.every(kk => byName[kk].length === 0)) break
+        idx++
+      }
+      result.samples = balanced
+    }
+
     return NextResponse.json({
       mode,
       dry_run: dryRun,
       ...result,
       investors_loaded: investors.length,
+      // 사전 명단 (검수용 — 누가 등록되어 있는지 확인)
+      investor_names: investors.map(i => `${i.investor_name}(${i.type === 'invest' ? '투자' : '지입'})`).sort(),
       message: dryRun
-        ? `dry-run — 매칭 가능 ${result.matched}건 (투자자/지입자 ${investors.length}명 사전)`
+        ? `dry-run — 매칭 가능 ${result.matched}건 (사전 ${investors.length}명: ${investors.map(i => i.investor_name).slice(0, 10).join(', ')}${investors.length > 10 ? '...' : ''})`
         : `${result.applied}건 매칭 적용 (matched=${result.matched}, multi=${result.multi}, no_candidate=${result.no_candidate}, no_pattern=${result.no_pattern})`,
     })
   } catch (e: any) {

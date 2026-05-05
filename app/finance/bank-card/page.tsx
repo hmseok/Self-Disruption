@@ -5144,7 +5144,12 @@ export default function BankCardPage() {
                     <div style={{ fontSize: 11, padding: '6px 8px', background: 'rgba(254,226,226,0.5)', borderRadius: 6 }}>❌ 사전 없음 <b>{investorJiipResult.no_candidate}건</b></div>
                     <div style={{ fontSize: 11, padding: '6px 8px', background: 'rgba(254,226,226,0.5)', borderRadius: 6 }}>❌ 비-인명 <b>{investorJiipResult.no_pattern}건</b></div>
                   </div>
-                  <div style={{ fontSize: 11, color: COLORS.textMuted, marginBottom: 8 }}>👥 투자자/지입자 사전 {investorJiipResult.investors_loaded}명 로드</div>
+                  <div style={{ fontSize: 11, color: COLORS.textMuted, marginBottom: 4 }}>👥 투자자/지입자 사전 {investorJiipResult.investors_loaded}명 로드 (status='active' 한정)</div>
+                  {investorJiipResult.investor_names?.length > 0 && (
+                    <div style={{ fontSize: 10, color: COLORS.textMuted, marginBottom: 8, padding: '4px 8px', background: 'rgba(0,0,0,0.03)', borderRadius: 4 }}>
+                      <b>등록 명단:</b> {investorJiipResult.investor_names.join(', ')}
+                    </div>
+                  )}
                   {/* 매칭 성공 */}
                   {investorJiipResult.samples?.length > 0 && (() => {
                     const all = investorJiipResult.samples
