@@ -11,13 +11,21 @@ import {
   annualToMonthly, hourlyToMonthly, dailyToMonthly,
   ALLOWANCE_TYPES, DEDUCTION_TYPES, EMPLOYMENT_TYPES, SALARY_TYPES,
 } from '../../utils/payroll-calc'
+import { auth } from '@/lib/auth-client'
 
 // ────────────────────────────────────────────────────────────────
-// Auth Helper
+// Auth Helper — Custom JWT (fmi_token) 통일
+// (이전: sb-auth-token 사용 → 401 → 직원 dropdown 빈 상태 발생)
 // ────────────────────────────────────────────────────────────────
 async function getAuthHeader(): Promise<Record<string, string>> {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('sb-auth-token') : null
-  return token ? { Authorization: `Bearer ${token}` } : {}
+  try {
+    const user = auth.currentUser
+    if (!user) return {}
+    const token = await user.getIdToken(false)
+    return token ? { Authorization: `Bearer ${token}` } : {}
+  } catch {
+    return {}
+  }
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -298,9 +306,8 @@ export default function PayrollPage() {
     if (!confirm(`${payPeriod} 급여를 생성하시겠습니까?`)) return
     setGenerating(true)
     try {
-      const token = localStorage.getItem('sb-auth-token')
       const res = await fetch('/api/payroll/generate', {
-        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        method: 'POST', headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) },
         body: JSON.stringify({  pay_period: payPeriod }),
       })
       const result = await res.json()

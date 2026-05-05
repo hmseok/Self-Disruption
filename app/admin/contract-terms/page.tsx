@@ -2,13 +2,20 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useApp } from '../../context/AppContext'
+import { auth } from '@/lib/auth-client'
 
 // ────────────────────────────────────────────────────────────────
-// Auth Helper
+// Auth Helper — Custom JWT (fmi_token) 통일
 // ────────────────────────────────────────────────────────────────
 async function getAuthHeader(): Promise<Record<string, string>> {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('sb-auth-token') : null
-  return token ? { Authorization: `Bearer ${token}` } : {}
+  try {
+    const user = auth.currentUser
+    if (!user) return {}
+    const token = await user.getIdToken(false)
+    return token ? { Authorization: `Bearer ${token}` } : {}
+  } catch {
+    return {}
+  }
 }
 
 export const dynamic = 'force-dynamic'
