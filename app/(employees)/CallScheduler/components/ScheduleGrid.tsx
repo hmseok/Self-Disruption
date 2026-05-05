@@ -7,7 +7,7 @@ import { useMemo, useState } from 'react'
 import { COLORS, GLASS } from '@/app/utils/ui-tokens'
 import AssignmentCell from './AssignmentCell'
 import WorkerPicker from './WorkerPicker'
-import { monthDays, dowIndex, DOW_LABEL } from '../utils/hours'
+import { monthDays, dowIndex, DOW_LABEL, isOnExternalDuty } from '../utils/hours'
 import { getAuthHeader } from '@/app/utils/auth-client'
 import type {
   ScheduleDetail, Assignment, ShiftSlot, Worker, SpecialCode,
@@ -42,6 +42,14 @@ export default function ScheduleGrid({ detail, onChanged }: Props) {
     for (const w of workers) m.set(w.id, w)
     return m
   }, [workers])
+
+  // PR-2RR-a — 외부 cycle 정의된 워커들 (외부 직원 + cycle 셋팅)
+  const externalCycleWorkers = useMemo(
+    () => workers.filter(w =>
+      w.is_external && w.cycle_days_on && w.cycle_start_date
+    ),
+    [workers],
+  )
 
   const [pickerSlot, setPickerSlot] = useState<ShiftSlot | null>(null)
   const [pickerDate, setPickerDate] = useState<string>('')
@@ -292,6 +300,36 @@ export default function ScheduleGrid({ detail, onChanged }: Props) {
               )
             })}
           </tr>
+          {/* PR-2RR-a — 외부 직원 cycle 시각화 행 */}
+          {externalCycleWorkers.map(ew => (
+            <tr key={`ext-${ew.id}`}>
+              <td style={{
+                padding: '2px 6px', position: 'sticky', left: 0,
+                background: 'rgba(243,244,246,0.95)',
+                color: COLORS.textSecondary, fontWeight: 600,
+                borderRadius: 4, whiteSpace: 'nowrap', zIndex: 1,
+                fontSize: 10,
+              }}>
+                <span style={{ marginRight: 4 }}>🏢</span>
+                {ew.name} <span style={{ fontSize: 9, color: COLORS.textMuted }}>외부</span>
+              </td>
+              {days.map(d => {
+                const onDuty = isOnExternalDuty(ew, d)
+                return (
+                  <td key={d} style={{
+                    padding: 0, minWidth: 44, height: 14,
+                    background: onDuty ? '#9ca3af' : 'transparent',
+                    borderTop: `1px solid ${COLORS.borderFaint}`,
+                    borderBottom: `1px solid ${COLORS.borderFaint}`,
+                    cursor: 'help',
+                  }}
+                  title={onDuty
+                    ? `${ew.name} 외부 근무 (당사 X) — ${d}`
+                    : `${ew.name} 외부 휴무 (당사 가능) — ${d}`} />
+                )
+              })}
+            </tr>
+          ))}
         </thead>
         <tbody>
           {slots.map(slot => (

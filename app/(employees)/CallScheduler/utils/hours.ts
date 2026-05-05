@@ -61,3 +61,26 @@ export function dowIndex(isoDate: string): number {
 }
 
 export const DOW_LABEL = ['일', '월', '화', '수', '목', '금', '토'] as const
+
+// ─── PR-2QQ-d-revert / PR-2RR-a — 외부 cycle 검사 (클라/서버 공용) ─────
+//
+// cycle on phase = 외부 근무 (당사 X)
+// cycle off phase = 외부 휴무 (당사 가능)
+//
+// 사용법:
+//   isOnExternalDuty(worker, '2026-05-01') === true  → 외부 근무 (당사 X)
+//   isOnExternalDuty(worker, '2026-05-03') === false → 외부 휴무 (당사 가능)
+export function isOnExternalDuty(
+  w: { cycle_days_on?: number | null; cycle_days_off?: number | null; cycle_start_date?: string | null },
+  isoDate: string,
+): boolean {
+  if (!w.cycle_days_on || !w.cycle_start_date) return false
+  const start = new Date(w.cycle_start_date + 'T00:00:00').getTime()
+  const cur = new Date(isoDate + 'T00:00:00').getTime()
+  const elapsed = Math.floor((cur - start) / (24 * 60 * 60 * 1000))
+  if (elapsed < 0) return false  // 시작 전엔 외부 일정 없음
+  const cycle = (w.cycle_days_on || 0) + (w.cycle_days_off || 0)
+  if (cycle <= 0) return false
+  const phase = ((elapsed % cycle) + cycle) % cycle
+  return phase < w.cycle_days_on  // on phase = 외부 근무 = 당사 X
+}
