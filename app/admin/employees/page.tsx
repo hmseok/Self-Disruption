@@ -109,6 +109,22 @@ export default function OrgManagementPage() {
   const [showPositionsDepts, setShowPositionsDepts] = useState(false)
   const [showInvitations, setShowInvitations] = useState(false)
 
+  // === 모달 내부 — 통합 직원 편집 (기본정보 + 급여 + 권한) ===
+  type EditSection = 'profile' | 'salary' | 'permissions'
+  const [editSection, setEditSection] = useState<EditSection>('profile')
+  // § 급여 설정
+  const [salaryForm, setSalaryForm] = useState<{
+    id: string | null
+    base_salary: string
+    meal_allowance: string  // 식대 (수당 중 가장 흔한 한 항목만 노출 — 단순화)
+    bank_name: string
+    account_number: string
+    account_holder: string
+    payment_day: string
+    is_active: boolean
+  }>({ id: null, base_salary: '', meal_allowance: '', bank_name: '', account_number: '', account_holder: '', payment_day: '25', is_active: true })
+  const [savingSalary, setSavingSalary] = useState(false)
+
   // === Tab 2: 페이지 권한 ===
   const [allUserPerms, setAllUserPerms] = useState<Record<string, UserPermMap>>({})
   const [savingPermsFor, setSavingPermsFor] = useState<string | null>(null)
@@ -123,6 +139,12 @@ export default function OrgManagementPage() {
   useEffect(() => {
     if (activeTab === 'permissions') loadAllUserPermissions()
   }, [activeTab])
+  // 모달의 § 페이지 권한 섹션이 처음 활성화되면 권한 데이터 prefetch
+  useEffect(() => {
+    if (editingEmp && editSection === 'permissions' && !allUserPerms[editingEmp.id]) {
+      loadAllUserPermissions()
+    }
+  }, [editingEmp, editSection])
 
   const loadAll = async () => {
     setLoading(true)
@@ -266,8 +288,9 @@ export default function OrgManagementPage() {
   }
 
   // ===== 직원 수정 모달 =====
-  const openEditModal = (emp: any) => {
+  const openEditModal = async (emp: any) => {
     setEditingEmp(emp)
+    setEditSection('profile')
     setEditForm({
       employee_name: emp.employee_name || '',  // DB 원본 값 (null이면 빈 문자열)
       phone: emp.phone || '',
@@ -276,8 +299,85 @@ export default function OrgManagementPage() {
       role: emp.role || 'user',
       is_active: !!emp.is_active,
     })
+    // 급여 설정 prefetch
+    try {
+      const res = await fetch(`/api/employee_salaries?employee_id=${encodeURIComponent(emp.id)}`, { headers: await getAuthHeader() })
+      const json = await res.json()
+      const row = (json.data || [])[0]
+      if (row) {
+        // allowances 는 JSON — meal 한 항목만 단순 표출
+        let mealAllow = ''
+        try {
+          const allowances = typeof row.allowances === 'string' ? JSON.parse(row.allowances) : (row.allowances || {})
+          if (allowances && typeof allowances === 'object') {
+            mealAllow = String(allowances.meal_allowance ?? allowances.식대 ?? allowances.meal ?? '')
+          }
+        } catch {}
+        setSalaryForm({
+          id: row.id,
+          base_salary: row.base_salary != null ? String(row.base_salary) : '',
+          meal_allowance: mealAllow,
+          bank_name: row.bank_name || '',
+          account_number: row.account_number || '',
+          account_holder: row.account_holder || (emp.employee_name || ''),
+          payment_day: row.payment_day != null ? String(row.payment_day) : '25',
+          is_active: !!row.is_active,
+        })
+      } else {
+        setSalaryForm({
+          id: null, base_salary: '', meal_allowance: '', bank_name: '', account_number: '',
+          account_holder: emp.employee_name || '', payment_day: '25', is_active: true,
+        })
+      }
+    } catch {
+      setSalaryForm({
+        id: null, base_salary: '', meal_allowance: '', bank_name: '', account_number: '',
+        account_holder: emp.employee_name || '', payment_day: '25', is_active: true,
+      })
+    }
   }
-  const closeEditModal = () => { setEditingEmp(null); setEditForm({}); setSavingEdit(false) }
+  const closeEditModal = () => { setEditingEmp(null); setEditForm({}); setSavingEdit(false); setEditSection('profile') }
+
+  // ===== 급여 설정 저장 =====
+  const saveSalary = async () => {
+    if (!editingEmp) return
+    setSavingSalary(true)
+    try {
+      const baseSalary = Number(salaryForm.base_salary || 0)
+      const mealAmt = Number(salaryForm.meal_allowance || 0)
+      const allowances: Record<string, number> = {}
+      if (mealAmt > 0) allowances.meal_allowance = mealAmt
+      const payload = {
+        employee_id: editingEmp.id,
+        company_id: company?.id,
+        base_salary: baseSalary,
+        allowances,
+        payment_day: Number(salaryForm.payment_day || 25),
+        bank_name: salaryForm.bank_name || null,
+        account_number: salaryForm.account_number || null,
+        account_holder: salaryForm.account_holder || null,
+        is_active: salaryForm.is_active,
+      }
+      // 신규 / 갱신 — POST UPSERT (ON DUPLICATE KEY UPDATE)
+      const res = await fetch('/api/employee_salaries', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) },
+        body: JSON.stringify(payload),
+      })
+      const json = await res.json()
+      if (!res.ok || json.error) {
+        alert('급여 설정 저장 실패: ' + (json.error || res.statusText))
+      } else {
+        // refresh — id 갱신
+        if (json.data?.id) setSalaryForm(prev => ({ ...prev, id: json.data.id }))
+        alert('급여 설정이 저장되었습니다.')
+      }
+    } catch (e: any) {
+      alert('급여 설정 저장 실패: ' + e.message)
+    } finally {
+      setSavingSalary(false)
+    }
+  }
 
   const saveEdit = async () => {
     if (!editingEmp) return
@@ -999,23 +1099,55 @@ export default function OrgManagementPage() {
         />
       )}
 
-      {/* 직원 수정 모달 — Glass Level 4 */}
+      {/* 직원 수정 모달 — Glass Level 4 (통합) */}
       {editingEmp && (
         <div onClick={closeEditModal}
           style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 16 }}>
           <div onClick={e => e.stopPropagation()}
-            style={{ background: 'rgba(255,255,255,0.92)', borderRadius: 20, width: '100%', maxWidth: 520, boxShadow: '0 25px 50px rgba(0,0,0,0.15)', border: '1px solid rgba(0,0,0,0.06)', overflow: 'hidden' }}>
+            style={{ background: 'rgba(255,255,255,0.92)', borderRadius: 20, width: '100%', maxWidth: 880, boxShadow: '0 25px 50px rgba(0,0,0,0.15)', border: '1px solid rgba(0,0,0,0.06)', overflow: 'hidden', display: 'flex', flexDirection: 'column', maxHeight: '92vh' }}>
 
             {/* 모달 헤더 — Glass */}
-            <div style={{ padding: '20px 24px', borderBottom: '1px solid rgba(0,0,0,0.06)', background: 'rgba(255,255,255,0.40)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <h3 style={{ fontSize: 17, fontWeight: 600, color: '#1e293b', margin: 0 }}>직원 정보 수정</h3>
-                <p style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>{editingEmp.email}</p>
+            <div style={{ padding: '20px 24px', borderBottom: '1px solid rgba(0,0,0,0.06)', background: 'rgba(255,255,255,0.40)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{
+                  width: 40, height: 40, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: '#fff', fontWeight: 800, fontSize: 14,
+                  background: editingEmp.role === 'admin' ? '#0ea5e9' : editingEmp.role === 'master' ? '#2563eb' : '#94a3b8',
+                }}>
+                  {(editingEmp.display_name || editingEmp.email || '?')[0].toUpperCase()}
+                </div>
+                <div>
+                  <h3 style={{ fontSize: 17, fontWeight: 600, color: '#1e293b', margin: 0 }}>{editingEmp.display_name || '(이름 미설정)'}</h3>
+                  <p style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>{editingEmp.email}</p>
+                </div>
               </div>
               <button onClick={closeEditModal} style={{ fontSize: 22, fontWeight: 300, color: '#94a3b8', background: 'none', border: 'none', cursor: 'pointer', lineHeight: 1, width: 32, height: 32, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>&times;</button>
             </div>
 
-            <div style={{ padding: 24, maxHeight: '60vh', overflowY: 'auto' }}>
+            {/* 섹션 탭 — 기본정보 / 급여설정 / 페이지권한 */}
+            <div style={{ display: 'flex', borderBottom: '1px solid rgba(0,0,0,0.06)', background: 'rgba(255,255,255,0.30)', flexShrink: 0 }}>
+              {([
+                { key: 'profile', label: '👤 기본정보' },
+                { key: 'salary', label: '💼 급여 설정' },
+                ...(editingEmp.role === 'user' ? [{ key: 'permissions', label: '🔐 페이지 권한' }] : []),
+              ] as Array<{ key: EditSection; label: string }>).map(t => (
+                <button key={t.key} onClick={() => setEditSection(t.key)}
+                  style={{
+                    flex: 1, padding: '12px 16px', fontSize: 13, fontWeight: 600,
+                    background: editSection === t.key ? 'rgba(59,130,246,0.08)' : 'transparent',
+                    color: editSection === t.key ? '#2563eb' : '#64748b',
+                    border: 'none', borderBottom: editSection === t.key ? '2px solid #3b82f6' : '2px solid transparent',
+                    cursor: 'pointer', whiteSpace: 'nowrap',
+                  }}>
+                  {t.label}
+                </button>
+              ))}
+            </div>
+
+            <div style={{ padding: 24, overflowY: 'auto', flex: 1 }}>
+
+            {/* § 기본정보 */}
+            {editSection === 'profile' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 <div>
                   <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#64748b', marginBottom: 6 }}>이름</label>
@@ -1076,11 +1208,149 @@ export default function OrgManagementPage() {
                   </div>
                 </div>
               </div>
+            )}
+
+            {/* § 급여 설정 — 관리용 단순 버전 (세무 정밀계산은 외부 세무사) */}
+            {editSection === 'salary' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <div style={{ background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.2)', borderRadius: 10, padding: '10px 14px', fontSize: 12, color: '#2563eb' }}>
+                  💡 관리용 기본 정보 — 4대보험·소득세 정밀계산은 외부 세무사 영역
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#64748b', marginBottom: 6 }}>기본급 (월)</label>
+                    <input type="number" value={salaryForm.base_salary}
+                      onChange={e => setSalaryForm({ ...salaryForm, base_salary: e.target.value })}
+                      placeholder="3000000"
+                      style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, outline: 'none', background: 'rgba(255,255,255,0.6)', boxSizing: 'border-box', fontVariantNumeric: 'tabular-nums' }} />
+                    {salaryForm.base_salary && Number(salaryForm.base_salary) > 0 && (
+                      <span style={{ fontSize: 11, color: '#94a3b8', marginTop: 4, display: 'block' }}>
+                        ₩ {Number(salaryForm.base_salary).toLocaleString()}
+                      </span>
+                    )}
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#64748b', marginBottom: 6 }}>식대 (월)</label>
+                    <input type="number" value={salaryForm.meal_allowance}
+                      onChange={e => setSalaryForm({ ...salaryForm, meal_allowance: e.target.value })}
+                      placeholder="200000"
+                      style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, outline: 'none', background: 'rgba(255,255,255,0.6)', boxSizing: 'border-box', fontVariantNumeric: 'tabular-nums' }} />
+                    {salaryForm.meal_allowance && Number(salaryForm.meal_allowance) > 0 && (
+                      <span style={{ fontSize: 11, color: '#94a3b8', marginTop: 4, display: 'block' }}>
+                        ₩ {Number(salaryForm.meal_allowance).toLocaleString()}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#64748b', marginBottom: 6 }}>지급일</label>
+                  <select value={salaryForm.payment_day}
+                    onChange={e => setSalaryForm({ ...salaryForm, payment_day: e.target.value })}
+                    style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, background: 'rgba(255,255,255,0.6)', outline: 'none' }}>
+                    {[5, 10, 15, 20, 25, 28, 30].map(d => <option key={d} value={d}>매월 {d}일</option>)}
+                  </select>
+                </div>
+                <div style={{ borderTop: '1px solid rgba(0,0,0,0.06)', paddingTop: 16 }}>
+                  <h4 style={{ fontSize: 13, fontWeight: 600, color: '#1e293b', marginBottom: 12 }}>계좌 정보</h4>
+                  <div className="grid grid-cols-2 gap-3" style={{ marginBottom: 12 }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#64748b', marginBottom: 6 }}>은행</label>
+                      <input value={salaryForm.bank_name}
+                        onChange={e => setSalaryForm({ ...salaryForm, bank_name: e.target.value })}
+                        placeholder="KB국민은행"
+                        style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, outline: 'none', background: 'rgba(255,255,255,0.6)', boxSizing: 'border-box' }} />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#64748b', marginBottom: 6 }}>예금주</label>
+                      <input value={salaryForm.account_holder}
+                        onChange={e => setSalaryForm({ ...salaryForm, account_holder: e.target.value })}
+                        placeholder="홍길동"
+                        style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, outline: 'none', background: 'rgba(255,255,255,0.6)', boxSizing: 'border-box' }} />
+                    </div>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#64748b', marginBottom: 6 }}>계좌번호</label>
+                    <input value={salaryForm.account_number}
+                      onChange={e => setSalaryForm({ ...salaryForm, account_number: e.target.value })}
+                      placeholder="1234-5678-9012"
+                      style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, outline: 'none', background: 'rgba(255,255,255,0.6)', boxSizing: 'border-box', fontVariantNumeric: 'tabular-nums' }} />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* § 페이지 권한 — 직원별 (role='user' 만 노출) */}
+            {editSection === 'permissions' && editingEmp.role === 'user' && (() => {
+              const userMap = allUserPerms[editingEmp.id] || {}
+              const enabledCount = Object.values(userMap).filter(p => p.can_view).length
+              return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.2)', borderRadius: 10 }}>
+                    <span style={{ fontSize: 12, color: '#2563eb' }}>
+                      💡 활성화된 페이지: <strong>{enabledCount}</strong> / {activeModules.length}
+                    </span>
+                    <button onClick={() => saveUserPerms(editingEmp.id)}
+                      disabled={savingPermsFor === editingEmp.id}
+                      style={{ padding: '6px 14px', fontSize: 12, fontWeight: 600, color: '#fff', background: savingPermsFor === editingEmp.id ? '#94a3b8' : '#3b82f6', borderRadius: 8, border: 'none', cursor: 'pointer' }}>
+                      {savingPermsFor === editingEmp.id ? '저장 중...' : '권한 저장'}
+                    </button>
+                  </div>
+                  <div style={{ border: '1px solid rgba(0,0,0,0.06)', borderRadius: 12, overflow: 'hidden', maxHeight: '50vh', overflowY: 'auto' }}>
+                    {moduleGroups.map(group => (
+                      <div key={group}>
+                        <div style={{ padding: '8px 14px', background: 'rgba(255,255,255,0.40)', borderBottom: '1px solid rgba(0,0,0,0.06)', position: 'sticky', top: 0, zIndex: 5 }}>
+                          <span style={{ fontSize: 10, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{group}</span>
+                        </div>
+                        {activeModules.filter(m => m.group === group).map(mod => {
+                          const perm = userMap[mod.path]
+                          const isOn = !!perm?.can_view
+                          return (
+                            <div key={mod.path} style={{ padding: '10px 14px', borderBottom: '1px solid rgba(0,0,0,0.04)' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                <button onClick={() => matrixTogglePage(editingEmp.id, mod.path)}
+                                  style={{
+                                    padding: '3px 8px', borderRadius: 6, fontSize: 11, fontWeight: 700, border: 'none', cursor: 'pointer', flexShrink: 0,
+                                    background: isOn ? 'rgba(34,197,94,0.15)' : 'rgba(0,0,0,0.04)',
+                                    color: isOn ? '#16a34a' : '#94a3b8', minWidth: 36,
+                                  }}>
+                                  {isOn ? 'ON' : 'OFF'}
+                                </button>
+                                <span style={{ fontWeight: 600, fontSize: 13, color: '#334155', flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{mod.name}</span>
+                              </div>
+                              {isOn && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 6, marginLeft: 46, flexWrap: 'wrap' }}>
+                                  {(['can_view', 'can_create', 'can_edit', 'can_delete'] as const).map(f => (
+                                    <label key={f} style={{ display: 'flex', alignItems: 'center', gap: 3, cursor: 'pointer', fontSize: 11 }}>
+                                      <input type="checkbox" checked={perm?.[f] || false}
+                                        onChange={() => matrixTogglePerm(editingEmp.id, mod.path, f)}
+                                        style={{ width: 13, height: 13, accentColor: '#3b82f6' }} />
+                                      <span style={{ fontWeight: 600, color: '#334155' }}>
+                                        {f === 'can_view' ? '조회' : f === 'can_create' ? '생성' : f === 'can_edit' ? '수정' : '삭제'}
+                                      </span>
+                                    </label>
+                                  ))}
+                                  <select value={perm?.data_scope || 'all'}
+                                    onChange={e => matrixChangeScope(editingEmp.id, mod.path, e.target.value)}
+                                    style={{ fontSize: 11, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 6, padding: '2px 6px', background: 'rgba(255,255,255,0.8)', fontWeight: 600, marginLeft: 'auto' }}>
+                                    {DATA_SCOPES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                                  </select>
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )
+            })()}
+
             </div>
 
-            {/* 직원 탈퇴 */}
-            {editingEmp.id !== user?.uid && editingEmp.role !== 'admin' && (
-              <div style={{ padding: '12px 24px', borderTop: '1px solid rgba(239,68,68,0.2)', background: 'rgba(254,242,242,0.6)' }}>
+            {/* 직원 탈퇴 — § 기본정보 탭에서만 노출 */}
+            {editSection === 'profile' && editingEmp.id !== user?.uid && editingEmp.role !== 'admin' && (
+              <div style={{ padding: '12px 24px', borderTop: '1px solid rgba(239,68,68,0.2)', background: 'rgba(254,242,242,0.6)', flexShrink: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <div>
                     <p style={{ fontSize: 12, fontWeight: 600, color: '#dc2626', margin: 0 }}>직원 탈퇴</p>
@@ -1100,16 +1370,29 @@ export default function OrgManagementPage() {
               </div>
             )}
 
-            {/* 모달 푸터 — Glass */}
-            <div style={{ padding: '16px 24px', borderTop: '1px solid rgba(0,0,0,0.06)', background: 'rgba(255,255,255,0.40)', display: 'flex', gap: 12 }}>
+            {/* 모달 푸터 — Glass — 섹션별 저장 버튼 */}
+            <div style={{ padding: '16px 24px', borderTop: '1px solid rgba(0,0,0,0.06)', background: 'rgba(255,255,255,0.40)', display: 'flex', gap: 12, flexShrink: 0 }}>
               <button onClick={closeEditModal}
                 style={{ flex: 1, padding: '10px 0', border: '1px solid rgba(0,0,0,0.08)', background: 'rgba(255,255,255,0.8)', color: '#64748b', borderRadius: 10, fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>
-                취소
+                닫기
               </button>
-              <button onClick={saveEdit} disabled={savingEdit}
-                style={{ flex: 1, padding: '10px 0', background: savingEdit ? '#94a3b8' : '#3b82f6', color: '#fff', borderRadius: 10, fontWeight: 600, fontSize: 14, border: 'none', cursor: savingEdit ? 'not-allowed' : 'pointer' }}>
-                {savingEdit ? '저장 중...' : '저장'}
-              </button>
+              {editSection === 'profile' && (
+                <button onClick={saveEdit} disabled={savingEdit}
+                  style={{ flex: 2, padding: '10px 0', background: savingEdit ? '#94a3b8' : '#3b82f6', color: '#fff', borderRadius: 10, fontWeight: 600, fontSize: 14, border: 'none', cursor: savingEdit ? 'not-allowed' : 'pointer' }}>
+                  {savingEdit ? '저장 중...' : '기본정보 저장'}
+                </button>
+              )}
+              {editSection === 'salary' && (
+                <button onClick={saveSalary} disabled={savingSalary}
+                  style={{ flex: 2, padding: '10px 0', background: savingSalary ? '#94a3b8' : '#3b82f6', color: '#fff', borderRadius: 10, fontWeight: 600, fontSize: 14, border: 'none', cursor: savingSalary ? 'not-allowed' : 'pointer' }}>
+                  {savingSalary ? '저장 중...' : '급여 설정 저장'}
+                </button>
+              )}
+              {editSection === 'permissions' && (
+                <span style={{ flex: 2, padding: '10px 0', textAlign: 'center', fontSize: 12, color: '#94a3b8' }}>
+                  ↑ 권한 섹션 상단의 「권한 저장」 버튼으로 저장
+                </span>
+              )}
             </div>
           </div>
         </div>
