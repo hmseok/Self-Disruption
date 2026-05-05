@@ -20,7 +20,18 @@
 - `app/api/employee_salaries/[id]/route.ts` — PATCH 화이트리스트 기반 부분 갱신
 - 효과: 직원 1명 → 한 모달에서 기본정보 + 급여 + 권한 모두 관리 (분산 해소)
 
-### HR-PR4 ~ PR-6 (예정)
-- PR-4 `/admin/freelancers` → Tab 4 흡수
-- PR-5 `/admin/payroll` 단순화 (세무사 외부 — 4대보험 자동계산 제거)
-- PR-6 `/admin/permissions` 정식 deprecation
+### HR-PR6 — `/admin/permissions` 정식 deprecation
+- 검수 결과: `/admin/permissions` 는 이미 `lib/menu-registry.ts` 의
+  `HIDDEN_PATHS` Set 에 등록 → 사이드바 / 권한 페이지 모두에서 자동 숨김
+- `app/admin/permissions/page.tsx` 는 redirect-only (→ `/admin/employees`)
+- 추가 코드 변경 불필요 (이미 deprecated 상태)
+
+### HR-PR4 / PR-5 (보류 — 가성비 평가 결과)
+
+| PR | 가치 | 결정 |
+|----|------|-----|
+| PR-4 freelancers Tab 흡수 | 🟡 — 프리랜서는 직원과 별개 (외부 인력) | 유지 — 사이드바 분리가 더 명확 |
+| PR-5 payroll 4대보험 모듈 제거 | 🟢 — 모듈 안 쓰면 무해 | 보류 — 미사용 코드 정리는 추후 |
+
+사용자 요구의 핵심 (직원 dropdown 정상화 + 통합 1화면) 은 PR-1 ~ PR-3 으로 달성.
+PR-4 / PR-5 는 매칭 검수 작업 진행 후 필요 시 별도 진행.
