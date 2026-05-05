@@ -15,7 +15,12 @@
 | **시스템 종류** | PHP 1,806파일 + PowerBuilder 데스크톱 EXE + MariaDB 10.1 |
 | **DB 종류** | **MariaDB 10.1.13** = MySQL 5.7 미만 수준 — 회색 함수 사용 금지 |
 | **연결 방식** | **외부 IP read-only 직접 접속** (`.env.local` 의 `CAFE24_DB_*` 사용) |
-| **연결 정책** | FMI ERP → Cafe24 DB 는 **READ-ONLY 만 허용** (마이그레이션 / DDL 절대 X) |
+| **연결 정책** | 단계 1 (현재): READ-ONLY 만 허용. 단계 2 (TBD): 양방 sync. 단계 3 (TBD): 카페24 폐기 후 FMI primary. |
+| **Source of Truth** | 단계 1 = 카페24. 단계 2~ = FMI 우선 (Q4=B). 마이그레이션 진행에 따라 전환. |
+| **캐시 정책** | 30~60초 (Q7=A 분당 변동) — staleTime: 30s, idle pool 60s |
+| **권한 모델** | 일단 관리자 전용 (Q8=D) — middleware/page.tsx 첫 줄 admin 체크. 직군별 분리는 별도 PR. |
+| **운영 시간** | 24/365 (Q1=A) — 모든 페이지 야간/주말에도 동작 |
+| **마이그레이션 타임라인** | 미정 (Q6=D) — **본 PR 들은 "장기 운영" 가능 설계** (임시 X) |
 | **Cowork 분리** | cafe24_source 폴더는 FMI repo 와 완전 분리 — git history 에 절대 들어가면 안 됨 |
 
 ---
