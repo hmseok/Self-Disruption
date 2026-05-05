@@ -5,6 +5,12 @@
 
 ## 2026-05-05 (새벽 — 매트릭스 외부 cycle 시각화)
 
+### PR-2RR-a-fix — schedules API cycle 컬럼 응답
+- 사용자 보고: 매트릭스에 외부 cycle 행 안 보임
+- 원인: `/api/call-scheduler/schedules/[id]` GET 이 `is_external` 만 응답하고 `cycle_days_on/off/start_date` 누락
+- 수정: workers SELECT 에 cycle 컬럼 graceful 추가 (`hasCycleCol` 체크)
+- 회귀 케이스: `regression-cases/...api-data-missing.md` 같은 패턴 — 다음에 cycle 같은 새 컬럼 추가 시 schedules/[id] API 도 같이 갱신 필요
+
 ### PR-2RR-a — 매트릭스 외부 직원 cycle 시각화
 - 매트릭스 일자 헤더 아래에 외부 직원(is_external + cycle 정의)별 한 줄 추가
 - cycle on phase = 회색 막대 (외부 근무 — 당사 X)

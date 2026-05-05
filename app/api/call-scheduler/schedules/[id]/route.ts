@@ -57,23 +57,44 @@ export async function GET(
     try {
       await prisma.$queryRaw<any[]>`SELECT is_external FROM cs_workers LIMIT 1`
     } catch { hasExtCol = false }
+    // PR-2RR-a: cycle_* 컬럼 graceful (외부 근무 cycle 시각화)
+    let hasCycleCol = true
+    try {
+      await prisma.$queryRaw<any[]>`SELECT cycle_days_on, cycle_days_off, cycle_start_date FROM cs_workers LIMIT 1`
+    } catch { hasCycleCol = false }
 
-    const workersRows = hasExtCol
-      ? await prisma.$queryRaw<any[]>`
-          SELECT id, name, profile_id, color_tone, group_label, phone, email, is_active,
-                 is_external, external_pattern
-          FROM cs_workers WHERE is_active = 1
-          ORDER BY is_external DESC, group_label DESC, name ASC
-        `
-      : await prisma.$queryRaw<any[]>`
-          SELECT id, name, profile_id, color_tone, group_label, phone, email, is_active
-          FROM cs_workers WHERE is_active = 1 ORDER BY group_label DESC, name ASC
-        `
+    let workersRows: any[]
+    if (hasCycleCol) {
+      workersRows = await prisma.$queryRaw<any[]>`
+        SELECT id, name, profile_id, color_tone, group_label, phone, email, is_active,
+               is_external, external_pattern,
+               cycle_days_on, cycle_days_off,
+               DATE_FORMAT(cycle_start_date, '%Y-%m-%d') AS cycle_start_date
+        FROM cs_workers WHERE is_active = 1
+        ORDER BY is_external DESC, group_label DESC, name ASC
+      `
+    } else if (hasExtCol) {
+      workersRows = await prisma.$queryRaw<any[]>`
+        SELECT id, name, profile_id, color_tone, group_label, phone, email, is_active,
+               is_external, external_pattern
+        FROM cs_workers WHERE is_active = 1
+        ORDER BY is_external DESC, group_label DESC, name ASC
+      `
+    } else {
+      workersRows = await prisma.$queryRaw<any[]>`
+        SELECT id, name, profile_id, color_tone, group_label, phone, email, is_active
+        FROM cs_workers WHERE is_active = 1 ORDER BY group_label DESC, name ASC
+      `
+    }
     const workers = workersRows.map(r => ({
       ...r,
       is_active: Boolean(r.is_active),
       is_external: hasExtCol ? Boolean(r.is_external) : false,
       external_pattern: hasExtCol ? (r.external_pattern ?? null) : null,
+      // PR-2RR-a — 외부 cycle (매트릭스 시각화용)
+      cycle_days_on: hasCycleCol && r.cycle_days_on != null ? Number(r.cycle_days_on) : null,
+      cycle_days_off: hasCycleCol && r.cycle_days_off != null ? Number(r.cycle_days_off) : null,
+      cycle_start_date: hasCycleCol ? (r.cycle_start_date ?? null) : null,
     }))
 
     // PR-2QQ-b: manual_lock 컬럼 graceful
