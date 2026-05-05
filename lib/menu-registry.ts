@@ -50,7 +50,9 @@ export const GROUPS: MenuGroup[] = [
   { id: 'operation',       label: '차량 운영',     section: 'business',         sortOrder: 2 },
   { id: 'finance',         label: '재무/경영지원', section: 'business',         sortOrder: 3 },
   { id: 'sales',           label: '영업/계약',     section: 'business',         sortOrder: 4 },
-  { id: 'admin',           label: '관리/HR',      section: 'business',         sortOrder: 5 },
+  // 인사 (HR) — 2026-05-05 신설 (PR-A4) — 인력/조직 마스터 분리
+  { id: 'hr',              label: '인사 (HR)',    section: 'business',         sortOrder: 5 },
+  { id: 'admin',           label: '관리',         section: 'business',         sortOrder: 6 },
   // 직장인필수 (Employee of Ride Inc. — 모든 로그인 사용자)
   { id: 'work-essentials', label: '직장인필수',    section: 'work-essentials', sortOrder: 10 },
   { id: 'cx-team',         label: 'CX팀',         section: 'work-essentials', sortOrder: 11 },
@@ -86,9 +88,13 @@ export const MENUS: MenuEntry[] = [
   { id: 'mod-operational-learning',    name: '운영학습',  displayName: '📚 운영학습',  path: '/quotes/operational-learning', iconKey: 'Chart', group: 'sales', sortOrder: 31 },
   { id: 'mod-contracts',               name: '계약/고객', displayName: '📑 계약/고객', path: '/contracts',                   iconKey: 'Doc',   group: 'sales', sortOrder: 32 },
 
+  // ── 인사 (hr) ── 2026-05-05 신설 (PR-A4)
+  { id: 'mod-hr-people',  name: '인력 마스터', displayName: '👥 인력 마스터', path: '/hr/people', iconKey: 'Users',   group: 'hr', sortOrder: 35, requirePermission: true },
+  { id: 'mod-hr-org',     name: '조직 마스터', displayName: '🏢 조직 마스터', path: '/hr/org',    iconKey: 'Setting', group: 'hr', sortOrder: 36, requirePermission: true },
+
   // ── 관리 (admin) ──
   { id: 'mod-dashboard', name: '대시보드', displayName: '🏠 대시보드', path: '/dashboard', iconKey: 'Setting', group: 'admin', sortOrder: 39, requirePermission: true },
-  { id: 'mod-payroll', name: '급여 관리', displayName: '💼 급여 관리', path: '/admin/payroll', iconKey: 'Money', group: 'admin', sortOrder: 40 },
+  { id: 'mod-payroll-ops', name: '급여 운영', displayName: '💼 급여 운영', path: '/finance/payroll-ops', iconKey: 'Money', group: 'admin', sortOrder: 40, requirePermission: true },
 
   // ── 직장인필수 (work-essentials) ──
   // 모두 권한 부여 대상 — 권한 페이지에서 ON/OFF 토글 (사용자 요청: 「실제 적용 페이지만 표출」)
@@ -105,8 +111,8 @@ export const MENUS: MenuEntry[] = [
 
   // ── 설정 (settings) ── admin 전용 (사이드바 별도 섹션)
   // 권한 부여 대상 — 일부 사용자에게 회사 정보 / 메시지 센터 등 위임 가능
+  // ※ mod-employees (조직/권한 관리) → /hr/people, /hr/org 로 분할 이전됨 (2026-05-05 PR-A4)
   { id: 'mod-company-info',     name: '회사 정보',     path: '/db/codes',                iconKey: 'Setting',   group: 'settings', sortOrder: 70, requirePermission: true },
-  { id: 'mod-employees',        name: '조직/권한 관리', path: '/admin/employees',         iconKey: 'Users',     group: 'settings', sortOrder: 71, requirePermission: true },
   { id: 'mod-contract-terms',   name: '계약 약관 관리', path: '/admin/contract-terms',    iconKey: 'Doc',       group: 'settings', sortOrder: 72, requirePermission: true },
   { id: 'mod-message-templates',name: '메시지 센터',    path: '/admin/message-templates', iconKey: 'Clipboard', group: 'settings', sortOrder: 73, requirePermission: true },
 ]
@@ -141,6 +147,8 @@ export const HIDDEN_PATHS = new Set<string>([
   // ── 미사용 admin 페이지 (legacy / 통합 완료) ──
   '/admin', '/admin/cards', '/admin/codes', '/admin/locations',
   '/admin/market-prices', '/admin/model', '/admin/permissions',
+  // 2026-05-05 PR-A4 — /hr/people, /hr/org, /finance/payroll-ops 로 이전
+  '/admin/employees', '/admin/payroll',
   // ── 인증 콜백 / 미사용 모듈 ──
   '/auth', '/loans-out',
 ])

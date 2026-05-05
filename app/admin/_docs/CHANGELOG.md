@@ -1,5 +1,32 @@
 # /admin 모듈 CHANGELOG
 
+## 2026-05-05 — 옵션 A 풀 마이그레이션 (PR-A1 ~ PR-A4)
+
+### 사용자 결정
+> "사이드 바 별룬데는 신경안써도돼요 A로 갑니다."
+
+### 구조 변경
+- 신규 사이드바 그룹 「인사 (HR)」 (sortOrder 5)
+- 신규 페이지:
+  - `/hr/people` (PR-A1) — 인력 마스터 (직원 + 모달 통합)
+  - `/hr/org` (PR-A2) — 조직 마스터 (직급/부서/초대)
+  - `/finance/payroll-ops` (PR-A3) — 급여 운영 (4탭: 대장/식대/프리랜서/분석)
+- 옛날 URL 처리 (PR-A4):
+  - `/admin/employees` → `/hr/people` redirect + HIDDEN_PATHS
+  - `/admin/payroll` → `/finance/payroll-ops` redirect + HIDDEN_PATHS
+
+### 모달 § 급여설정 노출 조건 (사용자 「구린데」 해결)
+- admin (GOD) → 「기본정보」 만 노출 (급여/권한 안 보임)
+- master → 「기본정보」 + 「💼 급여 설정」
+- user → 「기본정보」 + 「💼 급여 설정」 + 「🔐 페이지 권한」
+
+### menu-registry 변경
+- GROUPS: 'hr' 신설, 'admin' label 「관리/HR」 → 「관리」
+- MENUS: mod-hr-people, mod-hr-org 신설 / mod-payroll → mod-payroll-ops 명칭 + path 변경 / mod-employees 제거
+- HIDDEN_PATHS: /admin/employees, /admin/payroll 추가
+
+
+
 ## 2026-05-05 — HR 통합 작업 시작 (PR-1 ~ PR-6)
 
 ### HR-PR1 (긴급 — 토큰 키 fix)
