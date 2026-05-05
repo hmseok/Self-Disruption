@@ -1,5 +1,36 @@
 # /admin 모듈 CHANGELOG
 
+## 2026-05-05 — PR-B1 통합 페이지 (옵션 A 재해석)
+
+### 사용자 명시 의도
+> "사이드 바 메뉴만 분리되고 정리도 안되고 / 한페이지를 해서 직원관리,
+>  초대관리,조직,권한,부서,직급,직원 프리랜서 급여설정 기타 등등
+>  한곳에서 기본설정값들은 이루어질수있게"
+
+→ PR-A 의 「페이지 분리」 해석 잘못. 진짜 의도는 「ONE 페이지 통합」.
+
+### 구조 변경 (재정리)
+- `/hr` 신규 통합 페이지 (PR-B1) — 4 탭:
+  · 👥 직원 관리 — 직원 + 모달 (§ 기본 / § 급여 / § 권한)
+  · 🏢 부서 · 직급 — 부서 + 직급 마스터 (한 화면 좌우)
+  · ✉️ 초대 관리 — 신규 직원 초대
+  · 👤 외부 인력 — 프리랜서 + 라이드 직원 (조회)
+
+- 사이드바 변경:
+  · GROUPS: 「인사 (HR)」 그룹 폐기
+  · 「설정」 그룹 안 「👥 인사 마스터」 (path: /hr) 1 메뉴
+  · /hr/people, /hr/org → /hr redirect + HIDDEN_PATHS
+
+- /finance/payroll-ops (급여 운영) 는 그대로 유지 (월별 운영 — 명세/식대/프리랜서지급/분석)
+
+### menu-registry 변경
+- GROUPS: 'hr' 그룹 제거, 'admin' sortOrder 6 → 5 복귀
+- MENUS: mod-hr-people / mod-hr-org 제거 / mod-hr-master 신설 (settings 그룹)
+- HIDDEN_PATHS: /hr/people, /hr/org 추가
+- isRequirePermission, PATH_TO_GROUP 화이트리스트 'hr' 제거 (그룹 폐기 반영)
+
+
+
 ## 2026-05-05 — 옵션 A 풀 마이그레이션 (PR-A1 ~ PR-A4)
 
 ### 사용자 결정
