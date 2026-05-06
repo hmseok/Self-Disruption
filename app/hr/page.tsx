@@ -9,6 +9,7 @@ import DcStatStrip, { StatItem, ActionButton } from '../components/DcStatStrip'
 import DcToolbar, { FilterItem } from '../components/DcToolbar'
 import NeuDataTable, { TableColumn, MobileCardConfig } from '../components/NeuDataTable'
 import { auth } from '@/lib/auth-client'
+import PayrollOps from './_components/PayrollOps'
 
 // ────────────────────────────────────────────────────────────────
 // Auth Helper
@@ -91,19 +92,28 @@ export default function HRMasterPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
 
-  // 탭 상태 — 통합 페이지 4 탭 (5번째 「급여 운영」 은 /hr/payroll 로 router.push)
-  type TopTab = 'employees' | 'org' | 'invitations' | 'external'
+  // 탭 상태 — 통합 페이지 5 탭 (모두 inline — PR-B7)
+  type TopTab = 'employees' | 'org' | 'invitations' | 'external' | 'payroll'
+  const TOP_TABS: TopTab[] = ['employees', 'org', 'invitations', 'external', 'payroll']
   const initialTab = (() => {
-    const q = searchParams?.get('tab')
-    if (q === 'org' || q === 'invitations' || q === 'external' || q === 'employees') return q
-    return 'employees'
+    const q = searchParams?.get('tab') as TopTab | null
+    if (q && TOP_TABS.includes(q)) return q
+    return 'employees' as TopTab
   })()
   const [topTab, setTopTab] = useState<TopTab>(initialTab)
-  // querystring 변경 시 탭 동기화
+  // querystring 변경 시 탭 동기화 + 탭 변경 시 querystring 반영
   useEffect(() => {
-    const q = searchParams?.get('tab')
-    if (q === 'org' || q === 'invitations' || q === 'external' || q === 'employees') setTopTab(q)
+    const q = searchParams?.get('tab') as TopTab | null
+    if (q && TOP_TABS.includes(q)) setTopTab(q)
   }, [searchParams])
+  const changeTab = (next: TopTab) => {
+    setTopTab(next)
+    // querystring 부드럽게 반영 (페이지 reload 없음)
+    const url = next === 'employees' ? '/hr' : `/hr?tab=${next}`
+    if (typeof window !== 'undefined' && window.history) {
+      window.history.replaceState({}, '', url)
+    }
+  }
   // 옛 권한 master-detail 잔여 코드 호환 (사용 X)
   const [activeTab, setActiveTab] = useState<'organization' | 'permissions'>('organization')
 
@@ -974,10 +984,7 @@ export default function HRMasterPage() {
           { key: 'payroll', label: '💼 급여 운영' },
         ]}
         activeFilter={topTab}
-        onFilterChange={(key) => {
-          if (key === 'payroll') router.push('/hr/payroll')
-          else setTopTab(key as TopTab)
-        }}
+        onFilterChange={(key) => changeTab(key as TopTab)}
       />
 
       {/* ─── 탭 1: 직원 관리 ─── */}
@@ -1196,6 +1203,13 @@ export default function HRMasterPage() {
               ))}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ─── 탭 5: 💼 급여 운영 (PR-B7 — inline 컴포넌트 렌더) ─── */}
+      {topTab === 'payroll' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          <PayrollOps />
         </div>
       )}
 
