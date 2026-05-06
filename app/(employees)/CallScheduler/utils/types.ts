@@ -116,6 +116,28 @@ export interface Assignment {
   premium_hours?: number | null  // 가산 적용 후 (= night_hours × rate)
 }
 
+// PR-2SS-h-1 — 그룹 차원 회피일 (cs_group_member_skip_dates)
+export type SkipStatus = 'requested' | 'approved' | 'rejected' | 'canceled'
+
+export interface GroupMemberSkipDate {
+  id: string
+  group_id: string
+  worker_id: string
+  start_date: string  // 'YYYY-MM-DD'
+  end_date: string
+  reason: string | null
+  status: SkipStatus
+  requested_by: string | null
+  requested_at: string | null
+  approved_by: string | null
+  approved_at: string | null
+  created_at: string
+  updated_at: string
+  // join 컬럼
+  worker_name?: string
+  worker_tone?: ColorTone
+}
+
 export interface Distribution {
   id: string
   schedule_id: string

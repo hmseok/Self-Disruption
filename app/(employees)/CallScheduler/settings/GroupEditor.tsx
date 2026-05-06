@@ -7,7 +7,8 @@ import { COLORS, GLASS, BTN } from '@/app/utils/ui-tokens'
 import { TONE_BG, TONE_TEXT } from '@/app/(employees)/CallScheduler/utils/palette'
 import { COLOR_TONE_OPTIONS } from '@/app/(employees)/CallScheduler/utils/types'
 import { getAuthHeader } from '@/app/utils/auth-client'
-import type { ShiftSlot, Worker, ColorTone } from '@/app/(employees)/CallScheduler/utils/types'
+import type { ShiftSlot, Worker, ColorTone, GroupMemberSkipDate } from '@/app/(employees)/CallScheduler/utils/types'
+import GroupSkipDatesModal from './GroupSkipDatesModal'
 
 interface Props {
   groupId: string | null  // null = 신규
@@ -53,17 +54,22 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
   const [dowMin, setDowMin] = useState<Record<number, string>>({}) // 요일별 예외 (0~6)
   const [coverageLoading, setCoverageLoading] = useState(false)
   const [coverageMissing, setCoverageMissing] = useState(false)   // 마이그 미적용 시
+  // PR-2SS-h-1 — 그룹 회피일
+  const [skipDates, setSkipDates] = useState<GroupMemberSkipDate[]>([])
+  const [skipMissing, setSkipMissing] = useState(false)
+  const [skipModalWorkerId, setSkipModalWorkerId] = useState<string | null>(null)
 
-  // 기존 그룹 로드 + 최소 인원 셋팅 로드 (PR-2QQ-d-2)
+  // 기존 그룹 로드 + 최소 인원 셋팅 로드 (PR-2QQ-d-2) + 회피일 (PR-2SS-h-1)
   useEffect(() => {
     if (isNew) return
     let abort = false
     ;(async () => {
       try {
         const auth = await getAuthHeader()
-        const [gRes, cRes] = await Promise.all([
+        const [gRes, cRes, sRes] = await Promise.all([
           fetch(`/api/call-scheduler/shift-groups/${groupId}`, { headers: auth }),
           fetch(`/api/call-scheduler/shift-groups/${groupId}/min-coverage`, { headers: auth }),
+          fetch(`/api/call-scheduler/shift-groups/${groupId}/skip-dates?status=all`, { headers: auth }),
         ])
         const json = await gRes.json()
         if (!gRes.ok) throw new Error(json?.error || '조회 실패')
@@ -97,11 +103,32 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
           setDefaultMin(def)
           setDowMin(dowMap)
         }
+        // PR-2SS-h-1 — 그룹 회피일 (graceful)
+        try {
+          const sJson = await sRes.json()
+          if (sRes.ok && Array.isArray(sJson.data)) {
+            setSkipDates(sJson.data)
+            if (sJson._migration_pending) setSkipMissing(true)
+          } else if (sJson?._migration_pending) {
+            setSkipMissing(true)
+          }
+        } catch { setSkipMissing(true) }
       } catch (e: any) { setError(e?.message || '오류') }
       finally { if (!abort) setLoading(false) }
     })()
     return () => { abort = true }
   }, [groupId, isNew])
+
+  // PR-2SS-h-1 — 회피일 reload (모달 변경 후)
+  const reloadSkips = async () => {
+    if (isNew || !groupId) return
+    try {
+      const auth = await getAuthHeader()
+      const sRes = await fetch(`/api/call-scheduler/shift-groups/${groupId}/skip-dates?status=all`, { headers: auth })
+      const sJson = await sRes.json()
+      if (sRes.ok && Array.isArray(sJson.data)) setSkipDates(sJson.data)
+    } catch { /* graceful */ }
+  }
 
   const toggleMember = (wId: string) => {
     setMemberIds(prev => prev.includes(wId) ? prev.filter(x => x !== wId) : [...prev, wId])
@@ -511,25 +538,68 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                {selectedWorkers.map((w, idx) => (
-                  <div key={w.id} style={{
-                    display: 'flex', alignItems: 'center', gap: 6,
-                    padding: '4px 8px', borderRadius: 6,
-                    background: TONE_BG[w.color_tone] !== 'transparent' ? TONE_BG[w.color_tone] : 'rgba(0,0,0,0.03)',
-                  }}>
-                    <span style={{ fontSize: 11, color: COLORS.textMuted, width: 18 }}>{idx + 1}.</span>
-                    <span style={{ flex: 1, fontWeight: 700, color: TONE_TEXT[w.color_tone] }}>{w.name}</span>
-                    {w.group_label && (
-                      <span style={{ fontSize: 10, color: COLORS.textMuted }}>{w.group_label}</span>
-                    )}
-                    <button type="button" onClick={() => moveMember(w.id, -1)} disabled={idx === 0}
-                            style={miniBtn} title="위로">↑</button>
-                    <button type="button" onClick={() => moveMember(w.id, 1)} disabled={idx === selectedWorkers.length - 1}
-                            style={miniBtn} title="아래로">↓</button>
-                    <button type="button" onClick={() => toggleMember(w.id)}
-                            style={{ ...miniBtn, color: COLORS.danger }} title="제외">×</button>
-                  </div>
-                ))}
+                {selectedWorkers.map((w, idx) => {
+                  // PR-2SS-h-1 — 워커별 회피일 카운트
+                  const wSkips = skipDates.filter(s => s.worker_id === w.id)
+                  const approvedCount = wSkips.filter(s => s.status === 'approved').length
+                  const requestedCount = wSkips.filter(s => s.status === 'requested').length
+                  return (
+                    <div key={w.id} style={{
+                      display: 'flex', flexDirection: 'column', gap: 2,
+                      padding: '4px 8px', borderRadius: 6,
+                      background: TONE_BG[w.color_tone] !== 'transparent' ? TONE_BG[w.color_tone] : 'rgba(0,0,0,0.03)',
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ fontSize: 11, color: COLORS.textMuted, width: 18 }}>{idx + 1}.</span>
+                        <span style={{ flex: 1, fontWeight: 700, color: TONE_TEXT[w.color_tone] }}>{w.name}</span>
+                        {w.group_label && (
+                          <span style={{ fontSize: 10, color: COLORS.textMuted }}>{w.group_label}</span>
+                        )}
+                        {/* PR-2SS-h-1 — 회피일 chip + 모달 트리거 */}
+                        {!skipMissing && (
+                          <button type="button"
+                                  onClick={() => setSkipModalWorkerId(w.id)}
+                                  style={{
+                                    fontSize: 10, padding: '2px 7px', borderRadius: 99,
+                                    background: requestedCount > 0 ? COLORS.bgAmber
+                                              : approvedCount > 0 ? COLORS.bgRed
+                                              : 'rgba(255,255,255,0.5)',
+                                    color: requestedCount > 0 ? COLORS.warning
+                                         : approvedCount > 0 ? COLORS.danger
+                                         : COLORS.textMuted,
+                                    border: `1px solid ${
+                                      requestedCount > 0 ? COLORS.borderAmber
+                                      : approvedCount > 0 ? COLORS.borderRed
+                                      : COLORS.borderFaint
+                                    }`,
+                                    fontWeight: 700, cursor: 'pointer',
+                                  }}
+                                  title={`회피일 — 승인 ${approvedCount}건 / 신청 ${requestedCount}건`}>
+                            🛌 {approvedCount}{requestedCount > 0 ? `+${requestedCount}대기` : ''}
+                          </button>
+                        )}
+                        <button type="button" onClick={() => moveMember(w.id, -1)} disabled={idx === 0}
+                                style={miniBtn} title="위로">↑</button>
+                        <button type="button" onClick={() => moveMember(w.id, 1)} disabled={idx === selectedWorkers.length - 1}
+                                style={miniBtn} title="아래로">↓</button>
+                        <button type="button" onClick={() => toggleMember(w.id)}
+                                style={{ ...miniBtn, color: COLORS.danger }} title="제외">×</button>
+                      </div>
+                      {/* PR-2SS-h-1 — 회피일 요약 (최대 3건 + 더보기) */}
+                      {(approvedCount + requestedCount > 0) && (
+                        <div style={{ fontSize: 9, color: COLORS.textMuted, paddingLeft: 24 }}>
+                          {wSkips.slice(0, 3).map(s => (
+                            <span key={s.id} style={{ marginRight: 6 }}>
+                              {s.status === 'requested' ? '⏳' : s.status === 'approved' ? '✓' : '✗'}{' '}
+                              {s.start_date.slice(5)}{s.start_date !== s.end_date && `~${s.end_date.slice(5)}`}
+                            </span>
+                          ))}
+                          {wSkips.length > 3 && <span>... +{wSkips.length - 3}</span>}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
             )}
           </div>
@@ -555,6 +625,17 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
           </div>
         </div>
       </div>
+
+      {/* PR-2SS-h-1 — 회피일 모달 */}
+      {skipModalWorkerId && groupId && (
+        <GroupSkipDatesModal
+          groupId={groupId}
+          worker={workers.find(w => w.id === skipModalWorkerId) || null}
+          existingSkips={skipDates.filter(s => s.worker_id === skipModalWorkerId)}
+          onClose={() => setSkipModalWorkerId(null)}
+          onChanged={reloadSkips}
+        />
+      )}
 
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 14 }}>
         <button type="button" onClick={onClose} style={{

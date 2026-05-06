@@ -171,6 +171,32 @@ INDEX: `idx_cs_w_priority (priority_level, is_active)`
 3. `preferred_dow_avoid` 정의 시: 그 요일 후순위 (피함, 부족 시 들어감)
 4. `priority_level` ASC + `required` 미달 우선 + by_dow/total ASC + last_date 거리 DESC
 
+### 2.Y `cs_group_member_skip_dates` — 그룹 차원 회피일 (PR-2SS-h-1)
+
+| 컬럼 | 타입 | NULL | 기본 | 설명 |
+|------|------|------|------|------|
+| id | CHAR(36) | NN | | PK |
+| group_id | CHAR(36) | NN | | FK cs_shift_groups.id ON DELETE CASCADE |
+| worker_id | CHAR(36) | NN | | FK cs_workers.id ON DELETE CASCADE |
+| start_date | DATE | NN | | 회피 시작일 |
+| end_date | DATE | NN | | 회피 종료일 (start <= end) |
+| reason | VARCHAR(255) | Y | NULL | 사유 메모 (선택) |
+| status | ENUM | NN | 'requested' | requested / approved / rejected / canceled |
+| requested_by | CHAR(36) | Y | NULL | 신청자 profile_id |
+| requested_at | DATETIME | Y | NULL | |
+| approved_by | CHAR(36) | Y | NULL | 승인자 profile_id |
+| approved_at | DATETIME | Y | NULL | |
+| created_at, updated_at | DATETIME | NN | NOW | |
+
+INDEX: `idx_lookup_worker (worker_id, start_date, end_date)`, `idx_group_status (group_id, status, start_date)`
+
+**알고리즘**: status='approved' 만 자동 생성 후보 제외. Warning 'group_skip' 발생 (사유 메모 포함).
+
+**cs_leaves 와 차이**:
+- 그룹 한정 (group_id 포함) — cs_leaves 는 워커 차원 전체
+- 정식 휴가 X — 발급량 차감 X (cs_leave_quotas 미관여)
+- 단순 회피 — 종일만 (반차 X — 그룹 회피는 의미상 종일)
+
 ### 2.X `cs_group_min_coverage` — 그룹 최소 인원 (PR-2QQ-d-2)
 
 | 컬럼 | 타입 | NULL | 기본 | 설명 |

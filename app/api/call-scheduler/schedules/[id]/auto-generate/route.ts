@@ -102,6 +102,14 @@ interface CoverageRow {
   dow: number | null
   min_workers: number
 }
+// PR-2SS-h-1 — 그룹 회피일 (approved status 만 후보 제외)
+interface GroupSkipRow {
+  group_id: string
+  worker_id: string
+  start_date: string
+  end_date: string
+  reason: string | null
+}
 
 // "HH:MM:SS" → 분
 function timeToMin(t: string): number {
@@ -474,6 +482,34 @@ export async function POST(
       }
     }
 
+    // 5-C) PR-2SS-h-1 — 그룹 차원 회피일 (graceful)
+    //   approved status 만 후보 제외 — requested/rejected/canceled 는 영향 X
+    const groupSkipMap = new Map<string, GroupSkipRow[]>()  // group_id → rows
+    try {
+      const skipRows: any[] = await prisma.$queryRaw<any[]>`
+        SELECT group_id, worker_id,
+               DATE_FORMAT(start_date, '%Y-%m-%d') AS start_date,
+               DATE_FORMAT(end_date,   '%Y-%m-%d') AS end_date,
+               reason
+        FROM cs_group_member_skip_dates
+        WHERE status = 'approved'
+          AND NOT (end_date < ${monthStart} OR start_date > ${monthEnd})
+      `
+      for (const r of skipRows) {
+        const arr = groupSkipMap.get(r.group_id) || []
+        arr.push({
+          group_id: r.group_id,
+          worker_id: r.worker_id,
+          start_date: r.start_date,
+          end_date: r.end_date,
+          reason: r.reason,
+        })
+        groupSkipMap.set(r.group_id, arr)
+      }
+    } catch {
+      // 마이그 미적용 — 회피일 가드 비활성
+    }
+
     // 5-B) PR-2QQ-d-3 — 그룹 × 요일 최소 인원 (graceful)
     const coverageByGroup = new Map<string, CoverageRow[]>()
     if (enforceMinCoverage) {
@@ -566,6 +602,8 @@ export async function POST(
       | { type: 'consec_limit'; worker_id: string; date: string; slot_id: string; limit: number }
       | { type: 'slot_blocked'; worker_id: string; date: string; slot_id: string }
       // PR-2SS-d revert — seniority_short 폐기
+      // PR-2SS-h-1 — 그룹 회피일 (approved 매치 시 후보 제외)
+      | { type: 'group_skip'; worker_id: string; group_id: string; date: string; reason: string | null }
     const warnings: Warning[] = []
 
     // group_id → rotation cursor (usePriority=false 일 때만 사용)
@@ -705,6 +743,25 @@ export async function POST(
         })
 
         // PR-2SS-d revert — min_seniority 가드 폐기 (매니저 직접 판단)
+
+        // PR-2SS-h-1 — 그룹 차원 회피일 hard exclude (approved status)
+        const skipsForGroup = groupSkipMap.get(g.id)
+        if (skipsForGroup && skipsForGroup.length > 0) {
+          candidates = candidates.filter(wId => {
+            const matched = skipsForGroup.find(s =>
+              s.worker_id === wId && isoDate >= s.start_date && isoDate <= s.end_date
+            )
+            if (matched) {
+              warnings.push({
+                type: 'group_skip',
+                worker_id: wId, group_id: g.id, date: isoDate,
+                reason: matched.reason,
+              })
+              return false
+            }
+            return true
+          })
+        }
 
         // (4) usePriority=true 면 가중치 정렬, false 면 단순 rotation
         let selected: string[]
@@ -928,13 +985,14 @@ export async function POST(
       }
     }
 
-    // PR-2SS-b/c — 경고 타입별 카운트 (d revert 후 seniority_short 제거)
+    // PR-2SS-b/c/h-1 — 경고 타입별 카운트
     const warnCount = {
       missing: warnings.filter(w => w.type === 'missing').length,
       next_day_block: warnings.filter(w => w.type === 'next_day_block').length,
       time_conflict: warnings.filter(w => w.type === 'time_conflict').length,
       consec_limit: warnings.filter(w => w.type === 'consec_limit').length,
       slot_blocked: warnings.filter(w => w.type === 'slot_blocked').length,
+      group_skip: warnings.filter(w => w.type === 'group_skip').length,
     }
     const summary = {
       mode,
