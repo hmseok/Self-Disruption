@@ -1,7 +1,8 @@
 'use client'
 
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import * as XLSX from 'xlsx'
 import { useApp } from '../context/AppContext'
 import type { Position, Department } from '../types/rbac'
 import InviteModal from '../components/InviteModal'
@@ -151,6 +152,175 @@ export default function HRMasterPage() {
   const flEmpty = { name: '', phone: '', email: '', bank_name: 'KB국민은행', account_number: '', account_holder: '', reg_number: '', tax_type: '사업소득(3.3%)', service_type: '기타', is_active: true, memo: '' }
   const [freelancerForm, setFreelancerForm] = useState<any>(flEmpty)
   const [savingFreelancer, setSavingFreelancer] = useState(false)
+
+  // === 프리랜서 일괄등록 (PR-B10 — 옛 PayrollOps 코드 복원) ===
+  const [bulkData, setBulkData] = useState<any[]>([])
+  const [bulkLogs, setBulkLogs] = useState<string[]>([])
+  const [isDragging, setIsDragging] = useState(false)
+  const [aiParsing, setAiParsing] = useState(false)
+  const [bulkProcessing, setBulkProcessing] = useState(false)
+  const bulkFileRef = useRef<HTMLInputElement | null>(null)
+
+  const downloadFreelancerTemplate = () => {
+    const sample = [
+      { '이름': '홍길동', '연락처': '010-1234-5678', '이메일': 'hong@email.com', '은행': 'KB국민은행', '계좌번호': '123-456-789012', '예금주': '홍길동', '주민번호': '', '세금유형': '사업소득(3.3%)', '업종': '탁송', '메모': '' },
+      { '이름': '김철수', '연락처': '010-9876-5432', '이메일': '', '은행': '신한은행', '계좌번호': '110-123-456789', '예금주': '김철수', '주민번호': '', '세금유형': '사업소득(3.3%)', '업종': '대리운전', '메모': '' },
+    ]
+    const ws = XLSX.utils.json_to_sheet(sample)
+    ws['!cols'] = [{ wch: 10 }, { wch: 15 }, { wch: 20 }, { wch: 12 }, { wch: 18 }, { wch: 10 }, { wch: 15 }, { wch: 15 }, { wch: 10 }, { wch: 15 }]
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, '프리랜서')
+    XLSX.writeFile(wb, '프리랜서_등록양식.xlsx')
+  }
+
+  const downloadFreelancerList = () => {
+    if (freelancers.length === 0) { alert('등록된 프리랜서가 없습니다.'); return }
+    const data = freelancers.map(f => ({
+      '이름': f.name || '', '연락처': f.phone || '', '이메일': f.email || '',
+      '은행': f.bank_name || '', '계좌번호': f.account_number || '', '예금주': f.account_holder || '',
+      '주민번호': f.reg_number || '', '세금유형': f.tax_type || '', '업종': f.service_type || '',
+      '상태': f.is_active ? '활성' : '비활성', '메모': f.memo || '',
+    }))
+    const ws = XLSX.utils.json_to_sheet(data)
+    ws['!cols'] = [{ wch: 10 }, { wch: 15 }, { wch: 20 }, { wch: 12 }, { wch: 18 }, { wch: 10 }, { wch: 15 }, { wch: 15 }, { wch: 10 }, { wch: 8 }, { wch: 20 }]
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, '프리랜서')
+    const today = new Date().toISOString().slice(0, 10)
+    XLSX.writeFile(wb, `프리랜서_명단_${today}.xlsx`)
+  }
+
+  // Gemini AI 파싱 — 옛 PayrollOps 와 동일 (api 동일)
+  const parseWithGeminiFL = async (file: File): Promise<any[]> => {
+    setAiParsing(true)
+    setBulkLogs(prev => [...prev, 'Gemini AI 분석 중...'])
+    try {
+      let content = '', mimeType = file.type, isText = false
+      if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls') || file.name.endsWith('.csv')) {
+        const ab = await file.arrayBuffer()
+        const wb = XLSX.read(ab, { type: 'array' })
+        content = wb.SheetNames.map(name => `--- 시트: ${name} ---\n${XLSX.utils.sheet_to_csv(wb.Sheets[name])}`).join('\n\n')
+        isText = true
+      } else {
+        content = await new Promise<string>(resolve => {
+          const r = new FileReader()
+          r.onload = () => resolve((r.result as string).split(',')[1])
+          r.readAsDataURL(file)
+        })
+      }
+      const res = await fetch('/api/finance/parse-freelancers', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content, mimeType, isText }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        if (data.results?.length > 0) {
+          setBulkLogs(prev => [...prev, `AI: ${data.results.length}명 추출`])
+          setAiParsing(false)
+          return data.results
+        }
+      }
+      setBulkLogs(prev => [...prev, 'AI 파싱 결과 없음, 기본 파싱'])
+    } catch {
+      setBulkLogs(prev => [...prev, 'AI 파싱 실패, 기본 엑셀 파싱'])
+    }
+    setAiParsing(false)
+    return []
+  }
+
+  // 기본 엑셀 파싱 (헤더 매핑)
+  const parseExcelFallback = async (file: File): Promise<any[]> => {
+    const ab = await file.arrayBuffer()
+    const wb = XLSX.read(ab, { type: 'array' })
+    let allRows: any[] = []
+    for (const sheetName of wb.SheetNames) {
+      const rows: any[] = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { defval: '' })
+      allRows = [...allRows, ...rows.map((row: any, i: number) => ({
+        name: String(row['이름'] || row['성명'] || row['name'] || '').trim(),
+        phone: String(row['연락처'] || row['전화번호'] || '').trim(),
+        email: row['이메일'] || row['email'] || '',
+        bank_name: row['은행'] || 'KB국민은행',
+        account_number: String(row['계좌번호'] || '').trim(),
+        account_holder: row['예금주'] || String(row['이름'] || '').trim(),
+        reg_number: String(row['주민번호'] || row['사업자번호'] || '').trim(),
+        tax_type: row['세금유형'] || '사업소득(3.3%)',
+        service_type: row['업종'] || '기타',
+        is_active: true, memo: row['메모'] || '',
+        _row: i + 2, _status: 'ready' as const, _note: '',
+      })).filter(r => r.name)]
+    }
+    return allRows
+  }
+
+  const applyDuplicateCheck = (parsed: any[]) => {
+    const existing = new Set(freelancers.map(f => `${f.name}|${f.phone || ''}`))
+    const seen = new Set<string>()
+    let dup = 0
+    for (const item of parsed) {
+      const key = `${item.name}|${item.phone}`
+      if (existing.has(key)) { item._status = 'duplicate'; item._note = 'DB에 이미 존재'; dup++ }
+      else if (seen.has(key)) { item._status = 'duplicate'; item._note = '파일 내 중복'; dup++ }
+      seen.add(key)
+    }
+    setBulkLogs(prev => [...prev, `${parsed.length}명 파싱`, dup > 0 ? `${dup}명 중복 제외` : '중복 없음'])
+  }
+
+  const processBulkFiles = async (files: File[]) => {
+    setBulkLogs([`${files.length}개 파일 선택됨`])
+    setBulkData([])
+    let allParsed: any[] = []
+    for (const file of files) {
+      setBulkLogs(prev => [...prev, `${file.name} (${(file.size / 1024).toFixed(1)}KB)`])
+      const aiParsed = await parseWithGeminiFL(file)
+      if (aiParsed.length > 0) {
+        allParsed = [...allParsed, ...aiParsed.map((item: any, i: number) => ({
+          name: String(item.name || '').trim(),
+          phone: String(item.phone || '').trim(),
+          email: item.email || '',
+          bank_name: item.bank_name || 'KB국민은행',
+          account_number: String(item.account_number || '').trim(),
+          account_holder: item.account_holder || String(item.name || '').trim(),
+          reg_number: String(item.reg_number || '').trim(),
+          tax_type: item.tax_type || '사업소득(3.3%)',
+          service_type: item.service_type || '기타',
+          is_active: true, memo: item.memo || '',
+          _row: i + 1, _status: 'ready' as const, _note: '',
+        })).filter((r: any) => r.name)]
+      } else if (file.name.match(/\.(xlsx|xls|csv)$/i)) {
+        allParsed = [...allParsed, ...(await parseExcelFallback(file))]
+      }
+    }
+    if (allParsed.length === 0) { setBulkLogs(prev => [...prev, '파싱된 데이터가 없습니다.']); return }
+    applyDuplicateCheck(allParsed)
+    setBulkData(allParsed)
+    setBulkLogs(prev => [...prev, `총 ${allParsed.length}명 취합 완료`])
+  }
+
+  const handleBulkSaveFL = async () => {
+    const toSave = bulkData.filter(d => d._status === 'ready')
+    if (toSave.length === 0) { alert('저장할 데이터가 없습니다.'); return }
+    if (!confirm(`${toSave.length}명을 등록하시겠습니까?`)) return
+    setBulkProcessing(true)
+    let saved = 0
+    for (const item of toSave) {
+      const { _row, _status, _note, ...payload } = item
+      try {
+        const res = await fetch('/api/freelancers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) },
+          body: JSON.stringify(payload),
+        })
+        const json = await res.json()
+        if (json.error) { item._status = 'error'; item._note = json.error }
+        else { item._status = 'saved'; item._note = '등록 완료'; saved++ }
+      } catch (e: any) {
+        item._status = 'error'; item._note = e.message
+      }
+    }
+    setBulkData([...bulkData])
+    setBulkLogs(prev => [...prev, `${saved}명 등록 완료`])
+    setBulkProcessing(false)
+    if (saved > 0) await loadExternal()
+  }
 
   const openFreelancerForm = (f?: any) => {
     if (f) {
@@ -1141,13 +1311,108 @@ export default function HRMasterPage() {
 
           {/* 프리랜서 */}
           <div style={{ ...glassCard, padding: 20 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
               <h3 style={{ fontSize: 14, fontWeight: 700, color: '#1e293b', margin: 0 }}>🤝 프리랜서 ({freelancers.length})</h3>
-              <button onClick={() => openFreelancerForm()}
-                style={{ padding: '6px 14px', fontSize: 12, fontWeight: 600, color: '#fff', background: '#3b82f6', border: 'none', borderRadius: 8, cursor: 'pointer' }}>
-                + 프리랜서 추가
-              </button>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                <button onClick={downloadFreelancerTemplate}
+                  style={{ padding: '6px 12px', fontSize: 12, fontWeight: 600, color: '#64748b', background: '#fff', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, cursor: 'pointer' }}
+                  title="등록용 빈 엑셀 양식">
+                  📥 양식 다운로드
+                </button>
+                <button onClick={downloadFreelancerList}
+                  style={{ padding: '6px 12px', fontSize: 12, fontWeight: 600, color: '#0891b2', background: '#fff', border: '1px solid rgba(8,145,178,0.3)', borderRadius: 8, cursor: 'pointer' }}
+                  title="현재 등록 명단 (세무사용)">
+                  📊 명단 다운로드
+                </button>
+                <button onClick={() => openFreelancerForm()}
+                  style={{ padding: '6px 14px', fontSize: 12, fontWeight: 600, color: '#fff', background: '#3b82f6', border: 'none', borderRadius: 8, cursor: 'pointer' }}>
+                  + 프리랜서 추가
+                </button>
+              </div>
             </div>
+
+            {/* 드래그앤드롭 일괄 업로드 영역 */}
+            <div
+              onDragOver={e => { e.preventDefault(); setIsDragging(true) }}
+              onDragLeave={() => setIsDragging(false)}
+              onDrop={async e => { e.preventDefault(); setIsDragging(false); if (e.dataTransfer.files?.length) await processBulkFiles(Array.from(e.dataTransfer.files)) }}
+              style={{
+                border: isDragging ? '2px dashed #3b82f6' : '2px dashed rgba(0,0,0,0.08)',
+                borderRadius: 12, padding: aiParsing ? '24px 16px' : '16px', textAlign: 'center', marginBottom: 12,
+                background: isDragging ? 'rgba(59,130,246,0.05)' : aiParsing ? 'rgba(34,197,94,0.04)' : 'rgba(255,255,255,0.4)',
+                transition: 'all 0.3s', cursor: 'pointer', position: 'relative',
+              }}
+            >
+              {aiParsing ? (
+                <>
+                  <div style={{ width: 28, height: 28, border: '3px solid rgba(34,197,94,0.2)', borderTopColor: '#22c55e', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 8px' }} />
+                  <p style={{ fontWeight: 700, fontSize: 13, color: '#16a34a', margin: 0 }}>Gemini AI 분석 중...</p>
+                </>
+              ) : (
+                <>
+                  <p style={{ fontSize: 13, fontWeight: 600, color: isDragging ? '#2563eb' : '#64748b', margin: 0 }}>
+                    {isDragging ? '여기에 놓으세요!' : '📤 엑셀/CSV/이미지/PDF 파일 드래그하여 일괄 등록'}
+                  </p>
+                  <p style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>Gemini AI 자동 분석 + 중복 자동 제외</p>
+                  <input ref={bulkFileRef} type="file" accept=".xlsx,.xls,.csv,.png,.jpg,.jpeg,.pdf" multiple
+                    onChange={async e => { if (e.target.files?.length) await processBulkFiles(Array.from(e.target.files)); if (bulkFileRef.current) bulkFileRef.current.value = '' }}
+                    style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }} />
+                </>
+              )}
+            </div>
+
+            {/* 일괄등록 미리보기 */}
+            {(bulkLogs.length > 0 || bulkData.length > 0) && (
+              <div style={{ background: 'rgba(255,255,255,0.6)', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 10, padding: 12, marginBottom: 12 }}>
+                {bulkLogs.length > 0 && (
+                  <div style={{ marginBottom: bulkData.length > 0 ? 8 : 0 }}>
+                    {bulkLogs.map((log, i) => <p key={i} style={{ fontSize: 11, color: '#64748b', margin: '2px 0' }}>{log}</p>)}
+                  </div>
+                )}
+                {bulkData.length > 0 && (
+                  <>
+                    <div style={{ overflowX: 'auto', maxHeight: 240 }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 480, fontSize: 11 }}>
+                        <thead><tr style={{ background: 'rgba(0,0,0,0.04)' }}>
+                          <th style={{ padding: '6px 8px', textAlign: 'left' }}>이름</th>
+                          <th style={{ padding: '6px 8px', textAlign: 'left' }}>연락처</th>
+                          <th style={{ padding: '6px 8px', textAlign: 'left' }}>은행/계좌</th>
+                          <th style={{ padding: '6px 8px' }}>상태</th>
+                        </tr></thead>
+                        <tbody>
+                          {bulkData.map((d, i) => (
+                            <tr key={i} style={{ opacity: d._status === 'duplicate' ? 0.4 : 1, borderBottom: '1px solid rgba(0,0,0,0.04)' }}>
+                              <td style={{ padding: '4px 8px', fontWeight: 600 }}>{d.name}</td>
+                              <td style={{ padding: '4px 8px', color: '#64748b' }}>{d.phone || '-'}</td>
+                              <td style={{ padding: '4px 8px', color: '#64748b' }}>{d.bank_name} {d.account_number}</td>
+                              <td style={{ padding: '4px 8px', textAlign: 'center' }}>
+                                <span style={{
+                                  fontSize: 10, fontWeight: 600, padding: '2px 6px', borderRadius: 4,
+                                  background: d._status === 'saved' ? 'rgba(34,197,94,0.15)' : d._status === 'duplicate' ? 'rgba(0,0,0,0.04)' : d._status === 'error' ? 'rgba(239,68,68,0.15)' : 'rgba(251,191,36,0.18)',
+                                  color: d._status === 'saved' ? '#16a34a' : d._status === 'duplicate' ? '#94a3b8' : d._status === 'error' ? '#dc2626' : '#a16207',
+                                }}>
+                                  {d._status === 'saved' ? '등록완료' : d._status === 'duplicate' ? d._note : d._status === 'error' ? '에러' : '대기'}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <div style={{ marginTop: 10, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                      <button onClick={() => { setBulkData([]); setBulkLogs([]) }}
+                        style={{ padding: '6px 14px', fontSize: 12, fontWeight: 600, color: '#64748b', background: '#fff', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, cursor: 'pointer' }}>
+                        초기화
+                      </button>
+                      <button onClick={handleBulkSaveFL} disabled={bulkProcessing}
+                        style={{ padding: '6px 14px', fontSize: 12, fontWeight: 600, color: '#fff', background: bulkProcessing ? '#94a3b8' : '#22c55e', border: 'none', borderRadius: 8, cursor: bulkProcessing ? 'not-allowed' : 'pointer' }}>
+                        {bulkProcessing ? '저장 중...' : `${bulkData.filter(d => d._status === 'ready').length}명 일괄 등록`}
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
             <div style={{ border: '1px solid rgba(0,0,0,0.06)', borderRadius: 10, overflow: 'hidden' }}>
               {freelancers.length === 0 && (
                 <div style={{ padding: 20, textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>

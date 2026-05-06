@@ -76,6 +76,9 @@ export async function GET(request: Request) {
   const where: string[] = []
   const params: unknown[] = []
 
+  // PR-6.7.c — 비정상 mddt 필터 (긴급출동도 같은 패턴)
+  where.push('CHAR_LENGTH(a.esosmddt) = 8')
+  where.push("a.esosmddt BETWEEN '20100101' AND '20991231'")
   if (from && /^\d{8}$/.test(from)) {
     where.push('a.esosmddt >= ?')
     params.push(from)

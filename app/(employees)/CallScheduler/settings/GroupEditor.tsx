@@ -7,8 +7,7 @@ import { COLORS, GLASS, BTN } from '@/app/utils/ui-tokens'
 import { TONE_BG, TONE_TEXT } from '@/app/(employees)/CallScheduler/utils/palette'
 import { COLOR_TONE_OPTIONS } from '@/app/(employees)/CallScheduler/utils/types'
 import { getAuthHeader } from '@/app/utils/auth-client'
-import type { ShiftSlot, Worker, ColorTone, GroupMemberSkipDate } from '@/app/(employees)/CallScheduler/utils/types'
-import GroupSkipDatesModal from './GroupSkipDatesModal'
+import type { ShiftSlot, Worker, ColorTone, GroupMemberSkipDate, SkipStatus } from '@/app/(employees)/CallScheduler/utils/types'
 
 interface Props {
   groupId: string | null  // null = 신규
@@ -54,10 +53,16 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
   const [dowMin, setDowMin] = useState<Record<number, string>>({}) // 요일별 예외 (0~6)
   const [coverageLoading, setCoverageLoading] = useState(false)
   const [coverageMissing, setCoverageMissing] = useState(false)   // 마이그 미적용 시
-  // PR-2SS-h-1 — 그룹 회피일
+  // PR-2SS-h-1 → fix — 그룹 회피일 (인라인 펼침)
   const [skipDates, setSkipDates] = useState<GroupMemberSkipDate[]>([])
   const [skipMissing, setSkipMissing] = useState(false)
-  const [skipModalWorkerId, setSkipModalWorkerId] = useState<string | null>(null)
+  const [expandedSkipWorkerId, setExpandedSkipWorkerId] = useState<string | null>(null)
+  // 워커별 빠른 입력 폼 상태 (Map by workerId)
+  const [skipForms, setSkipForms] = useState<Record<string, { start: string; end: string; reason: string; saving: boolean; error: string | null }>>({})
+  const getSkipForm = (wId: string) => skipForms[wId] || { start: '', end: '', reason: '', saving: false, error: null }
+  const setSkipForm = (wId: string, patch: Partial<{ start: string; end: string; reason: string; saving: boolean; error: string | null }>) => {
+    setSkipForms(prev => ({ ...prev, [wId]: { ...getSkipForm(wId), ...patch } }))
+  }
 
   // 기존 그룹 로드 + 최소 인원 셋팅 로드 (PR-2QQ-d-2) + 회피일 (PR-2SS-h-1)
   useEffect(() => {
@@ -119,7 +124,7 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
     return () => { abort = true }
   }, [groupId, isNew])
 
-  // PR-2SS-h-1 — 회피일 reload (모달 변경 후)
+  // PR-2SS-h-1 — 회피일 reload (변경 후)
   const reloadSkips = async () => {
     if (isNew || !groupId) return
     try {
@@ -128,6 +133,69 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
       const sJson = await sRes.json()
       if (sRes.ok && Array.isArray(sJson.data)) setSkipDates(sJson.data)
     } catch { /* graceful */ }
+  }
+
+  // PR-2SS-h-1-fix — 인라인 빠른 입력 (매니저 즉시 승인)
+  const addSkipInline = async (wId: string) => {
+    if (isNew || !groupId) return
+    const form = getSkipForm(wId)
+    setSkipForm(wId, { error: null })
+    if (!form.start || !form.end) {
+      setSkipForm(wId, { error: '시작·종료 필수' }); return
+    }
+    if (form.start > form.end) {
+      setSkipForm(wId, { error: '시작이 종료보다 이후' }); return
+    }
+    setSkipForm(wId, { saving: true })
+    try {
+      const auth = await getAuthHeader()
+      const res = await fetch(`/api/call-scheduler/shift-groups/${groupId}/skip-dates`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...auth },
+        body: JSON.stringify({
+          worker_id: wId,
+          start_date: form.start,
+          end_date: form.end,
+          reason: form.reason.trim() || null,
+          status: 'approved',
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json?.error || '추가 실패')
+      setSkipForm(wId, { start: '', end: '', reason: '', saving: false })
+      reloadSkips()
+    } catch (e: any) {
+      setSkipForm(wId, { error: e?.message || '오류', saving: false })
+    }
+  }
+
+  // PR-2SS-h-1-fix — 인라인 status 변경 / 삭제
+  const updateSkipStatus = async (skipId: string, status: SkipStatus) => {
+    if (isNew || !groupId) return
+    try {
+      const auth = await getAuthHeader()
+      const res = await fetch(`/api/call-scheduler/shift-groups/${groupId}/skip-dates/${skipId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...auth },
+        body: JSON.stringify({ status }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json?.error || '실패')
+      reloadSkips()
+    } catch (e: any) { setError(e?.message || '오류') }
+  }
+  const removeSkip = async (skipId: string) => {
+    if (isNew || !groupId) return
+    if (!confirm('이 회피일을 삭제합니다. 계속할까요?')) return
+    try {
+      const auth = await getAuthHeader()
+      const res = await fetch(`/api/call-scheduler/shift-groups/${groupId}/skip-dates/${skipId}`, {
+        method: 'DELETE', headers: auth,
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json?.error || '실패')
+      reloadSkips()
+    } catch (e: any) { setError(e?.message || '오류') }
   }
 
   const toggleMember = (wId: string) => {
@@ -543,6 +611,8 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
                   const wSkips = skipDates.filter(s => s.worker_id === w.id)
                   const approvedCount = wSkips.filter(s => s.status === 'approved').length
                   const requestedCount = wSkips.filter(s => s.status === 'requested').length
+                  const isExpanded = expandedSkipWorkerId === w.id
+                  const form = getSkipForm(w.id)
                   return (
                     <div key={w.id} style={{
                       display: 'flex', flexDirection: 'column', gap: 2,
@@ -555,10 +625,10 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
                         {w.group_label && (
                           <span style={{ fontSize: 10, color: COLORS.textMuted }}>{w.group_label}</span>
                         )}
-                        {/* PR-2SS-h-1 — 회피일 chip + 모달 트리거 */}
-                        {!skipMissing && (
+                        {/* PR-2SS-h-1-fix — 인라인 펼침 토글 (모달 → 클릭으로 펼침) */}
+                        {!skipMissing && !isNew && (
                           <button type="button"
-                                  onClick={() => setSkipModalWorkerId(w.id)}
+                                  onClick={() => setExpandedSkipWorkerId(isExpanded ? null : w.id)}
                                   style={{
                                     fontSize: 10, padding: '2px 7px', borderRadius: 99,
                                     background: requestedCount > 0 ? COLORS.bgAmber
@@ -575,7 +645,7 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
                                     fontWeight: 700, cursor: 'pointer',
                                   }}
                                   title={`회피일 — 승인 ${approvedCount}건 / 신청 ${requestedCount}건`}>
-                            🛌 {approvedCount}{requestedCount > 0 ? `+${requestedCount}대기` : ''}
+                            🛌 {approvedCount}{requestedCount > 0 ? `+${requestedCount}대기` : ''} {isExpanded ? '▼' : '▶'}
                           </button>
                         )}
                         <button type="button" onClick={() => moveMember(w.id, -1)} disabled={idx === 0}
@@ -585,16 +655,107 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
                         <button type="button" onClick={() => toggleMember(w.id)}
                                 style={{ ...miniBtn, color: COLORS.danger }} title="제외">×</button>
                       </div>
-                      {/* PR-2SS-h-1 — 회피일 요약 (최대 3건 + 더보기) */}
-                      {(approvedCount + requestedCount > 0) && (
-                        <div style={{ fontSize: 9, color: COLORS.textMuted, paddingLeft: 24 }}>
-                          {wSkips.slice(0, 3).map(s => (
-                            <span key={s.id} style={{ marginRight: 6 }}>
-                              {s.status === 'requested' ? '⏳' : s.status === 'approved' ? '✓' : '✗'}{' '}
-                              {s.start_date.slice(5)}{s.start_date !== s.end_date && `~${s.end_date.slice(5)}`}
-                            </span>
-                          ))}
-                          {wSkips.length > 3 && <span>... +{wSkips.length - 3}</span>}
+                      {/* PR-2SS-h-1-fix — 인라인 펼침 (회피일 목록 + 빠른 입력) */}
+                      {isExpanded && !skipMissing && (
+                        <div style={{
+                          marginTop: 6, marginLeft: 24,
+                          padding: 8, borderRadius: 6,
+                          background: 'rgba(255,255,255,0.85)',
+                          border: `1px solid ${COLORS.borderFaint}`,
+                          display: 'flex', flexDirection: 'column', gap: 6,
+                        }}>
+                          {form.error && (
+                            <div style={{
+                              fontSize: 10, color: COLORS.danger,
+                              padding: '3px 6px', borderRadius: 4,
+                              background: COLORS.bgRed,
+                              border: `1px solid ${COLORS.borderRed}`,
+                            }}>❌ {form.error}</div>
+                          )}
+                          {/* 기존 목록 */}
+                          {wSkips.length > 0 && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                              {wSkips.map(s => (
+                                <div key={s.id} style={{
+                                  display: 'flex', alignItems: 'center', gap: 6,
+                                  fontSize: 11, padding: '3px 6px', borderRadius: 4,
+                                  background: 'rgba(0,0,0,0.03)',
+                                }}>
+                                  <span style={{
+                                    fontSize: 9, padding: '1px 5px', borderRadius: 99, fontWeight: 700,
+                                    background: s.status === 'approved' ? COLORS.bgGreen
+                                              : s.status === 'requested' ? COLORS.bgAmber
+                                              : COLORS.bgGray,
+                                    color: s.status === 'approved' ? COLORS.success
+                                         : s.status === 'requested' ? COLORS.warning
+                                         : COLORS.textSecondary,
+                                  }}>
+                                    {s.status === 'approved' ? '✓승인' : s.status === 'requested' ? '⏳대기' : s.status === 'rejected' ? '✗거절' : '취소'}
+                                  </span>
+                                  <span style={{ flex: 1, color: COLORS.textPrimary, fontWeight: 600 }}>
+                                    {s.start_date}{s.start_date !== s.end_date && ` ~ ${s.end_date}`}
+                                    {s.reason && (
+                                      <span style={{ fontSize: 9, color: COLORS.textMuted, fontWeight: 500, marginLeft: 4 }}>
+                                        — {s.reason}
+                                      </span>
+                                    )}
+                                  </span>
+                                  {s.status === 'requested' && (
+                                    <>
+                                      <button type="button"
+                                              onClick={() => updateSkipStatus(s.id, 'approved')}
+                                              style={{
+                                                fontSize: 9, padding: '1px 6px', borderRadius: 4,
+                                                background: COLORS.success, color: '#fff',
+                                                border: 'none', cursor: 'pointer', fontWeight: 700,
+                                              }}>승인</button>
+                                      <button type="button"
+                                              onClick={() => updateSkipStatus(s.id, 'rejected')}
+                                              style={{
+                                                fontSize: 9, padding: '1px 6px', borderRadius: 4,
+                                                background: 'transparent', color: COLORS.danger,
+                                                border: `1px solid ${COLORS.borderRed}`, cursor: 'pointer', fontWeight: 700,
+                                              }}>거절</button>
+                                    </>
+                                  )}
+                                  <button type="button"
+                                          onClick={() => removeSkip(s.id)}
+                                          style={{
+                                            background: 'transparent', border: 'none',
+                                            color: COLORS.textMuted, cursor: 'pointer',
+                                            fontSize: 12, padding: 0, lineHeight: 1,
+                                          }} title="삭제">×</button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {/* 빠른 입력 한 줄 */}
+                          <div style={{ display: 'flex', gap: 4, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                            <input type="date" value={form.start}
+                                   onChange={(e) => setSkipForm(w.id, {
+                                     start: e.target.value,
+                                     // 종료일이 비어있으면 시작일과 동일하게 (단일 일자 빠른 입력)
+                                     end: form.end || e.target.value,
+                                   })}
+                                   style={skipInlineInputStyle} title="시작일" />
+                            <span style={{ fontSize: 11, color: COLORS.textMuted, padding: '0 2px' }}>~</span>
+                            <input type="date" value={form.end}
+                                   onChange={(e) => setSkipForm(w.id, { end: e.target.value })}
+                                   style={skipInlineInputStyle} title="종료일" />
+                            <input type="text" value={form.reason}
+                                   onChange={(e) => setSkipForm(w.id, { reason: e.target.value })}
+                                   placeholder="사유 (선택)"
+                                   style={{ ...skipInlineInputStyle, flex: 1, minWidth: 100 }} />
+                            <button type="button" onClick={() => addSkipInline(w.id)} disabled={form.saving}
+                                    style={{
+                                      padding: '4px 10px', borderRadius: 4, fontSize: 11, fontWeight: 700,
+                                      background: COLORS.primary, color: '#fff', border: 'none',
+                                      cursor: form.saving ? 'not-allowed' : 'pointer',
+                                      opacity: form.saving ? 0.5 : 1,
+                                    }}>
+                              {form.saving ? '...' : '+ 추가'}
+                            </button>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -626,16 +787,7 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
         </div>
       </div>
 
-      {/* PR-2SS-h-1 — 회피일 모달 */}
-      {skipModalWorkerId && groupId && (
-        <GroupSkipDatesModal
-          groupId={groupId}
-          worker={workers.find(w => w.id === skipModalWorkerId) || null}
-          existingSkips={skipDates.filter(s => s.worker_id === skipModalWorkerId)}
-          onClose={() => setSkipModalWorkerId(null)}
-          onChanged={reloadSkips}
-        />
-      )}
+      {/* PR-2SS-h-1-fix — 모달 폐기, 인라인 펼침으로 대체 */}
 
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 14 }}>
         <button type="button" onClick={onClose} style={{
@@ -656,6 +808,13 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
 const inputStyle: React.CSSProperties = {
   ...GLASS.L1, padding: '7px 10px', borderRadius: 8,
   fontSize: 13, color: COLORS.textPrimary, outline: 'none', width: '100%',
+}
+// PR-2SS-h-1-fix — 인라인 회피일 빠른 입력
+const skipInlineInputStyle: React.CSSProperties = {
+  padding: '4px 8px', borderRadius: 4, fontSize: 11,
+  border: `1px solid ${COLORS.borderFaint}`,
+  background: 'rgba(255,255,255,0.95)',
+  outline: 'none',
 }
 const miniBtn: React.CSSProperties = {
   width: 22, height: 22, padding: 0, borderRadius: 4,

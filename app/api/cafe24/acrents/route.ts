@@ -59,10 +59,13 @@ export async function GET(request: Request) {
 
   const where: string[] = []
   const params: unknown[] = []
-  // PR-6.7.b — 비정상 mddt 필터 (확인안됨/확인불가/12자리 입력 오류 등 9건 제외)
-  // 정상 패턴: 8자리 + '20' prefix (YYYYMMDD)
-  where.push("a.otptmddt LIKE '20%'")
+  // PR-6.7.c — 비정상 mddt 필터 강화
+  // 사용자 입력 오타 ('24530811', '22020225' 같은 비현실적 미래/과거) 제외
+  // 합리적 범위: 2010-01-01 ~ 2099-12-31
   where.push('CHAR_LENGTH(a.otptmddt) = 8')
+  where.push("a.otptmddt BETWEEN '20100101' AND '20991231'")
+  // 시스템 기록 일자 (acdt) 도 비정상 제외 — NULL 허용 (옛 row)
+  where.push("(a.otptacdt IS NULL OR a.otptacdt = '' OR a.otptacdt BETWEEN '20100101' AND '20991231')")
   if (from && /^\d{8}$/.test(from)) {
     where.push('a.otptmddt >= ?')
     params.push(from)

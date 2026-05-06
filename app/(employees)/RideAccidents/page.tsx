@@ -110,11 +110,10 @@ const RSLT_COLOR: Record<string, string> = {
   '2': COLORS.danger,   // 취소
   '3': COLORS.success,  // 접수완료
 }
-// PR-6.7.b — Y/N 매핑 명확화. PHP 측 패턴: Y/N 의미는 컬럼별 다름.
-// 긴급출동 점검 항목 (esosbate/tire/oils/lock/move/help): 도메인상 Y=점검필요/문제 / N=정상 추정.
-// 운영자 검증 후 정정 가능.
+// PR-6.7.d — Y/N 매핑 정정.
+// PHP 신규 등록 시 점검 항목 'N' 디폴트 → Y=문제 발견 / N=정상.
 function checkBadge(v: string | null | undefined): { label: string; color: string; bg: string } {
-  if (v === 'Y') return { label: '체크됨', color: COLORS.warning, bg: COLORS.bgAmber }
+  if (v === 'Y') return { label: '문제', color: COLORS.danger, bg: COLORS.bgRed }
   if (v === 'N') return { label: '정상', color: COLORS.success, bg: COLORS.bgGreen }
   return { label: '-', color: COLORS.textMuted, bg: 'rgba(0,0,0,0.04)' }
 }
@@ -353,7 +352,7 @@ export default function RideAccidentsPage() {
     },
     {
       key: 'acdt',
-      label: '접수시각',
+      label: '기록시각',
       width: 130,
       sortBy: (r) => `${r.esosacdt || ''}${r.esosactm || ''}`,
       render: (r) => (
@@ -779,14 +778,15 @@ function DetailBody({
   const rsltColor = detail.esosrslt ? RSLT_COLOR[detail.esosrslt] || COLORS.textMuted : COLORS.textMuted
   const typp = getCodeLabel(codes, 'ESOSTYPP', detail.esostypp, detail.esostypp || '-')
 
-  // 점검 항목 — Y/N/null
+  // PR-6.7.d — 긴급출동 점검 항목 라벨 (PHP ace0101a.php SMS 메시지에서 정확 발견)
+  // Y = 해당 서비스 제공됨 (긴출 항목)
   const checks: Array<[string, string | null | undefined, string]> = [
-    ['배터리', detail.esosbate, '🔋'],
-    ['타이어', detail.esostire, '🛞'],
-    ['오일', detail.esosoils, '🛢'],
-    ['잠김', detail.esoslock, '🔒'],
-    ['이동', detail.esosmove, '🚙'],
-    ['긴급도움', detail.esoshelp, '🆘'],
+    ['배터리충전', detail.esosbate, '🔋'],
+    ['타이어교체/펑크수리', detail.esostire, '🛞'],
+    ['비상급유', detail.esosoils, '⛽'],
+    ['잠금장치해제', detail.esoslock, '🔓'],
+    ['긴급견인', detail.esosmove, '🚛'],
+    ['비상구난', detail.esoshelp, '🆘'],
   ]
   const checksWithIssue = checks.filter(([, v]) => v === 'Y')
 
@@ -796,11 +796,18 @@ function DetailBody({
       <Section title="기본">
         <Field label="접수일" value={fmtDate8(detail.esosmddt)} />
         <Field
-          label="접수 시각"
+          label="기록 시각"
           value={fmtDateTime(detail.esosacdt, detail.esosactm) || '-'}
         />
-        <Field label="ID" value={detail.esosidno} mono />
-        <Field label="순번" value={String(detail.esossrno)} mono />
+        {/* PR-6.7.d — carsidno (esosidno) 식별자 — 분석용 */}
+        <Field
+          label="carsidno"
+          value={
+            <span style={{ fontFamily: 'monospace', fontSize: 11, color: COLORS.textMuted }}>
+              {detail.esosidno} · srno {detail.esossrno}
+            </span>
+          }
+        />
         <Field
           label="등록 상태"
           value={

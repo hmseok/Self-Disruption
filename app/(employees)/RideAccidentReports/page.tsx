@@ -111,11 +111,27 @@ const RGST_LABEL: Record<string, { label: string; color: string }> = {
   C: { label: '취소', color: COLORS.danger },
   X: { label: '삭제', color: COLORS.neutral },
 }
-// PR-6.7.b — Y/N 매핑 정정. 사고접수 점검 항목 (Y=정상/N=문제) — PHP 패턴 따름.
-function checkBadge(v: string | null | undefined, yLabel = '정상', nLabel = '문제') {
-  if (v === 'Y') return { label: yLabel, color: COLORS.success, bg: COLORS.bgGreen }
-  if (v === 'N') return { label: nLabel, color: COLORS.danger, bg: COLORS.bgRed }
+// PR-6.7.d — Y/N 매핑 재정정.
+// PHP ACR0101A_dataacceptA 신규 등록 시 acdi/dm/jc/js/mb/no/ph = 'N' 디폴트.
+// 분포: acdi N 92% / acjs N 97% (대다수 N — 정상/체크안함)
+// → ✅ Y=문제 발견, N=정상/미점검
+// (otptacrn 만 예외: Y=운행가능 / N=운행불가능 — 별도 처리)
+function checkBadge(v: string | null | undefined) {
+  if (v === 'Y') return { label: '문제', color: COLORS.danger, bg: COLORS.bgRed }
+  if (v === 'N') return { label: '정상', color: COLORS.success, bg: COLORS.bgGreen }
   return { label: '-', color: COLORS.textMuted, bg: 'rgba(0,0,0,0.04)' }
+}
+
+// PR-6.7.d — 점검 항목 1자 약어 라벨
+// 운영 도메인 지식 — 사용자(운영자) 검증 후 정정 가능. 일단 약어 그대로 + 추정 라벨.
+const CHECK_LABEL: Record<string, string> = {
+  di: 'di',  // ? 운영자 확인 필요
+  dm: 'dm',
+  jc: 'jc',
+  js: 'js',
+  mb: 'mb',
+  no: 'no',
+  ph: 'ph',
 }
 
 export default function RideAccidentReportsPage() {
@@ -400,7 +416,7 @@ export default function RideAccidentReportsPage() {
     },
     {
       key: 'acdt',
-      label: '접수시각',
+      label: '기록시각',
       width: 130,
       sortBy: (r) => `${r.otptacdt || ''}${r.otptactm || ''}`,
       render: (r) => (
@@ -783,13 +799,13 @@ function DetailBody({
     ['no', detail.otptacno],
     ['ph', detail.otptacph],
   ]
-  const issues = checks.filter(([, v]) => v === 'N') // PR-6.7.b — N 이 문제
+  const issues = checks.filter(([, v]) => v === 'Y') // PR-6.7.d — Y 가 문제 (N 디폴트 패턴)
 
   return (
     <>
       <Section title="기본">
         <Field label="접수일" value={fmtDate8(detail.otptmddt)} />
-        <Field label="접수시각" value={fmtDateTime(detail.otptacdt, detail.otptactm)} />
+        <Field label="기록시각" value={fmtDateTime(detail.otptacdt, detail.otptactm)} />
         <Field
           label="사고유형"
           value={<span style={{ fontWeight: 700 }}>{acbnLabel}</span>}
@@ -808,6 +824,15 @@ function DetailBody({
         <Field
           label="진행단계"
           value={<span style={{ fontWeight: 700 }}>{rgtpLabel}</span>}
+        />
+        {/* PR-6.7.d — carsidno (otptidno) 식별자 표시 — 분석/디버그용 */}
+        <Field
+          label="carsidno"
+          value={
+            <span style={{ fontFamily: 'monospace', fontSize: 11, color: COLORS.textMuted }}>
+              {detail.otptidno} · srno {detail.otptsrno}
+            </span>
+          }
         />
       </Section>
 
@@ -851,11 +876,12 @@ function DetailBody({
           </span>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-          {checks.map(([label, v]) => {
+          {checks.map(([key, v]) => {
             const b = checkBadge(v)
+            const lbl = CHECK_LABEL[key] || key
             return (
               <div
-                key={label}
+                key={key}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -866,7 +892,7 @@ function DetailBody({
                 }}
               >
                 <span style={{ fontSize: 11, color: COLORS.textSecondary }}>
-                  {label}
+                  {lbl}
                 </span>
                 <span style={{ fontSize: 11, fontWeight: 700, color: b.color }}>
                   {b.label}

@@ -8,6 +8,61 @@
 
 ---
 
+## 2026-05-06 | PR-6.7.c | hotfix — 컬럼 의미 명확화 + 필터 강화
+
+### 사용자 의문
+> "접수일자는 저건 실제로 있는 데이터인가 사고일자인가 접수일자인가"
+> "접수시각도 일자인가 시간인가 믿기 어렵네"
+
+`2453-08-11` / `2202-02-25` 같은 비현실적 날짜가 표시됨 — 사용자 불신.
+
+### 진단
+
+```
+otptmddt = PK 의 일부 (사용자 입력 가능 — 운영자 수정도 가능)
+   → 실수로 24530811 (2453년) / 22020225 (2202년) 같은 비현실적 입력 누적
+   → PR-6.7.b 의 LIKE '20%' 필터 통과 (8자리 + '20'/'24' prefix 인 경우)
+
+otptacdt + otptactm = 시스템 자동 (CDATE/CTIME)
+   → "접수시각" 라벨이 사용자에게 "접수한 일시" 와 "접수 후 기록 시각" 둘 다로 해석 가능
+```
+
+### 정정
+
+```
+1. 필터 강화 (acrents + accidents):
+   이전: WHERE LIKE '20%' AND CHAR_LENGTH = 8
+   정정: WHERE BETWEEN '20100101' AND '20991231' AND CHAR_LENGTH = 8
+        AND otptacdt 도 같은 범위 또는 NULL (옛 row 허용)
+
+2. 컬럼 라벨 정정 (의미 명확):
+   이전: "접수시각"  (otptacdt+actm)
+   정정: "기록시각"  (시스템 자동 기록 = 신뢰 가능)
+
+   "접수일" (otptmddt) 은 그대로 유지 (PK 의미 그대로)
+```
+
+### 산출물
+
+| 파일 | 변경 |
+|------|------|
+| `app/api/cafe24/acrents/route.ts` | mddt BETWEEN '20100101' AND '20991231' + acdt 검증 추가 |
+| `app/api/cafe24/accidents/route.ts` | 동일 필터 (긴급출동도) |
+| `app/(employees)/RideAccidentReports/page.tsx` | "접수시각" → "기록시각" |
+| `app/(employees)/RideAccidents/page.tsx` | "접수시각" → "기록시각" |
+
+### GATE 진행 상태
+
+```
+✅ 사용자 의문 보고 → 즉시 진단 + 정정
+✅ G5 tsc 회귀 0건
+✅ G6 lint:harness 새 위반 0건
+⏭ G7 시각 검수 — Cloud Build 5-10분 후 hmseok.com 에서 확인
+✅ Rule 22 _docs 갱신
+```
+
+---
+
 ## 2026-05-06 | PR-6.7.b | 코드 정제 + 상담내역 + 비정상 데이터 필터
 
 ### 사용자 요청
