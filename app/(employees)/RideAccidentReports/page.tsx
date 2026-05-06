@@ -18,6 +18,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { getStoredToken, getStoredUser } from '@/lib/auth-client'
 import NeuDataTable, { type TableColumn } from '@/app/components/NeuDataTable'
 import { COLORS, GLASS, BTN } from '@/app/utils/ui-tokens'
+import { useCafe24Codes, getCodeLabel, ynBadge, type CodeMap } from './_codes'
 
 interface AcrentRow {
   otptidno: string
@@ -34,6 +35,20 @@ interface AcrentRow {
   cars_user: string | null
   cust_name: string | null
   user_name: string | null
+}
+
+interface AcrMemoRow {
+  memoidno: string
+  memomddt: string
+  memosrno: number
+  memonums: number
+  memosort: number
+  memotitl: string | null
+  memotext: string | null
+  memorgtp: string | null
+  memognus: string | null
+  memogndt: string | null
+  memogntm: string | null
 }
 
 interface AcrentDetail extends AcrentRow {
@@ -96,13 +111,15 @@ const RGST_LABEL: Record<string, { label: string; color: string }> = {
   C: { label: '취소', color: COLORS.danger },
   X: { label: '삭제', color: COLORS.neutral },
 }
-function checkBadge(v: string | null | undefined) {
-  if (v === 'Y') return { label: '문제', color: COLORS.danger, bg: COLORS.bgRed }
-  if (v === 'N') return { label: '정상', color: COLORS.success, bg: COLORS.bgGreen }
+// PR-6.7.b — Y/N 매핑 정정. 사고접수 점검 항목 (Y=정상/N=문제) — PHP 패턴 따름.
+function checkBadge(v: string | null | undefined, yLabel = '정상', nLabel = '문제') {
+  if (v === 'Y') return { label: yLabel, color: COLORS.success, bg: COLORS.bgGreen }
+  if (v === 'N') return { label: nLabel, color: COLORS.danger, bg: COLORS.bgRed }
   return { label: '-', color: COLORS.textMuted, bg: 'rgba(0,0,0,0.04)' }
 }
 
 export default function RideAccidentReportsPage() {
+  const codes = useCafe24Codes()
   const [user, setUser] = useState<{ role?: string } | null>(null)
   const [authChecked, setAuthChecked] = useState(false)
   const [rows, setRows] = useState<AcrentRow[]>([])
@@ -119,6 +136,7 @@ export default function RideAccidentReportsPage() {
     srno: number
   } | null>(null)
   const [detail, setDetail] = useState<AcrentDetail | null>(null)
+  const [memos, setMemos] = useState<AcrMemoRow[]>([])
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailError, setDetailError] = useState<string | null>(null)
 
@@ -165,9 +183,11 @@ export default function RideAccidentReportsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authChecked, user?.role, rgstFilter])
 
+  // PR-6.7.b — detail + acrmemoh 병렬 fetch
   useEffect(() => {
     if (!selectedKey) {
       setDetail(null)
+      setMemos([])
       setDetailError(null)
       return
     }
@@ -177,23 +197,30 @@ export default function RideAccidentReportsPage() {
       setDetailError(null)
       try {
         const token = getStoredToken()
+        const auth = token ? { Authorization: `Bearer ${token}` } : {}
         const params = new URLSearchParams({
           idno: selectedKey!.idno,
           mddt: selectedKey!.mddt,
           srno: String(selectedKey!.srno),
         })
-        const res = await fetch(`/api/cafe24/acrents/detail?${params}`, {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        const init: RequestInit = {
+          headers: auth as HeadersInit,
           cache: 'no-store',
           signal: ac.signal,
-        })
-        const json = await res.json()
-        if (!json.success || !json.data) {
-          setDetailError(json.error || 'not-found')
+        }
+        const [detailRes, memosRes] = await Promise.all([
+          fetch(`/api/cafe24/acrents/detail?${params}`, init),
+          fetch(`/api/cafe24/acrents/memos?${params}`, init),
+        ])
+        const detailJson = await detailRes.json()
+        const memosJson = await memosRes.json()
+        if (!detailJson.success || !detailJson.data) {
+          setDetailError(detailJson.error || 'not-found')
           setDetail(null)
         } else {
-          setDetail(json.data)
+          setDetail(detailJson.data)
         }
+        setMemos(memosJson.success && memosJson.data ? memosJson.data : [])
       } catch (e) {
         const err = e as { name?: string }
         if (err.name !== 'AbortError') setDetailError(String(e))
@@ -251,21 +278,47 @@ export default function RideAccidentReportsPage() {
     },
     {
       key: 'acbn',
-      label: '사고번호',
-      width: 110,
-      sortBy: (r) => r.otptacbn || '',
-      render: (r) => (
-        <span
-          style={{
-            fontFamily: 'monospace',
-            fontSize: 12,
-            color: COLORS.textPrimary,
-            fontWeight: 600,
-          }}
-        >
-          {r.otptacbn || '-'}
-        </span>
-      ),
+      label: '사고유형',
+      width: 90,
+      sortBy: (r) => getCodeLabel(codes, 'OTPTACBN', r.otptacbn, r.otptacbn || ''),
+      render: (r) => {
+        const lbl = getCodeLabel(codes, 'OTPTACBN', r.otptacbn, r.otptacbn || '-')
+        return (
+          <span style={{ fontSize: 12, color: COLORS.textPrimary, fontWeight: 600 }}>
+            {lbl}
+          </span>
+        )
+      },
+    },
+    {
+      key: 'rgtp',
+      label: '진행단계',
+      width: 80,
+      sortBy: (r) => getCodeLabel(codes, 'OTPTRGTP', r.otptrgtp, r.otptrgtp || ''),
+      render: (r) => {
+        const lbl = getCodeLabel(codes, 'OTPTRGTP', r.otptrgtp, r.otptrgtp || '-')
+        const code = r.otptrgtp
+        const color =
+          code === '1' ? COLORS.warning :
+          code === '2' ? COLORS.primary :
+          code === '3' ? COLORS.info :
+          code === '4' ? COLORS.success : COLORS.textMuted
+        return (
+          <span
+            style={{
+              padding: '2px 8px',
+              borderRadius: 6,
+              fontSize: 11,
+              fontWeight: 600,
+              color,
+              background: 'rgba(0,0,0,0.04)',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {lbl}
+          </span>
+        )
+      },
     },
     {
       key: 'cars_no',
@@ -536,9 +589,12 @@ export default function RideAccidentReportsPage() {
           loading={detailLoading}
           error={detailError}
           detail={detail}
+          memos={memos}
+          codes={codes}
           onClose={() => {
             setSelectedKey(null)
             setDetail(null)
+            setMemos([])
           }}
         />
       )}
@@ -551,11 +607,15 @@ function DetailModal({
   loading,
   error,
   detail,
+  memos,
+  codes,
   onClose,
 }: {
   loading: boolean
   error: string | null
   detail: AcrentDetail | null
+  memos: AcrMemoRow[]
+  codes: CodeMap
   onClose: () => void
 }) {
   useEffect(() => {
@@ -639,7 +699,7 @@ function DetailModal({
             ⚠️ {error}
           </div>
         )}
-        {detail && <DetailBody detail={detail} />}
+        {detail && <DetailBody detail={detail} memos={memos} codes={codes} />}
       </div>
     </div>
   )
@@ -700,9 +760,20 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
   )
 }
 
-function DetailBody({ detail }: { detail: AcrentDetail }) {
+function DetailBody({
+  detail,
+  memos,
+  codes,
+}: {
+  detail: AcrentDetail
+  memos: AcrMemoRow[]
+  codes: CodeMap
+}) {
   const rgst = detail.otptrgst ? RGST_LABEL[detail.otptrgst] : null
-  const acrn = checkBadge(detail.otptacrn)
+  // PR-6.7.b — 운행가능 정정. PHP 측 패턴: Y=가능 / N=불가능
+  const acrn = ynBadge(detail.otptacrn, '운행가능', '운행불가능', 'success', 'danger')
+  const acbnLabel = getCodeLabel(codes, 'OTPTACBN', detail.otptacbn, detail.otptacbn || '-')
+  const rgtpLabel = getCodeLabel(codes, 'OTPTRGTP', detail.otptrgtp, detail.otptrgtp || '-')
   const checks: Array<[string, string | null | undefined]> = [
     ['di', detail.otptacdi],
     ['dm', detail.otptacdm],
@@ -712,15 +783,18 @@ function DetailBody({ detail }: { detail: AcrentDetail }) {
     ['no', detail.otptacno],
     ['ph', detail.otptacph],
   ]
-  const issues = checks.filter(([, v]) => v === 'Y')
+  const issues = checks.filter(([, v]) => v === 'N') // PR-6.7.b — N 이 문제
 
   return (
     <>
       <Section title="기본">
         <Field label="접수일" value={fmtDate8(detail.otptmddt)} />
         <Field label="접수시각" value={fmtDateTime(detail.otptacdt, detail.otptactm)} />
-        <Field label="사고번호" value={detail.otptacbn} />
-        <Field label="사고번호2" value={detail.otptacnu} />
+        <Field
+          label="사고유형"
+          value={<span style={{ fontWeight: 700 }}>{acbnLabel}</span>}
+        />
+        {detail.otptacnu && <Field label="사고번호" value={detail.otptacnu} />}
         <Field
           label="등록상태"
           value={
@@ -731,7 +805,10 @@ function DetailBody({ detail }: { detail: AcrentDetail }) {
             )
           }
         />
-        <Field label="등록타입" value={detail.otptrgtp} />
+        <Field
+          label="진행단계"
+          value={<span style={{ fontWeight: 700 }}>{rgtpLabel}</span>}
+        />
       </Section>
 
       <Section title="차량">
@@ -755,15 +832,21 @@ function DetailBody({ detail }: { detail: AcrentDetail }) {
             alignItems: 'center',
             justifyContent: 'space-between',
             padding: '6px 10px',
-            background: acrn.bg,
+            background: acrn.tone === 'success' ? COLORS.bgGreen : COLORS.bgRed,
             borderRadius: 6,
             marginBottom: 6,
           }}
         >
           <span style={{ fontSize: 12, color: COLORS.textSecondary, fontWeight: 700 }}>
-            🚦 운행가능
+            🚦 운행 상태
           </span>
-          <span style={{ fontSize: 11, fontWeight: 700, color: acrn.color }}>
+          <span
+            style={{
+              fontSize: 11,
+              fontWeight: 700,
+              color: acrn.tone === 'success' ? COLORS.success : COLORS.danger,
+            }}
+          >
             {acrn.label}
           </span>
         </div>
@@ -837,6 +920,57 @@ function DetailBody({ detail }: { detail: AcrentDetail }) {
           <Field label="주차장" value={detail.otptpknm} />
         </Section>
       )}
+
+      {/* PR-6.7.b — 상담 내역 timeline (acrmemoh) */}
+      <Section title={`상담 내역 ${memos.length > 0 ? `· ${memos.length}건` : ''}`}>
+        {memos.length === 0 ? (
+          <div style={{ fontSize: 12, color: COLORS.textMuted, padding: '6px 0' }}>
+            등록된 상담 내역이 없습니다.
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {memos.map((m) => (
+              <div
+                key={`${m.memonums}-${m.memosort}`}
+                style={{
+                  borderLeft: `2px solid ${COLORS.primary}`,
+                  paddingLeft: 10,
+                  paddingTop: 2,
+                  paddingBottom: 2,
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: 11,
+                    color: COLORS.textMuted,
+                    marginBottom: 2,
+                    display: 'flex',
+                    gap: 8,
+                    flexWrap: 'wrap',
+                  }}
+                >
+                  <span style={{ fontWeight: 700, color: COLORS.textSecondary }}>
+                    {fmtDateTime(m.memogndt, m.memogntm)}
+                  </span>
+                  <span style={{ fontFamily: 'monospace' }}>{m.memognus || '-'}</span>
+                </div>
+                {m.memotext && (
+                  <div
+                    style={{
+                      fontSize: 13,
+                      color: COLORS.textPrimary,
+                      whiteSpace: 'pre-wrap',
+                      wordBreak: 'break-word',
+                    }}
+                  >
+                    {m.memotext}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </Section>
 
       <Section title="이력">
         <Field

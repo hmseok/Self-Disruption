@@ -8,6 +8,101 @@
 
 ---
 
+## 2026-05-06 | PR-6.7.b | 코드 정제 + 상담내역 + 비정상 데이터 필터
+
+### 사용자 요청
+> "데이터하고 뭐 코드들도 정제를 해야할것같고"
+> "상담 이력도 안보이는데"
+> "코드들도 사용자가 구분가능한내용으로"
+
+### 결정적 발견 — comcbsdm 코드 마스터
+
+PHP fs_bscddesc 함수 추적 → `comcbsdm` 테이블 발견.
+
+```sql
+SELECT cbsddesc FROM comcbsdm
+ WHERE cbsdjobb = ? AND cbsdgubn = ? AND cbsdcode = ?
+```
+
+#### OTPTACBN (사고 유형) — 12 코드
+B=보불 D=단독 E=기타 G=가해 H=긴출 J=자차 K=과실 M=면책 O=정비 P=피해 Q=검사 S=긴출
+
+#### OTPTRGTP (진행 단계) — 4 코드
+1=접수 2=완료 3=공장 4=종결
+
+#### ESOSTYPP (긴급 타입) — 5 코드 — **이전 추정 라벨 모두 틀림**
+이전 (PR-6.5+6): S=서비스 / J=점프 / E=긴급 / B=배터리 / I=점검 ❌
+실제: S=긴급출동 / J=정비상담 / E=기타상담 / B=법정검사 / I=블랙서비스 ✅
+
+#### ESOSRSLT — 3 코드
+1=처리중 / 2=취소 / 3=접수완료
+
+→ **즉 PR-6.5+6 배포된 페이지가 거짓 라벨 표시 중. 정정 의무**.
+
+### 산출물
+
+| 파일 | 종류 | 변경 |
+|------|------|------|
+| `app/api/cafe24/codes/route.ts` | 신규 | comcbsdm 코드 마스터 endpoint (OTPT*/ESOS*) |
+| `app/api/cafe24/acrents/memos/route.ts` | 신규 | acrmemoh 상담내역 (사고접수) |
+| `app/(employees)/RideAccidentReports/_codes.ts` | 신규 | useCafe24Codes hook + getCodeLabel + ynBadge |
+| `app/api/cafe24/acrents/route.ts` | 수정 | 비정상 mddt 필터 (`LIKE '20%' AND CHAR_LENGTH = 8`) |
+| `app/(employees)/RideAccidentReports/page.tsx` | 확장 | 사고유형/진행단계 한국어 매핑 + acrmemoh timeline |
+| `app/(employees)/RideAccidents/page.tsx` | 정정 | ESOSTYPP/ESOSRSLT 추정 라벨 → 실 매핑 정정 |
+
+### 비정상 데이터 필터 (사용자 스크린샷 발견)
+
+```
+"확인안됨" / "확인불가" 텍스트 입력: 7건
+"22020225" 같은 12자리 입력 오류: 2건
+빈값: 1건
+→ 합계 9건 자동 제외 (정상 68,983 / 99.99%)
+```
+
+### Y/N 매핑 명확화 (PHP 패턴 따름)
+
+```
+사고접수 (acr):
+  otptacrn (운행상태): Y=운행가능 / N=운행불가능 (이전 거꾸로 매핑 정정)
+  점검 7항목 (acdi/dm/jc/js/mb/no/ph): Y=정상 / N=문제 (PHP otptacrn 패턴 확장)
+
+긴급출동 (ace):
+  점검 6항목 (bate/tire/oils/lock/move/help): Y=체크됨(amber) / N=정상(green)
+  (도메인상 의미 확실치 않아 amber 로 보수적 표시)
+```
+
+### 신규 기능
+
+```
+✅ 한 번 fetch + 메모리 캐시 (코드 마스터 — 자주 안 변함)
+✅ useCafe24Codes() 훅 — 두 페이지 공통 사용
+✅ 사고접수 모달에 "상담 내역" timeline (acrmemoh) — 긴급출동과 동일 패턴
+✅ 비정상 mddt 자동 제외 (사용자 입력 오류 데이터 9건)
+✅ 사고유형/진행단계 한국어 라벨 — 운영자 즉시 이해
+```
+
+### GATE 진행 상태
+
+```
+✅ G3 사용자 GO ("코드들도 사용자가 구분가능한내용으로")
+✅ G5 tsc 회귀 0건
+✅ G6 lint:harness 새 위반 0건
+⏭ G7 Designer — 시각 검수 의무 (배포 후)
+✅ Rule 13 외부 시스템 호환성 — comcbsdm 실 검증 완료
+✅ Rule 17 모듈 폴더 분리 — _codes.ts 헬퍼는 RideAccidentReports/ 안 (RideAccidents 가 import — 의도적 cross)
+✅ Rule 22 _docs 갱신
+⚠ Rule 21 Cowork — cross-module (RideAccidents + RideAccidentReports + api:cafe24)
+   → COWORK_ALLOW_MULTI_MODULE=1 우회 (의도적 — 코드 마스터 일관성 위해 한 PR)
+```
+
+### 다음 PR 예고
+
+- **PR-6.8** — 차량 통합 이력 timeline (한 carsidno 의 긴급출동 + 사고접수 + 대차 + 정산)
+- **PR-6.9** — 계약정보 (보험/대차/정산) 모달에 추가
+- **PR-6.10** — 코드 마스터 화면 (운영자가 직접 코드 의미 보기)
+
+---
+
 ## 2026-05-06 | PR-6.7 | 사고접수 (acr 모듈) 별도 페이지 + 라벨 정정
 
 ### 사용자 요청

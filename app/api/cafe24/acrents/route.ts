@@ -59,6 +59,10 @@ export async function GET(request: Request) {
 
   const where: string[] = []
   const params: unknown[] = []
+  // PR-6.7.b — 비정상 mddt 필터 (확인안됨/확인불가/12자리 입력 오류 등 9건 제외)
+  // 정상 패턴: 8자리 + '20' prefix (YYYYMMDD)
+  where.push("a.otptmddt LIKE '20%'")
+  where.push('CHAR_LENGTH(a.otptmddt) = 8')
   if (from && /^\d{8}$/.test(from)) {
     where.push('a.otptmddt >= ?')
     params.push(from)

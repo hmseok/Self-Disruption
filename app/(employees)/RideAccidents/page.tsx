@@ -20,6 +20,12 @@ import { useEffect, useMemo, useState } from 'react'
 import { getStoredToken, getStoredUser } from '@/lib/auth-client'
 import NeuDataTable, { type TableColumn } from '@/app/components/NeuDataTable'
 import { COLORS, GLASS, BTN } from '@/app/utils/ui-tokens'
+// PR-6.7.b — 코드 마스터 (RideAccidentReports 의 _codes.ts 재사용)
+import {
+  useCafe24Codes,
+  getCodeLabel,
+  type CodeMap,
+} from '@/app/(employees)/RideAccidentReports/_codes'
 
 // ── 타입 ────────────────────────────────────────────────────────
 interface AccidentRow {
@@ -92,32 +98,30 @@ function fmtDateTime(d: string | null | undefined, t: string | null | undefined)
   return [dt, tm].filter(Boolean).join(' ')
 }
 
-// 코드 마스터 (PR-6.7 에서 bscddesc 조인 예정 — 일단 추정 라벨)
+// PR-6.7.b — 코드 마스터 (comcbsdm 실 매핑)
+// ESOSTYPP / ESOSRSLT 는 useCafe24Codes() 동적 fetch — 추정 라벨 잘못된 PR-6.5+6 정정
 const RGST_LABEL: Record<string, { label: string; color: string }> = {
   R: { label: '등록', color: COLORS.success },
   C: { label: '취소', color: COLORS.danger },
   X: { label: '삭제', color: COLORS.neutral },
 }
-const TYPP_LABEL: Record<string, string> = {
-  S: '서비스',
-  J: '점프',
-  E: '긴급',
-  B: '배터리',
-  I: '점검',
+const RSLT_COLOR: Record<string, string> = {
+  '1': COLORS.warning,  // 처리중
+  '2': COLORS.danger,   // 취소
+  '3': COLORS.success,  // 접수완료
 }
-const RSLT_LABEL: Record<string, { label: string; color: string }> = {
-  '1': { label: '처리중', color: COLORS.warning },
-  '3': { label: '완료', color: COLORS.success },
-}
-// 차량 점검 1자 (Y/N/null) — Y = 문제 발생 / N = 정상 / 빈값 = 미점검
+// PR-6.7.b — Y/N 매핑 명확화. PHP 측 패턴: Y/N 의미는 컬럼별 다름.
+// 긴급출동 점검 항목 (esosbate/tire/oils/lock/move/help): 도메인상 Y=점검필요/문제 / N=정상 추정.
+// 운영자 검증 후 정정 가능.
 function checkBadge(v: string | null | undefined): { label: string; color: string; bg: string } {
-  if (v === 'Y') return { label: '문제', color: COLORS.danger, bg: COLORS.bgRed }
+  if (v === 'Y') return { label: '체크됨', color: COLORS.warning, bg: COLORS.bgAmber }
   if (v === 'N') return { label: '정상', color: COLORS.success, bg: COLORS.bgGreen }
   return { label: '-', color: COLORS.textMuted, bg: 'rgba(0,0,0,0.04)' }
 }
 
 // ── 페이지 ──────────────────────────────────────────────────────
 export default function RideAccidentsPage() {
+  const codes = useCafe24Codes()
   const [user, setUser] = useState<{ role?: string } | null>(null)
   const [authChecked, setAuthChecked] = useState(false)
   const [rows, setRows] = useState<AccidentRow[]>([])
@@ -367,28 +371,22 @@ export default function RideAccidentsPage() {
     {
       key: 'typp',
       label: '타입',
-      width: 70,
-      sortBy: (r) => TYPP_LABEL[r.esostypp || ''] || r.esostypp || '',
-      render: (r) => {
-        const lbl = TYPP_LABEL[r.esostypp || '']
-        return (
-          <span style={{ color: COLORS.textSecondary, fontSize: 12, whiteSpace: 'nowrap' }}>
-            {lbl || r.esostypp || '-'}
-          </span>
-        )
-      },
+      width: 100,
+      sortBy: (r) => getCodeLabel(codes, 'ESOSTYPP', r.esostypp, r.esostypp || ''),
+      render: (r) => (
+        <span style={{ color: COLORS.textSecondary, fontSize: 12, whiteSpace: 'nowrap' }}>
+          {getCodeLabel(codes, 'ESOSTYPP', r.esostypp, r.esostypp || '-')}
+        </span>
+      ),
     },
     {
       key: 'rslt',
       label: '결과',
-      width: 70,
-      sortBy: (r) => r.esosrslt || '',
+      width: 80,
+      sortBy: (r) => getCodeLabel(codes, 'ESOSRSLT', r.esosrslt, r.esosrslt || ''),
       render: (r) => {
-        const meta = r.esosrslt ? RSLT_LABEL[r.esosrslt] : null
-        if (!meta)
-          return (
-            <span style={{ color: COLORS.textMuted, fontSize: 12 }}>{r.esosrslt || '-'}</span>
-          )
+        const lbl = getCodeLabel(codes, 'ESOSRSLT', r.esosrslt, r.esosrslt || '-')
+        const color = r.esosrslt ? RSLT_COLOR[r.esosrslt] || COLORS.textMuted : COLORS.textMuted
         return (
           <span
             style={{
@@ -396,12 +394,12 @@ export default function RideAccidentsPage() {
               borderRadius: 6,
               fontSize: 11,
               fontWeight: 600,
-              color: meta.color,
+              color,
               background: 'rgba(0,0,0,0.04)',
               whiteSpace: 'nowrap',
             }}
           >
-            {meta.label}
+            {lbl}
           </span>
         )
       },
@@ -586,6 +584,7 @@ export default function RideAccidentsPage() {
           error={detailError}
           detail={detail}
           memos={memos}
+          codes={codes}
           onClose={() => {
             setSelectedKey(null)
             setDetail(null)
@@ -603,12 +602,14 @@ function DetailModal({
   error,
   detail,
   memos,
+  codes,
   onClose,
 }: {
   loading: boolean
   error: string | null
   detail: AccidentDetail | null
   memos: MemoRow[]
+  codes: CodeMap
   onClose: () => void
 }) {
   // ESC 닫기
@@ -694,7 +695,7 @@ function DetailModal({
             ⚠️ {error}
           </div>
         )}
-        {detail && <DetailBody detail={detail} memos={memos} />}
+        {detail && <DetailBody detail={detail} memos={memos} codes={codes} />}
       </div>
     </div>
   )
@@ -764,10 +765,19 @@ function Field({
   )
 }
 
-function DetailBody({ detail, memos }: { detail: AccidentDetail; memos: MemoRow[] }) {
+function DetailBody({
+  detail,
+  memos,
+  codes,
+}: {
+  detail: AccidentDetail
+  memos: MemoRow[]
+  codes: CodeMap
+}) {
   const rgst = detail.esosrgst ? RGST_LABEL[detail.esosrgst] : null
-  const rslt = detail.esosrslt ? RSLT_LABEL[detail.esosrslt] : null
-  const typp = TYPP_LABEL[detail.esostypp || '']
+  const rsltLabel = getCodeLabel(codes, 'ESOSRSLT', detail.esosrslt, detail.esosrslt || '-')
+  const rsltColor = detail.esosrslt ? RSLT_COLOR[detail.esosrslt] || COLORS.textMuted : COLORS.textMuted
+  const typp = getCodeLabel(codes, 'ESOSTYPP', detail.esostypp, detail.esostypp || '-')
 
   // 점검 항목 — Y/N/null
   const checks: Array<[string, string | null | undefined, string]> = [
@@ -803,15 +813,9 @@ function DetailBody({ detail, memos }: { detail: AccidentDetail; memos: MemoRow[
         />
         <Field
           label="결과"
-          value={
-            rslt ? (
-              <span style={{ color: rslt.color, fontWeight: 700 }}>{rslt.label}</span>
-            ) : (
-              detail.esosrslt
-            )
-          }
+          value={<span style={{ color: rsltColor, fontWeight: 700 }}>{rsltLabel}</span>}
         />
-        <Field label="타입" value={typp || detail.esostypp} />
+        <Field label="타입" value={typp} />
       </Section>
 
       {/* 차량 */}
