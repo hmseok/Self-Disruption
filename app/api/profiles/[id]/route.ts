@@ -52,6 +52,8 @@ export async function PATCH(
       'role', 'is_active', 'is_approved', 'status',
       'department', 'position', 'department_id', 'position_id',
       'avatar_url', 'team', 'regions', 'availability', 'max_cases', 'specialities',
+      // 2026-05-06 PR-B3 — 인사 정보
+      'hire_date', 'resign_date', 'resign_reason', 'emp_status',
     ]
 
     const sets: string[] = []

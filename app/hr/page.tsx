@@ -271,8 +271,11 @@ export default function HRMasterPage() {
 
   const filteredEmployees = useMemo(() => {
     let list = employees
-    if (statusFilter === 'active') list = list.filter(e => !!e.is_active)
-    else if (statusFilter === 'inactive') list = list.filter(e => !e.is_active)
+    // 재직 상태 필터 (active / on_leave / resigned)
+    if (statusFilter === 'active') list = list.filter(e => getEmpStatus(e) === 'active')
+    else if (statusFilter === 'on_leave') list = list.filter(e => getEmpStatus(e) === 'on_leave')
+    else if (statusFilter === 'resigned') list = list.filter(e => getEmpStatus(e) === 'resigned')
+    else if (statusFilter === 'inactive') list = list.filter(e => !e.is_active) // 옛 호환
     if (sosokFilter !== 'all') list = list.filter(e => getSoSokType(e) === sosokFilter)
     if (searchTerm.trim()) {
       const q = searchTerm.toLowerCase()
@@ -286,19 +289,41 @@ export default function HRMasterPage() {
     return list
   }, [employees, searchTerm, statusFilter, sosokFilter])
 
-  const activeCount = employees.filter(e => !!e.is_active).length
-  const inactiveCount = employees.filter(e => !e.is_active).length
+  // 재직 상태 헬퍼 (emp_status + 폴백 — 마이그레이션 미적용 환경 대응)
+  type EmpStatus = 'active' | 'on_leave' | 'resigned'
+  const getEmpStatus = (emp: any): EmpStatus => {
+    const s = emp.emp_status as EmpStatus | null
+    if (s === 'active' || s === 'on_leave' || s === 'resigned') return s
+    // 폴백: emp_status 미사용 환경 → resign_date 또는 is_active 로 추정
+    if (emp.resign_date) return 'resigned'
+    if (!emp.is_active) return 'resigned'
+    return 'active'
+  }
+  const STATUS_LABEL: Record<EmpStatus, string> = { active: '재직', on_leave: '휴직', resigned: '퇴사' }
+  const STATUS_STYLE_EMP: Record<EmpStatus, { bg: string; color: string }> = {
+    active:   { bg: 'rgba(34,197,94,0.12)', color: '#16a34a' },
+    on_leave: { bg: 'rgba(251,191,36,0.18)', color: '#a16207' },
+    resigned: { bg: 'rgba(239,68,68,0.12)', color: '#dc2626' },
+  }
+
+  const workingCount = employees.filter(e => getEmpStatus(e) === 'active').length
+  const onLeaveCount = employees.filter(e => getEmpStatus(e) === 'on_leave').length
+  const resignedCount = employees.filter(e => getEmpStatus(e) === 'resigned').length
   const pendingInvitationCount = invitations.filter((inv: any) => inv.status === 'pending').length
   const fmiCount = employees.filter(e => getSoSokType(e) === 'fmi').length
   const externalCount = employees.filter(e => getSoSokType(e) === 'external').length
   const adminSosokCount = employees.filter(e => getSoSokType(e) === 'admin').length
 
-  // ===== 필터 탭 — 활성/비활성 (기존) =====
+  // ===== 필터 탭 — 재직 상태 (재직 / 휴직 / 퇴사) =====
   const FILTER_ITEMS: FilterItem[] = [
     { key: 'all', label: '전체', count: employees.length },
-    { key: 'active', label: '활성', count: activeCount },
-    { key: 'inactive', label: '비활성', count: inactiveCount },
+    { key: 'active', label: '재직', count: workingCount },
+    { key: 'on_leave', label: '휴직', count: onLeaveCount },
+    { key: 'resigned', label: '퇴사', count: resignedCount },
   ]
+  // 옛 active/inactive 값 호환
+  const activeCount = workingCount
+  const inactiveCount = employees.filter(e => !e.is_active).length
   // ===== 소속 유형 필터 =====
   const SOSOK_FILTER_ITEMS: FilterItem[] = [
     { key: 'all',      label: '전체 소속',     count: employees.length },
@@ -354,6 +379,11 @@ export default function HRMasterPage() {
       department_id: emp.department_id || '',
       role: emp.role || 'user',
       is_active: !!emp.is_active,
+      // 2026-05-06 PR-B3 — 인사 정보
+      hire_date: emp.hire_date ? String(emp.hire_date).slice(0, 10) : '',
+      resign_date: emp.resign_date ? String(emp.resign_date).slice(0, 10) : '',
+      resign_reason: emp.resign_reason || '',
+      emp_status: emp.emp_status || 'active', // active / on_leave / resigned
     })
     // 급여 설정 prefetch
     try {
@@ -439,7 +469,17 @@ export default function HRMasterPage() {
     if (!editingEmp) return
     setSavingEdit(true)
     try {
-      const payload = { ...editForm, position_id: editForm.position_id || null, department_id: editForm.department_id || null }
+      // emp_status === 'resigned' 면 is_active=false 자동 동기화 (계정 비활성)
+      const isResigned = editForm.emp_status === 'resigned'
+      const payload = {
+        ...editForm,
+        position_id: editForm.position_id || null,
+        department_id: editForm.department_id || null,
+        hire_date: editForm.hire_date || null,
+        resign_date: editForm.resign_date || null,
+        resign_reason: editForm.resign_reason || null,
+        is_active: isResigned ? false : editForm.is_active,
+      }
       const res = await fetch(`/api/profiles/${editingEmp.id}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) },
         body: JSON.stringify(payload),
@@ -654,16 +694,31 @@ export default function HRMasterPage() {
       ),
     },
     {
-      key: 'status', label: '상태', width: 80, align: 'center',
-      render: (emp) => (
-        <span style={{
-          fontSize: 11, fontWeight: 600, padding: '3px 8px', borderRadius: 6,
-          background: !!emp.is_active ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)',
-          color: !!emp.is_active ? '#16a34a' : '#dc2626',
-        }}>
-          {!!emp.is_active ? '활성' : '비활성'}
-        </span>
-      ),
+      key: 'status', label: '재직상태', width: 80, align: 'center',
+      render: (emp) => {
+        const s = getEmpStatus(emp)
+        const sty = STATUS_STYLE_EMP[s]
+        return (
+          <span style={{
+            fontSize: 11, fontWeight: 600, padding: '3px 8px', borderRadius: 6,
+            background: sty.bg, color: sty.color,
+          }}>
+            {STATUS_LABEL[s]}
+          </span>
+        )
+      },
+    },
+    {
+      key: 'hire_date', label: '입사/퇴사', width: 130, align: 'center', hideOnMobile: true,
+      render: (emp) => {
+        if (!emp.hire_date && !emp.resign_date) return <span style={{ fontSize: 11, color: '#cbd5e1' }}>-</span>
+        return (
+          <div style={{ fontSize: 11, color: '#64748b', lineHeight: 1.4 }}>
+            {emp.hire_date && <div>입사 {String(emp.hire_date).slice(0, 10)}</div>}
+            {emp.resign_date && <div style={{ color: '#dc2626' }}>퇴사 {String(emp.resign_date).slice(0, 10)}</div>}
+          </div>
+        )
+      },
     },
     {
       key: 'created_at', label: '가입일', width: 120, align: 'right', hideOnMobile: true,
@@ -784,9 +839,10 @@ export default function HRMasterPage() {
       {/* Stats */}
       <DcStatStrip
         stats={[
-          { label: '전체 직원', value: employees.length, tint: 'blue' },
-          { label: '활성', value: activeCount, tint: 'green' },
-          { label: '비활성', value: inactiveCount, tint: 'red' },
+          { label: '전체', value: employees.length, tint: 'blue' },
+          { label: '재직', value: workingCount, tint: 'green' },
+          { label: '휴직', value: onLeaveCount, tint: 'amber' },
+          { label: '퇴사', value: resignedCount, tint: 'red' },
           { label: '대기중 초대', value: pendingInvitationCount, tint: 'amber' },
         ]}
         actions={[
@@ -1443,12 +1499,13 @@ export default function HRMasterPage() {
                     </select>
                   </div>
                   <div>
-                    <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#64748b', marginBottom: 6 }}>상태</label>
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#64748b', marginBottom: 6 }}>계정 활성</label>
                     <select value={editForm.is_active ? 'active' : 'inactive'} onChange={e => setEditForm({ ...editForm, is_active: e.target.value === 'active' })}
                       style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, background: 'rgba(255,255,255,0.6)', outline: 'none' }}>
-                      <option value="active">활성</option>
-                      <option value="inactive">비활성</option>
+                      <option value="active">로그인 가능</option>
+                      <option value="inactive">로그인 차단</option>
                     </select>
+                    <span style={{ fontSize: 10, color: '#94a3b8', display: 'block', marginTop: 4 }}>※ 재직상태는 ↓ 인사 정보에서</span>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
@@ -1469,6 +1526,60 @@ export default function HRMasterPage() {
                     </select>
                   </div>
                 </div>
+                {/* § 인사 정보 — 입사일 / 퇴사일 / 재직상태 (2026-05-06 PR-B3) */}
+                <div style={{ borderTop: '1px solid rgba(0,0,0,0.06)', paddingTop: 16 }}>
+                  <h4 style={{ fontSize: 13, fontWeight: 700, color: '#1e293b', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    📅 인사 정보
+                  </h4>
+                  <div className="grid grid-cols-2 gap-3" style={{ marginBottom: 12 }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#64748b', marginBottom: 6 }}>입사일</label>
+                      <input type="date" value={editForm.hire_date || ''}
+                        onChange={e => setEditForm({ ...editForm, hire_date: e.target.value })}
+                        style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, outline: 'none', background: 'rgba(255,255,255,0.6)', boxSizing: 'border-box' }} />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#64748b', marginBottom: 6 }}>재직 상태</label>
+                      <select value={editForm.emp_status || 'active'}
+                        onChange={e => {
+                          const v = e.target.value
+                          setEditForm({
+                            ...editForm,
+                            emp_status: v,
+                            // 퇴사 선택 시 퇴사일 자동 오늘 (이미 있으면 유지)
+                            resign_date: v === 'resigned' ? (editForm.resign_date || new Date().toISOString().slice(0, 10)) : (v === 'active' ? '' : editForm.resign_date),
+                          })
+                        }}
+                        style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, background: 'rgba(255,255,255,0.6)', outline: 'none' }}>
+                        <option value="active">🟢 재직</option>
+                        <option value="on_leave">🟡 휴직</option>
+                        <option value="resigned">🔴 퇴사</option>
+                      </select>
+                    </div>
+                  </div>
+                  {/* 퇴사 선택 시 퇴사일 + 사유 입력 */}
+                  {editForm.emp_status === 'resigned' && (
+                    <div style={{ background: 'rgba(254,226,226,0.4)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 10, padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#dc2626', marginBottom: 6 }}>퇴사일</label>
+                        <input type="date" value={editForm.resign_date || ''}
+                          onChange={e => setEditForm({ ...editForm, resign_date: e.target.value })}
+                          style={{ width: '100%', padding: 10, border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, fontSize: 13, outline: 'none', background: 'rgba(255,255,255,0.8)', boxSizing: 'border-box' }} />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#dc2626', marginBottom: 6 }}>퇴사 사유</label>
+                        <input value={editForm.resign_reason || ''}
+                          onChange={e => setEditForm({ ...editForm, resign_reason: e.target.value })}
+                          placeholder="예: 자진퇴사 / 이직 / 계약만료"
+                          style={{ width: '100%', padding: 10, border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, fontSize: 13, outline: 'none', background: 'rgba(255,255,255,0.8)', boxSizing: 'border-box' }} />
+                      </div>
+                      <p style={{ fontSize: 11, color: '#ef4444', margin: 0 }}>
+                        ⚠ 퇴사 처리 시 자동으로 계정 비활성 (is_active = false) 됩니다.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
                 {/* 정보 카드 — Glass Level 1 */}
                 <div style={{ background: 'rgba(255,255,255,0.40)', borderRadius: 10, padding: 12, border: '1px solid rgba(0,0,0,0.05)', boxShadow: 'inset 1px 1px 3px rgba(0,0,0,0.04)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>

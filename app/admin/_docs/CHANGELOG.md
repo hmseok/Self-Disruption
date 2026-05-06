@@ -1,5 +1,36 @@
 # /admin 모듈 CHANGELOG
 
+## 2026-05-06 — PR-B3 인사 정보 (입사일/퇴사일/재직상태)
+
+사용자 요청:
+> "입사,퇴사 이런 ㅎㅎ 뭔가 인사적인 내용도 있으면 좋을것같은데 퇴사직원도 있고 해서"
+
+마이그레이션:
+- migrations/2026-05-06_profiles_hr_fields.sql — 멱등 (IF NOT EXISTS)
+  · hire_date DATE NULL — 입사일
+  · resign_date DATE NULL — 퇴사일
+  · resign_reason VARCHAR(200) — 퇴사 사유
+  · emp_status VARCHAR(16) DEFAULT 'active' — active/on_leave/resigned
+  · INDEX idx_profiles_emp_status
+
+API:
+- /api/profiles/[id]/route.ts — PATCH 화이트리스트에 4개 컬럼 추가
+
+UI (/hr 페이지):
+- Stats: 「전체 / 재직 / 휴직 / 퇴사」 (4개)
+- 재직상태 필터: [전체] [재직] [휴직] [퇴사]
+- 「재직상태」 컬럼 (재직/휴직/퇴사 — 색상 구분)
+- 「입사/퇴사」 컬럼 (날짜 표시)
+- 모달 § 기본정보 안 「📅 인사 정보」 섹션 신설:
+  · 입사일 + 재직 상태 (active/on_leave/resigned)
+  · 퇴사 선택 시 퇴사일 + 사유 입력 (빨간 박스)
+  · 퇴사 처리 시 자동 is_active=false 동기화
+- 「상태」 → 「계정 활성」 으로 명칭 변경 (재직상태와 분리)
+
+폴백: emp_status 미적용 환경 → resign_date / is_active 로 추정
+
+
+
 ## 2026-05-05 — PR-B1 통합 페이지 (옵션 A 재해석)
 
 ### 사용자 명시 의도
