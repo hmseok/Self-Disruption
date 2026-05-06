@@ -245,11 +245,35 @@ export default function HRMasterPage() {
     } catch {}
   }
 
+  // ===== 「소속 유형」 헬퍼 =====
+  // FMI = 본 회사 정직원 (급여 모달 노출)
+  // 외부 매니저 = 라이드주식회사 부서 (본 ERP 권한만, 급여 본 시스템 X)
+  // 시스템 관리자 = role='admin' (GOD ADMIN — 급여 무관)
+  type SoSokType = 'fmi' | 'external' | 'admin'
+  const getSoSokType = (emp: any): SoSokType => {
+    if (emp.role === 'admin') return 'admin'
+    const dept = emp.department?.name || ''
+    if (dept === '라이드주식회사' || /라이드/.test(dept)) return 'external'
+    return 'fmi'
+  }
+  const SOSOK_LABEL: Record<SoSokType, string> = { fmi: 'FMI 직원', external: '외부 매니저', admin: '시스템 관리자' }
+  const SOSOK_STYLE: Record<SoSokType, { bg: string; color: string }> = {
+    fmi:      { bg: 'rgba(34,197,94,0.12)', color: '#16a34a' },
+    external: { bg: 'rgba(168,85,247,0.12)', color: '#9333ea' },
+    admin:    { bg: 'rgba(14,165,233,0.12)', color: '#0284c7' },
+  }
+  // 외부 매니저 + admin 은 급여 모달 § 급여 설정 노출 안 함
+  const showSalaryTab = (emp: any) => getSoSokType(emp) === 'fmi' && (emp.role === 'user' || emp.role === 'master')
+
   // ===== 검색 + 필터 로직 =====
+  // sosokFilter: all / fmi / external / admin (소속 유형)
+  const [sosokFilter, setSosokFilter] = useState<'all' | SoSokType>('all')
+
   const filteredEmployees = useMemo(() => {
     let list = employees
     if (statusFilter === 'active') list = list.filter(e => !!e.is_active)
     else if (statusFilter === 'inactive') list = list.filter(e => !e.is_active)
+    if (sosokFilter !== 'all') list = list.filter(e => getSoSokType(e) === sosokFilter)
     if (searchTerm.trim()) {
       const q = searchTerm.toLowerCase()
       list = list.filter(e =>
@@ -260,17 +284,27 @@ export default function HRMasterPage() {
       )
     }
     return list
-  }, [employees, searchTerm, statusFilter])
+  }, [employees, searchTerm, statusFilter, sosokFilter])
 
   const activeCount = employees.filter(e => !!e.is_active).length
   const inactiveCount = employees.filter(e => !e.is_active).length
   const pendingInvitationCount = invitations.filter((inv: any) => inv.status === 'pending').length
+  const fmiCount = employees.filter(e => getSoSokType(e) === 'fmi').length
+  const externalCount = employees.filter(e => getSoSokType(e) === 'external').length
+  const adminSosokCount = employees.filter(e => getSoSokType(e) === 'admin').length
 
-  // ===== 필터 탭 =====
+  // ===== 필터 탭 — 활성/비활성 (기존) =====
   const FILTER_ITEMS: FilterItem[] = [
     { key: 'all', label: '전체', count: employees.length },
     { key: 'active', label: '활성', count: activeCount },
     { key: 'inactive', label: '비활성', count: inactiveCount },
+  ]
+  // ===== 소속 유형 필터 =====
+  const SOSOK_FILTER_ITEMS: FilterItem[] = [
+    { key: 'all',      label: '전체 소속',     count: employees.length },
+    { key: 'fmi',      label: '🏢 FMI 직원',   count: fmiCount },
+    { key: 'external', label: '👥 외부 매니저', count: externalCount },
+    { key: 'admin',    label: '🔧 시스템 관리자', count: adminSosokCount },
   ]
 
   // ===== 직원 초대 =====
@@ -567,19 +601,25 @@ export default function HRMasterPage() {
   // ===== NeuDataTable 컬럼 정의 =====
   const employeeColumns: TableColumn<any>[] = [
     {
-      key: 'name', label: '직원', width: '35%',
+      key: 'name', label: '직원', width: '32%',
       render: (emp) => {
-        const rc = ROLE_COLORS[emp.role] || ROLE_COLORS.user
-        const avatarBg = emp.role === 'admin' ? '#0ea5e9' : emp.role === 'master' ? '#2563eb' : '#94a3b8'
+        const sosok = getSoSokType(emp)
+        const sty = SOSOK_STYLE[sosok]
+        const avatarBg = sosok === 'admin' ? '#0ea5e9' : sosok === 'external' ? '#9333ea' : sosok === 'fmi' && emp.role === 'master' ? '#2563eb' : '#22c55e'
         return (
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{ width: 36, height: 36, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 800, fontSize: 13, flexShrink: 0, background: avatarBg }}>
               {(emp.display_name || emp.email || '?')[0].toUpperCase()}
             </div>
             <div style={{ minWidth: 0 }}>
-              <div style={{ fontWeight: 600, fontSize: 13, color: emp.employee_name ? '#1e293b' : '#94a3b8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {emp.display_name || '(이름 미설정)'}
-                {!emp.employee_name && <span style={{ fontSize: 10, color: '#d97706', marginLeft: 6, fontWeight: 500 }}>이름 미등록</span>}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                <span style={{ fontWeight: 600, fontSize: 13, color: emp.employee_name ? '#1e293b' : '#94a3b8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {emp.display_name || '(이름 미설정)'}
+                </span>
+                <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4, background: sty.bg, color: sty.color, whiteSpace: 'nowrap', flexShrink: 0 }}>
+                  {SOSOK_LABEL[sosok]}
+                </span>
+                {!emp.employee_name && <span style={{ fontSize: 10, color: '#d97706', fontWeight: 500 }}>이름 미등록</span>}
               </div>
               <div style={{ fontSize: 12, color: '#94a3b8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {emp.email}
@@ -590,7 +630,7 @@ export default function HRMasterPage() {
       },
     },
     {
-      key: 'role', label: '역할', width: 100, align: 'center',
+      key: 'role', label: '권한', width: 90, align: 'center',
       render: (emp) => {
         const rc = ROLE_COLORS[emp.role] || ROLE_COLORS.user
         const rl = ROLE_LABELS[emp.role] || ROLE_LABELS.user
@@ -771,7 +811,17 @@ export default function HRMasterPage() {
 
       {/* ─── 탭 1: 직원 관리 ─── */}
       {topTab === 'employees' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {/* 소속 유형 필터 — FMI / 외부 매니저 / 시스템 관리자 구분 */}
+          <DcToolbar
+            search=""
+            onSearchChange={() => {}}
+            noSearch
+            filters={SOSOK_FILTER_ITEMS}
+            activeFilter={sosokFilter}
+            onFilterChange={(key) => setSosokFilter(key as 'all' | SoSokType)}
+          />
+          {/* 검색 + 활성/비활성 필터 */}
           <DcToolbar
             search={searchTerm}
             onSearchChange={setSearchTerm}
@@ -1346,12 +1396,12 @@ export default function HRMasterPage() {
               <button onClick={closeEditModal} style={{ fontSize: 22, fontWeight: 300, color: '#94a3b8', background: 'none', border: 'none', cursor: 'pointer', lineHeight: 1, width: 32, height: 32, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>&times;</button>
             </div>
 
-            {/* 섹션 탭 — 기본정보 / 급여설정 (user/master) / 페이지권한 (user 만) */}
-            {/* admin (GOD) 은 「기본정보」 만 노출 — 시스템 관리자라 급여/권한 본인 모달에서 무관 */}
+            {/* 섹션 탭 — 기본정보 / 급여설정 (FMI 직원만) / 페이지권한 (user 만) */}
+            {/* 외부 매니저 (라이드주식회사) + admin (GOD) 은 § 급여 미노출 — 본 ERP 급여 받지 않음 */}
             <div style={{ display: 'flex', borderBottom: '1px solid rgba(0,0,0,0.06)', background: 'rgba(255,255,255,0.30)', flexShrink: 0 }}>
               {([
                 { key: 'profile', label: '👤 기본정보' },
-                ...(editingEmp.role === 'user' || editingEmp.role === 'master' ? [{ key: 'salary', label: '💼 급여 설정' }] : []),
+                ...(showSalaryTab(editingEmp) ? [{ key: 'salary', label: '💼 급여 설정' }] : []),
                 ...(editingEmp.role === 'user' ? [{ key: 'permissions', label: '🔐 페이지 권한' }] : []),
               ] as Array<{ key: EditSection; label: string }>).map(t => (
                 <button key={t.key} onClick={() => setEditSection(t.key)}
