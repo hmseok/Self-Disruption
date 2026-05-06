@@ -944,16 +944,31 @@ export default function PayrollOps() {
                   if (!p?.is_active) return true
                   return false
                 }
-                const groups: Record<string, { count: number; total: number; total_count: number }> = {}
-                let excludedCount = 0
+                // 1단계 — employee_id 별 dedup (중복 row 발생 시 base_salary 큰 row 선택)
+                const dedup: Record<string, any> = {}
                 for (const s of settings) {
+                  const k = s.employee_id || s.id
+                  if (!k) continue
+                  const cur = Number(s.base_salary || 0)
+                  const existing = dedup[k]
+                  if (!existing || cur > Number(existing.base_salary || 0)) {
+                    dedup[k] = s
+                  }
+                }
+                const uniqSettings = Object.values(dedup)
+                const dedupCount = settings.length - uniqSettings.length
+                // 2단계 — 재직 + FMI 직원만
+                const groups: Record<string, { count: number; total: number }> = {}
+                let excludedCount = 0
+                for (const s of uniqSettings) {
                   const profile = s.employee_id ? empMap[s.employee_id] : null
-                  // 매칭 안 되거나 / 퇴사 / 외부매니저 / admin role → 제외
                   const skip = !profile || isResigned(profile) || isExternal(profile) || profile.role === 'admin'
                   if (skip) { excludedCount++; continue }
+                  const baseAmt = Number(s.base_salary || 0)
+                  if (baseAmt <= 0) { excludedCount++; continue }
                   const t = s.employment_type || '정규직'
-                  if (!groups[t]) groups[t] = { count: 0, total: 0, total_count: 0 }
-                  groups[t].count++; groups[t].total += Number(s.base_salary || 0)
+                  if (!groups[t]) groups[t] = { count: 0, total: 0 }
+                  groups[t].count++; groups[t].total += baseAmt
                 }
                 const maxTotal = Math.max(...Object.values(groups).map(g => g.total), 1)
                 if (Object.keys(groups).length === 0) {
@@ -971,9 +986,10 @@ export default function PayrollOps() {
                       </div>
                     </div>
                   ))}
-                  {excludedCount > 0 && (
+                  {(excludedCount > 0 || dedupCount > 0) && (
                     <p style={{ fontSize: 10, color: C.gray400, marginTop: 8 }}>
-                      ⚠ 제외 {excludedCount}건 (퇴사/외부매니저/admin/매핑누락 → 고용통계에서 제외)
+                      ⚠ {dedupCount > 0 && <>중복 {dedupCount}건 dedup (직원당 최대값) · </>}
+                      제외 {excludedCount}건 (퇴사/외부매니저/admin/0원/매핑누락)
                     </p>
                   )}
                 </>)
