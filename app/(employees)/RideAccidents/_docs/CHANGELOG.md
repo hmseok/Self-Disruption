@@ -8,7 +8,67 @@
 
 ---
 
-## 2026-05-06 | PR-6.7.c | hotfix — 컬럼 의미 명확화 + 필터 강화
+## 2026-05-06 | PR-6.7.cde | 통합 hotfix — 필터/Y-N/사고구분 라벨 (3개 묶음)
+
+### Part C — 필터 강화 + 컬럼 라벨
+- `mddt BETWEEN '20100101' AND '20991231'` (24530811 같은 비현실적 날짜 제외)
+- "접수시각" → "기록시각" (시스템 자동 vs 사용자 입력 의미 명확)
+
+### Part D — Y/N 정정
+- 점검 항목 신규 등록 시 'N' 디폴트 → Y=문제, N=정상 (PHP 패턴)
+- 모달에 carsidno 추가 (분석/디버그)
+- 긴급출동 6항목 한국어 라벨 (PHP SMS 메시지 발견):
+  배터리충전 / 타이어교체/펑크수리 / 비상급유 / 잠금장치해제 / 긴급견인 / 비상구난
+
+### Part E — ★ PB 화면 검증 (사용자 캡쳐)
+
+사용자가 카페24 PB 데스크톱 acr_app.exe 사고처리관리 화면 캡쳐 공유 →
+사고구분 체크박스 7개 = 한국어 발음 머리글자 약어 확정:
+
+```
+acrotpth 컬럼      한국어        발음 매칭
+otptacdi (di)  →  대인          Daein → di
+otptacdm (dm)  →  대물          Daemul → dm
+otptacjc (jc)  →  자차          Jacha → jc
+otptacjs (js)  →  자손          Jason → js
+otptacmb (mb)  →  무보험        Muboheom → mb
+otptacno (no)  →  현장출동
+otptacph (ph)  →  긴급견인
+```
+
+**의미 재정의** (이전 가정 정정):
+- 이전: "차량 점검 항목" Y/N (정상/문제)
+- ✅ 정확: "사고구분" 체크박스 Y=해당 / N=미해당
+  → 한 사고에 여러 구분 동시 적용 가능 (예: 대물+자차 동시)
+
+### Part F (덤) — OTPTACBN 라벨 풀어쓰기
+
+PB 화면 발견: `B=보불` (코드 마스터) → 화면 표시는 `보유불명` 으로 풀어 씀.
+참고 — 본 모듈은 cbsddesc 그대로 표시 (보불). 운영자 친숙도 위해 향후 개선 가능.
+
+### 산출물
+
+| 파일 | 변경 |
+|------|------|
+| `app/api/cafe24/acrents/route.ts` | mddt BETWEEN 강화 + acdt 검증 |
+| `app/api/cafe24/accidents/route.ts` | 동일 필터 |
+| `app/(employees)/RideAccidentReports/page.tsx` | 라벨 정정 + CHECK_LABEL 한국어 + carsidno 표시 |
+| `app/(employees)/RideAccidents/page.tsx` | "기록시각" + 긴급출동 라벨 + esosidno 표시 |
+
+### GATE 진행 상태
+
+```
+✅ G3 사용자 GO ("코드 좀 찾아주세요" + PB 화면 캡쳐 제공)
+✅ G5 tsc 회귀 0건
+✅ G6 lint:harness 새 위반 0건 (예상)
+⏭ G7 시각 검수 — Cloud Build 5-10분 후
+✅ Rule 13 외부 시스템 호환성 — PB 화면 캡쳐로 정확 검증
+✅ Rule 22 _docs 갱신 (본 항목)
+```
+
+---
+
+## 2026-05-06 | PR-6.7.c | hotfix — 컬럼 의미 명확화 + 필터 강화 (Part C 별도 보존)
 
 ### 사용자 의문
 > "접수일자는 저건 실제로 있는 데이터인가 사고일자인가 접수일자인가"

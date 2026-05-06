@@ -111,27 +111,30 @@ const RGST_LABEL: Record<string, { label: string; color: string }> = {
   C: { label: '취소', color: COLORS.danger },
   X: { label: '삭제', color: COLORS.neutral },
 }
-// PR-6.7.d — Y/N 매핑 재정정.
-// PHP ACR0101A_dataacceptA 신규 등록 시 acdi/dm/jc/js/mb/no/ph = 'N' 디폴트.
-// 분포: acdi N 92% / acjs N 97% (대다수 N — 정상/체크안함)
-// → ✅ Y=문제 발견, N=정상/미점검
+// PR-6.7.e — Y/N 매핑 재정정 (사용자 PB 화면 검증).
+// 사고구분 체크박스 7개 = otptacdi/dm/jc/js/mb/no/ph
+//   Y = 해당 (대인 사고 발생 / 대물 사고 발생 / ...)
+//   N = 미해당
 // (otptacrn 만 예외: Y=운행가능 / N=운행불가능 — 별도 처리)
 function checkBadge(v: string | null | undefined) {
-  if (v === 'Y') return { label: '문제', color: COLORS.danger, bg: COLORS.bgRed }
-  if (v === 'N') return { label: '정상', color: COLORS.success, bg: COLORS.bgGreen }
+  if (v === 'Y') return { label: '해당', color: COLORS.primary, bg: COLORS.bgBlue }
+  if (v === 'N') return { label: '미해당', color: COLORS.textMuted, bg: 'rgba(0,0,0,0.04)' }
   return { label: '-', color: COLORS.textMuted, bg: 'rgba(0,0,0,0.04)' }
 }
 
-// PR-6.7.d — 점검 항목 1자 약어 라벨
-// 운영 도메인 지식 — 사용자(운영자) 검증 후 정정 가능. 일단 약어 그대로 + 추정 라벨.
+// PR-6.7.e — 점검 항목 7개 한국어 라벨 (사용자 PB 데스크톱 acr_app.exe 화면 검증 완료)
+// PB 화면 사고구분 체크박스 7개 = 한국어 발음 머리글자 약어:
+//   di = 대인 (Daein) / dm = 대물 (Daemul) / jc = 자차 (Jacha) / js = 자손 (Jason)
+//   mb = 무보험 (Muboheom) / no = 현장출동 / ph = 긴급견인
+// otptacdi/dm/jc/js/mb/no/ph 컬럼 각각 Y=해당 사고 구분에 해당 / N=미해당
 const CHECK_LABEL: Record<string, string> = {
-  di: 'di',  // ? 운영자 확인 필요
-  dm: 'dm',
-  jc: 'jc',
-  js: 'js',
-  mb: 'mb',
-  no: 'no',
-  ph: 'ph',
+  di: '대인',
+  dm: '대물',
+  jc: '자차',
+  js: '자손',
+  mb: '무보험',
+  no: '현장출동',
+  ph: '긴급견인',
 }
 
 export default function RideAccidentReportsPage() {
@@ -799,7 +802,7 @@ function DetailBody({
     ['no', detail.otptacno],
     ['ph', detail.otptacph],
   ]
-  const issues = checks.filter(([, v]) => v === 'Y') // PR-6.7.d — Y 가 문제 (N 디폴트 패턴)
+  const issues = checks.filter(([, v]) => v === 'Y') // PR-6.7.e — Y 가 "해당 사고구분"
 
   return (
     <>
@@ -850,7 +853,7 @@ function DetailBody({
         <Field label="고객" value={detail.cust_name} />
       </Section>
 
-      <Section title={`차량 점검 ${issues.length > 0 ? `· 문제 ${issues.length}건` : ''}`}>
+      <Section title={`사고구분 ${issues.length > 0 ? `· ${issues.length}건` : ''}`}>
         <div
           style={{
             display: 'flex',
