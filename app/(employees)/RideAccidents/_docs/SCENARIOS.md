@@ -94,7 +94,7 @@ PR-6.X 모든 페이지:
 
 흐름:
   Step 1. 카페24 측 PB 에서 사고 접수 (aceesosh INSERT)
-  Step 2. FMI ERP /Cafe24 ERP/accidents 페이지 진입
+  Step 2. FMI ERP /RideAccidents 페이지 진입
   Step 3. /api/cafe24/accidents fetch (캐시 30~60초)
   Step 4. 접수 건 목록 표시 — 글래스 L4 NeuDataTable
             컬럼: 접수일/협력업체/고객명/차량/상태/등록자
@@ -106,7 +106,7 @@ PR-6.X 모든 페이지:
 
 영향 받는 페이지:
   - app/operations/intake/page.tsx (broken call 해소)
-  - app/(employees)/Cafe24 ERP/accidents/page.tsx (신설)
+  - app/(employees)/RideAccidents/accidents/page.tsx (신설)
 ```
 
 ### Scenario D — 통합 대시보드 (KPI 위젯) ★ PR-6.4 우선
@@ -117,7 +117,7 @@ PR-6.X 모든 페이지:
 
 흐름:
   Step 1. FMI 진입 → 사이드바 "카페24 ERP" → "대시보드"
-  Step 2. /Cafe24 ERP/dashboard 진입
+  Step 2. /RideAccidents/dashboard 진입
   Step 3. 동시 fetch:
             - /api/cafe24/accidents/today (오늘 접수)
             - /api/cafe24/orders/active (진행 중 대차)
@@ -159,8 +159,8 @@ TBD: 카페24 단계적 폐기 타임라인 결정 (Q6=D 미정) 후 설계
 
 ```
 PR-6.2: lib/cafe24-db.ts (mysql2 read-only pool + 단일 진입점)
-PR-6.3: /api/cafe24/accidents + /Cafe24 ERP/accidents 페이지 (Scenario A)
+PR-6.3: /api/cafe24/accidents + /RideAccidents 페이지 (Scenario A)
         ★ broken call (operations/intake) 해소 — 가장 가시적 결과
-PR-6.4: /api/cafe24/dashboard/* + /Cafe24 ERP/dashboard 페이지 (Scenario D)
+PR-6.4: /api/cafe24/dashboard/* + /RideAccidents/dashboard 페이지 (Scenario D)
 PR-6.5+: 보험 / 정산 / 차량 마스터 등 점진 확장
 ```

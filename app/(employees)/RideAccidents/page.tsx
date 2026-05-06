@@ -1,15 +1,18 @@
 'use client'
 
 /**
- * /Cafe24 ERP/accidents
+ * /RideAccidents
  *
- * 카페24 ERP 의 사고 접수 (aceesosh) 목록 — read-only.
+ * 라이드 사고접수 목록 — 카페24 ERP (aceesosh) read-only.
  *
+ * 사용자 노출 명칭: "라이드 사고접수"
+ * 백엔드 데이터 source: 카페24 ERP (skyautosvc.co.kr) aceesosh
+ *
+ * - 사이드바 그룹: Employee of Ride Inc. > CX팀
  * - admin 전용 (Q8=D)
  * - 캐시 30s (Q7=A 분당 변동 정책)
  * - 모든 컬럼 sortBy 의무 (CLAUDE.md 규칙 18)
  * - Glass L4 NeuDataTable + Glass L2 필터바
- * - 카페24 측 데이터는 'C24' 보라 배지 표시
  */
 
 import { useEffect, useMemo, useState } from 'react'
@@ -270,19 +273,7 @@ export default function CafeAccidentsPage() {
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <span style={{ fontSize: 18, fontWeight: 800, color: COLORS.textPrimary }}>
-            🚨 카페24 ERP &gt; 사고 접수
-          </span>
-          <span
-            style={{
-              padding: '2px 8px',
-              borderRadius: 6,
-              fontSize: 11,
-              fontWeight: 700,
-              color: '#7c3aed',
-              background: 'rgba(124,58,237,0.10)',
-            }}
-          >
-            C24
+            🚨 라이드 사고접수
           </span>
         </div>
 

@@ -44,6 +44,15 @@ export interface ShiftSlot {
   category: ShiftCategory
   sort_order: number
   is_active: boolean
+  // PR-2SS-b — 안전 가드 (graceful — 마이그 미적용 시 undefined)
+  next_day_blocking_hours?: number       // 종료 후 N시간 안 다른 슬롯 시작 금지 (0=제약 X, 야간 디폴트 16)
+  max_consecutive_days?: number | null   // 연속 N일 한도 (PR-2SS-c 활용, 야간 디폴트 3)
+  // PR-2SS-d — 최소 경력 (개월)
+  min_seniority_months?: number          // 0=제약 없음 / 야간 디폴트 6 (신입 야간 금지)
+  // PR-2SS-e — 시간 분해 + 가산율 (KPI 보조용, 현재 가산율 0)
+  night_period_start?: string | null     // "HH:MM:SS" 가산 시간대 시작 (NULL=가산 없음)
+  night_period_end?: string | null       // "HH:MM:SS" 가산 시간대 종료
+  night_premium_rate?: number            // 0.50 = 50% 가산
 }
 
 export interface Worker {
@@ -69,6 +78,9 @@ export interface Worker {
   cycle_days_on?: number | null        // 외부 연속 근무일
   cycle_days_off?: number | null       // 외부 연속 휴무일
   cycle_start_date?: string | null     // 'YYYY-MM-DD' 사이클 1일차 (외부 근무 첫째 날)
+  // PR-2SS-c — 연속 한도 + 슬롯 거부 (graceful — 마이그 미적용 시 undefined)
+  max_consecutive_work_days?: number | null   // 워커별 연속 근무 한도 (NULL=무제한)
+  blocked_slot_ids?: string[] | null          // 절대 안 들어가는 슬롯 ID
   // preferred_dow_only 폐기 (실제 사용 사례 없음 — 데이터 분석 결과)
 }
 
@@ -97,6 +109,10 @@ export interface Assignment {
   note: string | null
   // PR-2QQ-b — 수동 lock (외부 직원 일정 등 자동 생성이 보존)
   manual_lock?: boolean
+  // PR-2SS-e — 시간 분해 (KPI 보조)
+  day_hours?: number | null      // 일반 시간
+  night_hours?: number | null    // 가산 시간대 시간
+  premium_hours?: number | null  // 가산 적용 후 (= night_hours × rate)
 }
 
 export interface Distribution {

@@ -7,7 +7,7 @@
 ## 현재 상태 (2026-05-05)
 
 ```
-app/(employees)/Cafe24 ERP/
+app/(employees)/RideAccidents/
 └── _docs/                          ← PR-6.0a + 6.1 산출물 (8 파일)
 ```
 
@@ -74,10 +74,10 @@ white-space: nowrap 우선
 
 ## PR-6.3 — 사고 접수 목록 화면 명세 (Scenario A)
 
-### 페이지: `/Cafe24 ERP/accidents`
+### 페이지: `/RideAccidents`
 
 ```
-파일: app/(employees)/Cafe24 ERP/accidents/page.tsx
+파일: app/(employees)/RideAccidents/accidents/page.tsx
 권한: 관리자 (Q8=D)
 
 레이아웃:
@@ -160,10 +160,10 @@ Response:
 
 ## PR-6.4 — 통합 대시보드 화면 명세 (Scenario D)
 
-### 페이지: `/Cafe24 ERP/dashboard`
+### 페이지: `/RideAccidents/dashboard`
 
 ```
-파일: app/(employees)/Cafe24 ERP/dashboard/page.tsx
+파일: app/(employees)/RideAccidents/dashboard/page.tsx
 권한: 관리자 (Q8=D)
 
 레이아웃:
@@ -187,10 +187,10 @@ Response:
   └─────────────────────────────────────────────┘
 
 각 KPI 카드 클릭 → 드릴다운:
-  오늘 접수    → /Cafe24 ERP/accidents?date=today
-  진행 대차    → /Cafe24 ERP/orders?status=active
-  미정산       → /Cafe24 ERP/settlements?status=pending
-  보류         → /Cafe24 ERP/orders?hold=Y
+  오늘 접수    → /RideAccidents?date=today
+  진행 대차    → /RideAccidents/orders?status=active
+  미정산       → /RideAccidents/settlements?status=pending
+  보류         → /RideAccidents/orders?hold=Y
 ```
 
 ### API: `GET /api/cafe24/dashboard`
@@ -233,8 +233,8 @@ Response:
 ## TBD — Phase 6.5+ 후속 화면
 
 ```
-PR-6.5: 대차 주문 목록 (/Cafe24 ERP/orders) — 헤더+라인 expandable + 청구액 계산
-PR-6.6: 정산 워크플로우 (/Cafe24 ERP/settlements) — Kanban 식 또는 status tab
-PR-6.7: 차량/고객/협력업체 마스터 (/Cafe24 ERP/masters/*)
+PR-6.5: 대차 주문 목록 (/RideAccidents/orders) — 헤더+라인 expandable + 청구액 계산
+PR-6.6: 정산 워크플로우 (/RideAccidents/settlements) — Kanban 식 또는 status tab
+PR-6.7: 차량/고객/협력업체 마스터 (/RideAccidents/masters/*)
 PR-6.8: 보험 처리 (Persona 3) — ajc 모듈
 ```

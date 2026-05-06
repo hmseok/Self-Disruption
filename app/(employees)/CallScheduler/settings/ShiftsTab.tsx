@@ -22,6 +22,15 @@ interface FormState {
   is_overnight: boolean
   category: 'day' | 'evening' | 'overnight'
   sort_order: number
+  // PR-2SS-b — 안전 가드
+  next_day_blocking_hours: number    // 종료 후 N시간 안 다른 슬롯 시작 금지 (0=제약 X)
+  max_consecutive_days: string       // 연속 N일 한도 ('' = 무제한)
+  // PR-2SS-d — 최소 경력
+  min_seniority_months: number       // 0=제약 없음 / 야간 디폴트 6
+  // PR-2SS-e — 시간 분해 + 가산
+  night_period_start: string         // "HH:MM" or '' = 가산 없음
+  night_period_end: string           // "HH:MM" or ''
+  night_premium_rate: number         // 0.0 ~ 2.0 (0.5 = 50% 가산)
 }
 
 const EMPTY_FORM: FormState = {
@@ -32,6 +41,12 @@ const EMPTY_FORM: FormState = {
   is_overnight: false,
   category: 'day',
   sort_order: 0,
+  next_day_blocking_hours: 0,
+  max_consecutive_days: '',
+  min_seniority_months: 0,
+  night_period_start: '',
+  night_period_end: '',
+  night_premium_rate: 0,
 }
 
 export default function ShiftsTab() {
@@ -72,6 +87,15 @@ export default function ShiftsTab() {
       is_overnight: s.is_overnight,
       category: s.category,
       sort_order: s.sort_order,
+      // PR-2SS-b — 안전 가드
+      next_day_blocking_hours: Number(s.next_day_blocking_hours || 0),
+      max_consecutive_days: s.max_consecutive_days != null ? String(s.max_consecutive_days) : '',
+      // PR-2SS-d — 최소 경력
+      min_seniority_months: Number(s.min_seniority_months || 0),
+      // PR-2SS-e — 시간 분해
+      night_period_start: s.night_period_start ? s.night_period_start.substring(0, 5) : '',
+      night_period_end: s.night_period_end ? s.night_period_end.substring(0, 5) : '',
+      night_premium_rate: Number(s.night_premium_rate || 0),
     })
   }
 
@@ -83,7 +107,7 @@ export default function ShiftsTab() {
     setSaving(true); setError(null)
     try {
       const auth = await getAuthHeader()
-      const payload = {
+      const payload: Record<string, any> = {
         code: editing.code.trim(),
         label: editing.label.trim(),
         start_time: editing.start_time,
@@ -91,6 +115,15 @@ export default function ShiftsTab() {
         is_overnight: editing.is_overnight,
         category: editing.category,
         sort_order: editing.sort_order,
+        // PR-2SS-b — 안전 가드
+        next_day_blocking_hours: editing.next_day_blocking_hours,
+        max_consecutive_days: editing.max_consecutive_days === '' ? null : Number(editing.max_consecutive_days),
+        // PR-2SS-d — 최소 경력
+        min_seniority_months: editing.min_seniority_months,
+        // PR-2SS-e — 시간 분해
+        night_period_start: editing.night_period_start || null,
+        night_period_end: editing.night_period_end || null,
+        night_premium_rate: editing.night_premium_rate,
       }
       const url = editing.id
         ? `/api/call-scheduler/shift-slots/${editing.id}`
@@ -209,6 +242,14 @@ export default function ShiftsTab() {
                             ...editing,
                             category: opt.value,
                             is_overnight: opt.value === 'overnight',
+                            // PR-2SS-b — overnight 자동 디폴트 16h / 3일 제안 (사용자가 0/'' 일 때만)
+                            next_day_blocking_hours: opt.value === 'overnight' && editing.next_day_blocking_hours === 0
+                              ? 16 : editing.next_day_blocking_hours,
+                            max_consecutive_days: opt.value === 'overnight' && editing.max_consecutive_days === ''
+                              ? '3' : editing.max_consecutive_days,
+                            // PR-2SS-d — overnight 자동 디폴트 6개월 제안
+                            min_seniority_months: opt.value === 'overnight' && editing.min_seniority_months === 0
+                              ? 6 : editing.min_seniority_months,
                           })}
                           style={{
                             flex: 1, padding: '6px 0', fontSize: 12, fontWeight: 700, borderRadius: 6,
@@ -239,6 +280,114 @@ export default function ShiftsTab() {
                      onChange={(e) => setEditing({ ...editing, sort_order: Number(e.target.value) })}
                      style={inputStyle} />
             </Field>
+          </div>
+
+          {/* PR-2SS-b — 안전 가드 (야간 슬롯 권장: 16h 휴식 + 연속 3일 한도) */}
+          <div style={{
+            ...GLASS.L1, borderRadius: 8, padding: 12, marginTop: 12,
+            border: `1px solid ${COLORS.borderAmber}`,
+            background: COLORS.bgAmber,
+          }}>
+            <div style={{
+              fontSize: 12, fontWeight: 800, color: COLORS.warning, marginBottom: 4,
+              display: 'flex', alignItems: 'center', gap: 6,
+            }}>
+              🛡 안전 가드
+              <span style={{ fontSize: 10, fontWeight: 500, color: COLORS.textMuted }}>
+                자동 생성 시 적용 — 야간 슬롯에 권장
+              </span>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <Field label="🌙 종료 후 휴식 (시간)">
+                <input type="number" min={0} max={48}
+                       value={editing.next_day_blocking_hours}
+                       onChange={(e) => setEditing({
+                         ...editing,
+                         next_day_blocking_hours: Math.max(0, Math.min(48, Number(e.target.value) || 0)),
+                       })}
+                       style={inputStyle}
+                       placeholder="0" />
+                <div style={{ fontSize: 10, color: COLORS.textMuted, marginTop: 2 }}>
+                  종료 후 N시간 안에 다른 슬롯 시작 금지 (0=제약 없음, 야간 권장 16)
+                </div>
+              </Field>
+              <Field label="📅 연속 한도 (일)">
+                <input type="number" min={1} max={31}
+                       value={editing.max_consecutive_days}
+                       onChange={(e) => setEditing({ ...editing, max_consecutive_days: e.target.value })}
+                       style={inputStyle}
+                       placeholder="무제한" />
+                <div style={{ fontSize: 10, color: COLORS.textMuted, marginTop: 2 }}>
+                  연속 N일 한도 (빈 칸=무제한, 야간 권장 3)
+                </div>
+              </Field>
+            </div>
+            {/* PR-2SS-d — 최소 경력 */}
+            <div style={{ marginTop: 10 }}>
+              <Field label="🌱 최소 근무 경력 (개월)">
+                <input type="number" min={0} max={120}
+                       value={editing.min_seniority_months}
+                       onChange={(e) => setEditing({
+                         ...editing,
+                         min_seniority_months: Math.max(0, Math.min(120, Number(e.target.value) || 0)),
+                       })}
+                       style={inputStyle}
+                       placeholder="0" />
+                <div style={{ fontSize: 10, color: COLORS.textMuted, marginTop: 2 }}>
+                  ride_employees.hire_date 기준 — 0=제약 없음, 야간 권장 6 (신입 야간 금지)
+                </div>
+              </Field>
+            </div>
+          </div>
+
+          {/* PR-2SS-e — 시간 분해 + 가산율 (KPI 보조용, 현재 가산율 0) */}
+          <div style={{
+            ...GLASS.L1, borderRadius: 8, padding: 12, marginTop: 10,
+            border: `1px solid ${COLORS.borderViolet}`,
+            background: COLORS.bgViolet,
+          }}>
+            <div style={{
+              fontSize: 12, fontWeight: 800, color: COLORS.textPrimary, marginBottom: 4,
+              display: 'flex', alignItems: 'center', gap: 6,
+            }}>
+              💰 시간 분해 + 가산율 (KPI 보조)
+              <span style={{ fontSize: 10, fontWeight: 500, color: COLORS.textMuted }}>
+                현재 운영: 가산율 없음 (0). 향후 정책 변경 시 매니저가 직접 설정
+              </span>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+              <Field label="🌃 가산 시작 (시간)">
+                <input type="time" value={editing.night_period_start}
+                       onChange={(e) => setEditing({ ...editing, night_period_start: e.target.value })}
+                       style={inputStyle}
+                       placeholder="--:--" />
+                <div style={{ fontSize: 10, color: COLORS.textMuted, marginTop: 2 }}>
+                  예: 22:00 (빈 칸=가산 없음)
+                </div>
+              </Field>
+              <Field label="🌅 가산 종료 (시간)">
+                <input type="time" value={editing.night_period_end}
+                       onChange={(e) => setEditing({ ...editing, night_period_end: e.target.value })}
+                       style={inputStyle}
+                       placeholder="--:--" />
+                <div style={{ fontSize: 10, color: COLORS.textMuted, marginTop: 2 }}>
+                  예: 06:00 (자정 넘음 OK)
+                </div>
+              </Field>
+              <Field label="📈 가산율">
+                <input type="number" min={0} max={2} step={0.05}
+                       value={editing.night_premium_rate}
+                       onChange={(e) => setEditing({
+                         ...editing,
+                         night_premium_rate: Math.max(0, Math.min(2, Number(e.target.value) || 0)),
+                       })}
+                       style={inputStyle}
+                       placeholder="0.00" />
+                <div style={{ fontSize: 10, color: COLORS.textMuted, marginTop: 2 }}>
+                  0.50 = 50% 가산 (현재 정책: 0)
+                </div>
+              </Field>
+            </div>
           </div>
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
             <button type="button" onClick={() => setEditing(null)} style={{
@@ -300,6 +449,32 @@ export default function ShiftsTab() {
                     )}>
                       {s.category === 'overnight' ? '야간' : s.category === 'evening' ? '저녁' : '주간'}
                     </span>
+                    {/* PR-2SS-b — 안전 가드 배지 */}
+                    {Number(s.next_day_blocking_hours || 0) > 0 && (
+                      <span style={{
+                        marginLeft: 4, fontSize: 9, padding: '1px 5px', borderRadius: 4,
+                        background: COLORS.bgAmber, color: COLORS.warning, fontWeight: 700,
+                      }} title="종료 후 휴식 의무">
+                        🌙{s.next_day_blocking_hours}h
+                      </span>
+                    )}
+                    {s.max_consecutive_days != null && (
+                      <span style={{
+                        marginLeft: 4, fontSize: 9, padding: '1px 5px', borderRadius: 4,
+                        background: COLORS.bgRed, color: COLORS.danger, fontWeight: 700,
+                      }} title="연속 한도">
+                        📅{s.max_consecutive_days}
+                      </span>
+                    )}
+                    {/* PR-2SS-d — 최소 경력 배지 */}
+                    {Number(s.min_seniority_months || 0) > 0 && (
+                      <span style={{
+                        marginLeft: 4, fontSize: 9, padding: '1px 5px', borderRadius: 4,
+                        background: COLORS.bgGreen, color: COLORS.success, fontWeight: 700,
+                      }} title="최소 근무 경력">
+                        🌱{s.min_seniority_months}m
+                      </span>
+                    )}
                   </td>
                   <td style={tdStyle}>{s.sort_order}</td>
                   <td style={tdStyle}>

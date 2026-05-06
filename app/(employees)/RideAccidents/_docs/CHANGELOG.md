@@ -1,7 +1,74 @@
-# CHANGELOG — Cafe24 ERP 모듈
+# CHANGELOG — RideAccidents (라이드 사고접수) 모듈
 
 > 매 PR 종료 시 한 줄 이상 기록 의무 (규칙 22).
 > 형식: `YYYY-MM-DD | PR-CODE | 한 줄 요약`
+>
+> 사용자 노출 명칭: "라이드 사고접수"
+> 백엔드 source: 카페24 ERP (skyautosvc.co.kr) read-only
+
+---
+
+## 2026-05-06 | PR-6.3.c | Hotfix — 폴더 rename + 사이드바 그룹 변경
+
+### 사용자 피드백 (09:51 KST)
+```
+1. ❌ /Cafe24 ERP/accidents 404 — Next.js 가 공백 폴더 라우팅 못함
+2. ❌ "관리(admin)" 그룹 → ✅ "Employee of Ride Inc." (cx-team) 하위
+3. ❌ "🚨 카페24 사고접수" → ✅ "🚨 라이드 사고접수"
+```
+
+### 변경
+
+```
+폴더 RENAME:
+  app/(employees)/Cafe24 ERP/accidents/page.tsx
+  → app/(employees)/RideAccidents/page.tsx
+
+URL:
+  /Cafe24%20ERP/accidents (404)
+  → /RideAccidents (✅)
+
+menu-registry:
+  id:           mod-cafe24-accidents → mod-ride-accidents
+  name:         카페24 사고접수      → 라이드 사고접수
+  displayName:  🚨 카페24 사고접수    → 🚨 라이드 사고접수
+  path:         /Cafe24 ERP/accidents → /RideAccidents
+  group:        admin                → cx-team
+  sortOrder:    48                   → 63
+
+페이지 헤더 텍스트:
+  "🚨 카페24 ERP > 사고 접수" + C24 보라 배지
+  → "🚨 라이드 사고접수" (배지 제거)
+
+_docs path 참조 일괄 갱신:
+  app/(employees)/Cafe24 ERP/  →  app/(employees)/RideAccidents/
+  /Cafe24 ERP/{dashboard,orders,settlements,masters}  →  /RideAccidents/{...}
+```
+
+### 유지 (의도적)
+
+- 백엔드 데이터 source = "카페24 ERP (skyautosvc.co.kr)" — _docs 안 시스템 표현 유지
+- `lib/cafe24-db.ts` 모듈명 유지 (백엔드 connection)
+- `app/api/cafe24/probe`, `app/api/cafe24/accidents` 라우트 유지 (백엔드 source 의미)
+- `_docs/CLAUDE-Cafe24.md` 파일명 유지 (모듈 본명 — 백엔드 측)
+
+### 사용자 노출 vs 시스템 내부
+
+```
+사용자 (사이드바, 헤더, 라벨):  "라이드 사고접수"
+시스템 내부 (코드, _docs):      "카페24 ERP (백엔드 source)"
+```
+
+### GATE 진행 상태
+
+```
+✅ Hotfix — 사용자 결정적 피드백 받아 즉시 fix
+✅ G5 빌드 — 폴더 rename 후 tsc 회귀 0건 확인 의무
+✅ G6 lint:harness 검증 의무
+✅ Rule 17 모듈 폴더 분리 + import 경계 (RideAccidents 단일)
+✅ Rule 21 Cowork — 본 세션 영역만 staging
+✅ Rule 22 _docs 갱신 (CHANGELOG.md)
+```
 
 ---
 
@@ -14,7 +81,7 @@
   - `aceesosh` 직접 read (raw 컬럼 — pmccustm/pmccarsm 조인은 PR-6.3.b)
   - Query: `limit / offset / from / to / rgst / q`
   - admin role 체크 + graceful fallback (cafe24-unavailable 200 응답)
-- **`app/(employees)/Cafe24 ERP/accidents/page.tsx`** (신규) — UI
+- **`app/(employees)/RideAccidents/accidents/page.tsx`** (신규) — UI
   - Glass L5 헤더 + L2 필터바 + L4 NeuDataTable
   - 모든 컬럼 sortBy 의무 (규칙 18) — 8 컬럼
   - 'C24' 보라 배지 (카페24 데이터 출처 명시)
@@ -62,7 +129,7 @@
 신규 파일:
   app/api/cafe24/probe/route.ts
   app/api/cafe24/accidents/route.ts
-  app/(employees)/Cafe24 ERP/accidents/page.tsx
+  app/(employees)/RideAccidents/accidents/page.tsx
 
 자동 해소:
   app/operations/intake/page.tsx:170 broken call (코드 변경 X — API 라우트 신설로 해소)
@@ -70,13 +137,13 @@
 본 PR 미포함 (PR-6.3.b):
   lib/menu-registry.ts cafe24-accidents entry 등록 — 다른 세션 PR-B1 push 후 별도 진행
   → 사용자가 사이드바에서 "🚨 카페24 사고접수" 메뉴 보이려면 PR-6.3.b 후
-  → 그 전에는 직접 URL `/Cafe24 ERP/accidents` 입력으로 접근 가능
+  → 그 전에는 직접 URL `/RideAccidents` 입력으로 접근 가능
 ```
 
 ### 다음 PR
 
 - **PR-6.3.b** — 다른 세션 PR-B1 push 후 menu-registry 에 cafe24-accidents entry 추가
-- **PR-6.4** — `/Cafe24 ERP/dashboard` + 5 KPI 위젯 + 일별 추이 차트
+- **PR-6.4** — `/RideAccidents/dashboard` + 5 KPI 위젯 + 일별 추이 차트
 - **PR-6.5** — pmccustm/pmccarsm/pmcfactm 조인 + 코드 마스터 (bscddesc) 매핑
 
 ---
@@ -124,7 +191,7 @@ cafe24Db.end()                      // pool 종료 (테스트만)
                   · ui-data-coverage: warnings=33 (정보성)
 ⏭ G7 Designer — UI 변경 없음 (skip)
 ⏭ G8 Evaluator — lib 모듈만, 다음 PR-6.3 (UI 추가) 통합 평가
-✅ Rule 21 Cowork — 본 세션 영역만 staging (lib/cafe24-db.ts + Cafe24 ERP/_docs)
+✅ Rule 21 Cowork — 본 세션 영역만 staging (lib/cafe24-db.ts + RideAccidents/_docs)
 ✅ Rule 22 _docs 갱신 (API.md 신설 + CHANGELOG.md 추가)
 ✅ Rule 13 외부 시스템 호환성 — PR-6.1 검증 결과 코드에 반영 (charset / typeCast / sql_mode)
 ```
@@ -136,7 +203,7 @@ cafe24Db.end()                      // pool 종료 (테스트만)
 
 ### 다음 PR
 
-- **PR-6.3** — `/api/cafe24/probe` (헬스체크 디버그) + `/api/cafe24/accidents` (broken call 해소) + `/Cafe24 ERP/accidents` 페이지
+- **PR-6.3** — `/api/cafe24/probe` (헬스체크 디버그) + `/api/cafe24/accidents` (broken call 해소) + `/RideAccidents` 페이지
 
 ---
 
@@ -191,8 +258,8 @@ PR-6.2 — lib/cafe24-db.ts (mysql2 read-only pool 단일 진입점)
      - DB 호환성: 확정 (MariaDB 10.1, charset 함정 인지)
      - Connection 패턴: SOURCE-ANALYSIS § 11.7 + OPERATIONS § 8.1 명시
 
-PR-6.3 — /api/cafe24/accidents + /Cafe24 ERP/accidents 페이지
-PR-6.4 — /Cafe24 ERP/dashboard + 5 KPI 위젯 + 일별 추이
+PR-6.3 — /api/cafe24/accidents + /RideAccidents 페이지
+PR-6.4 — /RideAccidents/dashboard + 5 KPI 위젯 + 일별 추이
 ```
 
 ### GATE 진행 상태
@@ -229,8 +296,8 @@ PR-6.4 — /Cafe24 ERP/dashboard + 5 KPI 위젯 + 일별 추이
 
 **다음 PR 예고**:
 - PR-6.2 — `lib/cafe24-db.ts` mysql2 read-only pool (사용자 외부 IP 허용 후)
-- PR-6.3 — `/api/cafe24/accidents` + `/Cafe24 ERP/accidents` 페이지
-- PR-6.4 — `/Cafe24 ERP/dashboard` + 5개 KPI 위젯
+- PR-6.3 — `/api/cafe24/accidents` + `/RideAccidents` 페이지
+- PR-6.4 — `/RideAccidents/dashboard` + 5개 KPI 위젯
 
 **GATE 진행 상태**:
 - ✅ G3 Planner — 운영 인터뷰 4축 완료 (Q1~Q8)
@@ -274,6 +341,6 @@ PR-6.4 — /Cafe24 ERP/dashboard + 5 KPI 위젯 + 일별 추이
 - ✅ Rule 22 _docs 갱신 (본 PR 자체)
 
 **Cowork 협업 (규칙 21)**:
-- 본 세션 영역: `app/(employees)/Cafe24 ERP/_docs/` 만
+- 본 세션 영역: `app/(employees)/RideAccidents/_docs/` 만
 - 다른 세션 영역 침범 X (CallScheduler / admin / factory-search 절대 staging X)
 - 공통 파일 (CLAUDE.md / lint-violations.md / migrations) staging X — 다른 세션 영역

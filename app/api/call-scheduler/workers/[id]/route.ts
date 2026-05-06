@@ -16,6 +16,8 @@ const ALLOWED = new Set([
   'work_pattern_text',
   // PR-2QQ-d-3 → d-revert — 외부 근무 cycle (preferred_dow_only 폐기)
   'cycle_days_on', 'cycle_days_off', 'cycle_start_date',
+  // PR-2SS-c — 연속 한도 + 슬롯 거부
+  'max_consecutive_work_days', 'blocked_slot_ids',
 ])
 const COLOR_TONES = new Set([
   'blue', 'gray', 'green', 'amber', 'violet', 'red', 'none',
@@ -33,7 +35,7 @@ export async function PATCH(
     const body = await request.json()
 
     // 컬럼 존재 확인 (graceful)
-    let hasExt = true, hasConstraints = true, hasPattern = true
+    let hasExt = true, hasConstraints = true, hasPattern = true, hasBlockedConsec = true
     try {
       await prisma.$queryRaw<any[]>`SELECT is_external FROM cs_workers LIMIT 1`
     } catch { hasExt = false }
@@ -43,6 +45,9 @@ export async function PATCH(
     try {
       await prisma.$queryRaw<any[]>`SELECT cycle_days_on FROM cs_workers LIMIT 1`
     } catch { hasPattern = false }
+    try {
+      await prisma.$queryRaw<any[]>`SELECT max_consecutive_work_days FROM cs_workers LIMIT 1`
+    } catch { hasBlockedConsec = false }
 
     const CONSTRAINT_COLS = new Set([
       'priority_level', 'preferred_dow_avoid',
@@ -50,6 +55,9 @@ export async function PATCH(
     ])
     const PATTERN_COLS = new Set([
       'cycle_days_on', 'cycle_days_off', 'cycle_start_date',
+    ])
+    const BLOCKED_CONSEC_COLS = new Set([
+      'max_consecutive_work_days', 'blocked_slot_ids',
     ])
 
     const sets: string[] = []
@@ -59,6 +67,7 @@ export async function PATCH(
       if ((k === 'is_external' || k === 'external_pattern') && !hasExt) continue
       if (CONSTRAINT_COLS.has(k) && !hasConstraints) continue
       if (PATTERN_COLS.has(k) && !hasPattern) continue
+      if (BLOCKED_CONSEC_COLS.has(k) && !hasBlockedConsec) continue
       if (k === 'color_tone' && !COLOR_TONES.has(String(v))) continue
       if (k === 'is_external') {
         sets.push(`${k} = ?`); params.push(v ? 1 : 0); continue
@@ -68,8 +77,15 @@ export async function PATCH(
         sets.push(`${k} = ?`); params.push(n); continue
       }
       if (k === 'required_days_per_month' || k === 'max_days_per_month'
-          || k === 'cycle_days_on' || k === 'cycle_days_off') {
+          || k === 'cycle_days_on' || k === 'cycle_days_off'
+          || k === 'max_consecutive_work_days') {
         sets.push(`${k} = ?`); params.push(v == null || v === '' ? null : Number(v)); continue
+      }
+      if (k === 'blocked_slot_ids') {
+        // PR-2SS-c — 배열로 받아서 JSON 으로 저장 (빈 배열은 NULL)
+        let arr: string[] | null = null
+        if (Array.isArray(v) && v.length > 0) arr = v.map(String)
+        sets.push(`${k} = ?`); params.push(arr ? JSON.stringify(arr) : null); continue
       }
       sets.push(`${k} = ?`); params.push(v ?? null)
     }

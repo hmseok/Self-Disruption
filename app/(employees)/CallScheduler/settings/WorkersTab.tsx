@@ -11,7 +11,7 @@ import { COLORS, GLASS, BTN, pillStyle } from '@/app/utils/ui-tokens'
 import { TONE_BG, TONE_TEXT } from '@/app/(employees)/CallScheduler/utils/palette'
 import { COLOR_TONE_OPTIONS } from '@/app/(employees)/CallScheduler/utils/types'
 import { getAuthHeader } from '@/app/utils/auth-client'
-import type { Worker, ColorTone } from '@/app/(employees)/CallScheduler/utils/types'
+import type { Worker, ColorTone, ShiftSlot } from '@/app/(employees)/CallScheduler/utils/types'
 
 const GROUP_OPTIONS: (string | null)[] = [null, '주간', '야간', '저녁', '관리', '기타']
 
@@ -30,6 +30,8 @@ interface RideEmp {
 export default function WorkersTab() {
   const [workers, setWorkers] = useState<Worker[]>([])
   const [employees, setEmployees] = useState<RideEmp[]>([])
+  // PR-2SS-c — 슬롯 목록 (blocked_slot_ids 입력용)
+  const [slots, setSlots] = useState<ShiftSlot[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [actionMsg, setActionMsg] = useState<{ ok: boolean; text: string } | null>(null)
@@ -48,18 +50,24 @@ export default function WorkersTab() {
   const [editCycleOn, setEditCycleOn] = useState<string>('')
   const [editCycleOff, setEditCycleOff] = useState<string>('')
   const [editCycleStart, setEditCycleStart] = useState<string>('')
+  // PR-2SS-c — 연속 한도 + 슬롯 거부
+  const [editMaxConsec, setEditMaxConsec] = useState<string>('')
+  const [editBlockedSlots, setEditBlockedSlots] = useState<Set<string>>(new Set())
 
   const load = async () => {
     setLoading(true); setError(null)
     try {
       const auth = await getAuthHeader()
-      const [wRes, eRes] = await Promise.all([
+      const [wRes, eRes, sRes] = await Promise.all([
         fetch('/api/call-scheduler/workers', { headers: auth }),
         fetch('/api/ride-employees?include_inactive=0', { headers: auth }),
+        // PR-2SS-c — 슬롯 목록 (blocked_slot_ids 입력용)
+        fetch('/api/call-scheduler/shift-slots', { headers: auth }),
       ])
       const wJ = await wRes.json(); if (!wRes.ok) throw new Error(wJ?.error || '워커 조회 실패')
       const eJ = await eRes.json(); if (!eRes.ok) throw new Error(eJ?.error || '직원 조회 실패')
-      setWorkers(wJ.data); setEmployees(eJ.data)
+      const sJ = await sRes.json(); if (!sRes.ok) throw new Error(sJ?.error || '슬롯 조회 실패')
+      setWorkers(wJ.data); setEmployees(eJ.data); setSlots(sJ.data)
     } catch (e: any) { setError(e?.message || '오류') }
     finally { setLoading(false) }
   }
@@ -103,6 +111,9 @@ export default function WorkersTab() {
     setEditCycleOff(w.cycle_days_off != null ? String(w.cycle_days_off) : '')
     setEditCycleStart(w.cycle_start_date || '')
     // PR-2QQ-d-revert: preferred_dow_only 폐기
+    // PR-2SS-c — 연속 한도 + 슬롯 거부
+    setEditMaxConsec(w.max_consecutive_work_days != null ? String(w.max_consecutive_work_days) : '')
+    setEditBlockedSlots(new Set(Array.isArray(w.blocked_slot_ids) ? w.blocked_slot_ids : []))
   }
   const cancelEdit = () => { setEditingId(null) }
 
@@ -139,6 +150,9 @@ export default function WorkersTab() {
           cycle_days_on: editCycleOn ? Number(editCycleOn) : null,
           cycle_days_off: editCycleOff ? Number(editCycleOff) : null,
           cycle_start_date: editCycleStart || null,
+          // PR-2SS-c — 연속 한도 + 슬롯 거부
+          max_consecutive_work_days: editMaxConsec === '' ? null : Number(editMaxConsec),
+          blocked_slot_ids: Array.from(editBlockedSlots),
         }),
       })
       const wJson = await wRes.json()
@@ -375,6 +389,9 @@ export default function WorkersTab() {
                             cycleOn={editCycleOn} setCycleOn={setEditCycleOn}
                             cycleOff={editCycleOff} setCycleOff={setEditCycleOff}
                             cycleStart={editCycleStart} setCycleStart={setEditCycleStart}
+                            maxConsec={editMaxConsec} setMaxConsec={setEditMaxConsec}
+                            blockedSlots={editBlockedSlots} setBlockedSlots={setEditBlockedSlots}
+                            slots={slots}
                           />
                         </td>
                       </tr>
@@ -429,7 +446,7 @@ const tdStyle: React.CSSProperties = {
   padding: '8px 10px', whiteSpace: 'nowrap', color: COLORS.textPrimary,
 }
 
-// PR-2QQ-d-1 + d-revert — 워커 제약 패널 (dow_only 폐기)
+// PR-2QQ-d-1 + d-revert + PR-2SS-c — 워커 제약 패널 (연속 한도 + 슬롯 거부 추가)
 function ConstraintsPanel({
   isExternal, setIsExternal,
   priority, setPriority,
@@ -441,6 +458,10 @@ function ConstraintsPanel({
   cycleOn, setCycleOn,
   cycleOff, setCycleOff,
   cycleStart, setCycleStart,
+  // PR-2SS-c — 연속 한도 + 슬롯 거부
+  maxConsec, setMaxConsec,
+  blockedSlots, setBlockedSlots,
+  slots,
 }: {
   isExternal: boolean; setIsExternal: (v: boolean) => void
   priority: number; setPriority: (v: number) => void
@@ -451,6 +472,9 @@ function ConstraintsPanel({
   cycleOn: string; setCycleOn: (v: string) => void
   cycleOff: string; setCycleOff: (v: string) => void
   cycleStart: string; setCycleStart: (v: string) => void
+  maxConsec: string; setMaxConsec: (v: string) => void
+  blockedSlots: Set<string>; setBlockedSlots: (v: Set<string>) => void
+  slots: ShiftSlot[]
 }) {
   const DOW = ['일', '월', '화', '수', '목', '금', '토']
   const toggleDow = (d: number) => {
@@ -582,6 +606,69 @@ function ConstraintsPanel({
                  }} />
           <div style={{ fontSize: 10, color: COLORS.textMuted, marginTop: 3 }}>
             매니저 메모 (자동 생성 알고리즘에 직접 영향 X — 참고용)
+          </div>
+        </div>
+
+        {/* PR-2SS-c — 연속 한도 + 슬롯 거부 */}
+        <div style={{
+          ...GLASS.L1, borderRadius: 8, padding: 10, marginTop: 4,
+          border: `1px solid ${COLORS.borderRed}`,
+          background: COLORS.bgRed,
+        }}>
+          <FieldLabel>🛡 연속 한도 + 슬롯 거부</FieldLabel>
+          <div style={{ fontSize: 10, color: COLORS.textMuted, marginTop: 3, marginBottom: 6 }}>
+            워커별 hard 제약 — 자동 생성에서 절대 위반 X. 슬롯 자체 한도 (cs_shift_slots.max_consecutive_days) 와 둘 중 작은 값 적용
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}>
+            <div>
+              <div style={{ fontSize: 10, color: COLORS.textSecondary, fontWeight: 700 }}>📅 연속 근무 한도 (일)</div>
+              <input type="number" min={1} max={31} value={maxConsec}
+                     onChange={(e) => setMaxConsec(e.target.value)}
+                     placeholder="무제한"
+                     style={{
+                       width: '100%', padding: '4px 6px', borderRadius: 4, fontSize: 11,
+                       border: `1px solid ${COLORS.borderFaint}`,
+                       background: 'rgba(255,255,255,0.85)', marginTop: 2,
+                     }} />
+              <div style={{ fontSize: 9, color: COLORS.textMuted, marginTop: 2 }}>
+                빈 칸 = 무제한
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: 10, color: COLORS.textSecondary, fontWeight: 700 }}>🚫 슬롯 거부 (이 슬롯 절대 X)</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginTop: 4 }}>
+                {slots.filter(s => s.is_active).map(s => {
+                  const active = blockedSlots.has(s.id)
+                  return (
+                    <button key={s.id} type="button"
+                            onClick={() => {
+                              const next = new Set(blockedSlots)
+                              if (next.has(s.id)) next.delete(s.id); else next.add(s.id)
+                              setBlockedSlots(next)
+                            }}
+                            style={{
+                              padding: '3px 7px', borderRadius: 99, fontSize: 10, fontWeight: 700,
+                              background: active ? COLORS.danger : 'rgba(255,255,255,0.7)',
+                              color: active ? '#fff' : COLORS.textSecondary,
+                              border: `1px solid ${active ? COLORS.danger : COLORS.borderFaint}`,
+                              cursor: 'pointer',
+                            }}>
+                      {active && '🚫 '}{s.code}
+                    </button>
+                  )
+                })}
+                {slots.filter(s => s.is_active).length === 0 && (
+                  <div style={{ fontSize: 10, color: COLORS.textMuted }}>
+                    슬롯이 없습니다 — 시프트 탭에서 먼저 추가
+                  </div>
+                )}
+              </div>
+              {blockedSlots.size > 0 && (
+                <div style={{ fontSize: 9, color: COLORS.danger, marginTop: 3 }}>
+                  {blockedSlots.size}개 슬롯 거부 중
+                </div>
+              )}
+            </div>
           </div>
         </div>
 

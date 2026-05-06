@@ -34,6 +34,12 @@ cs_shift_groups ──< cs_group_members ────────┘
 | start_time | TIME | NN | | 09:00:00 |
 | end_time | TIME | NN | | 18:00:00 |
 | is_overnight | TINYINT(1) | NN | 0 | 1=익일 종료 |
+| **next_day_blocking_hours** | TINYINT | NN | 0 | **PR-2SS-b** — 종료 후 N시간 안 다른 슬롯 시작 금지 (야간 디폴트 16) |
+| **max_consecutive_days** | TINYINT | Y | NULL | **PR-2SS-b** — 연속 N일 한도 (NULL=무제한, 야간 디폴트 3 — PR-2SS-c 활용) |
+| **min_seniority_months** | TINYINT | NN | 0 | **PR-2SS-d** — 최소 근무 경력 (개월, 야간 디폴트 6 — 신입 야간 금지) |
+| **night_period_start** | TIME | Y | NULL | **PR-2SS-e** — 가산 시간대 시작 (예: 22:00:00, NULL=가산 없음) |
+| **night_period_end** | TIME | Y | NULL | **PR-2SS-e** — 가산 시간대 종료 (자정 넘음 가능) |
+| **night_premium_rate** | DECIMAL(4,2) | NN | 0.00 | **PR-2SS-e** — 가산율 (0.50=50%, 현재 정책 0) |
 | category | VARCHAR(16) | NN | 'day' | day / evening / overnight |
 | sort_order | INT | NN | 0 | 캘린더 행 순서 |
 | is_active | TINYINT(1) | NN | 1 | soft delete |
@@ -85,6 +91,9 @@ UNIQUE: `(year, month)` — 한 달 한 스케줄 (재작성 시 덮어쓰기 / 
 | worker_id | BIGINT UNSIGNED | Y | | FK cs_workers.id, NULL=공석/F-only |
 | special_code | ENUM('none','am_free','pm_free','am_half','pm_half','off') | NN | 'none' | 오전F/오후F/오전반차/오후반차/휴무 |
 | computed_hours | DECIMAL(4,2) | NN | 0.00 | special_code 반영 실 근무시간 (분석용 캐시) |
+| **day_hours** | DECIMAL(4,2) | Y | NULL | **PR-2SS-e** — 일반 시간 (computed_hours 에서 야간 시간 분리) |
+| **night_hours** | DECIMAL(4,2) | Y | NULL | **PR-2SS-e** — 가산 시간대 시간 |
+| **premium_hours** | DECIMAL(4,2) | Y | NULL | **PR-2SS-e** — 가산 적용 후 (= night × rate) |
 | note | VARCHAR(255) | Y | | |
 | created_at, updated_at | DATETIME | NN | NOW | |
 
@@ -136,7 +145,7 @@ GROUP BY s.id, s.code, s.label
 ORDER BY s.sort_order;
 ```
 
-### 2.W `cs_workers` 추가 컬럼 (PR-2QQ-d-1 + d-3)
+### 2.W `cs_workers` 추가 컬럼 (PR-2QQ-d-1 + d-3 + PR-2SS-c)
 
 | 컬럼 | 타입 | NULL | 기본 | PR | 설명 |
 |------|------|------|------|-----|------|
@@ -149,7 +158,9 @@ ORDER BY s.sort_order;
 | cycle_days_on | TINYINT | Y | NULL | d-3 | 연속 근무일 |
 | cycle_days_off | TINYINT | Y | NULL | d-3 | 연속 휴무일 |
 | cycle_start_date | DATE | Y | NULL | d-3 | cycle 1일차 |
-| preferred_dow_only | VARCHAR(16) | Y | NULL | d-3 | 한정 요일 ('1,3,5' = 월수금만) |
+| preferred_dow_only | VARCHAR(16) | Y | NULL | d-3 | 한정 요일 ('1,3,5' = 월수금만) — **폐기 (PR-2QQ-d-revert)** |
+| **max_consecutive_work_days** | TINYINT | Y | NULL | **PR-2SS-c** | 워커별 연속 근무 한도 (NULL=무제한, slot.max_consecutive_days 와 둘 중 작은 값) |
+| **blocked_slot_ids** | JSON | Y | NULL | **PR-2SS-c** | 절대 안 들어가는 슬롯 ID 배열 (예: `["L13-id"]` = 야간 거부) |
 
 INDEX: `idx_cs_w_priority (priority_level, is_active)`
 

@@ -24,10 +24,11 @@ interface FeatureFlags {
   hasExternal: boolean
   hasConstraints: boolean
   hasPattern: boolean  // PR-2QQ-d-3
+  hasBlockedConsec: boolean  // PR-2SS-c
 }
 
 async function detectFeatures(): Promise<FeatureFlags> {
-  let hasExternal = true, hasConstraints = true, hasPattern = true
+  let hasExternal = true, hasConstraints = true, hasPattern = true, hasBlockedConsec = true
   try {
     await prisma.$queryRaw<any[]>`SELECT is_external FROM cs_workers LIMIT 1`
   } catch { hasExternal = false }
@@ -37,16 +38,33 @@ async function detectFeatures(): Promise<FeatureFlags> {
   try {
     await prisma.$queryRaw<any[]>`SELECT cycle_days_on FROM cs_workers LIMIT 1`
   } catch { hasPattern = false }
-  return { hasExternal, hasConstraints, hasPattern }
+  try {
+    await prisma.$queryRaw<any[]>`SELECT max_consecutive_work_days FROM cs_workers LIMIT 1`
+  } catch { hasBlockedConsec = false }
+  return { hasExternal, hasConstraints, hasPattern, hasBlockedConsec }
 }
 
 export async function GET(request: NextRequest) {
   const user = await verifyUser(request)
   if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
   try {
-    const { hasExternal, hasConstraints, hasPattern } = await detectFeatures()
+    const { hasExternal, hasConstraints, hasPattern, hasBlockedConsec } = await detectFeatures()
     let rows: any[]
-    if (hasPattern) {
+    if (hasBlockedConsec) {
+      rows = await prisma.$queryRaw<any[]>`
+        SELECT id, name, profile_id, color_tone, group_label, phone, email, is_active,
+               is_external, external_pattern,
+               priority_level, preferred_dow_avoid,
+               required_days_per_month, max_days_per_month,
+               work_pattern_text,
+               cycle_days_on, cycle_days_off,
+               DATE_FORMAT(cycle_start_date, '%Y-%m-%d') AS cycle_start_date,
+               max_consecutive_work_days, blocked_slot_ids
+        FROM cs_workers
+        WHERE is_active = 1
+        ORDER BY priority_level ASC, is_external DESC, group_label DESC, name ASC
+      `
+    } else if (hasPattern) {
       rows = await prisma.$queryRaw<any[]>`
         SELECT id, name, profile_id, color_tone, group_label, phone, email, is_active,
                is_external, external_pattern,
@@ -102,6 +120,14 @@ export async function GET(request: NextRequest) {
       cycle_days_on: hasPattern && r.cycle_days_on != null ? Number(r.cycle_days_on) : null,
       cycle_days_off: hasPattern && r.cycle_days_off != null ? Number(r.cycle_days_off) : null,
       cycle_start_date: hasPattern ? (r.cycle_start_date ?? null) : null,
+      // PR-2SS-c — 연속 한도 + 슬롯 거부 (JSON 컬럼 graceful 파싱)
+      max_consecutive_work_days: hasBlockedConsec && r.max_consecutive_work_days != null
+        ? Number(r.max_consecutive_work_days) : null,
+      blocked_slot_ids: hasBlockedConsec && r.blocked_slot_ids != null
+        ? (typeof r.blocked_slot_ids === 'string'
+            ? (() => { try { return JSON.parse(r.blocked_slot_ids) } catch { return [] } })()
+            : (Array.isArray(r.blocked_slot_ids) ? r.blocked_slot_ids : []))
+        : null,
       // PR-2QQ-d-revert: preferred_dow_only 폐기
     }))
     return NextResponse.json({ data: serialize(data), error: null })

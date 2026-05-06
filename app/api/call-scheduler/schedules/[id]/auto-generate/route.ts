@@ -48,6 +48,15 @@ interface GroupRow {
   slot_start: string
   slot_end: string
   slot_overnight: number | boolean
+  // PR-2SS-b — 안전 가드 (graceful)
+  slot_next_day_blocking_hours?: number
+  slot_max_consecutive_days?: number | null
+  // PR-2SS-d — 최소 경력 (graceful)
+  slot_min_seniority_months?: number
+  // PR-2SS-e — 시간 분해 (graceful)
+  slot_night_period_start?: string | null
+  slot_night_period_end?: string | null
+  slot_night_premium_rate?: number
 }
 interface MemberRow {
   group_id: string
@@ -73,7 +82,7 @@ interface AssignmentRow {
   special_code: string
   manual_lock?: number  // PR-2QQ-b — 1=수동 lock 셀
 }
-// PR-2QQ-d-3 → d-revert — 워커 제약 + 외부 cycle (dow_only 폐기)
+// PR-2QQ-d-3 → d-revert → PR-2SS-c/d — 워커 제약 + 연속 한도 + 슬롯 거부 + 경력
 interface WorkerConstraint {
   id: string
   priority_level: number
@@ -83,6 +92,11 @@ interface WorkerConstraint {
   cycle_days_on: number | null      // 외부 근무일 수 (이 phase = 당사 X)
   cycle_days_off: number | null     // 외부 휴무일 수 (이 phase = 당사 가능)
   cycle_start_date: string | null   // 'YYYY-MM-DD' 외부 cycle 1일차
+  // PR-2SS-c — 연속 한도 + 슬롯 거부
+  max_consecutive_work_days: number | null
+  blocked_slot_ids: Set<string>     // 비어있으면 빈 Set
+  // PR-2SS-d — 입사일 (ride_employees join)
+  hire_date: string | null          // 'YYYY-MM-DD' or null
 }
 interface CoverageRow {
   group_id: string
@@ -96,6 +110,12 @@ function timeToMin(t: string): number {
   return h * 60 + m
 }
 
+// PR-2SS-b — ISO 날짜를 절대 분으로 (epoch-like, 1970-01-01 자정 기준)
+function isoToMin(iso: string, addMin: number = 0): number {
+  const t = new Date(iso + 'T00:00:00').getTime()
+  return Math.floor(t / 60000) + addMin
+}
+
 // 슬롯 + special_code → 시간 계산
 function computeHours(start: string, end: string, isOvernight: boolean, special: string): number {
   if (special === 'off' || special === 'am_free' || special === 'pm_free') return 0
@@ -107,11 +127,78 @@ function computeHours(start: string, end: string, isOvernight: boolean, special:
   return Math.round(hours * 100) / 100
 }
 
+// PR-2SS-e — 분 단위 두 구간 교집합
+function intersectMin(a1: number, a2: number, b1: number, b2: number): number {
+  return Math.max(0, Math.min(a2, b2) - Math.max(a1, b1))
+}
+
+// PR-2SS-e — 슬롯 시간을 day/night 로 분해 + 가산 적용
+//   night_period_start/end 가 NULL 이면 night=0, premium=0
+//   night 가 자정을 넘으면 (예: 22:00 ~ 06:00) 두 구간으로 나눠 교집합
+function computeBreakdown(
+  slotStart: string, slotEnd: string, isOvernight: boolean,
+  nightStart: string | null | undefined, nightEnd: string | null | undefined,
+  premiumRate: number,
+  special: string
+): { day: number; night: number; premium: number } {
+  const total = computeHours(slotStart, slotEnd, isOvernight, special)
+  if (!nightStart || !nightEnd) return { day: total, night: 0, premium: 0 }
+  if (special === 'off' || special === 'am_free' || special === 'pm_free') {
+    return { day: 0, night: 0, premium: 0 }
+  }
+  // 슬롯 절대 분 (자정 기준, 0 시작)
+  const sStart = timeToMin(slotStart)
+  let sEnd = timeToMin(slotEnd)
+  if (isOvernight) sEnd += 1440
+  // 야간 구간 — 자정 넘으면 두 구간 [nStart, 1440) + [1440+0, 1440+nEnd)
+  const nStart = timeToMin(nightStart)
+  const nEnd = timeToMin(nightEnd)
+  let nightMin = 0
+  if (nEnd > nStart) {
+    // 같은 날 [nStart, nEnd] — slot 의 자정 기준 하루 + 익일 하루 모두 검사
+    nightMin += intersectMin(sStart, sEnd, nStart, nEnd)
+    nightMin += intersectMin(sStart, sEnd, nStart + 1440, nEnd + 1440)
+  } else {
+    // 자정 넘는 [nStart, 1440) + [0, nEnd)
+    nightMin += intersectMin(sStart, sEnd, nStart, 1440)
+    nightMin += intersectMin(sStart, sEnd, 0, nEnd)
+    // overnight 슬롯 다음날 영역도
+    nightMin += intersectMin(sStart, sEnd, nStart + 1440, 1440 + 1440)
+    nightMin += intersectMin(sStart, sEnd, 1440, 1440 + nEnd)
+  }
+  let nightHours = nightMin / 60
+  if (special === 'am_half' || special === 'pm_half') nightHours = nightHours / 2
+  const day = Math.max(0, total - nightHours)
+  const premium = Math.round(nightHours * (premiumRate || 0) * 100) / 100
+  return {
+    day: Math.round(day * 100) / 100,
+    night: Math.round(nightHours * 100) / 100,
+    premium,
+  }
+}
+
 // 연차에서 special_code 추출
 function leaveToSpecial(amPm: 'full' | 'am' | 'pm'): 'off' | 'am_half' | 'pm_half' {
   if (amPm === 'full') return 'off'
   if (amPm === 'am') return 'am_half'
   return 'pm_half'
+}
+
+// PR-2SS-b — ISO 날짜에 N일 더한 ISO 날짜 반환
+function addDays(iso: string, n: number): string {
+  const d = new Date(iso + 'T00:00:00')
+  d.setDate(d.getDate() + n)
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+}
+
+// PR-2SS-d — 두 ISO 날짜 간 개월 수 (정수 — 일 단위 반올림)
+function monthsSince(hireDateIso: string, refIso: string): number {
+  const a = new Date(hireDateIso + 'T00:00:00')
+  const b = new Date(refIso + 'T00:00:00')
+  if (b < a) return 0
+  let months = (b.getFullYear() - a.getFullYear()) * 12 + (b.getMonth() - a.getMonth())
+  if (b.getDate() < a.getDate()) months -= 1
+  return Math.max(0, months)
 }
 
 // PR-2QQ-d-3 — '0,5' 같은 문자열 → number 배열 (안전 파싱)
@@ -199,18 +286,77 @@ export async function POST(
     const { year, month } = sRows[0]
     const lastDay = new Date(year, month, 0).getDate()
 
-    // 2) 그룹 + 슬롯 join
-    const groups: GroupRow[] = await prisma.$queryRaw<any[]>`
-      SELECT g.id, g.name, g.shift_slot_id, g.pattern_type, g.custom_days,
-             g.generation_strategy, g.rotation_size, g.rotation_period_days,
-             TIME_FORMAT(s.start_time, '%H:%i:%s') AS slot_start,
-             TIME_FORMAT(s.end_time, '%H:%i:%s')   AS slot_end,
-             s.is_overnight AS slot_overnight
-      FROM cs_shift_groups g
-      JOIN cs_shift_slots s ON s.id = g.shift_slot_id
-      WHERE g.is_active = 1
-      ORDER BY g.sort_order ASC, g.name ASC
-    ` as any
+    // 2) 그룹 + 슬롯 join — PR-2SS-b/d/e: 안전 가드 + 경력 + 시간 분해 컬럼 graceful
+    let hasSlotSafety = true
+    let hasSlotSeniority = true
+    let hasSlotBreakdown = true
+    try {
+      await prisma.$queryRaw<any[]>`SELECT next_day_blocking_hours FROM cs_shift_slots LIMIT 1`
+    } catch { hasSlotSafety = false }
+    try {
+      await prisma.$queryRaw<any[]>`SELECT min_seniority_months FROM cs_shift_slots LIMIT 1`
+    } catch { hasSlotSeniority = false }
+    try {
+      await prisma.$queryRaw<any[]>`SELECT night_period_start FROM cs_shift_slots LIMIT 1`
+    } catch { hasSlotBreakdown = false }
+    const groups: GroupRow[] = (hasSlotSafety && hasSlotSeniority && hasSlotBreakdown)
+      ? (await prisma.$queryRaw<any[]>`
+          SELECT g.id, g.name, g.shift_slot_id, g.pattern_type, g.custom_days,
+                 g.generation_strategy, g.rotation_size, g.rotation_period_days,
+                 TIME_FORMAT(s.start_time, '%H:%i:%s') AS slot_start,
+                 TIME_FORMAT(s.end_time, '%H:%i:%s')   AS slot_end,
+                 s.is_overnight AS slot_overnight,
+                 s.next_day_blocking_hours AS slot_next_day_blocking_hours,
+                 s.max_consecutive_days   AS slot_max_consecutive_days,
+                 s.min_seniority_months   AS slot_min_seniority_months,
+                 TIME_FORMAT(s.night_period_start, '%H:%i:%s') AS slot_night_period_start,
+                 TIME_FORMAT(s.night_period_end,   '%H:%i:%s') AS slot_night_period_end,
+                 s.night_premium_rate AS slot_night_premium_rate
+          FROM cs_shift_groups g
+          JOIN cs_shift_slots s ON s.id = g.shift_slot_id
+          WHERE g.is_active = 1
+          ORDER BY g.sort_order ASC, g.name ASC
+        ` as any)
+      : (hasSlotSafety && hasSlotSeniority)
+      ? (await prisma.$queryRaw<any[]>`
+          SELECT g.id, g.name, g.shift_slot_id, g.pattern_type, g.custom_days,
+                 g.generation_strategy, g.rotation_size, g.rotation_period_days,
+                 TIME_FORMAT(s.start_time, '%H:%i:%s') AS slot_start,
+                 TIME_FORMAT(s.end_time, '%H:%i:%s')   AS slot_end,
+                 s.is_overnight AS slot_overnight,
+                 s.next_day_blocking_hours AS slot_next_day_blocking_hours,
+                 s.max_consecutive_days   AS slot_max_consecutive_days,
+                 s.min_seniority_months   AS slot_min_seniority_months
+          FROM cs_shift_groups g
+          JOIN cs_shift_slots s ON s.id = g.shift_slot_id
+          WHERE g.is_active = 1
+          ORDER BY g.sort_order ASC, g.name ASC
+        ` as any)
+      : hasSlotSafety
+      ? (await prisma.$queryRaw<any[]>`
+          SELECT g.id, g.name, g.shift_slot_id, g.pattern_type, g.custom_days,
+                 g.generation_strategy, g.rotation_size, g.rotation_period_days,
+                 TIME_FORMAT(s.start_time, '%H:%i:%s') AS slot_start,
+                 TIME_FORMAT(s.end_time, '%H:%i:%s')   AS slot_end,
+                 s.is_overnight AS slot_overnight,
+                 s.next_day_blocking_hours AS slot_next_day_blocking_hours,
+                 s.max_consecutive_days   AS slot_max_consecutive_days
+          FROM cs_shift_groups g
+          JOIN cs_shift_slots s ON s.id = g.shift_slot_id
+          WHERE g.is_active = 1
+          ORDER BY g.sort_order ASC, g.name ASC
+        ` as any)
+      : (await prisma.$queryRaw<any[]>`
+          SELECT g.id, g.name, g.shift_slot_id, g.pattern_type, g.custom_days,
+                 g.generation_strategy, g.rotation_size, g.rotation_period_days,
+                 TIME_FORMAT(s.start_time, '%H:%i:%s') AS slot_start,
+                 TIME_FORMAT(s.end_time, '%H:%i:%s')   AS slot_end,
+                 s.is_overnight AS slot_overnight
+          FROM cs_shift_groups g
+          JOIN cs_shift_slots s ON s.id = g.shift_slot_id
+          WHERE g.is_active = 1
+          ORDER BY g.sort_order ASC, g.name ASC
+        ` as any)
     const targetGroups = groupFilter
       ? groups.filter(g => groupFilter.includes(g.id))
       : groups
@@ -288,18 +434,52 @@ export async function POST(
       }
     }
 
-    // 5-A) PR-2QQ-d-3 — 워커 제약 + 패턴 (graceful)
+    // 5-A) PR-2QQ-d-3 → PR-2SS-c/d — 워커 제약 + 연속/거부 + 경력 (graceful)
     let workerCons: Map<string, WorkerConstraint> = new Map()
+    let hasBlockedConsec = true
     if (usePriority) {
       try {
-        const wcRows = await prisma.$queryRaw<any[]>`
-          SELECT id, priority_level, preferred_dow_avoid,
-                 required_days_per_month, max_days_per_month,
-                 cycle_days_on, cycle_days_off,
-                 DATE_FORMAT(cycle_start_date, '%Y-%m-%d') AS cycle_start_date
-          FROM cs_workers WHERE is_active = 1
-        `
+        try {
+          await prisma.$queryRaw<any[]>`SELECT max_consecutive_work_days FROM cs_workers LIMIT 1`
+        } catch { hasBlockedConsec = false }
+        // PR-2SS-d — ride_employees.hire_date LEFT JOIN (employee_id 또는 name 매칭)
+        const wcRows = hasBlockedConsec
+          ? await prisma.$queryRaw<any[]>`
+              SELECT w.id, w.priority_level, w.preferred_dow_avoid,
+                     w.required_days_per_month, w.max_days_per_month,
+                     w.cycle_days_on, w.cycle_days_off,
+                     DATE_FORMAT(w.cycle_start_date, '%Y-%m-%d') AS cycle_start_date,
+                     w.max_consecutive_work_days, w.blocked_slot_ids,
+                     DATE_FORMAT(re.hire_date, '%Y-%m-%d') AS hire_date
+              FROM cs_workers w
+              LEFT JOIN ride_employees re
+                ON (w.employee_id IS NOT NULL AND re.id = w.employee_id)
+                OR (w.employee_id IS NULL AND re.name = w.name)
+              WHERE w.is_active = 1
+            `
+          : await prisma.$queryRaw<any[]>`
+              SELECT w.id, w.priority_level, w.preferred_dow_avoid,
+                     w.required_days_per_month, w.max_days_per_month,
+                     w.cycle_days_on, w.cycle_days_off,
+                     DATE_FORMAT(w.cycle_start_date, '%Y-%m-%d') AS cycle_start_date,
+                     DATE_FORMAT(re.hire_date, '%Y-%m-%d') AS hire_date
+              FROM cs_workers w
+              LEFT JOIN ride_employees re
+                ON (w.employee_id IS NOT NULL AND re.id = w.employee_id)
+                OR (w.employee_id IS NULL AND re.name = w.name)
+              WHERE w.is_active = 1
+            `
         for (const r of wcRows) {
+          // PR-2SS-c — blocked_slot_ids JSON 안전 파싱
+          let blocked: Set<string> = new Set()
+          if (hasBlockedConsec && r.blocked_slot_ids != null) {
+            try {
+              const arr = typeof r.blocked_slot_ids === 'string'
+                ? JSON.parse(r.blocked_slot_ids)
+                : (Array.isArray(r.blocked_slot_ids) ? r.blocked_slot_ids : [])
+              if (Array.isArray(arr)) blocked = new Set(arr.map(String))
+            } catch { /* 무시 */ }
+          }
           workerCons.set(r.id, {
             id: r.id,
             priority_level: Number(r.priority_level || 2),
@@ -309,6 +489,11 @@ export async function POST(
             cycle_days_on: r.cycle_days_on != null ? Number(r.cycle_days_on) : null,
             cycle_days_off: r.cycle_days_off != null ? Number(r.cycle_days_off) : null,
             cycle_start_date: r.cycle_start_date,
+            max_consecutive_work_days: hasBlockedConsec && r.max_consecutive_work_days != null
+              ? Number(r.max_consecutive_work_days) : null,
+            blocked_slot_ids: blocked,
+            // PR-2SS-d
+            hire_date: r.hire_date || null,
           })
         }
       } catch {
@@ -392,7 +577,24 @@ export async function POST(
       if (!counter.has(wId)) counter.set(wId, { total: 0, by_dow: [0,0,0,0,0,0,0], last_date: null })
       return counter.get(wId)!
     }
-    const warnings: Array<{ group_id: string; group_name: string; date: string; missing: number }> = []
+    // PR-2SS-b — 워커별 마지막 슬롯 종료 시각 추적 (익일 휴식 검사용)
+    //   endMin: 자정 기준 분 단위 (overnight 슬롯이면 +24*60)
+    //   endIsoDate: 슬롯이 끝난 날짜 (overnight 면 다음 날, 아니면 같은 날)
+    const workerLastEnd = new Map<string, { endIsoDate: string; endMin: number }>()
+    // PR-2SS-c — 워커별 연속 근무일 카운터 (휴무일 = 리셋, 근무일 = ++)
+    //   슬롯의 max_consecutive_days + 워커의 max_consecutive_work_days 둘 중 작은 값 한도
+    const workerConsec = new Map<string, number>()
+    // PR-2SS-b — Warning 다중 타입 지원
+    type Warning =
+      | { type: 'missing'; group_id: string; group_name: string; date: string; missing: number }
+      | { type: 'next_day_block'; worker_id: string; date: string; blocked_slot_id: string; blocking_hours: number; prev_end_date: string }
+      | { type: 'time_conflict'; worker_id: string; date: string; slot_a: string; slot_b: string }
+      // PR-2SS-c — 연속 한도 / 슬롯 거부
+      | { type: 'consec_limit'; worker_id: string; date: string; slot_id: string; limit: number }
+      | { type: 'slot_blocked'; worker_id: string; date: string; slot_id: string }
+      // PR-2SS-d — 경력 부족 (신입 야간 금지 등)
+      | { type: 'seniority_short'; worker_id: string; date: string; slot_id: string; required_months: number; actual_months: number | null }
+    const warnings: Warning[] = []
 
     // group_id → rotation cursor (usePriority=false 일 때만 사용)
     const rotState = new Map<string, { cursor: number; dayInPeriod: number }>()
@@ -401,6 +603,9 @@ export async function POST(
     for (let d = 1; d <= lastDay; d++) {
       const isoDate = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`
       const dow = new Date(isoDate + 'T00:00:00').getDay()
+
+      // PR-2SS-c — 오늘 근무한 워커 집계 (그룹 무관, 일자 단위)
+      const workedToday = new Set<string>()
 
       for (const g of targetGroups) {
         if (!byGroup[g.id]) byGroup[g.id] = { generated: 0, skipped: 0 }
@@ -466,6 +671,93 @@ export async function POST(
           const sp = lm.get(isoDate)
           return sp !== 'off'  // 종일 off 면 제외
         })
+
+        // PR-2SS-b — 익일 휴식 가드 (슬롯의 next_day_blocking_hours 적용)
+        //   직전 슬롯 종료 시각 + blockingHours 가 오늘 슬롯 시작 시각 이후면 후보 제외
+        const blockingHours = Number(g.slot_next_day_blocking_hours || 0)
+        if (blockingHours > 0) {
+          const slotStartMin = timeToMin(g.slot_start)
+          const todayStartMin = isoToMin(isoDate, slotStartMin)
+          candidates = candidates.filter(wId => {
+            const last = workerLastEnd.get(wId)
+            if (!last) return true
+            // last.endMin 이 last.endIsoDate 자정 기준이면 절대 분으로 변환
+            const lastAbsMin = isoToMin(last.endIsoDate, 0) + last.endMin
+            const gap = (todayStartMin - lastAbsMin) / 60  // 시간 단위
+            if (gap < blockingHours) {
+              warnings.push({
+                type: 'next_day_block',
+                worker_id: wId,
+                date: isoDate,
+                blocked_slot_id: g.shift_slot_id,
+                blocking_hours: blockingHours,
+                prev_end_date: last.endIsoDate,
+              })
+              return false
+            }
+            return true
+          })
+        }
+
+        // PR-2SS-c — 슬롯 거부 (blocked_slot_ids) hard exclude
+        candidates = candidates.filter(wId => {
+          const wc = workerCons.get(wId)
+          if (wc && wc.blocked_slot_ids.has(g.shift_slot_id)) {
+            warnings.push({
+              type: 'slot_blocked',
+              worker_id: wId, date: isoDate, slot_id: g.shift_slot_id,
+            })
+            return false
+          }
+          return true
+        })
+
+        // PR-2SS-c — 연속 한도 가드 (slot.max + worker.max 둘 중 작은 값)
+        const slotConsecLimit = g.slot_max_consecutive_days != null ? Number(g.slot_max_consecutive_days) : null
+        candidates = candidates.filter(wId => {
+          const wc = workerCons.get(wId)
+          const limits: number[] = []
+          if (slotConsecLimit != null && slotConsecLimit > 0) limits.push(slotConsecLimit)
+          if (wc?.max_consecutive_work_days != null && wc.max_consecutive_work_days > 0) limits.push(wc.max_consecutive_work_days)
+          if (limits.length === 0) return true
+          const limit = Math.min(...limits)
+          const cur = workerConsec.get(wId) || 0
+          if (cur >= limit) {
+            warnings.push({
+              type: 'consec_limit',
+              worker_id: wId, date: isoDate, slot_id: g.shift_slot_id, limit,
+            })
+            return false
+          }
+          return true
+        })
+
+        // PR-2SS-d — 최소 경력 가드 (slot.min_seniority_months 적용)
+        const requiredMonths = Number(g.slot_min_seniority_months || 0)
+        if (requiredMonths > 0) {
+          candidates = candidates.filter(wId => {
+            const wc = workerCons.get(wId)
+            // 입사일 모르면 안전상 후보 X (운영 정책: 신입 야간 X)
+            if (!wc?.hire_date) {
+              warnings.push({
+                type: 'seniority_short',
+                worker_id: wId, date: isoDate, slot_id: g.shift_slot_id,
+                required_months: requiredMonths, actual_months: null,
+              })
+              return false
+            }
+            const months = monthsSince(wc.hire_date, isoDate)
+            if (months < requiredMonths) {
+              warnings.push({
+                type: 'seniority_short',
+                worker_id: wId, date: isoDate, slot_id: g.shift_slot_id,
+                required_months: requiredMonths, actual_months: months,
+              })
+              return false
+            }
+            return true
+          })
+        }
 
         // (4) usePriority=true 면 가중치 정렬, false 면 단순 rotation
         let selected: string[]
@@ -566,6 +858,15 @@ export async function POST(
             cn.total++
             cn.by_dow[dow]++
             cn.last_date = isoDate
+            // PR-2SS-b — 슬롯 종료 시각 기록 (익일 휴식 가드용)
+            const slotEndMin = timeToMin(g.slot_end)
+            const isOver = !!g.slot_overnight
+            workerLastEnd.set(wId, {
+              endIsoDate: isOver ? addDays(isoDate, 1) : isoDate,
+              endMin: slotEndMin,
+            })
+            // PR-2SS-c — 오늘 근무 집계 (그룹 무관 — 같은 날 여러 슬롯 들어가도 1일)
+            workedToday.add(wId)
           }
         }
 
@@ -575,18 +876,116 @@ export async function POST(
           cn.total++
           cn.by_dow[dow]++
           cn.last_date = isoDate
+          // PR-2SS-b — lock 워커도 종료 시각 기록
+          const slotEndMin = timeToMin(g.slot_end)
+          const isOver = !!g.slot_overnight
+          workerLastEnd.set(wId, {
+            endIsoDate: isOver ? addDays(isoDate, 1) : isoDate,
+            endMin: slotEndMin,
+          })
+          // PR-2SS-c — lock 도 오늘 근무로 카운트
+          workedToday.add(wId)
         }
 
         // (7) 부족 경고
         if (selected.length + lockedSet.size < minN) {
           warnings.push({
+            type: 'missing',
             group_id: g.id, group_name: g.name,
             date: isoDate, missing: minN - (selected.length + lockedSet.size),
           })
         }
       }
+
+      // PR-2SS-c — 일자 끝에서 연속 근무일 카운터 업데이트
+      //   workedToday 에 있으면 ++ / 없으면 0 (휴무 = 리셋)
+      //   각 워커 마다 (활성 워커 전체 — 후보 풀 합집합 사용)
+      const allCandidateWorkers = new Set<string>()
+      for (const arr of membersByGroup.values()) {
+        for (const wId of arr) allCandidateWorkers.add(wId)
+      }
+      for (const wId of allCandidateWorkers) {
+        if (workedToday.has(wId)) {
+          workerConsec.set(wId, (workerConsec.get(wId) || 0) + 1)
+        } else {
+          workerConsec.set(wId, 0)
+        }
+      }
     }
 
+    // PR-2SS-b — 시간 겹침 검사 (apply 전 사전 가드)
+    //   같은 (worker_id, work_date) 의 plan + lock + existing 들 중 시간 겹침 detect
+    {
+      type Range = { start: number; end: number; slot_id: string }
+      const occByWorkerDate = new Map<string, Range[]>()
+      // 슬롯 ID → (start_min, end_min, is_overnight) 인덱스
+      const slotById = new Map<string, { start: number; end: number; overnight: boolean }>()
+      for (const g of targetGroups) {
+        if (slotById.has(g.shift_slot_id)) continue
+        slotById.set(g.shift_slot_id, {
+          start: timeToMin(g.slot_start),
+          end: timeToMin(g.slot_end),
+          overnight: !!g.slot_overnight,
+        })
+      }
+      const addRange = (wId: string, isoDate: string, slotId: string) => {
+        const sl = slotById.get(slotId)
+        if (!sl) return
+        const startAbs = isoToMin(isoDate, sl.start)
+        const endAbs = sl.overnight
+          ? isoToMin(addDays(isoDate, 1), sl.end)
+          : isoToMin(isoDate, sl.end)
+        const key = `${wId}_${isoDate}`
+        const arr = occByWorkerDate.get(key) || []
+        arr.push({ start: startAbs, end: endAbs, slot_id: slotId })
+        occByWorkerDate.set(key, arr)
+      }
+      // existing (lock 포함) row 들 우선 등록
+      for (const a of existingRows) {
+        if (!a.worker_id) continue
+        addRange(a.worker_id, a.work_date, a.shift_slot_id)
+      }
+      // plan 의 새 insert/update 등록 (skip 제외)
+      for (const p of plan) {
+        if (!p.worker_id) continue
+        if (p.action !== 'insert' && p.action !== 'update') continue
+        // existing 와 동일 (worker, date, slot) 인 경우 중복 등록 회피
+        const key = `${p.worker_id}_${p.work_date}_${p.shift_slot_id}`
+        if (existingMap.has(`${p.work_date}_${p.shift_slot_id}_${p.worker_id}`)) continue
+        addRange(p.worker_id, p.work_date, p.shift_slot_id)
+      }
+      // 겹침 detect — 같은 (wId, date) 의 range 들 페어 비교
+      for (const [key, ranges] of occByWorkerDate) {
+        if (ranges.length < 2) continue
+        const [wId, date] = key.split('_')
+        // 시작 시각 정렬 후 인접 페어 검사 (O(n log n))
+        const sorted = [...ranges].sort((a, b) => a.start - b.start)
+        for (let i = 0; i < sorted.length - 1; i++) {
+          for (let j = i + 1; j < sorted.length; j++) {
+            const a = sorted[i], b = sorted[j]
+            if (b.start >= a.end) break  // 정렬 보장 — 이후 j 도 안 겹침
+            // 겹침 발견
+            warnings.push({
+              type: 'time_conflict',
+              worker_id: wId,
+              date: date,
+              slot_a: a.slot_id,
+              slot_b: b.slot_id,
+            })
+          }
+        }
+      }
+    }
+
+    // PR-2SS-b/c/d — 경고 타입별 카운트
+    const warnCount = {
+      missing: warnings.filter(w => w.type === 'missing').length,
+      next_day_block: warnings.filter(w => w.type === 'next_day_block').length,
+      time_conflict: warnings.filter(w => w.type === 'time_conflict').length,
+      consec_limit: warnings.filter(w => w.type === 'consec_limit').length,
+      slot_blocked: warnings.filter(w => w.type === 'slot_blocked').length,
+      seniority_short: warnings.filter(w => w.type === 'seniority_short').length,
+    }
     const summary = {
       mode,
       total_plan: plan.length,
@@ -599,9 +998,10 @@ export async function POST(
       leaves_marked: markLeaves ? leaves.length : 0,
       by_group: byGroup,
       by_date: byDate,
-      // PR-2QQ-d-3
-      warnings: warnings.slice(0, 50),  // 부족 경고 (최대 50개)
+      // PR-2QQ-d-3 → PR-2SS-b — 경고 다중 타입 (missing/next_day_block/time_conflict)
+      warnings: warnings.slice(0, 100),
       warning_count: warnings.length,
+      warn_by_type: warnCount,
       use_priority: usePriority,
       enforce_min_coverage: enforceMinCoverage,
     }
@@ -614,6 +1014,12 @@ export async function POST(
     }
 
     // ── 8) APPLY ────────────────────────────────────────────────────
+    // PR-2SS-e — cs_assignments 의 day_hours/night_hours/premium_hours 컬럼 graceful
+    let hasAsnBreakdown = true
+    try {
+      await prisma.$queryRaw<any[]>`SELECT day_hours FROM cs_assignments LIMIT 1`
+    } catch { hasAsnBreakdown = false }
+
     if (clearFirst) {
       // PR-2QQ-b: manual_lock=1 셀은 보존
       if (hasLockCol) {
@@ -630,12 +1036,32 @@ export async function POST(
         const slot = targetGroups.find(g => g.shift_slot_id === p.shift_slot_id)!
         const hours = computeHours(slot.slot_start, slot.slot_end, !!slot.slot_overnight, p.special_code)
         const newId = crypto.randomUUID()
-        await prisma.$executeRaw`
-          INSERT INTO cs_assignments
-            (id, schedule_id, work_date, shift_slot_id, worker_id, special_code, computed_hours, created_at, updated_at)
-          VALUES
-            (${newId}, ${scheduleId}, ${p.work_date}, ${p.shift_slot_id}, ${p.worker_id}, ${p.special_code}, ${hours}, NOW(), NOW())
-        `
+        // PR-2SS-e — 시간 분해
+        const bd = computeBreakdown(
+          slot.slot_start, slot.slot_end, !!slot.slot_overnight,
+          slot.slot_night_period_start, slot.slot_night_period_end,
+          Number(slot.slot_night_premium_rate || 0),
+          p.special_code,
+        )
+        if (hasAsnBreakdown) {
+          await prisma.$executeRaw`
+            INSERT INTO cs_assignments
+              (id, schedule_id, work_date, shift_slot_id, worker_id, special_code,
+               computed_hours, day_hours, night_hours, premium_hours,
+               created_at, updated_at)
+            VALUES
+              (${newId}, ${scheduleId}, ${p.work_date}, ${p.shift_slot_id}, ${p.worker_id}, ${p.special_code},
+               ${hours}, ${bd.day}, ${bd.night}, ${bd.premium},
+               NOW(), NOW())
+          `
+        } else {
+          await prisma.$executeRaw`
+            INSERT INTO cs_assignments
+              (id, schedule_id, work_date, shift_slot_id, worker_id, special_code, computed_hours, created_at, updated_at)
+            VALUES
+              (${newId}, ${scheduleId}, ${p.work_date}, ${p.shift_slot_id}, ${p.worker_id}, ${p.special_code}, ${hours}, NOW(), NOW())
+          `
+        }
       }
     } else {
       // 일반 적용 — insert / update 만
@@ -643,24 +1069,57 @@ export async function POST(
         if (p.action !== 'insert' && p.action !== 'update') continue
         const slot = targetGroups.find(g => g.shift_slot_id === p.shift_slot_id)!
         const hours = computeHours(slot.slot_start, slot.slot_end, !!slot.slot_overnight, p.special_code)
+        // PR-2SS-e — 시간 분해
+        const bd = computeBreakdown(
+          slot.slot_start, slot.slot_end, !!slot.slot_overnight,
+          slot.slot_night_period_start, slot.slot_night_period_end,
+          Number(slot.slot_night_premium_rate || 0),
+          p.special_code,
+        )
 
         if (p.action === 'insert') {
           const newId = crypto.randomUUID()
-          await prisma.$executeRaw`
-            INSERT INTO cs_assignments
-              (id, schedule_id, work_date, shift_slot_id, worker_id, special_code, computed_hours, created_at, updated_at)
-            VALUES
-              (${newId}, ${scheduleId}, ${p.work_date}, ${p.shift_slot_id}, ${p.worker_id}, ${p.special_code}, ${hours}, NOW(), NOW())
-          `
+          if (hasAsnBreakdown) {
+            await prisma.$executeRaw`
+              INSERT INTO cs_assignments
+                (id, schedule_id, work_date, shift_slot_id, worker_id, special_code,
+                 computed_hours, day_hours, night_hours, premium_hours,
+                 created_at, updated_at)
+              VALUES
+                (${newId}, ${scheduleId}, ${p.work_date}, ${p.shift_slot_id}, ${p.worker_id}, ${p.special_code},
+                 ${hours}, ${bd.day}, ${bd.night}, ${bd.premium},
+                 NOW(), NOW())
+            `
+          } else {
+            await prisma.$executeRaw`
+              INSERT INTO cs_assignments
+                (id, schedule_id, work_date, shift_slot_id, worker_id, special_code, computed_hours, created_at, updated_at)
+              VALUES
+                (${newId}, ${scheduleId}, ${p.work_date}, ${p.shift_slot_id}, ${p.worker_id}, ${p.special_code}, ${hours}, NOW(), NOW())
+            `
+          }
         } else {
           // update — PR-2OO: (date, slot, worker) 키
           const existing = existingMap.get(`${p.work_date}_${p.shift_slot_id}_${p.worker_id || 'null'}`)!
-          await prisma.$executeRaw`
-            UPDATE cs_assignments
-            SET special_code = ${p.special_code},
-                computed_hours = ${hours}, updated_at = NOW()
-            WHERE id = ${existing.id}
-          `
+          if (hasAsnBreakdown) {
+            await prisma.$executeRaw`
+              UPDATE cs_assignments
+              SET special_code = ${p.special_code},
+                  computed_hours = ${hours},
+                  day_hours = ${bd.day},
+                  night_hours = ${bd.night},
+                  premium_hours = ${bd.premium},
+                  updated_at = NOW()
+              WHERE id = ${existing.id}
+            `
+          } else {
+            await prisma.$executeRaw`
+              UPDATE cs_assignments
+              SET special_code = ${p.special_code},
+                  computed_hours = ${hours}, updated_at = NOW()
+              WHERE id = ${existing.id}
+            `
+          }
         }
       }
     }

@@ -33,7 +33,7 @@
 
 ### 다른 세션 영역 staging 검증 (규칙 21)
 ```
-본 세션 staged: app/(employees)/Cafe24 ERP/_docs/ 만
+본 세션 staged: app/(employees)/RideAccidents/_docs/ 만
 다른 세션 영역 (절대 staging X):
   - CLAUDE.md
   - app/(employees)/CallScheduler/

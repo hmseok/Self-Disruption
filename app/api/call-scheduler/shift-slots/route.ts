@@ -21,27 +21,120 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: '인증 필요' }, { status: 401 })
   }
   try {
+    // PR-2SS-b/d/e — 안전 가드 + 경력 + 시간 분해 컬럼 graceful
+    let hasSafetyCols = true
+    let hasSeniorityCol = true
+    let hasBreakdownCols = true
+    try {
+      await prisma.$queryRaw<any[]>`SELECT next_day_blocking_hours FROM cs_shift_slots LIMIT 1`
+    } catch { hasSafetyCols = false }
+    try {
+      await prisma.$queryRaw<any[]>`SELECT min_seniority_months FROM cs_shift_slots LIMIT 1`
+    } catch { hasSeniorityCol = false }
+    try {
+      await prisma.$queryRaw<any[]>`SELECT night_period_start FROM cs_shift_slots LIMIT 1`
+    } catch { hasBreakdownCols = false }
+
     const includeInactive = request.nextUrl.searchParams.get('include_inactive') === '1'
-    const rows = includeInactive
-      ? await prisma.$queryRaw<any[]>`
-          SELECT id, code, label,
-            TIME_FORMAT(start_time, '%H:%i:%s') AS start_time,
-            TIME_FORMAT(end_time,   '%H:%i:%s') AS end_time,
-            is_overnight, category, sort_order, is_active
-          FROM cs_shift_slots
-          ORDER BY is_active DESC, sort_order ASC`
-      : await prisma.$queryRaw<any[]>`
-          SELECT id, code, label,
-            TIME_FORMAT(start_time, '%H:%i:%s') AS start_time,
-            TIME_FORMAT(end_time,   '%H:%i:%s') AS end_time,
-            is_overnight, category, sort_order, is_active
-          FROM cs_shift_slots
-          WHERE is_active = 1
-          ORDER BY sort_order ASC`
+    let rows: any[]
+    if (hasSafetyCols && hasSeniorityCol && hasBreakdownCols) {
+      rows = includeInactive
+        ? await prisma.$queryRaw<any[]>`
+            SELECT id, code, label,
+              TIME_FORMAT(start_time, '%H:%i:%s') AS start_time,
+              TIME_FORMAT(end_time,   '%H:%i:%s') AS end_time,
+              is_overnight, category, sort_order, is_active,
+              next_day_blocking_hours, max_consecutive_days, min_seniority_months,
+              TIME_FORMAT(night_period_start, '%H:%i:%s') AS night_period_start,
+              TIME_FORMAT(night_period_end,   '%H:%i:%s') AS night_period_end,
+              night_premium_rate
+            FROM cs_shift_slots
+            ORDER BY is_active DESC, sort_order ASC`
+        : await prisma.$queryRaw<any[]>`
+            SELECT id, code, label,
+              TIME_FORMAT(start_time, '%H:%i:%s') AS start_time,
+              TIME_FORMAT(end_time,   '%H:%i:%s') AS end_time,
+              is_overnight, category, sort_order, is_active,
+              next_day_blocking_hours, max_consecutive_days, min_seniority_months,
+              TIME_FORMAT(night_period_start, '%H:%i:%s') AS night_period_start,
+              TIME_FORMAT(night_period_end,   '%H:%i:%s') AS night_period_end,
+              night_premium_rate
+            FROM cs_shift_slots
+            WHERE is_active = 1
+            ORDER BY sort_order ASC`
+    } else if (hasSafetyCols && hasSeniorityCol) {
+      rows = includeInactive
+        ? await prisma.$queryRaw<any[]>`
+            SELECT id, code, label,
+              TIME_FORMAT(start_time, '%H:%i:%s') AS start_time,
+              TIME_FORMAT(end_time,   '%H:%i:%s') AS end_time,
+              is_overnight, category, sort_order, is_active,
+              next_day_blocking_hours, max_consecutive_days, min_seniority_months
+            FROM cs_shift_slots
+            ORDER BY is_active DESC, sort_order ASC`
+        : await prisma.$queryRaw<any[]>`
+            SELECT id, code, label,
+              TIME_FORMAT(start_time, '%H:%i:%s') AS start_time,
+              TIME_FORMAT(end_time,   '%H:%i:%s') AS end_time,
+              is_overnight, category, sort_order, is_active,
+              next_day_blocking_hours, max_consecutive_days, min_seniority_months
+            FROM cs_shift_slots
+            WHERE is_active = 1
+            ORDER BY sort_order ASC`
+    } else if (hasSafetyCols) {
+      rows = includeInactive
+        ? await prisma.$queryRaw<any[]>`
+            SELECT id, code, label,
+              TIME_FORMAT(start_time, '%H:%i:%s') AS start_time,
+              TIME_FORMAT(end_time,   '%H:%i:%s') AS end_time,
+              is_overnight, category, sort_order, is_active,
+              next_day_blocking_hours, max_consecutive_days
+            FROM cs_shift_slots
+            ORDER BY is_active DESC, sort_order ASC`
+        : await prisma.$queryRaw<any[]>`
+            SELECT id, code, label,
+              TIME_FORMAT(start_time, '%H:%i:%s') AS start_time,
+              TIME_FORMAT(end_time,   '%H:%i:%s') AS end_time,
+              is_overnight, category, sort_order, is_active,
+              next_day_blocking_hours, max_consecutive_days
+            FROM cs_shift_slots
+            WHERE is_active = 1
+            ORDER BY sort_order ASC`
+    } else {
+      rows = includeInactive
+        ? await prisma.$queryRaw<any[]>`
+            SELECT id, code, label,
+              TIME_FORMAT(start_time, '%H:%i:%s') AS start_time,
+              TIME_FORMAT(end_time,   '%H:%i:%s') AS end_time,
+              is_overnight, category, sort_order, is_active
+            FROM cs_shift_slots
+            ORDER BY is_active DESC, sort_order ASC`
+        : await prisma.$queryRaw<any[]>`
+            SELECT id, code, label,
+              TIME_FORMAT(start_time, '%H:%i:%s') AS start_time,
+              TIME_FORMAT(end_time,   '%H:%i:%s') AS end_time,
+              is_overnight, category, sort_order, is_active
+            FROM cs_shift_slots
+            WHERE is_active = 1
+            ORDER BY sort_order ASC`
+    }
     const data = rows.map(r => ({
       ...r,
       is_overnight: Boolean(r.is_overnight),
       is_active: Boolean(r.is_active),
+      // PR-2SS-b — graceful 디폴트
+      next_day_blocking_hours: hasSafetyCols && r.next_day_blocking_hours != null
+        ? Number(r.next_day_blocking_hours) : 0,
+      max_consecutive_days: hasSafetyCols && r.max_consecutive_days != null
+        ? Number(r.max_consecutive_days) : null,
+      // PR-2SS-d — 최소 경력 graceful
+      min_seniority_months: hasSeniorityCol && r.min_seniority_months != null
+        ? Number(r.min_seniority_months) : 0,
+      // PR-2SS-e — 시간 분해 graceful
+      night_period_start: hasBreakdownCols ? (r.night_period_start ?? null) : null,
+      night_period_end: hasBreakdownCols ? (r.night_period_end ?? null) : null,
+      night_premium_rate: hasBreakdownCols && r.night_premium_rate != null
+        ? Number(r.night_premium_rate) : 0,
     }))
     return NextResponse.json({ data: serialize(data), error: null })
   } catch (e: any) {
@@ -78,6 +171,17 @@ export async function POST(request: NextRequest) {
     const is_overnight: boolean = Boolean(body?.is_overnight)
     const category: string = CATEGORIES.includes(body?.category) ? body.category : 'day'
     const sort_order: number = Number(body?.sort_order) || 0
+    // PR-2SS-b — 안전 가드 (overnight 디폴트 16h / 3일)
+    const nextDayBlocking: number = body?.next_day_blocking_hours != null
+      ? Math.max(0, Math.min(48, Number(body.next_day_blocking_hours) || 0))
+      : (is_overnight ? 16 : 0)
+    const maxConsec: number | null = body?.max_consecutive_days != null && body.max_consecutive_days !== ''
+      ? Math.max(1, Math.min(31, Number(body.max_consecutive_days) || 0)) || null
+      : (is_overnight ? 3 : null)
+    // PR-2SS-d — 최소 경력 (overnight 디폴트 6개월)
+    const minSeniority: number = body?.min_seniority_months != null
+      ? Math.max(0, Math.min(120, Number(body.min_seniority_months) || 0))
+      : (is_overnight ? 6 : 0)
 
     // code 중복 체크
     const dup = await prisma.$queryRaw<any[]>`
@@ -87,14 +191,47 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: `code "${code}" 중복` }, { status: 409 })
     }
 
+    // PR-2SS-b/d — 안전 가드 + 경력 컬럼 graceful
+    let hasSafetyCols = true
+    let hasSeniorityCol = true
+    try {
+      await prisma.$queryRaw<any[]>`SELECT next_day_blocking_hours FROM cs_shift_slots LIMIT 1`
+    } catch { hasSafetyCols = false }
+    try {
+      await prisma.$queryRaw<any[]>`SELECT min_seniority_months FROM cs_shift_slots LIMIT 1`
+    } catch { hasSeniorityCol = false }
+
     const id = crypto.randomUUID()
-    await prisma.$executeRaw`
-      INSERT INTO cs_shift_slots
-        (id, code, label, start_time, end_time, is_overnight, category, sort_order, is_active, created_at, updated_at)
-      VALUES
-        (${id}, ${code}, ${label}, ${start_time}, ${end_time},
-         ${is_overnight ? 1 : 0}, ${category}, ${sort_order}, 1, NOW(), NOW())
-    `
+    if (hasSafetyCols && hasSeniorityCol) {
+      await prisma.$executeRaw`
+        INSERT INTO cs_shift_slots
+          (id, code, label, start_time, end_time, is_overnight, category, sort_order, is_active,
+           next_day_blocking_hours, max_consecutive_days, min_seniority_months,
+           created_at, updated_at)
+        VALUES
+          (${id}, ${code}, ${label}, ${start_time}, ${end_time},
+           ${is_overnight ? 1 : 0}, ${category}, ${sort_order}, 1,
+           ${nextDayBlocking}, ${maxConsec}, ${minSeniority}, NOW(), NOW())
+      `
+    } else if (hasSafetyCols) {
+      await prisma.$executeRaw`
+        INSERT INTO cs_shift_slots
+          (id, code, label, start_time, end_time, is_overnight, category, sort_order, is_active,
+           next_day_blocking_hours, max_consecutive_days, created_at, updated_at)
+        VALUES
+          (${id}, ${code}, ${label}, ${start_time}, ${end_time},
+           ${is_overnight ? 1 : 0}, ${category}, ${sort_order}, 1,
+           ${nextDayBlocking}, ${maxConsec}, NOW(), NOW())
+      `
+    } else {
+      await prisma.$executeRaw`
+        INSERT INTO cs_shift_slots
+          (id, code, label, start_time, end_time, is_overnight, category, sort_order, is_active, created_at, updated_at)
+        VALUES
+          (${id}, ${code}, ${label}, ${start_time}, ${end_time},
+           ${is_overnight ? 1 : 0}, ${category}, ${sort_order}, 1, NOW(), NOW())
+      `
+    }
     const rows = await prisma.$queryRaw<any[]>`
       SELECT id, code, label,
         TIME_FORMAT(start_time, '%H:%i:%s') AS start_time,

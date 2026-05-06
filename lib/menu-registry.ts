@@ -97,12 +97,9 @@ export const MENUS: MenuEntry[] = [
   { id: 'mod-receipts',        name: '영수증제출',   path: '/work-essentials/receipts', iconKey: 'Clipboard', group: 'work-essentials', sortOrder: 51, requirePermission: true },
   { id: 'mod-meetings',        name: '회의록', displayName: '📋 회의록', path: '/meetings', iconKey: 'Doc', group: 'work-essentials', sortOrder: 52, requirePermission: true },
 
-  // ── 카페24 ERP (외부 연동 — 관리자 전용) ──
-  // PR-6.3 신설 — Q8=D 일단 관리자 전용 (직군별 분리는 별도 PR)
-  // 단계 1 read-only / 단계 2 양방 동기화 / 단계 3 카페24 폐기 — 장기 마이그레이션
-  { id: 'mod-cafe24-accidents', name: '카페24 사고접수', displayName: '🚨 카페24 사고접수', path: '/Cafe24 ERP/accidents', iconKey: 'Clipboard', group: 'admin', sortOrder: 48, requirePermission: true },
-
   // ── CX팀 (cx-team) ── Employee of Ride Inc. > CX팀 — 권한 부여 대상 (CX팀원만)
+  // PR-6.3.c (2026-05-05) — 라이드 사고접수 신설. 백엔드 카페24 ERP (skyautosvc.co.kr) read-only 연동
+  { id: 'mod-ride-accidents',  name: '라이드 사고접수', displayName: '🚨 라이드 사고접수', path: '/RideAccidents', iconKey: 'Clipboard', group: 'cx-team', sortOrder: 63, requirePermission: true },
   { id: 'mod-call-scheduler',  name: '근무시간표 분석 & 배포', displayName: '📅 근무시간표 분석 & 배포', path: '/CallScheduler', iconKey: 'Setting', group: 'cx-team', sortOrder: 60, requirePermission: true },
   // 직원 마스터 — 사이드바 숨김. 근무스케줄 페이지 안에서 sub-nav 로 접근 (권한 페이지에는 노출 유지)
   { id: 'mod-ride-employees',  name: '직원 마스터',   path: '/RideEmployees',  iconKey: 'Users',   group: 'cx-team', sortOrder: 61, requirePermission: true, sidebarHidden: true },
