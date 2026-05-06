@@ -649,7 +649,26 @@ export default function PayrollPage() {
     <div className="page-bg">
       <div className="max-w-[1400px] mx-auto py-4 px-4 md:py-5 md:px-6">
 
-      {/* ── 탭 바 (DcToolbar) ── */}
+      {/* PR-B6 — /hr 와 동일 5 메인 탭 (사이드바 1메뉴 통합) */}
+      <DcToolbar
+        search=""
+        onSearchChange={() => {}}
+        noSearch
+        filters={[
+          { key: 'employees', label: '👥 직원 관리' },
+          { key: 'org', label: '🏢 부서 · 직급' },
+          { key: 'invitations', label: '✉️ 초대 관리' },
+          { key: 'external', label: '👤 외부 인력' },
+          { key: 'payroll', label: '💼 급여 운영' },
+        ]}
+        activeFilter="payroll"
+        onFilterChange={(key) => {
+          if (key === 'payroll') return // 이미 활성
+          router.push(`/hr?tab=${key}`)
+        }}
+      />
+
+      {/* ── 급여 운영 sub-탭 (DcToolbar) — 대장 / 식대 / 프리랜서지급 / 분석 ── */}
       <DcToolbar
         search=""
         onSearchChange={() => {}}
@@ -818,77 +837,11 @@ export default function PayrollPage() {
             </button>
           </div>
 
-          {/* 필터 + 검색 + 액션 */}
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-            {(['active', 'all', 'inactive'] as const).map(f => (
-              <button key={f} onClick={() => setFlFilter(f)} style={{ ...pill(flFilter === f ? C.steel : '#fff', flFilter === f ? '#fff' : C.gray500), border: flFilter === f ? 'none' : `1px solid ${C.gray200}`, cursor: 'pointer' }}>
-                {f === 'active' ? `활성 (${freelancers.filter(x => x.is_active).length})` : f === 'all' ? '전체' : '비활성'}
-              </button>
-            ))}
-            <input placeholder="이름/연락처 검색" value={flSearch} onChange={e => setFlSearch(e.target.value)} style={{ ...inputBase, flex: '1 1 140px', maxWidth: 200 }} />
-          </div>
-          {/* PR-B5 Q2a — 드래그앤드롭 일괄 등록 / 양식 다운로드 모두 인사 마스터로 이전 */}
-          {/* 일괄등록 미리보기 */}
-          {(bulkLogs.length > 0 || bulkData.length > 0) && (
-            <div style={sectionCard}>
-              {bulkLogs.length > 0 && (
-                <div style={{ padding: '12px 20px', borderBottom: bulkData.length > 0 ? `1px solid ${C.gray100}` : 'none' }}>
-                  {bulkLogs.map((log, i) => <p key={i} style={{ fontSize: 12, color: C.gray500, margin: '2px 0', fontWeight: 500 }}>{log}</p>)}
-                </div>
-              )}
-              {bulkData.length > 0 && (
-                <div style={{ overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 600 }}>
-                    <thead><tr><th style={thStyle}>이름</th><th style={thStyle}>연락처</th><th style={thStyle}>세금유형</th><th style={thStyle}>업종</th><th style={thStyle}>상태</th></tr></thead>
-                    <tbody>
-                      {bulkData.map((d, i) => (
-                        <tr key={i} style={{ opacity: d._status === 'duplicate' ? 0.4 : 1 }}>
-                          <td style={tdStyle}>{d.name}</td><td style={tdStyle}>{d.phone}</td>
-                          <td style={tdStyle}>{d.tax_type}</td><td style={tdStyle}>{d.service_type}</td>
-                          <td style={tdStyle}><span style={badge(d._status === 'saved' ? C.greenLight : d._status === 'duplicate' ? C.gray100 : d._status === 'error' ? C.redLight : C.amberLight, d._status === 'saved' ? C.green : d._status === 'duplicate' ? C.gray400 : d._status === 'error' ? C.red : C.amber)}>{d._status === 'saved' ? '등록완료' : d._status === 'duplicate' ? d._note : d._status === 'error' ? d._note : '대기'}</span></td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  <div style={{ padding: 16, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                    <button onClick={() => { setBulkData([]); setBulkLogs([]) }} style={btnSecondary}>초기화</button>
-                    <button onClick={handleBulkSave} disabled={bulkProcessing} style={btnPrimary(bulkProcessing ? C.gray400 : C.green)}>
-                      {bulkProcessing ? '저장 중...' : `${bulkData.filter(d => d._status === 'ready').length}명 일괄 등록`}
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-          {/* 프리랜서 목록 */}
-          <div style={{ ...sectionCard, overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 700 }}>
-              <thead><tr>
-                <th style={thStyle}>이름</th><th style={thStyle}>연락처</th><th style={thStyle}>세금유형</th>
-                <th style={thStyle}>업종</th><th style={thStyle}>은행/계좌</th><th style={thStyle}>상태</th><th style={thStyle}>액션</th>
-              </tr></thead>
-              <tbody>
-                {filteredFl.map(f => (
-                  <tr key={f.id} onMouseEnter={e => (e.currentTarget.style.background = C.gray50)} onMouseLeave={e => (e.currentTarget.style.background = '')}>
-                    <td style={{ ...tdStyle, fontWeight: 700 }}>{f.name}</td>
-                    <td style={{ ...tdStyle, fontSize: 13 }}>{f.phone || '-'}</td>
-                    <td style={tdStyle}><span style={badge(C.amberLight, C.amber)}>{f.tax_type}</span></td>
-                    <td style={{ ...tdStyle, fontSize: 13 }}>{f.service_type}</td>
-                    <td style={{ ...tdStyle, fontSize: 12, color: C.gray500 }}>{f.bank_name} {f.account_number}</td>
-                    <td style={tdStyle}><span style={badge(f.is_active ? C.greenLight : C.gray100, f.is_active ? C.green : C.gray400)}>{f.is_active ? '활성' : '비활성'}</span></td>
-                    <td style={{ ...tdStyle, display: 'flex', gap: 4 }}>
-                      <button onClick={() => openFlModal(f)} style={{ ...btnSecondary, padding: '6px 12px', fontSize: 12 }}>수정</button>
-                      <button onClick={() => handleToggleActive(f)} style={{ ...btnSecondary, padding: '6px 12px', fontSize: 12, color: f.is_active ? C.red : C.green }}>{f.is_active ? '비활성화' : '활성화'}</button>
-                    </td>
-                  </tr>
-                ))}
-                {filteredFl.length === 0 && <tr><td colSpan={7} style={{ ...tdStyle, textAlign: 'center', padding: 48, color: C.gray400 }}>등록된 프리랜서가 없습니다</td></tr>}
-              </tbody>
-            </table>
-          </div>
+          {/* PR-B6 — 프리랜서 마스터 list / 필터 / 일괄등록 모두 제거 (인사 마스터에서 처리) */}
+          {/* 본 화면은 「용역비 지급 내역」만 — 지급 등록/확정 운영 */}
 
-          {/* ── 용역비 지급 (합쳐진 영역) ── */}
-          <div style={{ marginTop: 16 }}>
+          {/* ── 용역비 지급 내역 ── */}
+          <div>
             <h3 style={{ fontSize: 16, fontWeight: 800, color: C.gray900, margin: '0 0 16px' }}>용역비 지급 내역</h3>
             {/* KPI 스탯 카드 */}
             <DcStatStrip

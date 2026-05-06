@@ -111,9 +111,11 @@ export const MENUS: MenuEntry[] = [
   // 권한 부여 대상 — 일부 사용자에게 회사 정보 / 메시지 센터 등 위임 가능
   // 2026-05-05 PR-B1 — 「인사 마스터」 통합 페이지 (직원/부서·직급/초대/외부인력) 1개 메뉴로 통합
   // 2026-05-06 PR-B4 — 「급여 운영」 admin → settings 그룹으로 이동 (인사 영역 통합)
+  // 2026-05-06 PR-B6 — mod-payroll-ops 사이드바에서 숨김 (sidebarHidden), 권한 페이지에는 유지
+  // 「인사 마스터」(/hr) 안 5번째 탭에서 「급여 운영」 으로 진입 — 사이드바는 1 메뉴만
   { id: 'mod-company-info',     name: '회사 정보',     path: '/db/codes',                iconKey: 'Setting',   group: 'settings', sortOrder: 70, requirePermission: true },
   { id: 'mod-hr-master',        name: '인사 마스터', displayName: '👥 인사 마스터', path: '/hr', iconKey: 'Users', group: 'settings', sortOrder: 71, requirePermission: true },
-  { id: 'mod-payroll-ops',      name: '급여 운영', displayName: '💼 급여 운영', path: '/hr/payroll', iconKey: 'Money', group: 'settings', sortOrder: 72, requirePermission: true },
+  { id: 'mod-payroll-ops',      name: '급여 운영', displayName: '💼 급여 운영', path: '/hr/payroll', iconKey: 'Money', group: 'settings', sortOrder: 72, requirePermission: true, sidebarHidden: true },
   { id: 'mod-contract-terms',   name: '계약 약관 관리', path: '/admin/contract-terms',    iconKey: 'Doc',       group: 'settings', sortOrder: 73, requirePermission: true },
   { id: 'mod-message-templates',name: '메시지 센터',    path: '/admin/message-templates', iconKey: 'Clipboard', group: 'settings', sortOrder: 74, requirePermission: true },
 ]

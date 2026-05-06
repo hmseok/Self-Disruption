@@ -1,5 +1,29 @@
 # /admin 모듈 CHANGELOG
 
+## 2026-05-06 — PR-B6 급여 운영 5탭 통합 (사이드바 1메뉴)
+
+사용자 명시:
+> "설정/급여운영이 분리되어있는건 별로 / 통합해야 오류나 중복이 없는데"
+> "지금 중복 되어있는거 아닌가?"
+
+중복 제거:
+- /hr/payroll 프리랜서 탭 — 프리랜서 마스터 list / 필터 / 일괄등록 모두 제거
+  · 등록은 /hr 외부 인력 탭에서 (PR-B5 에서 이전 완료)
+  · 본 화면은 「용역비 지급 내역」 (flPayments) 만 표시
+
+5탭 통합 (사이드바 1메뉴):
+- /hr — 5번째 탭 「💼 급여 운영」 추가 → 클릭 시 /hr/payroll 으로 router.push
+- /hr/payroll — 동일 5탭 nav 상단 추가 (active='payroll')
+  · 다른 탭 클릭 시 /hr?tab={key} 으로 이동
+- /hr — querystring ?tab= 파싱하여 초기 탭 동기화
+
+menu-registry:
+- mod-payroll-ops: sidebarHidden=true (사이드바에서 숨김, 권한 페이지에는 노출)
+- 사이드바 「설정」 그룹 안 「💼 급여 운영」 메뉴 사라짐
+- 옛 URL `/hr/payroll` 직접 접근 가능 (북마크 유지)
+
+
+
 ## 2026-05-06 — PR-B5 식대 라벨 + 프리랜서 분리 + 수당 동적 추가
 
 사용자 결정: Q1 ㄱㄱ / Q2 a / Q3 γ

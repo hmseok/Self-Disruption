@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useMemo } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useApp } from '../context/AppContext'
 import type { Position, Department } from '../types/rbac'
 import InviteModal from '../components/InviteModal'
@@ -73,6 +74,8 @@ const ROLE_COLORS: Record<string, { bg: string; color: string }> = {
 
 export default function HRMasterPage() {
   const { user, company, role } = useApp()
+  const router = useRouter()
+  const searchParams = useSearchParams()
 
   // 기본 데이터
   const [employees, setEmployees] = useState<any[]>([])
@@ -88,9 +91,19 @@ export default function HRMasterPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
 
-  // 탭 상태 — 통합 페이지 4 탭
+  // 탭 상태 — 통합 페이지 4 탭 (5번째 「급여 운영」 은 /hr/payroll 로 router.push)
   type TopTab = 'employees' | 'org' | 'invitations' | 'external'
-  const [topTab, setTopTab] = useState<TopTab>('employees')
+  const initialTab = (() => {
+    const q = searchParams?.get('tab')
+    if (q === 'org' || q === 'invitations' || q === 'external' || q === 'employees') return q
+    return 'employees'
+  })()
+  const [topTab, setTopTab] = useState<TopTab>(initialTab)
+  // querystring 변경 시 탭 동기화
+  useEffect(() => {
+    const q = searchParams?.get('tab')
+    if (q === 'org' || q === 'invitations' || q === 'external' || q === 'employees') setTopTab(q)
+  }, [searchParams])
   // 옛 권한 master-detail 잔여 코드 호환 (사용 X)
   const [activeTab, setActiveTab] = useState<'organization' | 'permissions'>('organization')
 
@@ -958,9 +971,13 @@ export default function HRMasterPage() {
           { key: 'org', label: '🏢 부서 · 직급', count: positions.length + departments.length },
           { key: 'invitations', label: '✉️ 초대 관리', count: invitations.length },
           { key: 'external', label: '👤 외부 인력', count: freelancers.length + rideEmployees.length },
+          { key: 'payroll', label: '💼 급여 운영' },
         ]}
         activeFilter={topTab}
-        onFilterChange={(key) => setTopTab(key as TopTab)}
+        onFilterChange={(key) => {
+          if (key === 'payroll') router.push('/hr/payroll')
+          else setTopTab(key as TopTab)
+        }}
       />
 
       {/* ─── 탭 1: 직원 관리 ─── */}
