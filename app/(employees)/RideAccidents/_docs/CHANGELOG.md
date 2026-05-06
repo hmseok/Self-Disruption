@@ -8,6 +8,72 @@
 
 ---
 
+## 2026-05-06 | PR-6.7 | 사고접수 (acr 모듈) 별도 페이지 + 라벨 정정
+
+### 사용자 요청
+> "긴출 내용이라 사고접수내용까지 가봐야 디테일 알겠네요"
+> "추천을 믿습니다" → A 옵션 (PR-6.7 + PR-6.8 둘 다 진행)
+
+### 변경
+
+```
+사이드바 라벨 정정:
+  기존  /RideAccidents          🚨 라이드 사고접수  (실은 긴급출동)
+  → ✅  /RideAccidents          🚨 라이드 긴급출동
+  + ✅  /RideAccidentReports    🚗 라이드 사고접수  (신설)
+
+데이터 source:
+  /RideAccidents          aceesosh + acememoh (기존 — 긴급출동)
+  /RideAccidentReports    acrotpth + pmccarsm + picuserm + pmccustm (신설 — 사고접수)
+```
+
+### 산출물
+
+| 파일 | 종류 | 내용 |
+|------|------|------|
+| `app/api/cafe24/acrents/route.ts` | 신규 | 4-table JOIN 목록 API |
+| `app/api/cafe24/acrents/detail/route.ts` | 신규 | 60+ 컬럼 단건 상세 |
+| `app/(employees)/RideAccidentReports/page.tsx` | 신규 | 사고접수 페이지 + 모달 |
+| `app/(employees)/RideAccidents/page.tsx` | 라벨 | 헤더 "긴급출동" 으로 정정 |
+| `lib/menu-registry.ts` | 갱신 | mod-ride-accident-rep entry 추가 + 기존 라벨 정정 |
+
+### 사고접수 모달 섹션
+
+```
+🚗 사고접수 상세                                [× 닫기]
+─────────────────────────────────────
+[기본]      접수일 / 접수시각 / 사고번호 / 등록상태 / 등록타입
+[차량]      차량번호 + 차종/모델 + 차량 사용자 + 고객
+[차량 점검] 운행가능 (acrn) + 7개 점검 (di/dm/jc/js/mb/no/ph) — Y문제/N정상
+[사고 정보] 현장 etc / 주소 / 메모 / 비용
+[운전자]   이름 / 연락처 / 면허 / 사용자 / 전화 / 메모
+[차주]      이름 / 연락처
+[견인]      견인 회사 / 회사 전화 / 견인 차량 / 기사 이름 / 기사 전화
+[장소]      빌딩 / 주차장
+[이력]      등록 (date+time+user) / 수정 (date+time+user)
+```
+
+### GATE 진행 상태
+
+```
+✅ G3 Planner — 사용자 GO ("a — 둘 다 진행")
+✅ G5 Generator — tsc 회귀 0건
+✅ G6 Reviewer — lint:harness 새 위반 0건
+✅ Rule 13 외부 시스템 호환성 — PHP 측 4-table JOIN 패턴 그대로 검증 후 LEFT JOIN 으로 안전화
+✅ Rule 17 모듈 폴더 분리 — RideAccidentReports/ 별도 폴더
+✅ Rule 18 모든 컬럼 sortBy (9 컬럼)
+✅ Rule 21 Cowork — 본 세션 영역만 staging
+   ⚠ cross-module (api:cafe24 + RideAccidentReports + RideAccidents + lib:menu-registry)
+   → COWORK_ALLOW_MULTI_MODULE=1 우회 (의도적 cross-module — 라벨 일관성 위해 한 PR)
+✅ Rule 22 _docs 갱신
+```
+
+### 다음 PR
+
+- **PR-6.8** — 차량 통합 이력 timeline (한 carsidno 의 긴급출동 + 사고접수 + 대차 + 정산 모든 이력)
+
+---
+
 ## 2026-05-06 | PR-6.6 | 상담내역 (acememoh) timeline 추가
 
 ### 사용자 통찰력 + 요청

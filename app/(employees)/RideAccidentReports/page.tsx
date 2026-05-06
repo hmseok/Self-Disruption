@@ -1,19 +1,17 @@
 'use client'
 
 /**
- * /RideAccidents
+ * /RideAccidentReports — 라이드 사고접수
  *
- * 라이드 사고접수 목록 + 상세 모달 — 카페24 ERP (aceesosh + pmccarsm) read-only.
+ * 카페24 ERP 의 사고차 출동/접수 (acrotpth) read-only.
+ * 4-table JOIN: acrotpth + pmccarsm + picuserm + pmccustm
  *
- * 사용자 노출 명칭: "라이드 사고접수"
- * 백엔드 데이터 source: 카페24 ERP (skyautosvc.co.kr) aceesosh + pmccarsm 조인
+ * 백엔드: /api/cafe24/acrents (목록) + /api/cafe24/acrents/detail (상세)
  *
  * - 사이드바 그룹: Employee of Ride Inc. > CX팀
  * - admin 전용 (Q8=D)
- * - 캐시 30s (Q7=A 분당 변동 정책)
+ * - 캐시 30s
  * - 모든 컬럼 sortBy 의무 (CLAUDE.md 규칙 18)
- * - Glass 디자인 시스템 (CLAUDE.md § 10)
- * - 행 클릭 → 우측 슬라이드 상세 모달
  */
 
 import { useEffect, useMemo, useState } from 'react'
@@ -21,63 +19,66 @@ import { getStoredToken, getStoredUser } from '@/lib/auth-client'
 import NeuDataTable, { type TableColumn } from '@/app/components/NeuDataTable'
 import { COLORS, GLASS, BTN } from '@/app/utils/ui-tokens'
 
-// ── 타입 ────────────────────────────────────────────────────────
-interface AccidentRow {
-  esosidno: string
-  esosmddt: string // YYYYMMDD
-  esossrno: number
-  esosacdt: string | null
-  esosactm: string | null
-  esosrgst: string | null
-  esosrslt: string | null
-  esosrstx: string | null
-  esostypp: string | null
-  esosgnus: string | null
+interface AcrentRow {
+  otptidno: string
+  otptmddt: string
+  otptsrno: number
+  otptacdt: string | null
+  otptactm: string | null
+  otptacbn: string | null
+  otptrgst: string | null
+  otptrgtp: string | null
+  otptgnus: string | null
   cars_no: string | null
   cars_model: string | null
+  cars_user: string | null
+  cust_name: string | null
+  user_name: string | null
 }
 
-interface MemoRow {
-  memoidno: string
-  memomddt: string
-  memosrno: number
-  memonums: number
-  memosort: number
-  memotitl: string | null
-  memotext: string | null
-  memognus: string | null
-  memogndt: string | null
-  memogntm: string | null
+interface AcrentDetail extends AcrentRow {
+  otptmscs: string | null
+  otptacfe: string | null
+  otptacnu: string | null
+  // 점검
+  otptacrn: string | null
+  otptacdi: string | null
+  otptacdm: string | null
+  otptacjc: string | null
+  otptacjs: string | null
+  otptacmb: string | null
+  otptacno: string | null
+  otptacph: string | null
+  otptacet: string | null
+  otptacad: string | null
+  otptacmo: string | null
+  // 운전자
+  otptdsnm: string | null
+  otptdshp: string | null
+  otptdsli: string | null
+  otptdsus: string | null
+  otptdstl: string | null
+  otptdsmo: string | null
+  // 차주
+  otptcanm: string | null
+  otptcahp: string | null
+  // 견인
+  otpttonm: string | null
+  otpttohp: string | null
+  otpttwnm: string | null
+  otpttwhp: string | null
+  otpttwgn: string | null
+  // 주차/빌딩
+  otptbdnm: string | null
+  otptpknm: string | null
+  // 이력
+  otptgndt: string | null
+  otptgntm: string | null
+  otptupus: string | null
+  otptupdt: string | null
+  otptuptm: string | null
 }
 
-interface AccidentDetail extends AccidentRow {
-  esosjsfg: string | null
-  esosstat: string | null
-  esosbate: string | null
-  esostire: string | null
-  esosoils: string | null
-  esoslock: string | null
-  esosmove: string | null
-  esoshelp: string | null
-  esosaddr: string | null
-  esosadnm: string | null
-  esosadtl: string | null
-  esosusnm: string | null
-  esosustl: string | null
-  esosusvp: string | null
-  esosusvd: string | null
-  esosuser: string | null
-  esosmemo: string | null
-  esosinft: string | null
-  esoskilo: string | null
-  esosgndt: string | null
-  esosgntm: string | null
-  esosupdt: string | null
-  esosuptm: string | null
-  esosupus: string | null
-}
-
-// ── 헬퍼 ────────────────────────────────────────────────────────
 function fmtDate8(d: string | null | undefined): string {
   if (!d || d.length < 8) return ''
   return `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}`
@@ -87,40 +88,24 @@ function fmtTime4(t: string | null | undefined): string {
   return `${t.slice(0, 2)}:${t.slice(2, 4)}`
 }
 function fmtDateTime(d: string | null | undefined, t: string | null | undefined): string {
-  const dt = fmtDate8(d)
-  const tm = fmtTime4(t)
-  return [dt, tm].filter(Boolean).join(' ')
+  return [fmtDate8(d), fmtTime4(t)].filter(Boolean).join(' ')
 }
 
-// 코드 마스터 (PR-6.7 에서 bscddesc 조인 예정 — 일단 추정 라벨)
 const RGST_LABEL: Record<string, { label: string; color: string }> = {
   R: { label: '등록', color: COLORS.success },
   C: { label: '취소', color: COLORS.danger },
   X: { label: '삭제', color: COLORS.neutral },
 }
-const TYPP_LABEL: Record<string, string> = {
-  S: '서비스',
-  J: '점프',
-  E: '긴급',
-  B: '배터리',
-  I: '점검',
-}
-const RSLT_LABEL: Record<string, { label: string; color: string }> = {
-  '1': { label: '처리중', color: COLORS.warning },
-  '3': { label: '완료', color: COLORS.success },
-}
-// 차량 점검 1자 (Y/N/null) — Y = 문제 발생 / N = 정상 / 빈값 = 미점검
-function checkBadge(v: string | null | undefined): { label: string; color: string; bg: string } {
+function checkBadge(v: string | null | undefined) {
   if (v === 'Y') return { label: '문제', color: COLORS.danger, bg: COLORS.bgRed }
   if (v === 'N') return { label: '정상', color: COLORS.success, bg: COLORS.bgGreen }
   return { label: '-', color: COLORS.textMuted, bg: 'rgba(0,0,0,0.04)' }
 }
 
-// ── 페이지 ──────────────────────────────────────────────────────
-export default function RideAccidentsPage() {
+export default function RideAccidentReportsPage() {
   const [user, setUser] = useState<{ role?: string } | null>(null)
   const [authChecked, setAuthChecked] = useState(false)
-  const [rows, setRows] = useState<AccidentRow[]>([])
+  const [rows, setRows] = useState<AcrentRow[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [fetchedAt, setFetchedAt] = useState<Date | null>(null)
@@ -128,14 +113,12 @@ export default function RideAccidentsPage() {
   const [searchQ, setSearchQ] = useState('')
   const [limit] = useState(100)
 
-  // 상세 모달
   const [selectedKey, setSelectedKey] = useState<{
     idno: string
     mddt: string
     srno: number
   } | null>(null)
-  const [detail, setDetail] = useState<AccidentDetail | null>(null)
-  const [memos, setMemos] = useState<MemoRow[]>([])
+  const [detail, setDetail] = useState<AcrentDetail | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailError, setDetailError] = useState<string | null>(null)
 
@@ -154,7 +137,7 @@ export default function RideAccidentsPage() {
           const params = new URLSearchParams({ limit: String(limit) })
           if (rgstFilter !== 'all') params.set('rgst', rgstFilter)
           if (searchQ.trim()) params.set('q', searchQ.trim())
-          const res = await fetch(`/api/cafe24/accidents?${params}`, {
+          const res = await fetch(`/api/cafe24/acrents?${params}`, {
             headers: token ? { Authorization: `Bearer ${token}` } : {},
             cache: 'no-store',
           })
@@ -182,11 +165,9 @@ export default function RideAccidentsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authChecked, user?.role, rgstFilter])
 
-  // ── 상세 + 상담내역 병렬 fetch ──
   useEffect(() => {
     if (!selectedKey) {
       setDetail(null)
-      setMemos([])
       setDetailError(null)
       return
     }
@@ -196,31 +177,23 @@ export default function RideAccidentsPage() {
       setDetailError(null)
       try {
         const token = getStoredToken()
-        const auth = token ? { Authorization: `Bearer ${token}` } : {}
         const params = new URLSearchParams({
           idno: selectedKey!.idno,
           mddt: selectedKey!.mddt,
           srno: String(selectedKey!.srno),
         })
-        const init: RequestInit = {
-          headers: auth as HeadersInit,
+        const res = await fetch(`/api/cafe24/acrents/detail?${params}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
           cache: 'no-store',
           signal: ac.signal,
-        }
-        // 병렬 — 상세 + 상담내역
-        const [detailRes, memosRes] = await Promise.all([
-          fetch(`/api/cafe24/accidents/detail?${params}`, init),
-          fetch(`/api/cafe24/accidents/memos?${params}`, init),
-        ])
-        const detailJson = await detailRes.json()
-        const memosJson = await memosRes.json()
-        if (!detailJson.success || !detailJson.data) {
-          setDetailError(detailJson.error || 'not-found')
+        })
+        const json = await res.json()
+        if (!json.success || !json.data) {
+          setDetailError(json.error || 'not-found')
           setDetail(null)
         } else {
-          setDetail(detailJson.data)
+          setDetail(json.data)
         }
-        setMemos(memosJson.success && memosJson.data ? memosJson.data : [])
       } catch (e) {
         const err = e as { name?: string }
         if (err.name !== 'AbortError') setDetailError(String(e))
@@ -232,7 +205,6 @@ export default function RideAccidentsPage() {
     return () => ac.abort()
   }, [selectedKey])
 
-  // ── 권한 차단 ──
   if (!authChecked) {
     return (
       <div style={{ padding: 32, textAlign: 'center', color: COLORS.textMuted }}>
@@ -257,16 +229,15 @@ export default function RideAccidentsPage() {
     )
   }
 
-  // ── 컬럼 정의 (모든 컬럼 sortBy — 규칙 18) ──
-  const columns: TableColumn<AccidentRow>[] = [
+  const columns: TableColumn<AcrentRow>[] = [
     {
       key: 'mddt',
       label: '접수일',
       width: 100,
-      sortBy: (r) => r.esosmddt || '',
+      sortBy: (r) => r.otptmddt || '',
       render: (r) => (
         <span style={{ whiteSpace: 'nowrap', color: COLORS.textPrimary, fontSize: 13 }}>
-          {fmtDate8(r.esosmddt)}
+          {fmtDate8(r.otptmddt)}
         </span>
       ),
     },
@@ -275,9 +246,25 @@ export default function RideAccidentsPage() {
       label: '#',
       width: 60,
       align: 'right',
-      sortBy: (r) => r.esossrno || 0,
+      sortBy: (r) => r.otptsrno || 0,
+      render: (r) => <span style={{ color: COLORS.textMuted, fontSize: 12 }}>{r.otptsrno}</span>,
+    },
+    {
+      key: 'acbn',
+      label: '사고번호',
+      width: 110,
+      sortBy: (r) => r.otptacbn || '',
       render: (r) => (
-        <span style={{ color: COLORS.textMuted, fontSize: 12 }}>{r.esossrno}</span>
+        <span
+          style={{
+            fontFamily: 'monospace',
+            fontSize: 12,
+            color: COLORS.textPrimary,
+            fontWeight: 600,
+          }}
+        >
+          {r.otptacbn || '-'}
+        </span>
       ),
     },
     {
@@ -311,7 +298,7 @@ export default function RideAccidentsPage() {
             overflow: 'hidden',
             textOverflow: 'ellipsis',
             display: 'block',
-            maxWidth: 280,
+            maxWidth: 220,
           }}
           title={r.cars_model || ''}
         >
@@ -320,15 +307,26 @@ export default function RideAccidentsPage() {
       ),
     },
     {
+      key: 'cust_name',
+      label: '고객',
+      width: 90,
+      sortBy: (r) => r.cust_name || '',
+      render: (r) => (
+        <span style={{ color: COLORS.textSecondary, fontSize: 12, whiteSpace: 'nowrap' }}>
+          {r.cust_name || '-'}
+        </span>
+      ),
+    },
+    {
       key: 'rgst',
       label: '등록',
       width: 70,
-      sortBy: (r) => r.esosrgst || '',
+      sortBy: (r) => r.otptrgst || '',
       render: (r) => {
-        const meta = r.esosrgst ? RGST_LABEL[r.esosrgst] : null
+        const meta = r.otptrgst ? RGST_LABEL[r.otptrgst] : null
         if (!meta)
           return (
-            <span style={{ color: COLORS.textMuted, fontSize: 12 }}>{r.esosrgst || '-'}</span>
+            <span style={{ color: COLORS.textMuted, fontSize: 12 }}>{r.otptrgst || '-'}</span>
           )
         return (
           <span
@@ -351,7 +349,7 @@ export default function RideAccidentsPage() {
       key: 'acdt',
       label: '접수시각',
       width: 130,
-      sortBy: (r) => `${r.esosacdt || ''}${r.esosactm || ''}`,
+      sortBy: (r) => `${r.otptacdt || ''}${r.otptactm || ''}`,
       render: (r) => (
         <span
           style={{
@@ -360,60 +358,18 @@ export default function RideAccidentsPage() {
             fontSize: 12,
           }}
         >
-          {fmtDateTime(r.esosacdt, r.esosactm)}
+          {fmtDateTime(r.otptacdt, r.otptactm)}
         </span>
       ),
     },
     {
-      key: 'typp',
-      label: '타입',
-      width: 70,
-      sortBy: (r) => TYPP_LABEL[r.esostypp || ''] || r.esostypp || '',
-      render: (r) => {
-        const lbl = TYPP_LABEL[r.esostypp || '']
-        return (
-          <span style={{ color: COLORS.textSecondary, fontSize: 12, whiteSpace: 'nowrap' }}>
-            {lbl || r.esostypp || '-'}
-          </span>
-        )
-      },
-    },
-    {
-      key: 'rslt',
-      label: '결과',
-      width: 70,
-      sortBy: (r) => r.esosrslt || '',
-      render: (r) => {
-        const meta = r.esosrslt ? RSLT_LABEL[r.esosrslt] : null
-        if (!meta)
-          return (
-            <span style={{ color: COLORS.textMuted, fontSize: 12 }}>{r.esosrslt || '-'}</span>
-          )
-        return (
-          <span
-            style={{
-              padding: '2px 8px',
-              borderRadius: 6,
-              fontSize: 11,
-              fontWeight: 600,
-              color: meta.color,
-              background: 'rgba(0,0,0,0.04)',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {meta.label}
-          </span>
-        )
-      },
-    },
-    {
-      key: 'gnus',
+      key: 'user_name',
       label: '등록자',
-      width: 80,
-      sortBy: (r) => r.esosgnus || '',
+      width: 90,
+      sortBy: (r) => r.user_name || r.otptgnus || '',
       render: (r) => (
-        <span style={{ color: COLORS.textMuted, fontSize: 12, fontFamily: 'monospace' }}>
-          {r.esosgnus || '-'}
+        <span style={{ color: COLORS.textMuted, fontSize: 12 }}>
+          {r.user_name || r.otptgnus || '-'}
         </span>
       ),
     },
@@ -427,7 +383,6 @@ export default function RideAccidentsPage() {
 
   return (
     <div style={{ padding: '20px 24px', maxWidth: 1400, margin: '0 auto' }}>
-      {/* 헤더 */}
       <div
         style={{
           ...GLASS.L5,
@@ -441,7 +396,7 @@ export default function RideAccidentsPage() {
         }}
       >
         <span style={{ fontSize: 18, fontWeight: 800, color: COLORS.textPrimary }}>
-          🚨 라이드 긴급출동
+          🚗 라이드 사고접수
         </span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={{ fontSize: 12, color: stalenessColor }}>
@@ -464,7 +419,6 @@ export default function RideAccidentsPage() {
         </div>
       </div>
 
-      {/* 필터 */}
       <div
         style={{
           ...GLASS.L2,
@@ -505,7 +459,7 @@ export default function RideAccidentsPage() {
           </span>
           <input
             type="text"
-            placeholder="결과 메모 검색..."
+            placeholder="사고번호 / 차량번호 / 고객명..."
             value={searchQ}
             onChange={(e) => setSearchQ(e.target.value)}
             onKeyDown={(e) => {
@@ -539,7 +493,6 @@ export default function RideAccidentsPage() {
         </div>
       </div>
 
-      {/* 에러 배너 */}
       {error && (
         <div
           style={{
@@ -557,39 +510,35 @@ export default function RideAccidentsPage() {
         </div>
       )}
 
-      {/* 테이블 */}
       <div style={{ ...GLASS.L4, borderRadius: 12, padding: 4, overflow: 'hidden' }}>
         <NeuDataTable
           columns={columns}
           data={rows}
-          rowKey={(r) => `${r.esosidno}|${r.esosmddt}|${r.esossrno}`}
+          rowKey={(r) => `${r.otptidno}|${r.otptmddt}|${r.otptsrno}`}
           onRowClick={(r) =>
-            setSelectedKey({ idno: r.esosidno, mddt: r.esosmddt, srno: r.esossrno })
+            setSelectedKey({ idno: r.otptidno, mddt: r.otptmddt, srno: r.otptsrno })
           }
           loading={loading}
-          emptyIcon="🚨"
+          emptyIcon="🚗"
           emptyMessage={
             error
               ? '카페24 DB 미연결'
               : searchQ || rgstFilter !== 'all'
-                ? '필터에 해당하는 접수 건이 없습니다'
+                ? '필터에 해당하는 사고접수 건이 없습니다'
                 : '접수된 사고가 없습니다'
           }
           defaultSort={{ key: 'mddt', dir: 'desc' }}
         />
       </div>
 
-      {/* 상세 모달 */}
       {selectedKey && (
         <DetailModal
           loading={detailLoading}
           error={detailError}
           detail={detail}
-          memos={memos}
           onClose={() => {
             setSelectedKey(null)
             setDetail(null)
-            setMemos([])
           }}
         />
       )}
@@ -597,21 +546,18 @@ export default function RideAccidentsPage() {
   )
 }
 
-// ── 상세 모달 ──────────────────────────────────────────────────
+// ── 상세 모달 ───────────────────────────────────────────────
 function DetailModal({
   loading,
   error,
   detail,
-  memos,
   onClose,
 }: {
   loading: boolean
   error: string | null
-  detail: AccidentDetail | null
-  memos: MemoRow[]
+  detail: AcrentDetail | null
   onClose: () => void
 }) {
-  // ESC 닫기
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()
@@ -640,7 +586,7 @@ function DetailModal({
         onClick={(e) => e.stopPropagation()}
         style={{
           ...GLASS.L4,
-          width: 560,
+          width: 600,
           maxWidth: '100vw',
           height: '100vh',
           overflow: 'auto',
@@ -648,7 +594,6 @@ function DetailModal({
           boxShadow: '-8px 0 24px rgba(0,0,0,0.12)',
         }}
       >
-        {/* 헤더 */}
         <div
           style={{
             display: 'flex',
@@ -660,7 +605,7 @@ function DetailModal({
           }}
         >
           <span style={{ fontSize: 16, fontWeight: 800, color: COLORS.textPrimary }}>
-            🚨 사고 접수 상세
+            🚗 사고접수 상세
           </span>
           <button
             onClick={onClose}
@@ -694,7 +639,7 @@ function DetailModal({
             ⚠️ {error}
           </div>
         )}
-        {detail && <DetailBody detail={detail} memos={memos} />}
+        {detail && <DetailBody detail={detail} />}
       </div>
     </div>
   )
@@ -728,15 +673,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   )
 }
 
-function Field({
-  label,
-  value,
-  mono,
-}: {
-  label: string
-  value: React.ReactNode
-  mono?: boolean
-}) {
+function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div style={{ display: 'flex', gap: 12, padding: '4px 0', alignItems: 'baseline' }}>
       <span
@@ -754,7 +691,6 @@ function Field({
         style={{
           fontSize: 13,
           color: COLORS.textPrimary,
-          fontFamily: mono ? 'monospace' : undefined,
           wordBreak: 'break-word',
         }}
       >
@@ -764,57 +700,40 @@ function Field({
   )
 }
 
-function DetailBody({ detail, memos }: { detail: AccidentDetail; memos: MemoRow[] }) {
-  const rgst = detail.esosrgst ? RGST_LABEL[detail.esosrgst] : null
-  const rslt = detail.esosrslt ? RSLT_LABEL[detail.esosrslt] : null
-  const typp = TYPP_LABEL[detail.esostypp || '']
-
-  // 점검 항목 — Y/N/null
-  const checks: Array<[string, string | null | undefined, string]> = [
-    ['배터리', detail.esosbate, '🔋'],
-    ['타이어', detail.esostire, '🛞'],
-    ['오일', detail.esosoils, '🛢'],
-    ['잠김', detail.esoslock, '🔒'],
-    ['이동', detail.esosmove, '🚙'],
-    ['긴급도움', detail.esoshelp, '🆘'],
+function DetailBody({ detail }: { detail: AcrentDetail }) {
+  const rgst = detail.otptrgst ? RGST_LABEL[detail.otptrgst] : null
+  const acrn = checkBadge(detail.otptacrn)
+  const checks: Array<[string, string | null | undefined]> = [
+    ['di', detail.otptacdi],
+    ['dm', detail.otptacdm],
+    ['jc', detail.otptacjc],
+    ['js', detail.otptacjs],
+    ['mb', detail.otptacmb],
+    ['no', detail.otptacno],
+    ['ph', detail.otptacph],
   ]
-  const checksWithIssue = checks.filter(([, v]) => v === 'Y')
+  const issues = checks.filter(([, v]) => v === 'Y')
 
   return (
     <>
-      {/* 기본 정보 */}
       <Section title="기본">
-        <Field label="접수일" value={fmtDate8(detail.esosmddt)} />
+        <Field label="접수일" value={fmtDate8(detail.otptmddt)} />
+        <Field label="접수시각" value={fmtDateTime(detail.otptacdt, detail.otptactm)} />
+        <Field label="사고번호" value={detail.otptacbn} />
+        <Field label="사고번호2" value={detail.otptacnu} />
         <Field
-          label="접수 시각"
-          value={fmtDateTime(detail.esosacdt, detail.esosactm) || '-'}
-        />
-        <Field label="ID" value={detail.esosidno} mono />
-        <Field label="순번" value={String(detail.esossrno)} mono />
-        <Field
-          label="등록 상태"
+          label="등록상태"
           value={
             rgst ? (
               <span style={{ color: rgst.color, fontWeight: 700 }}>{rgst.label}</span>
             ) : (
-              detail.esosrgst
+              detail.otptrgst
             )
           }
         />
-        <Field
-          label="결과"
-          value={
-            rslt ? (
-              <span style={{ color: rslt.color, fontWeight: 700 }}>{rslt.label}</span>
-            ) : (
-              detail.esosrslt
-            )
-          }
-        />
-        <Field label="타입" value={typp || detail.esostypp} />
+        <Field label="등록타입" value={detail.otptrgtp} />
       </Section>
 
-      {/* 차량 */}
       <Section title="차량">
         <Field
           label="차량번호"
@@ -825,20 +744,32 @@ function DetailBody({ detail, memos }: { detail: AccidentDetail; memos: MemoRow[
           }
         />
         <Field label="차종/모델" value={detail.cars_model} />
-        <Field label="주행거리" value={detail.esoskilo ? `${detail.esoskilo} km` : null} />
+        <Field label="차량 사용자" value={detail.cars_user} />
+        <Field label="고객" value={detail.cust_name} />
       </Section>
 
-      {/* 차량 점검 */}
-      <Section title={`차량 점검 ${checksWithIssue.length > 0 ? `· 문제 ${checksWithIssue.length}건` : ''}`}>
+      <Section title={`차량 점검 ${issues.length > 0 ? `· 문제 ${issues.length}건` : ''}`}>
         <div
           style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
-            gap: 6,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '6px 10px',
+            background: acrn.bg,
+            borderRadius: 6,
+            marginBottom: 6,
           }}
         >
-          {checks.map(([label, v, emoji]) => {
-            const badge = checkBadge(v)
+          <span style={{ fontSize: 12, color: COLORS.textSecondary, fontWeight: 700 }}>
+            🚦 운행가능
+          </span>
+          <span style={{ fontSize: 11, fontWeight: 700, color: acrn.color }}>
+            {acrn.label}
+          </span>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+          {checks.map(([label, v]) => {
+            const b = checkBadge(v)
             return (
               <div
                 key={label}
@@ -847,21 +778,15 @@ function DetailBody({ detail, memos }: { detail: AccidentDetail; memos: MemoRow[
                   alignItems: 'center',
                   justifyContent: 'space-between',
                   padding: '4px 10px',
-                  background: badge.bg,
+                  background: b.bg,
                   borderRadius: 6,
                 }}
               >
-                <span style={{ fontSize: 12, color: COLORS.textSecondary }}>
-                  {emoji} {label}
+                <span style={{ fontSize: 11, color: COLORS.textSecondary }}>
+                  {label}
                 </span>
-                <span
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 700,
-                    color: badge.color,
-                  }}
-                >
-                  {badge.label}
+                <span style={{ fontSize: 11, fontWeight: 700, color: b.color }}>
+                  {b.label}
                 </span>
               </div>
             )
@@ -869,103 +794,59 @@ function DetailBody({ detail, memos }: { detail: AccidentDetail; memos: MemoRow[
         </div>
       </Section>
 
-      {/* 위치 */}
-      <Section title="발생 위치">
-        <Field label="주소" value={detail.esosaddr} />
-        <Field label="도로/동" value={detail.esosadnm} />
-        <Field label="상세" value={detail.esosadtl} />
-      </Section>
-
-      {/* 요청자 */}
-      <Section title="요청자">
-        <Field label="이름" value={detail.esosusnm} />
-        <Field label="연락처" value={detail.esosustl} />
-        {detail.esosusvp && <Field label="추가1" value={detail.esosusvp} />}
-        {detail.esosusvd && <Field label="추가2" value={detail.esosusvd} />}
-      </Section>
-
-      {/* 메모 */}
-      {(detail.esosrstx || detail.esosmemo || detail.esosinft) && (
-        <Section title="메모">
-          {detail.esosrstx && <Field label="결과 메모" value={detail.esosrstx} />}
-          {detail.esosmemo && <Field label="메모" value={detail.esosmemo} />}
-          {detail.esosinft && <Field label="추가 정보" value={detail.esosinft} />}
+      {(detail.otptacet || detail.otptacad || detail.otptacmo) && (
+        <Section title="사고 정보">
+          {detail.otptacet && <Field label="현장 etc" value={detail.otptacet} />}
+          {detail.otptacad && <Field label="현장 주소" value={detail.otptacad} />}
+          {detail.otptacmo && <Field label="현장 메모" value={detail.otptacmo} />}
+          {detail.otptacfe && <Field label="비용" value={detail.otptacfe} />}
         </Section>
       )}
 
-      {/* 상담내역 timeline */}
-      <Section title={`상담 내역 ${memos.length > 0 ? `· ${memos.length}건` : ''}`}>
-        {memos.length === 0 ? (
-          <div style={{ fontSize: 12, color: COLORS.textMuted, padding: '6px 0' }}>
-            등록된 상담 내역이 없습니다.
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {memos.map((m) => (
-              <div
-                key={`${m.memonums}-${m.memosort}`}
-                style={{
-                  borderLeft: `2px solid ${COLORS.primary}`,
-                  paddingLeft: 10,
-                  paddingTop: 2,
-                  paddingBottom: 2,
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: 11,
-                    color: COLORS.textMuted,
-                    marginBottom: 2,
-                    display: 'flex',
-                    gap: 8,
-                    flexWrap: 'wrap',
-                  }}
-                >
-                  <span style={{ fontWeight: 700, color: COLORS.textSecondary }}>
-                    {fmtDateTime(m.memogndt, m.memogntm)}
-                  </span>
-                  <span style={{ fontFamily: 'monospace' }}>{m.memognus || '-'}</span>
-                </div>
-                {m.memotitl && (
-                  <div
-                    style={{
-                      fontSize: 13,
-                      fontWeight: 700,
-                      color: COLORS.textPrimary,
-                      marginBottom: 2,
-                    }}
-                  >
-                    {m.memotitl}
-                  </div>
-                )}
-                {m.memotext && (
-                  <div
-                    style={{
-                      fontSize: 13,
-                      color: COLORS.textPrimary,
-                      whiteSpace: 'pre-wrap',
-                      wordBreak: 'break-word',
-                    }}
-                  >
-                    {m.memotext}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-      </Section>
+      {(detail.otptdsnm || detail.otptdshp || detail.otptdsli) && (
+        <Section title="운전자">
+          <Field label="이름" value={detail.otptdsnm} />
+          <Field label="연락처" value={detail.otptdshp} />
+          <Field label="면허" value={detail.otptdsli} />
+          {detail.otptdsus && <Field label="사용자" value={detail.otptdsus} />}
+          {detail.otptdstl && <Field label="전화" value={detail.otptdstl} />}
+          {detail.otptdsmo && <Field label="메모" value={detail.otptdsmo} />}
+        </Section>
+      )}
 
-      {/* 등록 / 수정 이력 */}
+      {(detail.otptcanm || detail.otptcahp) && (
+        <Section title="차주">
+          <Field label="이름" value={detail.otptcanm} />
+          <Field label="연락처" value={detail.otptcahp} />
+        </Section>
+      )}
+
+      {(detail.otpttonm || detail.otpttohp || detail.otpttwnm) && (
+        <Section title="견인">
+          <Field label="견인 회사" value={detail.otpttonm} />
+          <Field label="회사 전화" value={detail.otpttohp} />
+          <Field label="견인 차량" value={detail.otpttwgn} />
+          <Field label="기사 이름" value={detail.otpttwnm} />
+          <Field label="기사 전화" value={detail.otpttwhp} />
+        </Section>
+      )}
+
+      {(detail.otptbdnm || detail.otptpknm) && (
+        <Section title="장소">
+          <Field label="빌딩" value={detail.otptbdnm} />
+          <Field label="주차장" value={detail.otptpknm} />
+        </Section>
+      )}
+
       <Section title="이력">
         <Field
           label="등록"
-          value={`${fmtDateTime(detail.esosgndt, detail.esosgntm)} · ${detail.esosgnus || ''}`}
+          value={`${fmtDateTime(detail.otptgndt, detail.otptgntm)} · ${detail.user_name || detail.otptgnus || ''}`}
         />
-        {detail.esosupdt && (
+        {detail.otptupdt && (
           <Field
             label="수정"
-            value={`${fmtDateTime(detail.esosupdt, detail.esosuptm)} · ${detail.esosupus || ''}`}
+            value={`${fmtDateTime(detail.otptupdt, detail.otptuptm)} · ${detail.otptupus || ''}`}
           />
         )}
       </Section>
