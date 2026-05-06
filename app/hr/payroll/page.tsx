@@ -397,11 +397,10 @@ export default function PayrollPage() {
     }
     alert('저장되었습니다.'); setShowFlModal(false); setEditingFl(null); setFlForm(emptyFlForm); fetchFreelancers()
   }
-  const openFlModal = (f?: any) => {
-    if (f) {
-      setEditingFl(f); setFlForm({ name: f.name, phone: f.phone || '', email: f.email || '', bank_name: f.bank_name || 'KB국민은행', account_number: f.account_number || '', account_holder: f.account_holder || '', reg_number: f.reg_number || '', tax_type: f.tax_type || '사업소득(3.3%)', service_type: f.service_type || '기타', is_active: f.is_active, memo: f.memo || '' })
-    } else { setEditingFl(null); setFlForm(emptyFlForm) }
-    setShowFlModal(true)
+  // PR-B5 Q2a — 프리랜서 등록/수정은 「인사 마스터 → 외부 인력 탭」 에서만
+  // 본 페이지에서 호출 시 redirect (등록 차단)
+  const openFlModal = (_f?: any) => {
+    router.push('/hr?tab=external')
   }
   const handleToggleActive = async (f: any) => {
     await fetch(`/api/freelancers/\${JSON.stringify(f.id)}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }, body: JSON.stringify({ is_active: !f.is_active }) })
@@ -796,9 +795,29 @@ export default function PayrollPage() {
         </div>
       )}
 
-      {/* ══════════ 탭3: 프리랜서 관리 (필터 + 검색 + 테이블 — 일부 공유 컴포넌트) ══════════ */}
+      {/* ══════════ 탭3: 프리랜서 지급 (등록은 인사 마스터에서 — PR-B5 Q2a) ══════════ */}
       {tab === 'freelancers' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          {/* 안내 — 등록은 /hr 외부 인력 탭 */}
+          <div style={{
+            background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.25)',
+            borderRadius: 12, padding: '12px 16px', display: 'flex',
+            alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap',
+          }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#1e40af', marginBottom: 2 }}>
+                💡 프리랜서 등록은 「인사 마스터 → 외부 인력 탭」 에서
+              </div>
+              <div style={{ fontSize: 11, color: '#64748b' }}>
+                본 화면에서는 월별 지급 운영만 (지급 등록 / 명세 / 영수증).
+              </div>
+            </div>
+            <button onClick={() => router.push('/hr?tab=external')}
+              style={{ ...btnPrimary(), flexShrink: 0 }}>
+              → 인사 마스터로 이동
+            </button>
+          </div>
+
           {/* 필터 + 검색 + 액션 */}
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
             {(['active', 'all', 'inactive'] as const).map(f => (
@@ -807,37 +826,8 @@ export default function PayrollPage() {
               </button>
             ))}
             <input placeholder="이름/연락처 검색" value={flSearch} onChange={e => setFlSearch(e.target.value)} style={{ ...inputBase, flex: '1 1 140px', maxWidth: 200 }} />
-            <button onClick={downloadTemplate} style={btnSecondary}>양식 다운로드</button>
-            <button onClick={() => openFlModal()} style={btnPrimary()}>+ 프리랜서 등록</button>
           </div>
-          {/* 드래그앤드롭 업로드 */}
-          <div
-            onDragOver={e => { e.preventDefault(); setIsDragging(true) }} onDragLeave={() => setIsDragging(false)}
-            onDrop={async e => { e.preventDefault(); setIsDragging(false); if (e.dataTransfer.files?.length) await processMultipleFiles(Array.from(e.dataTransfer.files)) }}
-            style={{
-              border: isDragging ? `2px dashed ${C.steel}` : `2px dashed ${C.gray200}`,
-              borderRadius: 16, padding: aiParsing ? '32px 20px' : '24px 20px', textAlign: 'center',
-              background: isDragging ? C.steelLight : aiParsing ? C.greenLight : '#fff',
-              transition: 'all 0.3s', cursor: 'pointer', position: 'relative',
-            }}
-          >
-            {aiParsing ? (
-              <>
-                <div style={{ width: 32, height: 32, border: `3px solid ${C.greenBorder}`, borderTopColor: C.green, borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 10px' }} />
-                <p style={{ fontWeight: 800, fontSize: 14, color: C.green, margin: 0 }}>Gemini AI가 파일을 분석 중...</p>
-              </>
-            ) : (
-              <>
-                <p style={{ fontWeight: 800, fontSize: 14, color: isDragging ? C.steel : C.gray900, margin: 0 }}>
-                  {isDragging ? '여기에 놓으세요!' : '프리랜서 엑셀/이미지 파일을 드래그하여 일괄 등록'}
-                </p>
-                <p style={{ fontSize: 12, color: C.gray400, marginTop: 4 }}>엑셀 · CSV · 이미지 · PDF 지원 · Gemini AI 자동 분석</p>
-                <input ref={bulkFileRef} type="file" accept=".xlsx,.xls,.csv,.png,.jpg,.jpeg,.pdf" multiple
-                  onChange={async e => { if (e.target.files?.length) await processMultipleFiles(Array.from(e.target.files)); if (bulkFileRef.current) bulkFileRef.current.value = '' }}
-                  style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }} />
-              </>
-            )}
-          </div>
+          {/* PR-B5 Q2a — 드래그앤드롭 일괄 등록 / 양식 다운로드 모두 인사 마스터로 이전 */}
           {/* 일괄등록 미리보기 */}
           {(bulkLogs.length > 0 || bulkData.length > 0) && (
             <div style={sectionCard}>

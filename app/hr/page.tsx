@@ -118,18 +118,94 @@ export default function HRMasterPage() {
   // === 모달 내부 — 통합 직원 편집 (기본정보 + 급여 + 권한) ===
   type EditSection = 'profile' | 'salary' | 'permissions'
   const [editSection, setEditSection] = useState<EditSection>('profile')
-  // § 급여 설정
+
+  // === 외부 인력 — 프리랜서 폼 (PR-B5 Q2a) ===
+  const [showFreelancerForm, setShowFreelancerForm] = useState(false)
+  const [editingFreelancerId, setEditingFreelancerId] = useState<string | null>(null)
+  const FL_TAX_TYPES = ['사업소득(3.3%)', '기타소득(8.8%)', '세금계산서', '원천징수 없음']
+  const FL_SERVICE_TYPES = ['탁송', '대리운전', '정비', '세차', '디자인', '개발', '법무/세무', '기타']
+  const FL_BANKS = ['KB국민은행', '신한은행', '우리은행', '하나은행', 'NH농협은행', 'IBK기업은행', '카카오뱅크', '케이뱅크', '토스뱅크']
+  const flEmpty = { name: '', phone: '', email: '', bank_name: 'KB국민은행', account_number: '', account_holder: '', reg_number: '', tax_type: '사업소득(3.3%)', service_type: '기타', is_active: true, memo: '' }
+  const [freelancerForm, setFreelancerForm] = useState<any>(flEmpty)
+  const [savingFreelancer, setSavingFreelancer] = useState(false)
+
+  const openFreelancerForm = (f?: any) => {
+    if (f) {
+      setEditingFreelancerId(f.id)
+      setFreelancerForm({
+        name: f.name || '', phone: f.phone || '', email: f.email || '',
+        bank_name: f.bank_name || 'KB국민은행', account_number: f.account_number || '',
+        account_holder: f.account_holder || '', reg_number: f.reg_number || '',
+        tax_type: f.tax_type || '사업소득(3.3%)', service_type: f.service_type || '기타',
+        is_active: f.is_active !== false, memo: f.memo || '',
+      })
+    } else {
+      setEditingFreelancerId(null)
+      setFreelancerForm(flEmpty)
+    }
+    setShowFreelancerForm(true)
+  }
+  const closeFreelancerForm = () => { setShowFreelancerForm(false); setEditingFreelancerId(null); setFreelancerForm(flEmpty) }
+
+  const saveFreelancer = async () => {
+    if (!freelancerForm.name) { alert('이름은 필수입니다.'); return }
+    setSavingFreelancer(true)
+    try {
+      const headers = { 'Content-Type': 'application/json', ...(await getAuthHeader()) }
+      if (editingFreelancerId) {
+        const res = await fetch(`/api/freelancers/${editingFreelancerId}`, { method: 'PATCH', headers, body: JSON.stringify(freelancerForm) })
+        if (!res.ok) { const j = await res.json().catch(() => ({})); alert('수정 실패: ' + (j.error || res.statusText)); return }
+      } else {
+        const res = await fetch('/api/freelancers', { method: 'POST', headers, body: JSON.stringify(freelancerForm) })
+        if (!res.ok) { const j = await res.json().catch(() => ({})); alert('등록 실패: ' + (j.error || res.statusText)); return }
+      }
+      closeFreelancerForm()
+      await loadExternal()
+    } catch (e: any) {
+      alert('저장 실패: ' + e.message)
+    } finally {
+      setSavingFreelancer(false)
+    }
+  }
+  const toggleFreelancerActive = async (f: any) => {
+    try {
+      await fetch(`/api/freelancers/${f.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) },
+        body: JSON.stringify({ is_active: !f.is_active }),
+      })
+      await loadExternal()
+    } catch {}
+  }
+
+  // § 급여 설정 — 동적 수당 (PR-B5 Q3γ)
+  // 식대는 기본 노출 (가장 흔함) + 「+ 수당 추가」 버튼으로 다른 항목 동적 추가
+  const ALLOWANCE_OPTIONS = [
+    { key: 'meal_allowance', label: '식대', defaultAmount: 200000, hint: '비과세 한도 월 20만원' },
+    { key: 'transport_allowance', label: '교통비', defaultAmount: 0, hint: '과세' },
+    { key: 'self_drive_allowance', label: '자가운전보조금', defaultAmount: 0, hint: '비과세 한도 월 20만원' },
+    { key: 'position_allowance', label: '직책수당', defaultAmount: 0, hint: '직급별 수당' },
+    { key: 'family_allowance', label: '가족수당', defaultAmount: 0, hint: '부양가족 수당' },
+    { key: 'night_allowance', label: '야간수당', defaultAmount: 0, hint: '22:00~06:00 150%' },
+    { key: 'overtime_allowance', label: '연장수당', defaultAmount: 0, hint: '주 40h 초과 150%' },
+    { key: 'annual_leave_allowance', label: '연차수당', defaultAmount: 0, hint: '미사용 연차 보상' },
+    { key: 'bonus', label: '상여금', defaultAmount: 0, hint: '성과/명절' },
+  ]
+  const ALLOWANCE_LABELS: Record<string, string> = Object.fromEntries(ALLOWANCE_OPTIONS.map(o => [o.key, o.label]))
+
   const [salaryForm, setSalaryForm] = useState<{
     id: string | null
     base_salary: string
-    meal_allowance: string  // 식대 (수당 중 가장 흔한 한 항목만 노출 — 단순화)
+    meal_allowance: string                     // 기본 식대 (마스터 — 매월 동일)
+    extra_allowances: Record<string, string>   // 추가 수당 (key=ALLOWANCE_OPTIONS.key, value=금액)
     bank_name: string
     account_number: string
     account_holder: string
     payment_day: string
     is_active: boolean
-  }>({ id: null, base_salary: '', meal_allowance: '', bank_name: '', account_number: '', account_holder: '', payment_day: '25', is_active: true })
+  }>({ id: null, base_salary: '', meal_allowance: '', extra_allowances: {}, bank_name: '', account_number: '', account_holder: '', payment_day: '25', is_active: true })
   const [savingSalary, setSavingSalary] = useState(false)
+  const [showAddAllowance, setShowAddAllowance] = useState(false)
 
   // === Tab 2: 페이지 권한 ===
   const [allUserPerms, setAllUserPerms] = useState<Record<string, UserPermMap>>({})
@@ -391,18 +467,34 @@ export default function HRMasterPage() {
       const json = await res.json()
       const row = (json.data || [])[0]
       if (row) {
-        // allowances 는 JSON — meal 한 항목만 단순 표출
+        // allowances JSON 파싱 — meal_allowance 는 분리, 나머지는 extra_allowances 로
         let mealAllow = ''
+        const extras: Record<string, string> = {}
         try {
           const allowances = typeof row.allowances === 'string' ? JSON.parse(row.allowances) : (row.allowances || {})
           if (allowances && typeof allowances === 'object') {
+            // 식대 — 우선순위 (legacy 호환)
             mealAllow = String(allowances.meal_allowance ?? allowances.식대 ?? allowances.meal ?? '')
+            // legacy 한글 키 → 영문 키 매핑
+            const LEGACY_MAP: Record<string, string> = {
+              '교통비': 'transport_allowance', '자가운전보조금': 'self_drive_allowance',
+              '직책수당': 'position_allowance', '가족수당': 'family_allowance',
+              '야간수당': 'night_allowance', '연장수당': 'overtime_allowance',
+              '연차수당': 'annual_leave_allowance', '상여금': 'bonus',
+            }
+            for (const [k, v] of Object.entries(allowances)) {
+              if (k === 'meal_allowance' || k === '식대' || k === 'meal') continue
+              const mappedKey = LEGACY_MAP[k] || k
+              const amt = Number(v || 0)
+              if (amt > 0) extras[mappedKey] = String(amt)
+            }
           }
         } catch {}
         setSalaryForm({
           id: row.id,
           base_salary: row.base_salary != null ? String(row.base_salary) : '',
           meal_allowance: mealAllow,
+          extra_allowances: extras,
           bank_name: row.bank_name || '',
           account_number: row.account_number || '',
           account_holder: row.account_holder || (emp.employee_name || ''),
@@ -411,16 +503,17 @@ export default function HRMasterPage() {
         })
       } else {
         setSalaryForm({
-          id: null, base_salary: '', meal_allowance: '', bank_name: '', account_number: '',
+          id: null, base_salary: '', meal_allowance: '', extra_allowances: {}, bank_name: '', account_number: '',
           account_holder: emp.employee_name || '', payment_day: '25', is_active: true,
         })
       }
     } catch {
       setSalaryForm({
-        id: null, base_salary: '', meal_allowance: '', bank_name: '', account_number: '',
+        id: null, base_salary: '', meal_allowance: '', extra_allowances: {}, bank_name: '', account_number: '',
         account_holder: emp.employee_name || '', payment_day: '25', is_active: true,
       })
     }
+    setShowAddAllowance(false)
   }
   const closeEditModal = () => { setEditingEmp(null); setEditForm({}); setSavingEdit(false); setEditSection('profile') }
 
@@ -433,6 +526,11 @@ export default function HRMasterPage() {
       const mealAmt = Number(salaryForm.meal_allowance || 0)
       const allowances: Record<string, number> = {}
       if (mealAmt > 0) allowances.meal_allowance = mealAmt
+      // 추가 수당 병합 (Q3γ — 동적 수당)
+      for (const [k, v] of Object.entries(salaryForm.extra_allowances)) {
+        const amt = Number(v || 0)
+        if (amt > 0) allowances[k] = amt
+      }
       const payload = {
         employee_id: editingEmp.id,
         company_id: company?.id,
@@ -1014,29 +1112,41 @@ export default function HRMasterPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {/* 안내 */}
           <div style={{ background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.2)', borderRadius: 10, padding: '8px 14px', fontSize: 12, color: '#2563eb' }}>
-            💡 외부 인력은 직원 (profiles) 과 별개 — 시스템 권한/계정 X. 월별 지급은 「💼 급여 운영 → 프리랜서 지급」 탭.
+            💡 외부 인력은 직원 (profiles) 과 별개 — 시스템 권한/계정 X. <b>등록/수정은 여기서</b>, <b>월별 지급</b>은 「💼 급여 운영 → 프리랜서 지급」 탭.
           </div>
 
           {/* 프리랜서 */}
           <div style={{ ...glassCard, padding: 20 }}>
-            <h3 style={{ fontSize: 14, fontWeight: 700, color: '#1e293b', marginBottom: 12 }}>🤝 프리랜서 ({freelancers.length})</h3>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <h3 style={{ fontSize: 14, fontWeight: 700, color: '#1e293b', margin: 0 }}>🤝 프리랜서 ({freelancers.length})</h3>
+              <button onClick={() => openFreelancerForm()}
+                style={{ padding: '6px 14px', fontSize: 12, fontWeight: 600, color: '#fff', background: '#3b82f6', border: 'none', borderRadius: 8, cursor: 'pointer' }}>
+                + 프리랜서 추가
+              </button>
+            </div>
             <div style={{ border: '1px solid rgba(0,0,0,0.06)', borderRadius: 10, overflow: 'hidden' }}>
               {freelancers.length === 0 && (
                 <div style={{ padding: 20, textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>
-                  등록된 프리랜서 없음 — /admin/freelancers 또는 향후 신설 예정
+                  등록된 프리랜서 없음 — 「+ 프리랜서 추가」 버튼 클릭
                 </div>
               )}
               {freelancers.map((f: any) => (
-                <div key={f.id} style={{ padding: '10px 14px', borderBottom: '1px solid rgba(0,0,0,0.04)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div key={f.id} onClick={() => openFreelancerForm(f)}
+                  style={{ padding: '10px 14px', borderBottom: '1px solid rgba(0,0,0,0.04)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'rgba(59,130,246,0.04)')}
+                  onMouseLeave={e => (e.currentTarget.style.background = '')}>
                   <div>
                     <div style={{ fontWeight: 600, fontSize: 13, color: '#334155' }}>{f.name}</div>
                     <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>
                       {f.service_type || '-'} · {f.tax_type || '-'} · {f.bank_name || '-'} {f.account_number || ''}
                     </div>
                   </div>
-                  <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 6px', borderRadius: 4, background: f.is_active ? 'rgba(34,197,94,0.15)' : 'rgba(0,0,0,0.04)', color: f.is_active ? '#16a34a' : '#94a3b8' }}>
-                    {f.is_active ? '활성' : '비활성'}
-                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <button onClick={(e) => { e.stopPropagation(); toggleFreelancerActive(f) }}
+                      style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 4, background: f.is_active ? 'rgba(34,197,94,0.15)' : 'rgba(0,0,0,0.04)', color: f.is_active ? '#16a34a' : '#94a3b8', border: 'none', cursor: 'pointer' }}>
+                      {f.is_active ? '활성' : '비활성'}
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -1427,6 +1537,104 @@ export default function HRMasterPage() {
         />
       )}
 
+      {/* 프리랜서 등록/수정 모달 (PR-B5 Q2a) */}
+      {showFreelancerForm && (
+        <div onClick={closeFreelancerForm}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 16 }}>
+          <div onClick={e => e.stopPropagation()}
+            style={{ background: 'rgba(255,255,255,0.92)', borderRadius: 20, width: '100%', maxWidth: 560, boxShadow: '0 25px 50px rgba(0,0,0,0.15)', border: '1px solid rgba(0,0,0,0.06)', overflow: 'hidden', maxHeight: '92vh', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ padding: '20px 24px', borderBottom: '1px solid rgba(0,0,0,0.06)', background: 'rgba(255,255,255,0.40)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+              <h3 style={{ fontSize: 16, fontWeight: 700, color: '#1e293b', margin: 0 }}>
+                🤝 {editingFreelancerId ? '프리랜서 수정' : '프리랜서 등록'}
+              </h3>
+              <button onClick={closeFreelancerForm} style={{ fontSize: 22, fontWeight: 300, color: '#94a3b8', background: 'none', border: 'none', cursor: 'pointer', lineHeight: 1, width: 32, height: 32 }}>×</button>
+            </div>
+            <div style={{ padding: 20, overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#64748b', marginBottom: 6 }}>이름 *</label>
+                  <input value={freelancerForm.name} onChange={e => setFreelancerForm({ ...freelancerForm, name: e.target.value })}
+                    placeholder="홍길동"
+                    style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none', background: 'rgba(255,255,255,0.6)', boxSizing: 'border-box' }} />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#64748b', marginBottom: 6 }}>전화</label>
+                  <input value={freelancerForm.phone} onChange={e => setFreelancerForm({ ...freelancerForm, phone: e.target.value })}
+                    placeholder="010-1234-5678"
+                    style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none', background: 'rgba(255,255,255,0.6)', boxSizing: 'border-box' }} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#64748b', marginBottom: 6 }}>이메일</label>
+                  <input value={freelancerForm.email} onChange={e => setFreelancerForm({ ...freelancerForm, email: e.target.value })}
+                    style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none', background: 'rgba(255,255,255,0.6)', boxSizing: 'border-box' }} />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#64748b', marginBottom: 6 }}>주민/사업자</label>
+                  <input value={freelancerForm.reg_number} onChange={e => setFreelancerForm({ ...freelancerForm, reg_number: e.target.value })}
+                    style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none', background: 'rgba(255,255,255,0.6)', boxSizing: 'border-box' }} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#64748b', marginBottom: 6 }}>업무 유형</label>
+                  <select value={freelancerForm.service_type} onChange={e => setFreelancerForm({ ...freelancerForm, service_type: e.target.value })}
+                    style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none', background: 'rgba(255,255,255,0.6)' }}>
+                    {FL_SERVICE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#64748b', marginBottom: 6 }}>세금 처리</label>
+                  <select value={freelancerForm.tax_type} onChange={e => setFreelancerForm({ ...freelancerForm, tax_type: e.target.value })}
+                    style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none', background: 'rgba(255,255,255,0.6)' }}>
+                    {FL_TAX_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div style={{ borderTop: '1px solid rgba(0,0,0,0.06)', paddingTop: 14 }}>
+                <h4 style={{ fontSize: 13, fontWeight: 700, color: '#1e293b', marginBottom: 10 }}>계좌 정보</h4>
+                <div className="grid grid-cols-2 gap-3" style={{ marginBottom: 10 }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#64748b', marginBottom: 6 }}>은행</label>
+                    <select value={freelancerForm.bank_name} onChange={e => setFreelancerForm({ ...freelancerForm, bank_name: e.target.value })}
+                      style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none', background: 'rgba(255,255,255,0.6)' }}>
+                      {FL_BANKS.map(b => <option key={b} value={b}>{b}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#64748b', marginBottom: 6 }}>예금주</label>
+                    <input value={freelancerForm.account_holder} onChange={e => setFreelancerForm({ ...freelancerForm, account_holder: e.target.value })}
+                      style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none', background: 'rgba(255,255,255,0.6)', boxSizing: 'border-box' }} />
+                  </div>
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#64748b', marginBottom: 6 }}>계좌번호</label>
+                  <input value={freelancerForm.account_number} onChange={e => setFreelancerForm({ ...freelancerForm, account_number: e.target.value })}
+                    style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none', background: 'rgba(255,255,255,0.6)', boxSizing: 'border-box' }} />
+                </div>
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#64748b', marginBottom: 6 }}>메모</label>
+                <textarea value={freelancerForm.memo} onChange={e => setFreelancerForm({ ...freelancerForm, memo: e.target.value })}
+                  rows={2}
+                  style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none', background: 'rgba(255,255,255,0.6)', boxSizing: 'border-box', resize: 'vertical' }} />
+              </div>
+            </div>
+            <div style={{ padding: '14px 20px', borderTop: '1px solid rgba(0,0,0,0.06)', background: 'rgba(255,255,255,0.40)', display: 'flex', gap: 10, flexShrink: 0 }}>
+              <button onClick={closeFreelancerForm}
+                style={{ flex: 1, padding: '10px 0', border: '1px solid rgba(0,0,0,0.08)', background: 'rgba(255,255,255,0.8)', color: '#64748b', borderRadius: 10, fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
+                취소
+              </button>
+              <button onClick={saveFreelancer} disabled={savingFreelancer}
+                style={{ flex: 2, padding: '10px 0', background: savingFreelancer ? '#94a3b8' : '#3b82f6', color: '#fff', borderRadius: 10, fontWeight: 600, fontSize: 13, border: 'none', cursor: savingFreelancer ? 'not-allowed' : 'pointer' }}>
+                {savingFreelancer ? '저장 중...' : (editingFreelancerId ? '수정 저장' : '등록')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 직원 수정 모달 — Glass Level 4 (통합) */}
       {editingEmp && (
         <div onClick={closeEditModal}
@@ -1614,17 +1822,86 @@ export default function HRMasterPage() {
                     )}
                   </div>
                   <div>
-                    <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#64748b', marginBottom: 6 }}>식대 (월)</label>
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#64748b', marginBottom: 6 }}>
+                      식대 수당 (월 마스터)
+                      <span style={{ fontSize: 10, color: '#94a3b8', fontWeight: 400, marginLeft: 6 }}>비과세 한도 20만원</span>
+                    </label>
                     <input type="number" value={salaryForm.meal_allowance}
                       onChange={e => setSalaryForm({ ...salaryForm, meal_allowance: e.target.value })}
                       placeholder="200000"
                       style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, outline: 'none', background: 'rgba(255,255,255,0.6)', boxSizing: 'border-box', fontVariantNumeric: 'tabular-nums' }} />
                     {salaryForm.meal_allowance && Number(salaryForm.meal_allowance) > 0 && (
                       <span style={{ fontSize: 11, color: '#94a3b8', marginTop: 4, display: 'block' }}>
-                        ₩ {Number(salaryForm.meal_allowance).toLocaleString()}
+                        ₩ {Number(salaryForm.meal_allowance).toLocaleString()} <span style={{ color: '#cbd5e1' }}>· 매월 동일 수당</span>
                       </span>
                     )}
                   </div>
+                </div>
+
+                {/* 추가 수당 — 동적 (Q3γ — 2026-05-06 PR-B5) */}
+                <div style={{ borderTop: '1px solid rgba(0,0,0,0.06)', paddingTop: 14 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                    <h4 style={{ fontSize: 13, fontWeight: 700, color: '#1e293b', margin: 0 }}>추가 수당 (선택)</h4>
+                    <button
+                      onClick={() => setShowAddAllowance(!showAddAllowance)}
+                      style={{ padding: '4px 12px', fontSize: 11, fontWeight: 600, color: '#3b82f6', background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 8, cursor: 'pointer' }}>
+                      {showAddAllowance ? '✕ 닫기' : '+ 수당 추가'}
+                    </button>
+                  </div>
+                  {/* 추가된 수당 목록 */}
+                  {Object.keys(salaryForm.extra_allowances).length === 0 && !showAddAllowance && (
+                    <p style={{ fontSize: 11, color: '#94a3b8', margin: 0 }}>추가 수당 없음 — 「+ 수당 추가」 클릭</p>
+                  )}
+                  {Object.entries(salaryForm.extra_allowances).map(([k, v]) => {
+                    const opt = ALLOWANCE_OPTIONS.find(o => o.key === k)
+                    return (
+                      <div key={k} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, padding: 8, background: 'rgba(255,255,255,0.4)', borderRadius: 8, border: '1px solid rgba(0,0,0,0.05)' }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: '#334155' }}>{ALLOWANCE_LABELS[k] || k}</div>
+                          {opt?.hint && <div style={{ fontSize: 10, color: '#94a3b8' }}>{opt.hint}</div>}
+                        </div>
+                        <input type="number" value={v}
+                          onChange={e => setSalaryForm({ ...salaryForm, extra_allowances: { ...salaryForm.extra_allowances, [k]: e.target.value } })}
+                          placeholder="0"
+                          style={{ width: 130, padding: 8, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none', background: 'rgba(255,255,255,0.8)', fontVariantNumeric: 'tabular-nums', textAlign: 'right' }} />
+                        <button
+                          onClick={() => {
+                            const next = { ...salaryForm.extra_allowances }
+                            delete next[k]
+                            setSalaryForm({ ...salaryForm, extra_allowances: next })
+                          }}
+                          style={{ width: 28, height: 28, border: 'none', background: 'rgba(239,68,68,0.1)', color: '#dc2626', borderRadius: 6, cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>
+                          ×
+                        </button>
+                      </div>
+                    )
+                  })}
+                  {/* 「+ 수당 추가」 토글 시 사용 가능 수당 dropdown */}
+                  {showAddAllowance && (
+                    <div style={{ marginTop: 8, padding: 10, background: 'rgba(59,130,246,0.04)', border: '1px dashed rgba(59,130,246,0.3)', borderRadius: 10 }}>
+                      <p style={{ fontSize: 11, fontWeight: 600, color: '#2563eb', marginBottom: 8, margin: 0 }}>추가할 수당 선택:</p>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+                        {ALLOWANCE_OPTIONS
+                          .filter(o => o.key !== 'meal_allowance' && !(o.key in salaryForm.extra_allowances))
+                          .map(opt => (
+                            <button key={opt.key}
+                              onClick={() => {
+                                setSalaryForm({
+                                  ...salaryForm,
+                                  extra_allowances: { ...salaryForm.extra_allowances, [opt.key]: String(opt.defaultAmount) },
+                                })
+                                setShowAddAllowance(false)
+                              }}
+                              style={{ padding: '6px 12px', fontSize: 11, fontWeight: 600, color: '#3b82f6', background: '#fff', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 6, cursor: 'pointer' }}>
+                              + {opt.label}
+                            </button>
+                          ))}
+                        {ALLOWANCE_OPTIONS.filter(o => o.key !== 'meal_allowance' && !(o.key in salaryForm.extra_allowances)).length === 0 && (
+                          <span style={{ fontSize: 11, color: '#94a3b8' }}>모든 수당이 추가됨</span>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#64748b', marginBottom: 6 }}>지급일</label>
