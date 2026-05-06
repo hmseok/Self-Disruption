@@ -924,28 +924,59 @@ export default function PayrollOps() {
       {tab === 'analytics' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-            {/* 고용유형별 분석 */}
+            {/* 고용유형별 분석 — 재직 + 본 회사 (FMI) 직원만 카운트 */}
             <div style={{ ...sectionCard, flex: '1 1 300px', padding: 24 }}>
-              <h3 style={{ fontSize: 14, fontWeight: 800, color: C.gray900, marginBottom: 16 }}>고용유형별 급여 현황</h3>
+              <h3 style={{ fontSize: 14, fontWeight: 800, color: C.gray900, marginBottom: 4 }}>고용유형별 급여 현황</h3>
+              <p style={{ fontSize: 11, color: C.gray400, marginBottom: 16 }}>※ 재직 + FMI 본 회사 직원만 (퇴사/외부매니저 제외)</p>
               {(() => {
-                const groups: Record<string, { count: number; total: number }> = {}
+                // employee_id → profile 매핑 — 재직 + FMI 직원 필터
+                const empMap: Record<string, any> = {}
+                for (const e of emps) empMap[e.id] = e
+                // 외부 매니저 판별 (라이드주식회사 부서)
+                const isExternal = (p: any) => {
+                  const dept = p?.department?.name || p?.department || ''
+                  return /라이드/.test(String(dept))
+                }
+                const isResigned = (p: any) => {
+                  const s = p?.emp_status
+                  if (s === 'resigned') return true
+                  if (p?.resign_date) return true
+                  if (!p?.is_active) return true
+                  return false
+                }
+                const groups: Record<string, { count: number; total: number; total_count: number }> = {}
+                let excludedCount = 0
                 for (const s of settings) {
+                  const profile = s.employee_id ? empMap[s.employee_id] : null
+                  // 매칭 안 되거나 / 퇴사 / 외부매니저 / admin role → 제외
+                  const skip = !profile || isResigned(profile) || isExternal(profile) || profile.role === 'admin'
+                  if (skip) { excludedCount++; continue }
                   const t = s.employment_type || '정규직'
-                  if (!groups[t]) groups[t] = { count: 0, total: 0 }
+                  if (!groups[t]) groups[t] = { count: 0, total: 0, total_count: 0 }
                   groups[t].count++; groups[t].total += Number(s.base_salary || 0)
                 }
                 const maxTotal = Math.max(...Object.values(groups).map(g => g.total), 1)
-                return Object.entries(groups).map(([type, data]) => (
-                  <div key={type} style={{ marginBottom: 12 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                      <span style={{ fontSize: 13, fontWeight: 700, color: C.gray700 }}>{type} ({data.count}명)</span>
-                      <span style={{ fontSize: 13, fontWeight: 800, color: C.steel }}>{n(data.total)}원</span>
+                if (Object.keys(groups).length === 0) {
+                  return <p style={{ fontSize: 12, color: C.gray400 }}>등록된 활성 직원 급여 설정이 없습니다.</p>
+                }
+                return (<>
+                  {Object.entries(groups).map(([type, data]) => (
+                    <div key={type} style={{ marginBottom: 12 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: C.gray700 }}>{type} ({data.count}명)</span>
+                        <span style={{ fontSize: 13, fontWeight: 800, color: C.steel }}>{n(data.total)}원</span>
+                      </div>
+                      <div style={{ height: 8, background: C.gray200, borderRadius: 4, overflow: 'hidden' }}>
+                        <div style={{ width: `${(data.total / maxTotal) * 100}%`, height: '100%', background: type === '프리랜서' ? C.amber : C.steel, borderRadius: 4, transition: 'width 0.3s' }} />
+                      </div>
                     </div>
-                    <div style={{ height: 8, background: C.gray200, borderRadius: 4, overflow: 'hidden' }}>
-                      <div style={{ width: `${(data.total / maxTotal) * 100}%`, height: '100%', background: type === '프리랜서' ? C.amber : C.steel, borderRadius: 4, transition: 'width 0.3s' }} />
-                    </div>
-                  </div>
-                ))
+                  ))}
+                  {excludedCount > 0 && (
+                    <p style={{ fontSize: 10, color: C.gray400, marginTop: 8 }}>
+                      ⚠ 제외 {excludedCount}건 (퇴사/외부매니저/admin/매핑누락 → 고용통계에서 제외)
+                    </p>
+                  )}
+                </>)
               })()}
             </div>
             {/* 프리랜서 지급 현황 */}
