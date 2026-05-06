@@ -403,7 +403,6 @@ export default function CafeAccidentsPage() {
                 : '접수된 사고가 없습니다'
           }
           defaultSort={{ key: 'mddt', dir: 'desc' }}
-          maxHeight={'calc(100vh - 280px)'}
         />
       </div>
     </div>
