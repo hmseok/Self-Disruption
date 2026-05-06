@@ -18,15 +18,12 @@ const ALLOWED_COLS = new Set([
   'is_overnight', 'category', 'sort_order', 'is_active',
   // PR-2SS-b — 안전 가드
   'next_day_blocking_hours', 'max_consecutive_days',
-  // PR-2SS-d — 최소 경력
-  'min_seniority_months',
+  // PR-2SS-d revert — min_seniority_months 폐기
   // PR-2SS-e — 시간 분해
   'night_period_start', 'night_period_end', 'night_premium_rate',
 ])
 // PR-2SS-b — 안전 가드 컬럼 (graceful 검사 대상)
 const SAFETY_COLS = new Set(['next_day_blocking_hours', 'max_consecutive_days'])
-// PR-2SS-d — 경력 컬럼 (별도 graceful)
-const SENIORITY_COLS = new Set(['min_seniority_months'])
 // PR-2SS-e — 시간 분해 컬럼
 const BREAKDOWN_COLS = new Set(['night_period_start', 'night_period_end', 'night_premium_rate'])
 const CATEGORIES = new Set(['day', 'evening', 'overnight'])
@@ -50,16 +47,12 @@ export async function PATCH(
     const { id } = await context.params
     const body = await request.json()
 
-    // PR-2SS-b/d/e — 안전 가드 + 경력 + 시간 분해 컬럼 graceful
+    // PR-2SS-b/e — 안전 가드 + 시간 분해 컬럼 graceful (d revert 후 seniority 제거)
     let hasSafetyCols = true
-    let hasSeniorityCol = true
     let hasBreakdownCols = true
     try {
       await prisma.$queryRaw<any[]>`SELECT next_day_blocking_hours FROM cs_shift_slots LIMIT 1`
     } catch { hasSafetyCols = false }
-    try {
-      await prisma.$queryRaw<any[]>`SELECT min_seniority_months FROM cs_shift_slots LIMIT 1`
-    } catch { hasSeniorityCol = false }
     try {
       await prisma.$queryRaw<any[]>`SELECT night_period_start FROM cs_shift_slots LIMIT 1`
     } catch { hasBreakdownCols = false }
@@ -69,7 +62,6 @@ export async function PATCH(
     for (const [k, v] of Object.entries(body || {})) {
       if (!ALLOWED_COLS.has(k)) continue
       if (SAFETY_COLS.has(k) && !hasSafetyCols) continue
-      if (SENIORITY_COLS.has(k) && !hasSeniorityCol) continue
       if (BREAKDOWN_COLS.has(k) && !hasBreakdownCols) continue
       if (k === 'category' && !CATEGORIES.has(String(v))) continue
       if (k === 'start_time' || k === 'end_time') {
@@ -86,10 +78,7 @@ export async function PATCH(
         const n = v == null || v === '' ? null : Math.max(1, Math.min(31, Number(v) || 0)) || null
         sets.push(`${k} = ?`); params.push(n); continue
       }
-      if (k === 'min_seniority_months') {
-        const n = v == null || v === '' ? 0 : Math.max(0, Math.min(120, Number(v) || 0))
-        sets.push(`${k} = ?`); params.push(n); continue
-      }
+      // PR-2SS-d revert — min_seniority_months 폐기
       // PR-2SS-e — 시간 분해
       if (k === 'night_period_start' || k === 'night_period_end') {
         const t = v == null || v === '' ? null : normalizeTime(String(v))
@@ -109,16 +98,7 @@ export async function PATCH(
     params.push(id)
     await prisma.$executeRawUnsafe(sql, ...params)
 
-    const rows = (hasSafetyCols && hasSeniorityCol)
-      ? await prisma.$queryRaw<any[]>`
-          SELECT id, code, label,
-            TIME_FORMAT(start_time, '%H:%i:%s') AS start_time,
-            TIME_FORMAT(end_time, '%H:%i:%s') AS end_time,
-            is_overnight, category, sort_order, is_active,
-            next_day_blocking_hours, max_consecutive_days, min_seniority_months
-          FROM cs_shift_slots WHERE id = ${id} LIMIT 1
-        `
-      : hasSafetyCols
+    const rows = hasSafetyCols
       ? await prisma.$queryRaw<any[]>`
           SELECT id, code, label,
             TIME_FORMAT(start_time, '%H:%i:%s') AS start_time,
@@ -143,8 +123,6 @@ export async function PATCH(
             ? Number(rows[0].next_day_blocking_hours) : 0,
           max_consecutive_days: hasSafetyCols && rows[0].max_consecutive_days != null
             ? Number(rows[0].max_consecutive_days) : null,
-          min_seniority_months: hasSeniorityCol && rows[0].min_seniority_months != null
-            ? Number(rows[0].min_seniority_months) : 0,
         }
       : null
     return NextResponse.json({ data: serialize(updated), error: null })

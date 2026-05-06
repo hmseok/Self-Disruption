@@ -25,8 +25,7 @@ interface FormState {
   // PR-2SS-b — 안전 가드
   next_day_blocking_hours: number    // 종료 후 N시간 안 다른 슬롯 시작 금지 (0=제약 X)
   max_consecutive_days: string       // 연속 N일 한도 ('' = 무제한)
-  // PR-2SS-d — 최소 경력
-  min_seniority_months: number       // 0=제약 없음 / 야간 디폴트 6
+  // PR-2SS-d revert — min_seniority_months 폐기
   // PR-2SS-e — 시간 분해 + 가산
   night_period_start: string         // "HH:MM" or '' = 가산 없음
   night_period_end: string           // "HH:MM" or ''
@@ -43,7 +42,6 @@ const EMPTY_FORM: FormState = {
   sort_order: 0,
   next_day_blocking_hours: 0,
   max_consecutive_days: '',
-  min_seniority_months: 0,
   night_period_start: '',
   night_period_end: '',
   night_premium_rate: 0,
@@ -90,8 +88,7 @@ export default function ShiftsTab() {
       // PR-2SS-b — 안전 가드
       next_day_blocking_hours: Number(s.next_day_blocking_hours || 0),
       max_consecutive_days: s.max_consecutive_days != null ? String(s.max_consecutive_days) : '',
-      // PR-2SS-d — 최소 경력
-      min_seniority_months: Number(s.min_seniority_months || 0),
+      // PR-2SS-d revert — min_seniority_months 폐기
       // PR-2SS-e — 시간 분해
       night_period_start: s.night_period_start ? s.night_period_start.substring(0, 5) : '',
       night_period_end: s.night_period_end ? s.night_period_end.substring(0, 5) : '',
@@ -118,8 +115,7 @@ export default function ShiftsTab() {
         // PR-2SS-b — 안전 가드
         next_day_blocking_hours: editing.next_day_blocking_hours,
         max_consecutive_days: editing.max_consecutive_days === '' ? null : Number(editing.max_consecutive_days),
-        // PR-2SS-d — 최소 경력
-        min_seniority_months: editing.min_seniority_months,
+        // PR-2SS-d revert — min_seniority_months 폐기
         // PR-2SS-e — 시간 분해
         night_period_start: editing.night_period_start || null,
         night_period_end: editing.night_period_end || null,
@@ -247,9 +243,7 @@ export default function ShiftsTab() {
                               ? 16 : editing.next_day_blocking_hours,
                             max_consecutive_days: opt.value === 'overnight' && editing.max_consecutive_days === ''
                               ? '3' : editing.max_consecutive_days,
-                            // PR-2SS-d — overnight 자동 디폴트 6개월 제안
-                            min_seniority_months: opt.value === 'overnight' && editing.min_seniority_months === 0
-                              ? 6 : editing.min_seniority_months,
+                            // PR-2SS-d revert — min_seniority_months 폐기
                           })}
                           style={{
                             flex: 1, padding: '6px 0', fontSize: 12, fontWeight: 700, borderRadius: 6,
@@ -322,22 +316,7 @@ export default function ShiftsTab() {
                 </div>
               </Field>
             </div>
-            {/* PR-2SS-d — 최소 경력 */}
-            <div style={{ marginTop: 10 }}>
-              <Field label="🌱 최소 근무 경력 (개월)">
-                <input type="number" min={0} max={120}
-                       value={editing.min_seniority_months}
-                       onChange={(e) => setEditing({
-                         ...editing,
-                         min_seniority_months: Math.max(0, Math.min(120, Number(e.target.value) || 0)),
-                       })}
-                       style={inputStyle}
-                       placeholder="0" />
-                <div style={{ fontSize: 10, color: COLORS.textMuted, marginTop: 2 }}>
-                  ride_employees.hire_date 기준 — 0=제약 없음, 야간 권장 6 (신입 야간 금지)
-                </div>
-              </Field>
-            </div>
+            {/* PR-2SS-d revert — 최소 경력 섹션 폐기 (매니저 직접 판단) */}
           </div>
 
           {/* PR-2SS-e — 시간 분해 + 가산율 (KPI 보조용, 현재 가산율 0) */}
@@ -466,15 +445,7 @@ export default function ShiftsTab() {
                         📅{s.max_consecutive_days}
                       </span>
                     )}
-                    {/* PR-2SS-d — 최소 경력 배지 */}
-                    {Number(s.min_seniority_months || 0) > 0 && (
-                      <span style={{
-                        marginLeft: 4, fontSize: 9, padding: '1px 5px', borderRadius: 4,
-                        background: COLORS.bgGreen, color: COLORS.success, fontWeight: 700,
-                      }} title="최소 근무 경력">
-                        🌱{s.min_seniority_months}m
-                      </span>
-                    )}
+                    {/* PR-2SS-d revert — 최소 경력 배지 폐기 */}
                   </td>
                   <td style={tdStyle}>{s.sort_order}</td>
                   <td style={tdStyle}>

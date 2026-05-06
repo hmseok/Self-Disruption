@@ -18,6 +18,8 @@ const ALLOWED = new Set([
   'cycle_days_on', 'cycle_days_off', 'cycle_start_date',
   // PR-2SS-c — 연속 한도 + 슬롯 거부
   'max_consecutive_work_days', 'blocked_slot_ids',
+  // PR-2SS-g — 희망 요일 (Hard ranking)
+  'preferred_dow_prefer',
 ])
 const COLOR_TONES = new Set([
   'blue', 'gray', 'green', 'amber', 'violet', 'red', 'none',
@@ -35,7 +37,7 @@ export async function PATCH(
     const body = await request.json()
 
     // 컬럼 존재 확인 (graceful)
-    let hasExt = true, hasConstraints = true, hasPattern = true, hasBlockedConsec = true
+    let hasExt = true, hasConstraints = true, hasPattern = true, hasBlockedConsec = true, hasPreferDow = true
     try {
       await prisma.$queryRaw<any[]>`SELECT is_external FROM cs_workers LIMIT 1`
     } catch { hasExt = false }
@@ -48,6 +50,9 @@ export async function PATCH(
     try {
       await prisma.$queryRaw<any[]>`SELECT max_consecutive_work_days FROM cs_workers LIMIT 1`
     } catch { hasBlockedConsec = false }
+    try {
+      await prisma.$queryRaw<any[]>`SELECT preferred_dow_prefer FROM cs_workers LIMIT 1`
+    } catch { hasPreferDow = false }
 
     const CONSTRAINT_COLS = new Set([
       'priority_level', 'preferred_dow_avoid',
@@ -59,6 +64,7 @@ export async function PATCH(
     const BLOCKED_CONSEC_COLS = new Set([
       'max_consecutive_work_days', 'blocked_slot_ids',
     ])
+    const PREFER_DOW_COLS = new Set(['preferred_dow_prefer'])
 
     const sets: string[] = []
     const params: any[] = []
@@ -68,6 +74,7 @@ export async function PATCH(
       if (CONSTRAINT_COLS.has(k) && !hasConstraints) continue
       if (PATTERN_COLS.has(k) && !hasPattern) continue
       if (BLOCKED_CONSEC_COLS.has(k) && !hasBlockedConsec) continue
+      if (PREFER_DOW_COLS.has(k) && !hasPreferDow) continue
       if (k === 'color_tone' && !COLOR_TONES.has(String(v))) continue
       if (k === 'is_external') {
         sets.push(`${k} = ?`); params.push(v ? 1 : 0); continue

@@ -47,8 +47,7 @@ export interface ShiftSlot {
   // PR-2SS-b — 안전 가드 (graceful — 마이그 미적용 시 undefined)
   next_day_blocking_hours?: number       // 종료 후 N시간 안 다른 슬롯 시작 금지 (0=제약 X, 야간 디폴트 16)
   max_consecutive_days?: number | null   // 연속 N일 한도 (PR-2SS-c 활용, 야간 디폴트 3)
-  // PR-2SS-d — 최소 경력 (개월)
-  min_seniority_months?: number          // 0=제약 없음 / 야간 디폴트 6 (신입 야간 금지)
+  // PR-2SS-d revert — min_seniority_months 폐기 (매니저 직접 판단)
   // PR-2SS-e — 시간 분해 + 가산율 (KPI 보조용, 현재 가산율 0)
   night_period_start?: string | null     // "HH:MM:SS" 가산 시간대 시작 (NULL=가산 없음)
   night_period_end?: string | null       // "HH:MM:SS" 가산 시간대 종료
@@ -70,6 +69,8 @@ export interface Worker {
   // PR-2QQ-d-1 — 워커 제약 모델
   priority_level?: number              // 1=최우선 / 2=일반 / 3=백업
   preferred_dow_avoid?: string | null  // '0,5' = 일·금 회피
+  // PR-2SS-g — 희망 요일 (avoid 와 대칭, 매치 시 ranking 우선)
+  preferred_dow_prefer?: string | null // '1,3,5' = 월수금 희망
   required_days_per_month?: number | null
   max_days_per_month?: number | null
   work_pattern_text?: string | null    // '2-on-2-off' 같은 자유 메모

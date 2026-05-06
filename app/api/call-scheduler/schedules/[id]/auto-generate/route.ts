@@ -51,8 +51,7 @@ interface GroupRow {
   // PR-2SS-b — 안전 가드 (graceful)
   slot_next_day_blocking_hours?: number
   slot_max_consecutive_days?: number | null
-  // PR-2SS-d — 최소 경력 (graceful)
-  slot_min_seniority_months?: number
+  // PR-2SS-d revert — slot_min_seniority_months 폐기
   // PR-2SS-e — 시간 분해 (graceful)
   slot_night_period_start?: string | null
   slot_night_period_end?: string | null
@@ -82,11 +81,13 @@ interface AssignmentRow {
   special_code: string
   manual_lock?: number  // PR-2QQ-b — 1=수동 lock 셀
 }
-// PR-2QQ-d-3 → d-revert → PR-2SS-c/d — 워커 제약 + 연속 한도 + 슬롯 거부 + 경력
+// PR-2QQ-d-3 → d-revert → PR-2SS-c/g — 워커 제약 + 연속 한도 + 슬롯 거부 + 희망 요일
+//   PR-2SS-d revert: hire_date / min_seniority 폐기
 interface WorkerConstraint {
   id: string
   priority_level: number
   preferred_dow_avoid: number[]
+  preferred_dow_prefer: number[]    // PR-2SS-g — 희망 요일 (Hard ranking)
   required_days_per_month: number | null
   max_days_per_month: number | null
   cycle_days_on: number | null      // 외부 근무일 수 (이 phase = 당사 X)
@@ -95,8 +96,6 @@ interface WorkerConstraint {
   // PR-2SS-c — 연속 한도 + 슬롯 거부
   max_consecutive_work_days: number | null
   blocked_slot_ids: Set<string>     // 비어있으면 빈 Set
-  // PR-2SS-d — 입사일 (ride_employees join)
-  hire_date: string | null          // 'YYYY-MM-DD' or null
 }
 interface CoverageRow {
   group_id: string
@@ -191,15 +190,7 @@ function addDays(iso: string, n: number): string {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
 }
 
-// PR-2SS-d — 두 ISO 날짜 간 개월 수 (정수 — 일 단위 반올림)
-function monthsSince(hireDateIso: string, refIso: string): number {
-  const a = new Date(hireDateIso + 'T00:00:00')
-  const b = new Date(refIso + 'T00:00:00')
-  if (b < a) return 0
-  let months = (b.getFullYear() - a.getFullYear()) * 12 + (b.getMonth() - a.getMonth())
-  if (b.getDate() < a.getDate()) months -= 1
-  return Math.max(0, months)
-}
+// PR-2SS-d revert — monthsSince 헬퍼 폐기
 
 // PR-2QQ-d-3 — '0,5' 같은 문자열 → number 배열 (안전 파싱)
 function parseDowList(s: string | null | undefined): number[] {
@@ -286,20 +277,16 @@ export async function POST(
     const { year, month } = sRows[0]
     const lastDay = new Date(year, month, 0).getDate()
 
-    // 2) 그룹 + 슬롯 join — PR-2SS-b/d/e: 안전 가드 + 경력 + 시간 분해 컬럼 graceful
+    // 2) 그룹 + 슬롯 join — PR-2SS-b/e: 안전 가드 + 시간 분해 컬럼 graceful (d revert 후 seniority 제거)
     let hasSlotSafety = true
-    let hasSlotSeniority = true
     let hasSlotBreakdown = true
     try {
       await prisma.$queryRaw<any[]>`SELECT next_day_blocking_hours FROM cs_shift_slots LIMIT 1`
     } catch { hasSlotSafety = false }
     try {
-      await prisma.$queryRaw<any[]>`SELECT min_seniority_months FROM cs_shift_slots LIMIT 1`
-    } catch { hasSlotSeniority = false }
-    try {
       await prisma.$queryRaw<any[]>`SELECT night_period_start FROM cs_shift_slots LIMIT 1`
     } catch { hasSlotBreakdown = false }
-    const groups: GroupRow[] = (hasSlotSafety && hasSlotSeniority && hasSlotBreakdown)
+    const groups: GroupRow[] = (hasSlotSafety && hasSlotBreakdown)
       ? (await prisma.$queryRaw<any[]>`
           SELECT g.id, g.name, g.shift_slot_id, g.pattern_type, g.custom_days,
                  g.generation_strategy, g.rotation_size, g.rotation_period_days,
@@ -308,25 +295,9 @@ export async function POST(
                  s.is_overnight AS slot_overnight,
                  s.next_day_blocking_hours AS slot_next_day_blocking_hours,
                  s.max_consecutive_days   AS slot_max_consecutive_days,
-                 s.min_seniority_months   AS slot_min_seniority_months,
                  TIME_FORMAT(s.night_period_start, '%H:%i:%s') AS slot_night_period_start,
                  TIME_FORMAT(s.night_period_end,   '%H:%i:%s') AS slot_night_period_end,
                  s.night_premium_rate AS slot_night_premium_rate
-          FROM cs_shift_groups g
-          JOIN cs_shift_slots s ON s.id = g.shift_slot_id
-          WHERE g.is_active = 1
-          ORDER BY g.sort_order ASC, g.name ASC
-        ` as any)
-      : (hasSlotSafety && hasSlotSeniority)
-      ? (await prisma.$queryRaw<any[]>`
-          SELECT g.id, g.name, g.shift_slot_id, g.pattern_type, g.custom_days,
-                 g.generation_strategy, g.rotation_size, g.rotation_period_days,
-                 TIME_FORMAT(s.start_time, '%H:%i:%s') AS slot_start,
-                 TIME_FORMAT(s.end_time, '%H:%i:%s')   AS slot_end,
-                 s.is_overnight AS slot_overnight,
-                 s.next_day_blocking_hours AS slot_next_day_blocking_hours,
-                 s.max_consecutive_days   AS slot_max_consecutive_days,
-                 s.min_seniority_months   AS slot_min_seniority_months
           FROM cs_shift_groups g
           JOIN cs_shift_slots s ON s.id = g.shift_slot_id
           WHERE g.is_active = 1
@@ -434,40 +405,43 @@ export async function POST(
       }
     }
 
-    // 5-A) PR-2QQ-d-3 → PR-2SS-c/d — 워커 제약 + 연속/거부 + 경력 (graceful)
+    // 5-A) PR-2QQ-d-3 → PR-2SS-c/g — 워커 제약 + 연속/거부 + 희망 요일 (graceful)
+    //   PR-2SS-d revert: hire_date join 제거
     let workerCons: Map<string, WorkerConstraint> = new Map()
     let hasBlockedConsec = true
+    let hasPreferDow = true
     if (usePriority) {
       try {
         try {
           await prisma.$queryRaw<any[]>`SELECT max_consecutive_work_days FROM cs_workers LIMIT 1`
         } catch { hasBlockedConsec = false }
-        // PR-2SS-d — ride_employees.hire_date LEFT JOIN (employee_id 또는 name 매칭)
-        const wcRows = hasBlockedConsec
+        try {
+          await prisma.$queryRaw<any[]>`SELECT preferred_dow_prefer FROM cs_workers LIMIT 1`
+        } catch { hasPreferDow = false }
+        const wcRows = (hasBlockedConsec && hasPreferDow)
           ? await prisma.$queryRaw<any[]>`
-              SELECT w.id, w.priority_level, w.preferred_dow_avoid,
-                     w.required_days_per_month, w.max_days_per_month,
-                     w.cycle_days_on, w.cycle_days_off,
-                     DATE_FORMAT(w.cycle_start_date, '%Y-%m-%d') AS cycle_start_date,
-                     w.max_consecutive_work_days, w.blocked_slot_ids,
-                     DATE_FORMAT(re.hire_date, '%Y-%m-%d') AS hire_date
-              FROM cs_workers w
-              LEFT JOIN ride_employees re
-                ON (w.employee_id IS NOT NULL AND re.id = w.employee_id)
-                OR (w.employee_id IS NULL AND re.name = w.name)
-              WHERE w.is_active = 1
+              SELECT id, priority_level, preferred_dow_avoid, preferred_dow_prefer,
+                     required_days_per_month, max_days_per_month,
+                     cycle_days_on, cycle_days_off,
+                     DATE_FORMAT(cycle_start_date, '%Y-%m-%d') AS cycle_start_date,
+                     max_consecutive_work_days, blocked_slot_ids
+              FROM cs_workers WHERE is_active = 1
+            `
+          : hasBlockedConsec
+          ? await prisma.$queryRaw<any[]>`
+              SELECT id, priority_level, preferred_dow_avoid,
+                     required_days_per_month, max_days_per_month,
+                     cycle_days_on, cycle_days_off,
+                     DATE_FORMAT(cycle_start_date, '%Y-%m-%d') AS cycle_start_date,
+                     max_consecutive_work_days, blocked_slot_ids
+              FROM cs_workers WHERE is_active = 1
             `
           : await prisma.$queryRaw<any[]>`
-              SELECT w.id, w.priority_level, w.preferred_dow_avoid,
-                     w.required_days_per_month, w.max_days_per_month,
-                     w.cycle_days_on, w.cycle_days_off,
-                     DATE_FORMAT(w.cycle_start_date, '%Y-%m-%d') AS cycle_start_date,
-                     DATE_FORMAT(re.hire_date, '%Y-%m-%d') AS hire_date
-              FROM cs_workers w
-              LEFT JOIN ride_employees re
-                ON (w.employee_id IS NOT NULL AND re.id = w.employee_id)
-                OR (w.employee_id IS NULL AND re.name = w.name)
-              WHERE w.is_active = 1
+              SELECT id, priority_level, preferred_dow_avoid,
+                     required_days_per_month, max_days_per_month,
+                     cycle_days_on, cycle_days_off,
+                     DATE_FORMAT(cycle_start_date, '%Y-%m-%d') AS cycle_start_date
+              FROM cs_workers WHERE is_active = 1
             `
         for (const r of wcRows) {
           // PR-2SS-c — blocked_slot_ids JSON 안전 파싱
@@ -484,6 +458,7 @@ export async function POST(
             id: r.id,
             priority_level: Number(r.priority_level || 2),
             preferred_dow_avoid: parseDowList(r.preferred_dow_avoid),
+            preferred_dow_prefer: hasPreferDow ? parseDowList(r.preferred_dow_prefer) : [],
             required_days_per_month: r.required_days_per_month != null ? Number(r.required_days_per_month) : null,
             max_days_per_month: r.max_days_per_month != null ? Number(r.max_days_per_month) : null,
             cycle_days_on: r.cycle_days_on != null ? Number(r.cycle_days_on) : null,
@@ -492,8 +467,6 @@ export async function POST(
             max_consecutive_work_days: hasBlockedConsec && r.max_consecutive_work_days != null
               ? Number(r.max_consecutive_work_days) : null,
             blocked_slot_ids: blocked,
-            // PR-2SS-d
-            hire_date: r.hire_date || null,
           })
         }
       } catch {
@@ -592,8 +565,7 @@ export async function POST(
       // PR-2SS-c — 연속 한도 / 슬롯 거부
       | { type: 'consec_limit'; worker_id: string; date: string; slot_id: string; limit: number }
       | { type: 'slot_blocked'; worker_id: string; date: string; slot_id: string }
-      // PR-2SS-d — 경력 부족 (신입 야간 금지 등)
-      | { type: 'seniority_short'; worker_id: string; date: string; slot_id: string; required_months: number; actual_months: number | null }
+      // PR-2SS-d revert — seniority_short 폐기
     const warnings: Warning[] = []
 
     // group_id → rotation cursor (usePriority=false 일 때만 사용)
@@ -732,32 +704,7 @@ export async function POST(
           return true
         })
 
-        // PR-2SS-d — 최소 경력 가드 (slot.min_seniority_months 적용)
-        const requiredMonths = Number(g.slot_min_seniority_months || 0)
-        if (requiredMonths > 0) {
-          candidates = candidates.filter(wId => {
-            const wc = workerCons.get(wId)
-            // 입사일 모르면 안전상 후보 X (운영 정책: 신입 야간 X)
-            if (!wc?.hire_date) {
-              warnings.push({
-                type: 'seniority_short',
-                worker_id: wId, date: isoDate, slot_id: g.shift_slot_id,
-                required_months: requiredMonths, actual_months: null,
-              })
-              return false
-            }
-            const months = monthsSince(wc.hire_date, isoDate)
-            if (months < requiredMonths) {
-              warnings.push({
-                type: 'seniority_short',
-                worker_id: wId, date: isoDate, slot_id: g.shift_slot_id,
-                required_months: requiredMonths, actual_months: months,
-              })
-              return false
-            }
-            return true
-          })
-        }
+        // PR-2SS-d revert — min_seniority 가드 폐기 (매니저 직접 판단)
 
         // (4) usePriority=true 면 가중치 정렬, false 면 단순 rotation
         let selected: string[]
@@ -775,13 +722,17 @@ export async function POST(
             }
             return true
           })
-          // 가중치 정렬
+          // 가중치 정렬 (PR-2SS-g — 희망 요일 매치 우선)
           candidates.sort((a, b) => {
             const wa = workerCons.get(a)
             const wb = workerCons.get(b)
             const pa = wa?.priority_level || 2
             const pb = wb?.priority_level || 2
             if (pa !== pb) return pa - pb
+            // PR-2SS-g — 희망 요일 매치 우선 (priority 다음)
+            const aPrefer = wa?.preferred_dow_prefer.includes(dow) ? 0 : 1
+            const bPrefer = wb?.preferred_dow_prefer.includes(dow) ? 0 : 1
+            if (aPrefer !== bPrefer) return aPrefer - bPrefer
             const aAvoid = wa?.preferred_dow_avoid.includes(dow) ? 1 : 0
             const bAvoid = wb?.preferred_dow_avoid.includes(dow) ? 1 : 0
             if (aAvoid !== bAvoid) return aAvoid - bAvoid
@@ -977,14 +928,13 @@ export async function POST(
       }
     }
 
-    // PR-2SS-b/c/d — 경고 타입별 카운트
+    // PR-2SS-b/c — 경고 타입별 카운트 (d revert 후 seniority_short 제거)
     const warnCount = {
       missing: warnings.filter(w => w.type === 'missing').length,
       next_day_block: warnings.filter(w => w.type === 'next_day_block').length,
       time_conflict: warnings.filter(w => w.type === 'time_conflict').length,
       consec_limit: warnings.filter(w => w.type === 'consec_limit').length,
       slot_blocked: warnings.filter(w => w.type === 'slot_blocked').length,
-      seniority_short: warnings.filter(w => w.type === 'seniority_short').length,
     }
     const summary = {
       mode,

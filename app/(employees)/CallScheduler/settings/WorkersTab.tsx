@@ -53,6 +53,8 @@ export default function WorkersTab() {
   // PR-2SS-c — 연속 한도 + 슬롯 거부
   const [editMaxConsec, setEditMaxConsec] = useState<string>('')
   const [editBlockedSlots, setEditBlockedSlots] = useState<Set<string>>(new Set())
+  // PR-2SS-g — 희망 요일 (Hard ranking)
+  const [editPreferDow, setEditPreferDow] = useState<Set<number>>(new Set())
 
   const load = async () => {
     setLoading(true); setError(null)
@@ -114,6 +116,15 @@ export default function WorkersTab() {
     // PR-2SS-c — 연속 한도 + 슬롯 거부
     setEditMaxConsec(w.max_consecutive_work_days != null ? String(w.max_consecutive_work_days) : '')
     setEditBlockedSlots(new Set(Array.isArray(w.blocked_slot_ids) ? w.blocked_slot_ids : []))
+    // PR-2SS-g — 희망 요일 (Hard ranking)
+    setEditPreferDow(new Set(
+      (w.preferred_dow_prefer || '')
+        .split(',')
+        .map(s => s.trim())
+        .filter(s => s !== '')
+        .map(Number)
+        .filter(n => !isNaN(n) && n >= 0 && n <= 6)
+    ))
   }
   const cancelEdit = () => { setEditingId(null) }
 
@@ -153,6 +164,8 @@ export default function WorkersTab() {
           // PR-2SS-c — 연속 한도 + 슬롯 거부
           max_consecutive_work_days: editMaxConsec === '' ? null : Number(editMaxConsec),
           blocked_slot_ids: Array.from(editBlockedSlots),
+          // PR-2SS-g — 희망 요일 (Hard ranking)
+          preferred_dow_prefer: Array.from(editPreferDow).sort().join(',') || null,
         }),
       })
       const wJson = await wRes.json()
@@ -391,6 +404,7 @@ export default function WorkersTab() {
                             cycleStart={editCycleStart} setCycleStart={setEditCycleStart}
                             maxConsec={editMaxConsec} setMaxConsec={setEditMaxConsec}
                             blockedSlots={editBlockedSlots} setBlockedSlots={setEditBlockedSlots}
+                            preferDow={editPreferDow} setPreferDow={setEditPreferDow}
                             slots={slots}
                           />
                         </td>
@@ -461,6 +475,8 @@ function ConstraintsPanel({
   // PR-2SS-c — 연속 한도 + 슬롯 거부
   maxConsec, setMaxConsec,
   blockedSlots, setBlockedSlots,
+  // PR-2SS-g — 희망 요일 (Hard ranking)
+  preferDow, setPreferDow,
   slots,
 }: {
   isExternal: boolean; setIsExternal: (v: boolean) => void
@@ -474,6 +490,7 @@ function ConstraintsPanel({
   cycleStart: string; setCycleStart: (v: string) => void
   maxConsec: string; setMaxConsec: (v: string) => void
   blockedSlots: Set<string>; setBlockedSlots: (v: Set<string>) => void
+  preferDow: Set<number>; setPreferDow: (v: Set<number>) => void
   slots: ShiftSlot[]
 }) {
   const DOW = ['일', '월', '화', '수', '목', '금', '토']
@@ -530,6 +547,38 @@ function ConstraintsPanel({
               외부 직원으로 표시 (🔒 아이콘 + 자동 P1 권장)
             </span>
           </label>
+        </div>
+
+        <div>
+          <FieldLabel>🌟 희망 요일 (Hard ranking)</FieldLabel>
+          <div style={{ display: 'flex', gap: 3, marginTop: 4 }}>
+            {DOW.map((label, i) => {
+              const active = preferDow.has(i)
+              const isWeekend = i === 0 || i === 6
+              return (
+                <button key={i} type="button"
+                        onClick={() => {
+                          const next = new Set(preferDow)
+                          if (next.has(i)) next.delete(i); else next.add(i)
+                          setPreferDow(next)
+                        }}
+                        style={{
+                          flex: 1, padding: '6px 0', borderRadius: 4, fontSize: 11, fontWeight: 700,
+                          background: active ? COLORS.bgGreen : 'transparent',
+                          color: active
+                            ? COLORS.success
+                            : (isWeekend ? COLORS.textSecondary : COLORS.textMuted),
+                          border: `1px solid ${active ? COLORS.borderGreen : COLORS.borderFaint}`,
+                          cursor: 'pointer',
+                        }}>
+                  {label}
+                </button>
+              )
+            })}
+          </div>
+          <div style={{ fontSize: 10, color: COLORS.textMuted, marginTop: 3 }}>
+            자동 생성 시 이 요일 매치 → priority 다음 우선순위 (avoid 보다 앞)
+          </div>
         </div>
 
         <div>

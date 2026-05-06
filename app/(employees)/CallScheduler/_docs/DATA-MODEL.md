@@ -36,7 +36,7 @@ cs_shift_groups ──< cs_group_members ────────┘
 | is_overnight | TINYINT(1) | NN | 0 | 1=익일 종료 |
 | **next_day_blocking_hours** | TINYINT | NN | 0 | **PR-2SS-b** — 종료 후 N시간 안 다른 슬롯 시작 금지 (야간 디폴트 16) |
 | **max_consecutive_days** | TINYINT | Y | NULL | **PR-2SS-b** — 연속 N일 한도 (NULL=무제한, 야간 디폴트 3 — PR-2SS-c 활용) |
-| **min_seniority_months** | TINYINT | NN | 0 | **PR-2SS-d** — 최소 근무 경력 (개월, 야간 디폴트 6 — 신입 야간 금지) |
+| ~~min_seniority_months~~ | ~~TINYINT~~ | | | **PR-2SS-d revert (2026-05-06)** — 컬럼 DROP, 매니저 직접 판단 |
 | **night_period_start** | TIME | Y | NULL | **PR-2SS-e** — 가산 시간대 시작 (예: 22:00:00, NULL=가산 없음) |
 | **night_period_end** | TIME | Y | NULL | **PR-2SS-e** — 가산 시간대 종료 (자정 넘음 가능) |
 | **night_premium_rate** | DECIMAL(4,2) | NN | 0.00 | **PR-2SS-e** — 가산율 (0.50=50%, 현재 정책 0) |
@@ -152,6 +152,7 @@ ORDER BY s.sort_order;
 | is_external | TINYINT(1) | NN | 0 | d-b | 외부 직원 표식 (🔒) |
 | priority_level | TINYINT | NN | 2 | d-1 | 1=최우선 / 2=일반 / 3=백업 |
 | preferred_dow_avoid | VARCHAR(16) | Y | NULL | d-1 | 비선호 요일 ('0,5' = 일·금) |
+| **preferred_dow_prefer** | VARCHAR(16) | Y | NULL | **PR-2SS-g** | 희망 요일 ('1,3,5' = 월수금, Hard ranking 매치 우선) |
 | required_days_per_month | TINYINT | Y | NULL | d-1 | 월 필수 일수 |
 | max_days_per_month | TINYINT | Y | NULL | d-1 | 월 최대 일수 |
 | work_pattern_text | VARCHAR(64) | Y | NULL | d-1 | 자유 패턴 메모 |
