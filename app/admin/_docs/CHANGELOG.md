@@ -1,5 +1,32 @@
 # /admin 모듈 CHANGELOG
 
+## 2026-05-06 — PR-B4 급여 운영 인사 영역 통합
+
+사용자 명시:
+> "관리에 분산된 급여를 인사 영역에 통합 / 추천대로 (B 옵션)
+>  설정연계되는 부분도 체크"
+
+이동:
+- /finance/payroll-ops → /hr/payroll
+- 사이드바: 「관리」 그룹 → 「설정」 그룹 (인사 마스터 옆)
+- 옛 URL redirect 유지
+
+menu-registry:
+- mod-payroll-ops: group 'admin' → 'settings', path 변경, sortOrder 72
+- mod-contract-terms / mod-message-templates: sortOrder 72→73, 73→74
+- HIDDEN_PATHS: /finance/payroll-ops 추가
+- 「관리」 그룹은 대시보드 (별도 ClientLayout 렌더) + 카페24 사고접수만 남음
+
+대시보드:
+- ClientLayout 별도 코드로 사이드바 최상단 렌더 — 그룹 무관 (이미 동작)
+- mod-dashboard 의 group 'admin' 은 권한 페이지용 entry — 그대로 유지
+
+내부 link 정리:
+- /hr/payroll 안 redirect 안내 텍스트: /admin/employees → /hr 로 변경
+- 「조직/권한 관리」 → 「인사 마스터」 라벨 변경
+
+
+
 ## 2026-05-06 — PR-B3 인사 정보 (입사일/퇴사일/재직상태)
 
 사용자 요청:

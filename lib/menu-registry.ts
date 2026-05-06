@@ -88,8 +88,9 @@ export const MENUS: MenuEntry[] = [
   { id: 'mod-contracts',               name: '계약/고객', displayName: '📑 계약/고객', path: '/contracts',                   iconKey: 'Doc',   group: 'sales', sortOrder: 32 },
 
   // ── 관리 (admin) ──
+  // ※ 대시보드 — 사이드바에서 ClientLayout 별도 코드로 최상단 렌더 (그룹 무관)
+  // ※ mod-payroll-ops — 2026-05-06 PR-B4: /hr/payroll 로 이동 (settings 그룹)
   { id: 'mod-dashboard', name: '대시보드', displayName: '🏠 대시보드', path: '/dashboard', iconKey: 'Setting', group: 'admin', sortOrder: 39, requirePermission: true },
-  { id: 'mod-payroll-ops', name: '급여 운영', displayName: '💼 급여 운영', path: '/finance/payroll-ops', iconKey: 'Money', group: 'admin', sortOrder: 40, requirePermission: true },
 
   // ── 직장인필수 (work-essentials) ──
   // 모두 권한 부여 대상 — 권한 페이지에서 ON/OFF 토글 (사용자 요청: 「실제 적용 페이지만 표출」)
@@ -109,10 +110,12 @@ export const MENUS: MenuEntry[] = [
   // ── 설정 (settings) ── admin 전용 (사이드바 별도 섹션)
   // 권한 부여 대상 — 일부 사용자에게 회사 정보 / 메시지 센터 등 위임 가능
   // 2026-05-05 PR-B1 — 「인사 마스터」 통합 페이지 (직원/부서·직급/초대/외부인력) 1개 메뉴로 통합
+  // 2026-05-06 PR-B4 — 「급여 운영」 admin → settings 그룹으로 이동 (인사 영역 통합)
   { id: 'mod-company-info',     name: '회사 정보',     path: '/db/codes',                iconKey: 'Setting',   group: 'settings', sortOrder: 70, requirePermission: true },
   { id: 'mod-hr-master',        name: '인사 마스터', displayName: '👥 인사 마스터', path: '/hr', iconKey: 'Users', group: 'settings', sortOrder: 71, requirePermission: true },
-  { id: 'mod-contract-terms',   name: '계약 약관 관리', path: '/admin/contract-terms',    iconKey: 'Doc',       group: 'settings', sortOrder: 72, requirePermission: true },
-  { id: 'mod-message-templates',name: '메시지 센터',    path: '/admin/message-templates', iconKey: 'Clipboard', group: 'settings', sortOrder: 73, requirePermission: true },
+  { id: 'mod-payroll-ops',      name: '급여 운영', displayName: '💼 급여 운영', path: '/hr/payroll', iconKey: 'Money', group: 'settings', sortOrder: 72, requirePermission: true },
+  { id: 'mod-contract-terms',   name: '계약 약관 관리', path: '/admin/contract-terms',    iconKey: 'Doc',       group: 'settings', sortOrder: 73, requirePermission: true },
+  { id: 'mod-message-templates',name: '메시지 센터',    path: '/admin/message-templates', iconKey: 'Clipboard', group: 'settings', sortOrder: 74, requirePermission: true },
 ]
 
 // ─── 숨김 경로 (legacy + 통합/축소 / 미사용) ───
@@ -149,6 +152,8 @@ export const HIDDEN_PATHS = new Set<string>([
   '/admin/employees', '/admin/payroll',
   // 2026-05-05 PR-B1 — /hr 통합 페이지로 흡수
   '/hr/people', '/hr/org',
+  // 2026-05-06 PR-B4 — /hr/payroll 로 이동 (인사 영역 통합)
+  '/finance/payroll-ops',
   // ── 인증 콜백 / 미사용 모듈 ──
   '/auth', '/loans-out',
 ])
