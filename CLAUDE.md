@@ -821,12 +821,21 @@ const cardColumns: TableColumn<Transaction>[] = [
 - ❌ 다른 세션 작업 영역 (Untracked 폴더) 자기 commit 에 포함
 - ❌ 다른 세션 push 안 끝났는데 force push / 동시 push
 
-**자동화 안전장치 (TBD)**:
+**자동화 안전장치 (도입 완료 — 2026-05-06)**:
 ```
-🔜 11. cowork-staging-lint — 한 commit 안에 여러 「모듈」 동시 staging 감지
-   - app/CallScheduler/ + app/RideEmployees/ 같이 staging 시 경고
-   - 사용자 명시적 GO 없으면 commit 차단
-   - 위치: harness-engineering/scripts/cowork-staging-lint.js (TBD)
+✅ 11. cowork-staging-lint (harness-engineering/scripts/cowork-staging-lint.js)
+   - git diff --cached --name-only 로 staged 파일 추출
+   - 모듈 라벨 매핑:
+     · app/(employees)/<X>/ → 모듈 X
+     · app/(admin)/<X>/    → 모듈 X
+     · app/api/<X>/         → api:X
+     · app/<X>/             → 모듈 X (top-level)
+     · lib/<X>-*.ts         → lib:X (모듈 전용)
+   - 화이트리스트 (_common/_harness/_db/_root) 외 실제 모듈 라벨 ≥ 2 → commit 차단
+   - 우회 (의도적 cross-module): COWORK_ALLOW_MULTI_MODULE=1 git commit ...
+   - harness-lint.js 의 [3.7] sub-lint 로 자동 통합 → pre-commit hook 자동 실행
+   - 회귀 케이스: harness-engineering/regression-cases/2026-05-06-cowork-staging-violation.md
+   - 트리거 사고 (2026-05-06): RideAccidents PR-6.3.c 가 CallScheduler PR-2SS 1,407 라인 흡수
 ```
 
 ### 규칙 22 — 모듈 _docs 갱신 의무 (2026-05-04 신설, 강력)

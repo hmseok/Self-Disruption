@@ -34,6 +34,7 @@ const helperCoverageLint = require('./helper-coverage-lint')
 const sqlReservedAliasLint = require('./sql-reserved-alias-lint')
 const sqlGroupByLint = require('./sql-group-by-lint')
 const menuSyncLint = require('./menu-sync-lint')
+const coworkStagingLint = require('./cowork-staging-lint')
 
 const flags = new Set(process.argv.slice(2))
 
@@ -202,6 +203,26 @@ function main() {
     console.error(`  ❌ menu-registry 에 등록 안 된 페이지: ${v}/page.tsx`)
   }
 
+  // [평가] 3.7. cowork-staging — 한 commit 에 여러 모듈 영역 동시 staged 차단 (CLAUDE.md 규칙 21)
+  // 회귀 케이스: 2026-05-06 — 두 세션 동시 작업 시 git add . 로 다른 세션 작업물 흡수 사고
+  console.log('\n▸ [3.7] cowork-staging-lint — 멀티 세션 staging 침범 차단')
+  const coworkR = coworkStagingLint.lint()
+  if (coworkR.skip) {
+    console.log(`  staged 0 files, skip (working tree 검사 모드)`)
+  } else {
+    console.log(`  ${coworkR.stagedCount} staged, modules=${Object.keys(coworkR.realModules).length}, whitelist=${Object.keys(coworkR.whitelist).length}`)
+    for (const [mod, list] of Object.entries(coworkR.realModules)) {
+      console.log(`  · [${mod}] ${list.length} files`)
+    }
+    for (const v of coworkR.violations) {
+      if (process.env.COWORK_ALLOW_MULTI_MODULE === '1') {
+        console.warn(`  ⚠ multi-module 허용 (COWORK_ALLOW_MULTI_MODULE=1): ${v.modules.join(', ')}`)
+      } else {
+        console.error(`  ❌ 한 commit 에 여러 모듈 staged: ${v.modules.join(', ')}`)
+      }
+    }
+  }
+
   // [평가] 4. UI 화면 데이터 정합성
   console.log('\n▸ [4/4] ui-data-coverage — 같은 API 호출 page 들 사이 누락 필드')
   const uiR = uiCoverage.buildCoverage()
@@ -256,7 +277,12 @@ function main() {
   }
 
   // 결과 집계
-  const newCritical = newSqlViolations.length + fnR.violations.length + newApiBroken.length + newSign.length + newHelper.length + newAlias.length + newGb.length + menuR.violations.length
+  // cowork-staging-lint: skip 또는 ALLOW=1 이면 카운트 X
+  const coworkCritical =
+    coworkR.skip || process.env.COWORK_ALLOW_MULTI_MODULE === '1'
+      ? 0
+      : coworkR.violations.length
+  const newCritical = newSqlViolations.length + fnR.violations.length + newApiBroken.length + newSign.length + newHelper.length + newAlias.length + newGb.length + menuR.violations.length + coworkCritical
   console.log('\n═══ 결과 ═══')
   console.log(`  새 critical 위반: ${newCritical}`)
   console.log(`  known issue: ${knownSqlViolations.length} SQL + ${apiR.brokenCalls.length - newApiBroken.length} broken-call`)
