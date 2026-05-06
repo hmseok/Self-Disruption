@@ -3,16 +3,17 @@
 /**
  * /RideAccidents
  *
- * 라이드 사고접수 목록 — 카페24 ERP (aceesosh) read-only.
+ * 라이드 사고접수 목록 + 상세 모달 — 카페24 ERP (aceesosh + pmccarsm) read-only.
  *
  * 사용자 노출 명칭: "라이드 사고접수"
- * 백엔드 데이터 source: 카페24 ERP (skyautosvc.co.kr) aceesosh
+ * 백엔드 데이터 source: 카페24 ERP (skyautosvc.co.kr) aceesosh + pmccarsm 조인
  *
  * - 사이드바 그룹: Employee of Ride Inc. > CX팀
  * - admin 전용 (Q8=D)
  * - 캐시 30s (Q7=A 분당 변동 정책)
  * - 모든 컬럼 sortBy 의무 (CLAUDE.md 규칙 18)
- * - Glass L4 NeuDataTable + Glass L2 필터바
+ * - Glass 디자인 시스템 (CLAUDE.md § 10)
+ * - 행 클릭 → 우측 슬라이드 상세 모달
  */
 
 import { useEffect, useMemo, useState } from 'react'
@@ -31,49 +32,104 @@ interface AccidentRow {
   esosrslt: string | null
   esosrstx: string | null
   esostypp: string | null
+  esosgnus: string | null
+  cars_no: string | null
+  cars_model: string | null
+}
+
+interface AccidentDetail extends AccidentRow {
+  esosjsfg: string | null
+  esosstat: string | null
+  esosbate: string | null
+  esostire: string | null
+  esosoils: string | null
+  esoslock: string | null
+  esosmove: string | null
+  esoshelp: string | null
+  esosaddr: string | null
+  esosadnm: string | null
+  esosadtl: string | null
+  esosusnm: string | null
+  esosustl: string | null
+  esosusvp: string | null
+  esosusvd: string | null
+  esosuser: string | null
+  esosmemo: string | null
+  esosinft: string | null
+  esoskilo: string | null
+  esosgndt: string | null
+  esosgntm: string | null
+  esosupdt: string | null
+  esosuptm: string | null
+  esosupus: string | null
 }
 
 // ── 헬퍼 ────────────────────────────────────────────────────────
-function fmtDate8(d: string | null): string {
+function fmtDate8(d: string | null | undefined): string {
   if (!d || d.length < 8) return ''
   return `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}`
 }
-
-function fmtTime4(t: string | null): string {
+function fmtTime4(t: string | null | undefined): string {
   if (!t || t.length < 4) return ''
   return `${t.slice(0, 2)}:${t.slice(2, 4)}`
 }
+function fmtDateTime(d: string | null | undefined, t: string | null | undefined): string {
+  const dt = fmtDate8(d)
+  const tm = fmtTime4(t)
+  return [dt, tm].filter(Boolean).join(' ')
+}
 
-// 상태 코드 라벨 — bscddesc 조인은 PR-6.3.b 에서. 일단 raw 표시.
+// 코드 마스터 (PR-6.7 에서 bscddesc 조인 예정 — 일단 추정 라벨)
 const RGST_LABEL: Record<string, { label: string; color: string }> = {
   R: { label: '등록', color: COLORS.success },
   C: { label: '취소', color: COLORS.danger },
   X: { label: '삭제', color: COLORS.neutral },
 }
+const TYPP_LABEL: Record<string, string> = {
+  S: '서비스',
+  J: '점프',
+  E: '긴급',
+  B: '배터리',
+  I: '점검',
+}
+const RSLT_LABEL: Record<string, { label: string; color: string }> = {
+  '1': { label: '처리중', color: COLORS.warning },
+  '3': { label: '완료', color: COLORS.success },
+}
+// 차량 점검 1자 (Y/N/null) — Y = 문제 발생 / N = 정상 / 빈값 = 미점검
+function checkBadge(v: string | null | undefined): { label: string; color: string; bg: string } {
+  if (v === 'Y') return { label: '문제', color: COLORS.danger, bg: COLORS.bgRed }
+  if (v === 'N') return { label: '정상', color: COLORS.success, bg: COLORS.bgGreen }
+  return { label: '-', color: COLORS.textMuted, bg: 'rgba(0,0,0,0.04)' }
+}
 
 // ── 페이지 ──────────────────────────────────────────────────────
-export default function CafeAccidentsPage() {
+export default function RideAccidentsPage() {
   const [user, setUser] = useState<{ role?: string } | null>(null)
   const [authChecked, setAuthChecked] = useState(false)
-
   const [rows, setRows] = useState<AccidentRow[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [fetchedAt, setFetchedAt] = useState<Date | null>(null)
-
-  // 필터
   const [rgstFilter, setRgstFilter] = useState<'all' | 'R' | 'C' | 'X'>('all')
   const [searchQ, setSearchQ] = useState('')
   const [limit] = useState(100)
 
-  // ── 권한 체크 ──
+  // 상세 모달
+  const [selectedKey, setSelectedKey] = useState<{
+    idno: string
+    mddt: string
+    srno: number
+  } | null>(null)
+  const [detail, setDetail] = useState<AccidentDetail | null>(null)
+  const [detailLoading, setDetailLoading] = useState(false)
+  const [detailError, setDetailError] = useState<string | null>(null)
+
   useEffect(() => {
-    const u = getStoredUser()
-    setUser(u)
+    setUser(getStoredUser())
     setAuthChecked(true)
   }, [])
 
-  // ── fetch ──
   const fetchData = useMemo(
     () =>
       async function () {
@@ -84,7 +140,6 @@ export default function CafeAccidentsPage() {
           const params = new URLSearchParams({ limit: String(limit) })
           if (rgstFilter !== 'all') params.set('rgst', rgstFilter)
           if (searchQ.trim()) params.set('q', searchQ.trim())
-
           const res = await fetch(`/api/cafe24/accidents?${params}`, {
             headers: token ? { Authorization: `Bearer ${token}` } : {},
             cache: 'no-store',
@@ -107,12 +162,52 @@ export default function CafeAccidentsPage() {
     [limit, rgstFilter, searchQ]
   )
 
-  // 첫 로드 + 필터 변경 시 fetch
   useEffect(() => {
     if (!authChecked || user?.role !== 'admin') return
     fetchData()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authChecked, user?.role, rgstFilter])
+
+  // ── 상세 fetch ──
+  useEffect(() => {
+    if (!selectedKey) {
+      setDetail(null)
+      setDetailError(null)
+      return
+    }
+    const ac = new AbortController()
+    async function load() {
+      setDetailLoading(true)
+      setDetailError(null)
+      try {
+        const token = getStoredToken()
+        const params = new URLSearchParams({
+          idno: selectedKey!.idno,
+          mddt: selectedKey!.mddt,
+          srno: String(selectedKey!.srno),
+        })
+        const res = await fetch(`/api/cafe24/accidents/detail?${params}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          cache: 'no-store',
+          signal: ac.signal,
+        })
+        const json = await res.json()
+        if (!json.success || !json.data) {
+          setDetailError(json.error || 'not-found')
+          setDetail(null)
+        } else {
+          setDetail(json.data)
+        }
+      } catch (e) {
+        const err = e as { name?: string }
+        if (err.name !== 'AbortError') setDetailError(String(e))
+      } finally {
+        setDetailLoading(false)
+      }
+    }
+    load()
+    return () => ac.abort()
+  }, [selectedKey])
 
   // ── 권한 차단 ──
   if (!authChecked) {
@@ -124,11 +219,17 @@ export default function CafeAccidentsPage() {
   }
   if (user?.role !== 'admin') {
     return (
-      <div style={{ padding: 32, ...GLASS.L4, borderRadius: 12, maxWidth: 520, margin: '40px auto' }}>
+      <div
+        style={{
+          padding: 32,
+          ...GLASS.L4,
+          borderRadius: 12,
+          maxWidth: 520,
+          margin: '40px auto',
+        }}
+      >
         <h2 style={{ marginTop: 0, color: COLORS.danger }}>🔒 접근 권한 없음</h2>
-        <p style={{ color: COLORS.textSecondary }}>
-          본 페이지는 관리자 전용입니다. (Cafe24 ERP 모듈 — Q8=D 정책)
-        </p>
+        <p style={{ color: COLORS.textSecondary }}>본 페이지는 관리자 전용입니다.</p>
       </div>
     )
   }
@@ -138,10 +239,10 @@ export default function CafeAccidentsPage() {
     {
       key: 'mddt',
       label: '접수일',
-      width: 110,
+      width: 100,
       sortBy: (r) => r.esosmddt || '',
       render: (r) => (
-        <span style={{ whiteSpace: 'nowrap', color: COLORS.textPrimary }}>
+        <span style={{ whiteSpace: 'nowrap', color: COLORS.textPrimary, fontSize: 13 }}>
           {fmtDate8(r.esosmddt)}
         </span>
       ),
@@ -149,7 +250,7 @@ export default function CafeAccidentsPage() {
     {
       key: 'srno',
       label: '#',
-      width: 70,
+      width: 60,
       align: 'right',
       sortBy: (r) => r.esossrno || 0,
       render: (r) => (
@@ -157,30 +258,55 @@ export default function CafeAccidentsPage() {
       ),
     },
     {
-      key: 'idno',
-      label: 'ID',
+      key: 'cars_no',
+      label: '차량번호',
       width: 110,
-      sortBy: (r) => r.esosidno || '',
+      sortBy: (r) => r.cars_no || '',
       render: (r) => (
-        <span style={{ fontFamily: 'monospace', fontSize: 12, color: COLORS.textSecondary }}>
-          {r.esosidno}
+        <span
+          style={{
+            whiteSpace: 'nowrap',
+            color: r.cars_no ? COLORS.textPrimary : COLORS.textMuted,
+            fontWeight: r.cars_no ? 600 : 400,
+            fontSize: 13,
+          }}
+        >
+          🚗 {r.cars_no || '-'}
+        </span>
+      ),
+    },
+    {
+      key: 'cars_model',
+      label: '차종',
+      sortBy: (r) => r.cars_model || '',
+      render: (r) => (
+        <span
+          style={{
+            color: COLORS.textSecondary,
+            fontSize: 12,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            display: 'block',
+            maxWidth: 280,
+          }}
+          title={r.cars_model || ''}
+        >
+          {r.cars_model || '-'}
         </span>
       ),
     },
     {
       key: 'rgst',
-      label: '상태',
-      width: 80,
+      label: '등록',
+      width: 70,
       sortBy: (r) => r.esosrgst || '',
       render: (r) => {
         const meta = r.esosrgst ? RGST_LABEL[r.esosrgst] : null
-        if (!meta) {
+        if (!meta)
           return (
-            <span style={{ color: COLORS.textMuted, fontSize: 12 }}>
-              {r.esosrgst || '-'}
-            </span>
+            <span style={{ color: COLORS.textMuted, fontSize: 12 }}>{r.esosrgst || '-'}</span>
           )
-        }
         return (
           <span
             style={{
@@ -204,61 +330,81 @@ export default function CafeAccidentsPage() {
       width: 130,
       sortBy: (r) => `${r.esosacdt || ''}${r.esosactm || ''}`,
       render: (r) => (
-        <span style={{ whiteSpace: 'nowrap', color: COLORS.textSecondary, fontSize: 12 }}>
-          {fmtDate8(r.esosacdt)} {fmtTime4(r.esosactm)}
+        <span
+          style={{
+            whiteSpace: 'nowrap',
+            color: COLORS.textSecondary,
+            fontSize: 12,
+          }}
+        >
+          {fmtDateTime(r.esosacdt, r.esosactm)}
         </span>
       ),
     },
     {
       key: 'typp',
       label: '타입',
-      width: 60,
-      sortBy: (r) => r.esostypp || '',
-      render: (r) => (
-        <span style={{ color: COLORS.textMuted, fontSize: 12 }}>{r.esostypp || '-'}</span>
-      ),
+      width: 70,
+      sortBy: (r) => TYPP_LABEL[r.esostypp || ''] || r.esostypp || '',
+      render: (r) => {
+        const lbl = TYPP_LABEL[r.esostypp || '']
+        return (
+          <span style={{ color: COLORS.textSecondary, fontSize: 12, whiteSpace: 'nowrap' }}>
+            {lbl || r.esostypp || '-'}
+          </span>
+        )
+      },
     },
     {
       key: 'rslt',
       label: '결과',
-      width: 60,
+      width: 70,
       sortBy: (r) => r.esosrslt || '',
-      render: (r) => (
-        <span style={{ color: COLORS.textMuted, fontSize: 12 }}>{r.esosrslt || '-'}</span>
-      ),
+      render: (r) => {
+        const meta = r.esosrslt ? RSLT_LABEL[r.esosrslt] : null
+        if (!meta)
+          return (
+            <span style={{ color: COLORS.textMuted, fontSize: 12 }}>{r.esosrslt || '-'}</span>
+          )
+        return (
+          <span
+            style={{
+              padding: '2px 8px',
+              borderRadius: 6,
+              fontSize: 11,
+              fontWeight: 600,
+              color: meta.color,
+              background: 'rgba(0,0,0,0.04)',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {meta.label}
+          </span>
+        )
+      },
     },
     {
-      key: 'rstx',
-      label: '결과 메모',
-      sortBy: (r) => r.esosrstx || '',
+      key: 'gnus',
+      label: '등록자',
+      width: 80,
+      sortBy: (r) => r.esosgnus || '',
       render: (r) => (
-        <span
-          style={{
-            color: COLORS.textPrimary,
-            fontSize: 13,
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            display: 'block',
-            maxWidth: 360,
-          }}
-          title={r.esosrstx || ''}
-        >
-          {r.esosrstx || ''}
+        <span style={{ color: COLORS.textMuted, fontSize: 12, fontFamily: 'monospace' }}>
+          {r.esosgnus || '-'}
         </span>
       ),
     },
   ]
 
-  // ── stale 인디케이터 (분당 변동 정책 — 규칙 26 SCENARIOS / Q7=A) ──
-  const stalenessSec = fetchedAt ? Math.floor((Date.now() - fetchedAt.getTime()) / 1000) : 0
+  const stalenessSec = fetchedAt
+    ? Math.floor((Date.now() - fetchedAt.getTime()) / 1000)
+    : 0
   const stalenessColor =
     stalenessSec > 300 ? COLORS.danger : stalenessSec > 60 ? COLORS.warning : COLORS.success
 
-  // ── 렌더 ──
   return (
     <div style={{ padding: '20px 24px', maxWidth: 1400, margin: '0 auto' }}>
-      {/* 헤더 (Glass L5) */}
+      {/* 헤더 */}
       <div
         style={{
           ...GLASS.L5,
@@ -271,12 +417,9 @@ export default function CafeAccidentsPage() {
           gap: 16,
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <span style={{ fontSize: 18, fontWeight: 800, color: COLORS.textPrimary }}>
-            🚨 라이드 사고접수
-          </span>
-        </div>
-
+        <span style={{ fontSize: 18, fontWeight: 800, color: COLORS.textPrimary }}>
+          🚨 라이드 사고접수
+        </span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={{ fontSize: 12, color: stalenessColor }}>
             🕒 {fetchedAt ? `${stalenessSec}초 전` : '갱신 안 됨'}
@@ -298,7 +441,7 @@ export default function CafeAccidentsPage() {
         </div>
       </div>
 
-      {/* 필터 (Glass L2) */}
+      {/* 필터 */}
       <div
         style={{
           ...GLASS.L2,
@@ -312,7 +455,9 @@ export default function CafeAccidentsPage() {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 12, color: COLORS.textSecondary, fontWeight: 600 }}>상태</span>
+          <span style={{ fontSize: 12, color: COLORS.textSecondary, fontWeight: 600 }}>
+            상태
+          </span>
           {(['all', 'R', 'C', 'X'] as const).map((v) => (
             <button
               key={v}
@@ -329,9 +474,12 @@ export default function CafeAccidentsPage() {
             </button>
           ))}
         </div>
-
-        <div style={{ flex: 1, minWidth: 200, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 12, color: COLORS.textSecondary, fontWeight: 600 }}>검색</span>
+        <div
+          style={{ flex: 1, minWidth: 200, display: 'flex', alignItems: 'center', gap: 8 }}
+        >
+          <span style={{ fontSize: 12, color: COLORS.textSecondary, fontWeight: 600 }}>
+            검색
+          </span>
           <input
             type="text"
             placeholder="결과 메모 검색..."
@@ -363,7 +511,6 @@ export default function CafeAccidentsPage() {
             검색
           </button>
         </div>
-
         <div style={{ fontSize: 12, color: COLORS.textMuted }}>
           {rows.length}건 표시 (최대 {limit})
         </div>
@@ -383,16 +530,19 @@ export default function CafeAccidentsPage() {
             fontSize: 13,
           }}
         >
-          ⚠️ 카페24 DB 연결 실패: <strong>{error}</strong>. 잠시 후 다시 시도하세요.
+          ⚠️ 카페24 DB 연결 실패: <strong>{error}</strong>
         </div>
       )}
 
-      {/* 테이블 (Glass L4) */}
+      {/* 테이블 */}
       <div style={{ ...GLASS.L4, borderRadius: 12, padding: 4, overflow: 'hidden' }}>
         <NeuDataTable
           columns={columns}
           data={rows}
           rowKey={(r) => `${r.esosidno}|${r.esosmddt}|${r.esossrno}`}
+          onRowClick={(r) =>
+            setSelectedKey({ idno: r.esosidno, mddt: r.esosmddt, srno: r.esossrno })
+          }
           loading={loading}
           emptyIcon="🚨"
           emptyMessage={
@@ -405,6 +555,330 @@ export default function CafeAccidentsPage() {
           defaultSort={{ key: 'mddt', dir: 'desc' }}
         />
       </div>
+
+      {/* 상세 모달 */}
+      {selectedKey && (
+        <DetailModal
+          loading={detailLoading}
+          error={detailError}
+          detail={detail}
+          onClose={() => {
+            setSelectedKey(null)
+            setDetail(null)
+          }}
+        />
+      )}
     </div>
+  )
+}
+
+// ── 상세 모달 ──────────────────────────────────────────────────
+function DetailModal({
+  loading,
+  error,
+  detail,
+  onClose,
+}: {
+  loading: boolean
+  error: string | null
+  detail: AccidentDetail | null
+  onClose: () => void
+}) {
+  // ESC 닫기
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [onClose])
+
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: 'rgba(15,23,42,0.32)',
+        backdropFilter: 'blur(2px)',
+        zIndex: 50,
+        display: 'flex',
+        justifyContent: 'flex-end',
+      }}
+      onClick={onClose}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          ...GLASS.L4,
+          width: 560,
+          maxWidth: '100vw',
+          height: '100vh',
+          overflow: 'auto',
+          padding: '20px 24px',
+          boxShadow: '-8px 0 24px rgba(0,0,0,0.12)',
+        }}
+      >
+        {/* 헤더 */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: 16,
+            paddingBottom: 12,
+            borderBottom: `1px solid ${COLORS.borderSubtle}`,
+          }}
+        >
+          <span style={{ fontSize: 16, fontWeight: 800, color: COLORS.textPrimary }}>
+            🚨 사고 접수 상세
+          </span>
+          <button
+            onClick={onClose}
+            style={{
+              ...BTN.sm,
+              border: `1px solid ${COLORS.borderSubtle}`,
+              background: 'rgba(255,255,255,0.6)',
+              cursor: 'pointer',
+            }}
+          >
+            × 닫기
+          </button>
+        </div>
+
+        {loading && (
+          <div style={{ padding: 40, textAlign: 'center', color: COLORS.textMuted }}>
+            로딩 중...
+          </div>
+        )}
+        {error && (
+          <div
+            style={{
+              padding: 14,
+              background: COLORS.bgRed,
+              border: `1px solid ${COLORS.borderRed}`,
+              borderRadius: 8,
+              color: COLORS.danger,
+              fontSize: 13,
+            }}
+          >
+            ⚠️ {error}
+          </div>
+        )}
+        {detail && <DetailBody detail={detail} />}
+      </div>
+    </div>
+  )
+}
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div
+      style={{
+        ...GLASS.L3,
+        borderRadius: 10,
+        padding: '12px 14px',
+        marginBottom: 12,
+        border: `1px solid ${COLORS.borderSubtle}`,
+      }}
+    >
+      <div
+        style={{
+          fontSize: 11,
+          fontWeight: 700,
+          color: COLORS.textMuted,
+          letterSpacing: '0.04em',
+          marginBottom: 8,
+          textTransform: 'uppercase',
+        }}
+      >
+        {title}
+      </div>
+      {children}
+    </div>
+  )
+}
+
+function Field({
+  label,
+  value,
+  mono,
+}: {
+  label: string
+  value: React.ReactNode
+  mono?: boolean
+}) {
+  return (
+    <div style={{ display: 'flex', gap: 12, padding: '4px 0', alignItems: 'baseline' }}>
+      <span
+        style={{
+          fontSize: 11,
+          color: COLORS.textMuted,
+          fontWeight: 600,
+          minWidth: 84,
+          flexShrink: 0,
+        }}
+      >
+        {label}
+      </span>
+      <span
+        style={{
+          fontSize: 13,
+          color: COLORS.textPrimary,
+          fontFamily: mono ? 'monospace' : undefined,
+          wordBreak: 'break-word',
+        }}
+      >
+        {value || <span style={{ color: COLORS.textMuted }}>-</span>}
+      </span>
+    </div>
+  )
+}
+
+function DetailBody({ detail }: { detail: AccidentDetail }) {
+  const rgst = detail.esosrgst ? RGST_LABEL[detail.esosrgst] : null
+  const rslt = detail.esosrslt ? RSLT_LABEL[detail.esosrslt] : null
+  const typp = TYPP_LABEL[detail.esostypp || '']
+
+  // 점검 항목 — Y/N/null
+  const checks: Array<[string, string | null | undefined, string]> = [
+    ['배터리', detail.esosbate, '🔋'],
+    ['타이어', detail.esostire, '🛞'],
+    ['오일', detail.esosoils, '🛢'],
+    ['잠김', detail.esoslock, '🔒'],
+    ['이동', detail.esosmove, '🚙'],
+    ['긴급도움', detail.esoshelp, '🆘'],
+  ]
+  const checksWithIssue = checks.filter(([, v]) => v === 'Y')
+
+  return (
+    <>
+      {/* 기본 정보 */}
+      <Section title="기본">
+        <Field label="접수일" value={fmtDate8(detail.esosmddt)} />
+        <Field
+          label="접수 시각"
+          value={fmtDateTime(detail.esosacdt, detail.esosactm) || '-'}
+        />
+        <Field label="ID" value={detail.esosidno} mono />
+        <Field label="순번" value={String(detail.esossrno)} mono />
+        <Field
+          label="등록 상태"
+          value={
+            rgst ? (
+              <span style={{ color: rgst.color, fontWeight: 700 }}>{rgst.label}</span>
+            ) : (
+              detail.esosrgst
+            )
+          }
+        />
+        <Field
+          label="결과"
+          value={
+            rslt ? (
+              <span style={{ color: rslt.color, fontWeight: 700 }}>{rslt.label}</span>
+            ) : (
+              detail.esosrslt
+            )
+          }
+        />
+        <Field label="타입" value={typp || detail.esostypp} />
+      </Section>
+
+      {/* 차량 */}
+      <Section title="차량">
+        <Field
+          label="차량번호"
+          value={
+            detail.cars_no ? (
+              <span style={{ fontWeight: 700 }}>🚗 {detail.cars_no}</span>
+            ) : null
+          }
+        />
+        <Field label="차종/모델" value={detail.cars_model} />
+        <Field label="주행거리" value={detail.esoskilo ? `${detail.esoskilo} km` : null} />
+      </Section>
+
+      {/* 차량 점검 */}
+      <Section title={`차량 점검 ${checksWithIssue.length > 0 ? `· 문제 ${checksWithIssue.length}건` : ''}`}>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: 6,
+          }}
+        >
+          {checks.map(([label, v, emoji]) => {
+            const badge = checkBadge(v)
+            return (
+              <div
+                key={label}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '4px 10px',
+                  background: badge.bg,
+                  borderRadius: 6,
+                }}
+              >
+                <span style={{ fontSize: 12, color: COLORS.textSecondary }}>
+                  {emoji} {label}
+                </span>
+                <span
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: badge.color,
+                  }}
+                >
+                  {badge.label}
+                </span>
+              </div>
+            )
+          })}
+        </div>
+      </Section>
+
+      {/* 위치 */}
+      <Section title="발생 위치">
+        <Field label="주소" value={detail.esosaddr} />
+        <Field label="도로/동" value={detail.esosadnm} />
+        <Field label="상세" value={detail.esosadtl} />
+      </Section>
+
+      {/* 요청자 */}
+      <Section title="요청자">
+        <Field label="이름" value={detail.esosusnm} />
+        <Field label="연락처" value={detail.esosustl} />
+        {detail.esosusvp && <Field label="추가1" value={detail.esosusvp} />}
+        {detail.esosusvd && <Field label="추가2" value={detail.esosusvd} />}
+      </Section>
+
+      {/* 메모 */}
+      {(detail.esosrstx || detail.esosmemo || detail.esosinft) && (
+        <Section title="메모">
+          {detail.esosrstx && <Field label="결과 메모" value={detail.esosrstx} />}
+          {detail.esosmemo && <Field label="메모" value={detail.esosmemo} />}
+          {detail.esosinft && <Field label="추가 정보" value={detail.esosinft} />}
+        </Section>
+      )}
+
+      {/* 등록 / 수정 이력 */}
+      <Section title="이력">
+        <Field
+          label="등록"
+          value={`${fmtDateTime(detail.esosgndt, detail.esosgntm)} · ${detail.esosgnus || ''}`}
+        />
+        {detail.esosupdt && (
+          <Field
+            label="수정"
+            value={`${fmtDateTime(detail.esosupdt, detail.esosuptm)} · ${detail.esosupus || ''}`}
+          />
+        )}
+      </Section>
+    </>
   )
 }

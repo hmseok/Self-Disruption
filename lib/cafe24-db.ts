@@ -83,10 +83,11 @@ function getPool(): Pool {
     charset: 'utf8',
 
     // 한글 응답이 Buffer 로 오는 문제 회피
+    // ⚠ field.string() 인자 없으면 latin1 처리됨 — 'utf8' 명시 의무 (PR-6.5 검증)
     typeCast: function (field, next) {
       const t = field.type
       if (t === 'VAR_STRING' || t === 'STRING' || t === 'BLOB') {
-        return field.string()
+        return field.string('utf8')
       }
       return next()
     },

@@ -2,32 +2,25 @@
  * GET /api/cafe24/accidents
  *
  * 카페24 ERP (skyautosvc.co.kr / MariaDB 10.1) 의 사고 접수 헤더 (aceesosh) 를
- * read-only 로 반환.
+ * read-only 로 반환. PR-6.5 — pmccarsm LEFT JOIN 으로 차량번호 / 차종 추가.
  *
  * 본 API 는 다음 두 곳에서 호출:
- *   1. app/(employees)/Cafe24 ERP/accidents/page.tsx (PR-6.3 신설)
- *   2. app/operations/intake/page.tsx (broken call — PR-6.3 에서 본 라우트로 해소)
+ *   1. app/(employees)/RideAccidents/page.tsx (목록)
+ *   2. app/operations/intake/page.tsx (broken call 해소)
  *
  * Query:
  *   limit:    기본 50, 최대 200
  *   offset:   pagination
  *   from:     YYYYMMDD (esosmddt 시작)
  *   to:       YYYYMMDD (esosmddt 끝)
- *   rgst:     상태 코드 (R/C/X 등)
+ *   rgst:     등록 상태 (R / C)
  *   q:        통합 검색 (esosrstx LIKE)
  *
  * Response:
  *   {
  *     success: true,
  *     data: AccidentRow[],
- *     meta: { total?: number, fetched_at: string, cache: number }
- *   }
- *
- *   에러 시 graceful:
- *   {
- *     success: false,
- *     data: [],
- *     error: 'cafe24-unavailable' | 'forbidden' | 'unauthorized'
+ *     meta: { fetched_at, cache, limit, offset, filters }
  *   }
  *
  * cafe24-db: MariaDB 10.1
@@ -47,6 +40,9 @@ export interface AccidentRow extends RowDataPacket {
   esosrslt: string | null
   esosrstx: string | null
   esostypp: string | null
+  esosgnus: string | null
+  cars_no: string | null
+  cars_model: string | null
 }
 
 export async function GET(request: Request) {
@@ -72,43 +68,48 @@ export async function GET(request: Request) {
     200
   )
   const offset = Math.max(parseInt(url.searchParams.get('offset') || '0', 10) || 0, 0)
-  const from = url.searchParams.get('from') // YYYYMMDD
-  const to = url.searchParams.get('to') // YYYYMMDD
-  const rgst = url.searchParams.get('rgst') // 1자 코드
-  const q = url.searchParams.get('q') // 검색어
+  const from = url.searchParams.get('from')
+  const to = url.searchParams.get('to')
+  const rgst = url.searchParams.get('rgst')
+  const q = url.searchParams.get('q')
 
-  // ── WHERE 절 동적 구성 ──
   const where: string[] = []
   const params: unknown[] = []
 
   if (from && /^\d{8}$/.test(from)) {
-    where.push('esosmddt >= ?')
+    where.push('a.esosmddt >= ?')
     params.push(from)
   }
   if (to && /^\d{8}$/.test(to)) {
-    where.push('esosmddt <= ?')
+    where.push('a.esosmddt <= ?')
     params.push(to)
   }
   if (rgst && /^[A-Z]$/.test(rgst)) {
-    where.push('esosrgst = ?')
+    where.push('a.esosrgst = ?')
     params.push(rgst)
   }
   if (q && q.trim().length > 0) {
-    where.push('esosrstx LIKE ?')
+    where.push('a.esosrstx LIKE ?')
     params.push(`%${q.trim()}%`)
   }
 
   const whereSql = where.length > 0 ? `WHERE ${where.join(' AND ')}` : ''
 
   try {
-    // ── 데이터 조회 ──
-    // PR-6.3 첫 PR — raw aceesosh 컬럼만 (pmccustm/pmccarsm 조인은 PR-6.3.b)
+    // PR-6.5 — pmccarsm LEFT JOIN 으로 차량번호/차종 추가
+    // 카페24 PHP 측 datalistC 패턴: esosidno = carsidno + 효력기간 BETWEEN
     const sql = `
-      SELECT esosidno, esosmddt, esossrno,
-             esosacdt, esosactm, esosrgst, esosrslt, esosrstx, esostypp
-        FROM aceesosh
+      SELECT a.esosidno, a.esosmddt, a.esossrno,
+             a.esosacdt, a.esosactm, a.esosrgst,
+             a.esosrslt, a.esosrstx, a.esostypp, a.esosgnus,
+             c.carsnums AS cars_no,
+             c.carsodnm AS cars_model
+        FROM aceesosh a
+        LEFT JOIN pmccarsm c
+          ON c.carsidno = a.esosidno
+         AND a.esosmddt BETWEEN c.carsfrdt AND c.carstodt
         ${whereSql}
-       ORDER BY esosmddt DESC, esossrno DESC
+       ORDER BY a.esosmddt DESC, a.esossrno DESC
        LIMIT ? OFFSET ?
     `
     const rows = await cafe24Db.query<AccidentRow>(sql, [...params, limit, offset])
@@ -137,7 +138,7 @@ export async function GET(request: Request) {
           db_error: err.code || 'no-code',
         },
       },
-      { status: 200 } // graceful — UI 가 빈 배열 + 배너 처리
+      { status: 200 }
     )
   }
 }

@@ -8,6 +8,100 @@
 
 ---
 
+## 2026-05-06 | PR-6.5+6 | 사고 본질 표출 + 상세 모달 (통합 PR)
+
+### 사용자 요청
+> "디비는 올라오기시작했는데 사고내용표출은 어떻게 진행할수있을까요?"
+> "go 사고접수내용을 볼수있고 상세내용도 볼수있게 표출해주세요"
+
+### 카페24 PHP 측 SQL 추출 결과 (cafe24_source/ERP/service/hace01sv/ace0101a.php)
+
+**ACE0101A_datalistC** (목록):
+```sql
+SELECT esosidno, esosmddt, esossrno, esosacdt, esosactm,
+       carsnums,    -- 차량번호 (예: "47하9604")
+       carsodnm,    -- 차종/모델 (PHP 코드 라벨은 차주명이지만 실 데이터는 차종)
+       esostypp, esosrslt, esosgnus
+  FROM aceesosh, pmccarsm
+ WHERE esosidno = carsidno              -- ★ 조인 키
+   AND esosmddt BETWEEN carsfrdt AND carstodt    -- ★ SCD-Type2 효력기간
+   AND esosrgst = 'R'
+ORDER BY esosgndt DESC, esosgntm DESC, esossrno DESC
+```
+
+**ACE0101A_dataselectD** (상세) — 30+ 컬럼:
+- 차량 점검 (1자 Y/N): bate / tire / oils / lock / move / help
+- 위치: addr / adnm / adtl
+- 요청자: usnm / ustl / usvp / usvd / user
+- 메모: rstx (2000자) / memo (500) / inft (500)
+- 주행거리: kilo
+- 등록/수정: gndt+gntm+gnus / updt+uptm+upus
+
+### 검증 결과 (실 데이터 — 카페24 외부 IP 직접 접속)
+
+```
+esosrgst:  R(72,847) / C(4,666)        — 등록/취소 2-state
+esosrslt:  3(71,316) / 1(6,197)        — 처리완료/처리중 (추정)
+esostypp:  S(51,965) / J(9,386) / E(5,995) / B(3,960) / I(1,964)
+점검 항목: Y(문제) / N(정상) / "" (미점검) — 한 사고 1~2 항목만 Y
+pmccarsm.carsodnm: "쏠라티(MQ4)-1.6 하이브리드" 같은 차종/모델 패턴
+```
+
+### 한글 charset 함정 (lib/cafe24-db.ts hotfix 포함)
+
+```ts
+// PR-6.2 에서 잘못 변경한 부분:
+return field.string()        // ❌ 인자 없으면 latin1 — 한글 깨짐
+return field.string('utf8')  // ✅ utf8 명시 — 한글 정상
+```
+
+### 산출물
+
+| 파일 | 종류 | 변경 |
+|------|------|------|
+| `lib/cafe24-db.ts` | hotfix | `field.string('utf8')` — 한글 깨짐 fix |
+| `app/api/cafe24/accidents/route.ts` | 확장 | LEFT JOIN pmccarsm + cars_no/cars_model |
+| `app/api/cafe24/accidents/detail/route.ts` | 신규 | 단건 상세 — 30+ 컬럼 + 차량 조인 |
+| `app/(employees)/RideAccidents/page.tsx` | 확장 | 차량/차종 컬럼 + 행 클릭 → 상세 모달 |
+
+### UI 상세 모달 구조
+
+```
+🚨 사고 접수 상세                                [× 닫기]
+─────────────────────────────────────
+[기본]      접수일 / 접수시각 / ID / 순번 / 등록상태 / 결과 / 타입
+[차량]      🚗 차량번호 / 차종-모델 / 주행거리
+[차량 점검] 6 항목 (bate/tire/oils/lock/move/help) — 정상/문제/미점검 색상
+[발생 위치] 주소 / 도로-동 / 상세
+[요청자]   이름 / 연락처 / 추가1 / 추가2
+[메모]     결과 메모 (2000자) / 메모 (500) / 추가 정보 (500)
+[이력]     등록 (date+time+user) / 수정 (date+time+user)
+```
+
+### GATE 진행 상태
+
+```
+✅ G3 Planner — 설계서 v2 + 사용자 GO ("go")
+✅ G5 Generator — tsc --noEmit 회귀 0건
+✅ G6 Reviewer — lint:harness 새 위반 0건
+   · cowork-staging-lint: working tree 검사 모드 skip (push 시 staged 검증 의무)
+⏭ G7 Designer — 사용자 시각 검수 의무 (배포 후 hmseok.com/RideAccidents)
+✅ Rule 13 외부 시스템 호환성 — typeCast utf8 명시 + LEFT JOIN 효력기간
+✅ Rule 18 NeuDataTable 모든 컬럼 sortBy (9 컬럼)
+✅ Rule 19 줄바꿈 최소화 — white-space nowrap + ellipsis
+✅ Rule 22 _docs 갱신
+⚠ Rule 21 Cowork — 본 PR 은 cross-module (lib + api + RideAccidents)
+   → 의도적 cross-module (UI + 백엔드 + connection hotfix 한 PR)
+   → COWORK_ALLOW_MULTI_MODULE=1 git commit ... 로 우회
+```
+
+### 다음 PR 예고
+
+- **PR-6.7** — 코드 마스터 매핑 (E/S/J/B/I → 한국어 라벨, 1/3 → 처리중/완료) `bscddesc` 조인
+- **PR-6.4** — `/RideAccidents/dashboard` KPI 위젯 (오늘 접수 / 진행 / 완료)
+
+---
+
 ## 2026-05-06 | PR-6.3.c | Hotfix — 폴더 rename + 사이드바 그룹 변경
 
 ### 사용자 피드백 (09:51 KST)
