@@ -37,6 +37,19 @@ interface AccidentRow {
   cars_model: string | null
 }
 
+interface MemoRow {
+  memoidno: string
+  memomddt: string
+  memosrno: number
+  memonums: number
+  memosort: number
+  memotitl: string | null
+  memotext: string | null
+  memognus: string | null
+  memogndt: string | null
+  memogntm: string | null
+}
+
 interface AccidentDetail extends AccidentRow {
   esosjsfg: string | null
   esosstat: string | null
@@ -122,6 +135,7 @@ export default function RideAccidentsPage() {
     srno: number
   } | null>(null)
   const [detail, setDetail] = useState<AccidentDetail | null>(null)
+  const [memos, setMemos] = useState<MemoRow[]>([])
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailError, setDetailError] = useState<string | null>(null)
 
@@ -168,10 +182,11 @@ export default function RideAccidentsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authChecked, user?.role, rgstFilter])
 
-  // ── 상세 fetch ──
+  // ── 상세 + 상담내역 병렬 fetch ──
   useEffect(() => {
     if (!selectedKey) {
       setDetail(null)
+      setMemos([])
       setDetailError(null)
       return
     }
@@ -181,23 +196,31 @@ export default function RideAccidentsPage() {
       setDetailError(null)
       try {
         const token = getStoredToken()
+        const auth = token ? { Authorization: `Bearer ${token}` } : {}
         const params = new URLSearchParams({
           idno: selectedKey!.idno,
           mddt: selectedKey!.mddt,
           srno: String(selectedKey!.srno),
         })
-        const res = await fetch(`/api/cafe24/accidents/detail?${params}`, {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        const init: RequestInit = {
+          headers: auth as HeadersInit,
           cache: 'no-store',
           signal: ac.signal,
-        })
-        const json = await res.json()
-        if (!json.success || !json.data) {
-          setDetailError(json.error || 'not-found')
+        }
+        // 병렬 — 상세 + 상담내역
+        const [detailRes, memosRes] = await Promise.all([
+          fetch(`/api/cafe24/accidents/detail?${params}`, init),
+          fetch(`/api/cafe24/accidents/memos?${params}`, init),
+        ])
+        const detailJson = await detailRes.json()
+        const memosJson = await memosRes.json()
+        if (!detailJson.success || !detailJson.data) {
+          setDetailError(detailJson.error || 'not-found')
           setDetail(null)
         } else {
-          setDetail(json.data)
+          setDetail(detailJson.data)
         }
+        setMemos(memosJson.success && memosJson.data ? memosJson.data : [])
       } catch (e) {
         const err = e as { name?: string }
         if (err.name !== 'AbortError') setDetailError(String(e))
@@ -562,9 +585,11 @@ export default function RideAccidentsPage() {
           loading={detailLoading}
           error={detailError}
           detail={detail}
+          memos={memos}
           onClose={() => {
             setSelectedKey(null)
             setDetail(null)
+            setMemos([])
           }}
         />
       )}
@@ -577,11 +602,13 @@ function DetailModal({
   loading,
   error,
   detail,
+  memos,
   onClose,
 }: {
   loading: boolean
   error: string | null
   detail: AccidentDetail | null
+  memos: MemoRow[]
   onClose: () => void
 }) {
   // ESC 닫기
@@ -667,7 +694,7 @@ function DetailModal({
             ⚠️ {error}
           </div>
         )}
-        {detail && <DetailBody detail={detail} />}
+        {detail && <DetailBody detail={detail} memos={memos} />}
       </div>
     </div>
   )
@@ -737,7 +764,7 @@ function Field({
   )
 }
 
-function DetailBody({ detail }: { detail: AccidentDetail }) {
+function DetailBody({ detail, memos }: { detail: AccidentDetail; memos: MemoRow[] }) {
   const rgst = detail.esosrgst ? RGST_LABEL[detail.esosrgst] : null
   const rslt = detail.esosrslt ? RSLT_LABEL[detail.esosrslt] : null
   const typp = TYPP_LABEL[detail.esostypp || '']
@@ -865,6 +892,69 @@ function DetailBody({ detail }: { detail: AccidentDetail }) {
           {detail.esosinft && <Field label="추가 정보" value={detail.esosinft} />}
         </Section>
       )}
+
+      {/* 상담내역 timeline */}
+      <Section title={`상담 내역 ${memos.length > 0 ? `· ${memos.length}건` : ''}`}>
+        {memos.length === 0 ? (
+          <div style={{ fontSize: 12, color: COLORS.textMuted, padding: '6px 0' }}>
+            등록된 상담 내역이 없습니다.
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {memos.map((m) => (
+              <div
+                key={`${m.memonums}-${m.memosort}`}
+                style={{
+                  borderLeft: `2px solid ${COLORS.primary}`,
+                  paddingLeft: 10,
+                  paddingTop: 2,
+                  paddingBottom: 2,
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: 11,
+                    color: COLORS.textMuted,
+                    marginBottom: 2,
+                    display: 'flex',
+                    gap: 8,
+                    flexWrap: 'wrap',
+                  }}
+                >
+                  <span style={{ fontWeight: 700, color: COLORS.textSecondary }}>
+                    {fmtDateTime(m.memogndt, m.memogntm)}
+                  </span>
+                  <span style={{ fontFamily: 'monospace' }}>{m.memognus || '-'}</span>
+                </div>
+                {m.memotitl && (
+                  <div
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 700,
+                      color: COLORS.textPrimary,
+                      marginBottom: 2,
+                    }}
+                  >
+                    {m.memotitl}
+                  </div>
+                )}
+                {m.memotext && (
+                  <div
+                    style={{
+                      fontSize: 13,
+                      color: COLORS.textPrimary,
+                      whiteSpace: 'pre-wrap',
+                      wordBreak: 'break-word',
+                    }}
+                  >
+                    {m.memotext}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </Section>
 
       {/* 등록 / 수정 이력 */}
       <Section title="이력">

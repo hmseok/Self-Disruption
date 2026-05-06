@@ -8,6 +8,87 @@
 
 ---
 
+## 2026-05-06 | PR-6.6 | 상담내역 (acememoh) timeline 추가
+
+### 사용자 통찰력 + 요청
+> "긴급출동이랑, 사고접수랑 둘다 들어왔나요? 긴급출동만 들어왔나요?"
+> "상담내역도 보고싶어요"
+
+### 명확화 (PHP 코드 추가 분석)
+
+```
+✅ 현재 보이는 데이터 = 긴급출동 (ace 모듈)
+   - aceesosh (헤더) + esostypp: S/J/E/B/I — 모두 출동 카테고리
+   - 데스크톱 ace_app 추정
+
+❌ 사고접수 (acr 모듈) — 미연동, 별도 신설 필요 (PR-6.7 예정)
+   - acrotpth (사고차 출동)
+   - 4-table JOIN (acrotpth + pmccarsm + picuserm + pmccustm)
+   - acr_app.exe (사고차 처리 메인 데스크톱)
+```
+
+### 본 PR 범위 — 상담내역 표시
+
+`acememoh` 테이블 (긴급출동 1건 1:N):
+```sql
+SELECT memoidno, memomddt, memosrno, memonums, memosort,
+       memotitl, memotext,
+       memognus, memogndt, memogntm
+  FROM acememoh
+ WHERE memoidno = ? AND memomddt = ? AND memosrno = ?
+   AND memoflag = 'O'
+ ORDER BY memosort ASC, memonums ASC
+```
+
+### 산출물
+
+| 파일 | 종류 | 변경 |
+|------|------|------|
+| `app/api/cafe24/accidents/memos/route.ts` | 신규 | acememoh read-only API |
+| `app/(employees)/RideAccidents/page.tsx` | 확장 | MemoRow 타입 + 병렬 fetch + 상담내역 timeline |
+
+### UI 상담내역 timeline
+
+```
+[상담 내역 · 3건]
+─────────────────────────────────────
+| 2026-05-04 14:30 · khchoo
+|   [방문 점검]
+|   배터리 교체 후 정상 시동 확인
+|
+| 2026-05-04 11:15 · maseo
+|   [고객 통화]
+|   고객 위치 확인. 30분 내 출동 약속.
+```
+
+- 좌측 보라 stripe (border-left 2px primary)
+- 시각 + 작성자 (헤더)
+- 제목 굵게 + 본문 pre-wrap (한국어 줄바꿈 유지)
+- 빈 상태: "등록된 상담 내역이 없습니다"
+
+### GATE 진행 상태
+
+```
+✅ G3 Planner — "B 옵션 선택 + 추천 신뢰" 사용자 GO
+✅ G5 Generator — tsc 회귀 0건
+✅ G6 Reviewer — lint:harness 새 위반 0건
+⏭ G7 Designer — 사용자 시각 검수 의무
+✅ Rule 13 외부 시스템 호환성 — acememoh DDL PHP 코드 추출 검증
+✅ Rule 17 모듈 폴더 분리 — api:cafe24 만 추가 (RideAccidents UI 유지)
+✅ Rule 21 Cowork — 본 세션 영역만 staging
+   ⚠ cross-module (api:cafe24 + RideAccidents) — COWORK_ALLOW_MULTI_MODULE=1 우회
+✅ Rule 22 _docs 갱신 (CHANGELOG)
+```
+
+### 다음 PR 예고
+
+- **PR-6.7** — 사고접수 (acr 모듈) 별도 페이지 신설
+  - 새 사이드바 항목 + acrotpth 4-table JOIN
+  - 기존 ace = 긴급출동 / 신규 acr = 사고접수 분리
+- **PR-6.8** — 코드 마스터 매핑 (S/J/E/B/I → 한국어 라벨, 1/3 → 처리중/완료)
+
+---
+
 ## 2026-05-06 | PR-6.5+6 | 사고 본질 표출 + 상세 모달 (통합 PR)
 
 ### 사용자 요청
