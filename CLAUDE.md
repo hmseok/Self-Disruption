@@ -820,6 +820,14 @@ const cardColumns: TableColumn<Transaction>[] = [
 - ❌ 공통 파일 임의 수정 후 commit — 다른 세션과 충돌
 - ❌ 다른 세션 작업 영역 (Untracked 폴더) 자기 commit 에 포함
 - ❌ 다른 세션 push 안 끝났는데 force push / 동시 push
+- ❌ **`git commit --no-verify` 절대 사용 X** (2026-05-06 2차 사고 후 강화)
+   - cowork-staging-lint 차단 시 hook 우회 절대 금지
+   - 차단 메시지 보고 → 사용자 보고 후 → `git reset HEAD` + 자기 모듈만 add → 재 commit
+   - 의도적 cross-module: `COWORK_ALLOW_MULTI_MODULE=1` 환경변수만 사용
+- ❌ **다른 세션 active 시 staging 시도 X** (2026-05-06 2차 사고 후 강화)
+   - lock 자주 발생하면 다른 세션 commit 진행 중 신호
+   - 1~3분 자연 해제 대기 후 자기 영역 add 진행
+   - 사용자에게 "다른 세션 작업 끝남" 확인 후 진행
 
 **자동화 안전장치 (도입 완료 — 2026-05-06)**:
 ```
@@ -835,7 +843,10 @@ const cardColumns: TableColumn<Transaction>[] = [
    - 우회 (의도적 cross-module): COWORK_ALLOW_MULTI_MODULE=1 git commit ...
    - harness-lint.js 의 [3.7] sub-lint 로 자동 통합 → pre-commit hook 자동 실행
    - 회귀 케이스: harness-engineering/regression-cases/2026-05-06-cowork-staging-violation.md
-   - 트리거 사고 (2026-05-06): RideAccidents PR-6.3.c 가 CallScheduler PR-2SS 1,407 라인 흡수
+   - 트리거 사고:
+     · 1차 (2026-05-06 새벽): RideAccidents PR-6.3.c 가 CallScheduler PR-2SS 1,407 라인 흡수
+     · 2차 (2026-05-06 저녁): PR-B10 프리랜서 엑셀 commit 이 CallScheduler PR-2SS-h-1-fix 233 라인 흡수
+   - 한계: --no-verify 사용 시 hook 우회 — CLAUDE.md 규칙 21 금지 항목 강화로 보강
 ```
 
 ### 규칙 22 — 모듈 _docs 갱신 의무 (2026-05-04 신설, 강력)

@@ -1,8 +1,9 @@
 # 회귀 케이스 — Cowork 멀티 세션 staging 침범
 
-**날짜**: 2026-05-06
+**날짜**: 2026-05-06 (1차) / 2026-05-06 저녁 (2차 — 같은 부류 재발생)
 **카테고리**: cowork-collab, git-staging, regulation-21
 **심각도**: 🔴 High (다른 세션 작업물 흡수 — git history 분리 불가)
+**재발생 누적**: 2회 — CLAUDE.md 규칙 15 "같은 부류 N회 → 시스템 안전장치 강화" 적용
 
 ---
 
@@ -142,4 +143,90 @@ PR-Z1 staged:
 □ 세션 B (CallScheduler PR-2SS) 가 자기 작업의 메타데이터 (CHANGELOG / 설계서) 별도로 push
 □ 본 세션 사고로 인해 PR-2SS commit 메시지 부재 → 세션 B 가 별도 PR 로 보충
 □ 같은 부류 사고 N회 발생 시 추가 안전장치 검토
+```
+
+---
+
+## 2차 사고 (2026-05-06 저녁) — 자동화 hook 있음에도 재발
+
+### 정황
+
+```
+시점: 2026-05-06 18~19 KST
+세션 A: Cafe24/RideAccidents 작업 중
+세션 B: CallScheduler PR-2SS-h-1 (그룹 회피일) push 후
+세션 B 가 PR-2SS-h-1-fix (모달 → 인라인 펼침) UX 개선 작업 중
+
+세션 B 가 commit 시도하려 했으나 lock 자주 발생 (다른 세션 commit 진행 중)
+대기 중 세션 A 가 자기 commit (PR-B10 프리랜서 엑셀) 진행하면서
+세션 B 의 working tree 변경 (CallScheduler GroupEditor + _docs)
+한꺼번에 흡수.
+```
+
+### Actual
+
+`commit 044f8ba PR-B10: 프리랜서 엑셀 업로드/다운로드 복원` 안에:
+
+```
+정상 (세션 A 의도):
+  app/(employees)/RideAccidents/_docs/CHANGELOG.md  +55
+  (그 외 RideAccidents 영역)
+
+비정상 (세션 B 영역 — 흡수):
+  app/(employees)/CallScheduler/_docs/CHANGELOG.md  +15
+  app/(employees)/CallScheduler/_docs/UI-SPEC.md    +1
+  app/(employees)/CallScheduler/settings/GroupEditor.tsx  +217
+```
+
+### 원인 분석 (자동화 hook 있는데 왜 차단 안 됨?)
+
+```
+WHY 1: pre-commit hook 정상 설치됨 (.git/hooks/pre-commit, +x 권한 OK)
+WHY 2: cowork-staging-lint.js 정상 동작 (모듈 분류 검증 — 'CallScheduler' + 'RideAccidents' detect)
+WHY 3: 다른 세션 Claude 가 hook 우회로 추정:
+       옵션 a) git commit --no-verify 사용
+       옵션 b) git diff --cached --diff-filter=ACMRTD 결과 빈 상태에서 commit (?)
+       옵션 c) hook 실행 환경 변수 무시
+```
+
+→ **자동화 hook 의 한계: --no-verify 우회 막을 수 없음**.
+
+### 추가 Prevention (2차 대응)
+
+#### 1. CLAUDE.md 규칙 21 강화 — --no-verify 절대 금지 명시
+
+```
+[E] hook 우회 절대 금지 (2026-05-06 2차 사고 후 추가)
+   - git commit --no-verify 절대 사용 X
+   - cowork-staging-lint 차단 시:
+     1. git reset HEAD 로 staged 풀기
+     2. 자기 모듈만 명시적 add
+     3. 다시 commit (hook 통과 확인)
+   - 의도적 cross-module 시: COWORK_ALLOW_MULTI_MODULE=1 환경변수만 사용
+```
+
+#### 2. cowork-staging-lint 사고 알림 강화
+
+```
+hook 차단 시:
+  - 어느 모듈이 다른 세션 작업물로 추정되는지 명시
+  - "본 세션 영역" vs "다른 세션 영역" 구분 표시
+  - 사용자 결정 후 명령 가이드
+```
+
+#### 3. CLAUDE-{Module}.md 강제 준수
+
+```
+모든 세션 시작 시 자기 모듈의 _docs/CLAUDE-<Module>.md 읽기 의무
+   → CLAUDE.md 규칙 21 + 자기 모듈 staging 영역 인지
+   → 다른 모듈 staging 시도 자체 차단
+```
+
+### 운영 효과 (2차 사고 결과)
+
+```
+✅ 코드 production 반영 (PR-2SS-h-1-fix UX 개선 GroupEditor 인라인 펼침)
+⚠ commit 메시지가 PR-B10 — 추적성 손상 (이번이 두 번째)
+⚠ 다른 세션이 hook 우회한 패턴 — 추가 방어 어려움
+🔜 사용자 직접 다른 세션 (Claude / VS Code 등) 에게 CLAUDE.md 규칙 21 강조 필요
 ```
