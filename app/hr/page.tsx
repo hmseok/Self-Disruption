@@ -147,9 +147,9 @@ export default function HRMasterPage() {
   const [showFreelancerForm, setShowFreelancerForm] = useState(false)
   const [editingFreelancerId, setEditingFreelancerId] = useState<string | null>(null)
   const FL_TAX_TYPES = ['사업소득(3.3%)', '기타소득(8.8%)', '세금계산서', '원천징수 없음']
-  const FL_SERVICE_TYPES = ['탁송', '대리운전', '정비', '세차', '디자인', '개발', '법무/세무', '기타']
+  const FL_SERVICE_TYPES = ['탁송', '대리운전', '정비', '세차', '디자인', '개발', '법무/세무', '직원-기타지급', '기타']
   const FL_BANKS = ['KB국민은행', '신한은행', '우리은행', '하나은행', 'NH농협은행', 'IBK기업은행', '카카오뱅크', '케이뱅크', '토스뱅크']
-  const flEmpty = { name: '', phone: '', email: '', bank_name: 'KB국민은행', account_number: '', account_holder: '', reg_number: '', tax_type: '사업소득(3.3%)', service_type: '기타', is_active: true, memo: '' }
+  const flEmpty = { name: '', phone: '', email: '', bank_name: 'KB국민은행', account_number: '', account_holder: '', reg_number: '', tax_type: '사업소득(3.3%)', service_type: '기타', is_active: true, memo: '', linked_profile_id: '' }
   const [freelancerForm, setFreelancerForm] = useState<any>(flEmpty)
   const [savingFreelancer, setSavingFreelancer] = useState(false)
 
@@ -331,6 +331,7 @@ export default function HRMasterPage() {
         account_holder: f.account_holder || '', reg_number: f.reg_number || '',
         tax_type: f.tax_type || '사업소득(3.3%)', service_type: f.service_type || '기타',
         is_active: f.is_active !== false, memo: f.memo || '',
+        linked_profile_id: f.linked_profile_id || '',
       })
     } else {
       setEditingFreelancerId(null)
@@ -1419,25 +1420,35 @@ export default function HRMasterPage() {
                   등록된 프리랜서 없음 — 「+ 프리랜서 추가」 버튼 클릭
                 </div>
               )}
-              {freelancers.map((f: any) => (
-                <div key={f.id} onClick={() => openFreelancerForm(f)}
-                  style={{ padding: '10px 14px', borderBottom: '1px solid rgba(0,0,0,0.04)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}
-                  onMouseEnter={e => (e.currentTarget.style.background = 'rgba(59,130,246,0.04)')}
-                  onMouseLeave={e => (e.currentTarget.style.background = '')}>
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: 13, color: '#334155' }}>{f.name}</div>
-                    <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>
-                      {f.service_type || '-'} · {f.tax_type || '-'} · {f.bank_name || '-'} {f.account_number || ''}
+              {freelancers.map((f: any) => {
+                const linkedEmp = f.linked_profile_id ? employees.find(e => e.id === f.linked_profile_id) : null
+                return (
+                  <div key={f.id} onClick={() => openFreelancerForm(f)}
+                    style={{ padding: '10px 14px', borderBottom: '1px solid rgba(0,0,0,0.04)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'rgba(59,130,246,0.04)')}
+                    onMouseLeave={e => (e.currentTarget.style.background = '')}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                        <span style={{ fontWeight: 600, fontSize: 13, color: '#334155' }}>{f.name}</span>
+                        {linkedEmp && (
+                          <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4, background: 'rgba(34,197,94,0.15)', color: '#16a34a' }} title={`본 회사 직원 link: ${linkedEmp.display_name || linkedEmp.email}`}>
+                            🟢 FMI 직원 link
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: 11, color: '#94a3b8' }}>
+                        {f.service_type || '-'} · {f.tax_type || '-'} · {f.bank_name || '-'} {f.account_number || ''}
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <button onClick={(e) => { e.stopPropagation(); toggleFreelancerActive(f) }}
+                        style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 4, background: f.is_active ? 'rgba(34,197,94,0.15)' : 'rgba(0,0,0,0.04)', color: f.is_active ? '#16a34a' : '#94a3b8', border: 'none', cursor: 'pointer' }}>
+                        {f.is_active ? '활성' : '비활성'}
+                      </button>
                     </div>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <button onClick={(e) => { e.stopPropagation(); toggleFreelancerActive(f) }}
-                      style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 4, background: f.is_active ? 'rgba(34,197,94,0.15)' : 'rgba(0,0,0,0.04)', color: f.is_active ? '#16a34a' : '#94a3b8', border: 'none', cursor: 'pointer' }}>
-                      {f.is_active ? '활성' : '비활성'}
-                    </button>
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
 
@@ -1909,6 +1920,22 @@ export default function HRMasterPage() {
                   <input value={freelancerForm.account_number} onChange={e => setFreelancerForm({ ...freelancerForm, account_number: e.target.value })}
                     style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none', background: 'rgba(255,255,255,0.6)', boxSizing: 'border-box' }} />
                 </div>
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#64748b', marginBottom: 6 }}>
+                  본 회사 직원 link (선택)
+                  <span style={{ fontSize: 10, color: '#94a3b8', fontWeight: 400, marginLeft: 6 }}>직원에게 별도 지급한 경우 매칭</span>
+                </label>
+                <select value={freelancerForm.linked_profile_id}
+                  onChange={e => setFreelancerForm({ ...freelancerForm, linked_profile_id: e.target.value })}
+                  style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none', background: 'rgba(255,255,255,0.6)' }}>
+                  <option value="">— 외부 프리랜서 (link 없음) —</option>
+                  {employees.filter(e => e.role === 'user' || e.role === 'master' || e.role === 'admin').map(e => (
+                    <option key={e.id} value={e.id}>
+                      🟢 {e.display_name || e.employee_name || e.email} {e.department?.name ? `(${e.department.name})` : ''}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#64748b', marginBottom: 6 }}>메모</label>
