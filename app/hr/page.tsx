@@ -251,17 +251,40 @@ export default function HRMasterPage() {
     return allRows
   }
 
+  // PR-B12: 동일 이름+전화 → 'update' status (skip 아닌 UPDATE 대상)
   const applyDuplicateCheck = (parsed: any[]) => {
-    const existing = new Set(freelancers.map(f => `${f.name}|${f.phone || ''}`))
-    const seen = new Set<string>()
-    let dup = 0
-    for (const item of parsed) {
-      const key = `${item.name}|${item.phone}`
-      if (existing.has(key)) { item._status = 'duplicate'; item._note = 'DB에 이미 존재'; dup++ }
-      else if (seen.has(key)) { item._status = 'duplicate'; item._note = '파일 내 중복'; dup++ }
-      seen.add(key)
+    // existing — name 단독으로 매칭 (전화 비어있을 수 있음)
+    const existingByName: Record<string, any> = {}
+    for (const f of freelancers) {
+      const k = `${f.name}|${f.phone || ''}`
+      existingByName[k] = f
+      // name only fallback
+      if (!existingByName[f.name]) existingByName[f.name] = f
     }
-    setBulkLogs(prev => [...prev, `${parsed.length}명 파싱`, dup > 0 ? `${dup}명 중복 제외` : '중복 없음'])
+    const seen = new Set<string>()
+    let dup = 0, upd = 0, ne = 0
+    for (const item of parsed) {
+      const key = `${item.name}|${item.phone || ''}`
+      const fileSeenKey = `${item.name}|${item.phone || ''}`
+      if (existingByName[key] || existingByName[item.name]) {
+        item._status = 'update'
+        item._note = '동일 이름 → 업데이트'
+        upd++
+      } else if (seen.has(fileSeenKey)) {
+        item._status = 'duplicate'
+        item._note = '파일 내 중복'
+        dup++
+      } else {
+        item._status = 'ready'
+        ne++
+      }
+      seen.add(fileSeenKey)
+    }
+    const parts = [`${parsed.length}명 파싱`]
+    if (ne) parts.push(`✨ 신규 ${ne}명`)
+    if (upd) parts.push(`🔄 업데이트 ${upd}명`)
+    if (dup) parts.push(`⚠ 파일 내 중복 ${dup}명 제외`)
+    setBulkLogs(prev => [...prev, parts.join(' · ')])
   }
 
   const processBulkFiles = async (files: File[]) => {
@@ -296,30 +319,40 @@ export default function HRMasterPage() {
   }
 
   const handleBulkSaveFL = async () => {
-    const toSave = bulkData.filter(d => d._status === 'ready')
+    // PR-B12 — 'ready' (신규) + 'update' (UPSERT) 모두 처리
+    const toSave = bulkData.filter(d => d._status === 'ready' || d._status === 'update')
     if (toSave.length === 0) { alert('저장할 데이터가 없습니다.'); return }
-    if (!confirm(`${toSave.length}명을 등록하시겠습니까?`)) return
+    const newCnt = toSave.filter(d => d._status === 'ready').length
+    const updCnt = toSave.filter(d => d._status === 'update').length
+    const msg = `신규 ${newCnt}명${updCnt ? ` + 업데이트 ${updCnt}명` : ''} 진행하시겠습니까?`
+    if (!confirm(msg)) return
     setBulkProcessing(true)
-    let saved = 0
+    let saved = 0, updated = 0
     for (const item of toSave) {
+      const wasUpdate = item._status === 'update'
       const { _row, _status, _note, ...payload } = item
       try {
         const res = await fetch('/api/freelancers', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) },
-          body: JSON.stringify(payload),
+          body: JSON.stringify({ ...payload, upsert: true }),
         })
         const json = await res.json()
         if (json.error) { item._status = 'error'; item._note = json.error }
-        else { item._status = 'saved'; item._note = '등록 완료'; saved++ }
+        else if (json.upserted === 'updated' || wasUpdate) { item._status = 'saved'; item._note = '🔄 업데이트 완료'; updated++ }
+        else { item._status = 'saved'; item._note = '✨ 신규 등록 완료'; saved++ }
       } catch (e: any) {
         item._status = 'error'; item._note = e.message
       }
     }
     setBulkData([...bulkData])
-    setBulkLogs(prev => [...prev, `${saved}명 등록 완료`])
+    const summary = [
+      saved > 0 ? `✨ 신규 ${saved}명` : null,
+      updated > 0 ? `🔄 업데이트 ${updated}명` : null,
+    ].filter(Boolean).join(' / ')
+    setBulkLogs(prev => [...prev, summary || '저장 완료'])
     setBulkProcessing(false)
-    if (saved > 0) await loadExternal()
+    if (saved + updated > 0) await loadExternal()
   }
 
   const openFreelancerForm = (f?: any) => {
@@ -1389,10 +1422,24 @@ export default function HRMasterPage() {
                               <td style={{ padding: '4px 8px', textAlign: 'center' }}>
                                 <span style={{
                                   fontSize: 10, fontWeight: 600, padding: '2px 6px', borderRadius: 4,
-                                  background: d._status === 'saved' ? 'rgba(34,197,94,0.15)' : d._status === 'duplicate' ? 'rgba(0,0,0,0.04)' : d._status === 'error' ? 'rgba(239,68,68,0.15)' : 'rgba(251,191,36,0.18)',
-                                  color: d._status === 'saved' ? '#16a34a' : d._status === 'duplicate' ? '#94a3b8' : d._status === 'error' ? '#dc2626' : '#a16207',
+                                  background:
+                                    d._status === 'saved' ? 'rgba(34,197,94,0.15)' :
+                                    d._status === 'update' ? 'rgba(59,130,246,0.15)' :
+                                    d._status === 'duplicate' ? 'rgba(0,0,0,0.04)' :
+                                    d._status === 'error' ? 'rgba(239,68,68,0.15)' :
+                                    'rgba(251,191,36,0.18)',
+                                  color:
+                                    d._status === 'saved' ? '#16a34a' :
+                                    d._status === 'update' ? '#2563eb' :
+                                    d._status === 'duplicate' ? '#94a3b8' :
+                                    d._status === 'error' ? '#dc2626' :
+                                    '#a16207',
                                 }}>
-                                  {d._status === 'saved' ? '등록완료' : d._status === 'duplicate' ? d._note : d._status === 'error' ? '에러' : '대기'}
+                                  {d._status === 'saved' ? d._note :
+                                   d._status === 'update' ? '🔄 업데이트' :
+                                   d._status === 'duplicate' ? d._note :
+                                   d._status === 'error' ? '에러' :
+                                   '✨ 신규'}
                                 </span>
                               </td>
                             </tr>
@@ -1407,7 +1454,14 @@ export default function HRMasterPage() {
                       </button>
                       <button onClick={handleBulkSaveFL} disabled={bulkProcessing}
                         style={{ padding: '6px 14px', fontSize: 12, fontWeight: 600, color: '#fff', background: bulkProcessing ? '#94a3b8' : '#22c55e', border: 'none', borderRadius: 8, cursor: bulkProcessing ? 'not-allowed' : 'pointer' }}>
-                        {bulkProcessing ? '저장 중...' : `${bulkData.filter(d => d._status === 'ready').length}명 일괄 등록`}
+                        {bulkProcessing ? '저장 중...' : (() => {
+                          const ne = bulkData.filter(d => d._status === 'ready').length
+                          const upd = bulkData.filter(d => d._status === 'update').length
+                          if (ne && upd) return `✨ 신규 ${ne} + 🔄 업데이트 ${upd}명 적용`
+                          if (upd) return `🔄 ${upd}명 업데이트`
+                          if (ne) return `✨ ${ne}명 신규 등록`
+                          return '저장할 데이터 없음'
+                        })()}
                       </button>
                     </div>
                   </>

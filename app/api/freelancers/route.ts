@@ -42,6 +42,10 @@ const FIELDS = [
   'reg_number', 'tax_type', 'service_type', 'is_active', 'memo', 'linked_profile_id',
 ]
 
+// POST UPSERT 동작 (PR-B12, 2026-05-07):
+//   - 같은 (name, phone) row 있으면 → UPDATE (계좌번호/은행 등 갱신)
+//   - 없으면 → INSERT
+//   - body.upsert === false 면 강제 INSERT (옛 동작)
 export async function POST(request: NextRequest) {
   try {
     const user = await verifyUser(request)
@@ -55,6 +59,53 @@ export async function POST(request: NextRequest) {
       `SHOW COLUMNS FROM freelancers`
     )).map((c: any) => c.Field)
 
+    const name = String(body.name).trim()
+    const phone = body.phone ? String(body.phone).trim() : null
+    const upsert = body.upsert !== false  // default ON — 동일 이름+전화 갱신
+
+    // 1) 기존 row 검색 (이름+전화번호 매칭)
+    let existingId: string | null = null
+    if (upsert) {
+      const params: any[] = [name]
+      let phoneClause = ''
+      if (phone) {
+        phoneClause = ' AND (phone = ? OR phone IS NULL OR phone = "")'
+        params.push(phone)
+      }
+      const found = await prisma.$queryRawUnsafe<any[]>(
+        `SELECT id FROM freelancers WHERE name = ?${phoneClause} ORDER BY phone IS NULL ASC, created_at DESC LIMIT 1`,
+        ...params,
+      )
+      if (found && found.length > 0) existingId = String(found[0].id)
+    }
+
+    // 2) 갱신 또는 신규 INSERT
+    if (existingId) {
+      // UPDATE — 화이트리스트 컬럼만
+      const sets: string[] = []
+      const vals: any[] = []
+      for (const f of FIELDS) {
+        if (!existingCols.includes(f)) continue
+        if (!(f in body)) continue
+        let v = body[f]
+        if (v === '') v = null
+        if (typeof v === 'boolean') v = v ? 1 : 0
+        sets.push(`${f} = ?`)
+        vals.push(v)
+      }
+      if (existingCols.includes('updated_at')) sets.push('updated_at = NOW()')
+      if (sets.length > 0) {
+        vals.push(existingId)
+        await prisma.$executeRawUnsafe(
+          `UPDATE freelancers SET ${sets.join(', ')} WHERE id = ?`,
+          ...vals,
+        )
+      }
+      const updated = await prisma.$queryRaw<any[]>`SELECT * FROM freelancers WHERE id = ${existingId} LIMIT 1`
+      return NextResponse.json({ data: serialize(updated[0]), error: null, upserted: 'updated' }, { status: 200 })
+    }
+
+    // INSERT
     const id = randomUUID()
     const cols: string[] = ['id']
     const placeholders: string[] = ['?']
@@ -82,7 +133,7 @@ export async function POST(request: NextRequest) {
       ...values,
     )
     const created = await prisma.$queryRaw<any[]>`SELECT * FROM freelancers WHERE id = ${id} LIMIT 1`
-    return NextResponse.json({ data: serialize(created[0]), error: null }, { status: 201 })
+    return NextResponse.json({ data: serialize(created[0]), error: null, upserted: 'inserted' }, { status: 201 })
   } catch (e: any) {
     console.error('[freelancers POST]', e)
     return NextResponse.json({ error: e.message }, { status: 500 })
