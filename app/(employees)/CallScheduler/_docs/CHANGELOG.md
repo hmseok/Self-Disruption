@@ -3,6 +3,37 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-08 (Phase J) — 시간대 + 그룹 같이 표출
+
+### Phase J — 슬롯 좌측 컬럼 보강 (사용자 5/8 요청)
+- 사용자 의도: "매트릭스에 실제 시간대 + 그룹 같이 표출"
+- ScheduleGrid 변경:
+  · `slotGroups` state — `/api/call-scheduler/shift-groups` fetch (slotId → group 매핑)
+  · 슬롯 좌측 sticky 컬럼 폭 100→200px / minWidth 200, maxWidth 220
+  · 카테고리별 색 stripe (좌측 3px border)
+    - 야간 → violet / 저녁 → amber / 주간 → blue / 특수 → red / 일반 → gray
+- 표출 구조 (각 슬롯 행):
+  ```
+  [stripe] L13 20:30~08:30 익  [야간콜]
+            ▓▓▓▓▓▓▓░░░░░░░░░░░░░░░░░░░░░░░ (24h 시간 막대)
+                    12h            24h
+  ```
+- 24h 시간 막대 (mini SVG-like div):
+  · overnight 슬롯 → 48h 스케일
+  · 슬롯 시작/종료 시각을 막대 left/width 로 시각화
+  · 12h / 24h 마커 (회색 세로선)
+- 그룹 chip:
+  · 슬롯 라벨 옆 작은 pill (max-width 80, ellipsis)
+  · 카테고리별 색
+  · hover 툴팁: "그룹: {name} ({category})"
+
+### 운영 효과
+- 매니저가 매트릭스 첫 컬럼 보면 즉시 파악:
+  · 슬롯 코드 (L13) + 시간 (20:30~08:30) + 익일 표시
+  · 어느 그룹 (야간콜 / 주간 09-18 / 등)
+  · 24h 시간대 막대 — 야간 vs 주간 시각 구분 (보라 vs 파랑)
+- 사용자 원칙 충족: "시간대 + 그룹 같이 표출"
+
 ## 2026-05-08 (Phase E + F) — 가드 위반 시각화 + 빈 셀 사유
 
 ### Phase E — 가드 위반 시각화 (clientside)

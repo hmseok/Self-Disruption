@@ -52,6 +52,36 @@ export default function ScheduleGrid({ detail, onChanged }: Props) {
     [workers],
   )
 
+  // PR-2SS-Phase-J — 슬롯 → 그룹 매핑 (시간대 + 그룹 같이 표출)
+  const [slotGroups, setSlotGroups] = useState<Record<string, { name: string; category: string; tone?: string }>>({})
+  useEffect(() => {
+    let abort = false
+    ;(async () => {
+      try {
+        const auth = await getAuthHeader()
+        const res = await fetch('/api/call-scheduler/shift-groups', { headers: auth })
+        const json = await res.json()
+        if (abort) return
+        if (res.ok && Array.isArray(json.data)) {
+          const map: Record<string, { name: string; category: string; tone?: string }> = {}
+          for (const g of json.data) {
+            if (!g.is_active) continue
+            // 한 슬롯에 여러 그룹 가능 — 첫 활성 그룹 선택 (대부분 1:1)
+            if (!map[g.shift_slot_id]) {
+              map[g.shift_slot_id] = {
+                name: g.name,
+                category: g.category || 'general',
+                tone: g.color_tone,
+              }
+            }
+          }
+          setSlotGroups(map)
+        }
+      } catch { /* graceful */ }
+    })()
+    return () => { abort = true }
+  }, [schedule.id])
+
   // PR-2SS-h-4 — 회피일 fetch (월간 통합)
   const [skipDates, setSkipDates] = useState<GroupMemberSkipDate[]>([])
   useEffect(() => {
@@ -534,19 +564,83 @@ export default function ScheduleGrid({ detail, onChanged }: Props) {
           ))}
         </thead>
         <tbody>
-          {slots.map(slot => (
+          {slots.map(slot => {
+            // Phase J — 그룹 + 시간 막대
+            const grp = slotGroups[slot.id]
+            // 시간 막대 (24h scale): start_time/end_time → 막대 위치/폭
+            const toMin = (t: string) => { const [h,m] = t.split(':').map(Number); return h*60 + m }
+            const startMin = toMin(slot.start_time)
+            let endMin = toMin(slot.end_time)
+            if (slot.is_overnight) endMin += 1440
+            const barTotalMin = slot.is_overnight ? 2880 : 1440  // overnight 은 48h 스케일
+            const barLeftPct = (startMin / barTotalMin) * 100
+            const barWidthPct = ((endMin - startMin) / barTotalMin) * 100
+            // 그룹 카테고리별 색
+            const grpTone = grp?.category === '야간' ? COLORS.bgViolet
+                          : grp?.category === '저녁' ? COLORS.bgAmber
+                          : grp?.category === '주간' ? COLORS.bgBlue
+                          : grp?.category === '특수' ? COLORS.bgRed
+                          : COLORS.bgGray
+            const grpBorder = grp?.category === '야간' ? COLORS.borderViolet
+                            : grp?.category === '저녁' ? COLORS.borderAmber
+                            : grp?.category === '주간' ? COLORS.borderBlue
+                            : grp?.category === '특수' ? COLORS.borderRed
+                            : COLORS.borderFaint
+            return (
             <tr key={slot.id}>
               <td style={{
-                padding: '2px 6px', position: 'sticky', left: 0,
-                background: 'rgba(255,255,255,0.92)',
+                padding: '4px 8px', position: 'sticky', left: 0,
+                background: 'rgba(255,255,255,0.95)',
                 color: COLORS.textPrimary, fontWeight: 600,
                 borderRadius: 4, whiteSpace: 'nowrap', zIndex: 1,
-                fontSize: 11,
+                fontSize: 11, minWidth: 200, maxWidth: 220,
+                borderLeft: `3px solid ${grpBorder}`,
               }}>
-                <span style={{ fontSize: 10, color: COLORS.textMuted, marginRight: 4 }}>
-                  {slot.code}
-                </span>
-                {slot.label}
+                {/* 1행: 슬롯 코드 + 시간 + 그룹 chip */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                  <span style={{
+                    fontSize: 10, color: COLORS.textMuted, fontFamily: 'monospace', fontWeight: 700,
+                  }}>{slot.code}</span>
+                  <span style={{ fontSize: 11, fontWeight: 700 }}>
+                    {slot.start_time.substring(0,5)}~{slot.end_time.substring(0,5)}
+                    {slot.is_overnight && <span style={{ fontSize: 8, color: COLORS.warning, marginLeft: 2 }}>익</span>}
+                  </span>
+                  {grp && (
+                    <span style={{
+                      fontSize: 9, padding: '1px 5px', borderRadius: 99, fontWeight: 700,
+                      background: grpTone, color: COLORS.textPrimary,
+                      border: `1px solid ${grpBorder}`,
+                      whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 80,
+                    }} title={`그룹: ${grp.name} (${grp.category})`}>
+                      {grp.name}
+                    </span>
+                  )}
+                </div>
+                {/* 2행: 24h 시간 막대 */}
+                <div style={{
+                  position: 'relative', width: '100%', height: 6,
+                  background: 'rgba(0,0,0,0.05)', borderRadius: 3, overflow: 'hidden',
+                }} title={`${slot.start_time.substring(0,5)} ~ ${slot.end_time.substring(0,5)}${slot.is_overnight ? ' (익일)' : ''}`}>
+                  <div style={{
+                    position: 'absolute',
+                    left: `${barLeftPct}%`,
+                    width: `${barWidthPct}%`,
+                    height: '100%',
+                    background: grpBorder,
+                    borderRadius: 3,
+                  }} />
+                  {/* 12h / 24h 마커 */}
+                  <div style={{
+                    position: 'absolute', left: `${(720/barTotalMin)*100}%`,
+                    width: 1, height: '100%', background: 'rgba(0,0,0,0.15)',
+                  }} />
+                  {slot.is_overnight && (
+                    <div style={{
+                      position: 'absolute', left: `${(1440/barTotalMin)*100}%`,
+                      width: 1, height: '100%', background: 'rgba(0,0,0,0.25)',
+                    }} />
+                  )}
+                </div>
               </td>
               {days.map(d => {
                 // PR-2OO: 1셀에 N워커 가능 — 모든 row 표시
@@ -636,7 +730,8 @@ export default function ScheduleGrid({ detail, onChanged }: Props) {
                 )
               })}
             </tr>
-          ))}
+            )
+          })}
         </tbody>
       </table>
 
