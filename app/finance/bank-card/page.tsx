@@ -558,6 +558,86 @@ export default function BankCardPage() {
       setInvestorJiipLoading(false)
     }
   }
+  // ── PR-UX1: 통합 자동 매칭 (4 매처 일괄) ──
+  // 사용자 명령 — 8 버튼 → 2 클릭 (dry-run + 확정 적용)
+  const [autoMatchAllLoading, setAutoMatchAllLoading] = useState(false)
+  const [autoMatchAllResult, setAutoMatchAllResult] = useState<null | {
+    mode: 'dry-run' | 'apply'
+    ts: number
+    matchers: {
+      insurance: { matched: number; applied: number; ok: boolean; err?: string }
+      invest:    { matched: number; applied: number; ok: boolean; err?: string }
+      employee:  { matched: number; applied: number; ok: boolean; err?: string }
+      freelancer:{ matched: number; applied: number; ok: boolean; err?: string }
+    }
+    total_matched: number
+    total_applied: number
+  }>(null)
+  const [showAdvancedMatchers, setShowAdvancedMatchers] = useState(false)
+
+  const runAutoMatchAll = async (mode: 'dry-run' | 'apply') => {
+    const dryRun = mode === 'dry-run'
+    setAutoMatchAllLoading(true)
+    if (dryRun) setAutoMatchAllResult(null)
+    const taskId = floaterProgress.start({
+      title: dryRun ? '🪄 자동 매칭 dry-run' : '🪄 자동 매칭 적용',
+      total: 4,
+    })
+    // 우선순위 순서 — insurance → invest → employee → freelancer
+    const phases = [
+      { key: 'insurance' as const, label: '대차건 보험',
+        url: '/api/finance/transactions/auto-match-fmi-rental',  body: { mode: 'insurance', dryRun } },
+      { key: 'invest'    as const, label: '투자/지입',
+        url: '/api/finance/transactions/auto-match-investor-jiip', body: { mode: 'both', dryRun } },
+      { key: 'employee'  as const, label: '직원',
+        url: '/api/finance/transactions/auto-match-employee',   body: { source: 'both', dryRun } },
+      { key: 'freelancer'as const, label: '프리랜서',
+        url: '/api/finance/transactions/auto-match-freelancer', body: { dryRun } },
+    ]
+    const results: any = {
+      insurance:  { matched: 0, applied: 0, ok: false },
+      invest:     { matched: 0, applied: 0, ok: false },
+      employee:   { matched: 0, applied: 0, ok: false },
+      freelancer: { matched: 0, applied: 0, ok: false },
+    }
+    let totalApplied = 0
+    for (let i = 0; i < phases.length; i++) {
+      const ph = phases[i]
+      try {
+        const { ok, json, status } = await fetchWithAuth(ph.url, { method: 'POST', body: ph.body })
+        if (ok) {
+          results[ph.key].matched = Number(json.matched || 0)
+          results[ph.key].applied = Number(json.applied || 0)
+          results[ph.key].ok = true
+          totalApplied += results[ph.key].applied
+        } else {
+          results[ph.key].ok = false
+          results[ph.key].err = `HTTP ${status} — ${json?.error || ''}`
+        }
+      } catch (e: any) {
+        results[ph.key].ok = false
+        results[ph.key].err = e?.message || String(e)
+      }
+      floaterProgress.update(taskId, { processed: i + 1, applied: totalApplied })
+    }
+    const totalMatched = (Object.values(results) as any[]).reduce((a, r) => a + r.matched, 0)
+    setAutoMatchAllResult({
+      mode,
+      ts: Date.now(),
+      matchers: results,
+      total_matched: totalMatched,
+      total_applied: totalApplied,
+    })
+    floaterProgress.finish(
+      taskId,
+      dryRun
+        ? `🔍 dry-run — 매칭 가능 ${totalMatched}건`
+        : `✅ ${totalApplied}건 매칭 적용 (4 매처 합계)`,
+    )
+    if (!dryRun && totalApplied > 0) await loadMatchReview()
+    setAutoMatchAllLoading(false)
+  }
+
   const runFmiRentalMatch = async (dryRun: boolean) => {
     setFmiRentalMatching(true)
     setFmiRentalMatchResult(null)
@@ -4922,73 +5002,55 @@ export default function BankCardPage() {
                 <div style={{ fontSize: 12, color: COLORS.textMuted, marginBottom: 8 }}>
                   차량 / 직원 / 투자자 / 지입자 별로 묶어 매칭 정합성 검수. entity 카드 클릭 → 매칭된 거래 목록 펼침.
                 </div>
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
                   <button
                     onClick={loadMatchReview}
                     disabled={matchReviewLoading}
                     style={{ ...BTN.sm, padding: '4px 10px', fontSize: 11, background: COLORS.primary, color: '#fff', border: 'none', cursor: matchReviewLoading ? 'wait' : 'pointer' }}
                   >{matchReviewLoading ? '로드 중...' : '🔄 새로고침'}</button>
+
+                  {/* PR-UX1: 통합 자동 매칭 — 8 버튼 → 2 클릭 (dry-run + 확정 적용) */}
                   <button
-                    onClick={runMatchDiagnostic}
-                    disabled={matchDiagnosticLoading}
-                    style={{ ...BTN.sm, padding: '4px 10px', fontSize: 11, background: '#fff', color: '#7c3aed', border: '1px solid rgba(124,58,237,0.3)', cursor: matchDiagnosticLoading ? 'wait' : 'pointer' }}
-                  >{matchDiagnosticLoading ? '진단 중...' : '🩺 매칭 진단'}</button>
-                  <button
-                    onClick={() => runFmiRentalMatch(true)}
-                    disabled={fmiRentalMatching}
-                    style={{ ...BTN.sm, padding: '4px 10px', fontSize: 11, background: '#fff', color: '#1e40af', border: '1px solid rgba(59,130,246,0.3)', cursor: fmiRentalMatching ? 'wait' : 'pointer' }}
-                    title="실제 적용 안 함 — 매칭 가능 건수만 확인"
-                  >{fmiRentalMatching ? '진행 중...' : '🔍 대차건 dry-run'}</button>
-                  <button
-                    onClick={() => {
-                      if (!confirm('대차건 보험 매칭을 실제 적용하시겠습니까?\n(dry-run 결과 먼저 확인 권장)')) return
-                      runFmiRentalMatch(false)
+                    onClick={() => runAutoMatchAll('dry-run')}
+                    disabled={autoMatchAllLoading}
+                    style={{
+                      padding: '6px 16px', fontSize: 12, fontWeight: 700,
+                      background: 'linear-gradient(135deg, #7c3aed 0%, #2563eb 100%)',
+                      color: '#fff', border: 'none', borderRadius: 8,
+                      cursor: autoMatchAllLoading ? 'wait' : 'pointer',
+                      boxShadow: '0 2px 8px rgba(124,58,237,0.3)',
                     }}
-                    disabled={fmiRentalMatching}
-                    style={{ ...BTN.sm, padding: '4px 10px', fontSize: 11, background: '#1e40af', color: '#fff', border: 'none', cursor: fmiRentalMatching ? 'wait' : 'pointer' }}
-                  >{fmiRentalMatching ? '진행 중...' : '📥 대차건 매칭 적용'}</button>
+                    title="4 매처 일괄 dry-run (대차건 + 투자/지입 + 직원 + 프리랜서)"
+                  >{autoMatchAllLoading ? '진행 중...' : '🪄 자동 매칭'}</button>
+
+                  {autoMatchAllResult && autoMatchAllResult.mode === 'dry-run' && autoMatchAllResult.total_matched > 0 && (
+                    <button
+                      onClick={() => {
+                        if (!confirm(`자동 매칭 ${autoMatchAllResult.total_matched}건을 실제 적용합니다.\n\n` +
+                          `· 대차건 보험: ${autoMatchAllResult.matchers.insurance.matched}건\n` +
+                          `· 투자/지입:   ${autoMatchAllResult.matchers.invest.matched}건\n` +
+                          `· 직원:        ${autoMatchAllResult.matchers.employee.matched}건\n` +
+                          `· 프리랜서:    ${autoMatchAllResult.matchers.freelancer.matched}건\n\n` +
+                          `우선순위 순서대로 (insurance → invest → employee → freelancer) 적용됩니다.\n` +
+                          `계속할까요?`)) return
+                        runAutoMatchAll('apply')
+                      }}
+                      disabled={autoMatchAllLoading}
+                      style={{
+                        padding: '6px 16px', fontSize: 12, fontWeight: 700,
+                        background: '#16a34a', color: '#fff', border: 'none', borderRadius: 8,
+                        cursor: 'pointer',
+                        boxShadow: '0 2px 8px rgba(22,163,74,0.3)',
+                      }}
+                    >✅ 확정 적용 ({autoMatchAllResult.total_matched}건)</button>
+                  )}
+
                   <button
-                    onClick={() => runInvestorJiipMatch(true)}
-                    disabled={investorJiipLoading}
-                    style={{ ...BTN.sm, padding: '4px 10px', fontSize: 11, background: '#fff', color: '#7c3aed', border: '1px solid rgba(124,58,237,0.3)', cursor: investorJiipLoading ? 'wait' : 'pointer' }}
-                    title="투자자/지입자 입금자명 매칭 — 양방향 (입금+지급)"
-                  >{investorJiipLoading ? '진행 중...' : '🔍 투자/지입 dry-run'}</button>
-                  <button
-                    onClick={() => {
-                      if (!confirm('투자자/지입자 매칭을 실제 적용하시겠습니까?\n(dry-run 결과 먼저 확인 권장)')) return
-                      runInvestorJiipMatch(false)
-                    }}
-                    disabled={investorJiipLoading}
-                    style={{ ...BTN.sm, padding: '4px 10px', fontSize: 11, background: '#7c3aed', color: '#fff', border: 'none', cursor: investorJiipLoading ? 'wait' : 'pointer' }}
-                  >{investorJiipLoading ? '진행 중...' : '💼 투자/지입 매칭 적용'}</button>
-                  <button
-                    onClick={() => runEmployeeMatch(true)}
-                    disabled={employeeMatchLoading}
-                    style={{ ...BTN.sm, padding: '4px 10px', fontSize: 11, background: '#fff', color: '#0891b2', border: '1px solid rgba(8,145,178,0.3)', cursor: employeeMatchLoading ? 'wait' : 'pointer' }}
-                    title="직원 (계정+라이드) 거래 매칭 — 양방향 (입금+지급)"
-                  >{employeeMatchLoading ? '진행 중...' : '🔍 직원 dry-run'}</button>
-                  <button
-                    onClick={() => {
-                      if (!confirm('직원 매칭을 실제 적용하시겠습니까?\n(dry-run 결과 먼저 확인 권장)')) return
-                      runEmployeeMatch(false)
-                    }}
-                    disabled={employeeMatchLoading}
-                    style={{ ...BTN.sm, padding: '4px 10px', fontSize: 11, background: '#0891b2', color: '#fff', border: 'none', cursor: employeeMatchLoading ? 'wait' : 'pointer' }}
-                  >{employeeMatchLoading ? '진행 중...' : '👥 직원 매칭 적용'}</button>
-                  <button
-                    onClick={() => runFreelancerMatch(true)}
-                    disabled={freelancerMatchLoading}
-                    style={{ ...BTN.sm, padding: '4px 10px', fontSize: 11, background: '#fff', color: '#d97706', border: '1px solid rgba(217,119,6,0.3)', cursor: freelancerMatchLoading ? 'wait' : 'pointer' }}
-                    title="프리랜서 거래 매칭 — 양방향 (입금+지급)"
-                  >{freelancerMatchLoading ? '진행 중...' : '🔍 프리랜서 dry-run'}</button>
-                  <button
-                    onClick={() => {
-                      if (!confirm('프리랜서 매칭을 실제 적용하시겠습니까?\n(dry-run 결과 먼저 확인 권장)')) return
-                      runFreelancerMatch(false)
-                    }}
-                    disabled={freelancerMatchLoading}
-                    style={{ ...BTN.sm, padding: '4px 10px', fontSize: 11, background: '#d97706', color: '#fff', border: 'none', cursor: freelancerMatchLoading ? 'wait' : 'pointer' }}
-                  >{freelancerMatchLoading ? '진행 중...' : '🤝 프리랜서 매칭 적용'}</button>
+                    onClick={() => setShowAdvancedMatchers(!showAdvancedMatchers)}
+                    style={{ ...BTN.sm, padding: '4px 10px', fontSize: 11, background: '#fff', color: COLORS.textSecondary, border: `1px solid ${COLORS.borderSubtle}`, cursor: 'pointer' }}
+                    title="개별 매처 dry-run / 적용 / 진단 (디버깅용)"
+                  >{showAdvancedMatchers ? '⬆ 고급 옵션 닫기' : '⚙ 고급 옵션'}</button>
+
                   <select
                     value={matchReviewTypeFilter}
                     onChange={(e) => setMatchReviewTypeFilter(e.target.value)}
@@ -5000,7 +5062,149 @@ export default function BankCardPage() {
                     ))}
                   </select>
                 </div>
+
+                {/* 고급 옵션 — 기존 8 버튼 (디버깅/개별 실행) */}
+                {showAdvancedMatchers && (
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8, paddingTop: 8, borderTop: `1px dashed ${COLORS.borderSubtle}` }}>
+                    <button
+                      onClick={runMatchDiagnostic}
+                      disabled={matchDiagnosticLoading}
+                      style={{ ...BTN.sm, padding: '4px 10px', fontSize: 11, background: '#fff', color: '#7c3aed', border: '1px solid rgba(124,58,237,0.3)', cursor: matchDiagnosticLoading ? 'wait' : 'pointer' }}
+                    >{matchDiagnosticLoading ? '진단 중...' : '🩺 매칭 진단'}</button>
+                    <button
+                      onClick={() => runFmiRentalMatch(true)}
+                      disabled={fmiRentalMatching}
+                      style={{ ...BTN.sm, padding: '4px 10px', fontSize: 11, background: '#fff', color: '#1e40af', border: '1px solid rgba(59,130,246,0.3)', cursor: fmiRentalMatching ? 'wait' : 'pointer' }}
+                      title="실제 적용 안 함 — 매칭 가능 건수만 확인"
+                    >{fmiRentalMatching ? '진행 중...' : '🔍 대차건 dry-run'}</button>
+                    <button
+                      onClick={() => {
+                        if (!confirm('대차건 보험 매칭을 실제 적용하시겠습니까?\n(dry-run 결과 먼저 확인 권장)')) return
+                        runFmiRentalMatch(false)
+                      }}
+                      disabled={fmiRentalMatching}
+                      style={{ ...BTN.sm, padding: '4px 10px', fontSize: 11, background: '#1e40af', color: '#fff', border: 'none', cursor: fmiRentalMatching ? 'wait' : 'pointer' }}
+                    >{fmiRentalMatching ? '진행 중...' : '📥 대차건 매칭 적용'}</button>
+                    <button
+                      onClick={() => runInvestorJiipMatch(true)}
+                      disabled={investorJiipLoading}
+                      style={{ ...BTN.sm, padding: '4px 10px', fontSize: 11, background: '#fff', color: '#7c3aed', border: '1px solid rgba(124,58,237,0.3)', cursor: investorJiipLoading ? 'wait' : 'pointer' }}
+                      title="투자자/지입자 입금자명 매칭 — 양방향 (입금+지급)"
+                    >{investorJiipLoading ? '진행 중...' : '🔍 투자/지입 dry-run'}</button>
+                    <button
+                      onClick={() => {
+                        if (!confirm('투자자/지입자 매칭을 실제 적용하시겠습니까?\n(dry-run 결과 먼저 확인 권장)')) return
+                        runInvestorJiipMatch(false)
+                      }}
+                      disabled={investorJiipLoading}
+                      style={{ ...BTN.sm, padding: '4px 10px', fontSize: 11, background: '#7c3aed', color: '#fff', border: 'none', cursor: investorJiipLoading ? 'wait' : 'pointer' }}
+                    >{investorJiipLoading ? '진행 중...' : '💼 투자/지입 매칭 적용'}</button>
+                    <button
+                      onClick={() => runEmployeeMatch(true)}
+                      disabled={employeeMatchLoading}
+                      style={{ ...BTN.sm, padding: '4px 10px', fontSize: 11, background: '#fff', color: '#0891b2', border: '1px solid rgba(8,145,178,0.3)', cursor: employeeMatchLoading ? 'wait' : 'pointer' }}
+                      title="직원 (계정+라이드) 거래 매칭 — 양방향 (입금+지급)"
+                    >{employeeMatchLoading ? '진행 중...' : '🔍 직원 dry-run'}</button>
+                    <button
+                      onClick={() => {
+                        if (!confirm('직원 매칭을 실제 적용하시겠습니까?\n(dry-run 결과 먼저 확인 권장)')) return
+                        runEmployeeMatch(false)
+                      }}
+                      disabled={employeeMatchLoading}
+                      style={{ ...BTN.sm, padding: '4px 10px', fontSize: 11, background: '#0891b2', color: '#fff', border: 'none', cursor: employeeMatchLoading ? 'wait' : 'pointer' }}
+                    >{employeeMatchLoading ? '진행 중...' : '👥 직원 매칭 적용'}</button>
+                    <button
+                      onClick={() => runFreelancerMatch(true)}
+                      disabled={freelancerMatchLoading}
+                      style={{ ...BTN.sm, padding: '4px 10px', fontSize: 11, background: '#fff', color: '#d97706', border: '1px solid rgba(217,119,6,0.3)', cursor: freelancerMatchLoading ? 'wait' : 'pointer' }}
+                      title="프리랜서 거래 매칭 — 양방향 (입금+지급)"
+                    >{freelancerMatchLoading ? '진행 중...' : '🔍 프리랜서 dry-run'}</button>
+                    <button
+                      onClick={() => {
+                        if (!confirm('프리랜서 매칭을 실제 적용하시겠습니까?\n(dry-run 결과 먼저 확인 권장)')) return
+                        runFreelancerMatch(false)
+                      }}
+                      disabled={freelancerMatchLoading}
+                      style={{ ...BTN.sm, padding: '4px 10px', fontSize: 11, background: '#d97706', color: '#fff', border: 'none', cursor: freelancerMatchLoading ? 'wait' : 'pointer' }}
+                    >{freelancerMatchLoading ? '진행 중...' : '🤝 프리랜서 매칭 적용'}</button>
+                  </div>
+                )}
               </div>
+
+              {/* PR-UX1: 통합 자동 매칭 결과 패널 (Glass L4 — Rule 20) */}
+              {autoMatchAllResult && (() => {
+                const r = autoMatchAllResult
+                const isDryRun = r.mode === 'dry-run'
+                const headerColor = isDryRun ? '#7c3aed' : '#16a34a'
+                const headerBorder = isDryRun ? 'rgba(124,58,237,0.3)' : 'rgba(22,163,74,0.3)'
+                const matcherCards = [
+                  { key: 'insurance' as const,  label: '🚗 대차건 보험', color: '#1e40af' },
+                  { key: 'invest' as const,     label: '📈 투자/지입',  color: '#7c3aed' },
+                  { key: 'employee' as const,   label: '👥 직원',       color: '#0891b2' },
+                  { key: 'freelancer' as const, label: '🤝 프리랜서',   color: '#d97706' },
+                ]
+                return (
+                  <div style={{ ...GLASS.L4, border: `1px solid ${headerBorder}`, borderRadius: 12, padding: '14px 18px', marginBottom: 12 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: headerColor }}>
+                          🪄 자동 매칭 결과 — {isDryRun ? 'dry-run' : '적용 완료'}
+                          <span style={{ marginLeft: 8, fontSize: 11, color: COLORS.textMuted, fontWeight: 400 }}>
+                            {new Date(r.ts).toLocaleTimeString()}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 2 }}>
+                          {isDryRun
+                            ? `매칭 가능 ${r.total_matched}건 — [확정 적용] 버튼으로 실제 반영`
+                            : `${r.total_applied}건 매칭 적용 (4 매처 합계)`}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => setAutoMatchAllResult(null)}
+                        style={{ background: 'transparent', border: 'none', color: COLORS.textMuted, cursor: 'pointer', fontSize: 12 }}
+                      >× 닫기</button>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 8 }}>
+                      {matcherCards.map(mc => {
+                        const m = r.matchers[mc.key]
+                        const value = isDryRun ? m.matched : m.applied
+                        return (
+                          <div key={mc.key} style={{
+                            ...GLASS.L3,
+                            border: `1px solid ${m.ok ? mc.color : '#dc2626'}30`,
+                            borderRadius: 8, padding: '10px 12px',
+                            opacity: m.ok ? 1 : 0.6,
+                          }}>
+                            <div style={{ fontSize: 11, color: COLORS.textMuted, marginBottom: 4 }}>{mc.label}</div>
+                            <div style={{ fontSize: 18, fontWeight: 700, color: m.ok ? mc.color : '#dc2626' }}>
+                              {m.ok ? `${value}건` : '실패'}
+                            </div>
+                            {isDryRun && m.ok && (
+                              <div style={{ fontSize: 10, color: COLORS.textMuted, marginTop: 2 }}>매칭 가능</div>
+                            )}
+                            {!isDryRun && m.ok && (
+                              <div style={{ fontSize: 10, color: COLORS.textMuted, marginTop: 2 }}>적용됨</div>
+                            )}
+                            {!m.ok && m.err && (
+                              <div style={{ fontSize: 10, color: '#dc2626', marginTop: 2 }} title={m.err}>{m.err.slice(0, 30)}…</div>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                    <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px dashed ${COLORS.borderSubtle}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ fontSize: 12, color: COLORS.textPrimary }}>
+                        <strong>합계</strong>: {isDryRun ? `매칭 가능 ${r.total_matched}건` : `${r.total_applied}건 적용`}
+                      </div>
+                      {isDryRun && r.total_matched > 0 && (
+                        <div style={{ fontSize: 11, color: COLORS.textMuted }}>
+                          📌 우선순위: insurance → invest → employee → freelancer (중복 자동 제외)
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )
+              })()}
 
               {/* 진단 결과 글래스 패널 (CLAUDE.md 규칙 20) */}
               {matchDiagnostic && (
