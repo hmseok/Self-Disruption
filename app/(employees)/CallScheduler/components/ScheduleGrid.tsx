@@ -3,7 +3,7 @@
 // ScheduleGrid — 메인 캘린더 그리드 (슬롯 행 × 일자 열)
 // 가로 스크롤 (반응형, CLAUDE.md 규칙 19)
 // ═══════════════════════════════════════════════════════════════════
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { COLORS, GLASS } from '@/app/utils/ui-tokens'
 import AssignmentCell from './AssignmentCell'
 import WorkerPicker from './WorkerPicker'
@@ -11,6 +11,7 @@ import { monthDays, dowIndex, DOW_LABEL, isOnExternalDuty } from '../utils/hours
 import { getAuthHeader } from '@/app/utils/auth-client'
 import type {
   ScheduleDetail, Assignment, ShiftSlot, Worker, SpecialCode,
+  GroupMemberSkipDate, SkipStatus,
 } from '../utils/types'
 
 interface Props {
@@ -50,6 +51,61 @@ export default function ScheduleGrid({ detail, onChanged }: Props) {
     ),
     [workers],
   )
+
+  // PR-2SS-h-4 — 회피일 fetch (월간 통합)
+  const [skipDates, setSkipDates] = useState<GroupMemberSkipDate[]>([])
+  useEffect(() => {
+    let abort = false
+    ;(async () => {
+      try {
+        const auth = await getAuthHeader()
+        const monthStart = `${schedule.year}-${String(schedule.month).padStart(2, '0')}-01`
+        const lastDay = new Date(schedule.year, schedule.month, 0).getDate()
+        const monthEnd = `${schedule.year}-${String(schedule.month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
+        const res = await fetch(
+          `/api/call-scheduler/skip-dates?from=${monthStart}&to=${monthEnd}&status=approved,requested`,
+          { headers: auth },
+        )
+        const json = await res.json()
+        if (abort) return
+        if (res.ok && Array.isArray(json.data)) {
+          setSkipDates(json.data)
+        }
+      } catch { /* graceful */ }
+    })()
+    return () => { abort = true }
+  }, [schedule.id, schedule.year, schedule.month, schedule.updated_at])
+
+  // PR-2SS-h-4 — (worker_id, isoDate) → SkipStatus 매핑 + 사유
+  const skipMap = useMemo(() => {
+    const m = new Map<string, { status: SkipStatus; reason: string | null; group_name?: string }>()
+    for (const s of skipDates) {
+      const start = new Date(s.start_date + 'T00:00:00')
+      const end = new Date(s.end_date + 'T00:00:00')
+      const cur = new Date(start)
+      while (cur <= end) {
+        const iso = `${cur.getFullYear()}-${String(cur.getMonth()+1).padStart(2,'0')}-${String(cur.getDate()).padStart(2,'0')}`
+        const key = `${s.worker_id}_${iso}`
+        // 기존 값이 approved 면 유지 (requested 우선순위 낮음)
+        const existing = m.get(key)
+        if (!existing || (existing.status === 'requested' && s.status === 'approved')) {
+          m.set(key, {
+            status: s.status,
+            reason: s.reason,
+            group_name: (s as any).group_name,
+          })
+        }
+        cur.setDate(cur.getDate() + 1)
+      }
+    }
+    return m
+  }, [skipDates])
+
+  // PR-2SS-h-4 — 회피일 신청한 워커들 (행 표출용)
+  const skipWorkers = useMemo(() => {
+    const ids = new Set(skipDates.map(s => s.worker_id))
+    return workers.filter(w => ids.has(w.id))
+  }, [skipDates, workers])
 
   const [pickerSlot, setPickerSlot] = useState<ShiftSlot | null>(null)
   const [pickerDate, setPickerDate] = useState<string>('')
@@ -326,6 +382,49 @@ export default function ScheduleGrid({ detail, onChanged }: Props) {
                   title={onDuty
                     ? `${ew.name} 외부 근무 (당사 X) — ${d}`
                     : `${ew.name} 외부 휴무 (당사 가능) — ${d}`} />
+                )
+              })}
+            </tr>
+          ))}
+          {/* PR-2SS-h-4 — 회피일 시각화 행 (워커별) */}
+          {skipWorkers.map(sw => (
+            <tr key={`skip-${sw.id}`}>
+              <td style={{
+                padding: '2px 6px', position: 'sticky', left: 0,
+                background: 'rgba(254,243,199,0.85)',
+                color: COLORS.warning, fontWeight: 600,
+                borderRadius: 4, whiteSpace: 'nowrap', zIndex: 1,
+                fontSize: 10,
+              }}>
+                <span style={{ marginRight: 4 }}>🛌</span>
+                {sw.name} <span style={{ fontSize: 9, color: COLORS.textMuted }}>회피</span>
+              </td>
+              {days.map(d => {
+                const skip = skipMap.get(`${sw.id}_${d}`)
+                if (!skip) {
+                  return (
+                    <td key={d} style={{
+                      padding: 0, minWidth: 44, height: 14,
+                      borderTop: `1px solid ${COLORS.borderFaint}`,
+                      borderBottom: `1px solid ${COLORS.borderFaint}`,
+                    }} />
+                  )
+                }
+                const isApproved = skip.status === 'approved'
+                return (
+                  <td key={d} style={{
+                    padding: 0, minWidth: 44, height: 14,
+                    background: isApproved ? COLORS.bgAmber : COLORS.bgRed,
+                    color: isApproved ? COLORS.warning : COLORS.danger,
+                    borderTop: `1px solid ${COLORS.borderFaint}`,
+                    borderBottom: `1px solid ${COLORS.borderFaint}`,
+                    fontSize: 9, textAlign: 'center', fontWeight: 700,
+                    cursor: 'help',
+                  }}
+                  title={`${sw.name} ${isApproved ? '회피 (승인)' : '회피 신청 (대기)'}${skip.group_name ? ' [' + skip.group_name + ']' : ''}${skip.reason ? ' — ' + skip.reason : ''} — ${d}`}
+                  >
+                    {isApproved ? '🛌' : '⏳'}
+                  </td>
                 )
               })}
             </tr>

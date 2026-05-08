@@ -3,6 +3,29 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-08 — PR-2SS-h-4 (매트릭스 회피일 시각 표출)
+
+### PR-2SS-h-4 — 매트릭스에 회피일 워커별 행 추가
+- 사용자 원칙: 매트릭스 = '왜' 답하는 곳 / 설정 = 단일 입력 위치
+  → 회피일 입력해도 매트릭스에 안 보이는 답답함 해소
+- API 신설: `GET /api/call-scheduler/skip-dates?from=&to=&status=`
+  - 모든 그룹 통합 조회 (status=approved,requested 디폴트)
+  - graceful fallback (테이블 미적용 시 빈 배열)
+- ScheduleGrid 변경:
+  - 월간 회피일 fetch (schedule.year/month + status filter)
+  - skipMap 매핑: `(worker_id, isoDate) → { status, reason, group_name }`
+  - 외부 cycle 행 패턴 따라 **회피일 워커별 행** 추가 (요약 layer)
+    · 🛌 (승인) — 노랑 배경
+    · ⏳ (신청 대기) — 빨강 배경
+    · hover 툴팁: "{워커} 회피 [그룹명] — 사유 — 일자"
+- 매트릭스 시각 효과:
+  - 외부 cycle 행 + 회피일 행이 일자별 헤더 아래 표출
+  - 매니저가 한눈에 "왜 5/15 야간 비었지" 답 — 정동민 회피 행에 🛌 보임
+- 다음 Phase (h-5/6/7):
+  - h-5: 비선호/희망 요일 셀 색상 + cycle 회색 줄
+  - h-6: 가드 위반 시각화 (익일 휴식 / 연속 한도 / 시간 겹침)
+  - h-7: 빈 셀 hover 사유 분석
+
 ## 2026-05-06 (저녁 후) — PR-2SS-h-1-fix (회피일 모달 → 인라인 펼침)
 
 ### PR-2SS-h-1-fix — UX 개선 (사용자 피드백)
