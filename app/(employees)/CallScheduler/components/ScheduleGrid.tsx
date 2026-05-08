@@ -3,7 +3,7 @@
 // ScheduleGrid — 메인 캘린더 그리드 (슬롯 행 × 일자 열)
 // 가로 스크롤 (반응형, CLAUDE.md 규칙 19)
 // ═══════════════════════════════════════════════════════════════════
-import { useMemo, useState, useEffect } from 'react'
+import { useMemo, useState, useEffect, Fragment } from 'react'
 import { COLORS, GLASS } from '@/app/utils/ui-tokens'
 import AssignmentCell from './AssignmentCell'
 import WorkerPicker from './WorkerPicker'
@@ -53,7 +53,9 @@ export default function ScheduleGrid({ detail, onChanged }: Props) {
   )
 
   // PR-2SS-Phase-J — 슬롯 → 그룹 매핑 (시간대 + 그룹 같이 표출)
-  const [slotGroups, setSlotGroups] = useState<Record<string, { name: string; category: string; tone?: string }>>({})
+  const [slotGroups, setSlotGroups] = useState<Record<string, { id: string; name: string; category: string; tone?: string; member_ids: string[] }>>({})
+  // PR-2SS-Phase-J-3 — 그룹 멤버 매핑 (그룹별 회피/cycle 행 분리용)
+  const [allGroups, setAllGroups] = useState<Array<{ id: string; name: string; category: string; shift_slot_id: string; member_ids: string[] }>>([])
   useEffect(() => {
     let abort = false
     ;(async () => {
@@ -63,19 +65,30 @@ export default function ScheduleGrid({ detail, onChanged }: Props) {
         const json = await res.json()
         if (abort) return
         if (res.ok && Array.isArray(json.data)) {
-          const map: Record<string, { name: string; category: string; tone?: string }> = {}
+          const map: Record<string, { id: string; name: string; category: string; tone?: string; member_ids: string[] }> = {}
+          const groupList: Array<{ id: string; name: string; category: string; shift_slot_id: string; member_ids: string[] }> = []
           for (const g of json.data) {
             if (!g.is_active) continue
-            // 한 슬롯에 여러 그룹 가능 — 첫 활성 그룹 선택 (대부분 1:1)
+            const memberIds = Array.isArray(g.members) ? g.members.map((m: any) => m.id) : []
+            groupList.push({
+              id: g.id,
+              name: g.name,
+              category: g.category || 'general',
+              shift_slot_id: g.shift_slot_id,
+              member_ids: memberIds,
+            })
             if (!map[g.shift_slot_id]) {
               map[g.shift_slot_id] = {
+                id: g.id,
                 name: g.name,
                 category: g.category || 'general',
                 tone: g.color_tone,
+                member_ids: memberIds,
               }
             }
           }
           setSlotGroups(map)
+          setAllGroups(groupList)
         }
       } catch { /* graceful */ }
     })()
@@ -489,8 +502,11 @@ export default function ScheduleGrid({ detail, onChanged }: Props) {
               )
             })}
           </tr>
-          {/* PR-2RR-a — 외부 직원 cycle 시각화 행 */}
-          {externalCycleWorkers.map(ew => (
+          {/* PR-2RR-a — 외부 직원 cycle 시각화 행 (그룹 미배정 워커만 — 그룹별 행은 tbody 섹션에서) */}
+          {externalCycleWorkers.filter(ew => {
+            // 어느 그룹의 멤버인지 — 그룹별 행에서 표시되므로 여기는 미배정만
+            return !allGroups.some(g => g.member_ids.includes(ew.id))
+          }).map(ew => (
             <tr key={`ext-${ew.id}`}>
               <td style={{
                 padding: '2px 6px', position: 'sticky', left: 0,
@@ -519,8 +535,8 @@ export default function ScheduleGrid({ detail, onChanged }: Props) {
               })}
             </tr>
           ))}
-          {/* PR-2SS-h-4 — 회피일 시각화 행 (워커별) */}
-          {skipWorkers.map(sw => (
+          {/* PR-2SS-h-4 → J-3 — 회피일 시각화 행 (그룹 미배정 워커만 — 그룹별 행은 tbody 섹션에서) */}
+          {skipWorkers.filter(sw => !allGroups.some(g => g.member_ids.includes(sw.id))).map(sw => (
             <tr key={`skip-${sw.id}`}>
               <td style={{
                 padding: '2px 6px', position: 'sticky', left: 0,
@@ -564,7 +580,113 @@ export default function ScheduleGrid({ detail, onChanged }: Props) {
           ))}
         </thead>
         <tbody>
-          {slots.map(slot => {
+          {/* PR-2SS-Phase-J-3 — DISABLED 복잡 구조 (Fragment 인라인으로 대체) */}
+          {false && (() => {
+            const sections: any[] = []
+            return sections.flatMap((section: any) => {
+              const cat = section.category
+              const sectionColor = cat === '야간' ? COLORS.bgViolet : cat === '저녁' ? COLORS.bgAmber
+                                 : cat === '주간' ? COLORS.bgBlue : cat === '특수' ? COLORS.bgRed : COLORS.bgGray
+              const sectionBorder = cat === '야간' ? COLORS.borderViolet : cat === '저녁' ? COLORS.borderAmber
+                                  : cat === '주간' ? COLORS.borderBlue : cat === '특수' ? COLORS.borderRed : COLORS.borderFaint
+              const sectionExt = externalCycleWorkers.filter(ew => section.memberIds.includes(ew.id))
+              const sectionSkip = skipWorkers.filter(sw => section.memberIds.includes(sw.id))
+              const out: React.ReactNode[] = []
+              // 그룹 헤더
+              out.push(
+                <tr key={`gh-${section.key}`}>
+                  <td colSpan={days.length + 1} style={{
+                    padding: '6px 12px', position: 'sticky', left: 0,
+                    background: sectionColor, color: COLORS.textPrimary,
+                    fontWeight: 800, fontSize: 12,
+                    borderTop: `2px solid ${sectionBorder}`,
+                    borderBottom: `1px solid ${sectionBorder}`,
+                  }}>
+                    🚧 {section.groupName}
+                    <span style={{ fontSize: 10, fontWeight: 500, color: COLORS.textMuted, marginLeft: 8 }}>
+                      {cat} · 슬롯 {section.slots.length} · 멤버 {section.memberIds.length}명
+                    </span>
+                  </td>
+                </tr>
+              )
+              // 그룹 멤버 외부 cycle 행
+              for (const ew of sectionExt) {
+                out.push(
+                  <tr key={`gex-${section.key}-${ew.id}`}>
+                    <td style={{
+                      padding: '2px 6px 2px 22px', position: 'sticky', left: 0,
+                      background: 'rgba(243,244,246,0.92)', color: COLORS.textSecondary,
+                      fontWeight: 600, borderRadius: 4, whiteSpace: 'nowrap', zIndex: 1, fontSize: 10,
+                    }}>
+                      🏢 {ew.name} <span style={{ fontSize: 9, color: COLORS.textMuted }}>외부</span>
+                    </td>
+                    {days.map(d => {
+                      const onDuty = isOnExternalDuty(ew, d)
+                      return (
+                        <td key={d} style={{
+                          padding: 0, minWidth: 56, height: 14,
+                          background: onDuty ? '#9ca3af' : 'transparent',
+                          borderTop: `1px solid ${COLORS.borderFaint}`,
+                          borderBottom: `1px solid ${COLORS.borderFaint}`,
+                          cursor: 'help',
+                        }} title={onDuty ? `${ew.name} 외부 근무 (당사 X) — ${d}` : `${ew.name} 외부 휴무 — ${d}`} />
+                      )
+                    })}
+                  </tr>
+                )
+              }
+              // 그룹 멤버 회피 행
+              for (const sw of sectionSkip) {
+                out.push(
+                  <tr key={`gsk-${section.key}-${sw.id}`}>
+                    <td style={{
+                      padding: '2px 6px 2px 22px', position: 'sticky', left: 0,
+                      background: 'rgba(254,243,199,0.85)', color: COLORS.warning,
+                      fontWeight: 600, borderRadius: 4, whiteSpace: 'nowrap', zIndex: 1, fontSize: 10,
+                    }}>
+                      🛌 {sw.name} <span style={{ fontSize: 9, color: COLORS.textMuted }}>회피</span>
+                    </td>
+                    {days.map(d => {
+                      const skip = skipMap.get(`${sw.id}_${d}`)
+                      if (!skip) return <td key={d} style={{ padding: 0, minWidth: 56, height: 14, borderTop: `1px solid ${COLORS.borderFaint}`, borderBottom: `1px solid ${COLORS.borderFaint}` }} />
+                      const ok = skip.status === 'approved'
+                      return (
+                        <td key={d} style={{
+                          padding: 0, minWidth: 56, height: 14,
+                          background: ok ? COLORS.bgAmber : COLORS.bgRed,
+                          color: ok ? COLORS.warning : COLORS.danger,
+                          borderTop: `1px solid ${COLORS.borderFaint}`,
+                          borderBottom: `1px solid ${COLORS.borderFaint}`,
+                          fontSize: 9, textAlign: 'center', fontWeight: 700, cursor: 'help',
+                        }} title={`${sw.name} ${ok ? '회피 (승인)' : '회피 신청 (대기)'}${skip.reason ? ' — ' + skip.reason : ''} — ${d}`}>
+                          {ok ? '🛌' : '⏳'}
+                        </td>
+                      )
+                    })}
+                  </tr>
+                )
+              }
+              return out
+            })
+          })()}
+          {/* 슬롯 행 (그룹 헤더 사이에 끼움 — index 비교로 그룹 변경 시 헤더 추가) */}
+          {slots.map((slot, slotIdx) => {
+            // PR-2SS-Phase-J-3 — 그룹 변경 시 헤더 + 그룹 멤버 cycle/회피 행 inline
+            const curGrp = slotGroups[slot.id]
+            const prevGrp = slotIdx > 0 ? slotGroups[slots[slotIdx-1].id] : null
+            const isNewGroupSection = !prevGrp || (curGrp?.id || '') !== (prevGrp?.id || '')
+            const sectionExt = isNewGroupSection && curGrp
+              ? externalCycleWorkers.filter(ew => curGrp.member_ids.includes(ew.id))
+              : []
+            const sectionSkip = isNewGroupSection && curGrp
+              ? skipWorkers.filter(sw => curGrp.member_ids.includes(sw.id))
+              : []
+            const cat = curGrp?.category || 'general'
+            const headerColor = cat === '야간' ? COLORS.bgViolet : cat === '저녁' ? COLORS.bgAmber
+                              : cat === '주간' ? COLORS.bgBlue : cat === '특수' ? COLORS.bgRed : COLORS.bgGray
+            const headerBorder = cat === '야간' ? COLORS.borderViolet : cat === '저녁' ? COLORS.borderAmber
+                               : cat === '주간' ? COLORS.borderBlue : cat === '특수' ? COLORS.borderRed : COLORS.borderFaint
+            const _slotRow = (() => {
             // Phase J — 그룹 + 시간 막대
             const grp = slotGroups[slot.id]
             // 시간 막대 (24h scale): start_time/end_time → 막대 위치/폭
@@ -730,6 +852,80 @@ export default function ScheduleGrid({ detail, onChanged }: Props) {
                 )
               })}
             </tr>
+            )
+            })()
+            // PR-2SS-Phase-J-3 — 그룹 헤더 + 멤버 cycle/회피 행 + 슬롯 행 묶음
+            return (
+              <Fragment key={slot.id}>
+                {isNewGroupSection && curGrp && (
+                  <tr key={`gh-${slot.id}`}>
+                    <td colSpan={days.length + 1} style={{
+                      padding: '6px 12px', position: 'sticky', left: 0,
+                      background: headerColor, color: COLORS.textPrimary,
+                      fontWeight: 800, fontSize: 12,
+                      borderTop: `3px solid ${headerBorder}`,
+                      borderBottom: `1px solid ${headerBorder}`,
+                    }}>
+                      🚧 {curGrp.name}
+                      <span style={{ fontSize: 10, fontWeight: 500, color: COLORS.textMuted, marginLeft: 8 }}>
+                        {cat} · 멤버 {curGrp.member_ids.length}명
+                      </span>
+                    </td>
+                  </tr>
+                )}
+                {sectionExt.map(ew => (
+                  <tr key={`gex-${slot.id}-${ew.id}`}>
+                    <td style={{
+                      padding: '2px 6px 2px 22px', position: 'sticky', left: 0,
+                      background: 'rgba(243,244,246,0.92)', color: COLORS.textSecondary,
+                      fontWeight: 600, borderRadius: 4, whiteSpace: 'nowrap', zIndex: 1, fontSize: 10,
+                    }}>
+                      🏢 {ew.name} <span style={{ fontSize: 9, color: COLORS.textMuted }}>외부</span>
+                    </td>
+                    {days.map(d => {
+                      const onDuty = isOnExternalDuty(ew, d)
+                      return (
+                        <td key={d} style={{
+                          padding: 0, minWidth: 56, height: 14,
+                          background: onDuty ? '#9ca3af' : 'transparent',
+                          borderTop: `1px solid ${COLORS.borderFaint}`,
+                          borderBottom: `1px solid ${COLORS.borderFaint}`,
+                          cursor: 'help',
+                        }} title={onDuty ? `${ew.name} 외부 근무 (당사 X) — ${d}` : `${ew.name} 외부 휴무 — ${d}`} />
+                      )
+                    })}
+                  </tr>
+                ))}
+                {sectionSkip.map(sw => (
+                  <tr key={`gsk-${slot.id}-${sw.id}`}>
+                    <td style={{
+                      padding: '2px 6px 2px 22px', position: 'sticky', left: 0,
+                      background: 'rgba(254,243,199,0.85)', color: COLORS.warning,
+                      fontWeight: 600, borderRadius: 4, whiteSpace: 'nowrap', zIndex: 1, fontSize: 10,
+                    }}>
+                      🛌 {sw.name} <span style={{ fontSize: 9, color: COLORS.textMuted }}>회피</span>
+                    </td>
+                    {days.map(d => {
+                      const skip = skipMap.get(`${sw.id}_${d}`)
+                      if (!skip) return <td key={d} style={{ padding: 0, minWidth: 56, height: 14, borderTop: `1px solid ${COLORS.borderFaint}`, borderBottom: `1px solid ${COLORS.borderFaint}` }} />
+                      const ok = skip.status === 'approved'
+                      return (
+                        <td key={d} style={{
+                          padding: 0, minWidth: 56, height: 14,
+                          background: ok ? COLORS.bgAmber : COLORS.bgRed,
+                          color: ok ? COLORS.warning : COLORS.danger,
+                          borderTop: `1px solid ${COLORS.borderFaint}`,
+                          borderBottom: `1px solid ${COLORS.borderFaint}`,
+                          fontSize: 9, textAlign: 'center', fontWeight: 700, cursor: 'help',
+                        }} title={`${sw.name} ${ok ? '회피 (승인)' : '회피 신청 (대기)'}${skip.reason ? ' — ' + skip.reason : ''} — ${d}`}>
+                          {ok ? '🛌' : '⏳'}
+                        </td>
+                      )
+                    })}
+                  </tr>
+                ))}
+                {_slotRow}
+              </Fragment>
             )
           })}
         </tbody>
