@@ -183,7 +183,7 @@ function clip(v: string | null | undefined, n = 30): string {
 export default function RideCustomerDataPage() {
   const [user, setUser] = useState<{ role?: string; id?: string } | null>(null)
   const [authChecked, setAuthChecked] = useState(false)
-  const [tab, setTab] = useState<Tab>('reports')
+  const [tab, setTab] = useState<Tab>('contracts')
 
   // 공통 — 고객사 마스터 (모든 탭에서 사용)
   const [companies, setCompanies] = useState<Company[]>([])
@@ -408,7 +408,7 @@ export default function RideCustomerDataPage() {
       key: 'report_date',
       label: '보고일',
       sortBy: r => r.report_date || '',
-      render: r => <span style={{ whiteSpace: 'nowrap' }}>{fmt(r.report_date)}</span>,
+      render: r => <span style={{ whiteSpace: 'nowrap' }}>{fmtValue(r.report_date)}</span>,
     },
     {
       key: 'customer',
@@ -584,16 +584,11 @@ export default function RideCustomerDataPage() {
             🏢 라이드 고객사 데이터
           </div>
           <div style={{ fontSize: 12, color: COLORS.textSecondary, marginTop: 4 }}>
-            캐피탈/금융 고객사 정비 보고 + 장기 계약 마스터 통합 관리
+            📜 <b>장기 계약</b> = 활성 계약 1건 = 1 row (B2B · 만료/해지 관리)  ·
+            📥 <b>업로드 이력</b> = 캐피탈에서 받은 보고를 업로드한 raw 누적 이력
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button
-            style={{ ...BTN.md, background: COLORS.bgGreen, color: COLORS.success, border: `1px solid ${COLORS.borderGreen}` }}
-            onClick={() => setUploadOpen(true)}
-          >
-            📥 엑셀 업로드
-          </button>
           <button
             style={{ ...BTN.md, background: COLORS.bgViolet, color: '#7c3aed', border: `1px solid ${COLORS.borderViolet}` }}
             onClick={() => setCompanyModal({})}
@@ -603,16 +598,16 @@ export default function RideCustomerDataPage() {
         </div>
       </div>
 
-      {/* ─── 탭 ─── */}
+      {/* ─── 탭 — 운영 메인 (장기 계약) → 마스터 → 히스토리 ─── */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
-        <button style={tabBtn('reports', '📊 정비 보고서')} onClick={() => setTab('reports')}>
-          📊 정비 보고서 (캐피탈 정기 보고) {reports.length > 0 && `(${reports.length})`}
-        </button>
         <button style={tabBtn('contracts', '📜 장기 계약')} onClick={() => setTab('contracts')}>
-          📜 장기 계약 (B2B) {contracts.length > 0 && `(${contracts.length})`}
+          📜 장기 계약 (B2B 메인) {contracts.length > 0 && `(${contracts.length})`}
         </button>
         <button style={tabBtn('companies', '🏢 고객사 마스터')} onClick={() => setTab('companies')}>
           🏢 고객사 ({companies.length})
+        </button>
+        <button style={tabBtn('reports', '📥 업로드 이력')} onClick={() => setTab('reports')}>
+          📥 업로드 이력 {reports.length > 0 && `(${reports.length})`}
         </button>
       </div>
 
@@ -645,9 +640,18 @@ export default function RideCustomerDataPage() {
             <button style={{ ...BTN.sm, background: COLORS.primary, color: '#fff' }} onClick={fetchReports}>
               검색
             </button>
-            <span style={{ color: COLORS.textMuted, fontSize: 12, marginLeft: 'auto' }}>
+            <button
+              style={{ ...BTN.sm, background: COLORS.bgGreen, color: COLORS.success, marginLeft: 'auto' }}
+              onClick={() => setUploadOpen(true)}
+            >
+              📥 엑셀
+            </button>
+            <span style={{ color: COLORS.textMuted, fontSize: 12 }}>
               {reportsLoading ? '로딩 중…' : `${reports.length}건`}
             </span>
+          </div>
+          <div style={{ fontSize: 11, color: COLORS.textMuted, marginBottom: 8, padding: '4px 8px', background: 'rgba(0,0,0,0.03)', borderRadius: 6 }}>
+            ℹ️ 업로드된 raw 보고 누적 이력 — 같은 차량이 여러 날짜에 중복 보고될 수 있음 (원본 추적용)
           </div>
           {reportsError && (
             <div style={{ padding: 8, background: COLORS.bgRed, color: COLORS.danger, borderRadius: 8, marginBottom: 8, fontSize: 12 }}>
@@ -659,7 +663,7 @@ export default function RideCustomerDataPage() {
             data={reports}
             rowKey={r => r.id}
             defaultSort={{ key: 'report_date', dir: 'desc' }}
-            emptyMessage="보고 데이터 없음 — 엑셀 업로드 또는 수기 등록"
+            emptyMessage="업로드 이력 없음 — [📥 엑셀] 버튼으로 보고 파일 업로드"
           />
         </div>
       )}
@@ -693,15 +697,12 @@ export default function RideCustomerDataPage() {
             <button style={{ ...BTN.sm, background: COLORS.primary, color: '#fff' }} onClick={fetchContracts}>
               검색
             </button>
-            <button
-              style={{ ...BTN.sm, background: COLORS.bgGreen, color: COLORS.success, marginLeft: 'auto' }}
-              onClick={() => setUploadOpen(true)}
-            >
-              📥 엑셀
-            </button>
-            <span style={{ color: COLORS.textMuted, fontSize: 12 }}>
+            <span style={{ color: COLORS.textMuted, fontSize: 12, marginLeft: 'auto' }}>
               {contractsLoading ? '로딩 중…' : `${contracts.length}건`}
             </span>
+          </div>
+          <div style={{ fontSize: 11, color: COLORS.textMuted, marginBottom: 8, padding: '4px 8px', background: 'rgba(0,0,0,0.03)', borderRadius: 6 }}>
+            ℹ️ 활성 계약 1건 = 1 row — 계약자/이용자 분리된 B2B 마스터 (만료/해지 추적)
           </div>
           {contractsError && (
             <div style={{ padding: 8, background: COLORS.bgRed, color: COLORS.danger, borderRadius: 8, marginBottom: 8, fontSize: 12 }}>
@@ -751,7 +752,7 @@ export default function RideCustomerDataPage() {
       {/* ─── 보고 상세 모달 ─── */}
       {reportDetail && (
         <DetailModal
-          title={`📊 캐피탈 보고 — ${reportDetail.car_number || reportDetail.exec_no || '상세'}`}
+          title={`📥 업로드 이력 — ${reportDetail.car_number || reportDetail.exec_no || '상세'}`}
           rows={Object.entries(reportDetail).filter(([k]) => k !== 'id')}
           onClose={() => setReportDetail(null)}
         />
@@ -760,7 +761,7 @@ export default function RideCustomerDataPage() {
       {/* ─── 계약 상세 모달 ─── */}
       {contractDetail && (
         <DetailModal
-          title={`📜 계약 마스터 — ${contractDetail.car_number || contractDetail.exec_no || '상세'}`}
+          title={`📜 장기 계약 — ${contractDetail.car_number || contractDetail.exec_no || '상세'}`}
           rows={Object.entries(contractDetail).filter(([k]) => k !== 'id')}
           onClose={() => setContractDetail(null)}
         />
