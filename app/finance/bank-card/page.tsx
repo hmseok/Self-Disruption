@@ -495,6 +495,40 @@ export default function BankCardPage() {
       setEmployeeMatchLoading(false)
     }
   }
+  // 프리랜서 매칭 (freelancers — 외부 인력)
+  const [freelancerMatchResult, setFreelancerMatchResult] = useState<any | null>(null)
+  const [freelancerMatchLoading, setFreelancerMatchLoading] = useState(false)
+  const [freelancerMatchExpand, setFreelancerMatchExpand] = useState<{ matched: boolean; multi: boolean; failed: boolean }>({ matched: false, multi: false, failed: false })
+  const runFreelancerMatch = async (dryRun: boolean) => {
+    setFreelancerMatchLoading(true)
+    setFreelancerMatchResult(null)
+    const taskId = floaterProgress.start({
+      title: dryRun ? '🔍 프리랜서 매칭 dry-run' : '🤝 프리랜서 매칭',
+      total: 1,
+    })
+    try {
+      const { ok, json, status } = await fetchWithAuth('/api/finance/transactions/auto-match-freelancer', {
+        method: 'POST',
+        body: { dryRun },
+      })
+      if (!ok) {
+        floaterProgress.finish(taskId, `오류: HTTP ${status} — ${json?.error || ''}`, 'error')
+        return
+      }
+      setFreelancerMatchResult(json)
+      floaterProgress.update(taskId, { processed: 1, applied: json.applied || 0 })
+      floaterProgress.finish(
+        taskId,
+        dryRun ? `🔍 dry-run — 매칭 가능 ${json.matched || 0}건` : `✅ ${json.applied || 0}건 매칭 적용`,
+      )
+      if (!dryRun && json.applied > 0) await loadMatchReview()
+    } catch (e: any) {
+      floaterProgress.finish(taskId, `오류: ${e.message}`, 'error')
+    } finally {
+      setFreelancerMatchLoading(false)
+    }
+  }
+
   const runInvestorJiipMatch = async (dryRun: boolean) => {
     setInvestorJiipLoading(true)
     setInvestorJiipResult(null)
@@ -4941,6 +4975,20 @@ export default function BankCardPage() {
                     disabled={employeeMatchLoading}
                     style={{ ...BTN.sm, padding: '4px 10px', fontSize: 11, background: '#0891b2', color: '#fff', border: 'none', cursor: employeeMatchLoading ? 'wait' : 'pointer' }}
                   >{employeeMatchLoading ? '진행 중...' : '👥 직원 매칭 적용'}</button>
+                  <button
+                    onClick={() => runFreelancerMatch(true)}
+                    disabled={freelancerMatchLoading}
+                    style={{ ...BTN.sm, padding: '4px 10px', fontSize: 11, background: '#fff', color: '#d97706', border: '1px solid rgba(217,119,6,0.3)', cursor: freelancerMatchLoading ? 'wait' : 'pointer' }}
+                    title="프리랜서 거래 매칭 — 양방향 (입금+지급)"
+                  >{freelancerMatchLoading ? '진행 중...' : '🔍 프리랜서 dry-run'}</button>
+                  <button
+                    onClick={() => {
+                      if (!confirm('프리랜서 매칭을 실제 적용하시겠습니까?\n(dry-run 결과 먼저 확인 권장)')) return
+                      runFreelancerMatch(false)
+                    }}
+                    disabled={freelancerMatchLoading}
+                    style={{ ...BTN.sm, padding: '4px 10px', fontSize: 11, background: '#d97706', color: '#fff', border: 'none', cursor: freelancerMatchLoading ? 'wait' : 'pointer' }}
+                  >{freelancerMatchLoading ? '진행 중...' : '🤝 프리랜서 매칭 적용'}</button>
                   <select
                     value={matchReviewTypeFilter}
                     onChange={(e) => setMatchReviewTypeFilter(e.target.value)}
@@ -5344,6 +5392,97 @@ export default function BankCardPage() {
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
                         <span style={{ fontSize: 11, fontWeight: 600, color: '#b91c1c' }}>❌ 매칭 실패 ({all.length}건)</span>
                         {all.length > 6 && <button onClick={() => setEmployeeMatchExpand(s => ({ ...s, failed: !s.failed }))} style={{ background: 'transparent', border: '1px solid rgba(185,28,28,0.3)', color: '#b91c1c', fontSize: 10, padding: '1px 8px', borderRadius: 4, cursor: 'pointer' }}>{expanded ? '▾ 접기' : `▸ 전체 ${all.length}건`}</button>}
+                      </div>
+                      <div style={{ maxHeight: expanded ? 400 : 'none', overflowY: expanded ? 'auto' : 'visible' }}>
+                        {list.map((f: any, i: number) => (
+                          <div key={i} style={{ fontSize: 11, padding: '3px 6px', borderBottom: '1px dashed rgba(0,0,0,0.05)' }}>
+                            <span style={{ fontWeight: 600 }}>{f.client_name || '-'}</span>
+                            <span style={{ color: COLORS.textMuted }}> — {f.reason}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </>)
+                  })()}
+                </div>
+              )}
+
+              {/* 프리랜서 매칭 결과 패널 (CLAUDE.md 규칙 20) */}
+              {freelancerMatchResult && (
+                <div style={{ ...GLASS.L4, border: '1px solid rgba(217,119,6,0.3)', borderRadius: 12, padding: '14px 18px', marginBottom: 12, background: 'rgba(254,243,199,0.4)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: '#d97706' }}>
+                      {freelancerMatchResult.dry_run ? '🔍 프리랜서 매칭 — dry-run 결과' : '🤝 프리랜서 매칭 — 적용 결과'}
+                    </div>
+                    <button onClick={() => setFreelancerMatchResult(null)} style={{ background: 'transparent', border: 'none', color: COLORS.textMuted, cursor: 'pointer', fontSize: 12 }}>× 닫기</button>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 6, marginBottom: 10 }}>
+                    <div style={{ fontSize: 11, padding: '6px 8px', background: 'rgba(255,255,255,0.6)', borderRadius: 6 }}>후보 거래 <b>{freelancerMatchResult.total_candidates}건</b></div>
+                    <div style={{ fontSize: 11, padding: '6px 8px', background: 'rgba(187,247,208,0.5)', borderRadius: 6 }}>✅ 매칭 가능 <b>{freelancerMatchResult.matched}건</b></div>
+                    {!freelancerMatchResult.dry_run && <div style={{ fontSize: 11, padding: '6px 8px', background: 'rgba(217,119,6,0.15)', borderRadius: 6 }}>📥 적용 <b>{freelancerMatchResult.applied}건</b></div>}
+                    <div style={{ fontSize: 11, padding: '6px 8px', background: 'rgba(254,243,199,0.5)', borderRadius: 6 }}>🟡 동명 다수 <b>{freelancerMatchResult.multi}건</b></div>
+                    <div style={{ fontSize: 11, padding: '6px 8px', background: 'rgba(254,226,226,0.5)', borderRadius: 6 }}>❌ 사전 없음 <b>{freelancerMatchResult.no_candidate}건</b></div>
+                    <div style={{ fontSize: 11, padding: '6px 8px', background: 'rgba(254,226,226,0.5)', borderRadius: 6 }}>❌ 비-인명 <b>{freelancerMatchResult.no_pattern}건</b></div>
+                  </div>
+                  <div style={{ fontSize: 11, color: COLORS.textMuted, marginBottom: 4 }}>
+                    🤝 프리랜서 사전 {freelancerMatchResult.freelancers_loaded}명 로드 (is_active=1)
+                  </div>
+                  {freelancerMatchResult.freelancer_names?.length > 0 && (
+                    <div style={{ fontSize: 10, color: COLORS.textMuted, marginBottom: 8, padding: '4px 8px', background: 'rgba(0,0,0,0.03)', borderRadius: 4 }}>
+                      <b>등록 명단:</b> {freelancerMatchResult.freelancer_names.join(', ')}
+                    </div>
+                  )}
+                  {/* 매칭 성공 */}
+                  {freelancerMatchResult.samples?.length > 0 && (() => {
+                    const all = freelancerMatchResult.samples
+                    const expanded = freelancerMatchExpand.matched
+                    const list = expanded ? all : all.slice(0, 6)
+                    return (<>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                        <span style={{ fontSize: 11, fontWeight: 600, color: '#059669' }}>✅ 매칭 성공 ({all.length}건)</span>
+                        {all.length > 6 && <button onClick={() => setFreelancerMatchExpand(s => ({ ...s, matched: !s.matched }))} style={{ background: 'transparent', border: '1px solid rgba(5,150,105,0.3)', color: '#059669', fontSize: 10, padding: '1px 8px', borderRadius: 4, cursor: 'pointer' }}>{expanded ? '▾ 접기' : `▸ 전체 ${all.length}건`}</button>}
+                      </div>
+                      <div style={{ marginBottom: 10, maxHeight: expanded ? 400 : 'none', overflowY: expanded ? 'auto' : 'visible' }}>
+                        {list.map((s: any, i: number) => (
+                          <div key={i} style={{ fontSize: 11, padding: '3px 6px', borderBottom: '1px dashed rgba(0,0,0,0.05)' }}>
+                            <span style={{ fontWeight: 600 }}>{s.client_name}</span>
+                            {' → '}
+                            <span style={{ color: '#d97706' }}>🤝 {s.name}</span>
+                            {s.bank_name && <span style={{ marginLeft: 4, fontSize: 9, color: COLORS.textMuted }}>({s.bank_name})</span>}
+                            {s.linked_profile && <span style={{ marginLeft: 4, fontSize: 9, color: '#16a34a' }}>🟢 직원 link</span>}
+                            <span style={{ marginLeft: 6, fontSize: 9, color: COLORS.textMuted }}>{s.tx_type === 'income' ? '↓입금' : '↑지급'} {nf(Math.abs(s.amount))}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </>)
+                  })()}
+                  {/* 동명 다수 */}
+                  {freelancerMatchResult.multi_samples?.length > 0 && (() => {
+                    const all = freelancerMatchResult.multi_samples
+                    const expanded = freelancerMatchExpand.multi
+                    const list = expanded ? all : all.slice(0, 6)
+                    return (<>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                        <span style={{ fontSize: 11, fontWeight: 600, color: '#a16207' }}>🟡 동명 다수 ({all.length}건) — 자동 매칭 보류</span>
+                        {all.length > 6 && <button onClick={() => setFreelancerMatchExpand(s => ({ ...s, multi: !s.multi }))} style={{ background: 'transparent', border: '1px solid rgba(161,98,7,0.3)', color: '#a16207', fontSize: 10, padding: '1px 8px', borderRadius: 4, cursor: 'pointer' }}>{expanded ? '▾ 접기' : `▸ 전체 ${all.length}건`}</button>}
+                      </div>
+                      <div style={{ marginBottom: 10, maxHeight: expanded ? 400 : 'none', overflowY: expanded ? 'auto' : 'visible' }}>
+                        {list.map((s: any, i: number) => (
+                          <div key={i} style={{ fontSize: 11, padding: '3px 6px', borderBottom: '1px dashed rgba(0,0,0,0.05)' }}>
+                            <span style={{ fontWeight: 600 }}>{s.client_name}</span> — 후보 {s.candidates?.length || 0}건
+                          </div>
+                        ))}
+                      </div>
+                    </>)
+                  })()}
+                  {/* 매칭 실패 */}
+                  {freelancerMatchResult.failed_samples?.length > 0 && (() => {
+                    const all = freelancerMatchResult.failed_samples
+                    const expanded = freelancerMatchExpand.failed
+                    const list = expanded ? all : all.slice(0, 6)
+                    return (<>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                        <span style={{ fontSize: 11, fontWeight: 600, color: '#b91c1c' }}>❌ 매칭 실패 ({all.length}건)</span>
+                        {all.length > 6 && <button onClick={() => setFreelancerMatchExpand(s => ({ ...s, failed: !s.failed }))} style={{ background: 'transparent', border: '1px solid rgba(185,28,28,0.3)', color: '#b91c1c', fontSize: 10, padding: '1px 8px', borderRadius: 4, cursor: 'pointer' }}>{expanded ? '▾ 접기' : `▸ 전체 ${all.length}건`}</button>}
                       </div>
                       <div style={{ maxHeight: expanded ? 400 : 'none', overflowY: expanded ? 'auto' : 'visible' }}>
                         {list.map((f: any, i: number) => (
