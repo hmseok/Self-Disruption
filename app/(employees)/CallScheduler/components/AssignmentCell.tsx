@@ -14,9 +14,22 @@ interface Props {
   worker: Worker | null
   onClick: () => void
   onQuickAction?: (action: 'off' | 'am_half' | 'pm_half' | 'am_free' | 'pm_free' | 'clear') => void
+  // Phase D — 워커 조건 색상 layer (요일 매치 시 보더 hint)
+  dow?: number  // 0=일 ~ 6=토 (선택 — 미전달 시 색상 layer 비활성)
 }
 
-export default function AssignmentCell({ assignment, worker, onClick, onQuickAction }: Props) {
+// Phase D — 요일 매치 검사 헬퍼
+function matchDow(csv: string | null | undefined, dow: number): boolean {
+  if (!csv || dow == null) return false
+  return String(csv)
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean)
+    .map(Number)
+    .includes(dow)
+}
+
+export default function AssignmentCell({ assignment, worker, onClick, onQuickAction, dow }: Props) {
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null)
 
   useEffect(() => {
@@ -37,6 +50,17 @@ export default function AssignmentCell({ assignment, worker, onClick, onQuickAct
   const isOff = special === 'off'
   const isEmpty = !assignment || (!assignment.worker_id && special === 'none')
 
+  // Phase D — 워커 요일 조건 매치 (색상 layer)
+  const dowAvoidMatch = worker && dow != null
+    ? matchDow(worker.preferred_dow_avoid, dow) : false
+  const dowPreferMatch = worker && dow != null
+    ? matchDow(worker.preferred_dow_prefer, dow) : false
+  const tintBorder = dowPreferMatch
+    ? 'rgba(34,197,94,0.55)'   // 희망 매치 — 옅은 녹색
+    : dowAvoidMatch
+    ? 'rgba(239,68,68,0.55)'   // 비선호 매치 — 옅은 빨강
+    : null
+
   let bg = TONE_BG[tone]
   if (isOff) bg = COLORS.bgGray
   if (isEmpty) bg = 'transparent'
@@ -53,11 +77,13 @@ export default function AssignmentCell({ assignment, worker, onClick, onQuickAct
       }}
       style={{
         width: '100%',
-        height: 24,
-        padding: '0 4px',
+        height: 32,  // Phase C — 24 → 32 (사용자 원칙: 작은 버튼 지양)
+        padding: '0 6px',
         background: bg,
-        border: `1px solid ${isEmpty ? COLORS.borderFaint : TONE_BORDER[tone]}`,
-        borderRadius: 4,
+        border: `${tintBorder ? '2px' : '1px'} solid ${
+          tintBorder ? tintBorder : (isEmpty ? COLORS.borderFaint : TONE_BORDER[tone])
+        }`,
+        borderRadius: 6,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
@@ -68,14 +94,19 @@ export default function AssignmentCell({ assignment, worker, onClick, onQuickAct
         textAlign: 'left',
         transition: 'background 0.15s, border-color 0.15s',
       }}
-      title={
-        worker
+      title={(() => {
+        // Phase D — 색상 layer hint 툴팁 추가
+        const base = worker
           ? `${worker.name}${special !== 'none' ? ' · ' + SPECIAL_LABEL[special] : ''}`
           : (special !== 'none' ? SPECIAL_LABEL[special] : '비어있음 — 클릭해서 배정')
-      }
+        const layer = dowPreferMatch ? ' [✓ 희망 요일]'
+                    : dowAvoidMatch ? ' [⚠ 비선호 요일]'
+                    : ''
+        return base + layer
+      })()}
     >
       <span style={{
-        fontSize: 11,
+        fontSize: 12,  // Phase C — 11 → 12
         fontWeight: worker ? 700 : 400,
         color: worker ? TONE_TEXT[tone] : COLORS.textMuted,
         overflow: 'hidden',

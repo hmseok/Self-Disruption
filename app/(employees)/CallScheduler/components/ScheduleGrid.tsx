@@ -341,7 +341,7 @@ export default function ScheduleGrid({ detail, onChanged }: Props) {
                 <th
                   key={d}
                   style={{
-                    minWidth: 44, padding: '3px 4px', textAlign: 'center',
+                    minWidth: 56, padding: '4px 4px', textAlign: 'center',  // Phase C — 44 → 56
                     background: isWeekend ? COLORS.bgRed : COLORS.bgGray,
                     color: dow === 0 ? COLORS.danger : (dow === 6 ? COLORS.info : COLORS.textSecondary),
                     fontWeight: 700, borderRadius: 4,
@@ -450,16 +450,19 @@ export default function ScheduleGrid({ detail, onChanged }: Props) {
                 const arr = cellMap.get(`${d}_${slot.id}`) || []
                 const isEmpty = arr.length === 0
                   || arr.every(a => !a.worker_id && a.special_code !== 'off')
+                // Phase C — 셀 td 너비 44 → 56 (사용자 원칙: 직관적 표시)
                 const cellTdStyle: React.CSSProperties = emptyOnly && isEmpty ? {
-                  padding: 0, minWidth: 44, verticalAlign: 'top',
+                  padding: 1, minWidth: 56, verticalAlign: 'top',
                   background: COLORS.bgRed,
                   border: `2px dashed ${COLORS.borderRed}`,
                   borderRadius: 4,
-                } : { padding: 0, minWidth: 44, verticalAlign: 'top' }
+                } : { padding: 1, minWidth: 56, verticalAlign: 'top' }
                 const isSwapFirst = swapFirst && swapFirst.slotId === slot.id && swapFirst.date === d
                 const finalCellStyle: React.CSSProperties = isSwapFirst
                   ? { ...cellTdStyle, background: COLORS.bgViolet, border: `2px solid #7c3aed`, borderRadius: 4 }
                   : cellTdStyle
+                // Phase D — dow 계산 (요일 색상 layer 용)
+                const cellDow = dowIndex(d)
                 return (
                   <td key={d} style={finalCellStyle}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
@@ -472,6 +475,7 @@ export default function ScheduleGrid({ detail, onChanged }: Props) {
                             setPickerSlot(slot); setPickerDate(d); setPickerAssignmentId(null)
                           }}
                           onQuickAction={undefined}
+                          dow={cellDow}
                         />
                       ) : (
                         arr.map(a => {
@@ -493,6 +497,7 @@ export default function ScheduleGrid({ detail, onChanged }: Props) {
                                 }
                               }}
                               onQuickAction={swapMode ? undefined : (action) => handleQuickAction(a, slot, d, action)}
+                              dow={cellDow}
                             />
                           )
                         })

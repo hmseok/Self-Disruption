@@ -14,6 +14,7 @@ import { SPECIAL_LABEL } from '../utils/types'
 import { getAuthHeader } from '@/app/utils/auth-client'
 import { buildIcs, downloadIcs } from '../utils/icalExport'
 import LeaveRequestDialog from './LeaveRequestDialog'
+import SkipRequestDialog from './SkipRequestDialog'
 import type { ColorTone, SpecialCode } from '../utils/types'
 
 interface ScheduleMeta {
@@ -79,6 +80,7 @@ export default function MyScheduleView({ token }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [yearMonth, setYearMonth] = useState<{ year: number; month: number } | null>(null)
   const [leaveRequestOpen, setLeaveRequestOpen] = useState(false)
+  const [skipRequestOpen, setSkipRequestOpen] = useState(false)  // Phase G — 회피 신청
 
   const isPublic = !!token
 
@@ -213,6 +215,15 @@ export default function MyScheduleView({ token }: Props) {
                     title={isPublic ? '휴가 신청 — 매니저 승인 대기' : '휴가 등록 (즉시 적용)'}>
               🙋 휴가 신청
             </button>
+            {/* Phase G — 회피일 신청 (그룹 차원 단순 회피) */}
+            <button type="button" onClick={() => setSkipRequestOpen(true)}
+                    style={{
+                      ...BTN.sm, background: COLORS.bgRed, color: COLORS.danger,
+                      border: `1px solid ${COLORS.borderRed}`, cursor: 'pointer',
+                    }}
+                    title="회피일 신청 — 정식 휴가 X, 단순 빠지고 싶은 날 (매니저 승인 대기)">
+              🛌 회피 신청
+            </button>
             <button type="button" onClick={() => {
               const ics = buildIcs({
                 workerName: worker.employee_name || worker.worker_name,
@@ -315,6 +326,15 @@ export default function MyScheduleView({ token }: Props) {
       <LeaveRequestDialog
         open={leaveRequestOpen}
         onClose={() => setLeaveRequestOpen(false)}
+        workerId={worker.worker_id}
+        workerName={worker.employee_name || worker.worker_name}
+        token={token}
+        onCompleted={() => load()}
+      />
+      {/* Phase G — 회피일 신청 (그룹 차원) */}
+      <SkipRequestDialog
+        open={skipRequestOpen}
+        onClose={() => setSkipRequestOpen(false)}
         workerId={worker.worker_id}
         workerName={worker.employee_name || worker.worker_name}
         token={token}

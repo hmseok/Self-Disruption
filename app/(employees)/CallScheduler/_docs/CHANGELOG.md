@@ -3,6 +3,66 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-08 (Phase G + H) — 직원 회피 신청 + 매니저 검토 통합
+
+### Phase G — 직원 본인 회피일 신청
+- 신설: `components/SkipRequestDialog.tsx`
+  · 그룹 선택 (활성 그룹 chip) + 일자 범위 + 사유
+  · POST /api/call-scheduler/shift-groups/[id]/skip-dates
+  · status='requested' 명시 → 매니저 검토 대기
+- MyScheduleView 헤더에 "🛌 회피 신청" 버튼 추가
+  · 휴가 신청 (🙋) 옆에 나란히
+  · 토큰 페이지 (/e/[token]) 도 같은 컴포넌트 사용 — 본인 토큰으로 동작
+
+### Phase H — 매니저 검토 통합 페이지
+- 신설: `/CallScheduler/skips` 페이지
+- 기능:
+  · 미래 90일 범위의 모든 그룹 회피일 일괄 표시
+  · 필터: ⏳ 대기 / ✓ 승인됨 / 전체
+  · 그룹별 묶음 표시 (Glass L4 카드)
+  · 각 row: status pill + 워커명 + 일자 + 사유
+  · 대기 신청에 [✓ 승인] / [✗ 거절] 버튼
+- API: 기존 `GET /skip-dates` + `PATCH /skip-dates/[id]` 활용
+
+### 운영 흐름 완성
+```
+직원 마이페이지 [🛌 회피 신청] → status='requested'
+   ↓
+매니저 /CallScheduler/skips 페이지 — 일괄 검토
+   ↓
+[✓ 승인] → status='approved'
+   ↓
+자동 생성 알고리즘이 후보 제외 (group_skip warning 발생)
+   ↓
+매트릭스 워커별 회피일 행에 🛌 표시 (h-4)
+```
+
+## 2026-05-08 (Phase B + C 일부 + D) — UI 가이드 + 매트릭스 직관화 + 색상 layer
+
+### Phase B — UI 디자인 가이드 신설
+- `_docs/UI-GUIDE.md` 작성
+  · 버튼 크기 정책 (작은 버튼 지양 — 22×22 미만 mini 버튼 금지)
+  · Glass L1~L5 깊이 정의
+  · 매트릭스 셀 크기 (32px) + 14색 토큰
+  · Phase D 색상 layer 정의
+
+### Phase C 일부 — 매트릭스 셀 크기 확대
+- AssignmentCell 높이 24 → **32px**
+- AssignmentCell 폰트 11 → **12px**
+- AssignmentCell 보더 radius 4 → 6
+- ScheduleGrid 셀 td minWidth 44 → **56px**
+- ScheduleGrid 헤더 th minWidth 44 → 56
+- 사용자 원칙 충족: "쪼그만 버튼 지양, 시간대×워커 직관적"
+
+### Phase D — 워커 조건 색상 layer (요일 매치)
+- AssignmentCell 신규 prop `dow?: number` (0~6)
+- `matchDow(csv, dow)` 헬퍼 — preferred_dow_avoid/prefer 매치 검사
+- 매치 시 보더 강화:
+  · 희망 요일 → 옅은 녹색 (rgba(34,197,94,0.55))
+  · 비선호 요일 → 옅은 빨강 (rgba(239,68,68,0.55))
+- 툴팁에 "[✓ 희망 요일]" / "[⚠ 비선호 요일]" 추가
+- ScheduleGrid 가 `dowIndex(d)` 계산해서 prop 전달
+
 ## 2026-05-08 (Phase I) — 그룹별 우선순위 정책 표출
 
 ### PR-2SS-Phase-I — 매니저 판단 도구 (GroupEditor 정책 박스)
