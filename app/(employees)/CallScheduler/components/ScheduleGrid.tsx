@@ -107,6 +107,109 @@ export default function ScheduleGrid({ detail, onChanged }: Props) {
     return workers.filter(w => ids.has(w.id))
   }, [skipDates, workers])
 
+  // PR-2SS-Phase-E — 가드 위반 검사 (clientside)
+  //   1) 시간 겹침: 같은 워커 같은 날 두 슬롯 시간 겹침
+  //   2) 익일 휴식: overnight 슬롯 종료 시각 + slot.next_day_blocking_hours > 다음날 슬롯 시작
+  //   3) 연속 한도: 워커별 N일 연속 근무 한도 도달
+  const slotById = useMemo(() => {
+    const m = new Map<string, ShiftSlot>()
+    for (const s of slots) m.set(s.id, s)
+    return m
+  }, [slots])
+
+  // (worker_id, date) → violation type set
+  const violationMap = useMemo(() => {
+    const m = new Map<string, Set<'time_conflict' | 'next_day_block' | 'consec_limit'>>()
+    const add = (wId: string, date: string, type: 'time_conflict' | 'next_day_block' | 'consec_limit') => {
+      const k = `${wId}_${date}`
+      const s = m.get(k) || new Set()
+      s.add(type); m.set(k, s)
+    }
+
+    // 워커별 일자별 assignments 인덱스
+    const byWorkerDate = new Map<string, Array<{ a: Assignment; slot: ShiftSlot }>>()
+    for (const a of assignments) {
+      if (!a.worker_id) continue
+      const slot = slotById.get(a.shift_slot_id)
+      if (!slot) continue
+      const k = `${a.worker_id}_${a.work_date}`
+      const arr = byWorkerDate.get(k) || []
+      arr.push({ a, slot })
+      byWorkerDate.set(k, arr)
+    }
+
+    // 1) 시간 겹침 — 같은 워커 같은 날 두 슬롯
+    const toMin = (t: string) => { const [h,m] = t.split(':').map(Number); return h*60 + m }
+    for (const [key, arr] of byWorkerDate) {
+      if (arr.length < 2) continue
+      const [wId, date] = key.split('_')
+      const ranges = arr.map(({ a, slot }) => {
+        const start = toMin(slot.start_time)
+        let end = toMin(slot.end_time)
+        if (slot.is_overnight) end += 1440
+        return { a, slot, start, end }
+      })
+      for (let i = 0; i < ranges.length; i++) {
+        for (let j = i+1; j < ranges.length; j++) {
+          const x = ranges[i], y = ranges[j]
+          if (x.start < y.end && y.start < x.end) {
+            add(wId, date, 'time_conflict')
+          }
+        }
+      }
+    }
+
+    // 2) 익일 휴식 — 워커별 일자 정렬 후 인접 day 비교
+    const byWorker = new Map<string, Array<{ a: Assignment; slot: ShiftSlot; date: string }>>()
+    for (const a of assignments) {
+      if (!a.worker_id || a.special_code === 'off') continue
+      const slot = slotById.get(a.shift_slot_id)
+      if (!slot) continue
+      const arr = byWorker.get(a.worker_id) || []
+      arr.push({ a, slot, date: a.work_date })
+      byWorker.set(a.worker_id, arr)
+    }
+    for (const [wId, arr] of byWorker) {
+      arr.sort((x, y) => x.date.localeCompare(y.date) || toMin(x.slot.start_time) - toMin(y.slot.start_time))
+      for (let i = 0; i < arr.length - 1; i++) {
+        const cur = arr[i], next = arr[i+1]
+        const blocking = Number(cur.slot.next_day_blocking_hours || 0)
+        if (blocking <= 0) continue
+        // 종료 절대 분
+        const curEnd = new Date(cur.date + 'T00:00:00').getTime() / 60000
+          + toMin(cur.slot.end_time)
+          + (cur.slot.is_overnight ? 1440 : 0)
+        const nextStart = new Date(next.date + 'T00:00:00').getTime() / 60000
+          + toMin(next.slot.start_time)
+        const gap = (nextStart - curEnd) / 60
+        if (gap < blocking) {
+          add(wId, next.date, 'next_day_block')
+        }
+      }
+    }
+
+    // 3) 연속 한도 — 워커별 연속 근무일 카운트
+    for (const [wId, arr] of byWorker) {
+      const dates = Array.from(new Set(arr.map(x => x.date))).sort()
+      let streak = 1
+      for (let i = 1; i < dates.length; i++) {
+        const prev = new Date(dates[i-1] + 'T00:00:00')
+        const cur = new Date(dates[i] + 'T00:00:00')
+        const diff = Math.round((cur.getTime() - prev.getTime()) / 86400000)
+        if (diff === 1) streak += 1
+        else streak = 1
+        // worker / slot 한도 — 가장 작은 max_consecutive_days 적용
+        const slotMaxes = arr.filter(x => x.date === dates[i]).map(x => x.slot.max_consecutive_days || 0).filter(n => n > 0)
+        const slotMax = slotMaxes.length > 0 ? Math.min(...slotMaxes) : 0
+        if (slotMax > 0 && streak > slotMax) {
+          add(wId, dates[i], 'consec_limit')
+        }
+      }
+    }
+
+    return m
+  }, [assignments, slotById])
+
   const [pickerSlot, setPickerSlot] = useState<ShiftSlot | null>(null)
   const [pickerDate, setPickerDate] = useState<string>('')
   // PR-2OO: 편집 중인 assignment id (null=새 워커 추가, 존재=기존 row 수정)
@@ -463,6 +566,13 @@ export default function ScheduleGrid({ detail, onChanged }: Props) {
                   : cellTdStyle
                 // Phase D — dow 계산 (요일 색상 layer 용)
                 const cellDow = dowIndex(d)
+                // Phase F — 빈 셀 사유 (이 일자에 회피 신청한 워커 정보)
+                const dateSkippers = skipDates
+                  .filter(s => d >= s.start_date && d <= s.end_date)
+                  .map(s => `${(s as any).worker_name || s.worker_id.slice(0,4)}${s.status === 'requested' ? '⏳' : ''}`)
+                const emptyReasonText = dateSkippers.length > 0
+                  ? `회피: ${dateSkippers.join(', ')}`
+                  : ''
                 return (
                   <td key={d} style={finalCellStyle}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
@@ -476,10 +586,15 @@ export default function ScheduleGrid({ detail, onChanged }: Props) {
                           }}
                           onQuickAction={undefined}
                           dow={cellDow}
+                          emptyReason={emptyReasonText}
                         />
                       ) : (
                         arr.map(a => {
                           const w = a.worker_id ? workerMap.get(a.worker_id) || null : null
+                          // Phase E — 워커 가드 위반 검사
+                          const violations = a.worker_id
+                            ? violationMap.get(`${a.worker_id}_${d}`)
+                            : undefined
                           return (
                             <AssignmentCell
                               key={a.id}
@@ -498,6 +613,7 @@ export default function ScheduleGrid({ detail, onChanged }: Props) {
                               }}
                               onQuickAction={swapMode ? undefined : (action) => handleQuickAction(a, slot, d, action)}
                               dow={cellDow}
+                              violations={violations}
                             />
                           )
                         })

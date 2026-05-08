@@ -3,6 +3,32 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-08 (Phase E + F) — 가드 위반 시각화 + 빈 셀 사유
+
+### Phase E — 가드 위반 시각화 (clientside)
+- ScheduleGrid 에 `violationMap` 신설 — 워커별 일자별 위반 검사
+  - **시간 겹침** (time_conflict): 같은 워커 같은 날 두 슬롯 시간 범위 비교
+  - **익일 휴식** (next_day_block): overnight 종료 + slot.next_day_blocking_hours > 다음날 슬롯 시작
+  - **연속 한도** (consec_limit): 워커별 연속 근무일 streak vs slot.max_consecutive_days
+- AssignmentCell 신규 prop `violations: Set<...>`
+- 시각 표시:
+  - 🔴 시간 겹침 → 강한 빨강 보더 + ⏱ 아이콘
+  - 🔴 익일 휴식 위반 → 빨강 보더 + 🌙 아이콘
+  - 🟡 연속 한도 → 노랑 보더 + 📅 아이콘
+- 우선순위: violation 보더 > Phase D 색상 layer
+
+### Phase F — 빈 셀 사유 분석 (Phase 1)
+- AssignmentCell 신규 prop `emptyReason: string`
+- ScheduleGrid 에서 일자별 회피 신청자 (skipDates) 매핑
+- 빈 셀 hover 툴팁: "비어있음 — 회피: 정동민, 윤민진⏳"
+  - ⏳ 마크: 신청 대기 중
+
+### 통합 hover 툴팁 형식
+```
+"{워커명} · {special} [✓ 희망 요일] [⏱ 시간 겹침]"
+"비어있음 — 회피: 정동민, 윤민진⏳"
+```
+
 ## 2026-05-08 (Phase G + H) — 직원 회피 신청 + 매니저 검토 통합
 
 ### Phase G — 직원 본인 회피일 신청
