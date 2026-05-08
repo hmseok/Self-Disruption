@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { verifyUser } from '@/lib/auth-server'
 import { prisma } from '@/lib/prisma'
 import { randomUUID } from 'crypto'
+import { normName as commonNormName, isMetaTransaction } from '@/lib/match-helpers'
 
 /**
  * /api/finance/transactions/auto-match-freelancer
@@ -48,14 +49,8 @@ interface MatchResult {
   multi_samples: Array<any>
 }
 
-function normName(s: string | null | undefined): string {
-  if (!s) return ''
-  return String(s)
-    .trim()
-    .replace(/\s+/g, '')
-    .replace(/\(주\)|주식회사|㈜/g, '')
-    .toLowerCase()
-}
+// M-V2: 공통 normName 사용 (은행 prefix 자동 제거 + 회사명 정규화)
+const normName = commonNormName
 
 // 비-인명 prefix (보험사 / 카드사 / 페이 / 모바일이체) — skip
 const NON_PERSON_PREFIXES = new Set([
@@ -126,6 +121,11 @@ export async function POST(request: NextRequest) {
 
     for (const tx of candidates) {
       const clientRaw = String(tx.client_name || '').trim()
+      // M-V2: 메타 거래 (공용/급여/3.3/당직비/정산 등) 자동 skip
+      if (isMetaTransaction(clientRaw)) {
+        result.no_pattern++
+        continue
+      }
       let skip = false
       for (const p of NON_PERSON_PREFIXES) {
         if (clientRaw.startsWith(p)) { skip = true; break }

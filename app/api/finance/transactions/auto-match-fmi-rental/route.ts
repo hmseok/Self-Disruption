@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { verifyUser } from '@/lib/auth-server'
 import { prisma } from '@/lib/prisma'
 import { randomUUID } from 'crypto'
+import { extractCarNumber } from '@/lib/match-helpers'
 
 /**
  * /api/finance/transactions/auto-match-fmi-rental
@@ -106,9 +107,28 @@ function parseClientName(raw: string | null | undefined, dynamicAbbrs: string[])
   const dictAbbrs = Array.from(new Set([...dynamicAbbrs, ...Object.keys(INSURER_ABBR)]))
     .sort((a, b) => b.length - a.length) // 「DB손보」 「하나손해보험」 처럼 긴 약어 우선
 
+  // M-V2: 한국 차량번호 패턴 우선 시도 — 「농협125하4228」 → last4=4228 (last4=125 오탐 방지)
+  const carInfo = extractCarNumber(s)
+  if (carInfo) {
+    // 차량번호 앞부분 (prefix) 에서 보험사/은행 약어 추출
+    const carIdx = s.indexOf(carInfo.vehicle)
+    const beforeCar = s.slice(0, carIdx).trim().replace(/[\s\-_]+$/, '')
+    // 끝에 가까운 한글/영문 prefix 추출 (가장 마지막 word)
+    const prefixMatch = beforeCar.match(/([가-힣A-Za-z]+)$/)
+    if (prefixMatch) {
+      const abbr = prefixMatch[1]
+      if (NON_INSURER_PREFIXES.has(abbr)) return null
+      const keywords = INSURER_ABBR[abbr] || [abbr]
+      return { abbr, last4: carInfo.last4, insurerKeywords: keywords }
+    }
+    // prefix 없는 경우 — 차량번호 자체로 LOW 매칭 시도 (insurer 정보 없음 → LOW confidence)
+    return { abbr: '?', last4: carInfo.last4, insurerKeywords: [] }
+  }
+
   for (const abbr of dictAbbrs) {
-    // abbr 직후 (공백 0~2개) 3~4자리 숫자
-    const reg = new RegExp('^' + abbr.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*(\\d{3,4})')
+    // abbr 직후 (공백 0~2개) — 선택적으로 차량번호 앞부분 (\d{2,3}[가-힣]) 흡수 — 그 후 3~4자리 숫자
+    // M-V2: 「농협125하4228」 형태도 last4=4228 추출 가능
+    const reg = new RegExp('^' + abbr.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*(?:\\d{2,3}[가-힣])?(\\d{3,4})')
     const m = s.match(reg)
     if (m) {
       // INSURER_ABBR 사전에 있으면 keywords 사용, 없으면 abbr 자체 (동적 사전은 DB 약어와 일치)
@@ -259,7 +279,10 @@ export async function POST(request: NextRequest) {
       // → 보험사 mismatch 케이스도 후보로 보존 (사용자 검수 가능)
       const safeInsurerKeywords = parsed.insurerKeywords.map(k => k.replace(/[%_'"\\]/g, ''))
       const carNumberLike = `%${parsed.last4.replace(/[%_'"\\]/g, '')}`
-      const insurerCaseClauses = safeInsurerKeywords.map(() => 'insurance_company LIKE ?').join(' OR ')
+      // M-V2: insurer 정보 없을 때 (차량번호만 추출된 케이스) → 모두 LOW 처리
+      const insurerCaseClauses = safeInsurerKeywords.length > 0
+        ? safeInsurerKeywords.map(() => 'insurance_company LIKE ?').join(' OR ')
+        : '0' // 모든 후보 insurer_match=0 → LOW
 
       // customer_car_number (사고 차량) OR vehicle_car_number (FMI 보유 차량) 양쪽 검색
       // 입금자명의 last4 가 어느 쪽이든 매칭되도록 확장
