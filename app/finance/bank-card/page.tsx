@@ -575,6 +575,65 @@ export default function BankCardPage() {
   }>(null)
   const [showAdvancedMatchers, setShowAdvancedMatchers] = useState(false)
 
+  // ── PR-UX1.5: 처리 현황 + 매칭 확정 ──
+  const [processingStatus, setProcessingStatus] = useState<null | {
+    unmatched: number
+    pending_auto: number
+    confirmed: number
+    rejected: number
+    total: number
+    processed_pct: number
+    last_auto_match_at: string | null
+    recommended_actions: Array<{ key: string; label: string; priority: number; reason: string }>
+  }>(null)
+  const [processingStatusLoading, setProcessingStatusLoading] = useState(false)
+  const [confirmingMatchings, setConfirmingMatchings] = useState(false)
+
+  const loadProcessingStatus = async () => {
+    setProcessingStatusLoading(true)
+    try {
+      const { ok, json } = await fetchWithAuth('/api/finance/transactions/processing-status', { method: 'GET' })
+      if (ok) setProcessingStatus(json)
+    } catch (e: any) {
+      console.error('[processing-status]', e)
+    } finally {
+      setProcessingStatusLoading(false)
+    }
+  }
+
+  const confirmAllMatchings = async () => {
+    if (!processingStatus || processingStatus.pending_auto === 0) return
+    if (!confirm(
+      `자동 매칭 결과 ${processingStatus.pending_auto}건을 일괄 확정합니다.\n\n` +
+      `· 확정 후엔 final 보고서/통계에 반영됩니다\n` +
+      `· 잘못 매칭된 건은 [거부] 로 되돌릴 수 있습니다 (개별)\n\n` +
+      `계속할까요?`
+    )) return
+    setConfirmingMatchings(true)
+    const taskId = floaterProgress.start({
+      title: '✅ 매칭 일괄 확정',
+      total: 1,
+    })
+    try {
+      const { ok, json, status } = await fetchWithAuth('/api/finance/transactions/confirm-matchings', {
+        method: 'POST',
+        body: { mode: 'all' },
+      })
+      if (!ok) {
+        floaterProgress.finish(taskId, `오류: HTTP ${status} — ${json?.error || ''}`, 'error')
+        return
+      }
+      floaterProgress.update(taskId, { processed: 1, applied: json.updated || 0 })
+      floaterProgress.finish(taskId, `✅ ${json.updated || 0}건 확정 — 검증 ${json.verify?.ok ? 'PASS' : 'FAIL'}`)
+      await loadProcessingStatus()
+      await loadMatchReview()
+    } catch (e: any) {
+      floaterProgress.finish(taskId, `오류: ${e.message}`, 'error')
+    } finally {
+      setConfirmingMatchings(false)
+    }
+  }
+
   const runAutoMatchAll = async (mode: 'dry-run' | 'apply') => {
     const dryRun = mode === 'dry-run'
     setAutoMatchAllLoading(true)
@@ -634,7 +693,10 @@ export default function BankCardPage() {
         ? `🔍 dry-run — 매칭 가능 ${totalMatched}건`
         : `✅ ${totalApplied}건 매칭 적용 (4 매처 합계)`,
     )
-    if (!dryRun && totalApplied > 0) await loadMatchReview()
+    if (!dryRun && totalApplied > 0) {
+      await loadMatchReview()
+      await loadProcessingStatus()
+    }
     setAutoMatchAllLoading(false)
   }
 
@@ -902,7 +964,10 @@ export default function BankCardPage() {
   useEffect(() => {
     if (activeTab === 'sms') loadSmsData()
     if (activeTab === 'mapping') loadMappings()
-    if (activeTab === 'matchreview') loadMatchReview()
+    if (activeTab === 'matchreview') {
+      loadMatchReview()
+      loadProcessingStatus()
+    }
   }, [activeTab, loadSmsData, loadMappings, loadMatchReview])
 
   // 실패 건 재파싱
@@ -4994,6 +5059,107 @@ export default function BankCardPage() {
             : []
           return (
             <>
+              {/* PR-UX1.5: 📊 오늘의 처리 현황 (Glass L4 — 마무리 워크플로우) */}
+              {processingStatus && (() => {
+                const ps = processingStatus
+                const cards = [
+                  { key: 'unmatched',    label: '🚧 미매칭', value: ps.unmatched,    color: '#d97706', sub: '검수 필요' },
+                  { key: 'pending_auto', label: '⏳ 자동매칭', value: ps.pending_auto, color: '#7c3aed', sub: '미확정' },
+                  { key: 'confirmed',    label: '✅ 확정',    value: ps.confirmed,    color: '#16a34a', sub: 'final' },
+                  { key: 'rejected',     label: '❌ 거부',    value: ps.rejected,     color: '#dc2626', sub: '무시됨' },
+                  { key: 'total',        label: '📊 전체',    value: ps.total,        color: '#2563eb', sub: '거래' },
+                ]
+                return (
+                  <div style={{ ...GLASS.L4, border: `1px solid rgba(124,58,237,0.25)`, borderRadius: 12, padding: '14px 18px', marginBottom: 12 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.textPrimary }}>
+                        📊 오늘의 처리 현황
+                        {ps.last_auto_match_at && (
+                          <span style={{ marginLeft: 10, fontSize: 11, color: COLORS.textMuted, fontWeight: 400 }}>
+                            마지막 자동 매칭: {new Date(ps.last_auto_match_at).toLocaleString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        )}
+                      </div>
+                      <button
+                        onClick={loadProcessingStatus}
+                        disabled={processingStatusLoading}
+                        style={{ ...BTN.sm, padding: '3px 8px', fontSize: 10, background: '#fff', color: COLORS.textSecondary, border: `1px solid ${COLORS.borderSubtle}`, cursor: processingStatusLoading ? 'wait' : 'pointer' }}
+                      >{processingStatusLoading ? '...' : '↻'}</button>
+                    </div>
+
+                    {/* 5 카드 grid */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 8, marginBottom: 10 }}>
+                      {cards.map(c => (
+                        <div key={c.key} style={{
+                          ...GLASS.L3,
+                          border: `1px solid ${c.color}30`,
+                          borderRadius: 8, padding: '10px 12px',
+                        }}>
+                          <div style={{ fontSize: 11, color: COLORS.textMuted, marginBottom: 4 }}>{c.label}</div>
+                          <div style={{ fontSize: 20, fontWeight: 700, color: c.color }}>{c.value.toLocaleString()}</div>
+                          <div style={{ fontSize: 10, color: COLORS.textMuted, marginTop: 2 }}>{c.sub}</div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* 진행률 바 */}
+                    <div style={{ marginBottom: 10 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: COLORS.textMuted, marginBottom: 3 }}>
+                        <span>처리 진행률</span>
+                        <span style={{ fontWeight: 600, color: '#16a34a' }}>{ps.processed_pct}% 확정</span>
+                      </div>
+                      <div style={{ width: '100%', height: 8, background: 'rgba(0,0,0,0.05)', borderRadius: 4, overflow: 'hidden' }}>
+                        <div style={{
+                          width: `${ps.processed_pct}%`,
+                          height: '100%',
+                          background: 'linear-gradient(90deg, #16a34a 0%, #22c55e 100%)',
+                          transition: 'width 0.3s',
+                        }} />
+                      </div>
+                    </div>
+
+                    {/* 추천 액션 */}
+                    {ps.recommended_actions.length > 0 && (
+                      <div style={{ paddingTop: 10, borderTop: `1px dashed ${COLORS.borderSubtle}` }}>
+                        <div style={{ fontSize: 11, color: COLORS.textMuted, marginBottom: 6, fontWeight: 600 }}>🎯 추천 액션</div>
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                          {ps.recommended_actions.map(act => {
+                            const isHighPriority = act.priority === 1
+                            const isDone = act.key === 'done'
+                            return (
+                              <button
+                                key={act.key}
+                                onClick={() => {
+                                  if (act.key === 'confirm')      confirmAllMatchings()
+                                  else if (act.key === 'auto-match') runAutoMatchAll('dry-run')
+                                  else if (act.key === 'manual-review') {
+                                    // 분류 검수 탭으로 이동 권장
+                                    setActiveTab('classify' as any)
+                                  }
+                                }}
+                                disabled={isDone || (act.key === 'confirm' && confirmingMatchings)}
+                                title={act.reason}
+                                style={{
+                                  padding: '6px 14px',
+                                  fontSize: 12,
+                                  fontWeight: 600,
+                                  background: isDone ? '#fff' : isHighPriority ? 'linear-gradient(135deg, #16a34a 0%, #22c55e 100%)' : '#fff',
+                                  color: isDone ? COLORS.textSecondary : isHighPriority ? '#fff' : '#7c3aed',
+                                  border: isHighPriority ? 'none' : `1px solid ${isDone ? COLORS.borderSubtle : 'rgba(124,58,237,0.3)'}`,
+                                  borderRadius: 8,
+                                  cursor: isDone ? 'default' : 'pointer',
+                                  boxShadow: isHighPriority ? '0 2px 6px rgba(22,163,74,0.3)' : 'none',
+                                }}
+                              >{act.label}</button>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              })()}
+
               {/* 헤더 */}
               <div style={{ ...GLASS.L3, border: `1px solid ${COLORS.borderBlue}`, borderRadius: 12, padding: '14px 20px', marginBottom: 12 }}>
                 <div style={{ fontSize: 14, fontWeight: 600, color: COLORS.textPrimary, marginBottom: 4 }}>
