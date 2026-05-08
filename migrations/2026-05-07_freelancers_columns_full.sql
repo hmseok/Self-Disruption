@@ -97,8 +97,14 @@ SET @sql := IF(@col_exists = 0,
   'SELECT "linked_profile_id exists"');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
+-- 옛 status 컬럼과 신규 is_active 동기화 (status='inactive' 면 is_active=0)
+-- status 컬럼이 있고 is_active 도 있으면 — status 값을 is_active 로 옮김
+UPDATE freelancers SET is_active = 0
+  WHERE status = 'inactive' AND is_active = 1;
+
 -- 검증
 SELECT COLUMN_NAME, DATA_TYPE, IS_NULLABLE
   FROM information_schema.COLUMNS
   WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'freelancers'
   ORDER BY ORDINAL_POSITION;
+SELECT COUNT(*) AS 전체, SUM(is_active) AS 활성 FROM freelancers;
