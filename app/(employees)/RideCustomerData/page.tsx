@@ -90,6 +90,90 @@ function fmt(v: string | null | undefined): string {
   return v ?? ''
 }
 
+// DB 컬럼 → 사용자 친화 한글 라벨 (상세 모달 + 표 헤더)
+const COLUMN_LABEL_KO: Record<string, string> = {
+  // 메타
+  id: 'ID',
+  customer_id: '고객사 ID',
+  customer_name_snap: '고객사',
+  report_date: '보고일자',
+  source_file: '원본 파일',
+  exec_no: '실행번호',
+  // 고객/차량
+  cust_name: '고객명',
+  car_number: '차량번호',
+  car_model: '차종',
+  car_reg_date: '차량등록일',
+  vin: '차대번호',
+  car_options: '차량옵션',
+  // 여신/계약
+  loan_start_date: '여신/계약 시작일',
+  loan_period: '기간',
+  loan_end_date: '여신/계약 만기일',
+  exec_reason: '실행사유',
+  contract_start: '계약시작일',
+  contract_period: '계약기간',
+  contract_end: '계약종료일',
+  is_new: '신규/재렌탈',
+  contractor: '계약자',
+  contract_product: '계약상품',
+  user_name: '이용자',
+  // 보험
+  insurance_co: '보험사',
+  age_band: '연령',
+  ins_start_date: '보험 개시일',
+  ins_period: '보험 기간',
+  ins_di: '대인',
+  ins_dm: '대물',
+  ins_js: '자손/자기신체',
+  ins_uninsured: '무보험',
+  ins_deductible: '자기부담금',
+  // 정비/긴출
+  emergency: '긴급출동',
+  monthly_fee: '월정비료',
+  maint_product: '정비상품',
+  snow_tire: '스노우타이어',
+  snow_chain: '체인',
+  // 담당자/연락처
+  cust_manager: '고객담당자',
+  cust_phone: '전화',
+  office_phone: '사무실 전화',
+  cust_mobile: '휴대폰',
+  cust_address: '고객 주소',
+  bill_address: '청구지 주소',
+  // 운영 (메리츠 등)
+  maint_company: '정비업체명',
+  closing_date: '마감일자',
+  termination_date: '해지일자',
+  sales_dept: '영업부서',
+  sales_manager: '영업담당자',
+  registered_by: '실행등록자',
+  // iM 추가
+  rent_substitute: '렌트(대차)',
+  additional_driver: '추가운전자',
+  special_clause: '특약가입여부',
+  // 기타
+  status: '상태',
+  note: '비고',
+  raw_extra: '추가 데이터',
+  created_by: '등록자',
+  created_at: '등록일시',
+  updated_at: '수정일시',
+}
+
+function labelKo(key: string): string {
+  return COLUMN_LABEL_KO[key] || key
+}
+
+function fmtValue(v: unknown): string {
+  if (v === null || v === undefined || v === '') return '-'
+  if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(v)) {
+    // ISO 날짜 → YYYY-MM-DD
+    return v.substring(0, 10)
+  }
+  return String(v)
+}
+
 function clip(v: string | null | undefined, n = 30): string {
   if (!v) return ''
   return v.length > n ? v.substring(0, n) + '…' : v
@@ -832,14 +916,43 @@ function DetailModal({
   rows: [string, unknown][]
   onClose: () => void
 }) {
+  // 표시 우선순위 — 비어있는 필드는 뒤로 (선택)
+  // 그리고 'id' 와 'customer_id' (UUID) 같은 내부 필드는 숨김 또는 뒤로
+  const HIDE_KEYS = new Set(['id', 'customer_id', 'created_by', 'raw_extra'])
+  const visible = rows.filter(([k]) => !HIDE_KEYS.has(k))
+
   return (
     <ModalShell title={title} onClose={onClose} wide>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 16px', fontSize: 12 }}>
-        {rows.map(([k, v]) => (
-          <div key={k} style={{ display: 'flex', borderBottom: '1px solid rgba(0,0,0,0.05)', padding: '4px 0' }}>
-            <span style={{ width: 130, color: COLORS.textMuted, flexShrink: 0 }}>{k}</span>
-            <span style={{ color: COLORS.textPrimary, wordBreak: 'break-all' }}>
-              {v === null || v === undefined || v === '' ? '-' : String(v)}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 16px', fontSize: 12 }}>
+        {visible.map(([k, v]) => (
+          <div
+            key={k}
+            style={{
+              display: 'flex',
+              borderBottom: '1px solid rgba(0,0,0,0.05)',
+              padding: '6px 0',
+              alignItems: 'baseline',
+            }}
+          >
+            <span
+              style={{
+                width: 130,
+                color: COLORS.textMuted,
+                flexShrink: 0,
+                fontSize: 11,
+                fontWeight: 600,
+              }}
+            >
+              {labelKo(k)}
+            </span>
+            <span
+              style={{
+                color: COLORS.textPrimary,
+                wordBreak: 'break-all',
+                fontWeight: v ? 500 : 400,
+              }}
+            >
+              {fmtValue(v)}
             </span>
           </div>
         ))}
