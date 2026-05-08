@@ -521,11 +521,11 @@ export default function RideCustomerDataPage() {
 
       {/* ─── 탭 ─── */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
-        <button style={tabBtn('reports', '📊 캐피탈 보고')} onClick={() => setTab('reports')}>
-          📊 캐피탈 보고 {reports.length > 0 && `(${reports.length})`}
+        <button style={tabBtn('reports', '📊 정비 보고서')} onClick={() => setTab('reports')}>
+          📊 정비 보고서 (캐피탈 정기 보고) {reports.length > 0 && `(${reports.length})`}
         </button>
-        <button style={tabBtn('contracts', '📜 계약 마스터')} onClick={() => setTab('contracts')}>
-          📜 계약 마스터 {contracts.length > 0 && `(${contracts.length})`}
+        <button style={tabBtn('contracts', '📜 장기 계약')} onClick={() => setTab('contracts')}>
+          📜 장기 계약 (B2B) {contracts.length > 0 && `(${contracts.length})`}
         </button>
         <button style={tabBtn('companies', '🏢 고객사 마스터')} onClick={() => setTab('companies')}>
           🏢 고객사 ({companies.length})
@@ -862,13 +862,16 @@ interface PreviewData {
     report_date?: string | null
     customer_id?: string | null
     customer_name_snap?: string | null
+    suggested_customer_id?: string | null
+    suggested_customer_name?: string | null
   }
   mapping: {
     mapped: Record<string, string>
     unmapped_headers: string[]
   }
   sample: {
-    headers: string[]
+    headers: string[]   // 한글 라벨
+    cols?: string[]     // db 컬럼 (참고용)
     rows: (string | null)[][]
   }
 }
@@ -939,7 +942,23 @@ function MultiUploadModal({
         headers: token ? { Authorization: `Bearer ${token}` } : {},
         body: fd,
       })
-      const json = await res.json()
+      // 503 / HTML 에러 응답 안전 파싱
+      const text = await res.text()
+      let json: { success?: boolean; error?: string; target?: string; detected?: { report_date?: string | null; suggested_customer_id?: string | null } } & Record<string, unknown>
+      try {
+        json = JSON.parse(text)
+      } catch {
+        const status = res.status
+        const snippet = text.slice(0, 100)
+        setFiles(prev =>
+          prev.map(f =>
+            f.id === id
+              ? { ...f, busy: false, error: `서버 ${status}: ${snippet}${text.length > 100 ? '…' : ''}` }
+              : f
+          )
+        )
+        return
+      }
       if (!res.ok || !json.success) {
         setFiles(prev =>
           prev.map(f => (f.id === id ? { ...f, busy: false, error: json.error || `HTTP ${res.status}` } : f))
@@ -952,9 +971,11 @@ function MultiUploadModal({
             ? {
                 ...f,
                 busy: false,
-                preview: json as PreviewData,
-                target: json.target,
+                preview: json as unknown as PreviewData,
+                target: (json.target as 'capital_reports' | 'contracts') || f.target,
                 report_date: json.detected?.report_date || f.report_date,
+                // 자동 추정된 customer_id 가 있고 사용자 미지정이면 자동 채택
+                customer_id: f.customer_id || (json.detected?.suggested_customer_id ?? '') || '',
               }
             : f
         )
@@ -983,7 +1004,20 @@ function MultiUploadModal({
         headers: token ? { Authorization: `Bearer ${token}` } : {},
         body: fd,
       })
-      const json = await res.json()
+      const text = await res.text()
+      let json: { success?: boolean; error?: string; result?: { inserted: number; skipped: number; errors: string[] } }
+      try {
+        json = JSON.parse(text)
+      } catch {
+        setFiles(prev =>
+          prev.map(f =>
+            f.id === id
+              ? { ...f, busy: false, error: `서버 ${res.status}: ${text.slice(0, 100)}` }
+              : f
+          )
+        )
+        return
+      }
       if (!res.ok || !json.success) {
         setFiles(prev =>
           prev.map(f => (f.id === id ? { ...f, busy: false, error: json.error || `HTTP ${res.status}` } : f))
@@ -991,7 +1025,7 @@ function MultiUploadModal({
         return
       }
       setFiles(prev =>
-        prev.map(f => (f.id === id ? { ...f, busy: false, result: json.result } : f))
+        prev.map(f => (f.id === id ? { ...f, busy: false, result: json.result || { inserted: 0, skipped: 0, errors: [] } } : f))
       )
       onAnyApplied()
     } catch (e) {
@@ -1058,30 +1092,8 @@ function MultiUploadModal({
           </select>
         </div>
 
-        {/* 파일 추가 input */}
-        <div
-          style={{
-            ...GLASS.L1,
-            border: '2px dashed rgba(0,0,0,0.10)',
-            borderRadius: 12,
-            padding: 16,
-            textAlign: 'center',
-          }}
-        >
-          <input
-            type="file"
-            accept=".xlsx,.xls"
-            multiple
-            onChange={e => {
-              addFiles(e.target.files)
-              e.target.value = ''
-            }}
-            style={{ display: 'block', margin: '0 auto', fontSize: 13 }}
-          />
-          <div style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 6 }}>
-            여러 파일 동시 선택 가능 — 각 파일별로 양식 자동 감지 (캐피탈 보고 / 계약 마스터)
-          </div>
-        </div>
+        {/* 파일 추가 — 드래그 & 드롭 + 클릭 */}
+        <DropZone onFiles={addFiles} />
 
         {/* 파일별 카드 */}
         {files.length === 0 ? (
@@ -1149,6 +1161,59 @@ function MultiUploadModal({
   )
 }
 
+// ─── 드래그-앤-드롭 영역 ────────────────────────────────────────
+function DropZone({ onFiles }: { onFiles: (fl: FileList | null) => void }) {
+  const [hover, setHover] = useState(false)
+  const inputRef = (typeof window !== 'undefined' ? { current: null as HTMLInputElement | null } : { current: null })
+
+  return (
+    <label
+      onDragOver={e => {
+        e.preventDefault()
+        setHover(true)
+      }}
+      onDragLeave={() => setHover(false)}
+      onDrop={e => {
+        e.preventDefault()
+        setHover(false)
+        onFiles(e.dataTransfer.files)
+      }}
+      style={{
+        ...GLASS.L1,
+        display: 'block',
+        border: hover ? `2px dashed ${COLORS.primary}` : '2px dashed rgba(0,0,0,0.15)',
+        borderRadius: 12,
+        padding: '24px 16px',
+        textAlign: 'center',
+        cursor: 'pointer',
+        transition: 'all 0.15s',
+        background: hover ? 'rgba(59,110,181,0.08)' : 'rgba(255,255,255,0.40)',
+      }}
+    >
+      <input
+        ref={el => {
+          inputRef.current = el
+        }}
+        type="file"
+        accept=".xlsx,.xls"
+        multiple
+        onChange={e => {
+          onFiles(e.target.files)
+          e.target.value = ''
+        }}
+        style={{ display: 'none' }}
+      />
+      <div style={{ fontSize: 24, marginBottom: 4 }}>📁</div>
+      <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.textPrimary }}>
+        파일을 끌어오거나 클릭해서 선택
+      </div>
+      <div style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 4 }}>
+        .xlsx / .xls — 여러 파일 동시 선택 가능 · 양식과 고객사 자동 감지
+      </div>
+    </label>
+  )
+}
+
 // ─── 파일별 카드 ────────────────────────────────────────────────
 function FileCard({
   item,
@@ -1163,8 +1228,10 @@ function FileCard({
   onUpdate: (patch: Partial<FileItem>) => void
   onApply: () => void
 }) {
-  const targetLabel = item.target === 'contracts' ? '📜 계약 마스터' : '📊 캐피탈 보고'
+  const targetLabel = item.target === 'contracts' ? '📜 장기 계약' : '📊 정비 보고서'
   const customerName = companies.find(c => c.id === item.customer_id)?.name || ''
+  const suggestedName = item.preview?.detected.suggested_customer_name || ''
+  const isAutoMatched = !!suggestedName && customerName === suggestedName
   const status = item.result
     ? 'done'
     : item.error
@@ -1186,11 +1253,26 @@ function FileCard({
 
   return (
     <div style={{ ...GLASS.L3, border: `1px solid ${borderColor}`, borderRadius: 12, padding: 12 }}>
-      {/* 헤더 — 파일명 + target + 액션 */}
+      {/* 헤더 — 파일명 + 매칭 고객사 + target + 액션 */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 14, fontWeight: 700, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           📄 {item.file.name}
         </span>
+        {customerName && (
+          <span
+            style={{
+              fontSize: 11,
+              fontWeight: 700,
+              padding: '2px 8px',
+              borderRadius: 4,
+              background: isAutoMatched ? COLORS.bgGreen : COLORS.bgGray,
+              color: isAutoMatched ? COLORS.success : COLORS.textPrimary,
+              whiteSpace: 'nowrap',
+            }}
+          >
+            🏢 {customerName}{isAutoMatched && ' 🤖'}
+          </span>
+        )}
         <span
           style={{
             fontSize: 11,
@@ -1220,9 +1302,10 @@ function FileCard({
           value={item.target}
           onChange={e => onUpdate({ target: e.target.value as 'capital_reports' | 'contracts' })}
           style={{ ...inputStyle, width: 'auto', fontSize: 11, padding: '4px 8px' }}
+          title="대상 테이블"
         >
-          <option value="capital_reports">캐피탈 보고</option>
-          <option value="contracts">계약 마스터</option>
+          <option value="capital_reports">📊 정비 보고서</option>
+          <option value="contracts">📜 장기 계약</option>
         </select>
         <select
           value={item.customer_id}

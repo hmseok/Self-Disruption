@@ -158,6 +158,78 @@ function rowToObject(
   return obj
 }
 
+// DB 컬럼 → 사용자 친화 한글 라벨 (preview 표 헤더용)
+const COLUMN_LABELS_KO: Record<string, string> = {
+  exec_no: '실행번호',
+  cust_name: '고객명',
+  car_number: '차량번호',
+  car_model: '차종',
+  car_reg_date: '차량등록일',
+  loan_start_date: '여신/계약 시작일',
+  loan_period: '기간',
+  loan_end_date: '여신/계약 만기일',
+  exec_reason: '실행사유',
+  car_options: '차량옵션',
+  vin: '차대번호',
+  insurance_co: '보험사',
+  age_band: '연령',
+  ins_start_date: '보험 개시일',
+  ins_period: '보험 기간',
+  ins_di: '대인',
+  ins_dm: '대물',
+  ins_js: '자손/자기신체',
+  ins_uninsured: '무보험',
+  ins_deductible: '자기부담금',
+  emergency: '긴급출동',
+  monthly_fee: '월정비료',
+  maint_product: '정비상품',
+  snow_tire: '스노우타이어',
+  snow_chain: '체인',
+  cust_manager: '고객담당자',
+  cust_phone: '전화',
+  cust_mobile: '휴대폰',
+  cust_address: '주소',
+  bill_address: '청구지 주소',
+  maint_company: '정비업체명',
+  closing_date: '마감일자',
+  termination_date: '해지일자',
+  sales_dept: '영업부서',
+  sales_manager: '영업담당자',
+  registered_by: '실행등록자',
+  rent_substitute: '렌트(대차)',
+  additional_driver: '추가운전자',
+  special_clause: '특약가입여부',
+  contractor: '계약자',
+  contract_product: '계약상품',
+  user_name: '이용자',
+  contract_start: '계약시작일',
+  contract_period: '계약기간',
+  contract_end: '계약종료일',
+  is_new: '신규/재렌탈',
+  office_phone: '사무실 전화',
+  status: '상태',
+  note: '비고',
+}
+
+// 파일명/시트명 → ride_customer_companies 자동 추정
+function suggestCustomerFromName(name: string): { keyword: string; weight: number } | null {
+  const lower = name.toLowerCase()
+  // 키워드 우선순위 (긴 키워드 먼저)
+  const candidates: { keyword: string; matchKeys: string[] }[] = [
+    { keyword: 'iM캐피탈', matchKeys: ['im캐피', 'iM캐피', 'imcapital', 'im capital', 'daily report'] },
+    { keyword: '메리츠캐피탈', matchKeys: ['메리츠', 'meritz', '라이드주식회사', '4주차', '실행데이터'] },
+    { keyword: 'MG캐피탈', matchKeys: ['mg캐피', 'mgcapital', 'mg ', '새마을', '전산등록', '전산 등록'] },
+  ]
+  for (const c of candidates) {
+    for (const m of c.matchKeys) {
+      if (lower.includes(m.toLowerCase())) {
+        return { keyword: c.keyword, weight: m.length }
+      }
+    }
+  }
+  return null
+}
+
 function pickReportDateFromFilename(name: string): string | null {
   // "20260507 Daily report.xlsx" 또는 "26년 4월 4주차 ..." → YYYY-MM-DD 추정
   const m1 = name.match(/(\d{4})(\d{2})(\d{2})/)
@@ -204,7 +276,8 @@ export async function POST(request: Request) {
 
   let wb
   try {
-    wb = XLSX.read(buffer, { type: 'buffer', cellDates: false })
+    // sheetRows: 5000 — dim=1048568 같은 빈 row 폭증 파일 대응 (503 방지)
+    wb = XLSX.read(buffer, { type: 'buffer', cellDates: false, sheetRows: 5000 })
   } catch (e) {
     return NextResponse.json(
       { success: false, error: `xlsx parse 실패: ${(e as Error).message}` },
@@ -250,8 +323,10 @@ export async function POST(request: Request) {
     }
   }
 
-  // 고객사 마스터 조회 (customer_id 별 name)
+  // 고객사 마스터 조회 (customer_id 별 name) + 파일명 기반 자동 추정
   let customerNameSnap: string | null = null
+  let suggestedCustomerId: string | null = null
+  let suggestedCustomerName: string | null = null
   if (customer_id) {
     try {
       const [c] = await prisma.$queryRaw<{ name: string }[]>`
@@ -260,6 +335,25 @@ export async function POST(request: Request) {
       customerNameSnap = c?.name ?? null
     } catch {
       // ignore
+    }
+  } else {
+    // customer_id 미지정 — 파일명 + sheet name 으로 추정
+    const hint = `${file.name} ${wb.SheetNames[0] || ''}`
+    const guess = suggestCustomerFromName(hint)
+    if (guess) {
+      try {
+        const [c] = await prisma.$queryRaw<{ id: string; name: string }[]>`
+          SELECT id, name FROM ride_customer_companies WHERE name = ${guess.keyword} AND active = 1 LIMIT 1
+        `
+        if (c) {
+          suggestedCustomerId = c.id
+          suggestedCustomerName = c.name
+          // 파일명 기반 자동 매칭 — customer_id 로 채택
+          customerNameSnap = c.name
+        }
+      } catch {
+        // ignore
+      }
     }
   }
 
@@ -283,9 +377,10 @@ export async function POST(request: Request) {
       if (map[t]) mapped[t] = map[t]
       else unmapped.push(t)
     }
-    // 표 형태 sample (headers + values 매트릭스 — 클라이언트 렌더 쉬움)
-    const sampleHeaders = Object.keys(parsed[0] || {})
-    const sampleRows = parsed.slice(0, 5).map(obj => sampleHeaders.map(h => obj[h] ?? ''))
+    // 표 형태 sample (한글 헤더 + values 매트릭스)
+    const sampleCols = Object.keys(parsed[0] || {})
+    const sampleHeaders = sampleCols.map(c => COLUMN_LABELS_KO[c] || c)  // 한글 라벨
+    const sampleRows = parsed.slice(0, 5).map(obj => sampleCols.map(h => obj[h] ?? ''))
 
     return NextResponse.json({
       success: true,
@@ -298,15 +393,18 @@ export async function POST(request: Request) {
         report_date: reportDate,
         customer_id,
         customer_name_snap: customerNameSnap,
+        suggested_customer_id: suggestedCustomerId,
+        suggested_customer_name: suggestedCustomerName,
         file_name: file.name,
       },
       mapping: {
-        mapped,                 // { 헤더: db_컬럼 }
+        mapped,                 // { 한글헤더: db_컬럼 }
         unmapped_headers: unmapped,
       },
       sample: {
-        headers: sampleHeaders,  // db 컬럼 키
-        rows: sampleRows,        // 5 row 매트릭스
+        headers: sampleHeaders,  // 한글 라벨
+        cols: sampleCols,         // db 컬럼 (참고용)
+        rows: sampleRows,         // 5 row 매트릭스
       },
     })
   }
@@ -316,6 +414,9 @@ export async function POST(request: Request) {
   let skipped = 0
   const errors: string[] = []
 
+  // apply — 사용자가 customer_id 미지정 시 suggested 자동 채택
+  const effectiveCustomerId = customer_id || suggestedCustomerId
+
   if (target === 'capital_reports') {
     // 화이트리스트 컬럼 (DB 실제 컬럼)
     const allowed = new Set(Object.values(CAPITAL_HEADER_MAP))
@@ -324,7 +425,7 @@ export async function POST(request: Request) {
         const cols: string[] = ['id', 'customer_id', 'customer_name_snap', 'report_date', 'source_file', 'created_by']
         const placeholders: string[] = ['?', '?', '?', '?', '?', '?']
         const vals: (string | null)[] = [
-          randomUUID(), customer_id, customerNameSnap, reportDate, file.name, user.id,
+          randomUUID(), effectiveCustomerId, customerNameSnap, reportDate, file.name, user.id,
         ]
         for (const [k, v] of Object.entries(obj)) {
           if (!allowed.has(k)) continue
@@ -348,7 +449,7 @@ export async function POST(request: Request) {
         const cols: string[] = ['id', 'customer_id', 'source_file', 'created_by']
         const placeholders: string[] = ['?', '?', '?', '?']
         const vals: (string | null)[] = [
-          randomUUID(), customer_id, file.name, user.id,
+          randomUUID(), effectiveCustomerId, file.name, user.id,
         ]
         for (const [k, v] of Object.entries(obj)) {
           if (!allowed.has(k)) continue
@@ -375,8 +476,10 @@ export async function POST(request: Request) {
       total_data_rows: dataRows.length,
       parsed_rows: parsed.length,
       report_date: reportDate,
-      customer_id,
+      customer_id: effectiveCustomerId,
       customer_name_snap: customerNameSnap,
+      suggested_customer_id: suggestedCustomerId,
+      suggested_customer_name: suggestedCustomerName,
     },
     result: { inserted, skipped, errors },
   })
