@@ -341,6 +341,32 @@ export async function POST(request: NextRequest) {
     const base64SizeKB = Math.round(base64.length / 1024)
     console.log(`📸 영수증 이미지: ${file.name} (${fileSizeKB}KB, base64: ${base64SizeKB}KB, type: ${file.type})`)
 
+    // PR-B13: 이미지 sha256 hash 계산 (자동 dedup) — 같은 이미지 두 번 업로드 차단
+    const crypto = await import('crypto')
+    const imageHash = crypto.createHash('sha256').update(buffer).digest('hex')
+    // 같은 user 의 같은 이미지 hash 가 이미 있으면 → 클라이언트에 duplicate 표시
+    let duplicateOf: any = null
+    try {
+      const { prisma } = await import('@/lib/prisma')
+      const existing = await prisma.$queryRawUnsafe<any[]>(
+        `SELECT id, expense_date, merchant, amount FROM expense_receipts
+          WHERE user_id = ? AND image_hash = ? LIMIT 1`,
+        user.id, imageHash,
+      )
+      if (existing && existing.length > 0) {
+        const e = existing[0]
+        duplicateOf = {
+          id: String(e.id),
+          expense_date: e.expense_date,
+          merchant: e.merchant,
+          amount: Number(e.amount || 0),
+        }
+        console.log(`⚠️ 같은 이미지 이미 등록됨: ${duplicateOf.merchant} (${duplicateOf.amount}원)`)
+      }
+    } catch (e: any) {
+      console.warn('[receipts/ocr] image_hash 검사 실패 (마이그레이션 미적용?):', e?.message)
+    }
+
     let receiptUrl = ''
 
     // 2. AI 분석: Gemini 우선, 실패 시 CLOVA OCR 폴백
@@ -404,6 +430,9 @@ export async function POST(request: NextRequest) {
       item_count: parsedItems.length,
       fail_reason: failReason,
       rate_limited: rateLimited,                 // 429: 클라이언트가 큐 일시정지
+      // PR-B13: 이미지 sha256 + 중복 정보
+      image_hash: imageHash,
+      duplicate_of: duplicateOf,                 // null = 신규 / object = 같은 이미지 이미 등록됨
     })
   } catch (e: any) {
     console.error('영수증 분석 오류:', e.message)

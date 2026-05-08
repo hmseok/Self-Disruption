@@ -464,6 +464,14 @@ export default function ReceiptsPage() {
 
         if (ocrJson.fail_reason) failReasons.add(ocrJson.fail_reason)
 
+        // PR-B13: 같은 영수증 이미지가 이미 등록되어 있으면 사용자 알림 + skip
+        if (ocrJson.duplicate_of) {
+          const d = ocrJson.duplicate_of
+          failReasons.add(`⚠ 중복: 같은 영수증 이미지가 이미 등록됨 (${d.expense_date} / ${d.merchant} / ${Number(d.amount).toLocaleString()}원)`)
+          setUploadQueue(prev => prev.map((q, idx) => idx === i ? { ...q, status: 'done' } : q))
+          return  // 이 파일 skip — 다음 파일로
+        }
+
         // 각 OCR 항목을 DB에 저장할 아이템으로 변환
         // 0원만 제외 — 음수(승인취소) 는 저장 (회계 정합성)
         const itemsToSave = ocrItems
@@ -491,6 +499,8 @@ export default function ReceiptsPage() {
               customer_team: '',
               amount: ocr.amount || 0,
               receipt_url: receiptUrl,
+              // PR-B13: 이미지 sha256 — 자동 dedup (서버에서 검사)
+              image_hash: ocrJson.image_hash || null,
             }
           })
 

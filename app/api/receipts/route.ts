@@ -94,9 +94,24 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '항목이 필요합니다.' }, { status: 400 })
     }
 
-    // ── 중복 체크: 같은 날짜 + 사용처 + 금액이 이미 있으면 스킵 ──
+    // ── 중복 체크 (PR-B13 강화): image_hash 우선, 그 다음 (date + merchant + amount) ──
+    // image_hash 가 있으면 같은 이미지 두 번 업로드 차단 (이름 변형 무력화 방지)
     const duplicateChecks = await Promise.all(
-      items.map(async (item) => {
+      items.map(async (item: any) => {
+        // 1) image_hash 매칭 (가장 정확 — 같은 영수증 이미지)
+        if (item.image_hash) {
+          try {
+            const byHash = await prisma.$queryRaw<any[]>`
+              SELECT id FROM expense_receipts
+              WHERE user_id = ${user.id} AND image_hash = ${item.image_hash}
+              LIMIT 1
+            `
+            if (byHash && byHash.length > 0) {
+              return { item, isDuplicate: true, dupReason: 'image_hash' }
+            }
+          } catch { /* image_hash 컬럼 미적용 — 무시 */ }
+        }
+        // 2) 옛날 (date, merchant, amount) 매칭 — fallback
         const existing = await prisma.$queryRaw<any[]>`
           SELECT id FROM expense_receipts
           WHERE user_id = ${user.id}
@@ -105,7 +120,7 @@ export async function POST(request: NextRequest) {
           AND amount = ${item.amount}
           LIMIT 1
         `
-        return { item, isDuplicate: !!(existing && existing.length > 0) }
+        return { item, isDuplicate: !!(existing && existing.length > 0), dupReason: 'date_merchant_amount' }
       })
     )
 
@@ -121,7 +136,7 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    const makeInsertData = (withMemo: boolean) => newItems.map(item => {
+    const makeInsertData = (withMemo: boolean) => newItems.map((item: any) => {
       const row: Record<string, any> = {
         id: crypto.randomUUID(),  // CHAR(36) PK 컬럼 (auto-gen 안 됨)
         user_id: user.id,
@@ -134,6 +149,7 @@ export async function POST(request: NextRequest) {
         customer_team: item.customer_team || user.employee_name || '',
         amount: item.amount,
         receipt_url: item.receipt_url || receipt_url || '',
+        image_hash: item.image_hash || null,  // PR-B13: 영수증 이미지 sha256 (자동 dedup)
       }
       if (withMemo) row.memo = item.memo || ''
       return row
@@ -146,16 +162,35 @@ export async function POST(request: NextRequest) {
 
     try {
       for (const row of insertData) {
-        await prisma.$executeRaw`
-          INSERT INTO expense_receipts (
-            id, user_id, user_name, expense_date, card_number, category, merchant,
-            item_name, customer_team, amount, receipt_url, memo, created_at, updated_at
-          ) VALUES (
-            ${row.id}, ${row.user_id}, ${row.user_name}, ${row.expense_date}, ${row.card_number},
-            ${row.category}, ${row.merchant}, ${row.item_name}, ${row.customer_team},
-            ${row.amount}, ${row.receipt_url}, ${row.memo || ''}, NOW(), NOW()
-          )
-        `
+        // PR-B13: image_hash 컬럼 동적 처리 — 마이그레이션 미적용 환경 graceful
+        try {
+          await prisma.$executeRaw`
+            INSERT INTO expense_receipts (
+              id, user_id, user_name, expense_date, card_number, category, merchant,
+              item_name, customer_team, amount, receipt_url, memo, image_hash, created_at, updated_at
+            ) VALUES (
+              ${row.id}, ${row.user_id}, ${row.user_name}, ${row.expense_date}, ${row.card_number},
+              ${row.category}, ${row.merchant}, ${row.item_name}, ${row.customer_team},
+              ${row.amount}, ${row.receipt_url}, ${row.memo || ''}, ${row.image_hash}, NOW(), NOW()
+            )
+          `
+        } catch (e: any) {
+          // image_hash 컬럼 미적용 시 옛 INSERT (마이그레이션 적용 전 환경)
+          if (e?.message?.includes('image_hash')) {
+            await prisma.$executeRaw`
+              INSERT INTO expense_receipts (
+                id, user_id, user_name, expense_date, card_number, category, merchant,
+                item_name, customer_team, amount, receipt_url, memo, created_at, updated_at
+              ) VALUES (
+                ${row.id}, ${row.user_id}, ${row.user_name}, ${row.expense_date}, ${row.card_number},
+                ${row.category}, ${row.merchant}, ${row.item_name}, ${row.customer_team},
+                ${row.amount}, ${row.receipt_url}, ${row.memo || ''}, NOW(), NOW()
+              )
+            `
+          } else {
+            throw e
+          }
+        }
         // 방금 INSERT한 row를 id로 정확히 조회 (날짜+가맹점+금액 매칭은 동일 거래 시 실수 위험)
         const result = await prisma.$queryRaw<any[]>`
           SELECT * FROM expense_receipts WHERE id = ${row.id} LIMIT 1
