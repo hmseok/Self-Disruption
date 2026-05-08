@@ -108,6 +108,8 @@ export const MENUS: MenuEntry[] = [
   // PR-6.9 (2026-05-06) — 차량등록현황 (자체 DB + 카페24 read 통합)
   // PR-6.9.b (2026-05-06) — group: cx-team → admin-ops (관리자 운영)
   { id: 'mod-ride-vehicle-reg',   name: '라이드 차량등록',  displayName: '🚗 라이드 차량등록',  path: '/RideVehicleRegistry',   iconKey: 'Car',       group: 'admin-ops', sortOrder: 80, requirePermission: true },
+  // PR-6.10 (2026-05-08) — 고객사 데이터 통합 (캐피탈 보고 + 계약 마스터 + 엑셀 업로드)
+  { id: 'mod-ride-customer-data', name: '라이드 고객사 데이터', displayName: '🏢 라이드 고객사 데이터', path: '/RideCustomerData',     iconKey: 'Building',  group: 'admin-ops', sortOrder: 81, requirePermission: true },
   { id: 'mod-call-scheduler',  name: '근무시간표 분석 & 배포', displayName: '📅 근무시간표 분석 & 배포', path: '/CallScheduler', iconKey: 'Setting', group: 'cx-team', sortOrder: 60, requirePermission: true },
   // 직원 마스터 — 사이드바 숨김. 근무스케줄 페이지 안에서 sub-nav 로 접근 (권한 페이지에는 노출 유지)
   { id: 'mod-ride-employees',  name: '직원 마스터',   path: '/RideEmployees',  iconKey: 'Users',   group: 'cx-team', sortOrder: 61, requirePermission: true, sidebarHidden: true },
