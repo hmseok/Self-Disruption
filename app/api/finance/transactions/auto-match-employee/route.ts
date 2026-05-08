@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { verifyUser } from '@/lib/auth-server'
 import { prisma } from '@/lib/prisma'
 import { randomUUID } from 'crypto'
-import { normName as commonNormName, isMetaTransaction } from '@/lib/match-helpers'
+import { normName as commonNormName, isMetaTransaction, isNonPersonClient } from '@/lib/match-helpers'
 
 /**
  * /api/finance/transactions/auto-match-employee
@@ -148,11 +148,8 @@ export async function POST(request: NextRequest) {
         result.no_pattern++
         continue
       }
-      let skip = false
-      for (const p of NON_PERSON_PREFIXES) {
-        if (clientRaw.startsWith(p)) { skip = true; break }
-      }
-      if (skip) {
+      // M-V2.1: NON_PERSON 분리 — 은행 prefix 뒤 한글이면 통과
+      if (isNonPersonClient(clientRaw)) {
         result.no_pattern++
         continue
       }

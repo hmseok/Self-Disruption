@@ -88,6 +88,58 @@ export function normName(s: string | null | undefined): string {
   return r.toLowerCase()
 }
 
+// ════════════════════════════════════════════════════════════════
+// M-V2.1 (2026-05-08): NON_PERSON 분리 — 은행 prefix 뒤 한글 통과
+// ════════════════════════════════════════════════════════════════
+//
+// 사고: 「농협박진숙」, 「농협임미자」, 「하나-김진섭」 등이 NON_PERSON_PREFIXES
+//       startsWith 체크로 차단되어 사전 매칭 시도조차 못함.
+//       「국민」 은 NON_PERSON 에 없어서 작동, 「농협/하나」 는 차단됨.
+//
+// 해결: 두 그룹으로 분리
+//   - STRICT: 무조건 skip (카드자동집금, 타행, 펌뱅킹 등)
+//   - SOFT (은행/보험사): prefix 뒤 한글이면 통과 (normName 가 처리)
+
+// Strict — 사람 이름 절대 못 옴
+export const NON_PERSON_STRICT = new Set([
+  '카드자동집금', '카드사', '뱅킹', '펌뱅킹', '타행', '타행건별', '타행대량',
+  '인터넷', '모바일', '모바일이체', '업무폰환불', '업무폰',
+  '카카오페이', '네이버페이', '페이코', '페이플',
+  '택공', '택시공제', '렌공', '공제', '화물공제', '버스공제', '배달공제',
+])
+
+// Soft — 은행/보험사 prefix. 뒤가 한글이면 「하나-김진섭」 처럼 사람 이름일 수 있음
+export const NON_PERSON_BANK_SOFT = new Set([
+  '하나', '디비', 'DB', '현대', '삼성', 'KB', 'kb', '메리츠', '메츠',
+  '롯데', '흥국', '악사', 'AXA', '한화', '캐롯', '한화캐롯', '농협',
+  '카카오', '네이버', '토스',
+])
+
+/**
+ * 비-인명 client_name 판정 — 매처에서 skip 여부 결정
+ *  - STRICT prefix 매칭 → skip
+ *  - SOFT prefix + rest 가 비어있거나 숫자로 시작 → skip (보험금/카드)
+ *  - SOFT prefix + rest 가 한글로 시작 → 통과 (normName 가 「농협」 제거)
+ */
+export function isNonPersonClient(s: string | null | undefined): boolean {
+  if (!s) return false
+  const trimmed = String(s).trim()
+  // 1) Strict prefix
+  for (const p of NON_PERSON_STRICT) {
+    if (trimmed.startsWith(p)) return true
+  }
+  // 2) Soft bank prefix
+  for (const p of NON_PERSON_BANK_SOFT) {
+    if (trimmed.startsWith(p)) {
+      const rest = trimmed.slice(p.length).trim().replace(/^[\-_\s]+/, '')
+      // rest 비어있거나 한글/영문 으로 시작 안 함 → 보험금/카드 패턴 → skip
+      if (rest.length === 0 || !/^[가-힣A-Za-z]/.test(rest)) return true
+      // rest 한글/영문 시작 → 사람 이름 가능성 → 통과
+    }
+  }
+  return false
+}
+
 /**
  * 한국 차량번호 패턴 추출
  * 예: 「농협125하4228」 → { vehicle: '125하4228', last4: '4228' }
