@@ -487,7 +487,7 @@ export default function ScheduleGrid({ detail, onChanged }: Props) {
                 <th
                   key={d}
                   style={{
-                    minWidth: 56, padding: '4px 4px', textAlign: 'center',  // Phase C — 44 → 56
+                    minWidth: 48, padding: '4px 2px', textAlign: 'center',  // J-2B — 56 → 48 (너비 축소)
                     background: isWeekend ? COLORS.bgRed : COLORS.bgGray,
                     color: dow === 0 ? COLORS.danger : (dow === 6 ? COLORS.info : COLORS.textSecondary),
                     fontWeight: 700, borderRadius: 4,
@@ -522,7 +522,7 @@ export default function ScheduleGrid({ detail, onChanged }: Props) {
                 const onDuty = isOnExternalDuty(ew, d)
                 return (
                   <td key={d} style={{
-                    padding: 0, minWidth: 44, height: 14,
+                    padding: 0, minWidth: 48, height: 14,
                     background: onDuty ? '#9ca3af' : 'transparent',
                     borderTop: `1px solid ${COLORS.borderFaint}`,
                     borderBottom: `1px solid ${COLORS.borderFaint}`,
@@ -553,7 +553,7 @@ export default function ScheduleGrid({ detail, onChanged }: Props) {
                 if (!skip) {
                   return (
                     <td key={d} style={{
-                      padding: 0, minWidth: 44, height: 14,
+                      padding: 0, minWidth: 48, height: 14,
                       borderTop: `1px solid ${COLORS.borderFaint}`,
                       borderBottom: `1px solid ${COLORS.borderFaint}`,
                     }} />
@@ -562,7 +562,7 @@ export default function ScheduleGrid({ detail, onChanged }: Props) {
                 const isApproved = skip.status === 'approved'
                 return (
                   <td key={d} style={{
-                    padding: 0, minWidth: 44, height: 14,
+                    padding: 0, minWidth: 48, height: 14,
                     background: isApproved ? COLORS.bgAmber : COLORS.bgRed,
                     color: isApproved ? COLORS.warning : COLORS.danger,
                     borderTop: `1px solid ${COLORS.borderFaint}`,
@@ -624,7 +624,7 @@ export default function ScheduleGrid({ detail, onChanged }: Props) {
                       const onDuty = isOnExternalDuty(ew, d)
                       return (
                         <td key={d} style={{
-                          padding: 0, minWidth: 56, height: 14,
+                          padding: 0, minWidth: 48, height: 14,
                           background: onDuty ? '#9ca3af' : 'transparent',
                           borderTop: `1px solid ${COLORS.borderFaint}`,
                           borderBottom: `1px solid ${COLORS.borderFaint}`,
@@ -652,7 +652,7 @@ export default function ScheduleGrid({ detail, onChanged }: Props) {
                       const ok = skip.status === 'approved'
                       return (
                         <td key={d} style={{
-                          padding: 0, minWidth: 56, height: 14,
+                          padding: 0, minWidth: 48, height: 14,
                           background: ok ? COLORS.bgAmber : COLORS.bgRed,
                           color: ok ? COLORS.warning : COLORS.danger,
                           borderTop: `1px solid ${COLORS.borderFaint}`,
@@ -687,16 +687,20 @@ export default function ScheduleGrid({ detail, onChanged }: Props) {
             const headerBorder = cat === '야간' ? COLORS.borderViolet : cat === '저녁' ? COLORS.borderAmber
                                : cat === '주간' ? COLORS.borderBlue : cat === '특수' ? COLORS.borderRed : COLORS.borderFaint
             const _slotRow = (() => {
-            // Phase J — 그룹 + 시간 막대
+            // Phase J-2B — 그룹 + 24h 시간 막대 (항상 24h 스케일 + 익일 wrap 분리)
             const grp = slotGroups[slot.id]
-            // 시간 막대 (24h scale): start_time/end_time → 막대 위치/폭
             const toMin = (t: string) => { const [h,m] = t.split(':').map(Number); return h*60 + m }
             const startMin = toMin(slot.start_time)
-            let endMin = toMin(slot.end_time)
-            if (slot.is_overnight) endMin += 1440
-            const barTotalMin = slot.is_overnight ? 2880 : 1440  // overnight 은 48h 스케일
-            const barLeftPct = (startMin / barTotalMin) * 100
-            const barWidthPct = ((endMin - startMin) / barTotalMin) * 100
+            const rawEndMin = toMin(slot.end_time)
+            const isOvernight = slot.is_overnight
+            const BAR_TOTAL = 1440  // 항상 24h
+            // overnight: [start → 24:00] + [00:00 → end] 두 segment 로 wrap 표출
+            const seg1Left = startMin
+            const seg1Width = isOvernight ? (1440 - startMin) : (rawEndMin - startMin)
+            const seg2Width = isOvernight ? rawEndMin : 0
+            const seg1LeftPct = (seg1Left / BAR_TOTAL) * 100
+            const seg1WidthPct = (seg1Width / BAR_TOTAL) * 100
+            const seg2WidthPct = (seg2Width / BAR_TOTAL) * 100
             // 그룹 카테고리별 색
             const grpTone = grp?.category === '야간' ? COLORS.bgViolet
                           : grp?.category === '저녁' ? COLORS.bgAmber
@@ -711,57 +715,70 @@ export default function ScheduleGrid({ detail, onChanged }: Props) {
             return (
             <tr key={slot.id}>
               <td style={{
-                padding: '4px 8px', position: 'sticky', left: 0,
+                padding: '4px 6px', position: 'sticky', left: 0,
                 background: 'rgba(255,255,255,0.95)',
                 color: COLORS.textPrimary, fontWeight: 600,
                 borderRadius: 4, whiteSpace: 'nowrap', zIndex: 1,
-                fontSize: 11, minWidth: 200, maxWidth: 220,
+                fontSize: 11, minWidth: 148, maxWidth: 168,  // J-2B — 200~220 → 148~168
                 borderLeft: `3px solid ${grpBorder}`,
               }}>
-                {/* 1행: 슬롯 코드 + 시간 + 그룹 chip */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                {/* 1행: 슬롯 코드 + 시간 (한 줄) */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 2 }}>
                   <span style={{
-                    fontSize: 10, color: COLORS.textMuted, fontFamily: 'monospace', fontWeight: 700,
+                    fontSize: 9, color: COLORS.textMuted, fontFamily: 'monospace', fontWeight: 700,
                   }}>{slot.code}</span>
                   <span style={{ fontSize: 11, fontWeight: 700 }}>
                     {slot.start_time.substring(0,5)}~{slot.end_time.substring(0,5)}
-                    {slot.is_overnight && <span style={{ fontSize: 8, color: COLORS.warning, marginLeft: 2 }}>익</span>}
+                    {isOvernight && <span style={{ fontSize: 8, color: COLORS.warning, marginLeft: 2 }}>익</span>}
                   </span>
-                  {grp && (
-                    <span style={{
-                      fontSize: 9, padding: '1px 5px', borderRadius: 99, fontWeight: 700,
-                      background: grpTone, color: COLORS.textPrimary,
-                      border: `1px solid ${grpBorder}`,
-                      whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 80,
-                    }} title={`그룹: ${grp.name} (${grp.category})`}>
-                      {grp.name}
-                    </span>
-                  )}
                 </div>
-                {/* 2행: 24h 시간 막대 */}
+                {/* 2행: 24h 시간 막대 (항상 24h, 익일 wrap 분리) */}
                 <div style={{
-                  position: 'relative', width: '100%', height: 6,
-                  background: 'rgba(0,0,0,0.05)', borderRadius: 3, overflow: 'hidden',
-                }} title={`${slot.start_time.substring(0,5)} ~ ${slot.end_time.substring(0,5)}${slot.is_overnight ? ' (익일)' : ''}`}>
-                  <div style={{
-                    position: 'absolute',
-                    left: `${barLeftPct}%`,
-                    width: `${barWidthPct}%`,
-                    height: '100%',
-                    background: grpBorder,
-                    borderRadius: 3,
-                  }} />
-                  {/* 12h / 24h 마커 */}
-                  <div style={{
-                    position: 'absolute', left: `${(720/barTotalMin)*100}%`,
-                    width: 1, height: '100%', background: 'rgba(0,0,0,0.15)',
-                  }} />
-                  {slot.is_overnight && (
+                  position: 'relative', width: '100%', height: 12,
+                  background: 'rgba(0,0,0,0.04)', borderRadius: 3, overflow: 'hidden',
+                  border: '1px solid rgba(0,0,0,0.06)',
+                }} title={`${slot.start_time.substring(0,5)} ~ ${slot.end_time.substring(0,5)}${isOvernight ? ' (익일 wrap)' : ''}`}>
+                  {/* 6시간 눈금 (0/6/12/18/24) */}
+                  {[0, 6, 12, 18, 24].map(h => (
+                    <div key={h} style={{
+                      position: 'absolute',
+                      left: `${(h*60/BAR_TOTAL)*100}%`,
+                      top: 0, bottom: 0, width: 1,
+                      background: h === 12 ? 'rgba(0,0,0,0.18)' : 'rgba(0,0,0,0.08)',
+                    }} />
+                  ))}
+                  {/* Segment 1: 시작 → (익일이면 24:00, 아니면 종료) */}
+                  {seg1WidthPct > 0 && (
                     <div style={{
-                      position: 'absolute', left: `${(1440/barTotalMin)*100}%`,
-                      width: 1, height: '100%', background: 'rgba(0,0,0,0.25)',
+                      position: 'absolute',
+                      left: `${seg1LeftPct}%`,
+                      width: `${seg1WidthPct}%`,
+                      height: '100%',
+                      background: grpBorder,
+                      borderRadius: isOvernight ? '2px 0 0 2px' : 2,
                     }} />
                   )}
+                  {/* Segment 2: 익일 0:00 → 종료 (overnight wrap) */}
+                  {seg2WidthPct > 0 && (
+                    <div style={{
+                      position: 'absolute',
+                      left: 0,
+                      width: `${seg2WidthPct}%`,
+                      height: '100%',
+                      background: grpBorder,
+                      borderRadius: '0 2px 2px 0',
+                      opacity: 0.65,
+                      borderLeft: `1px dashed rgba(255,255,255,0.7)`,
+                    }} />
+                  )}
+                </div>
+                {/* 3행: 시간 라벨 (0/6/12/18/24) */}
+                <div style={{
+                  display: 'flex', justifyContent: 'space-between',
+                  fontSize: 7, color: COLORS.textMuted, marginTop: 1,
+                  fontFamily: 'monospace', lineHeight: 1,
+                }}>
+                  <span>0</span><span>6</span><span>12</span><span>18</span><span>24</span>
                 </div>
               </td>
               {days.map(d => {
@@ -769,13 +786,13 @@ export default function ScheduleGrid({ detail, onChanged }: Props) {
                 const arr = cellMap.get(`${d}_${slot.id}`) || []
                 const isEmpty = arr.length === 0
                   || arr.every(a => !a.worker_id && a.special_code !== 'off')
-                // Phase C — 셀 td 너비 44 → 56 (사용자 원칙: 직관적 표시)
+                // J-2B — 셀 td 너비 56 → 48 (화면 너비 축소)
                 const cellTdStyle: React.CSSProperties = emptyOnly && isEmpty ? {
-                  padding: 1, minWidth: 56, verticalAlign: 'top',
+                  padding: 1, minWidth: 48, verticalAlign: 'top',
                   background: COLORS.bgRed,
                   border: `2px dashed ${COLORS.borderRed}`,
                   borderRadius: 4,
-                } : { padding: 1, minWidth: 56, verticalAlign: 'top' }
+                } : { padding: 1, minWidth: 48, verticalAlign: 'top' }
                 const isSwapFirst = swapFirst && swapFirst.slotId === slot.id && swapFirst.date === d
                 const finalCellStyle: React.CSSProperties = isSwapFirst
                   ? { ...cellTdStyle, background: COLORS.bgViolet, border: `2px solid #7c3aed`, borderRadius: 4 }
@@ -886,7 +903,7 @@ export default function ScheduleGrid({ detail, onChanged }: Props) {
                       const onDuty = isOnExternalDuty(ew, d)
                       return (
                         <td key={d} style={{
-                          padding: 0, minWidth: 56, height: 14,
+                          padding: 0, minWidth: 48, height: 14,
                           background: onDuty ? '#9ca3af' : 'transparent',
                           borderTop: `1px solid ${COLORS.borderFaint}`,
                           borderBottom: `1px solid ${COLORS.borderFaint}`,
@@ -911,7 +928,7 @@ export default function ScheduleGrid({ detail, onChanged }: Props) {
                       const ok = skip.status === 'approved'
                       return (
                         <td key={d} style={{
-                          padding: 0, minWidth: 56, height: 14,
+                          padding: 0, minWidth: 48, height: 14,
                           background: ok ? COLORS.bgAmber : COLORS.bgRed,
                           color: ok ? COLORS.warning : COLORS.danger,
                           borderTop: `1px solid ${COLORS.borderFaint}`,
