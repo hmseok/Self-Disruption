@@ -131,16 +131,8 @@ export default function RideCustomerDataPage() {
   const [reportDetail, setReportDetail] = useState<CapitalReport | null>(null)
   const [contractDetail, setContractDetail] = useState<Contract | null>(null)
 
-  // 엑셀 업로드 모달
-  const [uploadModal, setUploadModal] = useState<{
-    target: 'capital_reports' | 'contracts'
-    customer_id: string
-    report_date: string
-    file: File | null
-    preview: { detected?: { parsed_rows: number; report_date?: string | null }; sample?: unknown[]; target?: string } | null
-    busy: boolean
-    result: { result: { inserted: number; skipped: number; errors: string[] } } | null
-  } | null>(null)
+  // 엑셀 업로드 모달 (다중 파일)
+  const [uploadOpen, setUploadOpen] = useState(false)
 
   useEffect(() => {
     setUser(getStoredUser())
@@ -514,7 +506,7 @@ export default function RideCustomerDataPage() {
         <div style={{ display: 'flex', gap: 8 }}>
           <button
             style={{ ...BTN.md, background: COLORS.bgGreen, color: COLORS.success, border: `1px solid ${COLORS.borderGreen}` }}
-            onClick={() => setUploadModal({ target: 'capital_reports', customer_id: '', report_date: '', file: null, preview: null, busy: false, result: null })}
+            onClick={() => setUploadOpen(true)}
           >
             📥 엑셀 업로드
           </button>
@@ -619,7 +611,7 @@ export default function RideCustomerDataPage() {
             </button>
             <button
               style={{ ...BTN.sm, background: COLORS.bgGreen, color: COLORS.success, marginLeft: 'auto' }}
-              onClick={() => setUploadModal({ target: 'contracts', customer_id: '', report_date: '', file: null, preview: null, busy: false, result: null })}
+              onClick={() => setUploadOpen(true)}
             >
               📥 엑셀
             </button>
@@ -690,16 +682,14 @@ export default function RideCustomerDataPage() {
         />
       )}
 
-      {/* ─── 엑셀 업로드 모달 ─── */}
-      {uploadModal && (
-        <UploadModal
+      {/* ─── 엑셀 업로드 모달 (다중 파일) ─── */}
+      {uploadOpen && (
+        <MultiUploadModal
           companies={companies}
-          state={uploadModal}
-          onChange={s => setUploadModal(s)}
-          onClose={() => setUploadModal(null)}
-          onApplied={() => {
-            if (uploadModal.target === 'capital_reports') fetchReports()
-            else fetchContracts()
+          onClose={() => setUploadOpen(false)}
+          onAnyApplied={() => {
+            fetchReports()
+            fetchContracts()
           }}
         />
       )}
@@ -858,44 +848,92 @@ function DetailModal({
   )
 }
 
-function UploadModal({
+// ───────────────────────── MultiUploadModal ──────────────────────
+// 여러 파일 동시 업로드 — 각 파일별 자동 감지 + 표 형식 미리보기
+
+interface PreviewData {
+  target: 'capital_reports' | 'contracts'
+  detected: {
+    file_name: string
+    sheet?: string
+    header_row_index?: number
+    total_data_rows: number
+    parsed_rows: number
+    report_date?: string | null
+    customer_id?: string | null
+    customer_name_snap?: string | null
+  }
+  mapping: {
+    mapped: Record<string, string>
+    unmapped_headers: string[]
+  }
+  sample: {
+    headers: string[]
+    rows: (string | null)[][]
+  }
+}
+
+interface FileItem {
+  id: string
+  file: File
+  customer_id: string
+  report_date: string
+  target: 'capital_reports' | 'contracts'
+  preview: PreviewData | null
+  result: { inserted: number; skipped: number; errors: string[] } | null
+  busy: boolean
+  error: string | null
+}
+
+function MultiUploadModal({
   companies,
-  state,
-  onChange,
   onClose,
-  onApplied,
+  onAnyApplied,
 }: {
   companies: Company[]
-  state: NonNullable<{
-    target: 'capital_reports' | 'contracts'
-    customer_id: string
-    report_date: string
-    file: File | null
-    preview: { detected?: { parsed_rows: number; report_date?: string | null }; sample?: unknown[]; target?: string } | null
-    busy: boolean
-    result: { result: { inserted: number; skipped: number; errors: string[] } } | null
-  }>
-  onChange: (s: typeof state | null) => void
   onClose: () => void
-  onApplied: () => void
+  onAnyApplied: () => void
 }) {
-  const [err, setErr] = useState<string | null>(null)
+  const [files, setFiles] = useState<FileItem[]>([])
+  const [bulkApplying, setBulkApplying] = useState(false)
+  const [defaultCustomerId, setDefaultCustomerId] = useState('')
 
-  const submit = async (mode: 'preview' | 'apply') => {
-    if (!state.file) {
-      setErr('파일 선택 필요')
-      return
+  const addFiles = async (fl: FileList | null) => {
+    if (!fl || fl.length === 0) return
+    const newItems: FileItem[] = Array.from(fl).map(f => ({
+      id: `${f.name}-${f.size}-${Date.now()}-${Math.random()}`,
+      file: f,
+      customer_id: defaultCustomerId,
+      report_date: '',
+      target: 'capital_reports',
+      preview: null,
+      result: null,
+      busy: false,
+      error: null,
+    }))
+    setFiles(prev => [...prev, ...newItems])
+    // 각 파일에 대해 자동 preview
+    for (const item of newItems) {
+      await runPreview(item.id, item.file, item.customer_id, '', '')
     }
-    setErr(null)
-    onChange({ ...state, busy: true })
+  }
+
+  const runPreview = async (
+    id: string,
+    file: File,
+    customer_id: string,
+    target: string,
+    report_date: string
+  ) => {
+    setFiles(prev => prev.map(f => (f.id === id ? { ...f, busy: true, error: null } : f)))
     try {
       const token = getStoredToken()
       const fd = new FormData()
-      fd.append('file', state.file)
-      fd.append('target', state.target)
-      if (state.customer_id) fd.append('customer_id', state.customer_id)
-      if (state.report_date) fd.append('report_date', state.report_date)
-      fd.append('mode', mode)
+      fd.append('file', file)
+      if (target) fd.append('target', target)
+      if (customer_id) fd.append('customer_id', customer_id)
+      if (report_date) fd.append('report_date', report_date)
+      fd.append('mode', 'preview')
       const res = await fetch('/api/ride-customer-data/upload', {
         method: 'POST',
         headers: token ? { Authorization: `Bearer ${token}` } : {},
@@ -903,130 +941,434 @@ function UploadModal({
       })
       const json = await res.json()
       if (!res.ok || !json.success) {
-        setErr(json.error || `HTTP ${res.status}`)
-        onChange({ ...state, busy: false })
+        setFiles(prev =>
+          prev.map(f => (f.id === id ? { ...f, busy: false, error: json.error || `HTTP ${res.status}` } : f))
+        )
         return
       }
-      if (mode === 'preview') {
-        onChange({ ...state, busy: false, preview: json, result: null })
-      } else {
-        onChange({ ...state, busy: false, result: json })
-        onApplied()
-      }
+      setFiles(prev =>
+        prev.map(f =>
+          f.id === id
+            ? {
+                ...f,
+                busy: false,
+                preview: json as PreviewData,
+                target: json.target,
+                report_date: json.detected?.report_date || f.report_date,
+              }
+            : f
+        )
+      )
     } catch (e) {
-      setErr(String(e))
-      onChange({ ...state, busy: false })
+      setFiles(prev =>
+        prev.map(f => (f.id === id ? { ...f, busy: false, error: String(e) } : f))
+      )
     }
   }
 
+  const applyOne = async (id: string) => {
+    const item = files.find(f => f.id === id)
+    if (!item) return
+    setFiles(prev => prev.map(f => (f.id === id ? { ...f, busy: true, error: null } : f)))
+    try {
+      const token = getStoredToken()
+      const fd = new FormData()
+      fd.append('file', item.file)
+      fd.append('target', item.target)
+      if (item.customer_id) fd.append('customer_id', item.customer_id)
+      if (item.report_date) fd.append('report_date', item.report_date)
+      fd.append('mode', 'apply')
+      const res = await fetch('/api/ride-customer-data/upload', {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: fd,
+      })
+      const json = await res.json()
+      if (!res.ok || !json.success) {
+        setFiles(prev =>
+          prev.map(f => (f.id === id ? { ...f, busy: false, error: json.error || `HTTP ${res.status}` } : f))
+        )
+        return
+      }
+      setFiles(prev =>
+        prev.map(f => (f.id === id ? { ...f, busy: false, result: json.result } : f))
+      )
+      onAnyApplied()
+    } catch (e) {
+      setFiles(prev =>
+        prev.map(f => (f.id === id ? { ...f, busy: false, error: String(e) } : f))
+      )
+    }
+  }
+
+  const applyAll = async () => {
+    setBulkApplying(true)
+    for (const f of files) {
+      if (f.result) continue
+      if (!f.preview) continue
+      await applyOne(f.id)
+    }
+    setBulkApplying(false)
+  }
+
+  const removeFile = (id: string) => {
+    setFiles(prev => prev.filter(f => f.id !== id))
+  }
+
+  const updateField = (id: string, patch: Partial<FileItem>) => {
+    setFiles(prev => prev.map(f => (f.id === id ? { ...f, ...patch, result: null } : f)))
+    // 변경 후 자동 re-preview (target / customer_id / report_date 변경 시)
+    const item = files.find(f => f.id === id)
+    if (item && (patch.target !== undefined || patch.customer_id !== undefined || patch.report_date !== undefined)) {
+      const next = { ...item, ...patch }
+      runPreview(id, next.file, next.customer_id, next.target, next.report_date)
+    }
+  }
+
+  const totalInserted = files.reduce((s, f) => s + (f.result?.inserted || 0), 0)
+  const totalSkipped = files.reduce((s, f) => s + (f.result?.skipped || 0), 0)
+  const pendingCount = files.filter(f => !f.result && f.preview).length
+
   return (
-    <ModalShell title={`📥 엑셀 업로드 — ${state.target === 'capital_reports' ? '캐피탈 보고' : '계약 마스터'}`} onClose={onClose} wide>
+    <ModalShell title="📥 엑셀 일괄 업로드 (다중 파일 + 양식 자동 감지)" onClose={onClose} wide>
       <div style={{ display: 'grid', gap: 12 }}>
-        <Field label="대상 테이블">
+        {/* 기본 고객사 (모든 파일 일괄 적용) */}
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 12, color: COLORS.textSecondary, fontWeight: 600 }}>
+            기본 고객사 (모든 파일):
+          </span>
           <select
-            value={state.target}
-            onChange={e => onChange({ ...state, target: e.target.value as 'capital_reports' | 'contracts', preview: null, result: null })}
-            style={inputStyle}
+            value={defaultCustomerId}
+            onChange={e => {
+              const v = e.target.value
+              setDefaultCustomerId(v)
+              // 이미 추가된 파일에도 일괄 적용
+              setFiles(prev => prev.map(f => ({ ...f, customer_id: v, result: null })))
+              // re-preview
+              files.forEach(f => runPreview(f.id, f.file, v, f.target, f.report_date))
+            }}
+            style={{ ...inputStyle, width: 'auto', minWidth: 200 }}
           >
-            <option value="capital_reports">캐피탈 보고 (ride_capital_reports)</option>
-            <option value="contracts">계약 마스터 (ride_contracts)</option>
-          </select>
-        </Field>
-        <Field label="고객사 (선택 — 미지정 시 컬럼 자동 감지)">
-          <select
-            value={state.customer_id}
-            onChange={e => onChange({ ...state, customer_id: e.target.value })}
-            style={inputStyle}
-          >
-            <option value="">미지정</option>
+            <option value="">파일별 개별 지정</option>
             {companies.map(c => (
               <option key={c.id} value={c.id}>
                 {c.name}
               </option>
             ))}
           </select>
-        </Field>
-        {state.target === 'capital_reports' && (
-          <Field label="보고일자 (미지정 시 파일명에서 추정)">
-            <input
-              type="date"
-              value={state.report_date}
-              onChange={e => onChange({ ...state, report_date: e.target.value })}
-              style={inputStyle}
-            />
-          </Field>
-        )}
-        <Field label="엑셀 파일">
+        </div>
+
+        {/* 파일 추가 input */}
+        <div
+          style={{
+            ...GLASS.L1,
+            border: '2px dashed rgba(0,0,0,0.10)',
+            borderRadius: 12,
+            padding: 16,
+            textAlign: 'center',
+          }}
+        >
           <input
             type="file"
             accept=".xlsx,.xls"
-            onChange={e => onChange({ ...state, file: e.target.files?.[0] || null, preview: null, result: null })}
-            style={inputStyle}
+            multiple
+            onChange={e => {
+              addFiles(e.target.files)
+              e.target.value = ''
+            }}
+            style={{ display: 'block', margin: '0 auto', fontSize: 13 }}
           />
-          {state.file && (
-            <div style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 4 }}>
-              {state.file.name} ({(state.file.size / 1024).toFixed(1)} KB)
-            </div>
-          )}
-        </Field>
-        {state.preview && (
-          <div style={{ ...GLASS.L3, border: `1px solid ${COLORS.borderBlue}`, padding: 12, borderRadius: 8 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
-              미리보기 — {state.preview.detected?.parsed_rows} row 감지 ({state.preview.target})
-            </div>
-            <div style={{ fontSize: 11, color: COLORS.textSecondary }}>
-              보고일자: {state.preview.detected?.report_date || '-'}
-            </div>
-            {Array.isArray(state.preview.sample) && state.preview.sample.length > 0 && (
-              <pre style={{ fontSize: 10, marginTop: 8, maxHeight: 160, overflow: 'auto', background: 'rgba(0,0,0,0.03)', padding: 8, borderRadius: 6 }}>
-                {JSON.stringify(state.preview.sample, null, 2)}
-              </pre>
-            )}
+          <div style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 6 }}>
+            여러 파일 동시 선택 가능 — 각 파일별로 양식 자동 감지 (캐피탈 보고 / 계약 마스터)
+          </div>
+        </div>
+
+        {/* 파일별 카드 */}
+        {files.length === 0 ? (
+          <div style={{ textAlign: 'center', color: COLORS.textMuted, fontSize: 12, padding: 20 }}>
+            파일을 추가하면 자동으로 양식을 감지합니다
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gap: 12, maxHeight: '50vh', overflow: 'auto' }}>
+            {files.map(f => (
+              <FileCard
+                key={f.id}
+                item={f}
+                companies={companies}
+                onRemove={() => removeFile(f.id)}
+                onUpdate={patch => updateField(f.id, patch)}
+                onApply={() => applyOne(f.id)}
+              />
+            ))}
           </div>
         )}
-        {state.result && (
-          <div style={{ ...GLASS.L3, border: `1px solid ${COLORS.borderGreen}`, padding: 12, borderRadius: 8 }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.success }}>
-              ✅ 업로드 완료
-            </div>
-            <div style={{ fontSize: 12, marginTop: 6 }}>
-              <div>✓ 신규: <b>{state.result.result.inserted}</b>건</div>
-              <div>· 중복 skip: {state.result.result.skipped}건</div>
-              {state.result.result.errors?.length > 0 && (
-                <div style={{ color: COLORS.danger, marginTop: 4 }}>
-                  ❌ 에러 {state.result.result.errors.length}건 (앞 5개만 표시)
-                  <ul style={{ margin: '4px 0 0 16px', padding: 0 }}>
-                    {state.result.result.errors.map((e: string, i: number) => (
-                      <li key={i} style={{ fontSize: 11 }}>{e}</li>
-                    ))}
-                  </ul>
-                </div>
+
+        {/* 총계 + 액션 */}
+        {files.length > 0 && (
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              gap: 8,
+              flexWrap: 'wrap',
+              padding: '8px 0',
+              borderTop: '1px solid rgba(0,0,0,0.05)',
+            }}
+          >
+            <div style={{ fontSize: 12, color: COLORS.textSecondary }}>
+              파일 <b>{files.length}</b>개 · 저장 대기 <b>{pendingCount}</b>개
+              {totalInserted > 0 && (
+                <span>
+                  {' '}
+                  · 누적 신규 <b style={{ color: COLORS.success }}>{totalInserted}</b>건 / 중복 {totalSkipped}건
+                </span>
               )}
             </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button style={{ ...BTN.md, background: COLORS.bgGray, color: COLORS.textSecondary }} onClick={onClose}>
+                닫기
+              </button>
+              <button
+                style={{
+                  ...BTN.md,
+                  background: COLORS.success,
+                  color: '#fff',
+                  opacity: pendingCount === 0 ? 0.5 : 1,
+                }}
+                disabled={bulkApplying || pendingCount === 0}
+                onClick={applyAll}
+              >
+                {bulkApplying ? '저장 중…' : `📥 ${pendingCount}개 일괄 저장`}
+              </button>
+            </div>
           </div>
         )}
-        {err && <div style={{ color: COLORS.danger, fontSize: 12 }}>{err}</div>}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-          <button style={{ ...BTN.md, background: COLORS.bgGray, color: COLORS.textSecondary }} onClick={onClose}>
-            닫기
-          </button>
-          <button
-            style={{ ...BTN.md, background: COLORS.bgBlue, color: COLORS.primary }}
-            onClick={() => submit('preview')}
-            disabled={state.busy || !state.file}
-          >
-            {state.busy ? '...' : '미리보기'}
-          </button>
-          <button
-            style={{ ...BTN.md, background: COLORS.success, color: '#fff' }}
-            onClick={() => submit('apply')}
-            disabled={state.busy || !state.file}
-          >
-            {state.busy ? '저장 중…' : '저장'}
-          </button>
-        </div>
       </div>
     </ModalShell>
+  )
+}
+
+// ─── 파일별 카드 ────────────────────────────────────────────────
+function FileCard({
+  item,
+  companies,
+  onRemove,
+  onUpdate,
+  onApply,
+}: {
+  item: FileItem
+  companies: Company[]
+  onRemove: () => void
+  onUpdate: (patch: Partial<FileItem>) => void
+  onApply: () => void
+}) {
+  const targetLabel = item.target === 'contracts' ? '📜 계약 마스터' : '📊 캐피탈 보고'
+  const customerName = companies.find(c => c.id === item.customer_id)?.name || ''
+  const status = item.result
+    ? 'done'
+    : item.error
+    ? 'error'
+    : item.busy
+    ? 'busy'
+    : item.preview
+    ? 'ready'
+    : 'pending'
+
+  const borderColor =
+    status === 'done'
+      ? COLORS.borderGreen
+      : status === 'error'
+      ? COLORS.borderRed
+      : status === 'ready'
+      ? COLORS.borderBlue
+      : COLORS.borderSubtle
+
+  return (
+    <div style={{ ...GLASS.L3, border: `1px solid ${borderColor}`, borderRadius: 12, padding: 12 }}>
+      {/* 헤더 — 파일명 + target + 액션 */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 14, fontWeight: 700, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          📄 {item.file.name}
+        </span>
+        <span
+          style={{
+            fontSize: 11,
+            padding: '2px 8px',
+            borderRadius: 4,
+            background: item.target === 'contracts' ? COLORS.bgViolet : COLORS.bgBlue,
+            color: item.target === 'contracts' ? '#7c3aed' : COLORS.primary,
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {targetLabel}
+        </span>
+        <span style={{ fontSize: 11, color: COLORS.textMuted, whiteSpace: 'nowrap' }}>
+          {(item.file.size / 1024).toFixed(1)} KB
+        </span>
+        <button
+          onClick={onRemove}
+          style={{ ...BTN.sm, background: 'transparent', color: COLORS.textMuted }}
+        >
+          ✕
+        </button>
+      </div>
+
+      {/* 설정 행 */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+        <select
+          value={item.target}
+          onChange={e => onUpdate({ target: e.target.value as 'capital_reports' | 'contracts' })}
+          style={{ ...inputStyle, width: 'auto', fontSize: 11, padding: '4px 8px' }}
+        >
+          <option value="capital_reports">캐피탈 보고</option>
+          <option value="contracts">계약 마스터</option>
+        </select>
+        <select
+          value={item.customer_id}
+          onChange={e => onUpdate({ customer_id: e.target.value })}
+          style={{ ...inputStyle, width: 'auto', fontSize: 11, padding: '4px 8px' }}
+        >
+          <option value="">고객사 미지정</option>
+          {companies.map(c => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+        </select>
+        {item.target === 'capital_reports' && (
+          <input
+            type="date"
+            value={item.report_date}
+            onChange={e => onUpdate({ report_date: e.target.value })}
+            style={{ ...inputStyle, width: 'auto', fontSize: 11, padding: '4px 8px' }}
+            placeholder="보고일자"
+          />
+        )}
+      </div>
+
+      {/* 진행 상태 */}
+      {item.busy && (
+        <div style={{ fontSize: 12, color: COLORS.primary }}>⏳ 분석 중…</div>
+      )}
+      {item.error && (
+        <div style={{ fontSize: 12, color: COLORS.danger, padding: 8, background: COLORS.bgRed, borderRadius: 6 }}>
+          ❌ {item.error}
+        </div>
+      )}
+
+      {/* 미리보기 — 표 형식 */}
+      {item.preview && !item.result && (
+        <div style={{ marginTop: 4 }}>
+          {/* 감지 요약 */}
+          <div style={{ display: 'flex', gap: 12, fontSize: 11, color: COLORS.textSecondary, marginBottom: 6, flexWrap: 'wrap' }}>
+            <span>
+              ✓ <b>{item.preview.detected.parsed_rows}</b>건 / 전체 {item.preview.detected.total_data_rows}건
+            </span>
+            {item.preview.detected.report_date && (
+              <span>
+                📅 보고일: <b>{item.preview.detected.report_date}</b>
+              </span>
+            )}
+            {customerName && (
+              <span>
+                🏢 <b>{customerName}</b>
+              </span>
+            )}
+            <span>
+              매핑 <b>{Object.keys(item.preview.mapping.mapped).length}</b> / 미매칭{' '}
+              <b style={{ color: item.preview.mapping.unmapped_headers.length > 0 ? COLORS.warning : COLORS.success }}>
+                {item.preview.mapping.unmapped_headers.length}
+              </b>
+            </span>
+          </div>
+
+          {/* 매핑 안 된 헤더 — 노란 경고 */}
+          {item.preview.mapping.unmapped_headers.length > 0 && (
+            <div style={{ fontSize: 11, color: COLORS.warning, padding: '4px 8px', background: COLORS.bgAmber, borderRadius: 6, marginBottom: 6 }}>
+              ⚠ 매핑 안 된 컬럼 (저장 시 무시): {item.preview.mapping.unmapped_headers.join(', ')}
+            </div>
+          )}
+
+          {/* 표 형식 미리보기 */}
+          {item.preview.sample.headers.length > 0 && item.preview.sample.rows.length > 0 ? (
+            <div style={{ overflow: 'auto', maxHeight: 200, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 6, background: 'rgba(255,255,255,0.6)' }}>
+              <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: 10 }}>
+                <thead style={{ background: 'rgba(0,0,0,0.04)', position: 'sticky', top: 0 }}>
+                  <tr>
+                    {item.preview.sample.headers.map(h => (
+                      <th
+                        key={h}
+                        style={{
+                          padding: '4px 6px',
+                          textAlign: 'left',
+                          fontSize: 10,
+                          fontWeight: 700,
+                          whiteSpace: 'nowrap',
+                          borderBottom: '1px solid rgba(0,0,0,0.08)',
+                          color: COLORS.textSecondary,
+                        }}
+                      >
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {item.preview.sample.rows.map((row, i) => (
+                    <tr key={i}>
+                      {row.map((cell, j) => (
+                        <td
+                          key={j}
+                          style={{
+                            padding: '4px 6px',
+                            whiteSpace: 'nowrap',
+                            borderBottom: '1px solid rgba(0,0,0,0.04)',
+                            maxWidth: 180,
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                          }}
+                          title={cell ? String(cell) : ''}
+                        >
+                          {cell || '-'}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div style={{ fontSize: 11, color: COLORS.textMuted, padding: 8, textAlign: 'center' }}>
+              파싱된 row 없음 — 양식 확인 필요
+            </div>
+          )}
+
+          {/* 개별 저장 버튼 */}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+            <button
+              style={{ ...BTN.sm, background: COLORS.success, color: '#fff' }}
+              onClick={onApply}
+              disabled={item.busy || item.preview.detected.parsed_rows === 0}
+            >
+              💾 이 파일만 저장 ({item.preview.detected.parsed_rows}건)
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 결과 */}
+      {item.result && (
+        <div style={{ fontSize: 12, padding: 8, background: COLORS.bgGreen, borderRadius: 6, color: COLORS.success }}>
+          ✅ 신규 <b>{item.result.inserted}</b>건 · 중복 skip {item.result.skipped}건
+          {item.result.errors.length > 0 && (
+            <span style={{ color: COLORS.danger, marginLeft: 8 }}>
+              · 에러 {item.result.errors.length}건
+            </span>
+          )}
+        </div>
+      )}
+    </div>
   )
 }
 

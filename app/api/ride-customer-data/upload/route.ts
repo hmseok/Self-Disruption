@@ -272,8 +272,21 @@ export async function POST(request: Request) {
     parsed.push(obj)
   }
 
-  // preview — 통계 + 샘플 5건만
+  // preview — 통계 + 샘플 + 헤더 매핑 결과
   if (mode === 'preview') {
+    // 매핑된 헤더 / 매핑 안 된 헤더 분리 (사용자 가시화)
+    const mapped: Record<string, string> = {}
+    const unmapped: string[] = []
+    for (const h of headers) {
+      const t = h.trim()
+      if (!t) continue
+      if (map[t]) mapped[t] = map[t]
+      else unmapped.push(t)
+    }
+    // 표 형태 sample (headers + values 매트릭스 — 클라이언트 렌더 쉬움)
+    const sampleHeaders = Object.keys(parsed[0] || {})
+    const sampleRows = parsed.slice(0, 5).map(obj => sampleHeaders.map(h => obj[h] ?? ''))
+
     return NextResponse.json({
       success: true,
       target,
@@ -287,7 +300,14 @@ export async function POST(request: Request) {
         customer_name_snap: customerNameSnap,
         file_name: file.name,
       },
-      sample: parsed.slice(0, 5),
+      mapping: {
+        mapped,                 // { 헤더: db_컬럼 }
+        unmapped_headers: unmapped,
+      },
+      sample: {
+        headers: sampleHeaders,  // db 컬럼 키
+        rows: sampleRows,        // 5 row 매트릭스
+      },
     })
   }
 
