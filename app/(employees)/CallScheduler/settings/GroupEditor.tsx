@@ -587,6 +587,83 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
               </div>
             )}
           </Field>
+
+          {/* PR-2SS-Phase-I — 우선순위 정책 표출 (매니저 판단 도구) */}
+          <div style={{
+            ...GLASS.L1, borderRadius: 10, padding: 14,
+            border: `1px solid ${COLORS.borderBlue}`,
+            background: 'rgba(219,234,254,0.45)',
+          }}>
+            <div style={{
+              fontSize: 13, fontWeight: 800, color: COLORS.textPrimary,
+              marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6,
+            }}>
+              🎯 우선순위 정책 <span style={{
+                fontSize: 10, fontWeight: 500, color: COLORS.textMuted,
+                background: 'rgba(255,255,255,0.7)', padding: '1px 6px', borderRadius: 99,
+              }}>자동 생성 시 적용</span>
+            </div>
+            <div style={{ fontSize: 11, color: COLORS.textMuted, marginBottom: 10 }}>
+              이 그룹의 자동 생성은 다음 7단계 ranking 으로 워커를 결정합니다.
+            </div>
+
+            <div style={{
+              background: 'rgba(255,255,255,0.85)', borderRadius: 8, padding: 10,
+              border: `1px solid ${COLORS.borderFaint}`,
+            }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.info, marginBottom: 6 }}>
+                ✓ 채울 워커 결정 순서
+              </div>
+              <ol style={{
+                margin: 0, paddingLeft: 20,
+                fontSize: 12, color: COLORS.textPrimary, lineHeight: 1.7,
+              }}>
+                <li>P1 → P2 → P3 (워커 우선순위)</li>
+                <li>희망 요일 매치 (워커 설정)</li>
+                <li>비선호 요일 회피 (워커 설정)</li>
+                <li>월 필수 일수 미달자 우선</li>
+                <li>이 요일 적게 한 사람 (균등)</li>
+                <li><strong>근무 시간 짧은 사람</strong> (월 누적)</li>
+                <li><strong>가장 오래 근무 안한 사람</strong></li>
+              </ol>
+            </div>
+
+            <div style={{
+              marginTop: 10,
+              background: 'rgba(254,226,226,0.5)', borderRadius: 8, padding: 10,
+              border: `1px solid ${COLORS.borderRed}`,
+            }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.danger, marginBottom: 6 }}>
+                ✗ 후보 제외 규칙 (hard exclude)
+              </div>
+              <ul style={{
+                margin: 0, paddingLeft: 20,
+                fontSize: 11, color: COLORS.textPrimary, lineHeight: 1.7,
+              }}>
+                <li><strong>그룹 회피일</strong> 승인됨 (위 멤버 패널 🛌 chip)</li>
+                <li><strong>연차 종일</strong> (직원 휴가 탭 — 승인됨)</li>
+                <li>외부 cycle 근무 phase (직원 탭)</li>
+                <li>슬롯 거부 / 연속 한도 (직원 탭)</li>
+                <li>익일 휴식 위반 / 시간 겹침 (시간 탭)</li>
+                <li>월 최대 일수 초과 (직원 탭)</li>
+              </ul>
+            </div>
+
+            <div style={{
+              marginTop: 10, fontSize: 11, color: COLORS.textMuted,
+              padding: '6px 10px', borderRadius: 6,
+              background: 'rgba(255,255,255,0.5)',
+              border: `1px dashed ${COLORS.borderFaint}`,
+            }}>
+              💡 정책 변경 위치:
+              <div style={{ marginTop: 4, paddingLeft: 12, lineHeight: 1.6 }}>
+                · 워커 우선순위 / 희망·비선호 / 외부 cycle / 슬롯 거부 / 연속 한도 → <strong>직원 탭</strong><br/>
+                · 안전 가드 (익일 휴식 / 연속 한도 한도) → <strong>시간 탭</strong><br/>
+                · 회피일 (승인) → 위 멤버 패널 <strong>🛌 chip</strong><br/>
+                · 정식 휴가 → <strong>직원 휴가 탭</strong>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* 우측 — 멤버 매핑 */}
