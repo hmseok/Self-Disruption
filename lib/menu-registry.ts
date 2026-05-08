@@ -103,6 +103,8 @@ export const MENUS: MenuEntry[] = [
   // PR-6.7 (2026-05-06) — 라벨 정정: aceesosh = 긴급출동 / acrotpth = 사고접수 분리
   { id: 'mod-ride-accidents',     name: '라이드 긴급출동',  displayName: '🚨 라이드 긴급출동',  path: '/RideAccidents',         iconKey: 'Clipboard', group: 'cx-team', sortOrder: 63, requirePermission: true },
   { id: 'mod-ride-accident-rep',  name: '라이드 사고접수',  displayName: '🚗 라이드 사고접수',  path: '/RideAccidentReports',   iconKey: 'Wrench',    group: 'cx-team', sortOrder: 64, requirePermission: true },
+  // PR-6.9 (2026-05-06) — 차량등록현황 (자체 DB + 카페24 read 통합)
+  { id: 'mod-ride-vehicle-reg',   name: '라이드 차량등록',  displayName: '🚗 라이드 차량등록',  path: '/RideVehicleRegistry',   iconKey: 'Car',       group: 'cx-team', sortOrder: 65, requirePermission: true },
   { id: 'mod-call-scheduler',  name: '근무시간표 분석 & 배포', displayName: '📅 근무시간표 분석 & 배포', path: '/CallScheduler', iconKey: 'Setting', group: 'cx-team', sortOrder: 60, requirePermission: true },
   // 직원 마스터 — 사이드바 숨김. 근무스케줄 페이지 안에서 sub-nav 로 접근 (권한 페이지에는 노출 유지)
   { id: 'mod-ride-employees',  name: '직원 마스터',   path: '/RideEmployees',  iconKey: 'Users',   group: 'cx-team', sortOrder: 61, requirePermission: true, sidebarHidden: true },

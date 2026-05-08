@@ -44,6 +44,23 @@ function getStagedFiles() {
   }
 }
 
+// ─── 특정 commit 의 파일 목록 ─────────────────────────────────────
+// pre-push hook 에서 사용 — 해당 commit 이 multi-module 위반인지 검증
+function getCommitFiles(sha) {
+  try {
+    const out = execSync(`git diff-tree --no-commit-id --name-only -r ${sha}`, {
+      cwd: ROOT,
+      encoding: 'utf-8',
+    })
+    return out
+      .split('\n')
+      .map((s) => s.trim())
+      .filter(Boolean)
+  } catch {
+    return []
+  }
+}
+
 // ─── 모듈 라벨 매핑 ────────────────────────────────────────────────
 //
 // _common  : 공통 영역 (한 PR 에 여러 모듈과 같이 변경 OK)
@@ -150,7 +167,7 @@ function classify(files) {
   return { realModules, whitelist }
 }
 
-// ─── lint 실행 ─────────────────────────────────────────────────────
+// ─── lint 실행 (staged 파일 검사) ─────────────────────────────────
 function lint() {
   const files = getStagedFiles()
   if (files.length === 0) {
@@ -178,8 +195,78 @@ function lint() {
   }
 }
 
+// ─── 특정 commit 검사 (pre-push hook 용) ──────────────────────────
+// 한 commit 의 변경 파일이 multi-module 인지 검증
+function lintCommit(sha) {
+  const files = getCommitFiles(sha)
+  if (files.length === 0) {
+    return { sha, stagedCount: 0, realModules: {}, whitelist: {}, violations: [], skip: true }
+  }
+  const { realModules, whitelist } = classify(files)
+  const moduleNames = Object.keys(realModules)
+  const violations = []
+  if (moduleNames.length > 1) {
+    violations.push({
+      type: 'multi-module-commit',
+      modules: moduleNames,
+      detail: realModules,
+    })
+  }
+  return {
+    sha,
+    stagedCount: files.length,
+    realModules,
+    whitelist,
+    violations,
+    skip: false,
+  }
+}
+
 // ─── 실행 ─────────────────────────────────────────────────────────
 if (require.main === module) {
+  // PR-2SS-Z3 — pre-push hook 모드: --check-commit <sha>
+  const argv = process.argv.slice(2)
+  const checkCommitIdx = argv.indexOf('--check-commit')
+  if (checkCommitIdx >= 0) {
+    const sha = argv[checkCommitIdx + 1]
+    if (!sha) {
+      console.error('Usage: cowork-staging-lint.js --check-commit <sha>')
+      process.exit(2)
+    }
+    const r = lintCommit(sha)
+    if (r.skip) {
+      console.log(`cowork-staging-lint --check-commit ${sha}: 변경 파일 0 — skip`)
+      process.exit(0)
+    }
+    console.log(
+      `cowork-staging-lint --check-commit ${sha.slice(0, 8)}: ${r.stagedCount} files, modules=${Object.keys(r.realModules).length}, whitelist=${Object.keys(r.whitelist).length}`
+    )
+    for (const [mod, list] of Object.entries(r.realModules)) {
+      console.log(`  · [${mod}] ${list.length} files`)
+    }
+    if (r.violations.length > 0) {
+      if (process.env.COWORK_ALLOW_MULTI_MODULE === '1') {
+        console.warn(`\n⚠ multi-module commit allowed (COWORK_ALLOW_MULTI_MODULE=1): ${r.violations[0].modules.join(', ')}`)
+        process.exit(0)
+      }
+      console.error('')
+      console.error(`❌ Cowork 협업 위반 (CLAUDE.md 규칙 21) — commit ${sha.slice(0, 8)}`)
+      console.error(`   다중 모듈 변경: ${r.violations[0].modules.join(', ')}`)
+      console.error('')
+      console.error('   조치:')
+      console.error(`     1. git reset --soft HEAD~1   # commit 풀기 (변경 보존)`)
+      console.error('     2. 자기 모듈만 git add 후 다시 commit')
+      console.error('     3. git push 재시도')
+      console.error('')
+      console.error('   의도적인 cross-module commit 이라면:')
+      console.error('     COWORK_ALLOW_MULTI_MODULE=1 git push origin main')
+      process.exit(1)
+    }
+    console.log('\n✅ commit 단일 모듈 영역 — 통과')
+    process.exit(0)
+  }
+
+  // 기본 모드 — staged 파일 검사 (pre-commit hook 용)
   const r = lint()
   if (r.skip) {
     console.log('cowork-staging-lint: staged 0 files, skip')
@@ -231,4 +318,4 @@ if (require.main === module) {
   process.exit(0)
 }
 
-module.exports = { lint, moduleOf, classify, getStagedFiles }
+module.exports = { lint, lintCommit, moduleOf, classify, getStagedFiles, getCommitFiles }
