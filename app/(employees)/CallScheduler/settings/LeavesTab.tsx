@@ -270,6 +270,79 @@ export default function LeavesTab() {
         </div>
       </div>
 
+      {/* N-3 — 직원별 휴가 잔여 시각화 */}
+      {quotas.length > 0 && (
+        <div style={{ ...GLASS.L4, borderRadius: 12, padding: 14, marginBottom: 12 }}>
+          <div style={{
+            fontSize: 14, fontWeight: 800, color: COLORS.textPrimary,
+            marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8,
+          }}>
+            💼 {year}년 직원별 휴가 잔여
+            <span style={{ fontSize: 11, fontWeight: 500, color: COLORS.textMuted }}>
+              (발급량 / 사용량 / 잔여)
+            </span>
+          </div>
+          <div style={{
+            display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 10,
+          }}>
+            {Array.from(quotaByWorker.entries())
+              .map(([wId, typeMap]) => {
+                const w = workers.find(x => x.id === wId)
+                if (!w) return null
+                const types = Array.from(typeMap.entries())
+                  .filter(([_, e]) => e.total > 0 || e.used > 0)
+                  .sort((a, b) => a[1].remaining - b[1].remaining)
+                if (types.length === 0) return null
+                return (
+                  <div key={wId} style={{
+                    ...GLASS.L1, borderRadius: 10, padding: 12,
+                    display: 'flex', flexDirection: 'column', gap: 8,
+                  }}>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: COLORS.textPrimary }}>
+                      {w.name}
+                    </div>
+                    {types.map(([type, e]) => {
+                      const pctUsed = e.total > 0 ? Math.min(100, (e.used / e.total) * 100) : 0
+                      const lowRemaining = e.remaining < 1 && e.total > 0
+                      return (
+                        <div key={type} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                          <div style={{
+                            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                            fontSize: 11, fontWeight: 700,
+                          }}>
+                            <span style={{ color: COLORS.textSecondary }}>
+                              {TYPE_LABEL[type as LeaveType] || type}
+                            </span>
+                            <span style={{
+                              color: lowRemaining ? COLORS.danger : COLORS.textPrimary,
+                              fontWeight: 800,
+                            }}>
+                              잔여 {e.remaining}일 / {e.total}
+                              {lowRemaining && ' ⚠'}
+                            </span>
+                          </div>
+                          <div style={{
+                            position: 'relative', height: 8,
+                            background: 'rgba(0,0,0,0.05)', borderRadius: 4, overflow: 'hidden',
+                          }}>
+                            <div style={{
+                              width: `${pctUsed}%`, height: '100%',
+                              background: pctUsed >= 90 ? COLORS.danger
+                                        : pctUsed >= 70 ? COLORS.warning
+                                        : COLORS.info,
+                              transition: 'width 0.3s',
+                            }} />
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )
+              })}
+          </div>
+        </div>
+      )}
+
       {/* 편집 폼 */}
       {editing && (
         <div style={{ ...GLASS.L4, borderRadius: 12, padding: 16, marginBottom: 12 }}>

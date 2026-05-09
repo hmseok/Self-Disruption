@@ -20,6 +20,34 @@
 - 셀 호출 시 `slotGroups[slot.id].id + worker_id` 로 lookup → 색상 layer 재활성
 - 효과: 같은 워커가 야간 그룹에서 화/목 희망, 주간 그룹에서 월/금 비선호 등 다른 색상 layer 표출
 
+## 2026-05-09 (Phase N-4) — /requests 거절 사유 입력 모달
+
+### 변경
+- [✗ 거절] 즉시 거절 X → 모달 띄우고 사유 입력
+- 거절 사유 textarea (4줄, placeholder 가이드)
+- "거절 확정" 시 PATCH body 에 reason / resolution_note 포함
+- skip / leave / swap 모두 동일 UX
+- 사유는 직원 측 (MyScheduleView 또는 신청 list) 에 전달되어 거절 이유 명확
+
+## 2026-05-09 (Phase N-3) — 직원별 휴가 잔여 시각화
+
+### LeavesTab 신규 패널
+- 「💼 {year}년 직원별 휴가 잔여」 — 카드 grid (auto-fill 280px)
+- 각 카드: 워커 이름 + 휴가 종류별:
+  · 라벨 (연차/패밀리데이/병가/...)
+  · 잔여 N일 / 발급량 N (잔여 < 1 시 빨간 ⚠)
+  · 사용량 막대 (≥90% 빨강 / ≥70% 노랑 / 그 외 파랑)
+- quota 0 + 사용 0 인 종류는 숨김
+- 잔여 적은 순 정렬 (위급한 워커 먼저)
+
+## 2026-05-09 (Phase N-2) — MyScheduleView 디자인 시원시원
+
+### 변경
+- 헤더 액션 버튼 (휴가 신청 / 회피 신청 / 캘린더 다운로드) BTN.sm → BTN.md
+- 보더 1px → 1.5px / fontWeight 700 → 800
+- viewMode 토글 (월간/주간/오늘) padding 5/12 → 10/20, fontSize 12 → 14, fontWeight 700 → 800
+- 활성 토글에 보더 2px + boxShadow
+
 ## 2026-05-09 (Phase N-1) — 자동 생성 미리보기 시각화 강화
 
 ### 변경

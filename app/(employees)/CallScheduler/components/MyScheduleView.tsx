@@ -208,22 +208,25 @@ export default function MyScheduleView({ token }: Props) {
                 : '아직 공지 안 됨'}
             </div>
           </div>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+            {/* N-2 — 시원시원: BTN.sm → BTN.md, 보더 1.5px */}
             <button type="button" onClick={() => setLeaveRequestOpen(true)}
                     style={{
-                      ...BTN.sm, background: COLORS.bgAmber, color: COLORS.warning,
-                      border: `1px solid ${COLORS.borderAmber}`, cursor: 'pointer',
+                      ...BTN.md, background: COLORS.bgAmber, color: COLORS.warning,
+                      border: `1.5px solid ${COLORS.borderAmber}`,
+                      cursor: 'pointer', fontWeight: 800,
                     }}
                     title={isPublic ? '휴가 신청 — 매니저 승인 대기' : '휴가 등록 (즉시 적용)'}>
               🙋 휴가 신청
             </button>
-            {/* Phase G — 회피일 신청 (그룹 차원 단순 회피) */}
+            {/* Phase G — 회피일 신청 */}
             <button type="button" onClick={() => setSkipRequestOpen(true)}
                     style={{
-                      ...BTN.sm, background: COLORS.bgRed, color: COLORS.danger,
-                      border: `1px solid ${COLORS.borderRed}`, cursor: 'pointer',
+                      ...BTN.md, background: COLORS.bgRed, color: COLORS.danger,
+                      border: `1.5px solid ${COLORS.borderRed}`,
+                      cursor: 'pointer', fontWeight: 800,
                     }}
-                    title="회피일 신청 — 정식 휴가 X, 단순 빠지고 싶은 날 (매니저 승인 대기)">
+                    title="회피일 신청 — 정식 휴가 X, 단순 빠지고 싶은 날">
               🛌 회피 신청
             </button>
             <button type="button" onClick={() => {
@@ -250,8 +253,9 @@ export default function MyScheduleView({ token }: Props) {
               )
             }}
                     style={{
-                      ...BTN.sm, background: COLORS.bgGreen, color: COLORS.success,
-                      border: `1px solid ${COLORS.borderGreen}`, cursor: 'pointer',
+                      ...BTN.md, background: COLORS.bgGreen, color: COLORS.success,
+                      border: `1.5px solid ${COLORS.borderGreen}`,
+                      cursor: 'pointer', fontWeight: 800,
                     }}
                     title="iCal (.ics) 다운로드 — 휴대폰 캘린더에 import 가능">
               📥 캘린더 다운로드
@@ -305,11 +309,13 @@ export default function MyScheduleView({ token }: Props) {
                     onClick={() => setViewMode(opt.v)}
                     title={opt.title}
                     style={{
-                      padding: '5px 12px', borderRadius: 6, fontSize: 12, fontWeight: 700,
-                      background: viewMode === opt.v ? COLORS.primary : 'transparent',
+                      padding: '10px 20px', borderRadius: 10, fontSize: 14, fontWeight: 800,
+                      background: viewMode === opt.v ? COLORS.primary : 'rgba(255,255,255,0.7)',
                       color: viewMode === opt.v ? '#fff' : COLORS.textSecondary,
-                      border: `1px solid ${viewMode === opt.v ? COLORS.primary : COLORS.borderFaint}`,
+                      border: `2px solid ${viewMode === opt.v ? COLORS.primary : COLORS.borderFaint}`,
                       cursor: 'pointer',
+                      transition: 'all 0.15s',
+                      boxShadow: viewMode === opt.v ? '0 2px 6px rgba(59,130,246,0.25)' : 'none',
                     }}>
               {opt.label}
             </button>

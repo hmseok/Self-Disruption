@@ -59,6 +59,13 @@ export default function RequestsPage() {
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  // N-4 — 거절 사유 입력 모달
+  const [rejectModal, setRejectModal] = useState<{
+    kind: 'skip' | 'leave' | 'swap'
+    name: string
+    onConfirm: (note: string | null) => void
+  } | null>(null)
+  const [rejectNote, setRejectNote] = useState('')
 
   const load = async () => {
     setLoading(true); setError(null)
@@ -100,13 +107,14 @@ export default function RequestsPage() {
   const totalPending = skipPending + leavePending + swapPending
 
   // 회피 status 변경
-  const updateSkip = async (skip: SkipRow, status: 'approved' | 'rejected') => {
+  const updateSkip = async (skip: SkipRow, status: 'approved' | 'rejected', note?: string | null) => {
     setBusy(`skip-${skip.id}`); setMsg(null)
     try {
       const auth = await getAuthHeader()
       const res = await fetch(
         `/api/call-scheduler/shift-groups/${skip.group_id}/skip-dates/${skip.id}`,
-        { method: 'PATCH', headers: { 'Content-Type': 'application/json', ...auth }, body: JSON.stringify({ status }) },
+        { method: 'PATCH', headers: { 'Content-Type': 'application/json', ...auth },
+          body: JSON.stringify({ status, ...(note != null ? { reason: note } : {}) }) },
       )
       const json = await res.json()
       if (!res.ok) throw new Error(json?.error || '실패')
@@ -116,8 +124,8 @@ export default function RequestsPage() {
     finally { setBusy(null) }
   }
 
-  // 휴가 / 교체 status 변경 (공통)
-  const resolve = async (kind: 'leave' | 'swap', id: string, action: 'approve' | 'reject', name: string) => {
+  // 휴가 / 교체 status 변경 (공통, note 포함)
+  const resolve = async (kind: 'leave' | 'swap', id: string, action: 'approve' | 'reject', name: string, note?: string | null) => {
     setBusy(`${kind}-${id}`); setMsg(null)
     try {
       const auth = await getAuthHeader()
@@ -128,7 +136,7 @@ export default function RequestsPage() {
       const res = await fetch(url, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', ...auth },
-        body: JSON.stringify({ status, resolution_note: null }),
+        body: JSON.stringify({ status, resolution_note: note ?? null }),
       })
       const json = await res.json()
       if (!res.ok) throw new Error(json?.error || '실패')
@@ -136,6 +144,12 @@ export default function RequestsPage() {
       load()
     } catch (e: any) { setMsg({ ok: false, text: e?.message || '오류' }) }
     finally { setBusy(null) }
+  }
+
+  // N-4 — 거절 시 사유 모달 띄움
+  const openRejectModal = (kind: 'skip' | 'leave' | 'swap', name: string, onConfirm: (note: string | null) => void) => {
+    setRejectNote('')
+    setRejectModal({ kind, name, onConfirm })
   }
 
   return (
@@ -240,23 +254,86 @@ export default function RequestsPage() {
           {tab === 'skip' && (
             skips.length === 0
               ? <EmptyHint text="회피일 신청이 없습니다." />
-              : <SkipList rows={skips} busy={busy} onUpdate={updateSkip} />
+              : <SkipList rows={skips} busy={busy}
+                  onApprove={(s) => updateSkip(s, 'approved')}
+                  onReject={(s) => openRejectModal('skip', s.worker_name || '워커',
+                    (note) => updateSkip(s, 'rejected', note))} />
           )}
 
           {/* 🙋 휴가 */}
           {tab === 'leave' && (
             leaves.length === 0
               ? <EmptyHint text="휴가 신청이 없습니다." />
-              : <LeaveList rows={leaves} busy={busy} onResolve={resolve} />
+              : <LeaveList rows={leaves} busy={busy}
+                  onApprove={(r) => resolve('leave', r.id, 'approve', r.worker_name)}
+                  onReject={(r) => openRejectModal('leave', r.worker_name,
+                    (note) => resolve('leave', r.id, 'reject', r.worker_name, note))} />
           )}
 
           {/* 🔄 교체 */}
           {tab === 'swap' && (
             swaps.length === 0
               ? <EmptyHint text="시프트 교체 요청이 없습니다." />
-              : <SwapList rows={swaps} busy={busy} onResolve={resolve} />
+              : <SwapList rows={swaps} busy={busy}
+                  onApprove={(r) => resolve('swap', r.id, 'approve', r.worker_name)}
+                  onReject={(r) => openRejectModal('swap', r.worker_name,
+                    (note) => resolve('swap', r.id, 'reject', r.worker_name, note))} />
           )}
         </>
+      )}
+
+      {/* N-4 — 거절 사유 입력 모달 */}
+      {rejectModal && (
+        <div onClick={() => setRejectModal(null)}
+             style={{
+               position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
+               display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100,
+             }}>
+          <div onClick={(e) => e.stopPropagation()}
+               style={{
+                 ...GLASS.L4, width: 480, maxWidth: '94vw', borderRadius: 16, padding: 24,
+                 display: 'flex', flexDirection: 'column', gap: 14,
+               }}>
+            <div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: COLORS.textPrimary }}>
+                ✗ {rejectModal.kind === 'skip' ? '회피일' : rejectModal.kind === 'leave' ? '휴가' : '시프트 교체'} 거절
+              </div>
+              <div style={{ fontSize: 13, color: COLORS.textMuted, marginTop: 4 }}>
+                <strong>{rejectModal.name}</strong> 님의 신청을 거절합니다. 사유를 입력하세요 (직원에게 전달).
+              </div>
+            </div>
+            <textarea value={rejectNote}
+                      onChange={(e) => setRejectNote(e.target.value)}
+                      placeholder="예: 같은 날 다른 직원과 겹쳐서 / 인원 부족 / 등"
+                      rows={4}
+                      style={{
+                        width: '100%', padding: '10px 14px', fontSize: 13,
+                        border: `1.5px solid ${COLORS.borderFaint}`, borderRadius: 8,
+                        background: 'rgba(255,255,255,1)', color: COLORS.textPrimary, outline: 'none',
+                        resize: 'vertical', fontFamily: 'inherit',
+                      }} />
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <button type="button" onClick={() => setRejectModal(null)}
+                      style={{
+                        ...BTN.md, background: 'transparent', color: COLORS.textSecondary,
+                        border: `1px solid ${COLORS.borderFaint}`, cursor: 'pointer',
+                      }}>
+                취소
+              </button>
+              <button type="button"
+                      onClick={() => {
+                        rejectModal.onConfirm(rejectNote.trim() || null)
+                        setRejectModal(null)
+                      }}
+                      style={{
+                        ...BTN.md, background: COLORS.danger, color: '#fff',
+                        border: 'none', cursor: 'pointer', fontWeight: 800,
+                      }}>
+                ✗ 거절 확정
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
@@ -272,10 +349,11 @@ function EmptyHint({ text }: { text: string }) {
 }
 
 // ── 회피일 list ────────────────────────────────────────────────────
-function SkipList({ rows, busy, onUpdate }: {
+function SkipList({ rows, busy, onApprove, onReject }: {
   rows: SkipRow[]
   busy: string | null
-  onUpdate: (s: SkipRow, status: 'approved' | 'rejected') => void
+  onApprove: (s: SkipRow) => void
+  onReject: (s: SkipRow) => void
 }) {
   // 그룹별 묶기
   const byGroup = rows.reduce((acc: Record<string, SkipRow[]>, r) => {
@@ -329,8 +407,8 @@ function SkipList({ rows, busy, onUpdate }: {
                   {isPending && (
                     <ResolveButtons
                       busyKey={busy === `skip-${r.id}`}
-                      onApprove={() => onUpdate(r, 'approved')}
-                      onReject={() => onUpdate(r, 'rejected')}
+                      onApprove={() => onApprove(r)}
+                      onReject={() => onReject(r)}
                     />
                   )}
                 </div>
@@ -344,10 +422,11 @@ function SkipList({ rows, busy, onUpdate }: {
 }
 
 // ── 휴가 list ──────────────────────────────────────────────────────
-function LeaveList({ rows, busy, onResolve }: {
+function LeaveList({ rows, busy, onApprove, onReject }: {
   rows: LeaveRow[]
   busy: string | null
-  onResolve: (kind: 'leave' | 'swap', id: string, action: 'approve' | 'reject', name: string) => void
+  onApprove: (r: LeaveRow) => void
+  onReject: (r: LeaveRow) => void
 }) {
   return (
     <div style={{ ...GLASS.L4, borderRadius: 12, padding: 14, display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -392,8 +471,8 @@ function LeaveList({ rows, busy, onResolve }: {
             {isPending && (
               <ResolveButtons
                 busyKey={busy === `leave-${r.id}`}
-                onApprove={() => onResolve('leave', r.id, 'approve', r.worker_name)}
-                onReject={() => onResolve('leave', r.id, 'reject', r.worker_name)}
+                onApprove={() => onApprove(r)}
+                onReject={() => onReject(r)}
               />
             )}
           </div>
@@ -404,10 +483,11 @@ function LeaveList({ rows, busy, onResolve }: {
 }
 
 // ── 교체 list ──────────────────────────────────────────────────────
-function SwapList({ rows, busy, onResolve }: {
+function SwapList({ rows, busy, onApprove, onReject }: {
   rows: SwapRow[]
   busy: string | null
-  onResolve: (kind: 'leave' | 'swap', id: string, action: 'approve' | 'reject', name: string) => void
+  onApprove: (r: SwapRow) => void
+  onReject: (r: SwapRow) => void
 }) {
   return (
     <div style={{ ...GLASS.L4, borderRadius: 12, padding: 14, display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -448,8 +528,8 @@ function SwapList({ rows, busy, onResolve }: {
             {isPending && (
               <ResolveButtons
                 busyKey={busy === `swap-${r.id}`}
-                onApprove={() => onResolve('swap', r.id, 'approve', r.worker_name)}
-                onReject={() => onResolve('swap', r.id, 'reject', r.worker_name)}
+                onApprove={() => onApprove(r)}
+                onReject={() => onReject(r)}
               />
             )}
           </div>
