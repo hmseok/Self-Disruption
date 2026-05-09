@@ -599,6 +599,98 @@ export default function BankCardPage() {
   }>(null)
   const [processingStatusLoading, setProcessingStatusLoading] = useState(false)
   const [confirmingMatchings, setConfirmingMatchings] = useState(false)
+
+  // PR-UX3-B: 검수 대기 큐
+  type PendingReviewItem = {
+    assignment_id: string
+    transaction_id: string
+    tx_date: string
+    tx_type: string
+    tx_amount: number
+    client_name: string
+    description: string
+    category: string | null
+    matched_type: string
+    matched_id: string
+    matched_name: string
+    source: string
+    suspect: boolean
+    suspect_reasons: string[]
+  }
+  const [reviewQueue, setReviewQueue] = useState<{
+    items: PendingReviewItem[]
+    page: number
+    pageSize: number
+    total: number
+    hasMore: boolean
+  } | null>(null)
+  const [reviewQueueLoading, setReviewQueueLoading] = useState(false)
+  const [reviewQueueShown, setReviewQueueShown] = useState(false)
+  const [reviewQueueFilter, setReviewQueueFilter] = useState<{ matcher: string; suspectOnly: boolean }>({ matcher: 'all', suspectOnly: false })
+  const [reviewActionLoading, setReviewActionLoading] = useState<Record<string, boolean>>({})
+
+  const loadReviewQueue = async (page: number = 1) => {
+    setReviewQueueLoading(true)
+    try {
+      const params = new URLSearchParams()
+      params.set('page', String(page))
+      params.set('pageSize', '20')
+      params.set('matcher', reviewQueueFilter.matcher)
+      params.set('suspectOnly', String(reviewQueueFilter.suspectOnly))
+      const { ok, json } = await fetchWithAuth(`/api/finance/transactions/pending-review?${params}`, { method: 'GET' })
+      if (ok) setReviewQueue(json)
+    } catch (e: any) {
+      console.error('[review-queue]', e)
+    } finally {
+      setReviewQueueLoading(false)
+    }
+  }
+
+  const reviewItemAction = async (item: PendingReviewItem, action: 'confirm' | 'reject') => {
+    setReviewActionLoading(prev => ({ ...prev, [item.assignment_id]: true }))
+    try {
+      const { ok, json } = await fetchWithAuth('/api/finance/transactions/confirm-matchings', {
+        method: 'POST',
+        body: { mode: action === 'confirm' ? 'specific' : 'reject', assignmentIds: [item.assignment_id] },
+      })
+      if (ok) {
+        // 리스트에서 즉시 제거 (optimistic)
+        setReviewQueue(prev => prev ? {
+          ...prev,
+          items: prev.items.filter(it => it.assignment_id !== item.assignment_id),
+          total: prev.total - 1,
+        } : null)
+        // 상태 패널 갱신
+        await loadProcessingStatus()
+      } else {
+        alert(`처리 실패: ${json?.error || ''}`)
+      }
+    } finally {
+      setReviewActionLoading(prev => ({ ...prev, [item.assignment_id]: false }))
+    }
+  }
+
+  const reviewBulkConfirmPage = async () => {
+    if (!reviewQueue || reviewQueue.items.length === 0) return
+    if (!confirm(`현재 페이지 ${reviewQueue.items.length}건을 모두 확정합니다. 계속할까요?`)) return
+    const ids = reviewQueue.items.map(it => it.assignment_id)
+    setReviewQueueLoading(true)
+    try {
+      const { ok, json } = await fetchWithAuth('/api/finance/transactions/confirm-matchings', {
+        method: 'POST',
+        body: { mode: 'specific', assignmentIds: ids },
+      })
+      if (ok) {
+        await loadReviewQueue(reviewQueue.page)
+        await loadProcessingStatus()
+      } else {
+        alert(`일괄 확정 실패: ${json?.error || ''}`)
+      }
+    } finally {
+      setReviewQueueLoading(false)
+    }
+  }
+
   const [runWorkflowLoading, setRunWorkflowLoading] = useState(false)
   const [runWorkflowResult, setRunWorkflowResult] = useState<null | {
     steps: Array<{ key: string; label: string; ok: boolean; applied?: number; matched?: number; error?: string; duration_ms: number }>
@@ -5260,14 +5352,15 @@ export default function BankCardPage() {
                               <button
                                 key={act.key}
                                 onClick={() => {
-                                  if (act.key === 'confirm')      confirmAllMatchings()
-                                  else if (act.key === 'auto-match') runAutoMatchAll('dry-run')
-                                  else if (act.key === 'classify')   runWorkflow(false) // 1-click triggers classify+match
-                                  else if (act.key === 'manual-review') setActiveTab('classify' as any)
-                                  else if (act.key === 'unmatched-review') {
-                                    // 미매칭 검수 — 분류 검수 탭으로 (수동 매칭 가능)
-                                    setActiveTab('classify' as any)
+                                  if (act.key === 'confirm') {
+                                    // PR-UX3-B: 검수 대기 큐 열기
+                                    setReviewQueueShown(true)
+                                    loadReviewQueue(1)
                                   }
+                                  else if (act.key === 'auto-match') runAutoMatchAll('dry-run')
+                                  else if (act.key === 'classify')   runWorkflow(false)
+                                  else if (act.key === 'manual-review') setActiveTab('classify' as any)
+                                  else if (act.key === 'unmatched-review') setActiveTab('classify' as any)
                                 }}
                                 disabled={isDone || (act.key === 'confirm' && confirmingMatchings) || runWorkflowLoading}
                                 title={act.reason}
@@ -5291,6 +5384,144 @@ export default function BankCardPage() {
                   </div>
                 )
               })()}
+
+              {/* PR-UX3-B: 검수 대기 큐 패널 (Glass L4) */}
+              {reviewQueueShown && (
+                <div style={{ ...GLASS.L4, border: '1px solid rgba(217,119,6,0.3)', borderRadius: 12, padding: '14px 18px', marginBottom: 12 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10, gap: 12, flexWrap: 'wrap' }}>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: '#d97706' }}>
+                        🚧 검수 대기 큐
+                        <span style={{ marginLeft: 8, fontSize: 11, color: COLORS.textMuted, fontWeight: 400 }}>
+                          {reviewQueue ? `${reviewQueue.total}건 대기` : '로드 중...'}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 2 }}>
+                        매칭 결과를 검토 후 [✓ 확정] 또는 [✗ 거부] 하세요
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                      <select
+                        value={reviewQueueFilter.matcher}
+                        onChange={(e) => { setReviewQueueFilter(f => ({ ...f, matcher: e.target.value })); setTimeout(() => loadReviewQueue(1), 0) }}
+                        style={{ fontSize: 11, padding: '4px 8px', border: `1px solid ${COLORS.borderSubtle}`, borderRadius: 4 }}
+                      >
+                        <option value="all">전체 매처</option>
+                        <option value="invest">📈 투자</option>
+                        <option value="jiip">🤝 지입</option>
+                        <option value="employee">👥 직원</option>
+                        <option value="freelancer">🤝 프리랜서</option>
+                        <option value="car">🚗 차량</option>
+                        <option value="fmi_rental">📥 대차건</option>
+                      </select>
+                      <label style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <input type="checkbox"
+                          checked={reviewQueueFilter.suspectOnly}
+                          onChange={(e) => { setReviewQueueFilter(f => ({ ...f, suspectOnly: e.target.checked })); setTimeout(() => loadReviewQueue(1), 0) }}
+                        />⚠️ 의심만
+                      </label>
+                      <button
+                        onClick={reviewBulkConfirmPage}
+                        disabled={!reviewQueue || reviewQueue.items.length === 0 || reviewQueueLoading}
+                        style={{ ...BTN.sm, padding: '4px 10px', fontSize: 11, background: '#16a34a', color: '#fff', border: 'none', cursor: reviewQueueLoading ? 'wait' : 'pointer' }}
+                      >✅ 페이지 모두 확정</button>
+                      <button
+                        onClick={() => { setReviewQueueShown(false); setReviewQueue(null) }}
+                        style={{ background: 'transparent', border: 'none', color: COLORS.textMuted, cursor: 'pointer', fontSize: 12 }}
+                      >× 닫기</button>
+                    </div>
+                  </div>
+
+                  {/* 리스트 */}
+                  {!reviewQueue ? (
+                    <div style={{ padding: 20, textAlign: 'center', color: COLORS.textMuted }}>로드 중...</div>
+                  ) : reviewQueue.items.length === 0 ? (
+                    <div style={{ padding: 20, textAlign: 'center', color: COLORS.textMuted }}>
+                      🎉 검수 대기 거래 없음 — 모든 자동 매칭 처리 완료
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      {reviewQueue.items.map(it => {
+                        const isLoading = reviewActionLoading[it.assignment_id]
+                        const matchedIcon =
+                          it.matched_type === 'invest' ? '📈' :
+                          it.matched_type === 'jiip' ? '🤝' :
+                          it.matched_type === 'employee' ? '👥' :
+                          it.matched_type === 'freelancer' ? '🤝' :
+                          it.matched_type === 'car' ? '🚗' :
+                          it.matched_type === 'fmi_rental' ? '📥' : '🔗'
+                        return (
+                          <div key={it.assignment_id} style={{
+                            ...GLASS.L3,
+                            border: `1px solid ${it.suspect ? 'rgba(217,119,6,0.5)' : COLORS.borderSubtle}`,
+                            borderRadius: 6, padding: '8px 12px',
+                            display: 'flex', alignItems: 'center', gap: 12,
+                            opacity: isLoading ? 0.5 : 1,
+                          }}>
+                            <div style={{ flex: '0 0 70px', fontSize: 11, color: COLORS.textMuted }}>
+                              {it.tx_date ? String(it.tx_date).slice(5, 10) : '-'}
+                            </div>
+                            <div style={{ flex: '1 1 200px', minWidth: 0 }}>
+                              <div style={{ fontSize: 12, fontWeight: 600, color: COLORS.textPrimary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {it.client_name || it.description || '-'}
+                              </div>
+                              <div style={{ fontSize: 10, color: COLORS.textMuted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {it.category || '미분류'} · {it.tx_type === 'income' ? '입금' : '출금'}
+                              </div>
+                            </div>
+                            <div style={{ flex: '0 0 110px', fontSize: 12, fontWeight: 700, color: it.tx_type === 'income' ? '#16a34a' : '#dc2626', textAlign: 'right' }}>
+                              {Number(it.tx_amount).toLocaleString()}원
+                            </div>
+                            <div style={{ flex: '0 0 12px', fontSize: 13, color: '#d97706' }}>→</div>
+                            <div style={{ flex: '1 1 180px', minWidth: 0, display: 'flex', alignItems: 'center', gap: 4 }}>
+                              <span style={{ fontSize: 14 }}>{matchedIcon}</span>
+                              <span style={{ fontSize: 12, fontWeight: 600, color: '#7c3aed', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {it.matched_name}
+                              </span>
+                            </div>
+                            {it.suspect && (
+                              <div style={{ flex: '0 0 auto', fontSize: 9, color: '#d97706', background: 'rgba(217,119,6,0.1)', padding: '2px 6px', borderRadius: 4 }}
+                                title={it.suspect_reasons.join(', ')}
+                              >⚠️</div>
+                            )}
+                            <div style={{ flex: '0 0 auto', display: 'flex', gap: 4 }}>
+                              <button
+                                onClick={() => reviewItemAction(it, 'confirm')}
+                                disabled={isLoading}
+                                style={{ padding: '4px 10px', fontSize: 11, background: '#16a34a', color: '#fff', border: 'none', borderRadius: 4, cursor: isLoading ? 'wait' : 'pointer' }}
+                              >✓ 확정</button>
+                              <button
+                                onClick={() => reviewItemAction(it, 'reject')}
+                                disabled={isLoading}
+                                style={{ padding: '4px 10px', fontSize: 11, background: '#fff', color: '#dc2626', border: '1px solid rgba(220,38,38,0.3)', borderRadius: 4, cursor: isLoading ? 'wait' : 'pointer' }}
+                              >✗ 거부</button>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+
+                  {/* 페이지네이션 */}
+                  {reviewQueue && reviewQueue.total > reviewQueue.pageSize && (
+                    <div style={{ marginTop: 10, display: 'flex', justifyContent: 'center', gap: 6, alignItems: 'center' }}>
+                      <button
+                        onClick={() => loadReviewQueue(reviewQueue.page - 1)}
+                        disabled={reviewQueue.page <= 1 || reviewQueueLoading}
+                        style={{ ...BTN.sm, padding: '4px 10px', fontSize: 11, background: '#fff', color: COLORS.textSecondary, border: `1px solid ${COLORS.borderSubtle}`, cursor: reviewQueue.page <= 1 ? 'default' : 'pointer' }}
+                      >← 이전</button>
+                      <span style={{ fontSize: 11, color: COLORS.textMuted }}>
+                        {reviewQueue.page} / {Math.ceil(reviewQueue.total / reviewQueue.pageSize)}
+                      </span>
+                      <button
+                        onClick={() => loadReviewQueue(reviewQueue.page + 1)}
+                        disabled={!reviewQueue.hasMore || reviewQueueLoading}
+                        style={{ ...BTN.sm, padding: '4px 10px', fontSize: 11, background: '#fff', color: COLORS.textSecondary, border: `1px solid ${COLORS.borderSubtle}`, cursor: !reviewQueue.hasMore ? 'default' : 'pointer' }}
+                      >다음 →</button>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* PR-UX2: 1-Click 자동 결과 패널 */}
               {runWorkflowResult && (() => {
