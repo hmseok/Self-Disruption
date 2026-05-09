@@ -42,6 +42,8 @@ const DEFAULT_STEPS: StepConfig[] = [
   { key: 'match-investor-jiip',label: '투자/지입',         url: '/api/finance/transactions/auto-match-investor-jiip', body: { mode: 'both', dryRun: false } },
   { key: 'match-employee',     label: '직원',             url: '/api/finance/transactions/auto-match-employee', body: { source: 'both', dryRun: false } },
   { key: 'match-freelancer',   label: '프리랜서',          url: '/api/finance/transactions/auto-match-freelancer', body: { dryRun: false } },
+  // PR-UX9: 보험료 분담금 (insurance_payment_plan 등록된 경우만 매칭)
+  { key: 'match-insurance-premium', label: '보험료 분담금',  url: '/api/finance/transactions/auto-match-insurance-premium', body: { dryRun: false } },
 ]
 
 const STEP_MAP: Record<string, StepConfig> = Object.fromEntries(DEFAULT_STEPS.map(s => [s.key, s]))
