@@ -91,12 +91,17 @@ export interface AcrentDetailRow extends RowDataPacket {
   otptupus: string | null
   otptupdt: string | null
   otptuptm: string | null
+  otptadfg: string | null  // 공장입고여부 (Y/N)
+  otptitem: string | null  // 사고상세구분
   // 차량 / 고객 / 사용자 조인
   cars_no: string | null
   cars_model: string | null
   cars_user: string | null
   cust_name: string | null
-  user_name: string | null
+  user_name: string | null         // 등록자 이름
+  modifier_name: string | null     // 수정자 이름 (PR-6.7.f)
+  factory_name: string | null      // 공장배정명 (PR-6.7.f)
+  factory_recv_date: string | null // 공장 입고일자
 }
 
 export async function GET(request: Request) {
@@ -137,7 +142,10 @@ export async function GET(request: Request) {
              a.otptacrn, a.otptacdi, a.otptacdm, a.otptacjc, a.otptacjs,
              a.otptacmb, a.otptacno, a.otptacph,
              a.otptacet, a.otptacad, a.otptacmo,
-             a.otptdsrp, a.otptdsnm, a.otptdsli, a.otptdshp, a.otptdsbh, a.otptdsbn,
+             a.otptadfg, a.otptitem,
+             a.otptdsrp, a.otptdsnm,
+             get_cbsddesc('OTPTDSLI', a.otptdsli) AS otptdsli,
+             a.otptdshp, a.otptdsbh, a.otptdsbn,
              a.otptdsus, a.otptdstl, a.otptdsre, a.otptdspk, a.otptdsmo,
              a.otptdscd, a.otptdsrs, a.otptdsvp, a.otptdsvd,
              a.otptcanm, a.otptcahp, a.otptcare, a.otptcavp, a.otptcavd,
@@ -152,7 +160,10 @@ export async function GET(request: Request) {
              c.carsodnm  AS cars_model,
              c.carsusnm  AS cars_user,
              cu.custname AS cust_name,
-             u.username  AS user_name
+             u.username  AS user_name,
+             m.username  AS modifier_name,
+             get_factname(o.oderfact) AS factory_name,
+             o.oderfrdt  AS factory_recv_date
         FROM acrotpth a
         LEFT JOIN pmccarsm c
           ON c.carsidno = a.otptidno
@@ -160,8 +171,16 @@ export async function GET(request: Request) {
         LEFT JOIN picuserm u
           ON u.userpidn = a.otptgnus
          AND a.otptmddt BETWEEN u.userfrdt AND u.usertodt
+        LEFT JOIN picuserm m
+          ON m.userpidn = a.otptupus
+         AND a.otptmddt BETWEEN m.userfrdt AND m.usertodt
         LEFT JOIN pmccustm cu
           ON cu.custcode = c.carscust
+        LEFT JOIN ajaoderh o
+          ON o.oderidno = a.otptidno
+         AND o.odermddt = a.otptmddt
+         AND o.odersrno = a.otptsrno
+         AND o.oderstat <> 'X'
        WHERE a.otptidno = ?
          AND a.otptmddt = ?
          AND a.otptsrno = ?

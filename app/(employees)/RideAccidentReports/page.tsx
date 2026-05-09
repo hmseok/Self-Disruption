@@ -93,6 +93,11 @@ interface AcrentDetail extends AcrentRow {
   otptupus: string | null
   otptupdt: string | null
   otptuptm: string | null
+  // 공장배정 (PR-6.7.f)
+  otptadfg: string | null
+  factory_name: string | null
+  factory_recv_date: string | null
+  modifier_name: string | null
 }
 
 function fmtDate8(d: string | null | undefined): string {
@@ -882,32 +887,33 @@ function DetailBody({
             {acrn.label}
           </span>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-          {checks.map(([key, v]) => {
-            const b = checkBadge(v)
-            const lbl = CHECK_LABEL[key] || key
-            return (
-              <div
-                key={key}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '4px 10px',
-                  background: b.bg,
-                  borderRadius: 6,
-                }}
-              >
-                <span style={{ fontSize: 11, color: COLORS.textSecondary }}>
-                  {lbl}
+        {issues.length > 0 ? (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {issues.map(([key]) => {
+              const lbl = CHECK_LABEL[key] || key
+              return (
+                <span
+                  key={key}
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: COLORS.danger,
+                    padding: '4px 10px',
+                    background: COLORS.bgRed,
+                    borderRadius: 6,
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  ⚠ {lbl}
                 </span>
-                <span style={{ fontSize: 11, fontWeight: 700, color: b.color }}>
-                  {b.label}
-                </span>
-              </div>
-            )
-          })}
-        </div>
+              )
+            })}
+          </div>
+        ) : (
+          <div style={{ fontSize: 11, color: COLORS.textMuted, padding: '4px 0' }}>
+            해당 사고구분 없음
+          </div>
+        )}
       </Section>
 
       {(detail.otptacet || detail.otptacad || detail.otptacmo) && (
@@ -1005,6 +1011,26 @@ function DetailBody({
         )}
       </Section>
 
+      {/* PR-6.7.f — 공장배정 정보 (있을 때만) */}
+      {(detail.factory_name || detail.otptadfg === 'Y') && (
+        <Section title="공장배정">
+          <Field label="공장명" value={detail.factory_name || '(이름 미확인)'} />
+          {detail.factory_recv_date && (
+            <Field label="입고일자" value={fmtDate8(detail.factory_recv_date)} />
+          )}
+          {detail.otptadfg && (
+            <Field
+              label="입고여부"
+              value={
+                <span style={{ color: detail.otptadfg === 'Y' ? COLORS.success : COLORS.textMuted, fontWeight: 700 }}>
+                  {detail.otptadfg === 'Y' ? '입고됨' : detail.otptadfg}
+                </span>
+              }
+            />
+          )}
+        </Section>
+      )}
+
       <Section title="이력">
         <Field
           label="등록"
@@ -1013,7 +1039,7 @@ function DetailBody({
         {detail.otptupdt && (
           <Field
             label="수정"
-            value={`${fmtDateTime(detail.otptupdt, detail.otptuptm)} · ${detail.otptupus || ''}`}
+            value={`${fmtDateTime(detail.otptupdt, detail.otptuptm)} · ${detail.modifier_name || detail.otptupus || ''}`}
           />
         )}
       </Section>
