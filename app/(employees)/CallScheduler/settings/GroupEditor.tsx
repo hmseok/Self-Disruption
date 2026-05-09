@@ -79,6 +79,8 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
   const [dowMin, setDowMin] = useState<Record<number, string>>({}) // 요일별 예외 (0~6)
   const [coverageLoading, setCoverageLoading] = useState(false)
   const [coverageMissing, setCoverageMissing] = useState(false)   // 마이그 미적용 시
+  // N-5 — 최소 인원 collapsible
+  const [coverageExpanded, setCoverageExpanded] = useState(false)
   // PR-2SS-h-1 → fix — 그룹 회피일 (인라인 펼침)
   const [skipDates, setSkipDates] = useState<GroupMemberSkipDate[]>([])
   const [skipMissing, setSkipMissing] = useState(false)
@@ -428,9 +430,10 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
         }}>❌ {error}</div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-        {/* 좌측 — 기본 설정 */}
-        <div style={{ ...GLASS.L4, borderRadius: 12, padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {/* N-5 — 2분할 → 수직 1컬럼 (의미있는 위계) */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        {/* 1. 그룹 정의 (이름/카테고리/색상/시프트/패턴/전략) */}
+        <div style={{ ...GLASS.L4, borderRadius: 12, padding: 18, display: 'flex', flexDirection: 'column', gap: 14 }}>
           <Field label="그룹 이름" required>
             <input type="text" value={name} onChange={(e) => setName(e.target.value)}
                    style={inputStyle} placeholder="예: 주간 09-18" />
@@ -596,8 +599,33 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
                    style={inputStyle} placeholder="자유 메모" />
           </Field>
 
-          {/* PR-2QQ-d-2 — 최소 인원 셋팅 (디폴트 + 요일별 예외) */}
-          <Field label="⚖️ 최소 인원 (자동 생성용)"
+          {/* N-5 — 최소 인원 collapsible (자주 안 만지는 셋팅 접기) */}
+          <div>
+            <button type="button"
+                    onClick={() => setCoverageExpanded(p => !p)}
+                    style={{
+                      width: '100%', textAlign: 'left',
+                      padding: '8px 12px', borderRadius: 8,
+                      background: coverageExpanded ? COLORS.bgBlue : 'rgba(0,0,0,0.03)',
+                      border: `1px solid ${coverageExpanded ? COLORS.borderBlue : COLORS.borderFaint}`,
+                      cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      fontSize: 12, fontWeight: 700,
+                      color: coverageExpanded ? COLORS.info : COLORS.textPrimary,
+                    }}>
+              <span>⚖️ 최소 인원 (자동 생성용)</span>
+              <span style={{ fontSize: 11, fontWeight: 500, color: COLORS.textMuted }}>
+                {(() => {
+                  const set = (defaultMin && Number(defaultMin) > 0)
+                    || Object.values(dowMin).some(v => Number(v) > 0)
+                  return set ? '셋팅됨' : '미설정'
+                })()}
+                {' '}{coverageExpanded ? '▼' : '▶'}
+              </span>
+            </button>
+          </div>
+          {coverageExpanded && (
+          <Field label=""
                  sub="매일 디폴트를 입력하고, 요일별로 다르면 따로 입력. 빈 칸 = 디폴트 사용.">
             {coverageMissing ? (
               <div style={{
@@ -667,6 +695,7 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
               </div>
             )}
           </Field>
+          )}
 
           {/* PR-2SS-Phase-I — 우선순위 정책 표출 (매니저 판단 도구) */}
           <div style={{
@@ -746,8 +775,8 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
           </div>
         </div>
 
-        {/* 우측 — 멤버 매핑 */}
-        <div style={{ ...GLASS.L4, borderRadius: 12, padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {/* 2. 멤버 + 후보 (수직 1컬럼 — 가로 폭 넉넉) */}
+        <div style={{ ...GLASS.L4, borderRadius: 12, padding: 18, display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div style={{ fontSize: 13, fontWeight: 800, color: COLORS.textPrimary }}>
             멤버 ({memberIds.length}명)
             <span style={{ fontSize: 11, fontWeight: 500, color: COLORS.textMuted, marginLeft: 6 }}>
