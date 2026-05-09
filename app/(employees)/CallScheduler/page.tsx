@@ -6,6 +6,7 @@
 import { useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
 import { COLORS, GLASS, BTN, pillStyle } from '@/app/utils/ui-tokens'
+import { TONE_BG, TONE_TEXT } from './utils/palette'
 import { getAuthHeader } from '@/app/utils/auth-client'
 
 export const dynamic = 'force-dynamic'
@@ -44,6 +45,14 @@ export default function CallSchedulerListPage() {
     workers: number
     quotaWorkers: number
   } | null>(null)
+  // N-7 — 카드 인라인 펼침
+  const [expandedCard, setExpandedCard] = useState<'shifts' | 'groups' | 'workers' | 'quota' | null>(null)
+  const [opsData, setOpsData] = useState<{
+    slots: any[]
+    groups: any[]
+    workers: any[]
+    quotaShortWorkers: { name: string; remaining: number; total: number; tone: string }[]
+  }>({ slots: [], groups: [], workers: [], quotaShortWorkers: [] })
 
   // 직원 요청 대기 카운트 fetch + N-6 운영 셋팅 요약
   useEffect(() => {
@@ -78,12 +87,36 @@ export default function CallSchedulerListPage() {
         const quotaWorkerSet = new Set(
           (quotaJ.data || []).filter((q: any) => Number(q.granted_days || 0) > 0).map((q: any) => q.worker_id),
         )
-        if (!abort) setOpsCounts({
-          slots: (slotJ.data || []).length,
-          groups: (groupJ.data || []).filter((g: any) => g.is_active !== false).length,
-          workers: (workerJ.data || []).length,
-          quotaWorkers: quotaWorkerSet.size,
-        })
+        const slots = slotJ.data || []
+        const groups = (groupJ.data || []).filter((g: any) => g.is_active !== false)
+        const workers = workerJ.data || []
+        // N-7 — 휴가 quota 잔여 부족 워커 (잔여 < 3 인 row)
+        const workerNameMap = new Map(workers.map((w: any) => [w.id, { name: w.name, tone: w.color_tone }]))
+        const shortByWorker = new Map<string, { name: string; remaining: number; total: number; tone: string }>()
+        for (const q of (quotaJ.data || [])) {
+          const remaining = Number(q.remaining_days || 0)
+          const total = Number(q.granted_days || 0) + Number(q.carried_over_days || 0)
+          if (remaining < 3 && total > 0) {
+            const w = workerNameMap.get(q.worker_id) as { name: string; tone: string } | undefined
+            if (!w) continue
+            const cur = shortByWorker.get(q.worker_id)
+            if (!cur || remaining < cur.remaining) {
+              shortByWorker.set(q.worker_id, { name: w.name, remaining, total, tone: w.tone || 'none' })
+            }
+          }
+        }
+        if (!abort) {
+          setOpsCounts({
+            slots: slots.length,
+            groups: groups.length,
+            workers: workers.length,
+            quotaWorkers: quotaWorkerSet.size,
+          })
+          setOpsData({
+            slots, groups, workers,
+            quotaShortWorkers: Array.from(shortByWorker.values()).sort((a, b) => a.remaining - b.remaining),
+          })
+        }
       } catch { /* graceful */ }
     })()
     return () => { abort = true }
@@ -252,22 +285,48 @@ export default function CallSchedulerListPage() {
           <div style={{
             display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10,
           }}>
-            <SettingsTile href="/CallScheduler/settings?tab=shifts"
+            <SettingsTile cardKey="shifts" expanded={expandedCard === 'shifts'}
+                          onToggle={() => setExpandedCard(expandedCard === 'shifts' ? null : 'shifts')}
                           icon="🕐" label="시프트" value={opsCounts.slots}
                           sub="시간대 정의" tone="blue" />
-            <SettingsTile href="/CallScheduler/settings?tab=groups"
+            <SettingsTile cardKey="groups" expanded={expandedCard === 'groups'}
+                          onToggle={() => setExpandedCard(expandedCard === 'groups' ? null : 'groups')}
                           icon="🚧" label="그룹" value={opsCounts.groups}
                           sub="시프트 + 멤버 + 패턴" tone="violet" />
-            <SettingsTile href="/CallScheduler/settings?tab=workers"
+            <SettingsTile cardKey="workers" expanded={expandedCard === 'workers'}
+                          onToggle={() => setExpandedCard(expandedCard === 'workers' ? null : 'workers')}
                           icon="👥" label="콜센터 워커" value={opsCounts.workers}
                           sub="정체성 + 외부 cycle" tone="amber" />
-            <SettingsTile href="/CallScheduler/settings?tab=leaves"
+            <SettingsTile cardKey="quota" expanded={expandedCard === 'quota'}
+                          onToggle={() => setExpandedCard(expandedCard === 'quota' ? null : 'quota')}
                           icon="💼" label="휴가 quota" value={opsCounts.quotaWorkers}
                           sub={opsCounts.workers > 0
-                            ? `워커 ${opsCounts.quotaWorkers}/${opsCounts.workers} 셋팅됨`
+                            ? `${opsCounts.quotaWorkers}/${opsCounts.workers} 셋팅됨`
                             : '직원별 잔여'}
                           tone={opsCounts.quotaWorkers < opsCounts.workers ? 'red' : 'green'} />
           </div>
+
+          {/* N-7 — 펼침 영역 (인라인 list) */}
+          {expandedCard && (
+            <div style={{
+              ...GLASS.L1, borderRadius: 10, padding: 14, marginTop: 12,
+              border: `1px solid ${COLORS.borderFaint}`,
+            }}>
+              {expandedCard === 'shifts' && (
+                <ExpandedShifts slots={opsData.slots} />
+              )}
+              {expandedCard === 'groups' && (
+                <ExpandedGroups groups={opsData.groups} />
+              )}
+              {expandedCard === 'workers' && (
+                <ExpandedWorkers workers={opsData.workers} />
+              )}
+              {expandedCard === 'quota' && (
+                <ExpandedQuota shortWorkers={opsData.quotaShortWorkers}
+                               total={opsCounts.workers} setCount={opsCounts.quotaWorkers} />
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -416,9 +475,11 @@ function KpiTile({ label, value, sub, tone }: {
   )
 }
 
-// N-6 — 운영 셋팅 카드 (클릭 시 해당 설정 탭으로)
-function SettingsTile({ href, icon, label, value, sub, tone }: {
-  href: string
+// N-7 — 운영 셋팅 카드 (클릭 시 인라인 펼침)
+function SettingsTile({ cardKey, expanded, onToggle, icon, label, value, sub, tone }: {
+  cardKey: string
+  expanded: boolean
+  onToggle: () => void
   icon: string
   label: string
   value: number
@@ -433,29 +494,232 @@ function SettingsTile({ href, icon, label, value, sub, tone }: {
     violet: { bg: COLORS.bgViolet, border: COLORS.borderViolet, color: '#7c3aed' },
   }[tone]
   return (
-    <Link href={href}
-          style={{
-            ...GLASS.L1, background: tintMap.bg, border: `1.5px solid ${tintMap.border}`,
-            borderRadius: 10, padding: '12px 14px',
-            display: 'flex', flexDirection: 'column', gap: 4,
-            textDecoration: 'none', cursor: 'pointer',
-            transition: 'transform 0.12s, box-shadow 0.12s',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.transform = 'translateY(-2px)'
-            e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)'
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = ''
-            e.currentTarget.style.boxShadow = ''
-          }}>
-      <div style={{ fontSize: 12, color: COLORS.textSecondary, fontWeight: 700 }}>
-        {icon} {label}
+    <button type="button" onClick={onToggle}
+            style={{
+              ...GLASS.L1, background: tintMap.bg,
+              border: `${expanded ? '2px' : '1.5px'} solid ${tintMap.border}`,
+              borderRadius: 10, padding: '12px 14px',
+              display: 'flex', flexDirection: 'column', gap: 4,
+              cursor: 'pointer', textAlign: 'left',
+              transition: 'transform 0.12s, box-shadow 0.12s',
+              boxShadow: expanded ? '0 4px 12px rgba(0,0,0,0.1)' : 'none',
+              transform: expanded ? 'translateY(-2px)' : 'none',
+            }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        fontSize: 12, color: COLORS.textSecondary, fontWeight: 700,
+      }}>
+        <span>{icon} {label}</span>
+        <span style={{ fontSize: 10, color: tintMap.color, fontWeight: 800 }}>
+          {expanded ? '▼' : '▶'}
+        </span>
       </div>
       <div style={{ fontSize: 22, fontWeight: 800, color: tintMap.color, lineHeight: 1.1 }}>
         {value}
       </div>
       <div style={{ fontSize: 11, color: COLORS.textMuted }}>{sub}</div>
-    </Link>
+    </button>
+  )
+}
+
+// N-7 — 펼침 영역
+function ExpandedShifts({ slots }: { slots: any[] }) {
+  return (
+    <div>
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        marginBottom: 8,
+      }}>
+        <div style={{ fontSize: 13, fontWeight: 800, color: COLORS.textPrimary }}>
+          🕐 시프트 ({slots.length}개) — 시간대 정의
+        </div>
+        <Link href="/CallScheduler/settings?tab=shifts"
+              style={{ fontSize: 11, color: COLORS.info, textDecoration: 'none', fontWeight: 700 }}>
+          편집 →
+        </Link>
+      </div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+        {slots.map((s: any) => (
+          <span key={s.id} style={{
+            padding: '6px 12px', borderRadius: 8, fontSize: 12, fontWeight: 700,
+            background: s.is_overnight ? COLORS.bgViolet : COLORS.bgBlue,
+            color: s.is_overnight ? '#7c3aed' : COLORS.info,
+            border: `1px solid ${s.is_overnight ? COLORS.borderViolet : COLORS.borderBlue}`,
+            fontFamily: 'monospace',
+          }}>
+            {s.code} {s.start_time?.substring(0,5)}~{s.end_time?.substring(0,5)}
+            {s.is_overnight && <span style={{ marginLeft: 4, fontSize: 9 }}>익</span>}
+          </span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function ExpandedGroups({ groups }: { groups: any[] }) {
+  // 카테고리별 묶기
+  const byCategory = new Map<string, any[]>()
+  for (const g of groups) {
+    const cat = g.category || 'general'
+    if (!byCategory.has(cat)) byCategory.set(cat, [])
+    byCategory.get(cat)!.push(g)
+  }
+  return (
+    <div>
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        marginBottom: 8,
+      }}>
+        <div style={{ fontSize: 13, fontWeight: 800, color: COLORS.textPrimary }}>
+          🚧 그룹 ({groups.length}개) — 카테고리별
+        </div>
+        <Link href="/CallScheduler/settings?tab=groups"
+              style={{ fontSize: 11, color: COLORS.info, textDecoration: 'none', fontWeight: 700 }}>
+          편집 →
+        </Link>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {Array.from(byCategory.entries()).map(([cat, list]) => {
+          const catColor = cat === '야간' ? COLORS.bgViolet
+                         : cat === '저녁' ? COLORS.bgAmber
+                         : cat === '주간' ? COLORS.bgBlue
+                         : cat === '특수' ? COLORS.bgRed
+                         : 'rgba(0,0,0,0.04)'
+          const catBorder = cat === '야간' ? COLORS.borderViolet
+                          : cat === '저녁' ? COLORS.borderAmber
+                          : cat === '주간' ? COLORS.borderBlue
+                          : cat === '특수' ? COLORS.borderRed
+                          : COLORS.borderFaint
+          return (
+            <div key={cat} style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              padding: '8px 12px', borderRadius: 8,
+              background: catColor, border: `1px solid ${catBorder}`,
+            }}>
+              <span style={{
+                fontSize: 11, fontWeight: 800, minWidth: 60,
+                color: COLORS.textPrimary,
+              }}>
+                {cat === 'general' ? '일반' : cat}
+              </span>
+              <div style={{ flex: 1, display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                {list.map((g: any) => (
+                  <span key={g.id} style={{
+                    padding: '3px 9px', borderRadius: 6, fontSize: 11, fontWeight: 700,
+                    background: 'rgba(255,255,255,0.7)', color: COLORS.textPrimary,
+                    border: `1px solid ${COLORS.borderFaint}`,
+                  }}>
+                    {g.name}
+                    <span style={{ marginLeft: 4, fontSize: 9, color: COLORS.textMuted }}>
+                      ({g.member_count || 0})
+                    </span>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function ExpandedWorkers({ workers }: { workers: any[] }) {
+  return (
+    <div>
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        marginBottom: 8,
+      }}>
+        <div style={{ fontSize: 13, fontWeight: 800, color: COLORS.textPrimary }}>
+          👥 콜센터 워커 ({workers.length}명)
+        </div>
+        <Link href="/CallScheduler/settings?tab=workers"
+              style={{ fontSize: 11, color: COLORS.info, textDecoration: 'none', fontWeight: 700 }}>
+          편집 →
+        </Link>
+      </div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+        {workers.map((w: any) => {
+          const tone = (w.color_tone || 'none') as keyof typeof TONE_BG
+          return (
+            <span key={w.id} style={{
+              padding: '6px 12px', borderRadius: 8, fontSize: 12, fontWeight: 700,
+              background: TONE_BG[tone] !== 'transparent' ? TONE_BG[tone] : 'rgba(255,255,255,0.7)',
+              color: TONE_TEXT[tone] || COLORS.textPrimary,
+              border: `1px solid ${COLORS.borderFaint}`,
+              display: 'inline-flex', alignItems: 'center', gap: 4,
+            }}>
+              {w.name}
+              {w.is_external && (
+                <span style={{ fontSize: 9, fontWeight: 800 }} title="외부 직원">🔒</span>
+              )}
+              {w.cycle_days_on && (
+                <span style={{ fontSize: 9, color: COLORS.textMuted }} title="외부 cycle">🏢</span>
+              )}
+            </span>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function ExpandedQuota({ shortWorkers, total, setCount }: {
+  shortWorkers: { name: string; remaining: number; total: number; tone: string }[]
+  total: number
+  setCount: number
+}) {
+  return (
+    <div>
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        marginBottom: 8,
+      }}>
+        <div style={{ fontSize: 13, fontWeight: 800, color: COLORS.textPrimary }}>
+          💼 휴가 quota — 셋팅 {setCount}/{total} 명
+          {shortWorkers.length > 0 && (
+            <span style={{
+              marginLeft: 8, padding: '2px 8px', borderRadius: 99,
+              background: COLORS.bgRed, color: COLORS.danger,
+              fontSize: 11, fontWeight: 800,
+            }}>
+              ⚠ 잔여 부족 {shortWorkers.length}건
+            </span>
+          )}
+        </div>
+        <Link href="/CallScheduler/settings?tab=leaves"
+              style={{ fontSize: 11, color: COLORS.info, textDecoration: 'none', fontWeight: 700 }}>
+          관리 →
+        </Link>
+      </div>
+      {shortWorkers.length === 0 ? (
+        <div style={{ fontSize: 12, color: COLORS.textMuted, padding: '8px 0' }}>
+          잔여 3일 미만 워커 없음 — 모두 안정.
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {shortWorkers.map((w, i) => {
+            const tone = w.tone as keyof typeof TONE_BG
+            return (
+              <span key={i} style={{
+                padding: '6px 12px', borderRadius: 8, fontSize: 12, fontWeight: 700,
+                background: TONE_BG[tone] !== 'transparent' ? TONE_BG[tone] : 'rgba(255,255,255,0.7)',
+                color: TONE_TEXT[tone] || COLORS.textPrimary,
+                border: `1.5px solid ${w.remaining < 1 ? COLORS.borderRed : COLORS.borderAmber}`,
+              }}>
+                {w.name}
+                <span style={{
+                  marginLeft: 6, fontSize: 11, fontWeight: 800,
+                  color: w.remaining < 1 ? COLORS.danger : COLORS.warning,
+                }}>
+                  {w.remaining}/{w.total}일
+                </span>
+              </span>
+            )
+          })}
+        </div>
+      )}
+    </div>
   )
 }

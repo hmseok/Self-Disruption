@@ -55,6 +55,22 @@ function clip(s: string | null | undefined, n = 30): string {
 
 type RightTab = 'snapshot' | 'partners'
 
+interface FactoryStats {
+  factcode: string
+  assign_count: number
+  last_assigned_date: string | null
+  distinct_cars: number | null
+  distinct_customers: number | null
+}
+
+interface FactoryVehicle {
+  car_number: string | null
+  car_model: string | null
+  customer: string | null
+  assigned_date: string | null
+  oderstat: string | null
+}
+
 export default function Cafe24ImportPage() {
   const [user, setUser] = useState<{ role?: string; id?: string } | null>(null)
   const [authChecked, setAuthChecked] = useState(false)
@@ -80,6 +96,15 @@ export default function Cafe24ImportPage() {
   const [partnersLoading, setPartnersLoading] = useState(false)
 
   const [rightTab, setRightTab] = useState<RightTab>('snapshot')
+
+  // PR-6.12.d — 공장별 stats Map (factcode → stats)
+  const [statsMap, setStatsMap] = useState<Map<string, FactoryStats>>(new Map())
+  const [statsMode, setStatsMode] = useState<'full' | 'simple' | 'empty' | 'idle'>('idle')
+
+  // PR-6.12.d — 공장 detail drawer (배정 차량 list)
+  const [vehicleDrawer, setVehicleDrawer] = useState<{ factcode: string; factname: string } | null>(null)
+  const [vehicles, setVehicles] = useState<FactoryVehicle[]>([])
+  const [vehiclesLoading, setVehiclesLoading] = useState(false)
 
   useEffect(() => {
     setUser(getStoredUser())
@@ -135,11 +160,58 @@ export default function Cafe24ImportPage() {
     []
   )
 
+  // PR-6.12.d — 공장 stats fetch (한 번만)
+  const fetchStats = useMemo(
+    () =>
+      async function () {
+        try {
+          const token = getStoredToken()
+          const res = await fetch('/api/cafe24/factory-stats', {
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+            cache: 'no-store',
+          })
+          const json = await res.json()
+          if (json.success) {
+            const m = new Map<string, FactoryStats>()
+            for (const s of json.data || []) {
+              if (s.factcode) m.set(s.factcode, s)
+            }
+            setStatsMap(m)
+            setStatsMode(json.meta?.mode || 'empty')
+          }
+        } catch (e) {
+          console.warn('[stats fetch]', e)
+          setStatsMode('empty')
+        }
+      },
+    []
+  )
+
+  const openVehicleDrawer = async (factcode: string, factname: string) => {
+    setVehicleDrawer({ factcode, factname })
+    setVehicles([])
+    setVehiclesLoading(true)
+    try {
+      const token = getStoredToken()
+      const res = await fetch(`/api/cafe24/factory-vehicles?factcode=${encodeURIComponent(factcode)}&limit=200`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        cache: 'no-store',
+      })
+      const json = await res.json()
+      if (json.success) setVehicles(json.data || [])
+    } catch (e) {
+      console.warn('[vehicles fetch]', e)
+    } finally {
+      setVehiclesLoading(false)
+    }
+  }
+
   useEffect(() => {
     if (!authChecked || user?.role !== 'admin') return
     fetchSnapshots()
     fetchPartners()
-  }, [authChecked, user, fetchSnapshots, fetchPartners])
+    fetchStats()
+  }, [authChecked, user, fetchSnapshots, fetchPartners, fetchStats])
 
   if (!authChecked)
     return (
@@ -312,6 +384,52 @@ export default function Cafe24ImportPage() {
         </span>
       ),
     },
+    // PR-6.12.d 배정 통계
+    {
+      key: 'assign_count',
+      label: '배정',
+      align: 'right',
+      sortBy: r => statsMap.get(r.factcode)?.assign_count || 0,
+      render: r => {
+        const s = statsMap.get(r.factcode)
+        if (!s || !s.assign_count) return <span style={{ fontSize: 11, color: COLORS.textMuted }}>-</span>
+        return (
+          <span style={{ whiteSpace: 'nowrap', fontSize: 11, fontWeight: 700, color: COLORS.primary }}>
+            {s.assign_count.toLocaleString()}건
+          </span>
+        )
+      },
+    },
+    {
+      key: 'last_assigned',
+      label: '최근 배정',
+      sortBy: r => statsMap.get(r.factcode)?.last_assigned_date || '',
+      render: r => {
+        const s = statsMap.get(r.factcode)
+        if (!s?.last_assigned_date) return <span style={{ fontSize: 11, color: COLORS.textMuted }}>-</span>
+        const d = s.last_assigned_date
+        const formatted = d.length >= 8 ? `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}` : d
+        return (
+          <span style={{ whiteSpace: 'nowrap', fontSize: 11 }}>{formatted}</span>
+        )
+      },
+    },
+    {
+      key: 'detail',
+      label: '차량',
+      render: r => {
+        const s = statsMap.get(r.factcode)
+        if (!s || !s.assign_count) return <span style={{ fontSize: 11, color: COLORS.textMuted }}>-</span>
+        return (
+          <button
+            style={{ ...BTN.sm, background: COLORS.bgBlue, color: COLORS.primary }}
+            onClick={() => openVehicleDrawer(r.factcode, r.factname || r.factcode)}
+          >
+            {s.distinct_cars ? `${s.distinct_cars}대` : '보기'}
+          </button>
+        )
+      },
+    },
   ]
 
   const partnerCols: TableColumn<PartnerFactory>[] = [
@@ -371,6 +489,51 @@ export default function Cafe24ImportPage() {
           {r.status === 'active' ? '운영중' : r.status === 'terminated' ? '폐기' : r.status}
         </span>
       ),
+    },
+    // PR-6.12.d 배정 통계 (cafe24_factcode 매칭)
+    {
+      key: 'assign_count',
+      label: '배정',
+      align: 'right',
+      sortBy: r => (r.cafe24_factcode && statsMap.get(r.cafe24_factcode)?.assign_count) || 0,
+      render: r => {
+        const s = r.cafe24_factcode ? statsMap.get(r.cafe24_factcode) : null
+        if (!s || !s.assign_count) return <span style={{ fontSize: 11, color: COLORS.textMuted }}>-</span>
+        return (
+          <span style={{ whiteSpace: 'nowrap', fontSize: 11, fontWeight: 700, color: COLORS.primary }}>
+            {s.assign_count.toLocaleString()}건
+          </span>
+        )
+      },
+    },
+    {
+      key: 'last_assigned',
+      label: '최근 배정',
+      sortBy: r => (r.cafe24_factcode && statsMap.get(r.cafe24_factcode)?.last_assigned_date) || '',
+      render: r => {
+        const s = r.cafe24_factcode ? statsMap.get(r.cafe24_factcode) : null
+        if (!s?.last_assigned_date) return <span style={{ fontSize: 11, color: COLORS.textMuted }}>-</span>
+        const d = s.last_assigned_date
+        const formatted = d.length >= 8 ? `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}` : d
+        return <span style={{ whiteSpace: 'nowrap', fontSize: 11 }}>{formatted}</span>
+      },
+    },
+    {
+      key: 'detail',
+      label: '차량',
+      render: r => {
+        if (!r.cafe24_factcode) return <span style={{ fontSize: 11, color: COLORS.textMuted }}>-</span>
+        const s = statsMap.get(r.cafe24_factcode)
+        if (!s || !s.assign_count) return <span style={{ fontSize: 11, color: COLORS.textMuted }}>-</span>
+        return (
+          <button
+            style={{ ...BTN.sm, background: COLORS.bgBlue, color: COLORS.primary }}
+            onClick={() => openVehicleDrawer(r.cafe24_factcode!, r.name)}
+          >
+            {s.distinct_cars ? `${s.distinct_cars}대` : '보기'}
+          </button>
+        )
+      },
     },
   ]
 
@@ -522,6 +685,18 @@ export default function Cafe24ImportPage() {
           </div>
 
           {/* 우측 데이터 */}
+          {/* PR-6.12.d — stats mode 안내 */}
+          {statsMode === 'simple' && (
+            <div style={{ fontSize: 11, color: COLORS.warning, padding: '4px 8px', background: COLORS.bgAmber, borderRadius: 6 }}>
+              ⚠ 카페24 join 권한 제한 — 차량/고객 detail 일부 미노출 (배정건수만 표시)
+            </div>
+          )}
+          {statsMode === 'empty' && (
+            <div style={{ fontSize: 11, color: COLORS.danger, padding: '4px 8px', background: COLORS.bgRed, borderRadius: 6 }}>
+              ⚠ 카페24 ajaoderh 접근 실패 — 배정 통계 미노출
+            </div>
+          )}
+
           {rightTab === 'snapshot' ? (
             <div style={{ ...GLASS.L4, padding: 12, borderRadius: 12 }}>
               <NeuDataTable
@@ -545,6 +720,92 @@ export default function Cafe24ImportPage() {
           )}
         </div>
       </div>
+
+      {/* PR-6.12.d — 공장별 배정 차량 drawer */}
+      {vehicleDrawer && (
+        <div
+          onClick={() => setVehicleDrawer(null)}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(15,23,42,0.32)',
+            backdropFilter: 'blur(2px)',
+            zIndex: 1000,
+            display: 'flex',
+            justifyContent: 'flex-end',
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              ...GLASS.L4,
+              width: 720,
+              maxWidth: '100vw',
+              height: '100vh',
+              overflow: 'auto',
+              padding: '20px 24px',
+              boxShadow: '-8px 0 24px rgba(0,0,0,0.12)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, paddingBottom: 12, borderBottom: `1px solid ${COLORS.borderSubtle}` }}>
+              <div>
+                <div style={{ fontSize: 16, fontWeight: 800 }}>🏭 {vehicleDrawer.factname}</div>
+                <div style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 2 }}>
+                  factcode <code>{vehicleDrawer.factcode}</code> · 배정 차량 {vehicles.length}건
+                </div>
+              </div>
+              <button style={{ ...BTN.sm, background: 'transparent', color: COLORS.textMuted }} onClick={() => setVehicleDrawer(null)}>
+                × 닫기
+              </button>
+            </div>
+            {vehiclesLoading ? (
+              <div style={{ padding: 40, textAlign: 'center', color: COLORS.textMuted }}>로딩 중…</div>
+            ) : vehicles.length === 0 ? (
+              <div style={{ padding: 40, textAlign: 'center', color: COLORS.textMuted }}>배정 차량 없음</div>
+            ) : (
+              <div style={{ overflow: 'auto' }}>
+                <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: 12 }}>
+                  <thead style={{ background: 'rgba(0,0,0,0.04)', position: 'sticky', top: 0 }}>
+                    <tr>
+                      <th style={{ padding: '6px 8px', textAlign: 'left', fontSize: 11, fontWeight: 700, borderBottom: `1px solid ${COLORS.borderSubtle}` }}>차량번호</th>
+                      <th style={{ padding: '6px 8px', textAlign: 'left', fontSize: 11, fontWeight: 700, borderBottom: `1px solid ${COLORS.borderSubtle}` }}>차종</th>
+                      <th style={{ padding: '6px 8px', textAlign: 'left', fontSize: 11, fontWeight: 700, borderBottom: `1px solid ${COLORS.borderSubtle}` }}>고객사</th>
+                      <th style={{ padding: '6px 8px', textAlign: 'left', fontSize: 11, fontWeight: 700, borderBottom: `1px solid ${COLORS.borderSubtle}` }}>배정일</th>
+                      <th style={{ padding: '6px 8px', textAlign: 'left', fontSize: 11, fontWeight: 700, borderBottom: `1px solid ${COLORS.borderSubtle}` }}>상태</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {vehicles.map((v, i) => (
+                      <tr key={i}>
+                        <td style={{ padding: '4px 8px', fontWeight: 600, borderBottom: '1px solid rgba(0,0,0,0.04)', whiteSpace: 'nowrap' }}>
+                          {v.car_number || '-'}
+                        </td>
+                        <td style={{ padding: '4px 8px', fontSize: 11, borderBottom: '1px solid rgba(0,0,0,0.04)', whiteSpace: 'nowrap' }}>
+                          {clip(v.car_model, 22)}
+                        </td>
+                        <td style={{ padding: '4px 8px', fontSize: 11, borderBottom: '1px solid rgba(0,0,0,0.04)', whiteSpace: 'nowrap' }}>
+                          {clip(v.customer, 24)}
+                        </td>
+                        <td style={{ padding: '4px 8px', fontSize: 11, borderBottom: '1px solid rgba(0,0,0,0.04)', whiteSpace: 'nowrap' }}>
+                          {v.assigned_date && v.assigned_date.length >= 8
+                            ? `${v.assigned_date.slice(0, 4)}-${v.assigned_date.slice(4, 6)}-${v.assigned_date.slice(6, 8)}`
+                            : v.assigned_date || '-'}
+                        </td>
+                        <td style={{ padding: '4px 8px', fontSize: 11, borderBottom: '1px solid rgba(0,0,0,0.04)', whiteSpace: 'nowrap' }}>
+                          {v.oderstat || '-'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </>
   )
 }
