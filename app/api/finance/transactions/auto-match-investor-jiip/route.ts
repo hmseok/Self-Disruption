@@ -119,13 +119,15 @@ export async function POST(request: NextRequest) {
       nameMap[k].push(inv)
     }
 
-    // ── 1) 매칭 후보 — 미매칭 통장 거래 (양방향) ──
+    // ── 1) 매칭 후보 — 미매칭 통장 거래만 (PR-UX8: 카드 거래 제외) ──
+    // 투자/지입은 통장으로만 거래 (입금/지급) — 카드 사용은 절대 매칭 X
     const candidates = await prisma.$queryRaw<Array<any>>`
-      SELECT id, transaction_date, amount, type, client_name, description, category
+      SELECT id, transaction_date, amount, type, client_name, description, category, imported_from
         FROM transactions
        WHERE deleted_at IS NULL
          AND (related_type IS NULL OR related_id IS NULL)
          AND client_name IS NOT NULL AND client_name != ''
+         AND (imported_from LIKE 'excel_bank%' OR imported_from = 'sms_bank')
        ORDER BY transaction_date DESC
        LIMIT 5000
     `

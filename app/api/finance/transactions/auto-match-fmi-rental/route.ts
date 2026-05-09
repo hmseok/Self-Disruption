@@ -230,13 +230,15 @@ export async function POST(request: NextRequest) {
     //   - type='income' (보험금 입금)
     //   - related_type IS NULL (미매칭)
     //   - client_name 또는 description 에 4자리 숫자
+    // PR-UX8: 통장 입금만 (대차건 보험금은 보험사가 통장으로 입금)
     const candidatesRaw = await prisma.$queryRaw<Array<any>>`
-      SELECT id, transaction_date, amount, client_name, description, category
+      SELECT id, transaction_date, amount, client_name, description, category, imported_from
         FROM transactions
        WHERE deleted_at IS NULL
          AND type = 'income'
          AND (related_type IS NULL OR related_id IS NULL)
          AND (client_name REGEXP '[0-9]{3,4}' OR description REGEXP '[0-9]{3,4}')
+         AND (imported_from LIKE 'excel_bank%' OR imported_from = 'sms_bank')
        ORDER BY transaction_date DESC
        LIMIT 5000
     `
