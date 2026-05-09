@@ -5,6 +5,35 @@
 
 ---
 
+## 🌟 0-0. 새 cowork 세션 시작 시 (2026-05-09 — 필수)
+
+> **다른 세션 작업물 흡수 사고 (Rule 21 위반) 4회 누적 후 신설.**
+> 새 cowork 세션이 시작되면 **반드시 1회 실행** — 1초도 안 걸림.
+
+```bash
+git pull origin main           # 최신 hooks + 스크립트 받기
+npm run cowork:init            # core.hooksPath 자동 설정 + 자가 진단
+```
+
+`cowork:init` 의 자동 동작:
+- `core.hooksPath = harness-engineering/git-hooks` 설정 (모든 세션 공유)
+- `pre-commit` / `pre-push` executable 권한 보장
+- stale lock 검출 + 자동 제거 (5분 이상)
+- 다른 세션 git config 오염 자동 복구 (hooksPath 다른 경로 가리킴 시 unset)
+
+**효과**:
+- 모든 cowork 세션이 같은 hooks 사용 (git pull 로 자동 갱신)
+- cowork-staging-lint 가 매 commit 마다 자동 실행 → Rule 21 위반 자동 차단
+- 다른 세션이 `git config` 오염시켜도 본 세션 자가 복구
+
+수동 진단:
+```bash
+npm run cowork:check           # 진단만 (수정 X)
+npm run cowork:fix             # 자동 수정 모드
+```
+
+---
+
 ## 🚨 0-1. 강제 규제 조항 (NON-NEGOTIABLE — 2026-04-29 사용자 명령)
 
 > **사용자가 토큰·시간을 무한 소모하는 사고가 반복되어 강제 규제 도입.**
