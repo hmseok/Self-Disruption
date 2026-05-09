@@ -438,6 +438,8 @@ function DetailInner({ id }: { id: string }) {
         onClose={() => setAutoGenOpen(false)}
         scheduleId={id}
         onCompleted={() => reload(id)}
+        workers={detail?.workers}
+        slots={detail?.slots}
       />
 
       {/* PR-2QQ-d-1: ExternalScheduleDialog 폐기 — 워커 셋팅으로 통합 */}
