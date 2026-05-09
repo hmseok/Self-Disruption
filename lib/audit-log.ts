@@ -15,9 +15,6 @@ export interface AuditUser {
   name?: string
 }
 
-/**
- * 변경 set 을 기록 (각 필드 1 row)
- */
 export async function logAuditChanges(
   tableName: string,
   recordId: string,
@@ -42,15 +39,11 @@ export async function logAuditChanges(
            ${user.id}, ${user.name || null})
       `
     } catch (e) {
-      // audit log 실패해도 본 작업은 차단 X
       console.warn('[audit-log] insert failed', tableName, field, (e as Error).message)
     }
   }
 }
 
-/**
- * 단일 액션 기록 (insert / delete)
- */
 export async function logAuditAction(
   tableName: string,
   recordId: string,
