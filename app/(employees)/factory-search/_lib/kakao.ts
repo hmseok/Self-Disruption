@@ -68,11 +68,28 @@ export function ensureKakao(): Promise<typeof window.kakao> {
 }
 
 // 주소 → 좌표 변환 (services 라이브러리)
+// hotfix 2026-05-09: addressSearch 실패 시 keywordSearch 로 fallback
+//   - addressSearch: 표준 주소만 매칭 (구주소/POI/아파트 동호수 fail)
+//   - keywordSearch: POI/장소명/키워드 매칭 (더 관대 — 「강남역」「△△아파트」 등 hit)
 export async function geocode(address: string): Promise<{ lat: number; lng: number } | null> {
   const k = await ensureKakao()
-  return new Promise(resolve => {
+  // 1차: 표준 addressSearch
+  const addrResult = await new Promise<{ lat: number; lng: number } | null>(resolve => {
     const geocoder = new k.maps.services.Geocoder()
     geocoder.addressSearch(address, (result: { x: string; y: string }[], status: string) => {
+      if (status === k.maps.services.Status.OK && result[0]) {
+        resolve({ lat: Number(result[0].y), lng: Number(result[0].x) })
+      } else {
+        resolve(null)
+      }
+    })
+  })
+  if (addrResult) return addrResult
+
+  // 2차: keywordSearch fallback (POI / 장소명 / 키워드)
+  return new Promise<{ lat: number; lng: number } | null>(resolve => {
+    const places = new k.maps.services.Places()
+    places.keywordSearch(address, (result: { x: string; y: string }[], status: string) => {
       if (status === k.maps.services.Status.OK && result[0]) {
         resolve({ lat: Number(result[0].y), lng: Number(result[0].x) })
       } else {
