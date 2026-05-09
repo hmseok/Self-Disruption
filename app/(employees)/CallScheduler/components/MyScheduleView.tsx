@@ -81,6 +81,8 @@ export default function MyScheduleView({ token }: Props) {
   const [yearMonth, setYearMonth] = useState<{ year: number; month: number } | null>(null)
   const [leaveRequestOpen, setLeaveRequestOpen] = useState(false)
   const [skipRequestOpen, setSkipRequestOpen] = useState(false)  // Phase G — 회피 신청
+  // L-2 — 뷰 모드 (직원이 본인 일정을 월/주/일 중 선택)
+  const [viewMode, setViewMode] = useState<'month' | 'week' | 'day'>('month')
 
   const isPublic = !!token
 
@@ -289,6 +291,32 @@ export default function MyScheduleView({ token }: Props) {
         </div>
       )}
 
+      {/* L-2 — 뷰 모드 토글 (월 / 주 / 일) */}
+      {schedule && (
+        <div style={{
+          display: 'flex', justifyContent: 'flex-end', marginBottom: 8, gap: 4,
+        }}>
+          {([
+            { v: 'month', label: '📅 월간', title: '한 달 전체 카드 그리드' },
+            { v: 'week',  label: '📆 주간', title: '이번 주 7일 카드' },
+            { v: 'day',   label: '📋 오늘', title: '오늘 또는 가장 가까운 일자' },
+          ] as const).map(opt => (
+            <button key={opt.v} type="button"
+                    onClick={() => setViewMode(opt.v)}
+                    title={opt.title}
+                    style={{
+                      padding: '5px 12px', borderRadius: 6, fontSize: 12, fontWeight: 700,
+                      background: viewMode === opt.v ? COLORS.primary : 'transparent',
+                      color: viewMode === opt.v ? '#fff' : COLORS.textSecondary,
+                      border: `1px solid ${viewMode === opt.v ? COLORS.primary : COLORS.borderFaint}`,
+                      cursor: 'pointer',
+                    }}>
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* 캘린더 */}
       {schedule && (
         <CalendarView
@@ -299,6 +327,7 @@ export default function MyScheduleView({ token }: Props) {
           scheduleId={schedule.id}
           token={token}
           myWorkerId={worker.worker_id}
+          viewMode={viewMode}
         />
       )}
 
@@ -345,15 +374,41 @@ export default function MyScheduleView({ token }: Props) {
 }
 
 // ── 캘린더 그리드 (직원 입장 — 본인 일정 + 같은 날 동료 보기) ─────
-function CalendarView({ year, month, assignments, tone, scheduleId, token, myWorkerId }: {
+function CalendarView({ year, month, assignments, tone, scheduleId, token, myWorkerId, viewMode = 'month' }: {
   year: number; month: number
   assignments: AssignmentRow[]
   tone: ColorTone
   scheduleId: string
   token?: string
   myWorkerId: string
+  viewMode?: 'month' | 'week' | 'day'  // L-2
 }) {
-  const days = useMemo(() => monthDays(year, month), [year, month])
+  const allDays = useMemo(() => monthDays(year, month), [year, month])
+  // L-2 — 뷰 모드별 days 필터
+  const days = useMemo(() => {
+    if (viewMode === 'month') return allDays
+    const today = new Date()
+    const todayIso = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`
+    if (viewMode === 'day') {
+      // 오늘 또는 첫 일자 1개
+      const target = allDays.includes(todayIso) ? todayIso : allDays[0]
+      return target ? [target] : []
+    }
+    // week — 오늘 (또는 첫 일자) 포함 주 (일~토)
+    const baseIso = allDays.includes(todayIso) ? todayIso : allDays[0]
+    if (!baseIso) return []
+    const base = new Date(baseIso + 'T00:00:00')
+    const dow = base.getDay()
+    base.setDate(base.getDate() - dow)
+    const weekDays: string[] = []
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(base); d.setDate(base.getDate() + i)
+      const iso = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+      // 이 달 범위 안만 표시 (월 경계 일자는 흐릿)
+      weekDays.push(iso)
+    }
+    return weekDays
+  }, [allDays, viewMode])
   const byDate = useMemo(() => {
     const m = new Map<string, AssignmentRow>()
     for (const a of assignments) m.set(a.work_date, a)
@@ -361,7 +416,8 @@ function CalendarView({ year, month, assignments, tone, scheduleId, token, myWor
   }, [assignments])
 
   const [pickedDate, setPickedDate] = useState<string | null>(null)
-  const firstDow = days.length > 0 ? dowIndex(days[0]) : 0
+  // L-2 — month 모드만 firstDow 빈칸 (week/day 는 1행)
+  const firstDow = viewMode === 'month' && days.length > 0 ? dowIndex(days[0]) : 0
 
   return (
     <>

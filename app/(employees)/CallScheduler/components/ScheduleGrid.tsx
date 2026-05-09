@@ -17,9 +17,10 @@ import type {
 interface Props {
   detail: ScheduleDetail
   onChanged: () => void  // 변경 후 부모에 reload 트리거
+  myWorkerId?: string    // L-2 — 본인 워커 ID (있으면 「내것만」 토글 활성)
 }
 
-export default function ScheduleGrid({ detail, onChanged }: Props) {
+export default function ScheduleGrid({ detail, onChanged, myWorkerId }: Props) {
   const { schedule, slots, workers, assignments } = detail
   const days = useMemo(
     () => monthDays(schedule.year, schedule.month),
@@ -279,6 +280,8 @@ export default function ScheduleGrid({ detail, onChanged }: Props) {
   const [swapFirst, setSwapFirst] = useState<{ a: Assignment | null; slotId: string; date: string } | null>(null)
   // PR-2SS-Phase-J-2C — 외부/회피 행 매니저 전용 토글 (기본 숨김 — 다른 직원 시야 차단)
   const [showPrivate, setShowPrivate] = useState(false)
+  // L-2 — 「내것만 보기」 토글 (myWorkerId 있을 때만)
+  const [meOnly, setMeOnly] = useState(false)
 
   // PR-2OO: 멀티 워커 — pickerAssignmentId 로 특정 row 추적
   const currentAssignment = pickerSlot && pickerDate && pickerAssignmentId
@@ -477,6 +480,21 @@ export default function ScheduleGrid({ detail, onChanged }: Props) {
               ? (swapFirst ? `🔄 두 번째 셀 선택` : '🔄 swap: 첫 셀 선택')
               : '🔄 시프트 교체'}
           </button>
+          {/* L-2 — 「내것만 보기」 토글 (myWorkerId 있을 때만 노출) */}
+          {myWorkerId && (
+            <button type="button"
+                    onClick={() => setMeOnly(m => !m)}
+                    style={{
+                      padding: '3px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700,
+                      background: meOnly ? COLORS.bgGreen : 'transparent',
+                      color: meOnly ? COLORS.success : COLORS.textSecondary,
+                      border: `1px solid ${meOnly ? COLORS.borderGreen : COLORS.borderFaint}`,
+                      cursor: 'pointer',
+                    }}
+                    title="본인 셀만 강조 (다른 워커 흐림)">
+              {meOnly ? '🙋 내것만 ON' : '🙋 내것만'}
+            </button>
+          )}
           {/* J-2C — 외부/회피 행 토글 (매니저 전용, 기본 숨김) */}
           <button type="button"
                   onClick={() => setShowPrivate(p => !p)}
@@ -819,12 +837,17 @@ export default function ScheduleGrid({ detail, onChanged }: Props) {
                 const isEmpty = arr.length === 0
                   || arr.every(a => !a.worker_id && a.special_code !== 'off')
                 // J-2B — 셀 td 너비 56 → 48 (화면 너비 축소)
+                // L-2 — meOnly 모드: 본인 워커 없는 셀 흐림
+                const hasMe = myWorkerId && arr.some(a => a.worker_id === myWorkerId)
+                const meDim: React.CSSProperties = (meOnly && myWorkerId && !hasMe)
+                  ? { opacity: 0.25 } : {}
                 const cellTdStyle: React.CSSProperties = emptyOnly && isEmpty ? {
                   padding: 1, minWidth: 48, verticalAlign: 'top',
                   background: COLORS.bgRed,
                   border: `2px dashed ${COLORS.borderRed}`,
                   borderRadius: 4,
-                } : { padding: 1, minWidth: 48, verticalAlign: 'top' }
+                  ...meDim,
+                } : { padding: 1, minWidth: 48, verticalAlign: 'top', ...meDim }
                 const isSwapFirst = swapFirst && swapFirst.slotId === slot.id && swapFirst.date === d
                 const finalCellStyle: React.CSSProperties = isSwapFirst
                   ? { ...cellTdStyle, background: COLORS.bgViolet, border: `2px solid #7c3aed`, borderRadius: 4 }

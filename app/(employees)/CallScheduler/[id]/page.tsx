@@ -50,10 +50,29 @@ function DetailInner({ id }: { id: string }) {
   const [pendingLeaveCount, setPendingLeaveCount] = useState(0)
   const [requestsOpen, setRequestsOpen] = useState(false)
   const [autoGenOpen, setAutoGenOpen] = useState(false)
+  // L-2 — 본인 워커 ID (있으면 ScheduleGrid「내것만」 토글 활성)
+  const [myWorkerId, setMyWorkerId] = useState<string | undefined>(undefined)
   // PR-2QQ-d-1 — 외부 직원 엑셀 업로드 폐기 (워커 셋팅으로 자동 채움)
   // const [externalOpen, setExternalOpen] = useState(false)
 
   useEffect(() => { reload(id) }, [id, reload])
+
+  // L-2 — 본인 워커 ID fetch (매니저 본인이 워커 등록되어 있으면 강조 가능)
+  useEffect(() => {
+    let abort = false
+    ;(async () => {
+      try {
+        const auth = await getAuthHeader()
+        const res = await fetch('/api/call-scheduler/me?year=2099&month=1', { headers: auth })
+        if (abort) return
+        if (res.ok) {
+          const json = await res.json()
+          if (json?.data?.worker?.worker_id) setMyWorkerId(json.data.worker.worker_id)
+        }
+      } catch { /* graceful — 매니저가 워커 아니면 그냥 비활성 */ }
+    })()
+    return () => { abort = true }
+  }, [])
 
   // 대기 중 직원 요청 카운트 (PR-2Y swap + PR-2BB leave)
   useEffect(() => {
@@ -385,7 +404,7 @@ function DetailInner({ id }: { id: string }) {
         <EmptyScheduleGuide onAutoGenerate={() => setAutoGenOpen(true)} />
       ) : (
         <>
-          {mode === 'view' && <ScheduleGrid detail={detail} onChanged={() => reload(id)} />}
+          {mode === 'view' && <ScheduleGrid detail={detail} onChanged={() => reload(id)} myWorkerId={myWorkerId} />}
           {mode === 'week' && <WeekView detail={detail} />}
           {mode === 'day' && <DayView detail={detail} />}
         </>

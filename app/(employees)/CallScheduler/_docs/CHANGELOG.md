@@ -20,6 +20,31 @@
 - 셀 호출 시 `slotGroups[slot.id].id + worker_id` 로 lookup → 색상 layer 재활성
 - 효과: 같은 워커가 야간 그룹에서 화/목 희망, 주간 그룹에서 월/금 비선호 등 다른 색상 layer 표출
 
+## 2026-05-09 (Phase L-2) — 「내것만」 토글 + MyScheduleView 뷰 모드
+
+### 사용자 요청
+> "뷰도 일별로 보기 / 주간보기 / 내것만보기 등 지원"
+
+### ScheduleGrid (매니저 매트릭스)
+- Props 신규: `myWorkerId?: string` — 본인 워커 ID (없으면 토글 비활성)
+- 「🙋 내것만」 토글 버튼 (외부/회피 토글 옆)
+- ON 시 본인 워커 없는 셀 opacity 0.25 — 내 일정만 시각 강조
+- 매트릭스 구조 (그룹/슬롯) 그대로 유지
+
+### [id]/page.tsx
+- /api/call-scheduler/me 호출하여 본인 worker_id fetch
+- ScheduleGrid 에 myWorkerId prop 전달
+
+### MyScheduleView (직원 본인)
+- 뷰 모드 토글 (월간 / 주간 / 오늘)
+- CalendarView prop 신규: `viewMode?: 'month' | 'week' | 'day'`
+- month: 기존 그대로 (월 카드 그리드 + firstDow 빈칸)
+- week: 오늘 포함 주 (일~토 7일) — 1행 grid
+- day: 오늘 단일 일자 (또는 첫 일자) — 1 카드
+
+### 검증
+- tsc CallScheduler 0 errors
+
 ## 2026-05-09 (Phase L-1) — WeekView 신규 + 매니저 매트릭스 viewMode (월/주/일)
 
 ### 사용자 요청
