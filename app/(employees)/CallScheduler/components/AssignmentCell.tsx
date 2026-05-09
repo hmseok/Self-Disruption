@@ -54,11 +54,13 @@ export default function AssignmentCell({ assignment, worker, onClick, onQuickAct
   const isOff = special === 'off'
   const isEmpty = !assignment || (!assignment.worker_id && special === 'none')
 
-  // Phase D — 워커 요일 조건 매치 (색상 layer)
-  const dowAvoidMatch = worker && dow != null
-    ? matchDow(worker.preferred_dow_avoid, dow) : false
-  const dowPreferMatch = worker && dow != null
-    ? matchDow(worker.preferred_dow_prefer, dow) : false
+  // Phase K (2026-05-09) — 워커 dow 설정 → 그룹멤버 설정으로 이동
+  //   본 셀은 그룹 컨텍스트 모름 → 색상 layer 임시 비활성
+  //   (향후 ScheduleGrid 가 멤버 설정 prop 으로 내려서 재활성)
+  const dowAvoidMatch = false
+  const dowPreferMatch = false
+  // 미사용 워닝 회피 (matchDow 헬퍼는 추후 그룹 멤버 prop 받을 때 다시 활용)
+  void matchDow
   // Phase E — 가드 위반 우선순위: time_conflict > next_day_block > consec_limit > Phase D
   const hasTimeConflict = violations?.has('time_conflict')
   const hasNextDayBlock = violations?.has('next_day_block')

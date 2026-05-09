@@ -54,6 +54,8 @@ export interface ShiftSlot {
   night_premium_rate?: number            // 0.50 = 50% 가산
 }
 
+// Phase K (2026-05-09) — Worker 정체성만 (글로벌 속성)
+//   그룹 안 역할 (priority/dow/한도/일수/슬롯거부/패턴) → GroupMemberSettings 로 이동
 export interface Worker {
   id: string
   name: string
@@ -63,26 +65,36 @@ export interface Worker {
   phone: string | null
   email: string | null
   is_active: boolean
-  // PR-2QQ-b — 외부 직원 표식 (시각적)
+  // PR-2QQ-b — 외부 직원 표식 (시각적, 글로벌)
   is_external?: boolean
-  external_pattern?: string | null  // (deprecated — work_pattern_text 로 통합)
-  // PR-2QQ-d-1 — 워커 제약 모델
-  priority_level?: number              // 1=최우선 / 2=일반 / 3=백업
-  preferred_dow_avoid?: string | null  // '0,5' = 일·금 회피
-  // PR-2SS-g — 희망 요일 (avoid 와 대칭, 매치 시 ranking 우선)
-  preferred_dow_prefer?: string | null // '1,3,5' = 월수금 희망
-  required_days_per_month?: number | null
-  max_days_per_month?: number | null
-  work_pattern_text?: string | null    // '2-on-2-off' 같은 자유 메모
-  // PR-2QQ-d-revert — 외부 근무 cycle (정동민 같은 외부 일정 워커)
+  external_pattern?: string | null  // 외부 일정 패턴 메모 (deprecated)
+  // PR-2QQ-d-revert — 외부 근무 cycle (정동민 같은 외부 일정 워커, 글로벌 — 모든 그룹 공통)
   // cycle on phase = 외부 근무 (당사 X) / cycle off phase = 외부 휴무 (당사 가능)
   cycle_days_on?: number | null        // 외부 연속 근무일
   cycle_days_off?: number | null       // 외부 연속 휴무일
   cycle_start_date?: string | null     // 'YYYY-MM-DD' 사이클 1일차 (외부 근무 첫째 날)
-  // PR-2SS-c — 연속 한도 + 슬롯 거부 (graceful — 마이그 미적용 시 undefined)
-  max_consecutive_work_days?: number | null   // 워커별 연속 근무 한도 (NULL=무제한)
-  blocked_slot_ids?: string[] | null          // 절대 안 들어가는 슬롯 ID
-  // preferred_dow_only 폐기 (실제 사용 사례 없음 — 데이터 분석 결과)
+}
+
+// Phase K — 그룹 안에서의 멤버 설정 (cs_group_members 행)
+//   같은 워커가 그룹 A 와 B 에서 다른 우선순위/요일/한도 가능
+export interface GroupMemberSettings {
+  id: string
+  group_id: string
+  worker_id: string
+  // 로테이션 순서 (이미 있던 컬럼)
+  priority?: number
+  // Phase K 신규 — 멤버 단위 제약/선호
+  priority_level?: number              // 1=P1 / 2=P2 / 3=P3 (이 그룹 안)
+  preferred_dow_prefer?: string | null // CSV '1,3,5'
+  preferred_dow_avoid?: string | null  // CSV '0,6'
+  max_consecutive_work_days?: number | null
+  required_days_per_month?: number | null
+  max_days_per_month?: number | null
+  blocked_slot_ids?: string[] | null   // ['L01','L02']
+  work_pattern_text?: string | null    // '2-on-2-off' 자유 메모
+  // join 결과 (UI 표출용)
+  worker_name?: string
+  worker_color_tone?: ColorTone
 }
 
 export interface Schedule {

@@ -1,7 +1,9 @@
 // ═══════════════════════════════════════════════════════════════════
-// GET  /api/call-scheduler/workers — 근무자 목록
+// GET  /api/call-scheduler/workers — 근무자 목록 (정체성만)
 // POST /api/call-scheduler/workers — 신규 근무자
-// PR-2QQ-a 14색 / PR-2QQ-b is_external / PR-2QQ-d-1 priority + 제약
+// Phase K (2026-05-09) — 그룹 중심 재구성
+//   priority_level / preferred_dow_* / 일수 한도 / 슬롯 거부 / 패턴 메모
+//   → cs_group_members 로 이동. 워커는 정체성만 (이름/색/외부여부/외부cycle).
 // ═══════════════════════════════════════════════════════════════════
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyUser } from '@/lib/auth-server'
@@ -21,90 +23,36 @@ const COLOR_TONES = [
 type Tone = typeof COLOR_TONES[number]
 
 interface FeatureFlags {
-  hasExternal: boolean
-  hasConstraints: boolean
-  hasPattern: boolean  // PR-2QQ-d-3
-  hasBlockedConsec: boolean  // PR-2SS-c
-  hasPreferDow: boolean  // PR-2SS-g
+  hasExternal: boolean    // is_external + external_pattern
+  hasCycle: boolean       // cycle_days_on/off/start
 }
 
 async function detectFeatures(): Promise<FeatureFlags> {
-  let hasExternal = true, hasConstraints = true, hasPattern = true, hasBlockedConsec = true, hasPreferDow = true
+  let hasExternal = true, hasCycle = true
   try {
     await prisma.$queryRaw<any[]>`SELECT is_external FROM cs_workers LIMIT 1`
   } catch { hasExternal = false }
   try {
-    await prisma.$queryRaw<any[]>`SELECT priority_level, preferred_dow_avoid, work_pattern_text FROM cs_workers LIMIT 1`
-  } catch { hasConstraints = false }
-  try {
     await prisma.$queryRaw<any[]>`SELECT cycle_days_on FROM cs_workers LIMIT 1`
-  } catch { hasPattern = false }
-  try {
-    await prisma.$queryRaw<any[]>`SELECT max_consecutive_work_days FROM cs_workers LIMIT 1`
-  } catch { hasBlockedConsec = false }
-  try {
-    await prisma.$queryRaw<any[]>`SELECT preferred_dow_prefer FROM cs_workers LIMIT 1`
-  } catch { hasPreferDow = false }
-  return { hasExternal, hasConstraints, hasPattern, hasBlockedConsec, hasPreferDow }
+  } catch { hasCycle = false }
+  return { hasExternal, hasCycle }
 }
 
 export async function GET(request: NextRequest) {
   const user = await verifyUser(request)
   if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
   try {
-    const { hasExternal, hasConstraints, hasPattern, hasBlockedConsec, hasPreferDow } = await detectFeatures()
+    const { hasExternal, hasCycle } = await detectFeatures()
     let rows: any[]
-    if (hasPreferDow) {
+    if (hasCycle) {
       rows = await prisma.$queryRaw<any[]>`
         SELECT id, name, profile_id, color_tone, group_label, phone, email, is_active,
                is_external, external_pattern,
-               priority_level, preferred_dow_avoid, preferred_dow_prefer,
-               required_days_per_month, max_days_per_month,
-               work_pattern_text,
-               cycle_days_on, cycle_days_off,
-               DATE_FORMAT(cycle_start_date, '%Y-%m-%d') AS cycle_start_date,
-               max_consecutive_work_days, blocked_slot_ids
-        FROM cs_workers
-        WHERE is_active = 1
-        ORDER BY priority_level ASC, is_external DESC, group_label DESC, name ASC
-      `
-    } else if (hasBlockedConsec) {
-      rows = await prisma.$queryRaw<any[]>`
-        SELECT id, name, profile_id, color_tone, group_label, phone, email, is_active,
-               is_external, external_pattern,
-               priority_level, preferred_dow_avoid,
-               required_days_per_month, max_days_per_month,
-               work_pattern_text,
-               cycle_days_on, cycle_days_off,
-               DATE_FORMAT(cycle_start_date, '%Y-%m-%d') AS cycle_start_date,
-               max_consecutive_work_days, blocked_slot_ids
-        FROM cs_workers
-        WHERE is_active = 1
-        ORDER BY priority_level ASC, is_external DESC, group_label DESC, name ASC
-      `
-    } else if (hasPattern) {
-      rows = await prisma.$queryRaw<any[]>`
-        SELECT id, name, profile_id, color_tone, group_label, phone, email, is_active,
-               is_external, external_pattern,
-               priority_level, preferred_dow_avoid,
-               required_days_per_month, max_days_per_month,
-               work_pattern_text,
                cycle_days_on, cycle_days_off,
                DATE_FORMAT(cycle_start_date, '%Y-%m-%d') AS cycle_start_date
         FROM cs_workers
         WHERE is_active = 1
-        ORDER BY priority_level ASC, is_external DESC, group_label DESC, name ASC
-      `
-    } else if (hasConstraints) {
-      rows = await prisma.$queryRaw<any[]>`
-        SELECT id, name, profile_id, color_tone, group_label, phone, email, is_active,
-               is_external, external_pattern,
-               priority_level, preferred_dow_avoid,
-               required_days_per_month, max_days_per_month,
-               work_pattern_text
-        FROM cs_workers
-        WHERE is_active = 1
-        ORDER BY priority_level ASC, is_external DESC, group_label DESC, name ASC
+        ORDER BY is_external DESC, group_label DESC, name ASC
       `
     } else if (hasExternal) {
       rows = await prisma.$queryRaw<any[]>`
@@ -127,28 +75,10 @@ export async function GET(request: NextRequest) {
       is_active: Boolean(r.is_active),
       is_external: hasExternal ? Boolean(r.is_external) : false,
       external_pattern: hasExternal ? (r.external_pattern ?? null) : null,
-      priority_level: hasConstraints ? Number(r.priority_level || 2) : 2,
-      preferred_dow_avoid: hasConstraints ? (r.preferred_dow_avoid ?? null) : null,
-      required_days_per_month: hasConstraints && r.required_days_per_month != null
-        ? Number(r.required_days_per_month) : null,
-      max_days_per_month: hasConstraints && r.max_days_per_month != null
-        ? Number(r.max_days_per_month) : null,
-      work_pattern_text: hasConstraints ? (r.work_pattern_text ?? null) : null,
-      // PR-2QQ-d-3 — 자동 근무 패턴
-      cycle_days_on: hasPattern && r.cycle_days_on != null ? Number(r.cycle_days_on) : null,
-      cycle_days_off: hasPattern && r.cycle_days_off != null ? Number(r.cycle_days_off) : null,
-      cycle_start_date: hasPattern ? (r.cycle_start_date ?? null) : null,
-      // PR-2SS-c — 연속 한도 + 슬롯 거부 (JSON 컬럼 graceful 파싱)
-      max_consecutive_work_days: hasBlockedConsec && r.max_consecutive_work_days != null
-        ? Number(r.max_consecutive_work_days) : null,
-      blocked_slot_ids: hasBlockedConsec && r.blocked_slot_ids != null
-        ? (typeof r.blocked_slot_ids === 'string'
-            ? (() => { try { return JSON.parse(r.blocked_slot_ids) } catch { return [] } })()
-            : (Array.isArray(r.blocked_slot_ids) ? r.blocked_slot_ids : []))
-        : null,
-      // PR-2SS-g — 희망 요일 (Hard ranking)
-      preferred_dow_prefer: hasPreferDow ? (r.preferred_dow_prefer ?? null) : null,
-      // PR-2QQ-d-revert: preferred_dow_only 폐기
+      // Phase K — 외부 cycle (워커 글로벌 — 모든 그룹 공통 일정)
+      cycle_days_on: hasCycle && r.cycle_days_on != null ? Number(r.cycle_days_on) : null,
+      cycle_days_off: hasCycle && r.cycle_days_off != null ? Number(r.cycle_days_off) : null,
+      cycle_start_date: hasCycle ? (r.cycle_start_date ?? null) : null,
     }))
     return NextResponse.json({ data: serialize(data), error: null })
   } catch (e: any) {
@@ -170,39 +100,20 @@ export async function POST(request: NextRequest) {
     const email: string | null = body?.email ?? null
     const profile_id: string | null = body?.profile_id ?? null
 
-    const { hasExternal, hasConstraints } = await detectFeatures()
+    const { hasExternal } = await detectFeatures()
     const id = crypto.randomUUID()
 
-    if (hasConstraints) {
+    // Phase K — INSERT 단순화 (정체성만, 그룹별 설정은 cs_group_members 로 별도 PUT)
+    if (hasExternal) {
       const is_external: number = body?.is_external ? 1 : 0
-      const priority_level: number = Math.min(3, Math.max(1, Number(body?.priority_level) || 2))
-      const preferred_dow_avoid: string | null = body?.preferred_dow_avoid ?? null
-      const required_days: number | null = body?.required_days_per_month != null
-        ? Number(body.required_days_per_month) : null
-      const max_days: number | null = body?.max_days_per_month != null
-        ? Number(body.max_days_per_month) : null
-      const work_pattern: string | null = body?.work_pattern_text ?? null
+      const external_pattern: string | null = body?.external_pattern ?? null
       await prisma.$executeRaw`
         INSERT INTO cs_workers
           (id, name, profile_id, color_tone, group_label, phone, email, is_active,
-           is_external, priority_level, preferred_dow_avoid,
-           required_days_per_month, max_days_per_month, work_pattern_text,
-           created_at, updated_at)
+           is_external, external_pattern, created_at, updated_at)
         VALUES
           (${id}, ${name}, ${profile_id}, ${tone}, ${group_label}, ${phone}, ${email}, 1,
-           ${is_external}, ${priority_level}, ${preferred_dow_avoid},
-           ${required_days}, ${max_days}, ${work_pattern},
-           NOW(), NOW())
-      `
-    } else if (hasExternal) {
-      const is_external: number = body?.is_external ? 1 : 0
-      await prisma.$executeRaw`
-        INSERT INTO cs_workers
-          (id, name, profile_id, color_tone, group_label, phone, email, is_active,
-           is_external, created_at, updated_at)
-        VALUES
-          (${id}, ${name}, ${profile_id}, ${tone}, ${group_label}, ${phone}, ${email}, 1,
-           ${is_external}, NOW(), NOW())
+           ${is_external}, ${external_pattern}, NOW(), NOW())
       `
     } else {
       await prisma.$executeRaw`

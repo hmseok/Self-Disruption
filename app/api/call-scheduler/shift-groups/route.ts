@@ -58,24 +58,66 @@ export async function GET(request: NextRequest) {
       for (const r of catRows) catMap.set(r.id, r.category || CATEGORIES_FALLBACK)
     }
 
-    // 멤버 chip 일괄 조회 (그룹별 워커 이름 + color_tone)
-    const memberMap = new Map<string, Array<{ id: string; name: string; color_tone: string; priority: number }>>()
+    // Phase K — cs_group_members 새 8 컬럼 존재 확인 (graceful)
+    let hasMemberSettings = true
+    try {
+      await prisma.$queryRaw<any[]>`SELECT priority_level FROM cs_group_members LIMIT 1`
+    } catch { hasMemberSettings = false }
+
+    // 멤버 chip 일괄 조회 (그룹별 워커 이름 + color_tone + 8 멤버 설정)
+    type MemberRow = {
+      id: string; name: string; color_tone: string; priority: number;
+      priority_level: number;
+      preferred_dow_prefer: string | null; preferred_dow_avoid: string | null;
+      max_consecutive_work_days: number | null;
+      required_days_per_month: number | null; max_days_per_month: number | null;
+      blocked_slot_ids: string[] | null; work_pattern_text: string | null;
+    }
+    const memberMap = new Map<string, MemberRow[]>()
     if (rows.length > 0) {
-      const memRows = await prisma.$queryRaw<any[]>`
-        SELECT m.group_id, w.id AS worker_id, w.name, w.color_tone, m.priority
-        FROM cs_group_members m
-        JOIN cs_workers w ON w.id = m.worker_id
-        WHERE w.is_active = 1
-        ORDER BY m.group_id, m.priority ASC
-      `
+      const memRows = hasMemberSettings
+        ? await prisma.$queryRaw<any[]>`
+            SELECT m.group_id, w.id AS worker_id, w.name, w.color_tone,
+                   m.priority,
+                   m.priority_level, m.preferred_dow_prefer, m.preferred_dow_avoid,
+                   m.max_consecutive_work_days, m.required_days_per_month, m.max_days_per_month,
+                   m.blocked_slot_ids, m.work_pattern_text
+            FROM cs_group_members m
+            JOIN cs_workers w ON w.id = m.worker_id
+            WHERE w.is_active = 1
+            ORDER BY m.group_id, m.priority ASC
+          `
+        : await prisma.$queryRaw<any[]>`
+            SELECT m.group_id, w.id AS worker_id, w.name, w.color_tone, m.priority
+            FROM cs_group_members m
+            JOIN cs_workers w ON w.id = m.worker_id
+            WHERE w.is_active = 1
+            ORDER BY m.group_id, m.priority ASC
+          `
       for (const r of memRows) {
         const arr = memberMap.get(r.group_id) || []
-        arr.push({
+        const row: MemberRow = {
           id: r.worker_id,
           name: r.name,
           color_tone: r.color_tone || 'none',
           priority: Number(r.priority || 0),
-        })
+          priority_level: hasMemberSettings ? Number(r.priority_level || 2) : 2,
+          preferred_dow_prefer: hasMemberSettings ? (r.preferred_dow_prefer ?? null) : null,
+          preferred_dow_avoid: hasMemberSettings ? (r.preferred_dow_avoid ?? null) : null,
+          max_consecutive_work_days: hasMemberSettings && r.max_consecutive_work_days != null
+            ? Number(r.max_consecutive_work_days) : null,
+          required_days_per_month: hasMemberSettings && r.required_days_per_month != null
+            ? Number(r.required_days_per_month) : null,
+          max_days_per_month: hasMemberSettings && r.max_days_per_month != null
+            ? Number(r.max_days_per_month) : null,
+          blocked_slot_ids: hasMemberSettings && r.blocked_slot_ids != null
+            ? (typeof r.blocked_slot_ids === 'string'
+               ? (() => { try { return JSON.parse(r.blocked_slot_ids) } catch { return [] } })()
+               : (Array.isArray(r.blocked_slot_ids) ? r.blocked_slot_ids : []))
+            : null,
+          work_pattern_text: hasMemberSettings ? (r.work_pattern_text ?? null) : null,
+        }
+        arr.push(row)
         memberMap.set(r.group_id, arr)
       }
     }

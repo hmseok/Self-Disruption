@@ -1,17 +1,19 @@
 'use client'
 // ═══════════════════════════════════════════════════════════════════
-// WorkersTab — 콜센터 워커 관리
-//   · 라이드 직원 마스터(ride_employees) 중에서 콜센터 워커로 활성화
-//   · 콜센터 특화 컬럼: color_tone, group_label
-//   · cs_workers 의 마스터 컬럼은 점진 deprecated → 라이드 직원 정보가 우선 표시
+// WorkersTab — 콜센터 워커 관리 (Phase K: 정체성만)
+//   2026-05-09 — 그룹 중심 재구성:
+//     priority/dow/한도/일수/슬롯거부/패턴 → cs_group_members (그룹쪽 편집)
+//   본 탭은 워커 정체성만:
+//     · 색상 + 그룹 라벨 + 외부 직원 여부 + 외부 근무 cycle
+//   그룹별 설정은 「그룹」 탭의 멤버 카드에서 편집
 // ═══════════════════════════════════════════════════════════════════
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, Fragment } from 'react'
 import Link from 'next/link'
 import { COLORS, GLASS, BTN, pillStyle } from '@/app/utils/ui-tokens'
 import { TONE_BG, TONE_TEXT } from '@/app/(employees)/CallScheduler/utils/palette'
 import { COLOR_TONE_OPTIONS } from '@/app/(employees)/CallScheduler/utils/types'
 import { getAuthHeader } from '@/app/utils/auth-client'
-import type { Worker, ColorTone, ShiftSlot } from '@/app/(employees)/CallScheduler/utils/types'
+import type { Worker, ColorTone } from '@/app/(employees)/CallScheduler/utils/types'
 
 const GROUP_OPTIONS: (string | null)[] = [null, '주간', '야간', '저녁', '관리', '기타']
 
@@ -30,63 +32,40 @@ interface RideEmp {
 export default function WorkersTab() {
   const [workers, setWorkers] = useState<Worker[]>([])
   const [employees, setEmployees] = useState<RideEmp[]>([])
-  // PR-2SS-c — 슬롯 목록 (blocked_slot_ids 입력용)
-  const [slots, setSlots] = useState<ShiftSlot[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [actionMsg, setActionMsg] = useState<{ ok: boolean; text: string } | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+
+  // Phase K — 정체성 편집 state (옮긴 필드 모두 제거)
   const [editTone, setEditTone] = useState<ColorTone>('none')
   const [editGroup, setEditGroup] = useState<string | null>(null)
-  const [saving, setSaving] = useState(false)
-  // PR-2QQ-d-1 — 워커 제약 셋팅
   const [editIsExternal, setEditIsExternal] = useState(false)
-  const [editPriority, setEditPriority] = useState(2)
-  const [editAvoidDow, setEditAvoidDow] = useState<Set<number>>(new Set())
-  const [editRequired, setEditRequired] = useState<string>('')
-  const [editMax, setEditMax] = useState<string>('')
-  const [editPattern, setEditPattern] = useState<string>('')
-  // PR-2QQ-d-revert — 외부 근무 cycle (dow_only 폐기)
   const [editCycleOn, setEditCycleOn] = useState<string>('')
   const [editCycleOff, setEditCycleOff] = useState<string>('')
   const [editCycleStart, setEditCycleStart] = useState<string>('')
-  // PR-2SS-c — 연속 한도 + 슬롯 거부
-  const [editMaxConsec, setEditMaxConsec] = useState<string>('')
-  const [editBlockedSlots, setEditBlockedSlots] = useState<Set<string>>(new Set())
-  // PR-2SS-g — 희망 요일 (Hard ranking)
-  const [editPreferDow, setEditPreferDow] = useState<Set<number>>(new Set())
 
   const load = async () => {
     setLoading(true); setError(null)
     try {
       const auth = await getAuthHeader()
-      const [wRes, eRes, sRes] = await Promise.all([
+      const [wRes, eRes] = await Promise.all([
         fetch('/api/call-scheduler/workers', { headers: auth }),
         fetch('/api/ride-employees?include_inactive=0', { headers: auth }),
-        // PR-2SS-c — 슬롯 목록 (blocked_slot_ids 입력용)
-        fetch('/api/call-scheduler/shift-slots', { headers: auth }),
       ])
       const wJ = await wRes.json(); if (!wRes.ok) throw new Error(wJ?.error || '워커 조회 실패')
       const eJ = await eRes.json(); if (!eRes.ok) throw new Error(eJ?.error || '직원 조회 실패')
-      const sJ = await sRes.json(); if (!sRes.ok) throw new Error(sJ?.error || '슬롯 조회 실패')
-      setWorkers(wJ.data); setEmployees(eJ.data); setSlots(sJ.data)
+      setWorkers(wJ.data); setEmployees(eJ.data)
     } catch (e: any) { setError(e?.message || '오류') }
     finally { setLoading(false) }
   }
 
   useEffect(() => { load() }, [])
 
-  // 어떤 직원이 콜센터 워커로 활성/비활성인지
-  const workerByName = useMemo(() => {
-    const m = new Map<string, Worker>()
-    for (const w of workers) m.set(w.name, w)
-    return m
-  }, [workers])
-
   // 콜센터 워커 + 라이드 직원 조인 (이름 또는 employee_id 기준)
   const rows = useMemo(() => {
     return workers.map(w => {
-      // employee 매칭은 v1 에서는 이름으로, v2 부터 employee_id 도 활용
       const emp = employees.find(e => e.id === (w as any).employee_id) || employees.find(e => e.name === w.name)
       return { worker: w, employee: emp || null }
     })
@@ -95,36 +74,9 @@ export default function WorkersTab() {
   const startEdit = (w: Worker) => {
     setEditingId(w.id); setEditTone(w.color_tone); setEditGroup(w.group_label)
     setEditIsExternal(!!w.is_external)
-    setEditPriority(w.priority_level || 2)
-    // PR-2QQ-d-1 버그 fix: 빈 문자열이 Number('') === 0 (일요일) 으로 잘못 파싱되던 문제
-    setEditAvoidDow(new Set(
-      (w.preferred_dow_avoid || '')
-        .split(',')
-        .map(s => s.trim())
-        .filter(s => s !== '')           // ✅ 빈 토큰 먼저 제거
-        .map(Number)
-        .filter(n => !isNaN(n) && n >= 0 && n <= 6)
-    ))
-    setEditRequired(w.required_days_per_month != null ? String(w.required_days_per_month) : '')
-    setEditMax(w.max_days_per_month != null ? String(w.max_days_per_month) : '')
-    setEditPattern(w.work_pattern_text || '')
-    // PR-2QQ-d-3 자동 근무 패턴
     setEditCycleOn(w.cycle_days_on != null ? String(w.cycle_days_on) : '')
     setEditCycleOff(w.cycle_days_off != null ? String(w.cycle_days_off) : '')
     setEditCycleStart(w.cycle_start_date || '')
-    // PR-2QQ-d-revert: preferred_dow_only 폐기
-    // PR-2SS-c — 연속 한도 + 슬롯 거부
-    setEditMaxConsec(w.max_consecutive_work_days != null ? String(w.max_consecutive_work_days) : '')
-    setEditBlockedSlots(new Set(Array.isArray(w.blocked_slot_ids) ? w.blocked_slot_ids : []))
-    // PR-2SS-g — 희망 요일 (Hard ranking)
-    setEditPreferDow(new Set(
-      (w.preferred_dow_prefer || '')
-        .split(',')
-        .map(s => s.trim())
-        .filter(s => s !== '')
-        .map(Number)
-        .filter(n => !isNaN(n) && n >= 0 && n <= 6)
-    ))
   }
   const cancelEdit = () => { setEditingId(null) }
 
@@ -143,8 +95,7 @@ export default function WorkersTab() {
         const json = await res.json()
         if (!res.ok) throw new Error(json?.error || 'RideEmployees 저장 실패')
       }
-      // 2. cs_workers (PR-2QQ-d-1 + d-revert: dow_only 폐기)
-      const avoidStr = Array.from(editAvoidDow).sort().join(',')
+      // 2. cs_workers (정체성 + 외부 cycle 만)
       const wRes = await fetch(`/api/call-scheduler/workers/${w.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', ...auth },
@@ -152,20 +103,9 @@ export default function WorkersTab() {
           color_tone: editTone,
           group_label: editGroup,
           is_external: editIsExternal,
-          priority_level: editPriority,
-          preferred_dow_avoid: avoidStr || null,
-          required_days_per_month: editRequired ? Number(editRequired) : null,
-          max_days_per_month: editMax ? Number(editMax) : null,
-          work_pattern_text: editPattern.trim() || null,
-          // PR-2QQ-d-revert: 외부 cycle (당사 X)
           cycle_days_on: editCycleOn ? Number(editCycleOn) : null,
           cycle_days_off: editCycleOff ? Number(editCycleOff) : null,
           cycle_start_date: editCycleStart || null,
-          // PR-2SS-c — 연속 한도 + 슬롯 거부
-          max_consecutive_work_days: editMaxConsec === '' ? null : Number(editMaxConsec),
-          blocked_slot_ids: Array.from(editBlockedSlots),
-          // PR-2SS-g — 희망 요일 (Hard ranking)
-          preferred_dow_prefer: Array.from(editPreferDow).sort().join(',') || null,
         }),
       })
       const wJson = await wRes.json()
@@ -237,6 +177,22 @@ export default function WorkersTab() {
         </Link>
       </div>
 
+      {/* Phase K 안내 — 그룹별 설정은 그룹쪽에서 */}
+      <div style={{
+        ...GLASS.L3, background: COLORS.bgBlue, borderRadius: 10,
+        padding: '10px 14px', marginBottom: 12,
+        border: `1px solid ${COLORS.borderBlue}`,
+        display: 'flex', alignItems: 'center', gap: 10,
+      }}>
+        <span style={{ fontSize: 16 }}>💡</span>
+        <div style={{ flex: 1, fontSize: 12, color: COLORS.textPrimary }}>
+          <strong>본 탭은 워커 정체성만</strong> — 색상 / 그룹 라벨 / 외부 직원 / 외부 근무 cycle.
+          {' '}
+          <strong>우선순위 / 희망요일 / 한도 / 슬롯 거부 / 패턴 메모는 「그룹」 탭의 멤버 카드</strong>에서
+          편집 (그룹마다 다르게 적용 가능).
+        </div>
+      </div>
+
       {loading ? (
         <div style={{ padding: 40, textAlign: 'center', color: COLORS.textMuted }}>로딩 중...</div>
       ) : (
@@ -266,8 +222,8 @@ export default function WorkersTab() {
                   const isEditing = editingId === worker.id
                   const tone = isEditing ? editTone : worker.color_tone
                   return (
-                    <>
-                    <tr key={worker.id} style={{ borderBottom: isEditing ? 'none' : `1px solid ${COLORS.borderFaint}` }}>
+                    <Fragment key={worker.id}>
+                    <tr style={{ borderBottom: isEditing ? 'none' : `1px solid ${COLORS.borderFaint}` }}>
                       <td style={tdStyle}>
                         <span style={{
                           color: TONE_TEXT[tone],
@@ -315,7 +271,6 @@ export default function WorkersTab() {
                       </td>
                       <td style={tdStyle}>
                         {isEditing ? (
-                          // PR-2QQ-a — 14 색상 dot picker
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
                             {COLOR_TONE_OPTIONS.map(opt => {
                               const active = editTone === opt.value
@@ -380,37 +335,22 @@ export default function WorkersTab() {
                             background: COLORS.bgViolet, color: '#7c3aed', fontWeight: 800,
                           }} title="외부 직원">🔒 외부</span>
                         )}
-                        {!isEditing && worker.priority_level === 1 && (
-                          <span style={{
-                            marginLeft: 4, fontSize: 9, padding: '1px 5px', borderRadius: 4,
-                            background: COLORS.bgRed, color: COLORS.danger, fontWeight: 800,
-                          }} title="1순위">P1</span>
-                        )}
                       </td>
                     </tr>
-                    {/* PR-2QQ-d-1 — 편집 시 제약 셋팅 펼침 */}
+                    {/* Phase K — 편집 시 정체성 패널 (외부 + 외부 cycle 만) */}
                     {isEditing && (
-                      <tr key={`${worker.id}-edit`} style={{ borderBottom: `1px solid ${COLORS.borderFaint}`, background: 'rgba(59,130,246,0.04)' }}>
+                      <tr style={{ borderBottom: `1px solid ${COLORS.borderFaint}`, background: 'rgba(59,130,246,0.04)' }}>
                         <td colSpan={7} style={{ padding: '12px 14px' }}>
-                          <ConstraintsPanel
+                          <IdentityPanel
                             isExternal={editIsExternal} setIsExternal={setEditIsExternal}
-                            priority={editPriority} setPriority={setEditPriority}
-                            avoidDow={editAvoidDow} setAvoidDow={setEditAvoidDow}
-                            required={editRequired} setRequired={setEditRequired}
-                            max={editMax} setMax={setEditMax}
-                            pattern={editPattern} setPattern={setEditPattern}
                             cycleOn={editCycleOn} setCycleOn={setEditCycleOn}
                             cycleOff={editCycleOff} setCycleOff={setEditCycleOff}
                             cycleStart={editCycleStart} setCycleStart={setEditCycleStart}
-                            maxConsec={editMaxConsec} setMaxConsec={setEditMaxConsec}
-                            blockedSlots={editBlockedSlots} setBlockedSlots={setEditBlockedSlots}
-                            preferDow={editPreferDow} setPreferDow={setEditPreferDow}
-                            slots={slots}
                           />
                         </td>
                       </tr>
                     )}
-                    </>
+                    </Fragment>
                   )
                 })}
               </tbody>
@@ -460,81 +400,24 @@ const tdStyle: React.CSSProperties = {
   padding: '8px 10px', whiteSpace: 'nowrap', color: COLORS.textPrimary,
 }
 
-// PR-2QQ-d-1 + d-revert + PR-2SS-c — 워커 제약 패널 (연속 한도 + 슬롯 거부 추가)
-function ConstraintsPanel({
+// Phase K — 워커 정체성 패널 (외부 직원 + 외부 근무 cycle)
+function IdentityPanel({
   isExternal, setIsExternal,
-  priority, setPriority,
-  avoidDow, setAvoidDow,
-  required, setRequired,
-  max, setMax,
-  pattern, setPattern,
-  // PR-2QQ-d-revert: 외부 cycle (dow_only 폐기)
   cycleOn, setCycleOn,
   cycleOff, setCycleOff,
   cycleStart, setCycleStart,
-  // PR-2SS-c — 연속 한도 + 슬롯 거부
-  maxConsec, setMaxConsec,
-  blockedSlots, setBlockedSlots,
-  // PR-2SS-g — 희망 요일 (Hard ranking)
-  preferDow, setPreferDow,
-  slots,
 }: {
   isExternal: boolean; setIsExternal: (v: boolean) => void
-  priority: number; setPriority: (v: number) => void
-  avoidDow: Set<number>; setAvoidDow: (v: Set<number>) => void
-  required: string; setRequired: (v: string) => void
-  max: string; setMax: (v: string) => void
-  pattern: string; setPattern: (v: string) => void
   cycleOn: string; setCycleOn: (v: string) => void
   cycleOff: string; setCycleOff: (v: string) => void
   cycleStart: string; setCycleStart: (v: string) => void
-  maxConsec: string; setMaxConsec: (v: string) => void
-  blockedSlots: Set<string>; setBlockedSlots: (v: Set<string>) => void
-  preferDow: Set<number>; setPreferDow: (v: Set<number>) => void
-  slots: ShiftSlot[]
 }) {
-  const DOW = ['일', '월', '화', '수', '목', '금', '토']
-  const toggleDow = (d: number) => {
-    const next = new Set(avoidDow)
-    if (next.has(d)) next.delete(d); else next.add(d)
-    setAvoidDow(next)
-  }
   return (
     <div style={{
-      display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14,
+      display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14,
       ...GLASS.L1, borderRadius: 8, padding: 12,
     }}>
-      {/* 좌측 — 우선순위 + 외부 + 비선호 요일 */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <div>
-          <FieldLabel>🏷 우선순위</FieldLabel>
-          <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
-            {[1, 2, 3].map(n => (
-              <button key={n} type="button" onClick={() => setPriority(n)}
-                      style={{
-                        flex: 1, padding: '6px 8px', borderRadius: 6, fontSize: 11, fontWeight: 700,
-                        background: priority === n
-                          ? (n === 1 ? COLORS.bgRed : n === 2 ? COLORS.bgBlue : COLORS.bgGray)
-                          : 'transparent',
-                        color: priority === n
-                          ? (n === 1 ? COLORS.danger : n === 2 ? COLORS.info : COLORS.textSecondary)
-                          : COLORS.textSecondary,
-                        border: `1px solid ${
-                          priority === n
-                            ? (n === 1 ? COLORS.borderRed : n === 2 ? COLORS.borderBlue : COLORS.borderFaint)
-                            : COLORS.borderFaint
-                        }`,
-                        cursor: 'pointer',
-                      }}>
-                {n === 1 ? 'P1 최우선' : n === 2 ? 'P2 일반' : 'P3 백업'}
-              </button>
-            ))}
-          </div>
-          <div style={{ fontSize: 10, color: COLORS.textMuted, marginTop: 3 }}>
-            자동 생성 시 P1 부터 우선 배정 (외부 직원은 보통 P1)
-          </div>
-        </div>
-
         <div>
           <FieldLabel>🔒 외부 직원</FieldLabel>
           <label style={{
@@ -544,232 +427,47 @@ function ConstraintsPanel({
             <input type="checkbox" checked={isExternal}
                    onChange={(e) => setIsExternal(e.target.checked)} />
             <span style={{ fontSize: 12, color: COLORS.textPrimary }}>
-              외부 직원으로 표시 (🔒 아이콘 + 자동 P1 권장)
+              외부 직원으로 표시 (🔒 아이콘 + 자동 P1 권장 — 그룹쪽 설정)
             </span>
           </label>
         </div>
-
-        <div>
-          <FieldLabel>🌟 희망 요일 (Hard ranking)</FieldLabel>
-          <div style={{ display: 'flex', gap: 3, marginTop: 4 }}>
-            {DOW.map((label, i) => {
-              const active = preferDow.has(i)
-              const isWeekend = i === 0 || i === 6
-              return (
-                <button key={i} type="button"
-                        onClick={() => {
-                          const next = new Set(preferDow)
-                          if (next.has(i)) next.delete(i); else next.add(i)
-                          setPreferDow(next)
-                        }}
-                        style={{
-                          flex: 1, padding: '6px 0', borderRadius: 4, fontSize: 11, fontWeight: 700,
-                          background: active ? COLORS.bgGreen : 'transparent',
-                          color: active
-                            ? COLORS.success
-                            : (isWeekend ? COLORS.textSecondary : COLORS.textMuted),
-                          border: `1px solid ${active ? COLORS.borderGreen : COLORS.borderFaint}`,
-                          cursor: 'pointer',
-                        }}>
-                  {label}
-                </button>
-              )
-            })}
-          </div>
-          <div style={{ fontSize: 10, color: COLORS.textMuted, marginTop: 3 }}>
-            자동 생성 시 이 요일 매치 → priority 다음 우선순위 (avoid 보다 앞)
-          </div>
-        </div>
-
-        <div>
-          <FieldLabel>🚫 비선호 요일</FieldLabel>
-          <div style={{ display: 'flex', gap: 3, marginTop: 4 }}>
-            {DOW.map((label, i) => {
-              const active = avoidDow.has(i)
-              const isWeekend = i === 0 || i === 6
-              return (
-                <button key={i} type="button" onClick={() => toggleDow(i)}
-                        style={{
-                          flex: 1, padding: '6px 0', borderRadius: 4, fontSize: 11, fontWeight: 700,
-                          background: active ? COLORS.bgRed : 'transparent',
-                          color: active
-                            ? COLORS.danger
-                            : (isWeekend ? COLORS.textSecondary : COLORS.textMuted),
-                          border: `1px solid ${active ? COLORS.borderRed : COLORS.borderFaint}`,
-                          cursor: 'pointer',
-                        }}>
-                  {label}
-                </button>
-              )
-            })}
-          </div>
-          <div style={{ fontSize: 10, color: COLORS.textMuted, marginTop: 3 }}>
-            자동 생성 시 이 요일 후순위 (예: 야간 워커 금·일 회피)
-          </div>
-        </div>
       </div>
 
-      {/* 우측 — 필수/최대 + 패턴 메모 */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+      {/* 외부 근무 cycle (정동민 같은 외부 일정 워커) */}
+      <div style={{
+        ...GLASS.L1, borderRadius: 8, padding: 10,
+        background: COLORS.bgViolet, border: `1px solid ${COLORS.borderViolet}`,
+      }}>
+        <div style={{ fontSize: 12, fontWeight: 800, color: '#7c3aed', marginBottom: 6 }}>
+          🏢 외부 근무 cycle (당사 X)
+        </div>
+        <div style={{ fontSize: 10, color: COLORS.textMuted, marginBottom: 8 }}>
+          다른 회사 근무 일정 — 외부 근무일은 자동 생성에서 당사 후보 제외
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
           <div>
-            <FieldLabel>📊 월 필수 일수</FieldLabel>
-            <input type="number" min={0} max={31} value={required}
-                   onChange={(e) => setRequired(e.target.value)}
-                   placeholder="없음"
-                   style={{
-                     width: '100%', padding: '6px 8px', borderRadius: 6, fontSize: 12,
-                     border: `1px solid ${COLORS.borderFaint}`,
-                     background: 'rgba(255,255,255,0.85)', marginTop: 4,
-                   }} />
-            <div style={{ fontSize: 10, color: COLORS.textMuted, marginTop: 3 }}>
-              미달 시 자동 생성에 우선 배정
-            </div>
+            <FieldLabel>외부 근무일</FieldLabel>
+            <input type="number" min={0} value={cycleOn}
+                   onChange={(e) => setCycleOn(e.target.value)}
+                   placeholder="2"
+                   style={inputStyle} />
           </div>
           <div>
-            <FieldLabel>🛑 월 최대 일수</FieldLabel>
-            <input type="number" min={0} max={31} value={max}
-                   onChange={(e) => setMax(e.target.value)}
-                   placeholder="없음"
-                   style={{
-                     width: '100%', padding: '6px 8px', borderRadius: 6, fontSize: 12,
-                     border: `1px solid ${COLORS.borderFaint}`,
-                     background: 'rgba(255,255,255,0.85)', marginTop: 4,
-                   }} />
-            <div style={{ fontSize: 10, color: COLORS.textMuted, marginTop: 3 }}>
-              초과 시 자동 생성에서 제외
-            </div>
+            <FieldLabel>외부 휴무일</FieldLabel>
+            <input type="number" min={0} value={cycleOff}
+                   onChange={(e) => setCycleOff(e.target.value)}
+                   placeholder="2"
+                   style={inputStyle} />
+          </div>
+          <div>
+            <FieldLabel>시작 기준일</FieldLabel>
+            <input type="date" value={cycleStart}
+                   onChange={(e) => setCycleStart(e.target.value)}
+                   style={inputStyle} />
           </div>
         </div>
-
-        <div>
-          <FieldLabel>📝 패턴 메모</FieldLabel>
-          <input type="text" value={pattern}
-                 onChange={(e) => setPattern(e.target.value)}
-                 placeholder="예: 2-on-2-off, 평일만, 주말만"
-                 maxLength={64}
-                 style={{
-                   width: '100%', padding: '6px 8px', borderRadius: 6, fontSize: 12,
-                   border: `1px solid ${COLORS.borderFaint}`,
-                   background: 'rgba(255,255,255,0.85)', marginTop: 4,
-                 }} />
-          <div style={{ fontSize: 10, color: COLORS.textMuted, marginTop: 3 }}>
-            매니저 메모 (자동 생성 알고리즘에 직접 영향 X — 참고용)
-          </div>
-        </div>
-
-        {/* PR-2SS-c — 연속 한도 + 슬롯 거부 */}
-        <div style={{
-          ...GLASS.L1, borderRadius: 8, padding: 10, marginTop: 4,
-          border: `1px solid ${COLORS.borderRed}`,
-          background: COLORS.bgRed,
-        }}>
-          <FieldLabel>🛡 연속 한도 + 슬롯 거부</FieldLabel>
-          <div style={{ fontSize: 10, color: COLORS.textMuted, marginTop: 3, marginBottom: 6 }}>
-            워커별 hard 제약 — 자동 생성에서 절대 위반 X. 슬롯 자체 한도 (cs_shift_slots.max_consecutive_days) 와 둘 중 작은 값 적용
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}>
-            <div>
-              <div style={{ fontSize: 10, color: COLORS.textSecondary, fontWeight: 700 }}>📅 연속 근무 한도 (일)</div>
-              <input type="number" min={1} max={31} value={maxConsec}
-                     onChange={(e) => setMaxConsec(e.target.value)}
-                     placeholder="무제한"
-                     style={{
-                       width: '100%', padding: '4px 6px', borderRadius: 4, fontSize: 11,
-                       border: `1px solid ${COLORS.borderFaint}`,
-                       background: 'rgba(255,255,255,0.85)', marginTop: 2,
-                     }} />
-              <div style={{ fontSize: 9, color: COLORS.textMuted, marginTop: 2 }}>
-                빈 칸 = 무제한
-              </div>
-            </div>
-            <div>
-              <div style={{ fontSize: 10, color: COLORS.textSecondary, fontWeight: 700 }}>🚫 슬롯 거부 (이 슬롯 절대 X)</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginTop: 4 }}>
-                {slots.filter(s => s.is_active).map(s => {
-                  const active = blockedSlots.has(s.id)
-                  return (
-                    <button key={s.id} type="button"
-                            onClick={() => {
-                              const next = new Set(blockedSlots)
-                              if (next.has(s.id)) next.delete(s.id); else next.add(s.id)
-                              setBlockedSlots(next)
-                            }}
-                            style={{
-                              padding: '3px 7px', borderRadius: 99, fontSize: 10, fontWeight: 700,
-                              background: active ? COLORS.danger : 'rgba(255,255,255,0.7)',
-                              color: active ? '#fff' : COLORS.textSecondary,
-                              border: `1px solid ${active ? COLORS.danger : COLORS.borderFaint}`,
-                              cursor: 'pointer',
-                            }}>
-                      {active && '🚫 '}{s.code}
-                    </button>
-                  )
-                })}
-                {slots.filter(s => s.is_active).length === 0 && (
-                  <div style={{ fontSize: 10, color: COLORS.textMuted }}>
-                    슬롯이 없습니다 — 시프트 탭에서 먼저 추가
-                  </div>
-                )}
-              </div>
-              {blockedSlots.size > 0 && (
-                <div style={{ fontSize: 9, color: COLORS.danger, marginTop: 3 }}>
-                  {blockedSlots.size}개 슬롯 거부 중
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* PR-2QQ-d-revert — 외부 근무 cycle (당사 X) — dow_only 폐기 */}
-        <div style={{
-          ...GLASS.L1, borderRadius: 8, padding: 10, marginTop: 4,
-          border: `1px solid ${COLORS.borderViolet}`,
-          background: COLORS.bgViolet,
-        }}>
-          <FieldLabel>🏢 외부 근무 cycle (당사 X)</FieldLabel>
-          <div style={{ fontSize: 10, color: COLORS.textMuted, marginTop: 3, marginBottom: 6 }}>
-            다른 회사 근무 일정 — 외부 근무일은 자동 생성에서 당사 후보 제외
-          </div>
-
-          {/* cycle 패턴 */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.4fr', gap: 6, marginBottom: 6 }}>
-            <div>
-              <div style={{ fontSize: 10, color: COLORS.textSecondary, fontWeight: 700 }}>외부 근무일</div>
-              <input type="number" min={0} max={30} value={cycleOn}
-                     onChange={(e) => setCycleOn(e.target.value)}
-                     placeholder="-"
-                     style={{
-                       width: '100%', padding: '4px 6px', borderRadius: 4, fontSize: 11,
-                       border: `1px solid ${COLORS.borderFaint}`,
-                       background: 'rgba(255,255,255,0.85)', marginTop: 2,
-                     }} />
-            </div>
-            <div>
-              <div style={{ fontSize: 10, color: COLORS.textSecondary, fontWeight: 700 }}>외부 휴무일</div>
-              <input type="number" min={0} max={30} value={cycleOff}
-                     onChange={(e) => setCycleOff(e.target.value)}
-                     placeholder="-"
-                     style={{
-                       width: '100%', padding: '4px 6px', borderRadius: 4, fontSize: 11,
-                       border: `1px solid ${COLORS.borderFaint}`,
-                       background: 'rgba(255,255,255,0.85)', marginTop: 2,
-                     }} />
-            </div>
-            <div>
-              <div style={{ fontSize: 10, color: COLORS.textSecondary, fontWeight: 700 }}>시작 기준일</div>
-              <input type="date" value={cycleStart}
-                     onChange={(e) => setCycleStart(e.target.value)}
-                     style={{
-                       width: '100%', padding: '4px 6px', borderRadius: 4, fontSize: 11,
-                       border: `1px solid ${COLORS.borderFaint}`,
-                       background: 'rgba(255,255,255,0.85)', marginTop: 2,
-                     }} />
-            </div>
-          </div>
-          <div style={{ fontSize: 10, color: COLORS.textMuted, marginBottom: 6 }}>
-            예: 외부 근무 2일 / 외부 휴무 2일 / 시작 2026-05-01 → 5/1·2 외부 근무 (당사 X), 5/3·4 외부 휴무 (당사 가능)
-          </div>
+        <div style={{ fontSize: 9, color: COLORS.textMuted, marginTop: 6 }}>
+          예: 외부 근무 2일 / 외부 휴무 2일 / 시작 2026-05-01 → 5/1·2 외부 근무 (당사 X), 5/3·4 외부 휴무 (당사 가능)
         </div>
       </div>
     </div>
@@ -783,3 +481,10 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
     </div>
   )
 }
+
+const inputStyle: React.CSSProperties = {
+  width: '100%', padding: '6px 8px', fontSize: 12,
+  border: `1px solid ${COLORS.borderFaint}`, borderRadius: 6,
+  background: 'rgba(255,255,255,0.6)', color: COLORS.textPrimary,
+}
+

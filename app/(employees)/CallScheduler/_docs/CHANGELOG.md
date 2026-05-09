@@ -3,6 +3,48 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-09 (Phase K-1) — 그룹 중심 설정 재구성 (DB + API + Worker UI 슬림)
+
+### 사용자 의도
+> "셋팅이 여기저기 가는게 불편 — 그룹에 인원 추가하면서 그 자리에서 셋팅"
+> 워커 페이지는 그 결과/설정을 보여주는 쪽 (편집 X)
+
+### 데이터 모델 변경
+- cs_group_members 에 멤버별 8 컬럼 추가 (priority_level / preferred_dow_prefer/avoid /
+  max_consecutive_work_days / required_days_per_month / max_days_per_month /
+  blocked_slot_ids / work_pattern_text)
+- cs_workers 의 위 8 컬럼 → 그룹멤버로 데이터 복사 후 cs_workers 에서 삭제
+- cs_workers 는 정체성만: name/color_tone/group_label/is_external/external_pattern/
+  cycle_days_on/off/cycle_start_date
+
+### 마이그레이션
+- migrations/2026-05-09_cs_phase_K_group_member_settings.sql (멱등 + 검증 SELECT)
+
+### API 변경
+- workers/route.ts: SELECT/INSERT 옮긴 컬럼 모두 제거, 정체성만
+- workers/[id]/route.ts: PATCH ALLOWED 정체성 컬럼만 (color/group/is_external/external_pattern/cycle_*)
+- shift-groups/route.ts: 멤버 응답에 8 멤버 설정 컬럼 추가 (graceful)
+- shift-groups/[id]/members/route.ts: PUT body 확장 — `members: [{worker_id, priority_level, ...}]`
+  (옛 `worker_ids` 호환)
+
+### 자동 생성 알고리즘
+- cs_workers SELECT 옮긴 컬럼 제거, 정체성 (cycle_*) 만
+- cs_group_members JOIN 으로 워커별 첫 그룹 멤버 설정 fallback
+  (그룹별 정교화는 K-2 별도)
+
+### UI
+- WorkersTab: 정체성만 (색상/그룹라벨/외부/외부cycle), 옮긴 필드 입력 모두 제거
+- 안내 배너: "우선순위/요일/한도/슬롯거부/패턴은 「그룹」 탭의 멤버 카드에서"
+- AssignmentCell: 워커 dow 색상 layer 임시 비활성 (그룹 컨텍스트 필요)
+
+### K-2 (다음 commit) 예정
+- GroupEditor 의 멤버 카드 인라인 설정 입력 (priority_level / dow_prefer/avoid / 한도 / 슬롯거부 / 패턴)
+- 자동 생성 알고리즘 그룹별 정교화 (multi-group 워커가 각 그룹에서 다른 설정 적용)
+
+### 검증
+- tsc --noEmit CallScheduler 영역 0 errors
+- 마이그레이션 검증 ① 8 컬럼 추가 PASS (사용자 확인)
+
 ## 2026-05-09 (Phase J-2C) — 외부/회피 행 매니저 전용 토글 (기본 숨김)
 
 ### 사용자 피드백

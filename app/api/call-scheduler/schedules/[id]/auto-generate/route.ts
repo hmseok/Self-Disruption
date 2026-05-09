@@ -413,67 +413,66 @@ export async function POST(
       }
     }
 
-    // 5-A) PR-2QQ-d-3 → PR-2SS-c/g — 워커 제약 + 연속/거부 + 희망 요일 (graceful)
-    //   PR-2SS-d revert: hire_date join 제거
+    // 5-A) Phase K (2026-05-09) — 멤버 단위 제약 lookup
+    //   cs_workers 정체성 (cycle_*) + cs_group_members 멤버 설정 8 컬럼
+    //   같은 워커가 그룹마다 다른 우선순위/요일/한도 가능 → 첫 멤버십 설정으로 fallback
+    //   (그룹별 정교화는 K-2 별도 PR — 이번엔 워커 단위 호환)
     let workerCons: Map<string, WorkerConstraint> = new Map()
-    let hasBlockedConsec = true
-    let hasPreferDow = true
     if (usePriority) {
       try {
+        // 워커 정체성 (cycle_*)
+        const wcRows = await prisma.$queryRaw<any[]>`
+          SELECT id,
+                 cycle_days_on, cycle_days_off,
+                 DATE_FORMAT(cycle_start_date, '%Y-%m-%d') AS cycle_start_date
+          FROM cs_workers WHERE is_active = 1
+        `
+        // 멤버 설정 (그룹멤버 첫 row → 워커 단위)
+        let memberRows: any[] = []
         try {
-          await prisma.$queryRaw<any[]>`SELECT max_consecutive_work_days FROM cs_workers LIMIT 1`
-        } catch { hasBlockedConsec = false }
-        try {
-          await prisma.$queryRaw<any[]>`SELECT preferred_dow_prefer FROM cs_workers LIMIT 1`
-        } catch { hasPreferDow = false }
-        const wcRows = (hasBlockedConsec && hasPreferDow)
-          ? await prisma.$queryRaw<any[]>`
-              SELECT id, priority_level, preferred_dow_avoid, preferred_dow_prefer,
-                     required_days_per_month, max_days_per_month,
-                     cycle_days_on, cycle_days_off,
-                     DATE_FORMAT(cycle_start_date, '%Y-%m-%d') AS cycle_start_date,
-                     max_consecutive_work_days, blocked_slot_ids
-              FROM cs_workers WHERE is_active = 1
-            `
-          : hasBlockedConsec
-          ? await prisma.$queryRaw<any[]>`
-              SELECT id, priority_level, preferred_dow_avoid,
-                     required_days_per_month, max_days_per_month,
-                     cycle_days_on, cycle_days_off,
-                     DATE_FORMAT(cycle_start_date, '%Y-%m-%d') AS cycle_start_date,
-                     max_consecutive_work_days, blocked_slot_ids
-              FROM cs_workers WHERE is_active = 1
-            `
-          : await prisma.$queryRaw<any[]>`
-              SELECT id, priority_level, preferred_dow_avoid,
-                     required_days_per_month, max_days_per_month,
-                     cycle_days_on, cycle_days_off,
-                     DATE_FORMAT(cycle_start_date, '%Y-%m-%d') AS cycle_start_date
-              FROM cs_workers WHERE is_active = 1
-            `
-        for (const r of wcRows) {
+          memberRows = await prisma.$queryRaw<any[]>`
+            SELECT m.worker_id,
+                   m.priority_level, m.preferred_dow_avoid, m.preferred_dow_prefer,
+                   m.required_days_per_month, m.max_days_per_month,
+                   m.max_consecutive_work_days, m.blocked_slot_ids,
+                   m.priority AS rotation_priority
+            FROM cs_group_members m
+            JOIN cs_workers w ON w.id = m.worker_id
+            WHERE w.is_active = 1
+            ORDER BY m.worker_id, m.priority ASC
+          `
+        } catch {
+          // 마이그 미적용 — 멤버 설정 컬럼 없음
+        }
+        // 워커별 첫 멤버 설정 (multi-group 워커는 첫 그룹 우선순위로 fallback)
+        const firstMember = new Map<string, any>()
+        for (const r of memberRows) {
+          if (!firstMember.has(r.worker_id)) firstMember.set(r.worker_id, r)
+        }
+        for (const w of wcRows) {
+          const m = firstMember.get(w.id)
           // PR-2SS-c — blocked_slot_ids JSON 안전 파싱
           let blocked: Set<string> = new Set()
-          if (hasBlockedConsec && r.blocked_slot_ids != null) {
+          if (m && m.blocked_slot_ids != null) {
             try {
-              const arr = typeof r.blocked_slot_ids === 'string'
-                ? JSON.parse(r.blocked_slot_ids)
-                : (Array.isArray(r.blocked_slot_ids) ? r.blocked_slot_ids : [])
+              const arr = typeof m.blocked_slot_ids === 'string'
+                ? JSON.parse(m.blocked_slot_ids)
+                : (Array.isArray(m.blocked_slot_ids) ? m.blocked_slot_ids : [])
               if (Array.isArray(arr)) blocked = new Set(arr.map(String))
             } catch { /* 무시 */ }
           }
-          workerCons.set(r.id, {
-            id: r.id,
-            priority_level: Number(r.priority_level || 2),
-            preferred_dow_avoid: parseDowList(r.preferred_dow_avoid),
-            preferred_dow_prefer: hasPreferDow ? parseDowList(r.preferred_dow_prefer) : [],
-            required_days_per_month: r.required_days_per_month != null ? Number(r.required_days_per_month) : null,
-            max_days_per_month: r.max_days_per_month != null ? Number(r.max_days_per_month) : null,
-            cycle_days_on: r.cycle_days_on != null ? Number(r.cycle_days_on) : null,
-            cycle_days_off: r.cycle_days_off != null ? Number(r.cycle_days_off) : null,
-            cycle_start_date: r.cycle_start_date,
-            max_consecutive_work_days: hasBlockedConsec && r.max_consecutive_work_days != null
-              ? Number(r.max_consecutive_work_days) : null,
+          workerCons.set(w.id, {
+            id: w.id,
+            priority_level: m ? Number(m.priority_level || 2) : 2,
+            preferred_dow_avoid: m ? parseDowList(m.preferred_dow_avoid) : [],
+            preferred_dow_prefer: m ? parseDowList(m.preferred_dow_prefer) : [],
+            required_days_per_month: m && m.required_days_per_month != null ? Number(m.required_days_per_month) : null,
+            max_days_per_month: m && m.max_days_per_month != null ? Number(m.max_days_per_month) : null,
+            cycle_days_on: w.cycle_days_on != null ? Number(w.cycle_days_on) : null,
+            cycle_days_off: w.cycle_days_off != null ? Number(w.cycle_days_off) : null,
+            cycle_start_date: w.cycle_start_date,
+            max_consecutive_work_days: m && m.max_consecutive_work_days != null
+              ? Number(m.max_consecutive_work_days) : null,
             blocked_slot_ids: blocked,
           })
         }
