@@ -56,14 +56,9 @@ export async function GET(request: Request) {
   const includeTerminated = url.searchParams.get('include_terminated') === '1'
 
   try {
-    const today = new Date()
-    const todayStr =
-      today.getFullYear().toString() +
-      String(today.getMonth() + 1).padStart(2, '0') +
-      String(today.getDate()).padStart(2, '0')
-
-    const conds: string[] = ['? BETWEEN factfrdt AND facttodt']
-    const args: (string | number)[] = [todayStr]
+    // pmcfactm 은 효력기간 컬럼 미존재 — facttype 만 필터
+    const conds: string[] = []
+    const args: (string | number)[] = []
     if (!includeTerminated) {
       conds.push("(facttype IS NULL OR facttype <> 'Z')")
     }
@@ -72,11 +67,12 @@ export async function GET(request: Request) {
       const like = `%${q}%`
       args.push(like, like, like)
     }
+    const where = conds.length > 0 ? `WHERE ${conds.join(' AND ')}` : ''
 
     const sql = `
       SELECT *
         FROM pmcfactm
-       WHERE ${conds.join(' AND ')}
+       ${where}
        ORDER BY factcode ASC
        LIMIT ${limit}
     `

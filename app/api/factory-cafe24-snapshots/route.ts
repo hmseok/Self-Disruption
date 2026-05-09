@@ -195,21 +195,18 @@ export async function POST(request: Request) {
 
   const userTyped = user as { id: string; name?: string }
   const batchId = randomUUID()
-  const today = new Date()
-  const todayStr =
-    today.getFullYear().toString() +
-    String(today.getMonth() + 1).padStart(2, '0') +
-    String(today.getDate()).padStart(2, '0')
 
   // 1. 카페24 fetch (SELECT *)
+  // pmcfactm 은 효력기간 컬럼 미존재 — 단순 facttype 만 필터
   let rows: FactoryCafe24Row[]
   try {
-    const conds: string[] = ['? BETWEEN factfrdt AND facttodt']
-    const args: (string | number)[] = [todayStr]
+    const conds: string[] = []
+    const args: (string | number)[] = []
     if (!includeTerminated) {
       conds.push("(facttype IS NULL OR facttype <> 'Z')")
     }
-    const sql = `SELECT * FROM pmcfactm WHERE ${conds.join(' AND ')}
+    const where = conds.length > 0 ? `WHERE ${conds.join(' AND ')}` : ''
+    const sql = `SELECT * FROM pmcfactm ${where}
                  ORDER BY factcode ASC LIMIT ${fetchLimit}`
     rows = await cafe24Db.query<FactoryCafe24Row>(sql, args)
   } catch (e) {
