@@ -42,6 +42,11 @@ type Summary = {
   totalPaid: number
   totalUnpaid: number
   completionRate: number
+  // PR-UX6: 검수 대기 미확정
+  pendingReviewCount?: number
+  pendingReviewAmount?: number
+  pendingVehicleRevenue?: number
+  pendingVehicleExpense?: number
 }
 
 type VehiclePnl = {
@@ -186,6 +191,46 @@ export default function InvestorPage() {
 
       {/* ── 스탯 ── */}
       {statItems.length > 0 && <DcStatStrip items={statItems} />}
+
+      {/* PR-UX6: 검수 대기 배너 (미확정 매칭이 있을 때만 노출) */}
+      {summary && (summary.pendingReviewCount || 0) > 0 && (
+        <div style={{
+          background: 'linear-gradient(135deg, rgba(217,119,6,0.05) 0%, rgba(217,119,6,0.1) 100%)',
+          border: '1px solid rgba(217,119,6,0.3)',
+          borderRadius: 12,
+          padding: '12px 18px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 12,
+          flexWrap: 'wrap',
+        }}>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#d97706', marginBottom: 2 }}>
+              ⚠️ 검수 대기 중인 매칭이 정산에 영향
+            </div>
+            <div style={{ fontSize: 12, color: '#92400e' }}>
+              <strong>{summary.pendingReviewCount}건 / {nf(summary.pendingReviewAmount || 0)}원</strong>
+              {' '} 확정되지 않은 자동 매칭이 정산 합계에 포함되어 있습니다.
+              {(summary.pendingVehicleRevenue || 0) > 0 || (summary.pendingVehicleExpense || 0) > 0 ? (
+                <>
+                  {' '} (차량: 수입 {nf(summary.pendingVehicleRevenue || 0)}원 / 지출 {nf(summary.pendingVehicleExpense || 0)}원)
+                </>
+              ) : null}
+            </div>
+          </div>
+          <a href="/finance/bank-card?tab=workflow" style={{
+            padding: '6px 14px',
+            fontSize: 12,
+            fontWeight: 600,
+            background: '#d97706',
+            color: '#fff',
+            borderRadius: 6,
+            textDecoration: 'none',
+            whiteSpace: 'nowrap',
+          }}>🚧 검수 대기 큐로 이동</a>
+        </div>
+      )}
 
       {/* ── 탭 ── */}
       <div className="flex gap-1 bg-white/40 rounded-lg p-1 border border-black/[0.05] w-fit">

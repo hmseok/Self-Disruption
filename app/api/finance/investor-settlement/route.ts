@@ -57,25 +57,42 @@ export async function GET(req: NextRequest) {
   `
   const carMap = new Map(cars.map(c => [c.id, c]))
 
-  // 차량별 월간 수입/지출
+  // 차량별 월간 수입/지출 — PR-UX6: 확정/미확정 분리 (status='confirmed' vs 'pending')
   const txData = await prisma.$queryRawUnsafe<Array<{
-    related_id: string; type: string; amount: number
+    related_id: string; type: string; amount: number; match_status: string
   }>>(
-    `SELECT related_id, type, amount
-     FROM transactions
-     WHERE related_type = 'car'
-       AND transaction_date >= ? AND transaction_date <= ?
-       AND deleted_at IS NULL`,
+    `SELECT t.related_id, t.type, t.amount,
+            COALESCE(MAX(ta.status), 'manual') AS match_status
+       FROM transactions t
+       LEFT JOIN transaction_assignments ta
+         ON ta.transaction_id = t.id
+         AND ta.source = 'auto'
+      WHERE t.related_type = 'car'
+        AND t.transaction_date >= ? AND t.transaction_date <= ?
+        AND t.deleted_at IS NULL
+      GROUP BY t.id, t.related_id, t.type, t.amount`,
     startDate, endDate
   )
 
-  const carPnl = new Map<string, { revenue: number; expense: number }>()
+  // 확정/미확정 분리 집계
+  const carPnl = new Map<string, {
+    revenue: number; expense: number;
+    revenuePending: number; expensePending: number;
+  }>()
   for (const tx of txData) {
-    if (!carPnl.has(tx.related_id)) carPnl.set(tx.related_id, { revenue: 0, expense: 0 })
+    if (!carPnl.has(tx.related_id)) {
+      carPnl.set(tx.related_id, { revenue: 0, expense: 0, revenuePending: 0, expensePending: 0 })
+    }
     const p = carPnl.get(tx.related_id)!
     const amt = Math.abs(Number(tx.amount) || 0)
-    if (tx.type === 'income') p.revenue += amt
-    else p.expense += amt
+    const isPending = tx.match_status === 'pending'
+    if (tx.type === 'income') {
+      p.revenue += amt
+      if (isPending) p.revenuePending += amt
+    } else {
+      p.expense += amt
+      if (isPending) p.expensePending += amt
+    }
   }
 
   // 지입 계약
@@ -180,6 +197,26 @@ export async function GET(req: NextRequest) {
   const jiipItems = items.filter(i => i.contractType === 'jiip')
   const investItems = items.filter(i => i.contractType === 'invest')
 
+  // PR-UX6: 검수 대기 미확정 매칭 집계 (전체 카테고리)
+  const pendingTotals = await prisma.$queryRawUnsafe<Array<{ cnt: number; total_amount: number }>>(
+    `SELECT COUNT(DISTINCT ta.transaction_id) AS cnt,
+            COALESCE(SUM(ABS(t.amount)), 0) AS total_amount
+       FROM transaction_assignments ta
+       JOIN transactions t ON t.id = ta.transaction_id
+      WHERE ta.status = 'pending' AND ta.source = 'auto'
+        AND t.transaction_date >= ? AND t.transaction_date <= ?
+        AND t.deleted_at IS NULL`,
+    startDate, endDate,
+  ).catch(() => [{ cnt: 0, total_amount: 0 }])
+  const pending = pendingTotals[0] || { cnt: 0, total_amount: 0 }
+
+  // 차량 카테고리 미확정 합계 (정산 영향)
+  let pendingRevenue = 0, pendingExpense = 0
+  for (const p of carPnl.values()) {
+    pendingRevenue += p.revenuePending
+    pendingExpense += p.expensePending
+  }
+
   return NextResponse.json(serialize({
     month,
     summary: {
@@ -191,6 +228,11 @@ export async function GET(req: NextRequest) {
       totalPaid,
       totalUnpaid: totalSettlement - totalPaid,
       completionRate: totalSettlement > 0 ? Math.round(totalPaid / totalSettlement * 100) : 100,
+      // PR-UX6: 검수 대기 미확정
+      pendingReviewCount: Number(pending.cnt || 0),
+      pendingReviewAmount: Number(pending.total_amount || 0),
+      pendingVehicleRevenue: pendingRevenue,
+      pendingVehicleExpense: pendingExpense,
     },
     items,
   }))
