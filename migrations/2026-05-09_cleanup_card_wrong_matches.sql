@@ -24,11 +24,12 @@ SELECT
    AND ta.status IN ('pending', 'confirmed');
 
 -- (1) transaction_assignments — 잘못된 매칭 → 'rejected' (이력 보존)
+-- MySQL: 문자열 연결은 CONCAT() (|| 는 OR 연산자)
 UPDATE transaction_assignments ta
 JOIN transactions t ON t.id = ta.transaction_id
    SET ta.status = 'rejected',
-       ta.note = COALESCE(ta.note, '') ||
-                 ' [PR-UX8 자동 거부 — 카드 거래에 invest/jiip/freelancer/fmi_rental 잘못 매칭]',
+       ta.note = CONCAT(COALESCE(ta.note, ''),
+                        ' [PR-UX8 자동 거부 — 카드 거래에 invest/jiip/freelancer/fmi_rental 잘못 매칭]'),
        ta.updated_at = NOW()
  WHERE ta.assignment_type IN ('invest', 'jiip', 'freelancer', 'fmi_rental')
    AND (t.imported_from = 'sms' OR t.imported_from LIKE 'excel_card%' OR t.imported_from LIKE 'pdf_card%')
