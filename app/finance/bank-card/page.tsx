@@ -1130,7 +1130,7 @@ export default function BankCardPage() {
   useEffect(() => {
     if (activeTab === 'sms') loadSmsData()
     if (activeTab === 'mapping') loadMappings()
-    if (activeTab === 'matchreview') {
+    if (activeTab === 'matchreview' || activeTab === 'workflow') {
       loadMatchReview()
       loadProcessingStatus()
     }
@@ -2972,7 +2972,9 @@ export default function BankCardPage() {
   const tabs = [
     { key: 'bank', label: '통장 거래', count: summary?.transactions.bank },
     { key: 'card', label: '카드 거래', count: summary?.transactions.card },
-    // 분류 검수 / 미분류 통합 — 한 탭에서 미분류 그룹 분류 + 분류 완료 카테고리 검수 모두 처리
+    // PR-UX5 (2026-05-09): 운영 흐름 통합 탭 — 분류 검수 + 매칭 검수 한 화면
+    { key: 'workflow', label: '🌊 운영 흐름', count: (summary?.transactions.classified || 0) + (summary?.transactions.unclassified || 0) },
+    // 분류 검수 / 매칭 검수 — 개별 탭 (advanced — 운영 흐름이 통합 view)
     { key: 'classify', label: '분류 검수', count: (summary?.transactions.classified || 0) + (summary?.transactions.unclassified || 0) },
     { key: 'matchreview', label: '매칭 검수', count: summary?.transactions.classified || 0 },
     { key: 'settlement', label: '정산 연결', count: summary?.settlement.total },
@@ -3684,8 +3686,8 @@ export default function BankCardPage() {
           </>
         )}
 
-        {/* ──── 분류 검수 탭 ──── */}
-        {activeTab === 'classify' && (
+        {/* ──── 분류 검수 탭 (PR-UX5: workflow 통합 탭에도 표시) ──── */}
+        {(activeTab === 'classify' || activeTab === 'workflow') && (
           <>
             {/* 풀 자동 매칭 결과 패널 — 글래스 디자인 (CLAUDE.md 규칙 20) */}
             {fullMatchResult && (() => {
@@ -4726,8 +4728,8 @@ export default function BankCardPage() {
           </>
         )}
 
-        {/* ──── 미분류 + 그룹분류 (분류 검수 탭 안에서 같이 표시) ──── */}
-        {activeTab === 'classify' && (
+        {/* ──── 미분류 + 그룹분류 (분류 검수 탭 / workflow 통합) ──── */}
+        {(activeTab === 'classify' || activeTab === 'workflow') && (
           <>
             {/* 데이터 품질 안내 배너 */}
             {summary && summary.transactions.unclassified > 0 && summary.transactions.classified === 0 && !autoClassifyResult && (
@@ -5214,8 +5216,8 @@ export default function BankCardPage() {
           </>
         )}
 
-        {/* ──── 매칭 검수 탭 (entity 중심 — C안 재설계) ──── */}
-        {activeTab === 'matchreview' && (() => {
+        {/* ──── 매칭 검수 탭 (entity 중심 — C안 재설계 / PR-UX5 workflow 통합) ──── */}
+        {(activeTab === 'matchreview' || activeTab === 'workflow') && (() => {
           // entity 중심 — by-entity API 응답 사용
           const data = matchReviewByEntity
           const filteredEntityTypes = data
