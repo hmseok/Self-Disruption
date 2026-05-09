@@ -56,6 +56,8 @@ export default function ScheduleGrid({ detail, onChanged }: Props) {
   const [slotGroups, setSlotGroups] = useState<Record<string, { id: string; name: string; category: string; tone?: string; member_ids: string[] }>>({})
   // PR-2SS-Phase-J-3 — 그룹 멤버 매핑 (그룹별 회피/cycle 행 분리용)
   const [allGroups, setAllGroups] = useState<Array<{ id: string; name: string; category: string; shift_slot_id: string; member_ids: string[] }>>([])
+  // K-3 — 그룹 × 워커 멤버 cfg (priority_level, dow prefer/avoid) — 색상 layer + 툴팁용
+  const [memberCfgMap, setMemberCfgMap] = useState<Map<string, { priority_level: number; preferred_dow_prefer: string | null; preferred_dow_avoid: string | null }>>(new Map())
   useEffect(() => {
     let abort = false
     ;(async () => {
@@ -67,6 +69,7 @@ export default function ScheduleGrid({ detail, onChanged }: Props) {
         if (res.ok && Array.isArray(json.data)) {
           const map: Record<string, { id: string; name: string; category: string; tone?: string; member_ids: string[] }> = {}
           const groupList: Array<{ id: string; name: string; category: string; shift_slot_id: string; member_ids: string[] }> = []
+          const cfgMap = new Map<string, { priority_level: number; preferred_dow_prefer: string | null; preferred_dow_avoid: string | null }>()
           for (const g of json.data) {
             if (!g.is_active) continue
             const memberIds = Array.isArray(g.members) ? g.members.map((m: any) => m.id) : []
@@ -86,9 +89,20 @@ export default function ScheduleGrid({ detail, onChanged }: Props) {
                 member_ids: memberIds,
               }
             }
+            // K-3 — 그룹 × 워커 cfg
+            if (Array.isArray(g.members)) {
+              for (const m of g.members) {
+                cfgMap.set(`${g.id}_${m.id}`, {
+                  priority_level: Number(m.priority_level || 2),
+                  preferred_dow_prefer: m.preferred_dow_prefer ?? null,
+                  preferred_dow_avoid: m.preferred_dow_avoid ?? null,
+                })
+              }
+            }
           }
           setSlotGroups(map)
           setAllGroups(groupList)
+          setMemberCfgMap(cfgMap)
         }
       } catch { /* graceful */ }
     })()
@@ -846,6 +860,11 @@ export default function ScheduleGrid({ detail, onChanged }: Props) {
                           const violations = a.worker_id
                             ? violationMap.get(`${a.worker_id}_${d}`)
                             : undefined
+                          // K-3 — 슬롯의 그룹에서 그 워커의 멤버 cfg lookup → 색상 layer
+                          const slotGrp = slotGroups[slot.id]
+                          const memberCfg = (slotGrp && a.worker_id)
+                            ? memberCfgMap.get(`${slotGrp.id}_${a.worker_id}`)
+                            : undefined
                           return (
                             <AssignmentCell
                               key={a.id}
@@ -864,6 +883,8 @@ export default function ScheduleGrid({ detail, onChanged }: Props) {
                               }}
                               onQuickAction={swapMode ? undefined : (action) => handleQuickAction(a, slot, d, action)}
                               dow={cellDow}
+                              memberPreferDow={memberCfg?.preferred_dow_prefer || null}
+                              memberAvoidDow={memberCfg?.preferred_dow_avoid || null}
                               violations={violations}
                             />
                           )

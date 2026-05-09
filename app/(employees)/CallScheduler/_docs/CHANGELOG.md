@@ -3,6 +3,44 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-09 (Phase K-3) — 자동 생성 알고리즘 그룹별 정교화 + AssignmentCell dow 색상 재활성
+
+### 자동 생성 알고리즘
+- WorkerConstraint → MemberConstraint + WorkerCycle 분리
+- memberCons: Map<`${groupId}_${workerId}`, MemberConstraint> — multi-group 워커가 그룹마다 다른 priority/dow/한도 적용
+- workerCycle: Map<workerId, WorkerCycle> — 외부 cycle 은 워커 글로벌 (모든 그룹 공통)
+- ranking 시 lookupMember(g.id, wId) — 그룹 컨텍스트 lookup
+- 슬롯 거부 / 연속 한도 / max_days_per_month / required_days_per_month / dow prefer/avoid 모두 멤버 단위
+- isAvailableOnCycle 시그니처 변경 (cycle 정보만)
+
+### AssignmentCell — dow 색상 layer 재활성
+- 새 prop: `memberPreferDow`, `memberAvoidDow` (CSV "0,5") — ScheduleGrid 가 그룹 컨텍스트로 내림
+- ScheduleGrid: `memberCfgMap = Map<\`${groupId}_${workerId}\`, { priority_level, dow_prefer, dow_avoid }>` 신설
+- shift-groups GET 응답의 멤버 cfg 파싱 → cfgMap 채움
+- 셀 호출 시 `slotGroups[slot.id].id + worker_id` 로 lookup → 색상 layer 재활성
+- 효과: 같은 워커가 야간 그룹에서 화/목 희망, 주간 그룹에서 월/금 비선호 등 다른 색상 layer 표출
+
+## 2026-05-09 (Phase K-2) — GroupEditor 멤버 카드 인라인 설정
+
+### 사용자 의도
+> "그룹에 인원 추가하면서 그 자리에서 셋팅"
+
+### GroupEditor 변경
+- 멤버 행 헤더 요약 칩: P1 / 🌟희망N / 🚫비선호N / 🛡연속한도 / 🚷슬롯거부
+- ⚙ 펼침 토글 → MemberCfgPanel:
+  - 🏷 우선순위 (P1/P2/P3)
+  - 🌟 희망 / 🚫 비선호 요일 (toggle, 상호 배타)
+  - 📈 월 필수 / 🛑 월 최대 / 🛡 연속 한도 (숫자, 빈칸=무제한)
+  - 🚷 슬롯 거부 (모든 슬롯 chip toggle)
+  - 📝 패턴 메모
+- 새 멤버 추가 시 자동 펼침 (즉시 cfg 입력)
+- 저장 시 PUT body — 새 형식 `members: [{worker_id, priority_level, ...}]`
+- 신규 그룹: POST 후 cfg 별도 PUT (POST 가 priority 만 받음)
+
+### 사고 회고 (코워크 멀티세션)
+- 1차 작성 후 lock 충돌 → working tree 변경분 손실 → 재작성
+- 향후: lock 발생 시 staging 결과 즉시 git diff > backup.patch 권장
+
 ## 2026-05-09 (Phase K-1) — 그룹 중심 설정 재구성 (DB + API + Worker UI 슬림)
 
 ### 사용자 의도

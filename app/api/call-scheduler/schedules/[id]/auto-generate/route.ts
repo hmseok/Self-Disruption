@@ -81,22 +81,28 @@ interface AssignmentRow {
   special_code: string
   manual_lock?: number  // PR-2QQ-b — 1=수동 lock 셀
 }
-// PR-2QQ-d-3 → d-revert → PR-2SS-c/g — 워커 제약 + 연속 한도 + 슬롯 거부 + 희망 요일
-//   PR-2SS-d revert: hire_date / min_seniority 폐기
-interface WorkerConstraint {
-  id: string
+// Phase K-3 (2026-05-09) — 멤버 단위 제약 + 워커 cycle 분리
+//   같은 워커가 그룹 A 에서 P1, 그룹 B 에서 P3 등 그룹마다 다른 설정 가능
+//   cycle_* 은 워커 글로벌 (외부 일정 — 모든 그룹 공통)
+interface MemberConstraint {
+  group_id: string
+  worker_id: string
   priority_level: number
   preferred_dow_avoid: number[]
-  preferred_dow_prefer: number[]    // PR-2SS-g — 희망 요일 (Hard ranking)
+  preferred_dow_prefer: number[]
   required_days_per_month: number | null
   max_days_per_month: number | null
-  cycle_days_on: number | null      // 외부 근무일 수 (이 phase = 당사 X)
-  cycle_days_off: number | null     // 외부 휴무일 수 (이 phase = 당사 가능)
-  cycle_start_date: string | null   // 'YYYY-MM-DD' 외부 cycle 1일차
-  // PR-2SS-c — 연속 한도 + 슬롯 거부
   max_consecutive_work_days: number | null
   blocked_slot_ids: Set<string>     // 비어있으면 빈 Set
 }
+interface WorkerCycle {
+  worker_id: string
+  cycle_days_on: number | null      // 외부 근무일 수 (이 phase = 당사 X)
+  cycle_days_off: number | null     // 외부 휴무일 수 (이 phase = 당사 가능)
+  cycle_start_date: string | null   // 'YYYY-MM-DD' 외부 cycle 1일차
+}
+// 옛 alias — isAvailableOnCycle 용 (점진 정리)
+type WorkerConstraint = MemberConstraint & WorkerCycle & { id: string }
 interface CoverageRow {
   group_id: string
   dow: number | null
@@ -413,72 +419,77 @@ export async function POST(
       }
     }
 
-    // 5-A) Phase K (2026-05-09) — 멤버 단위 제약 lookup
-    //   cs_workers 정체성 (cycle_*) + cs_group_members 멤버 설정 8 컬럼
-    //   같은 워커가 그룹마다 다른 우선순위/요일/한도 가능 → 첫 멤버십 설정으로 fallback
-    //   (그룹별 정교화는 K-2 별도 PR — 이번엔 워커 단위 호환)
-    let workerCons: Map<string, WorkerConstraint> = new Map()
+    // 5-A) Phase K-3 — 그룹 단위 멤버 제약 (multi-group 워커가 그룹마다 다른 설정)
+    //   memberCons: Map<`${groupId}_${workerId}`, MemberConstraint>
+    //   workerCycle: Map<workerId, WorkerCycle> (워커 글로벌)
+    let memberCons: Map<string, MemberConstraint> = new Map()
+    let workerCycle: Map<string, WorkerCycle> = new Map()
     if (usePriority) {
       try {
-        // 워커 정체성 (cycle_*)
+        // 워커 글로벌 cycle 정보
         const wcRows = await prisma.$queryRaw<any[]>`
           SELECT id,
                  cycle_days_on, cycle_days_off,
                  DATE_FORMAT(cycle_start_date, '%Y-%m-%d') AS cycle_start_date
           FROM cs_workers WHERE is_active = 1
         `
-        // 멤버 설정 (그룹멤버 첫 row → 워커 단위)
-        let memberRows: any[] = []
-        try {
-          memberRows = await prisma.$queryRaw<any[]>`
-            SELECT m.worker_id,
-                   m.priority_level, m.preferred_dow_avoid, m.preferred_dow_prefer,
-                   m.required_days_per_month, m.max_days_per_month,
-                   m.max_consecutive_work_days, m.blocked_slot_ids,
-                   m.priority AS rotation_priority
-            FROM cs_group_members m
-            JOIN cs_workers w ON w.id = m.worker_id
-            WHERE w.is_active = 1
-            ORDER BY m.worker_id, m.priority ASC
-          `
-        } catch {
-          // 마이그 미적용 — 멤버 설정 컬럼 없음
-        }
-        // 워커별 첫 멤버 설정 (multi-group 워커는 첫 그룹 우선순위로 fallback)
-        const firstMember = new Map<string, any>()
-        for (const r of memberRows) {
-          if (!firstMember.has(r.worker_id)) firstMember.set(r.worker_id, r)
-        }
         for (const w of wcRows) {
-          const m = firstMember.get(w.id)
-          // PR-2SS-c — blocked_slot_ids JSON 안전 파싱
-          let blocked: Set<string> = new Set()
-          if (m && m.blocked_slot_ids != null) {
-            try {
-              const arr = typeof m.blocked_slot_ids === 'string'
-                ? JSON.parse(m.blocked_slot_ids)
-                : (Array.isArray(m.blocked_slot_ids) ? m.blocked_slot_ids : [])
-              if (Array.isArray(arr)) blocked = new Set(arr.map(String))
-            } catch { /* 무시 */ }
-          }
-          workerCons.set(w.id, {
-            id: w.id,
-            priority_level: m ? Number(m.priority_level || 2) : 2,
-            preferred_dow_avoid: m ? parseDowList(m.preferred_dow_avoid) : [],
-            preferred_dow_prefer: m ? parseDowList(m.preferred_dow_prefer) : [],
-            required_days_per_month: m && m.required_days_per_month != null ? Number(m.required_days_per_month) : null,
-            max_days_per_month: m && m.max_days_per_month != null ? Number(m.max_days_per_month) : null,
+          workerCycle.set(w.id, {
+            worker_id: w.id,
             cycle_days_on: w.cycle_days_on != null ? Number(w.cycle_days_on) : null,
             cycle_days_off: w.cycle_days_off != null ? Number(w.cycle_days_off) : null,
             cycle_start_date: w.cycle_start_date,
-            max_consecutive_work_days: m && m.max_consecutive_work_days != null
-              ? Number(m.max_consecutive_work_days) : null,
-            blocked_slot_ids: blocked,
           })
+        }
+        // 멤버 설정 (그룹 × 워커 단위)
+        try {
+          const memberRows = await prisma.$queryRaw<any[]>`
+            SELECT m.group_id, m.worker_id,
+                   m.priority_level, m.preferred_dow_avoid, m.preferred_dow_prefer,
+                   m.required_days_per_month, m.max_days_per_month,
+                   m.max_consecutive_work_days, m.blocked_slot_ids
+            FROM cs_group_members m
+            JOIN cs_workers w ON w.id = m.worker_id
+            WHERE w.is_active = 1
+          `
+          for (const r of memberRows) {
+            // blocked_slot_ids JSON 안전 파싱
+            let blocked: Set<string> = new Set()
+            if (r.blocked_slot_ids != null) {
+              try {
+                const arr = typeof r.blocked_slot_ids === 'string'
+                  ? JSON.parse(r.blocked_slot_ids)
+                  : (Array.isArray(r.blocked_slot_ids) ? r.blocked_slot_ids : [])
+                if (Array.isArray(arr)) blocked = new Set(arr.map(String))
+              } catch { /* 무시 */ }
+            }
+            memberCons.set(`${r.group_id}_${r.worker_id}`, {
+              group_id: r.group_id,
+              worker_id: r.worker_id,
+              priority_level: Number(r.priority_level || 2),
+              preferred_dow_avoid: parseDowList(r.preferred_dow_avoid),
+              preferred_dow_prefer: parseDowList(r.preferred_dow_prefer),
+              required_days_per_month: r.required_days_per_month != null ? Number(r.required_days_per_month) : null,
+              max_days_per_month: r.max_days_per_month != null ? Number(r.max_days_per_month) : null,
+              max_consecutive_work_days: r.max_consecutive_work_days != null
+                ? Number(r.max_consecutive_work_days) : null,
+              blocked_slot_ids: blocked,
+            })
+          }
+        } catch {
+          // 마이그 미적용 — 멤버 설정 컬럼 없음
         }
       } catch {
         // 마이그 미적용 — 단순 rotation 동작
       }
+    }
+    // 그룹 컨텍스트 + 워커 ID 로 멤버 제약 lookup (없으면 default — 안전 fallback)
+    const lookupMember = (groupId: string, workerId: string): MemberConstraint | undefined => {
+      return memberCons.get(`${groupId}_${workerId}`)
+    }
+    // cycle 포함 통합 (옛 workerCons.get 호환 — 부분 컬럼만 사용처가 있어 alias 만)
+    const lookupWorkerCycle = (workerId: string): WorkerCycle | undefined => {
+      return workerCycle.get(workerId)
     }
 
     // 5-C) PR-2SS-h-1 — 그룹 차원 회피일 (graceful)
@@ -708,10 +719,10 @@ export async function POST(
           })
         }
 
-        // PR-2SS-c — 슬롯 거부 (blocked_slot_ids) hard exclude
+        // PR-2SS-c → K-3: 슬롯 거부 (blocked_slot_ids) hard exclude — 멤버 단위
         candidates = candidates.filter(wId => {
-          const wc = workerCons.get(wId)
-          if (wc && wc.blocked_slot_ids.has(g.shift_slot_id)) {
+          const mc = lookupMember(g.id, wId)
+          if (mc && mc.blocked_slot_ids.has(g.shift_slot_id)) {
             warnings.push({
               type: 'slot_blocked',
               worker_id: wId, date: isoDate, slot_id: g.shift_slot_id,
@@ -721,13 +732,13 @@ export async function POST(
           return true
         })
 
-        // PR-2SS-c — 연속 한도 가드 (slot.max + worker.max 둘 중 작은 값)
+        // PR-2SS-c → K-3: 연속 한도 가드 (slot.max + 멤버.max 둘 중 작은 값)
         const slotConsecLimit = g.slot_max_consecutive_days != null ? Number(g.slot_max_consecutive_days) : null
         candidates = candidates.filter(wId => {
-          const wc = workerCons.get(wId)
+          const mc = lookupMember(g.id, wId)
           const limits: number[] = []
           if (slotConsecLimit != null && slotConsecLimit > 0) limits.push(slotConsecLimit)
-          if (wc?.max_consecutive_work_days != null && wc.max_consecutive_work_days > 0) limits.push(wc.max_consecutive_work_days)
+          if (mc?.max_consecutive_work_days != null && mc.max_consecutive_work_days > 0) limits.push(mc.max_consecutive_work_days)
           if (limits.length === 0) return true
           const limit = Math.min(...limits)
           const cur = workerConsec.get(wId) || 0
@@ -765,27 +776,28 @@ export async function POST(
         // (4) usePriority=true 면 가중치 정렬, false 면 단순 rotation
         let selected: string[]
         if (usePriority) {
-          // max 초과 / 패턴 불일치 워커 제외
+          // max 초과 / 패턴 불일치 워커 제외 — K-3: 멤버 단위
           candidates = candidates.filter(wId => {
-            const wc = workerCons.get(wId)
-            if (wc) {
-              if (wc.max_days_per_month != null) {
+            const mc = lookupMember(g.id, wId)
+            if (mc) {
+              if (mc.max_days_per_month != null) {
                 const cn = counter.get(wId)
-                if (cn && cn.total >= wc.max_days_per_month) return false
+                if (cn && cn.total >= mc.max_days_per_month) return false
               }
-              // PR-2QQ-d-revert: 외부 cycle 의 외부 근무 phase 면 당사 후보 X
-              if (!isAvailableOnCycle(wc, isoDate)) return false
             }
+            // PR-2QQ-d-revert: 외부 cycle (워커 글로벌) — 외부 근무 phase 면 당사 후보 X
+            const cy = lookupWorkerCycle(wId)
+            if (cy && !isAvailableOnCycle(cy as any, isoDate)) return false
             return true
           })
-          // 가중치 정렬 (PR-2SS-g — 희망 요일 매치 우선)
+          // 가중치 정렬 (K-3: 멤버 단위 priority/dow/필수일수)
           candidates.sort((a, b) => {
-            const wa = workerCons.get(a)
-            const wb = workerCons.get(b)
+            const wa = lookupMember(g.id, a)
+            const wb = lookupMember(g.id, b)
             const pa = wa?.priority_level || 2
             const pb = wb?.priority_level || 2
             if (pa !== pb) return pa - pb
-            // PR-2SS-g — 희망 요일 매치 우선 (priority 다음)
+            // 희망 요일 매치 우선 (priority 다음)
             const aPrefer = wa?.preferred_dow_prefer.includes(dow) ? 0 : 1
             const bPrefer = wb?.preferred_dow_prefer.includes(dow) ? 0 : 1
             if (aPrefer !== bPrefer) return aPrefer - bPrefer

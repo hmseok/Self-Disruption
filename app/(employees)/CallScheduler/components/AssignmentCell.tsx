@@ -14,8 +14,11 @@ interface Props {
   worker: Worker | null
   onClick: () => void
   onQuickAction?: (action: 'off' | 'am_half' | 'pm_half' | 'am_free' | 'pm_free' | 'clear') => void
-  // Phase D — 워커 조건 색상 layer (요일 매치 시 보더 hint)
+  // Phase D / K-3 — 워커 조건 색상 layer (요일 매치 시 보더 hint)
   dow?: number  // 0=일 ~ 6=토 (선택 — 미전달 시 색상 layer 비활성)
+  // K-3: 그룹 컨텍스트의 멤버 dow 설정 (CSV "0,5") — ScheduleGrid 가 내림
+  memberPreferDow?: string | null
+  memberAvoidDow?: string | null
   // Phase E — 가드 위반 시각화
   violations?: Set<'time_conflict' | 'next_day_block' | 'consec_limit'>
   // Phase F — 빈 셀 사유 분석 (그룹 회피 멤버 등)
@@ -33,7 +36,7 @@ function matchDow(csv: string | null | undefined, dow: number): boolean {
     .includes(dow)
 }
 
-export default function AssignmentCell({ assignment, worker, onClick, onQuickAction, dow, violations, emptyReason }: Props) {
+export default function AssignmentCell({ assignment, worker, onClick, onQuickAction, dow, memberPreferDow, memberAvoidDow, violations, emptyReason }: Props) {
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null)
 
   useEffect(() => {
@@ -54,13 +57,11 @@ export default function AssignmentCell({ assignment, worker, onClick, onQuickAct
   const isOff = special === 'off'
   const isEmpty = !assignment || (!assignment.worker_id && special === 'none')
 
-  // Phase K (2026-05-09) — 워커 dow 설정 → 그룹멤버 설정으로 이동
-  //   본 셀은 그룹 컨텍스트 모름 → 색상 layer 임시 비활성
-  //   (향후 ScheduleGrid 가 멤버 설정 prop 으로 내려서 재활성)
-  const dowAvoidMatch = false
-  const dowPreferMatch = false
-  // 미사용 워닝 회피 (matchDow 헬퍼는 추후 그룹 멤버 prop 받을 때 다시 활용)
-  void matchDow
+  // Phase K-3 — 그룹 멤버 dow 설정 (ScheduleGrid 가 그룹 컨텍스트로 내림)
+  const dowAvoidMatch = worker && dow != null && memberAvoidDow
+    ? matchDow(memberAvoidDow, dow) : false
+  const dowPreferMatch = worker && dow != null && memberPreferDow
+    ? matchDow(memberPreferDow, dow) : false
   // Phase E — 가드 위반 우선순위: time_conflict > next_day_block > consec_limit > Phase D
   const hasTimeConflict = violations?.has('time_conflict')
   const hasNextDayBlock = violations?.has('next_day_block')

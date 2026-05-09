@@ -46,6 +46,32 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
   const [colorTone, setColorTone] = useState<ColorTone>('none')
   const [description, setDescription] = useState('')
   const [memberIds, setMemberIds] = useState<string[]>([])
+  // K-2 — 멤버별 cfg (priority_level / dow / 한도 / 슬롯거부 / 패턴)
+  interface MemberCfg {
+    priority_level: number
+    preferred_dow_prefer: Set<number>
+    preferred_dow_avoid: Set<number>
+    max_consecutive_work_days: string
+    required_days_per_month: string
+    max_days_per_month: string
+    blocked_slot_ids: Set<string>
+    work_pattern_text: string
+  }
+  const defaultMemberCfg = (): MemberCfg => ({
+    priority_level: 2,
+    preferred_dow_prefer: new Set(),
+    preferred_dow_avoid: new Set(),
+    max_consecutive_work_days: '',
+    required_days_per_month: '',
+    max_days_per_month: '',
+    blocked_slot_ids: new Set(),
+    work_pattern_text: '',
+  })
+  const [memberCfgs, setMemberCfgs] = useState<Record<string, MemberCfg>>({})
+  const [expandedCfgWorkerId, setExpandedCfgWorkerId] = useState<string | null>(null)
+  const updateMemberCfg = (wId: string, patch: Partial<MemberCfg>) => {
+    setMemberCfgs(prev => ({ ...prev, [wId]: { ...(prev[wId] || defaultMemberCfg()), ...patch } }))
+  }
   // PR-2QQ-a: 카테고리
   const [category, setCategory] = useState('general')
   // PR-2QQ-d-2: 최소 인원 (디폴트 + 요일별 예외)
@@ -95,6 +121,28 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
         setDescription(group.description || '')
         setCategory(group.category || 'general')
         setMemberIds(members.map((m: any) => m.worker_id))
+        // K-2 — 멤버 cfg 파싱
+        const cfgs: Record<string, MemberCfg> = {}
+        const parseCsv = (s: string | null | undefined): Set<number> => {
+          if (!s) return new Set()
+          return new Set(
+            String(s).split(',').map(x => x.trim()).filter(x => x !== '')
+              .map(Number).filter(n => !isNaN(n) && n >= 0 && n <= 6),
+          )
+        }
+        for (const m of members) {
+          cfgs[m.worker_id] = {
+            priority_level: Number(m.priority_level || 2),
+            preferred_dow_prefer: parseCsv(m.preferred_dow_prefer),
+            preferred_dow_avoid: parseCsv(m.preferred_dow_avoid),
+            max_consecutive_work_days: m.max_consecutive_work_days != null ? String(m.max_consecutive_work_days) : '',
+            required_days_per_month: m.required_days_per_month != null ? String(m.required_days_per_month) : '',
+            max_days_per_month: m.max_days_per_month != null ? String(m.max_days_per_month) : '',
+            blocked_slot_ids: new Set(Array.isArray(m.blocked_slot_ids) ? m.blocked_slot_ids : []),
+            work_pattern_text: m.work_pattern_text || '',
+          }
+        }
+        setMemberCfgs(cfgs)
         // 최소 인원 (graceful — 마이그 미적용 시 빈 배열)
         const cJson = await cRes.json()
         if (cRes.ok && Array.isArray(cJson.data)) {
@@ -200,6 +248,13 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
 
   const toggleMember = (wId: string) => {
     setMemberIds(prev => prev.includes(wId) ? prev.filter(x => x !== wId) : [...prev, wId])
+    // K-2 — 새 멤버 default cfg, 제외 시 cfg 정리
+    setMemberCfgs(prev => {
+      if (prev[wId]) { const next = { ...prev }; delete next[wId]; return next }
+      return { ...prev, [wId]: defaultMemberCfg() }
+    })
+    // 새 멤버 추가 시 자동 펼침 (그 자리에서 cfg 입력)
+    setExpandedCfgWorkerId(prev => prev === wId ? null : wId)
   }
 
   const moveMember = (wId: string, dir: -1 | 1) => {
@@ -233,6 +288,21 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
         color_tone: colorTone,
         description: description.trim() || null,
       }
+      // K-2 — 멤버 PUT body (8 컬럼 포함)
+      const buildMembersPayload = () => memberIds.map(wId => {
+        const cfg = memberCfgs[wId] || defaultMemberCfg()
+        return {
+          worker_id: wId,
+          priority_level: cfg.priority_level,
+          preferred_dow_prefer: Array.from(cfg.preferred_dow_prefer).sort().join(',') || null,
+          preferred_dow_avoid: Array.from(cfg.preferred_dow_avoid).sort().join(',') || null,
+          max_consecutive_work_days: cfg.max_consecutive_work_days === '' ? null : Number(cfg.max_consecutive_work_days),
+          required_days_per_month: cfg.required_days_per_month === '' ? null : Number(cfg.required_days_per_month),
+          max_days_per_month: cfg.max_days_per_month === '' ? null : Number(cfg.max_days_per_month),
+          blocked_slot_ids: Array.from(cfg.blocked_slot_ids),
+          work_pattern_text: cfg.work_pattern_text.trim() || null,
+        }
+      })
       let id = groupId
       if (isNew) {
         payload.member_ids = memberIds
@@ -244,8 +314,18 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
         const json = await res.json()
         if (!res.ok) throw new Error(json?.error || '생성 실패')
         id = json.data.id
+        // 신규 그룹: POST 후 멤버 cfg 별도 PUT (POST 가 priority 만 받음)
+        if (memberIds.length > 0) {
+          const mRes = await fetch(`/api/call-scheduler/shift-groups/${id}/members`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', ...auth },
+            body: JSON.stringify({ members: buildMembersPayload() }),
+          })
+          const mJ = await mRes.json()
+          if (!mRes.ok) throw new Error(mJ?.error || '멤버 cfg 저장 실패')
+        }
       } else {
-        // PATCH 본문 + 멤버 별도 PUT
+        // PATCH 본문 + 멤버 별도 PUT (K-2 새 형식)
         const res = await fetch(`/api/call-scheduler/shift-groups/${id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json', ...auth },
@@ -256,7 +336,7 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
         const mRes = await fetch(`/api/call-scheduler/shift-groups/${id}/members`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json', ...auth },
-          body: JSON.stringify({ worker_ids: memberIds }),
+          body: JSON.stringify({ members: buildMembersPayload() }),
         })
         const mJ = await mRes.json()
         if (!mRes.ok) throw new Error(mJ?.error || '멤버 저장 실패')
@@ -699,9 +779,38 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                         <span style={{ fontSize: 11, color: COLORS.textMuted, width: 18 }}>{idx + 1}.</span>
                         <span style={{ flex: 1, fontWeight: 700, color: TONE_TEXT[w.color_tone] }}>{w.name}</span>
+                        {(() => {
+                          // K-2 — 멤버 cfg 요약 칩
+                          const cfg = memberCfgs[w.id] || defaultMemberCfg()
+                          const chips: React.ReactNode[] = []
+                          if (cfg.priority_level === 1) chips.push(<span key="p1" style={cfgChip('danger')}>P1</span>)
+                          else if (cfg.priority_level === 3) chips.push(<span key="p3" style={cfgChip('neutral')}>P3</span>)
+                          if (cfg.preferred_dow_prefer.size > 0)
+                            chips.push(<span key="pf" style={cfgChip('success')} title={`희망: ${Array.from(cfg.preferred_dow_prefer).map(d => DOW_LABELS[d]).join(',')}`}>🌟{cfg.preferred_dow_prefer.size}</span>)
+                          if (cfg.preferred_dow_avoid.size > 0)
+                            chips.push(<span key="av" style={cfgChip('warning')} title={`비선호: ${Array.from(cfg.preferred_dow_avoid).map(d => DOW_LABELS[d]).join(',')}`}>🚫{cfg.preferred_dow_avoid.size}</span>)
+                          if (cfg.max_consecutive_work_days)
+                            chips.push(<span key="mc" style={cfgChip('warning')} title="연속 한도">🛡{cfg.max_consecutive_work_days}</span>)
+                          if (cfg.blocked_slot_ids.size > 0)
+                            chips.push(<span key="bs" style={cfgChip('danger')} title="슬롯 거부">🚷{cfg.blocked_slot_ids.size}</span>)
+                          return chips
+                        })()}
                         {w.group_label && (
                           <span style={{ fontSize: 10, color: COLORS.textMuted }}>{w.group_label}</span>
                         )}
+                        {/* K-2 — 멤버 cfg 펼침 토글 */}
+                        <button type="button"
+                                onClick={() => setExpandedCfgWorkerId(expandedCfgWorkerId === w.id ? null : w.id)}
+                                style={{
+                                  fontSize: 10, padding: '2px 7px', borderRadius: 99,
+                                  background: expandedCfgWorkerId === w.id ? COLORS.bgBlue : 'rgba(255,255,255,0.5)',
+                                  color: expandedCfgWorkerId === w.id ? COLORS.info : COLORS.textMuted,
+                                  border: `1px solid ${expandedCfgWorkerId === w.id ? COLORS.borderBlue : COLORS.borderFaint}`,
+                                  fontWeight: 700, cursor: 'pointer',
+                                }}
+                                title="이 그룹 안 멤버 설정">
+                          ⚙ {expandedCfgWorkerId === w.id ? '▼' : '▶'}
+                        </button>
                         {/* PR-2SS-h-1-fix — 인라인 펼침 토글 (모달 → 클릭으로 펼침) */}
                         {!skipMissing && !isNew && (
                           <button type="button"
@@ -835,6 +944,14 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
                           </div>
                         </div>
                       )}
+                      {/* K-2 — 멤버 cfg 펼침 카드 */}
+                      {expandedCfgWorkerId === w.id && (
+                        <MemberCfgPanel
+                          cfg={memberCfgs[w.id] || defaultMemberCfg()}
+                          onChange={(patch) => updateMemberCfg(w.id, patch)}
+                          slots={slots}
+                        />
+                      )}
                     </div>
                   )
                 })}
@@ -915,6 +1032,167 @@ function Field({ label, sub, required, children }: {
         {sub && <span style={{ fontSize: 10, color: COLORS.textMuted, marginLeft: 4 }}>{sub}</span>}
       </div>
       {children}
+    </div>
+  )
+}
+
+// K-2 — 멤버 cfg 칩 (행 헤더 요약)
+function cfgChip(tone: 'success' | 'warning' | 'danger' | 'neutral' | 'info'): React.CSSProperties {
+  const palette = tone === 'success' ? { bg: COLORS.bgGreen, fg: COLORS.success, bd: COLORS.borderGreen }
+                : tone === 'warning' ? { bg: COLORS.bgAmber, fg: COLORS.warning, bd: COLORS.borderAmber }
+                : tone === 'danger'  ? { bg: COLORS.bgRed,   fg: COLORS.danger,  bd: COLORS.borderRed }
+                : tone === 'info'    ? { bg: COLORS.bgBlue,  fg: COLORS.info,    bd: COLORS.borderBlue }
+                : { bg: 'rgba(0,0,0,0.04)', fg: COLORS.textSecondary, bd: COLORS.borderFaint }
+  return {
+    fontSize: 9, padding: '1px 5px', borderRadius: 99, fontWeight: 700,
+    background: palette.bg, color: palette.fg, border: `1px solid ${palette.bd}`,
+  }
+}
+
+// K-2 — 멤버 cfg 펼침 카드
+function MemberCfgPanel({
+  cfg, onChange, slots,
+}: {
+  cfg: {
+    priority_level: number
+    preferred_dow_prefer: Set<number>
+    preferred_dow_avoid: Set<number>
+    max_consecutive_work_days: string
+    required_days_per_month: string
+    max_days_per_month: string
+    blocked_slot_ids: Set<string>
+    work_pattern_text: string
+  }
+  onChange: (patch: Partial<typeof cfg>) => void
+  slots: ShiftSlot[]
+}) {
+  const DOW = ['일', '월', '화', '수', '목', '금', '토']
+  const togglePrefer = (d: number) => {
+    const next = new Set(cfg.preferred_dow_prefer)
+    if (next.has(d)) next.delete(d); else next.add(d)
+    const nextAvoid = new Set(cfg.preferred_dow_avoid)
+    if (nextAvoid.has(d)) nextAvoid.delete(d)
+    onChange({ preferred_dow_prefer: next, preferred_dow_avoid: nextAvoid })
+  }
+  const toggleAvoid = (d: number) => {
+    const next = new Set(cfg.preferred_dow_avoid)
+    if (next.has(d)) next.delete(d); else next.add(d)
+    const nextPrefer = new Set(cfg.preferred_dow_prefer)
+    if (nextPrefer.has(d)) nextPrefer.delete(d)
+    onChange({ preferred_dow_avoid: next, preferred_dow_prefer: nextPrefer })
+  }
+  const toggleBlockedSlot = (slotId: string) => {
+    const next = new Set(cfg.blocked_slot_ids)
+    if (next.has(slotId)) next.delete(slotId); else next.add(slotId)
+    onChange({ blocked_slot_ids: next })
+  }
+  const dowBtn = (d: number, set: Set<number>, kind: 'prefer' | 'avoid') => (
+    <button key={`${kind}-${d}`} type="button"
+            onClick={() => kind === 'prefer' ? togglePrefer(d) : toggleAvoid(d)}
+            style={{
+              flex: 1, padding: '4px 0', fontSize: 10, fontWeight: 700, borderRadius: 4,
+              background: set.has(d)
+                ? (kind === 'prefer' ? COLORS.bgGreen : COLORS.bgRed) : 'transparent',
+              color: set.has(d)
+                ? (kind === 'prefer' ? COLORS.success : COLORS.danger) : COLORS.textSecondary,
+              border: `1px solid ${set.has(d)
+                ? (kind === 'prefer' ? COLORS.borderGreen : COLORS.borderRed) : COLORS.borderFaint}`,
+              cursor: 'pointer',
+            }}>{DOW[d]}</button>
+  )
+  const cfgFieldLabel: React.CSSProperties = { fontSize: 10, fontWeight: 700, color: COLORS.textSecondary }
+  const cfgInputStyle: React.CSSProperties = {
+    width: '100%', padding: '5px 8px', fontSize: 11,
+    border: `1px solid ${COLORS.borderFaint}`, borderRadius: 5,
+    background: 'rgba(255,255,255,0.95)', color: COLORS.textPrimary, outline: 'none',
+  }
+  return (
+    <div style={{
+      marginTop: 6, marginLeft: 24,
+      padding: 10, borderRadius: 8,
+      background: 'rgba(255,255,255,0.92)',
+      border: `1px solid ${COLORS.borderBlue}`,
+      display: 'flex', flexDirection: 'column', gap: 10,
+    }}>
+      <div>
+        <div style={cfgFieldLabel}>🏷 우선순위 <span style={{ fontWeight: 500, color: COLORS.textMuted }}>(이 그룹 안)</span></div>
+        <div style={{ display: 'flex', gap: 4, marginTop: 3 }}>
+          {[1, 2, 3].map(n => (
+            <button key={n} type="button" onClick={() => onChange({ priority_level: n })}
+                    style={{
+                      flex: 1, padding: '5px 8px', borderRadius: 5, fontSize: 11, fontWeight: 700,
+                      background: cfg.priority_level === n
+                        ? (n === 1 ? COLORS.bgRed : n === 2 ? COLORS.bgBlue : COLORS.bgGray) : 'transparent',
+                      color: cfg.priority_level === n
+                        ? (n === 1 ? COLORS.danger : n === 2 ? COLORS.info : COLORS.textSecondary)
+                        : COLORS.textSecondary,
+                      border: `1px solid ${
+                        cfg.priority_level === n
+                          ? (n === 1 ? COLORS.borderRed : n === 2 ? COLORS.borderBlue : COLORS.borderFaint)
+                          : COLORS.borderFaint}`,
+                      cursor: 'pointer',
+                    }}>
+              {n === 1 ? 'P1 최우선' : n === 2 ? 'P2 일반' : 'P3 백업'}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        <div>
+          <div style={cfgFieldLabel}>🌟 희망 요일</div>
+          <div style={{ display: 'flex', gap: 2, marginTop: 3 }}>
+            {[0,1,2,3,4,5,6].map(d => dowBtn(d, cfg.preferred_dow_prefer, 'prefer'))}
+          </div>
+        </div>
+        <div>
+          <div style={cfgFieldLabel}>🚫 비선호 요일</div>
+          <div style={{ display: 'flex', gap: 2, marginTop: 3 }}>
+            {[0,1,2,3,4,5,6].map(d => dowBtn(d, cfg.preferred_dow_avoid, 'avoid'))}
+          </div>
+        </div>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+        <div>
+          <div style={cfgFieldLabel}>📈 월 필수</div>
+          <input type="number" min={0} value={cfg.required_days_per_month}
+                 onChange={(e) => onChange({ required_days_per_month: e.target.value })}
+                 placeholder="비움=무관" style={cfgInputStyle} />
+        </div>
+        <div>
+          <div style={cfgFieldLabel}>🛑 월 최대</div>
+          <input type="number" min={0} value={cfg.max_days_per_month}
+                 onChange={(e) => onChange({ max_days_per_month: e.target.value })}
+                 placeholder="비움=무제한" style={cfgInputStyle} />
+        </div>
+        <div>
+          <div style={cfgFieldLabel}>🛡 연속 한도</div>
+          <input type="number" min={0} value={cfg.max_consecutive_work_days}
+                 onChange={(e) => onChange({ max_consecutive_work_days: e.target.value })}
+                 placeholder="비움=무제한" style={cfgInputStyle} />
+        </div>
+      </div>
+      <div>
+        <div style={cfgFieldLabel}>🚷 슬롯 거부 <span style={{ fontWeight: 500, color: COLORS.textMuted }}>(이 슬롯 절대 X)</span></div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginTop: 3 }}>
+          {slots.map(s => (
+            <button key={s.id} type="button" onClick={() => toggleBlockedSlot(s.id)}
+                    style={{
+                      padding: '3px 8px', borderRadius: 4, fontSize: 10, fontWeight: 700,
+                      background: cfg.blocked_slot_ids.has(s.id) ? COLORS.bgRed : 'transparent',
+                      color: cfg.blocked_slot_ids.has(s.id) ? COLORS.danger : COLORS.textSecondary,
+                      border: `1px solid ${cfg.blocked_slot_ids.has(s.id) ? COLORS.borderRed : COLORS.borderFaint}`,
+                      cursor: 'pointer', fontFamily: 'monospace',
+                    }}>{s.code}</button>
+          ))}
+        </div>
+      </div>
+      <div>
+        <div style={cfgFieldLabel}>📝 패턴 메모 <span style={{ fontWeight: 500, color: COLORS.textMuted }}>(자유 — 알고리즘 영향 X)</span></div>
+        <input type="text" value={cfg.work_pattern_text}
+               onChange={(e) => onChange({ work_pattern_text: e.target.value })}
+               placeholder="예: 2-on-2-off"
+               style={cfgInputStyle} />
+      </div>
     </div>
   )
 }
