@@ -134,7 +134,9 @@ export async function GET(request: Request) {
   const srno = parseInt(srnoRaw, 10)
 
   try {
-    const sql = `
+    // PR-6.7.f — full enrichment SQL (modifier picuserm + ajaoderh + get_factname + get_cbsddesc)
+    // 카페24 측에 ajaoderh 테이블 또는 stored function 미존재 시 fallback
+    const FULL_SQL = `
       SELECT a.otptidno, a.otptmddt, a.otptsrno,
              a.otptrgst, a.otptmscs, a.otptrgtp,
              a.otptacdt, a.otptactm, a.otptacbn,
@@ -186,7 +188,66 @@ export async function GET(request: Request) {
          AND a.otptsrno = ?
        LIMIT 1
     `
-    const row = await cafe24Db.queryOne<AcrentDetailRow>(sql, [idno, mddt, srno])
+
+    // PR-6.7.f-fix — fallback SQL (전임 PR-6.7 에서 검증된 단순 join)
+    const FALLBACK_SQL = `
+      SELECT a.otptidno, a.otptmddt, a.otptsrno,
+             a.otptrgst, a.otptmscs, a.otptrgtp,
+             a.otptacdt, a.otptactm, a.otptacbn,
+             a.otptacfe, a.otptacnu,
+             a.otptacrn, a.otptacdi, a.otptacdm, a.otptacjc, a.otptacjs,
+             a.otptacmb, a.otptacno, a.otptacph,
+             a.otptacet, a.otptacad, a.otptacmo,
+             a.otptadfg,
+             a.otptdsrp, a.otptdsnm, a.otptdsli, a.otptdshp, a.otptdsbh, a.otptdsbn,
+             a.otptdsus, a.otptdstl, a.otptdsre, a.otptdspk, a.otptdsmo,
+             a.otptdscd, a.otptdsrs, a.otptdsvp, a.otptdsvd,
+             a.otptcanm, a.otptcahp, a.otptcare, a.otptcavp, a.otptcavd,
+             a.otpttonm, a.otpttohp, a.otpttonu, a.otpttomd,
+             a.otpttobm, a.otpttobn, a.otpttobu, a.otpttobh,
+             a.otpttwgn, a.otpttwnm, a.otpttwhp, a.otpttagt,
+             a.otptbdno, a.otptbdnm, a.otptpkno, a.otptpknm,
+             a.otptftyn, a.otptjsyn, a.otptdcyn, a.otptrtyn,
+             a.otptgnus, a.otptgndt, a.otptgntm,
+             a.otptupus, a.otptupdt, a.otptuptm,
+             c.carsnums  AS cars_no,
+             c.carsodnm  AS cars_model,
+             c.carsusnm  AS cars_user,
+             cu.custname AS cust_name,
+             u.username  AS user_name
+        FROM acrotpth a
+        LEFT JOIN pmccarsm c
+          ON c.carsidno = a.otptidno
+         AND a.otptmddt BETWEEN c.carsfrdt AND c.carstodt
+        LEFT JOIN picuserm u
+          ON u.userpidn = a.otptgnus
+         AND a.otptmddt BETWEEN u.userfrdt AND u.usertodt
+        LEFT JOIN pmccustm cu
+          ON cu.custcode = c.carscust
+       WHERE a.otptidno = ?
+         AND a.otptmddt = ?
+         AND a.otptsrno = ?
+       LIMIT 1
+    `
+
+    let row: AcrentDetailRow | null = null
+    let usedFallback = false
+    try {
+      row = (await cafe24Db.queryOne<AcrentDetailRow>(FULL_SQL, [idno, mddt, srno])) ?? null
+    } catch (enrichErr) {
+      // ajaoderh 미존재 / get_factname 미존재 / picuserm modifier join 실패 등
+      console.warn('[acrents/detail enrichment fallback]', (enrichErr as Error).message)
+      usedFallback = true
+      row = (await cafe24Db.queryOne<AcrentDetailRow>(FALLBACK_SQL, [idno, mddt, srno])) ?? null
+    }
+
+    // fallback 시 파생 컬럼 null 보정
+    if (row && usedFallback) {
+      row.modifier_name = null
+      row.factory_name = null
+      row.factory_recv_date = null
+      row.otptitem = null
+    }
     if (!row) {
       return NextResponse.json(
         { success: false, error: 'not-found', data: null },
@@ -199,6 +260,7 @@ export async function GET(request: Request) {
       meta: {
         fetched_at: new Date().toISOString(),
         key: { idno, mddt, srno },
+        enrichment: usedFallback ? 'fallback' : 'full',
       },
     })
   } catch (e) {
