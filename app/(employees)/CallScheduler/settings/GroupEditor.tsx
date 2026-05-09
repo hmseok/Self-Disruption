@@ -841,14 +841,15 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
                         <button type="button" onClick={() => toggleMember(w.id)}
                                 style={{ ...miniBtn, color: COLORS.danger }} title="제외">×</button>
                       </div>
-                      {/* PR-2SS-h-1-fix — 인라인 펼침 (회피일 목록 + 빠른 입력) */}
+                      {/* M-2 — 인라인 펼침 (회피일 목록 + 빠른 입력) 시원시원 */}
                       {isExpanded && !skipMissing && (
                         <div style={{
-                          marginTop: 6, marginLeft: 24,
-                          padding: 8, borderRadius: 6,
-                          background: 'rgba(255,255,255,0.85)',
-                          border: `1px solid ${COLORS.borderFaint}`,
-                          display: 'flex', flexDirection: 'column', gap: 6,
+                          marginTop: 12, marginLeft: 12, marginRight: 4,
+                          padding: 16, borderRadius: 12,
+                          background: 'rgba(255,255,255,0.96)',
+                          border: `2px solid ${COLORS.borderAmber}`,
+                          boxShadow: '0 2px 8px rgba(245,158,11,0.08)',
+                          display: 'flex', flexDirection: 'column', gap: 12,
                         }}>
                           {form.error && (
                             <div style={{
@@ -934,7 +935,7 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
                                    style={{ ...skipInlineInputStyle, flex: 1, minWidth: 100 }} />
                             <button type="button" onClick={() => addSkipInline(w.id)} disabled={form.saving}
                                     style={{
-                                      padding: '4px 10px', borderRadius: 4, fontSize: 11, fontWeight: 700,
+                                      padding: '8px 18px', borderRadius: 8, fontSize: 13, fontWeight: 800,
                                       background: COLORS.primary, color: '#fff', border: 'none',
                                       cursor: form.saving ? 'not-allowed' : 'pointer',
                                       opacity: form.saving ? 0.5 : 1,
@@ -1003,11 +1004,11 @@ const inputStyle: React.CSSProperties = {
   ...GLASS.L1, padding: '7px 10px', borderRadius: 8,
   fontSize: 13, color: COLORS.textPrimary, outline: 'none', width: '100%',
 }
-// PR-2SS-h-1-fix — 인라인 회피일 빠른 입력
+// M-2 — 회피일 빠른 입력 (시원시원)
 const skipInlineInputStyle: React.CSSProperties = {
-  padding: '4px 8px', borderRadius: 4, fontSize: 11,
-  border: `1px solid ${COLORS.borderFaint}`,
-  background: 'rgba(255,255,255,0.95)',
+  padding: '8px 12px', borderRadius: 8, fontSize: 13, fontWeight: 600,
+  border: `1.5px solid ${COLORS.borderFaint}`,
+  background: 'rgba(255,255,255,1)',
   outline: 'none',
 }
 const miniBtn: React.CSSProperties = {
@@ -1086,111 +1087,149 @@ function MemberCfgPanel({
     if (next.has(slotId)) next.delete(slotId); else next.add(slotId)
     onChange({ blocked_slot_ids: next })
   }
+  // M-2 — 시원시원한 사이즈
   const dowBtn = (d: number, set: Set<number>, kind: 'prefer' | 'avoid') => (
     <button key={`${kind}-${d}`} type="button"
             onClick={() => kind === 'prefer' ? togglePrefer(d) : toggleAvoid(d)}
             style={{
-              flex: 1, padding: '4px 0', fontSize: 10, fontWeight: 700, borderRadius: 4,
+              flex: 1, padding: '10px 0', fontSize: 13, fontWeight: 800, borderRadius: 8,
               background: set.has(d)
-                ? (kind === 'prefer' ? COLORS.bgGreen : COLORS.bgRed) : 'transparent',
+                ? (kind === 'prefer' ? COLORS.bgGreen : COLORS.bgRed) : 'rgba(255,255,255,0.7)',
               color: set.has(d)
                 ? (kind === 'prefer' ? COLORS.success : COLORS.danger) : COLORS.textSecondary,
-              border: `1px solid ${set.has(d)
+              border: `1.5px solid ${set.has(d)
                 ? (kind === 'prefer' ? COLORS.borderGreen : COLORS.borderRed) : COLORS.borderFaint}`,
               cursor: 'pointer',
+              transition: 'all 0.12s',
             }}>{DOW[d]}</button>
   )
-  const cfgFieldLabel: React.CSSProperties = { fontSize: 10, fontWeight: 700, color: COLORS.textSecondary }
+  const cfgFieldLabel: React.CSSProperties = {
+    fontSize: 13, fontWeight: 800, color: COLORS.textPrimary, marginBottom: 6,
+    display: 'flex', alignItems: 'center', gap: 4,
+  }
   const cfgInputStyle: React.CSSProperties = {
-    width: '100%', padding: '5px 8px', fontSize: 11,
-    border: `1px solid ${COLORS.borderFaint}`, borderRadius: 5,
-    background: 'rgba(255,255,255,0.95)', color: COLORS.textPrimary, outline: 'none',
+    width: '100%', padding: '10px 14px', fontSize: 14, fontWeight: 600,
+    border: `1.5px solid ${COLORS.borderFaint}`, borderRadius: 8,
+    background: 'rgba(255,255,255,1)', color: COLORS.textPrimary, outline: 'none',
   }
   return (
     <div style={{
-      marginTop: 6, marginLeft: 24,
-      padding: 10, borderRadius: 8,
-      background: 'rgba(255,255,255,0.92)',
-      border: `1px solid ${COLORS.borderBlue}`,
-      display: 'flex', flexDirection: 'column', gap: 10,
+      marginTop: 12, marginLeft: 12, marginRight: 4,
+      padding: 18, borderRadius: 12,
+      background: 'rgba(255,255,255,0.96)',
+      border: `2px solid ${COLORS.borderBlue}`,
+      boxShadow: '0 2px 8px rgba(59,130,246,0.08)',
+      display: 'flex', flexDirection: 'column', gap: 18,
     }}>
+      {/* 1행 — 우선순위 (전체 폭) */}
       <div>
-        <div style={cfgFieldLabel}>🏷 우선순위 <span style={{ fontWeight: 500, color: COLORS.textMuted }}>(이 그룹 안)</span></div>
-        <div style={{ display: 'flex', gap: 4, marginTop: 3 }}>
+        <div style={cfgFieldLabel}>
+          🏷 우선순위
+          <span style={{ fontSize: 11, fontWeight: 500, color: COLORS.textMuted }}>이 그룹 안 — 자동 생성 시 P1 부터 우선 배정</span>
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
           {[1, 2, 3].map(n => (
             <button key={n} type="button" onClick={() => onChange({ priority_level: n })}
                     style={{
-                      flex: 1, padding: '5px 8px', borderRadius: 5, fontSize: 11, fontWeight: 700,
+                      flex: 1, padding: '14px 8px', borderRadius: 10, fontSize: 14, fontWeight: 800,
                       background: cfg.priority_level === n
-                        ? (n === 1 ? COLORS.bgRed : n === 2 ? COLORS.bgBlue : COLORS.bgGray) : 'transparent',
+                        ? (n === 1 ? COLORS.bgRed : n === 2 ? COLORS.bgBlue : COLORS.bgGray)
+                        : 'rgba(255,255,255,0.7)',
                       color: cfg.priority_level === n
                         ? (n === 1 ? COLORS.danger : n === 2 ? COLORS.info : COLORS.textSecondary)
                         : COLORS.textSecondary,
-                      border: `1px solid ${
+                      border: `2px solid ${
                         cfg.priority_level === n
                           ? (n === 1 ? COLORS.borderRed : n === 2 ? COLORS.borderBlue : COLORS.borderFaint)
                           : COLORS.borderFaint}`,
                       cursor: 'pointer',
+                      transition: 'all 0.15s',
                     }}>
               {n === 1 ? 'P1 최우선' : n === 2 ? 'P2 일반' : 'P3 백업'}
             </button>
           ))}
         </div>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+
+      {/* 2행 — 희망 / 비선호 요일 (큰 버튼) */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
         <div>
-          <div style={cfgFieldLabel}>🌟 희망 요일</div>
-          <div style={{ display: 'flex', gap: 2, marginTop: 3 }}>
+          <div style={cfgFieldLabel}>
+            🌟 희망 요일
+            <span style={{ fontSize: 11, fontWeight: 500, color: COLORS.textMuted }}>매치 시 ranking 우선</span>
+          </div>
+          <div style={{ display: 'flex', gap: 4 }}>
             {[0,1,2,3,4,5,6].map(d => dowBtn(d, cfg.preferred_dow_prefer, 'prefer'))}
           </div>
         </div>
         <div>
-          <div style={cfgFieldLabel}>🚫 비선호 요일</div>
-          <div style={{ display: 'flex', gap: 2, marginTop: 3 }}>
+          <div style={cfgFieldLabel}>
+            🚫 비선호 요일
+            <span style={{ fontSize: 11, fontWeight: 500, color: COLORS.textMuted }}>매치 시 후순위</span>
+          </div>
+          <div style={{ display: 'flex', gap: 4 }}>
             {[0,1,2,3,4,5,6].map(d => dowBtn(d, cfg.preferred_dow_avoid, 'avoid'))}
           </div>
         </div>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+
+      {/* 3행 — 일수 / 한도 (3 컬럼) */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
         <div>
-          <div style={cfgFieldLabel}>📈 월 필수</div>
+          <div style={cfgFieldLabel}>📈 월 필수 일수</div>
           <input type="number" min={0} value={cfg.required_days_per_month}
                  onChange={(e) => onChange({ required_days_per_month: e.target.value })}
-                 placeholder="비움=무관" style={cfgInputStyle} />
+                 placeholder="비움 = 무관" style={cfgInputStyle} />
         </div>
         <div>
-          <div style={cfgFieldLabel}>🛑 월 최대</div>
+          <div style={cfgFieldLabel}>🛑 월 최대 일수</div>
           <input type="number" min={0} value={cfg.max_days_per_month}
                  onChange={(e) => onChange({ max_days_per_month: e.target.value })}
-                 placeholder="비움=무제한" style={cfgInputStyle} />
+                 placeholder="비움 = 무제한" style={cfgInputStyle} />
         </div>
         <div>
-          <div style={cfgFieldLabel}>🛡 연속 한도</div>
+          <div style={cfgFieldLabel}>🛡 연속 근무 한도</div>
           <input type="number" min={0} value={cfg.max_consecutive_work_days}
                  onChange={(e) => onChange({ max_consecutive_work_days: e.target.value })}
-                 placeholder="비움=무제한" style={cfgInputStyle} />
+                 placeholder="비움 = 무제한" style={cfgInputStyle} />
         </div>
       </div>
+
+      {/* 4행 — 슬롯 거부 (큼직 chip) */}
       <div>
-        <div style={cfgFieldLabel}>🚷 슬롯 거부 <span style={{ fontWeight: 500, color: COLORS.textMuted }}>(이 슬롯 절대 X)</span></div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginTop: 3 }}>
-          {slots.map(s => (
-            <button key={s.id} type="button" onClick={() => toggleBlockedSlot(s.id)}
-                    style={{
-                      padding: '3px 8px', borderRadius: 4, fontSize: 10, fontWeight: 700,
-                      background: cfg.blocked_slot_ids.has(s.id) ? COLORS.bgRed : 'transparent',
-                      color: cfg.blocked_slot_ids.has(s.id) ? COLORS.danger : COLORS.textSecondary,
-                      border: `1px solid ${cfg.blocked_slot_ids.has(s.id) ? COLORS.borderRed : COLORS.borderFaint}`,
-                      cursor: 'pointer', fontFamily: 'monospace',
-                    }}>{s.code}</button>
-          ))}
+        <div style={cfgFieldLabel}>
+          🚷 슬롯 거부
+          <span style={{ fontSize: 11, fontWeight: 500, color: COLORS.textMuted }}>이 슬롯엔 절대 배정 X</span>
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {slots.map(s => {
+            const active = cfg.blocked_slot_ids.has(s.id)
+            return (
+              <button key={s.id} type="button" onClick={() => toggleBlockedSlot(s.id)}
+                      style={{
+                        padding: '8px 14px', borderRadius: 8, fontSize: 13, fontWeight: 800,
+                        background: active ? COLORS.bgRed : 'rgba(255,255,255,0.7)',
+                        color: active ? COLORS.danger : COLORS.textSecondary,
+                        border: `1.5px solid ${active ? COLORS.borderRed : COLORS.borderFaint}`,
+                        cursor: 'pointer', fontFamily: 'monospace',
+                        transition: 'all 0.12s',
+                      }}>
+                {active && '🚫 '}{s.code}
+              </button>
+            )
+          })}
         </div>
       </div>
+
+      {/* 5행 — 패턴 메모 */}
       <div>
-        <div style={cfgFieldLabel}>📝 패턴 메모 <span style={{ fontWeight: 500, color: COLORS.textMuted }}>(자유 — 알고리즘 영향 X)</span></div>
+        <div style={cfgFieldLabel}>
+          📝 패턴 메모
+          <span style={{ fontSize: 11, fontWeight: 500, color: COLORS.textMuted }}>자유 — 알고리즘 영향 X (참고용)</span>
+        </div>
         <input type="text" value={cfg.work_pattern_text}
                onChange={(e) => onChange({ work_pattern_text: e.target.value })}
-               placeholder="예: 2-on-2-off"
+               placeholder="예: 2-on-2-off / 야간 전담 / 주말 안 됨 등"
                style={cfgInputStyle} />
       </div>
     </div>

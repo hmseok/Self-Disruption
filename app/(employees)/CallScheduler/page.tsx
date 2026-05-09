@@ -35,6 +35,34 @@ export default function CallSchedulerListPage() {
   const [error, setError] = useState<string | null>(null)
   const [sortKey, setSortKey] = useState<SortKey>('year_month')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
+  // M-2 — 직원 요청 대기 카운트 (회피 + 휴가 + 교체 합산)
+  const [pendingCount, setPendingCount] = useState(0)
+
+  // 직원 요청 대기 카운트 fetch
+  useEffect(() => {
+    let abort = false
+    ;(async () => {
+      try {
+        const auth = await getAuthHeader()
+        const today = new Date()
+        const monthStart = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-01`
+        const future = new Date(today); future.setDate(future.getDate() + 90)
+        const futureEnd = `${future.getFullYear()}-${String(future.getMonth()+1).padStart(2,'0')}-${String(future.getDate()).padStart(2,'0')}`
+        const [skipR, leaveR, swapR] = await Promise.all([
+          fetch(`/api/call-scheduler/skip-dates?from=${monthStart}&to=${futureEnd}&status=requested`, { headers: auth }),
+          fetch('/api/call-scheduler/leaves?status=pending', { headers: auth }),
+          fetch('/api/call-scheduler/swap-requests?status=pending', { headers: auth }),
+        ])
+        if (abort) return
+        const skipJ = skipR.ok ? await skipR.json() : { data: [] }
+        const leaveJ = leaveR.ok ? await leaveR.json() : { data: [] }
+        const swapJ = swapR.ok ? await swapR.json() : { data: [] }
+        const sum = (skipJ.data?.length || 0) + (leaveJ.data?.length || 0) + (swapJ.data?.length || 0)
+        if (!abort) setPendingCount(sum)
+      } catch { /* graceful */ }
+    })()
+    return () => { abort = true }
+  }, [])
 
   useEffect(() => {
     let abort = false
@@ -118,14 +146,25 @@ export default function CallSchedulerListPage() {
           <Link
             href="/CallScheduler/requests"
             style={{
-              ...BTN.md, background: 'transparent',
-              color: COLORS.textSecondary,
-              border: `1px solid ${COLORS.borderFaint}`,
-              textDecoration: 'none', display: 'inline-block',
+              ...BTN.md,
+              background: pendingCount > 0 ? COLORS.bgAmber : 'transparent',
+              color: pendingCount > 0 ? COLORS.warning : COLORS.textSecondary,
+              border: `1px solid ${pendingCount > 0 ? COLORS.borderAmber : COLORS.borderFaint}`,
+              textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6,
+              fontWeight: pendingCount > 0 ? 800 : 600,
             }}
             title="직원 요청 통합 검토 — 회피일 / 휴가 / 시프트 교체"
           >
             📋 직원 요청
+            {pendingCount > 0 && (
+              <span style={{
+                fontSize: 11, fontWeight: 800,
+                padding: '2px 8px', borderRadius: 99,
+                background: COLORS.warning, color: '#fff',
+              }}>
+                ⏳ {pendingCount}
+              </span>
+            )}
           </Link>
           <Link
             href="/CallScheduler/settings"

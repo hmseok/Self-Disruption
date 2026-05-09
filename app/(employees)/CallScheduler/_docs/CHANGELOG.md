@@ -20,6 +20,39 @@
 - 셀 호출 시 `slotGroups[slot.id].id + worker_id` 로 lookup → 색상 layer 재활성
 - 효과: 같은 워커가 야간 그룹에서 화/목 희망, 주간 그룹에서 월/금 비선호 등 다른 색상 layer 표출
 
+## 2026-05-09 (Phase M-2) — 멤버 cfg 펼침 카드 시원시원 + 메인 헤더 ⏳ 카운트 배지
+
+### 사용자 피드백
+> "여기부분 ui 좀 제대로 표출했음 좋겠습니다. 숨지말고 시원시원하게 셋팅하자고요"
+
+### MemberCfgPanel 큼직하게
+- 들여쓰기: marginLeft 24 → 12 (시원하게 보여줌)
+- padding: 10 → 18, gap: 10 → 18
+- 보더 1px → 2px + 박스 그림자 추가
+- 배경 0.92 → 0.96 (선명)
+- 라벨: fontSize 10 → 13 fontWeight 700 → 800 + 부설명 inline
+- P1/P2/P3 버튼: padding 5px → 14px, fontSize 11 → 14
+- 요일 버튼: padding 4px → 10px, fontSize 10 → 13, borderRadius 4 → 8
+- 입력 필드: padding 5/8 → 10/14, fontSize 11 → 14
+- 슬롯 거부 chip: padding 3/8 → 8/14, fontSize 10 → 13, 활성 시 🚫 prefix
+- gridGap 10 → 16
+
+### 회피일 펼침 카드도 통일
+- marginLeft 24 → 12, padding 8 → 16
+- 보더 1 → 2 (호박색)
+- 입력 필드 큼직 (padding 4/8 → 8/12, fontSize 11 → 13)
+- + 추가 버튼 padding 4/10 → 8/18
+
+### 메인 페이지 ⏳ 카운트 배지 (M-2 추가)
+- /CallScheduler 페이지 mount 시 회피+휴가+교체 대기 카운트 fetch
+- 「📋 직원 요청」 버튼:
+  · 대기 0건 — 기본 디자인
+  · 대기 N건 — 호박 배경 + ⏳ N 빨간 배지 (눈에 띄게)
+- 매니저 한눈에 처리할 일 파악
+
+### 검증
+- tsc CallScheduler 0 errors
+
 ## 2026-05-09 (Phase M-1) — 매니저 직원 요청 통합 검토 페이지
 
 ### 사용자 의도

@@ -700,6 +700,66 @@ export default function BankCardPage() {
     ts: number
   }>(null)
 
+  // PR-UX4: 자동 스케줄 설정 모달
+  const [scheduleModalOpen, setScheduleModalOpen] = useState(false)
+  const [scheduleConfig, setScheduleConfig] = useState<null | {
+    id: string | null
+    enabled: boolean
+    schedule_hour: number
+    schedule_minute: number
+    steps: string[]
+    auto_confirm: boolean
+    last_run_at: string | null
+    last_run_status: string | null
+    next_run_at: string | null
+    _migration_pending?: boolean
+  }>(null)
+  const [scheduleSaving, setScheduleSaving] = useState(false)
+  const loadScheduleConfig = async () => {
+    try {
+      const { ok, json } = await fetchWithAuth('/api/finance/auto-match-schedule', { method: 'GET' })
+      if (ok) setScheduleConfig(json)
+    } catch (e: any) {
+      console.error('[schedule load]', e)
+    }
+  }
+  const saveScheduleConfig = async () => {
+    if (!scheduleConfig) return
+    setScheduleSaving(true)
+    try {
+      const { ok, json } = await fetchWithAuth('/api/finance/auto-match-schedule', {
+        method: 'POST',
+        body: scheduleConfig,
+      })
+      if (ok) {
+        setScheduleConfig({ ...scheduleConfig, ...json })
+        alert(json.message || '✅ 저장 완료')
+      } else {
+        alert(`저장 실패: ${json?.error || ''}`)
+      }
+    } finally {
+      setScheduleSaving(false)
+    }
+  }
+  const triggerScheduleRunNow = async () => {
+    if (!confirm('스케줄을 지금 즉시 실행하시겠습니까?\n(테스트용 — 시간 검사 skip)')) return
+    setScheduleSaving(true)
+    try {
+      const { ok, json } = await fetchWithAuth('/api/finance/auto-match-schedule/run', {
+        method: 'POST',
+        body: { force: true },
+      })
+      if (ok) {
+        alert(`실행 결과: ${json.run_status}\n${JSON.stringify(json.result?.steps?.length || 0)} steps`)
+        await loadScheduleConfig()
+      } else {
+        alert(`실행 실패: ${json?.error || ''}`)
+      }
+    } finally {
+      setScheduleSaving(false)
+    }
+  }
+
   const loadProcessingStatus = async () => {
     setProcessingStatusLoading(true)
     try {
@@ -5270,6 +5330,11 @@ export default function BankCardPage() {
                           title="분류 (룰 + AI) → 4 매처 일괄 자동 실행"
                         >{runWorkflowLoading ? '진행 중...' : '🚀 1-Click 자동'}</button>
                         <button
+                          onClick={() => { setScheduleModalOpen(true); loadScheduleConfig() }}
+                          style={{ ...BTN.sm, padding: '6px 12px', fontSize: 11, background: '#fff', color: '#7c3aed', border: '1px solid rgba(124,58,237,0.3)', cursor: 'pointer' }}
+                          title="자동 적용 스케줄 설정 (매일 새벽 자동 실행)"
+                        >⚙ 자동 스케줄</button>
+                        <button
                           onClick={loadProcessingStatus}
                           disabled={processingStatusLoading}
                           style={{ ...BTN.sm, padding: '6px 10px', fontSize: 11, background: '#fff', color: COLORS.textSecondary, border: `1px solid ${COLORS.borderSubtle}`, cursor: processingStatusLoading ? 'wait' : 'pointer' }}
@@ -5522,6 +5587,169 @@ export default function BankCardPage() {
                       >다음 →</button>
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* PR-UX4: 자동 스케줄 설정 모달 */}
+              {scheduleModalOpen && scheduleConfig && (
+                <div style={{
+                  position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+                }} onClick={() => setScheduleModalOpen(false)}>
+                  <div style={{
+                    ...GLASS.L4, background: '#fff',
+                    borderRadius: 12, padding: '20px 24px', minWidth: 480, maxWidth: 600,
+                    maxHeight: '85vh', overflowY: 'auto',
+                  }} onClick={e => e.stopPropagation()}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                      <div style={{ fontSize: 16, fontWeight: 700, color: '#7c3aed' }}>⚙ 자동 적용 스케줄</div>
+                      <button onClick={() => setScheduleModalOpen(false)}
+                        style={{ background: 'transparent', border: 'none', fontSize: 16, cursor: 'pointer', color: COLORS.textMuted }}>×</button>
+                    </div>
+
+                    {scheduleConfig._migration_pending && (
+                      <div style={{ ...GLASS.L3, border: '1px solid rgba(217,119,6,0.3)', borderRadius: 8, padding: '10px 12px', marginBottom: 12, fontSize: 12, color: '#d97706' }}>
+                        ⚠ 마이그레이션 미적용 — DBeaver/CLI 에서 다음 SQL 실행 필요:<br />
+                        <code style={{ fontSize: 11 }}>migrations/2026-05-09_auto_match_schedule.sql</code>
+                      </div>
+                    )}
+
+                    {/* 활성/비활성 toggle */}
+                    <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <label style={{ fontSize: 13, fontWeight: 600, color: COLORS.textPrimary }}>스케줄 활성화</label>
+                      <label style={{ position: 'relative', display: 'inline-block', width: 44, height: 24 }}>
+                        <input type="checkbox"
+                          checked={scheduleConfig.enabled}
+                          onChange={e => setScheduleConfig({ ...scheduleConfig, enabled: e.target.checked })}
+                          style={{ opacity: 0, width: 0, height: 0 }}
+                        />
+                        <span style={{
+                          position: 'absolute', cursor: 'pointer', inset: 0,
+                          background: scheduleConfig.enabled ? '#16a34a' : COLORS.borderSubtle,
+                          transition: '0.2s', borderRadius: 24,
+                        }}>
+                          <span style={{
+                            position: 'absolute', height: 18, width: 18, left: scheduleConfig.enabled ? 23 : 3, bottom: 3,
+                            background: '#fff', transition: '0.2s', borderRadius: '50%',
+                          }} />
+                        </span>
+                      </label>
+                      <span style={{ fontSize: 11, color: COLORS.textMuted }}>
+                        {scheduleConfig.enabled ? '✅ 활성' : '⏸ 비활성'}
+                      </span>
+                    </div>
+
+                    {/* 시간 설정 */}
+                    <div style={{ marginBottom: 16 }}>
+                      <label style={{ fontSize: 12, fontWeight: 600, color: COLORS.textPrimary, marginBottom: 6, display: 'block' }}>
+                        실행 시각 (KST 기준 — 매일)
+                      </label>
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                        <input type="number" min={0} max={23}
+                          value={scheduleConfig.schedule_hour}
+                          onChange={e => setScheduleConfig({ ...scheduleConfig, schedule_hour: Math.max(0, Math.min(23, Number(e.target.value) || 0)) })}
+                          style={{ width: 60, padding: '6px 8px', fontSize: 13, border: `1px solid ${COLORS.borderSubtle}`, borderRadius: 6 }}
+                        />
+                        <span>:</span>
+                        <input type="number" min={0} max={59}
+                          value={scheduleConfig.schedule_minute}
+                          onChange={e => setScheduleConfig({ ...scheduleConfig, schedule_minute: Math.max(0, Math.min(59, Number(e.target.value) || 0)) })}
+                          style={{ width: 60, padding: '6px 8px', fontSize: 13, border: `1px solid ${COLORS.borderSubtle}`, borderRadius: 6 }}
+                        />
+                        <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 8 }}>
+                          예: 03 / 00 → 매일 새벽 3시
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* 실행 단계 */}
+                    <div style={{ marginBottom: 16 }}>
+                      <label style={{ fontSize: 12, fontWeight: 600, color: COLORS.textPrimary, marginBottom: 6, display: 'block' }}>
+                        실행 단계 (체크된 것만 자동 실행)
+                      </label>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        {[
+                          { key: 'classify-rule', label: '🔍 룰 분류', warn: false },
+                          { key: 'classify-ai', label: '🤖 AI 분류 (Gemini — 토큰 비용)', warn: false },
+                          { key: 'match-fmi-rental', label: '🚗 대차건 보험 매칭', warn: false },
+                          { key: 'match-investor-jiip', label: '📈 투자/지입 매칭', warn: false },
+                          { key: 'match-employee', label: '👥 직원 매칭', warn: false },
+                          { key: 'match-freelancer', label: '🤝 프리랜서 매칭', warn: false },
+                        ].map(s => (
+                          <label key={s.key} style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 6, color: COLORS.textPrimary }}>
+                            <input type="checkbox"
+                              checked={scheduleConfig.steps.includes(s.key)}
+                              onChange={e => {
+                                const next = e.target.checked
+                                  ? [...scheduleConfig.steps, s.key]
+                                  : scheduleConfig.steps.filter(x => x !== s.key)
+                                setScheduleConfig({ ...scheduleConfig, steps: next })
+                              }}
+                            />
+                            {s.label}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* 자동 확정 (위험 옵션) */}
+                    <div style={{ marginBottom: 16, padding: 10, background: 'rgba(220,38,38,0.05)', borderRadius: 6, border: '1px solid rgba(220,38,38,0.2)' }}>
+                      <label style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 6, color: COLORS.textPrimary }}>
+                        <input type="checkbox"
+                          checked={scheduleConfig.auto_confirm}
+                          onChange={e => setScheduleConfig({ ...scheduleConfig, auto_confirm: e.target.checked })}
+                        />
+                        ⚠️ 매칭 결과 자동 확정 (사용자 검수 skip)
+                      </label>
+                      <div style={{ fontSize: 10, color: COLORS.textMuted, marginTop: 4, marginLeft: 22 }}>
+                        ❌ 권장 X — 잘못된 매칭이 자동 final 됨. 검수 단계 거치는 것 안전.
+                      </div>
+                    </div>
+
+                    {/* 마지막 실행 결과 */}
+                    {scheduleConfig.last_run_at && (
+                      <div style={{ ...GLASS.L3, border: `1px solid ${COLORS.borderSubtle}`, borderRadius: 6, padding: 10, marginBottom: 16 }}>
+                        <div style={{ fontSize: 11, color: COLORS.textMuted, marginBottom: 4 }}>마지막 실행</div>
+                        <div style={{ fontSize: 12, color: COLORS.textPrimary }}>
+                          {new Date(scheduleConfig.last_run_at).toLocaleString('ko-KR')}
+                          <span style={{
+                            marginLeft: 8, padding: '2px 6px', borderRadius: 4, fontSize: 10, fontWeight: 600,
+                            background: scheduleConfig.last_run_status === 'success' ? '#16a34a20' : scheduleConfig.last_run_status === 'failed' ? '#dc262620' : '#d9770620',
+                            color: scheduleConfig.last_run_status === 'success' ? '#16a34a' : scheduleConfig.last_run_status === 'failed' ? '#dc2626' : '#d97706',
+                          }}>{scheduleConfig.last_run_status}</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {scheduleConfig.next_run_at && scheduleConfig.enabled && (
+                      <div style={{ fontSize: 11, color: COLORS.textMuted, marginBottom: 16 }}>
+                        다음 실행: {new Date(scheduleConfig.next_run_at).toLocaleString('ko-KR')}
+                      </div>
+                    )}
+
+                    {/* 버튼 */}
+                    <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                      <button onClick={triggerScheduleRunNow}
+                        disabled={scheduleSaving}
+                        style={{ ...BTN.sm, padding: '6px 12px', fontSize: 12, background: '#fff', color: '#7c3aed', border: '1px solid rgba(124,58,237,0.3)', cursor: scheduleSaving ? 'wait' : 'pointer' }}
+                      >▶ 지금 즉시 실행 (테스트)</button>
+                      <button onClick={() => setScheduleModalOpen(false)}
+                        style={{ ...BTN.sm, padding: '6px 12px', fontSize: 12, background: '#fff', color: COLORS.textSecondary, border: `1px solid ${COLORS.borderSubtle}`, cursor: 'pointer' }}
+                      >취소</button>
+                      <button onClick={saveScheduleConfig}
+                        disabled={scheduleSaving}
+                        style={{ padding: '6px 14px', fontSize: 12, fontWeight: 600, background: '#16a34a', color: '#fff', border: 'none', borderRadius: 6, cursor: scheduleSaving ? 'wait' : 'pointer' }}
+                      >{scheduleSaving ? '저장 중...' : '✅ 저장'}</button>
+                    </div>
+
+                    {/* cron 외부 설정 안내 */}
+                    <div style={{ marginTop: 16, paddingTop: 12, borderTop: `1px dashed ${COLORS.borderSubtle}`, fontSize: 10, color: COLORS.textMuted, lineHeight: 1.5 }}>
+                      💡 외부 cron 설정 (관리자):<br />
+                      GCP Cloud Scheduler 또는 Vercel Cron 으로 매분 호출:<br />
+                      <code style={{ fontSize: 10 }}>POST /api/finance/auto-match-schedule/run</code> (X-Cron-Secret 헤더)<br />
+                      env: <code>CRON_SECRET</code>
+                    </div>
+                  </div>
                 </div>
               )}
 
