@@ -575,7 +575,7 @@ export default function BankCardPage() {
   }>(null)
   const [showAdvancedMatchers, setShowAdvancedMatchers] = useState(false)
 
-  // ── PR-UX1.5 + PR-UX2: 처리 현황 + 매칭 확정 + 1-Click 자동 ──
+  // ── PR-UX1.5 + PR-UX2 + PR-UX3-A: 처리 현황 + 분기 + 매칭 확정 + 1-Click ──
   const [processingStatus, setProcessingStatus] = useState<null | {
     funnel: Array<{ key: string; label: string; done: number; todo: number; value: number; sub: string }>
     total: number
@@ -590,6 +590,12 @@ export default function BankCardPage() {
     processed_pct: number
     last_auto_match_at: string | null
     recommended_actions: Array<{ key: string; label: string; priority: number; reason: string }>
+    // PR-UX3-A: 분기 카운트
+    req_match_total: number
+    req_match_matched: number
+    req_match_unmatched: number
+    auto_final: number
+    final_count: number
   }>(null)
   const [processingStatusLoading, setProcessingStatusLoading] = useState(false)
   const [confirmingMatchings, setConfirmingMatchings] = useState(false)
@@ -5127,15 +5133,18 @@ export default function BankCardPage() {
             : []
           return (
             <>
-              {/* PR-UX2: 🌊 운영 흐름 패널 (Glass L4 — 5 단계 funnel + 1-Click 자동) */}
+              {/* PR-UX3: 🌊 운영 흐름 패널 (Glass L4 — 분기 모델 + 1-Click 자동) */}
               {processingStatus && (() => {
                 const ps = processingStatus
                 const stepColors: Record<string, string> = {
                   input: '#2563eb',
                   classify: '#7c3aed',
+                  split: '#ec4899',     // 분기 — 핑크
+                  review: '#d97706',    // 검수 — amber
+                  final: '#16a34a',
+                  // legacy
                   match: '#0891b2',
                   confirm: '#16a34a',
-                  final: '#16a34a',
                 }
                 return (
                   <div style={{ ...GLASS.L4, border: `1px solid rgba(124,58,237,0.25)`, borderRadius: 12, padding: '14px 18px', marginBottom: 12 }}>
@@ -5201,8 +5210,34 @@ export default function BankCardPage() {
                       })}
                     </div>
 
+                    {/* PR-UX3-A: 분기 안내 (매칭 대상 vs 일반) */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
+                      <div style={{ ...GLASS.L3, border: '1px solid rgba(236,72,153,0.25)', borderRadius: 8, padding: '8px 10px' }}>
+                        <div style={{ fontSize: 10, color: COLORS.textMuted, marginBottom: 2 }}>🎯 매칭 대상 (entity 추적)</div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: '#ec4899' }}>
+                          {ps.req_match_total.toLocaleString()}건
+                          <span style={{ fontSize: 10, color: COLORS.textMuted, fontWeight: 400, marginLeft: 6 }}>
+                            매칭됨 {ps.req_match_matched} / 미매칭 {ps.req_match_unmatched}
+                          </span>
+                        </div>
+                      </div>
+                      <div style={{ ...GLASS.L3, border: '1px solid rgba(34,197,94,0.25)', borderRadius: 8, padding: '8px 10px' }}>
+                        <div style={{ fontSize: 10, color: COLORS.textMuted, marginBottom: 2 }}>📦 일반 카테고리 (자동 final)</div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: '#16a34a' }}>
+                          {ps.auto_final.toLocaleString()}건
+                          <span style={{ fontSize: 10, color: COLORS.textMuted, fontWeight: 400, marginLeft: 6 }}>
+                            검수 불필요 — 분류만으로 완료
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
                     {/* 진행률 바 */}
                     <div style={{ marginBottom: 10 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: COLORS.textMuted, marginBottom: 3 }}>
+                        <span>final 도달률</span>
+                        <span>확정 {ps.confirmed} + 자동 {ps.auto_final} = {ps.final_count} / {ps.total}</span>
+                      </div>
                       <div style={{ width: '100%', height: 6, background: 'rgba(0,0,0,0.05)', borderRadius: 3, overflow: 'hidden' }}>
                         <div style={{
                           width: `${ps.processed_pct}%`,
@@ -5229,6 +5264,10 @@ export default function BankCardPage() {
                                   else if (act.key === 'auto-match') runAutoMatchAll('dry-run')
                                   else if (act.key === 'classify')   runWorkflow(false) // 1-click triggers classify+match
                                   else if (act.key === 'manual-review') setActiveTab('classify' as any)
+                                  else if (act.key === 'unmatched-review') {
+                                    // 미매칭 검수 — 분류 검수 탭으로 (수동 매칭 가능)
+                                    setActiveTab('classify' as any)
+                                  }
                                 }}
                                 disabled={isDone || (act.key === 'confirm' && confirmingMatchings) || runWorkflowLoading}
                                 title={act.reason}

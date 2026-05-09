@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyUser } from '@/lib/auth-server'
 import { prisma } from '@/lib/prisma'
+import { getMatchingCategoriesSqlList } from '@/lib/category-meta'
 
 /**
  * /api/finance/transactions/processing-status
@@ -31,8 +32,11 @@ export async function GET(request: NextRequest) {
     const user = await verifyUser(request)
     if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
 
-    // 한 쿼리로 모든 카운트 (성능) — PR-UX2: 5단계 funnel 데이터
-    const rows = await prisma.$queryRaw<Array<any>>`
+    // PR-UX3-A: 매칭 대상 vs 일반 분기
+    const matchingCatsList = getMatchingCategoriesSqlList()
+
+    // 한 쿼리로 모든 카운트 (성능) — PR-UX2: 5단계 funnel 데이터 + PR-UX3 분기
+    const rows = await prisma.$queryRawUnsafe<Array<any>>(`
       SELECT
         (SELECT COUNT(*) FROM transactions WHERE deleted_at IS NULL) AS total,
         (SELECT COUNT(*) FROM transactions
@@ -56,8 +60,25 @@ export async function GET(request: NextRequest) {
         (SELECT COUNT(DISTINCT transaction_id) FROM transaction_assignments
           WHERE status = 'rejected') AS rejected,
         (SELECT MAX(created_at) FROM transaction_assignments
-          WHERE source = 'auto') AS last_auto_match_at
-    `
+          WHERE source = 'auto') AS last_auto_match_at,
+
+        -- PR-UX3-A: 분기 카운트
+        (SELECT COUNT(*) FROM transactions
+          WHERE deleted_at IS NULL
+            AND category IN (${matchingCatsList})) AS req_match_total,
+        (SELECT COUNT(*) FROM transactions
+          WHERE deleted_at IS NULL
+            AND category IN (${matchingCatsList})
+            AND related_type IS NOT NULL AND related_id IS NOT NULL) AS req_match_matched,
+        (SELECT COUNT(*) FROM transactions
+          WHERE deleted_at IS NULL
+            AND category IN (${matchingCatsList})
+            AND (related_type IS NULL OR related_id IS NULL)) AS req_match_unmatched,
+        (SELECT COUNT(*) FROM transactions
+          WHERE deleted_at IS NULL
+            AND category IS NOT NULL AND category != '' AND category != '미분류'
+            AND category NOT IN (${matchingCatsList})) AS auto_final
+    `)
 
     const r = rows[0] || {}
     const total = Number(r.total || 0)
@@ -69,32 +90,41 @@ export async function GET(request: NextRequest) {
     const pendingAuto = Number(r.pending_auto || 0)
     const confirmed = Number(r.confirmed || 0)
     const rejected = Number(r.rejected || 0)
-    const processedPct = total > 0 ? Math.round((confirmed / total) * 1000) / 10 : 0
 
-    // 추천 액션 — 우선순위 결정 (PR-UX2: 분류 단계도 포함)
+    // PR-UX3-A: 분기 카운트
+    const reqMatchTotal = Number(r.req_match_total || 0)
+    const reqMatchMatched = Number(r.req_match_matched || 0)
+    const reqMatchUnmatched = Number(r.req_match_unmatched || 0)
+    const autoFinal = Number(r.auto_final || 0)
+
+    // 진행률 — confirmed (매칭 검수) + autoFinal (분류만 final) / total
+    const finalCount = confirmed + autoFinal
+    const processedPct = total > 0 ? Math.round((finalCount / total) * 1000) / 10 : 0
+
+    // 추천 액션 — 우선순위 (PR-UX3: 매칭 대상 우선)
     const recommended: Array<{ key: string; label: string; priority: number; reason: string }> = []
+    if (pendingAuto > 0) {
+      recommended.push({
+        key: 'confirm',
+        label: `✅ 매칭 검수 (${pendingAuto}건)`,
+        priority: 1,
+        reason: '자동 매칭 결과를 검토 후 확정 (or 거부)',
+      })
+    }
+    if (reqMatchUnmatched > 0) {
+      recommended.push({
+        key: 'unmatched-review',
+        label: `🔧 미매칭 검수 (${reqMatchUnmatched}건)`,
+        priority: 2,
+        reason: '매칭 대상이지만 매처가 못 잡음 — 사전 추가 또는 수동 매칭',
+      })
+    }
     if (unclassified > 0) {
       recommended.push({
         key: 'classify',
         label: `🤖 분류 실행 (${unclassified}건)`,
-        priority: 1,
-        reason: '미분류 거래를 룰 + AI 로 분류',
-      })
-    }
-    if (pendingAuto > 0) {
-      recommended.push({
-        key: 'confirm',
-        label: `✅ 매칭 확정 (${pendingAuto}건)`,
-        priority: unclassified > 0 ? 2 : 1,
-        reason: '자동 매칭 결과를 검토 후 확정하세요',
-      })
-    }
-    if (unmatched > 0) {
-      recommended.push({
-        key: 'auto-match',
-        label: `🪄 자동 매칭 실행 (${unmatched}건 후보)`,
         priority: 3,
-        reason: '미매칭 거래를 매처에 돌려 자동 매칭',
+        reason: '미분류 거래를 룰 + AI 로 분류 (매칭 대상 여부 결정)',
       })
     }
     if (recommended.length === 0) {
@@ -106,13 +136,26 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // 5단계 funnel — 운영 흐름 가시화
+    // 4단계 funnel — 분기 모델 (PR-UX3)
+    //   ① 신규 → ② 분류 → ③ 분기 → ④ 검수 → ⑤ 완료
     const funnel = [
-      { key: 'input',    label: '① 입력',  done: total,      todo: 0,            value: total,        sub: `오늘 +${todayInput}` },
-      { key: 'classify', label: '② 분류',  done: classified, todo: unclassified, value: classified,   sub: unclassified > 0 ? `미${unclassified}` : '✓' },
-      { key: 'match',    label: '③ 매칭',  done: matched,    todo: unmatched,    value: matched,      sub: unmatched > 0 ? `미${unmatched}` : '✓' },
-      { key: 'confirm',  label: '④ 확정',  done: confirmed,  todo: pendingAuto,  value: confirmed,    sub: pendingAuto > 0 ? `대기${pendingAuto}` : '✓' },
-      { key: 'final',    label: '⑤ 완료',  done: confirmed,  todo: 0,            value: confirmed,    sub: `${processedPct}%` },
+      { key: 'input',    label: '① 신규',
+        done: total, todo: 0, value: total, sub: `오늘 +${todayInput}` },
+      { key: 'classify', label: '② 분류',
+        done: classified, todo: unclassified, value: classified,
+        sub: unclassified > 0 ? `미분류 ${unclassified}` : '✓' },
+      { key: 'split',    label: '③ 분기',
+        done: reqMatchTotal + autoFinal, todo: 0,
+        value: reqMatchTotal,
+        sub: `매칭대상 ${reqMatchTotal} / 일반 ${autoFinal}` },
+      { key: 'review',   label: '④ 검수',
+        done: confirmed, todo: pendingAuto + reqMatchUnmatched,
+        value: confirmed,
+        sub: (pendingAuto + reqMatchUnmatched) > 0
+          ? `대기 ${pendingAuto + reqMatchUnmatched}`
+          : '✓' },
+      { key: 'final',    label: '⑤ 완료',
+        done: finalCount, todo: 0, value: finalCount, sub: `${processedPct}%` },
     ]
 
     return NextResponse.json({
@@ -131,6 +174,12 @@ export async function GET(request: NextRequest) {
       processed_pct: processedPct,
       last_auto_match_at: r.last_auto_match_at || null,
       recommended_actions: recommended,
+      // PR-UX3-A: 분기 카운트
+      req_match_total: reqMatchTotal,
+      req_match_matched: reqMatchMatched,
+      req_match_unmatched: reqMatchUnmatched,
+      auto_final: autoFinal,
+      final_count: finalCount,
     })
   } catch (e: any) {
     console.error('[processing-status]', e)

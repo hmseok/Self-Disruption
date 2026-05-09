@@ -110,6 +110,8 @@ export const MENUS: MenuEntry[] = [
   { id: 'mod-ride-vehicle-reg',   name: '라이드 차량등록',  displayName: '🚗 라이드 차량등록',  path: '/RideVehicleRegistry',   iconKey: 'Car',       group: 'admin-ops', sortOrder: 80, requirePermission: true },
   // PR-6.10 (2026-05-08) — 고객사 데이터 통합 (캐피탈 보고 + 계약 마스터 + 엑셀 업로드)
   { id: 'mod-ride-customer-data', name: '라이드 고객사 데이터', displayName: '🏢 라이드 고객사 데이터', path: '/RideCustomerData',     iconKey: 'Building',  group: 'admin-ops', sortOrder: 81, requirePermission: true },
+  // PR-6.11.a (2026-05-08) — 정산서 등록 (검수 + 매칭 + 미등록 고객 추출)
+  { id: 'mod-ride-settlements',  name: '라이드 정산서',     displayName: '💰 라이드 정산서',      path: '/RideSettlements',      iconKey: 'Money',     group: 'admin-ops', sortOrder: 82, requirePermission: true },
   { id: 'mod-call-scheduler',  name: '근무시간표 분석 & 배포', displayName: '📅 근무시간표 분석 & 배포', path: '/CallScheduler', iconKey: 'Setting', group: 'cx-team', sortOrder: 60, requirePermission: true },
   // 직원 마스터 — 사이드바 숨김. 근무스케줄 페이지 안에서 sub-nav 로 접근 (권한 페이지에는 노출 유지)
   { id: 'mod-ride-employees',  name: '직원 마스터',   path: '/RideEmployees',  iconKey: 'Users',   group: 'cx-team', sortOrder: 61, requirePermission: true, sidebarHidden: true },
