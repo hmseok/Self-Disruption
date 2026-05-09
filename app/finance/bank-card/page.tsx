@@ -575,19 +575,32 @@ export default function BankCardPage() {
   }>(null)
   const [showAdvancedMatchers, setShowAdvancedMatchers] = useState(false)
 
-  // ── PR-UX1.5: 처리 현황 + 매칭 확정 ──
+  // ── PR-UX1.5 + PR-UX2: 처리 현황 + 매칭 확정 + 1-Click 자동 ──
   const [processingStatus, setProcessingStatus] = useState<null | {
+    funnel: Array<{ key: string; label: string; done: number; todo: number; value: number; sub: string }>
+    total: number
+    today_input: number
+    classified: number
+    unclassified: number
+    matched: number
     unmatched: number
     pending_auto: number
     confirmed: number
     rejected: number
-    total: number
     processed_pct: number
     last_auto_match_at: string | null
     recommended_actions: Array<{ key: string; label: string; priority: number; reason: string }>
   }>(null)
   const [processingStatusLoading, setProcessingStatusLoading] = useState(false)
   const [confirmingMatchings, setConfirmingMatchings] = useState(false)
+  const [runWorkflowLoading, setRunWorkflowLoading] = useState(false)
+  const [runWorkflowResult, setRunWorkflowResult] = useState<null | {
+    steps: Array<{ key: string; label: string; ok: boolean; applied?: number; matched?: number; error?: string; duration_ms: number }>
+    total_applied: number
+    total_matched: number
+    duration_ms: number
+    ts: number
+  }>(null)
 
   const loadProcessingStatus = async () => {
     setProcessingStatusLoading(true)
@@ -598,6 +611,61 @@ export default function BankCardPage() {
       console.error('[processing-status]', e)
     } finally {
       setProcessingStatusLoading(false)
+    }
+  }
+
+  // PR-UX2: 1-Click 자동 진행 (분류 + 매칭 일괄)
+  const runWorkflow = async (autoConfirm: boolean = false) => {
+    if (!confirm(
+      `🚀 전체 운영 흐름 1-Click 자동 진행:\n\n` +
+      `① 룰 분류 (즉시)\n` +
+      `② AI 분류 (Gemini · 1~3분 · 토큰 소모)\n` +
+      `③ 대차건 보험 매칭\n` +
+      `④ 투자/지입 매칭\n` +
+      `⑤ 직원 매칭\n` +
+      `⑥ 프리랜서 매칭\n` +
+      (autoConfirm ? `⑦ 자동 매칭 결과 자동 확정 (사용자 검수 skip)\n` : '') +
+      `\n· 약 2~5분 소요 · 중간 정지 불가\n\n계속할까요?`
+    )) return
+    setRunWorkflowLoading(true)
+    setRunWorkflowResult(null)
+    const taskId = floaterProgress.start({
+      title: autoConfirm ? '🚀 1-Click 자동 + 자동 확정' : '🚀 1-Click 자동 (분류 + 매칭)',
+      total: autoConfirm ? 7 : 6,
+    })
+    try {
+      const steps = [
+        'classify-rule', 'classify-ai',
+        'match-fmi-rental', 'match-investor-jiip', 'match-employee', 'match-freelancer',
+      ]
+      if (autoConfirm) steps.push('auto-confirm')
+      const { ok, json, status } = await fetchWithAuth('/api/finance/transactions/run-workflow', {
+        method: 'POST',
+        body: { steps },
+      })
+      if (!ok) {
+        floaterProgress.finish(taskId, `오류: HTTP ${status} — ${json?.error || ''}`, 'error')
+        return
+      }
+      const okCount = (json.steps || []).filter((s: any) => s.ok).length
+      floaterProgress.update(taskId, { processed: json.steps?.length || 0, applied: json.total_applied || 0 })
+      floaterProgress.finish(
+        taskId,
+        `✅ ${okCount}/${json.steps?.length || 0} 단계 성공 — 총 ${json.total_applied || 0}건 적용 (${Math.round((json.duration_ms || 0) / 1000)}초)`,
+      )
+      setRunWorkflowResult({
+        steps: json.steps || [],
+        total_applied: json.total_applied || 0,
+        total_matched: json.total_matched || 0,
+        duration_ms: json.duration_ms || 0,
+        ts: Date.now(),
+      })
+      await loadProcessingStatus()
+      await loadMatchReview()
+    } catch (e: any) {
+      floaterProgress.finish(taskId, `오류: ${e.message}`, 'error')
+    } finally {
+      setRunWorkflowLoading(false)
     }
   }
 
@@ -5059,60 +5127,87 @@ export default function BankCardPage() {
             : []
           return (
             <>
-              {/* PR-UX1.5: 📊 오늘의 처리 현황 (Glass L4 — 마무리 워크플로우) */}
+              {/* PR-UX2: 🌊 운영 흐름 패널 (Glass L4 — 5 단계 funnel + 1-Click 자동) */}
               {processingStatus && (() => {
                 const ps = processingStatus
-                const cards = [
-                  { key: 'unmatched',    label: '🚧 미매칭', value: ps.unmatched,    color: '#d97706', sub: '검수 필요' },
-                  { key: 'pending_auto', label: '⏳ 자동매칭', value: ps.pending_auto, color: '#7c3aed', sub: '미확정' },
-                  { key: 'confirmed',    label: '✅ 확정',    value: ps.confirmed,    color: '#16a34a', sub: 'final' },
-                  { key: 'rejected',     label: '❌ 거부',    value: ps.rejected,     color: '#dc2626', sub: '무시됨' },
-                  { key: 'total',        label: '📊 전체',    value: ps.total,        color: '#2563eb', sub: '거래' },
-                ]
+                const stepColors: Record<string, string> = {
+                  input: '#2563eb',
+                  classify: '#7c3aed',
+                  match: '#0891b2',
+                  confirm: '#16a34a',
+                  final: '#16a34a',
+                }
                 return (
                   <div style={{ ...GLASS.L4, border: `1px solid rgba(124,58,237,0.25)`, borderRadius: 12, padding: '14px 18px', marginBottom: 12 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                      <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.textPrimary }}>
-                        📊 오늘의 처리 현황
+                    {/* 헤더 */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, gap: 12, flexWrap: 'wrap' }}>
+                      <div>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.textPrimary }}>
+                          🌊 운영 흐름 (전체) — 진행률 <span style={{ color: '#16a34a' }}>{ps.processed_pct}%</span>
+                        </div>
                         {ps.last_auto_match_at && (
-                          <span style={{ marginLeft: 10, fontSize: 11, color: COLORS.textMuted, fontWeight: 400 }}>
+                          <div style={{ fontSize: 10, color: COLORS.textMuted, marginTop: 2 }}>
                             마지막 자동 매칭: {new Date(ps.last_auto_match_at).toLocaleString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
-                          </span>
+                          </div>
                         )}
                       </div>
-                      <button
-                        onClick={loadProcessingStatus}
-                        disabled={processingStatusLoading}
-                        style={{ ...BTN.sm, padding: '3px 8px', fontSize: 10, background: '#fff', color: COLORS.textSecondary, border: `1px solid ${COLORS.borderSubtle}`, cursor: processingStatusLoading ? 'wait' : 'pointer' }}
-                      >{processingStatusLoading ? '...' : '↻'}</button>
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                        <button
+                          onClick={() => runWorkflow(false)}
+                          disabled={runWorkflowLoading}
+                          style={{
+                            padding: '8px 18px', fontSize: 12, fontWeight: 700,
+                            background: runWorkflowLoading
+                              ? COLORS.borderSubtle
+                              : 'linear-gradient(135deg, #ec4899 0%, #7c3aed 50%, #2563eb 100%)',
+                            color: '#fff', border: 'none', borderRadius: 8,
+                            cursor: runWorkflowLoading ? 'wait' : 'pointer',
+                            boxShadow: '0 2px 10px rgba(124,58,237,0.4)',
+                          }}
+                          title="분류 (룰 + AI) → 4 매처 일괄 자동 실행"
+                        >{runWorkflowLoading ? '진행 중...' : '🚀 1-Click 자동'}</button>
+                        <button
+                          onClick={loadProcessingStatus}
+                          disabled={processingStatusLoading}
+                          style={{ ...BTN.sm, padding: '6px 10px', fontSize: 11, background: '#fff', color: COLORS.textSecondary, border: `1px solid ${COLORS.borderSubtle}`, cursor: processingStatusLoading ? 'wait' : 'pointer' }}
+                        >{processingStatusLoading ? '...' : '↻'}</button>
+                      </div>
                     </div>
 
-                    {/* 5 카드 grid */}
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 8, marginBottom: 10 }}>
-                      {cards.map(c => (
-                        <div key={c.key} style={{
-                          ...GLASS.L3,
-                          border: `1px solid ${c.color}30`,
-                          borderRadius: 8, padding: '10px 12px',
-                        }}>
-                          <div style={{ fontSize: 11, color: COLORS.textMuted, marginBottom: 4 }}>{c.label}</div>
-                          <div style={{ fontSize: 20, fontWeight: 700, color: c.color }}>{c.value.toLocaleString()}</div>
-                          <div style={{ fontSize: 10, color: COLORS.textMuted, marginTop: 2 }}>{c.sub}</div>
-                        </div>
-                      ))}
+                    {/* 5 단계 funnel — 가로 step */}
+                    <div style={{ display: 'flex', alignItems: 'stretch', gap: 4, marginBottom: 12, overflowX: 'auto' }}>
+                      {ps.funnel.map((step, idx) => {
+                        const c = stepColors[step.key] || '#6b7280'
+                        const isLast = idx === ps.funnel.length - 1
+                        return (
+                          <div key={step.key} style={{ display: 'flex', alignItems: 'center', flex: '1 1 auto', minWidth: 0 }}>
+                            <div style={{
+                              ...GLASS.L3,
+                              flex: 1,
+                              border: `1px solid ${c}30`,
+                              borderRadius: 8,
+                              padding: '10px 12px',
+                              minWidth: 110,
+                            }}>
+                              <div style={{ fontSize: 11, color: COLORS.textMuted, marginBottom: 4 }}>{step.label}</div>
+                              <div style={{ fontSize: 18, fontWeight: 700, color: c, lineHeight: 1.1 }}>{step.value.toLocaleString()}</div>
+                              <div style={{ fontSize: 10, color: step.todo > 0 ? '#d97706' : COLORS.textMuted, marginTop: 2, fontWeight: step.todo > 0 ? 600 : 400 }}>{step.sub}</div>
+                            </div>
+                            {!isLast && (
+                              <div style={{ padding: '0 4px', color: c, fontSize: 14 }}>→</div>
+                            )}
+                          </div>
+                        )
+                      })}
                     </div>
 
                     {/* 진행률 바 */}
                     <div style={{ marginBottom: 10 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: COLORS.textMuted, marginBottom: 3 }}>
-                        <span>처리 진행률</span>
-                        <span style={{ fontWeight: 600, color: '#16a34a' }}>{ps.processed_pct}% 확정</span>
-                      </div>
-                      <div style={{ width: '100%', height: 8, background: 'rgba(0,0,0,0.05)', borderRadius: 4, overflow: 'hidden' }}>
+                      <div style={{ width: '100%', height: 6, background: 'rgba(0,0,0,0.05)', borderRadius: 3, overflow: 'hidden' }}>
                         <div style={{
                           width: `${ps.processed_pct}%`,
                           height: '100%',
-                          background: 'linear-gradient(90deg, #16a34a 0%, #22c55e 100%)',
+                          background: 'linear-gradient(90deg, #ec4899 0%, #7c3aed 50%, #16a34a 100%)',
                           transition: 'width 0.3s',
                         }} />
                       </div>
@@ -5121,7 +5216,7 @@ export default function BankCardPage() {
                     {/* 추천 액션 */}
                     {ps.recommended_actions.length > 0 && (
                       <div style={{ paddingTop: 10, borderTop: `1px dashed ${COLORS.borderSubtle}` }}>
-                        <div style={{ fontSize: 11, color: COLORS.textMuted, marginBottom: 6, fontWeight: 600 }}>🎯 추천 액션</div>
+                        <div style={{ fontSize: 11, color: COLORS.textMuted, marginBottom: 6, fontWeight: 600 }}>🎯 추천 액션 (개별 실행)</div>
                         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                           {ps.recommended_actions.map(act => {
                             const isHighPriority = act.priority === 1
@@ -5132,12 +5227,10 @@ export default function BankCardPage() {
                                 onClick={() => {
                                   if (act.key === 'confirm')      confirmAllMatchings()
                                   else if (act.key === 'auto-match') runAutoMatchAll('dry-run')
-                                  else if (act.key === 'manual-review') {
-                                    // 분류 검수 탭으로 이동 권장
-                                    setActiveTab('classify' as any)
-                                  }
+                                  else if (act.key === 'classify')   runWorkflow(false) // 1-click triggers classify+match
+                                  else if (act.key === 'manual-review') setActiveTab('classify' as any)
                                 }}
-                                disabled={isDone || (act.key === 'confirm' && confirmingMatchings)}
+                                disabled={isDone || (act.key === 'confirm' && confirmingMatchings) || runWorkflowLoading}
                                 title={act.reason}
                                 style={{
                                   padding: '6px 14px',
@@ -5156,6 +5249,51 @@ export default function BankCardPage() {
                         </div>
                       </div>
                     )}
+                  </div>
+                )
+              })()}
+
+              {/* PR-UX2: 1-Click 자동 결과 패널 */}
+              {runWorkflowResult && (() => {
+                const r = runWorkflowResult
+                const okCount = r.steps.filter(s => s.ok).length
+                return (
+                  <div style={{ ...GLASS.L4, border: '1px solid rgba(236,72,153,0.3)', borderRadius: 12, padding: '14px 18px', marginBottom: 12 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: '#ec4899' }}>
+                          🚀 1-Click 자동 결과 — {okCount}/{r.steps.length} 성공
+                          <span style={{ marginLeft: 8, fontSize: 11, color: COLORS.textMuted, fontWeight: 400 }}>
+                            {new Date(r.ts).toLocaleTimeString()} · {Math.round(r.duration_ms / 1000)}초
+                          </span>
+                        </div>
+                        <div style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 2 }}>
+                          총 {r.total_applied}건 적용
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => setRunWorkflowResult(null)}
+                        style={{ background: 'transparent', border: 'none', color: COLORS.textMuted, cursor: 'pointer', fontSize: 12 }}
+                      >× 닫기</button>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 6 }}>
+                      {r.steps.map(s => (
+                        <div key={s.key} style={{
+                          ...GLASS.L3,
+                          border: `1px solid ${s.ok ? '#16a34a' : '#dc2626'}30`,
+                          borderRadius: 8, padding: '8px 10px',
+                        }}>
+                          <div style={{ fontSize: 11, color: COLORS.textMuted, marginBottom: 2 }}>{s.label}</div>
+                          <div style={{ fontSize: 14, fontWeight: 700, color: s.ok ? '#16a34a' : '#dc2626' }}>
+                            {s.ok ? `${s.applied || 0}건` : '실패'}
+                          </div>
+                          <div style={{ fontSize: 9, color: COLORS.textMuted, marginTop: 2 }}>{Math.round(s.duration_ms / 1000)}초</div>
+                          {!s.ok && s.error && (
+                            <div style={{ fontSize: 9, color: '#dc2626', marginTop: 2 }} title={s.error}>{s.error.slice(0, 30)}…</div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )
               })()}
