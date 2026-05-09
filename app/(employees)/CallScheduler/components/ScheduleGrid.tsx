@@ -263,6 +263,8 @@ export default function ScheduleGrid({ detail, onChanged }: Props) {
   // 시프트 교체 모드 (PR-2R) — 두 셀 선택 후 swap
   const [swapMode, setSwapMode] = useState(false)
   const [swapFirst, setSwapFirst] = useState<{ a: Assignment | null; slotId: string; date: string } | null>(null)
+  // PR-2SS-Phase-J-2C — 외부/회피 행 매니저 전용 토글 (기본 숨김 — 다른 직원 시야 차단)
+  const [showPrivate, setShowPrivate] = useState(false)
 
   // PR-2OO: 멀티 워커 — pickerAssignmentId 로 특정 row 추적
   const currentAssignment = pickerSlot && pickerDate && pickerAssignmentId
@@ -461,6 +463,19 @@ export default function ScheduleGrid({ detail, onChanged }: Props) {
               ? (swapFirst ? `🔄 두 번째 셀 선택` : '🔄 swap: 첫 셀 선택')
               : '🔄 시프트 교체'}
           </button>
+          {/* J-2C — 외부/회피 행 토글 (매니저 전용, 기본 숨김) */}
+          <button type="button"
+                  onClick={() => setShowPrivate(p => !p)}
+                  style={{
+                    padding: '3px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700,
+                    background: showPrivate ? COLORS.bgAmber : 'transparent',
+                    color: showPrivate ? COLORS.warning : COLORS.textSecondary,
+                    border: `1px solid ${showPrivate ? COLORS.borderAmber : COLORS.borderFaint}`,
+                    cursor: 'pointer',
+                  }}
+                  title="외부 근무 / 회피일 행 보기 (매니저 계획용 — 다른 직원 시야엔 기본 숨김)">
+            {showPrivate ? '👁 외부/회피 표시' : '🙈 외부/회피 숨김'}
+          </button>
         </div>
       </div>
       <table style={{
@@ -503,7 +518,8 @@ export default function ScheduleGrid({ detail, onChanged }: Props) {
             })}
           </tr>
           {/* PR-2RR-a — 외부 직원 cycle 시각화 행 (그룹 미배정 워커만 — 그룹별 행은 tbody 섹션에서) */}
-          {externalCycleWorkers.filter(ew => {
+          {/* J-2C — 매니저 토글 (showPrivate) 켜졌을 때만 표출 */}
+          {showPrivate && externalCycleWorkers.filter(ew => {
             // 어느 그룹의 멤버인지 — 그룹별 행에서 표시되므로 여기는 미배정만
             return !allGroups.some(g => g.member_ids.includes(ew.id))
           }).map(ew => (
@@ -536,7 +552,8 @@ export default function ScheduleGrid({ detail, onChanged }: Props) {
             </tr>
           ))}
           {/* PR-2SS-h-4 → J-3 — 회피일 시각화 행 (그룹 미배정 워커만 — 그룹별 행은 tbody 섹션에서) */}
-          {skipWorkers.filter(sw => !allGroups.some(g => g.member_ids.includes(sw.id))).map(sw => (
+          {/* J-2C — 매니저 토글 (showPrivate) 켜졌을 때만 표출 */}
+          {showPrivate && skipWorkers.filter(sw => !allGroups.some(g => g.member_ids.includes(sw.id))).map(sw => (
             <tr key={`skip-${sw.id}`}>
               <td style={{
                 padding: '2px 6px', position: 'sticky', left: 0,
@@ -675,10 +692,11 @@ export default function ScheduleGrid({ detail, onChanged }: Props) {
             const curGrp = slotGroups[slot.id]
             const prevGrp = slotIdx > 0 ? slotGroups[slots[slotIdx-1].id] : null
             const isNewGroupSection = !prevGrp || (curGrp?.id || '') !== (prevGrp?.id || '')
-            const sectionExt = isNewGroupSection && curGrp
+            // J-2C — 매니저 토글 OFF 면 그룹 섹션 안 외부/회피 행 모두 빈 배열 (다른 직원 시야 차단)
+            const sectionExt = (showPrivate && isNewGroupSection && curGrp)
               ? externalCycleWorkers.filter(ew => curGrp.member_ids.includes(ew.id))
               : []
-            const sectionSkip = isNewGroupSection && curGrp
+            const sectionSkip = (showPrivate && isNewGroupSection && curGrp)
               ? skipWorkers.filter(sw => curGrp.member_ids.includes(sw.id))
               : []
             const cat = curGrp?.category || 'general'
