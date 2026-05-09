@@ -600,7 +600,7 @@ export default function BankCardPage() {
   const [processingStatusLoading, setProcessingStatusLoading] = useState(false)
   const [confirmingMatchings, setConfirmingMatchings] = useState(false)
 
-  // PR-UX3-B: 검수 대기 큐
+  // PR-UX3-B: 검수 대기 큐 (PR-UX7.1: 출처 정보 추가)
   type PendingReviewItem = {
     assignment_id: string
     transaction_id: string
@@ -616,6 +616,13 @@ export default function BankCardPage() {
     source: string
     suspect: boolean
     suspect_reasons: string[]
+    // PR-UX7.1
+    source_type?: 'card' | 'bank' | 'unknown'
+    source_label?: string
+    source_detail?: string
+    is_canceled?: boolean
+    sms_merchant?: string | null
+    sms_holder?: string | null
   }
   const [reviewQueue, setReviewQueue] = useState<{
     items: PendingReviewItem[]
@@ -5528,12 +5535,27 @@ export default function BankCardPage() {
                             <div style={{ flex: '0 0 70px', fontSize: 11, color: COLORS.textMuted }}>
                               {it.tx_date ? String(it.tx_date).slice(5, 10) : '-'}
                             </div>
-                            <div style={{ flex: '1 1 200px', minWidth: 0 }}>
+                            {/* PR-UX7.1: 출처 (카드/통장) + 카드사/통장명 */}
+                            <div style={{ flex: '0 0 130px', fontSize: 10, color: COLORS.textPrimary, lineHeight: 1.3 }}>
+                              <div style={{ fontWeight: 600 }}>{it.source_label || '📝'}</div>
+                              <div style={{ color: COLORS.textMuted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {it.source_detail || '-'}
+                              </div>
+                            </div>
+                            <div style={{ flex: '1 1 180px', minWidth: 0 }}>
                               <div style={{ fontSize: 12, fontWeight: 600, color: COLORS.textPrimary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                {it.client_name || it.description || '-'}
+                                {/* 카드 → 가맹점 / 통장 → client_name */}
+                                {it.source_type === 'card'
+                                  ? (it.sms_merchant || it.description || it.client_name || '-')
+                                  : (it.client_name || it.description || '-')}
+                                {it.is_canceled && <span style={{ marginLeft: 4, color: '#dc2626', fontSize: 10 }}>(취소)</span>}
                               </div>
                               <div style={{ fontSize: 10, color: COLORS.textMuted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                {it.category || '미분류'} · {it.tx_type === 'income' ? '입금' : '출금'}
+                                {it.category || '미분류'} ·{' '}
+                                {it.source_type === 'card'
+                                  ? (it.is_canceled ? '취소' : '승인')
+                                  : (it.tx_type === 'income' ? '입금' : '출금')}
+                                {it.source_type === 'card' && it.sms_holder && ` · ${it.sms_holder}`}
                               </div>
                             </div>
                             <div style={{ flex: '0 0 110px', fontSize: 12, fontWeight: 700, color: it.tx_type === 'income' ? '#16a34a' : '#dc2626', textAlign: 'right' }}>

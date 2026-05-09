@@ -36,29 +36,77 @@ export async function GET(request: NextRequest) {
     const matcherFilter = matcher === 'all' ? '' : `AND ta.assignment_type = '${matcher.replace(/[^a-z_]/gi, '')}'`
 
     // 1) 페이지 데이터 + 2) 전체 카운트
-    const items = await prisma.$queryRawUnsafe<Array<any>>(`
-      SELECT
-        ta.id              AS assignment_id,
-        ta.transaction_id,
-        ta.assignment_type AS matched_type,
-        ta.assignment_id   AS matched_id,
-        ta.created_at      AS matched_at,
-        ta.source,
-        t.transaction_date AS tx_date,
-        t.type             AS tx_type,
-        t.amount           AS tx_amount,
-        t.client_name,
-        t.description,
-        t.category
-      FROM transaction_assignments ta
-      JOIN transactions t ON t.id = ta.transaction_id
-      WHERE ta.status = 'pending'
-        AND ta.source = 'auto'
-        AND t.deleted_at IS NULL
-        ${matcherFilter}
-      ORDER BY t.transaction_date DESC, ta.created_at DESC
-      LIMIT ${pageSize} OFFSET ${offset}
-    `)
+    // PR-UX7.1: 거래 출처 (카드/통장) + 카드사/통장명/소유자 정보 JOIN
+    let items: Array<any> = []
+    try {
+      items = await prisma.$queryRawUnsafe<Array<any>>(`
+        SELECT
+          ta.id              AS assignment_id,
+          ta.transaction_id,
+          ta.assignment_type AS matched_type,
+          ta.assignment_id   AS matched_id,
+          ta.created_at      AS matched_at,
+          ta.source,
+          t.transaction_date AS tx_date,
+          t.type             AS tx_type,
+          t.amount           AS tx_amount,
+          t.client_name,
+          t.description,
+          t.category,
+          t.imported_from,
+          t.payment_method,
+          t.codef_org_code,
+          /* 카드 SMS 정보 */
+          sms.card_alias       AS sms_card_alias,
+          sms.merchant         AS sms_merchant,
+          sms.holder_name      AS sms_holder,
+          sms.transaction_type AS sms_transaction_type,
+          /* 통장 매핑 정보 */
+          bam.account_alias    AS bank_account_alias,
+          bam.account_holder   AS bank_account_holder
+        FROM transaction_assignments ta
+        JOIN transactions t ON t.id = ta.transaction_id
+        LEFT JOIN card_sms_transactions sms
+          ON sms.transaction_id COLLATE utf8mb4_unicode_ci = t.id COLLATE utf8mb4_unicode_ci
+        LEFT JOIN bank_account_mappings bam
+          ON bam.account_number = t.codef_org_code
+        WHERE ta.status = 'pending'
+          AND ta.source = 'auto'
+          AND t.deleted_at IS NULL
+          ${matcherFilter}
+        ORDER BY t.transaction_date DESC, ta.created_at DESC
+        LIMIT ${pageSize} OFFSET ${offset}
+      `)
+    } catch (e: any) {
+      // JOIN 실패 시 fallback (sms / bam 테이블 없거나 collation 충돌)
+      console.warn('[pending-review] JOIN fallback:', e?.message?.slice(0, 200))
+      items = await prisma.$queryRawUnsafe<Array<any>>(`
+        SELECT
+          ta.id              AS assignment_id,
+          ta.transaction_id,
+          ta.assignment_type AS matched_type,
+          ta.assignment_id   AS matched_id,
+          ta.created_at      AS matched_at,
+          ta.source,
+          t.transaction_date AS tx_date,
+          t.type             AS tx_type,
+          t.amount           AS tx_amount,
+          t.client_name,
+          t.description,
+          t.category,
+          t.imported_from,
+          t.payment_method,
+          t.codef_org_code
+        FROM transaction_assignments ta
+        JOIN transactions t ON t.id = ta.transaction_id
+        WHERE ta.status = 'pending'
+          AND ta.source = 'auto'
+          AND t.deleted_at IS NULL
+          ${matcherFilter}
+        ORDER BY t.transaction_date DESC, ta.created_at DESC
+        LIMIT ${pageSize} OFFSET ${offset}
+      `)
+    }
 
     // entity_name 조회 — assignment_type 별 다른 테이블
     // 매처별 group → 한 번에 IN 쿼리
@@ -148,17 +196,45 @@ export async function GET(request: NextRequest) {
       } catch {}
     }
 
-    // 의심 라벨링 (간단 휴리스틱)
+    // PR-UX7.1: 출처 라벨 + 의심 라벨링
     const enriched = items.map((it: any) => {
       const amount = Math.abs(Number(it.tx_amount || 0))
       const reasons: string[] = []
       if (amount >= 1_000_000) reasons.push(`큰 금액 (${(amount / 10000).toFixed(0)}만)`)
-      // multi-match 후보 — 일단 미구현 (필요 시 추가)
+
+      // 출처 분류 (카드/통장/SMS)
+      const importedFrom = String(it.imported_from || '')
+      let sourceType: 'card' | 'bank' | 'unknown' = 'unknown'
+      let sourceLabel = ''
+      let sourceDetail = ''
+      if (importedFrom === 'sms' || importedFrom.startsWith('excel_card') || importedFrom.startsWith('pdf_card')) {
+        sourceType = 'card'
+        sourceLabel = '💳 카드'
+        // sms_card_alias 있으면 카드 정보, sms_transaction_type='canceled' 면 취소
+        const cardAlias = it.sms_card_alias || it.payment_method || ''
+        sourceDetail = cardAlias ? `${cardAlias}` : '카드'
+        if (it.sms_transaction_type === 'canceled') sourceDetail += ' (취소)'
+      } else if (importedFrom.startsWith('excel_bank') || importedFrom === 'sms_bank') {
+        sourceType = 'bank'
+        sourceLabel = '🏦 통장'
+        const accAlias = it.bank_account_alias || ''
+        const accHolder = it.bank_account_holder || ''
+        sourceDetail = accAlias || (accHolder ? `${accHolder} 계좌` : '통장')
+      } else {
+        sourceLabel = '📝 기타'
+        sourceDetail = importedFrom || 'unknown'
+      }
+
       const matchedKey = `${it.matched_type}:${it.matched_id}`
       return {
         ...it,
         tx_amount: Number(it.tx_amount || 0),
         matched_name: entityNameMap[matchedKey] || `${it.matched_type}:${String(it.matched_id).slice(0, 8)}`,
+        // PR-UX7.1: 출처 라벨
+        source_type: sourceType,
+        source_label: sourceLabel,
+        source_detail: sourceDetail,
+        is_canceled: it.sms_transaction_type === 'canceled',
         suspect: reasons.length > 0,
         suspect_reasons: reasons,
       }
