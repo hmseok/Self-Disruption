@@ -20,6 +20,29 @@
 - 셀 호출 시 `slotGroups[slot.id].id + worker_id` 로 lookup → 색상 layer 재활성
 - 효과: 같은 워커가 야간 그룹에서 화/목 희망, 주간 그룹에서 월/금 비선호 등 다른 색상 layer 표출
 
+## 2026-05-09 (Phase M-1) — 매니저 직원 요청 통합 검토 페이지
+
+### 사용자 의도
+> 매니저 검토 동선 단순화 — 회피/휴가/교체 3 군데 흩어진 검토를 1 페이지로
+
+### 신규 페이지: `/CallScheduler/requests`
+- 3 탭: 🛌 회피일 / 🙋 휴가 / 🔄 시프트 교체
+- 각 탭 ⏳ 대기 카운트 배지
+- 상태 필터: 대기 / 승인됨 / 전체
+- 일괄 검토 [✓ 승인] [✗ 거절] 버튼
+- 회피는 그룹별 묶음 (기존 /skips 로직 재사용)
+
+### 메인 페이지 링크
+- `/CallScheduler` 헤더에 「📋 직원 요청」 버튼 추가 (⚙️ 설정 옆)
+
+### 기존 화면 호환성
+- `/CallScheduler/skips` (회피만) — 그대로 유지 (deep-link 호환)
+- `EmployeeRequestsPanel` (모달) — 그대로 유지 ([⋯] 메뉴 안)
+- 새 페이지는 통합 동선 추가 옵션
+
+### 검증
+- tsc CallScheduler 0 errors
+
 ## 2026-05-09 (Phase L-2) — 「내것만」 토글 + MyScheduleView 뷰 모드
 
 ### 사용자 요청

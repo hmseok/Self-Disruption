@@ -116,6 +116,18 @@ export default function CallSchedulerListPage() {
             📋 직원 마스터
           </Link>
           <Link
+            href="/CallScheduler/requests"
+            style={{
+              ...BTN.md, background: 'transparent',
+              color: COLORS.textSecondary,
+              border: `1px solid ${COLORS.borderFaint}`,
+              textDecoration: 'none', display: 'inline-block',
+            }}
+            title="직원 요청 통합 검토 — 회피일 / 휴가 / 시프트 교체"
+          >
+            📋 직원 요청
+          </Link>
+          <Link
             href="/CallScheduler/settings"
             style={{
               ...BTN.md, background: 'transparent',
