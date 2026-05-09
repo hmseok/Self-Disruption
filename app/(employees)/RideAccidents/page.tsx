@@ -18,6 +18,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { getStoredToken, getStoredUser } from '@/lib/auth-client'
+import { usePermission } from '@/app/hooks/usePermission'
 import NeuDataTable, { type TableColumn } from '@/app/components/NeuDataTable'
 import { COLORS, GLASS, BTN } from '@/app/utils/ui-tokens'
 // PR-6.7.b — 코드 마스터 (RideAccidentReports 의 _codes.ts 재사용)
@@ -123,6 +124,9 @@ export default function RideAccidentsPage() {
   const codes = useCafe24Codes()
   const [user, setUser] = useState<{ role?: string } | null>(null)
   const [authChecked, setAuthChecked] = useState(false)
+  // hotfix 2026-05-09: admin-only → admin OR hasPageAccess (사이드바 권한 시스템 일치)
+  const { hasPageAccess } = usePermission()
+  const canAccess = user?.role === 'admin' || hasPageAccess('/RideAccidents')
   const [rows, setRows] = useState<AccidentRow[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -180,7 +184,7 @@ export default function RideAccidentsPage() {
   )
 
   useEffect(() => {
-    if (!authChecked || user?.role !== 'admin') return
+    if (!authChecked || !canAccess) return
     fetchData()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authChecked, user?.role, rgstFilter])
@@ -243,7 +247,7 @@ export default function RideAccidentsPage() {
       </div>
     )
   }
-  if (user?.role !== 'admin') {
+  if (!canAccess) {
     return (
       <div
         style={{

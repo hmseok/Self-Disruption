@@ -17,6 +17,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { getStoredToken, getStoredUser } from '@/lib/auth-client'
+import { usePermission } from '@/app/hooks/usePermission'
 import NeuDataTable, { type TableColumn } from '@/app/components/NeuDataTable'
 import { COLORS, GLASS, BTN } from '@/app/utils/ui-tokens'
 
@@ -183,6 +184,9 @@ function clip(v: string | null | undefined, n = 30): string {
 export default function RideCustomerDataPage() {
   const [user, setUser] = useState<{ role?: string; id?: string } | null>(null)
   const [authChecked, setAuthChecked] = useState(false)
+  // hotfix 2026-05-09: admin-only → admin OR hasPageAccess (사이드바 권한 시스템 일치)
+  const { hasPageAccess } = usePermission()
+  const canAccess = user?.role === 'admin' || hasPageAccess('/RideCustomerData')
   const [tab, setTab] = useState<Tab>('contracts')
 
   // 공통 — 고객사 마스터 (모든 탭에서 사용)
@@ -323,12 +327,12 @@ export default function RideCustomerDataPage() {
   )
 
   useEffect(() => {
-    if (!authChecked || user?.role !== 'admin') return
+    if (!authChecked || !canAccess) return
     fetchCompanies()
   }, [authChecked, user, fetchCompanies])
 
   useEffect(() => {
-    if (!authChecked || user?.role !== 'admin') return
+    if (!authChecked || !canAccess) return
     if (tab === 'reports') fetchReports()
     if (tab === 'contracts') fetchContracts()
   }, [authChecked, user, tab, fetchReports, fetchContracts])
@@ -339,10 +343,10 @@ export default function RideCustomerDataPage() {
       <div style={{ padding: 24, color: COLORS.textSecondary }}>인증 확인 중…</div>
     )
   }
-  if (user?.role !== 'admin') {
+  if (!canAccess) {
     return (
       <div style={{ padding: 24, color: COLORS.danger }}>
-        ⚠ 관리자 권한 필요
+        ⚠ 권한 필요 (관리자 또는 페이지 권한)
       </div>
     )
   }

@@ -17,6 +17,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { getStoredToken, getStoredUser } from '@/lib/auth-client'
+import { usePermission } from '@/app/hooks/usePermission'
 import NeuDataTable, { type TableColumn } from '@/app/components/NeuDataTable'
 import { COLORS, GLASS, BTN } from '@/app/utils/ui-tokens'
 
@@ -89,6 +90,9 @@ function fmtDate(v: string | null | undefined): string {
 export default function RideSettlementsPage() {
   const [user, setUser] = useState<{ role?: string; id?: string } | null>(null)
   const [authChecked, setAuthChecked] = useState(false)
+  // hotfix 2026-05-09: admin-only → admin OR hasPageAccess (사이드바 권한 시스템 일치)
+  const { hasPageAccess } = usePermission()
+  const canAccess = user?.role === 'admin' || hasPageAccess('/RideSettlements')
 
   const [companies, setCompanies] = useState<Company[]>([])
   const [settlements, setSettlements] = useState<Settlement[]>([])
@@ -162,14 +166,14 @@ export default function RideSettlementsPage() {
   )
 
   useEffect(() => {
-    if (!authChecked || user?.role !== 'admin') return
+    if (!authChecked || !canAccess) return
     fetchCompanies()
     fetchSettlements()
   }, [authChecked, user, fetchCompanies, fetchSettlements])
 
   if (!authChecked) return <div style={{ padding: 24, color: COLORS.textSecondary }}>인증 확인 중…</div>
-  if (user?.role !== 'admin')
-    return <div style={{ padding: 24, color: COLORS.danger }}>⚠ 관리자 권한 필요</div>
+  if (!canAccess)
+    return <div style={{ padding: 24, color: COLORS.danger }}>⚠ 권한 필요 (관리자 또는 페이지 권한)</div>
 
   const cols: TableColumn<Settlement>[] = [
     {

@@ -15,6 +15,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { getStoredToken, getStoredUser } from '@/lib/auth-client'
+import { usePermission } from '@/app/hooks/usePermission'
 import NeuDataTable, { type TableColumn } from '@/app/components/NeuDataTable'
 import { COLORS, GLASS, BTN } from '@/app/utils/ui-tokens'
 
@@ -56,6 +57,9 @@ function fmtDate(d: string | Date | null | undefined): string {
 export default function RideVehicleRegistryPage() {
   const [user, setUser] = useState<{ role?: string; id?: string } | null>(null)
   const [authChecked, setAuthChecked] = useState(false)
+  // hotfix 2026-05-09: admin-only → admin OR hasPageAccess (사이드바 권한 시스템 일치)
+  const { hasPageAccess } = usePermission()
+  const canAccess = user?.role === 'admin' || hasPageAccess('/RideVehicleRegistry')
 
   // 자체 DB
   const [rows, setRows] = useState<RideVehicle[]>([])
@@ -117,7 +121,7 @@ export default function RideVehicleRegistryPage() {
   )
 
   useEffect(() => {
-    if (!authChecked || user?.role !== 'admin') return
+    if (!authChecked || !canAccess) return
     fetchOwnList()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authChecked, user?.role, statusFilter])
@@ -166,7 +170,7 @@ export default function RideVehicleRegistryPage() {
   if (!authChecked) {
     return <div style={{ padding: 32, textAlign: 'center', color: COLORS.textMuted }}>로딩 중...</div>
   }
-  if (user?.role !== 'admin') {
+  if (!canAccess) {
     return (
       <div
         style={{
