@@ -10,6 +10,7 @@ import { NextResponse } from 'next/server'
 import { verifyUser } from '@/lib/auth-server'
 import { canAccessPage } from '@/lib/page-access'
 import { cafe24Db } from '@/lib/cafe24-db'
+import { prisma } from '@/lib/prisma'
 import type { RowDataPacket } from 'mysql2'
 
 interface VehicleRow extends RowDataPacket {
@@ -21,6 +22,34 @@ interface VehicleRow extends RowDataPacket {
   oderidno: string | null
   odermddt: string | null
   odersrno: number | null
+}
+
+interface EnrichRow {
+  car_number: string | null
+  product_name: string | null
+  cust_name: string | null
+  source: string  // 'capital_report' | 'contract'
+}
+
+/**
+ * product_name → 정산구분 (턴키/실비/?)
+ * 키워드 매칭:
+ *   Self / 실비 / *Basic(실비정산) → 실비
+ *   Platinum / Premium / VIP / Basic / 턴키 → 턴키
+ */
+function classifySettlement(product: string | null | undefined): '턴키' | '실비' | '?' {
+  if (!product) return '?'
+  const lower = product.toLowerCase()
+  if (lower.includes('실비') || lower.includes('self')) return '실비'
+  if (
+    lower.includes('platinum') ||
+    lower.includes('premium') ||
+    lower.includes('vip') ||
+    lower.includes('basic') ||
+    lower.includes('턴키')
+  )
+    return '턴키'
+  return '?'
 }
 
 export async function GET(request: Request) {
@@ -101,14 +130,63 @@ export async function GET(request: Request) {
     }
   }
 
+  // ── 자체 DB enrichment — car_number → product_name (계약/보고) → 정산구분 ──
+  const carNumbers = Array.from(
+    new Set(rows.map(r => r.car_number).filter((v): v is string => !!v))
+  )
+  const enrichByCar = new Map<string, EnrichRow>()
+  if (carNumbers.length > 0) {
+    try {
+      const placeholders = carNumbers.map(() => '?').join(',')
+      // ride_contracts (계약상품 우선)
+      const contractRows = await prisma.$queryRawUnsafe<EnrichRow[]>(
+        `SELECT car_number, contract_product AS product_name, contractor AS cust_name, 'contract' AS source
+           FROM ride_contracts
+          WHERE car_number IN (${placeholders})`,
+        ...carNumbers
+      )
+      for (const c of contractRows) {
+        if (c.car_number) enrichByCar.set(c.car_number, c)
+      }
+      // ride_capital_reports (계약 없으면 보고의 정비상품)
+      const reportRows = await prisma.$queryRawUnsafe<EnrichRow[]>(
+        `SELECT car_number, maint_product AS product_name, cust_name, 'capital_report' AS source
+           FROM ride_capital_reports
+          WHERE car_number IN (${placeholders})
+          ORDER BY report_date DESC`,
+        ...carNumbers
+      )
+      for (const r of reportRows) {
+        if (r.car_number && !enrichByCar.has(r.car_number)) {
+          enrichByCar.set(r.car_number, r)
+        }
+      }
+    } catch (e) {
+      console.warn('[factory-vehicles enrichment]', (e as Error).message)
+    }
+  }
+
+  // 메모리 merge — settlement_type / own_product / own_customer 추가
+  const enriched = rows.map(r => {
+    const e = r.car_number ? enrichByCar.get(r.car_number) : null
+    return {
+      ...r,
+      own_product: e?.product_name || null,
+      own_customer: e?.cust_name || null,
+      enrich_source: e?.source || null,
+      settlement_type: classifySettlement(e?.product_name),
+    }
+  })
+
   return NextResponse.json({
     success: true,
-    data: rows,
+    data: enriched,
     meta: {
       fetched_at: new Date().toISOString(),
-      count: rows.length,
+      count: enriched.length,
       factcode,
       mode,
+      enriched_count: Array.from(enrichByCar.keys()).length,
     },
   })
 }

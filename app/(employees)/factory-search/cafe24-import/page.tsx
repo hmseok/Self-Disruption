@@ -69,6 +69,11 @@ interface FactoryVehicle {
   customer: string | null
   assigned_date: string | null
   oderstat: string | null
+  // PR-6.12.d enrichment (자체 DB 매칭)
+  own_product: string | null
+  own_customer: string | null
+  enrich_source: string | null
+  settlement_type: '턴키' | '실비' | '?'
 }
 
 export default function Cafe24ImportPage() {
@@ -773,32 +778,53 @@ export default function Cafe24ImportPage() {
                       <th style={{ padding: '6px 8px', textAlign: 'left', fontSize: 11, fontWeight: 700, borderBottom: `1px solid ${COLORS.borderSubtle}` }}>차량번호</th>
                       <th style={{ padding: '6px 8px', textAlign: 'left', fontSize: 11, fontWeight: 700, borderBottom: `1px solid ${COLORS.borderSubtle}` }}>차종</th>
                       <th style={{ padding: '6px 8px', textAlign: 'left', fontSize: 11, fontWeight: 700, borderBottom: `1px solid ${COLORS.borderSubtle}` }}>고객사</th>
+                      <th style={{ padding: '6px 8px', textAlign: 'left', fontSize: 11, fontWeight: 700, borderBottom: `1px solid ${COLORS.borderSubtle}` }}>서비스 상품</th>
+                      <th style={{ padding: '6px 8px', textAlign: 'left', fontSize: 11, fontWeight: 700, borderBottom: `1px solid ${COLORS.borderSubtle}` }}>정산</th>
                       <th style={{ padding: '6px 8px', textAlign: 'left', fontSize: 11, fontWeight: 700, borderBottom: `1px solid ${COLORS.borderSubtle}` }}>배정일</th>
                       <th style={{ padding: '6px 8px', textAlign: 'left', fontSize: 11, fontWeight: 700, borderBottom: `1px solid ${COLORS.borderSubtle}` }}>상태</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {vehicles.map((v, i) => (
-                      <tr key={i}>
-                        <td style={{ padding: '4px 8px', fontWeight: 600, borderBottom: '1px solid rgba(0,0,0,0.04)', whiteSpace: 'nowrap' }}>
-                          {v.car_number || '-'}
-                        </td>
-                        <td style={{ padding: '4px 8px', fontSize: 11, borderBottom: '1px solid rgba(0,0,0,0.04)', whiteSpace: 'nowrap' }}>
-                          {clip(v.car_model, 22)}
-                        </td>
-                        <td style={{ padding: '4px 8px', fontSize: 11, borderBottom: '1px solid rgba(0,0,0,0.04)', whiteSpace: 'nowrap' }}>
-                          {clip(v.customer, 24)}
-                        </td>
-                        <td style={{ padding: '4px 8px', fontSize: 11, borderBottom: '1px solid rgba(0,0,0,0.04)', whiteSpace: 'nowrap' }}>
-                          {v.assigned_date && v.assigned_date.length >= 8
-                            ? `${v.assigned_date.slice(0, 4)}-${v.assigned_date.slice(4, 6)}-${v.assigned_date.slice(6, 8)}`
-                            : v.assigned_date || '-'}
-                        </td>
-                        <td style={{ padding: '4px 8px', fontSize: 11, borderBottom: '1px solid rgba(0,0,0,0.04)', whiteSpace: 'nowrap' }}>
-                          {v.oderstat || '-'}
-                        </td>
-                      </tr>
-                    ))}
+                    {vehicles.map((v, i) => {
+                      const settleColor =
+                        v.settlement_type === '턴키' ? COLORS.primary
+                          : v.settlement_type === '실비' ? COLORS.success
+                          : COLORS.textMuted
+                      const customerDisplay = v.own_customer || v.customer
+                      return (
+                        <tr key={i}>
+                          <td style={{ padding: '4px 8px', fontWeight: 600, borderBottom: '1px solid rgba(0,0,0,0.04)', whiteSpace: 'nowrap' }}>
+                            {v.car_number || '-'}
+                          </td>
+                          <td style={{ padding: '4px 8px', fontSize: 11, borderBottom: '1px solid rgba(0,0,0,0.04)', whiteSpace: 'nowrap' }}>
+                            {clip(v.car_model, 22)}
+                          </td>
+                          <td
+                            style={{ padding: '4px 8px', fontSize: 11, borderBottom: '1px solid rgba(0,0,0,0.04)', whiteSpace: 'nowrap' }}
+                            title={v.own_customer ? `자체: ${v.own_customer} / 카페24: ${v.customer || '-'}` : ''}
+                          >
+                            {clip(customerDisplay, 22)}
+                            {v.own_customer && v.own_customer !== v.customer && (
+                              <span style={{ fontSize: 9, color: COLORS.textMuted, marginLeft: 2 }}>·자체</span>
+                            )}
+                          </td>
+                          <td style={{ padding: '4px 8px', fontSize: 11, borderBottom: '1px solid rgba(0,0,0,0.04)', whiteSpace: 'nowrap' }}>
+                            {v.own_product ? clip(v.own_product, 22) : <span style={{ color: COLORS.textMuted }}>-</span>}
+                          </td>
+                          <td style={{ padding: '4px 8px', fontSize: 11, borderBottom: '1px solid rgba(0,0,0,0.04)', whiteSpace: 'nowrap' }}>
+                            <span style={{ fontWeight: 700, color: settleColor }}>{v.settlement_type}</span>
+                          </td>
+                          <td style={{ padding: '4px 8px', fontSize: 11, borderBottom: '1px solid rgba(0,0,0,0.04)', whiteSpace: 'nowrap' }}>
+                            {v.assigned_date && v.assigned_date.length >= 8
+                              ? `${v.assigned_date.slice(0, 4)}-${v.assigned_date.slice(4, 6)}-${v.assigned_date.slice(6, 8)}`
+                              : v.assigned_date || '-'}
+                          </td>
+                          <td style={{ padding: '4px 8px', fontSize: 11, borderBottom: '1px solid rgba(0,0,0,0.04)', whiteSpace: 'nowrap' }}>
+                            {v.oderstat || '-'}
+                          </td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>
