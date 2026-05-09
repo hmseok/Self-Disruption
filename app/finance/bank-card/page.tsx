@@ -3746,8 +3746,8 @@ export default function BankCardPage() {
           </>
         )}
 
-        {/* ──── 분류 검수 탭 (PR-UX5: workflow 통합 탭에도 표시) ──── */}
-        {(activeTab === 'classify' || activeTab === 'workflow') && (
+        {/* ──── 분류 검수 탭 — PR-UX7: workflow 분리 (deep dive 는 별도 탭) ──── */}
+        {activeTab === 'classify' && (
           <>
             {/* 풀 자동 매칭 결과 패널 — 글래스 디자인 (CLAUDE.md 규칙 20) */}
             {fullMatchResult && (() => {
@@ -4788,8 +4788,8 @@ export default function BankCardPage() {
           </>
         )}
 
-        {/* ──── 미분류 + 그룹분류 (분류 검수 탭 / workflow 통합) ──── */}
-        {(activeTab === 'classify' || activeTab === 'workflow') && (
+        {/* ──── 미분류 + 그룹분류 (분류 검수 탭 only — PR-UX7) ──── */}
+        {activeTab === 'classify' && (
           <>
             {/* 데이터 품질 안내 배너 */}
             {summary && summary.transactions.unclassified > 0 && summary.transactions.classified === 0 && !autoClassifyResult && (
@@ -5798,7 +5798,8 @@ export default function BankCardPage() {
                 )
               })()}
 
-              {/* 헤더 */}
+              {/* 헤더 — PR-UX7: 매칭 검수 탭에서만 (workflow 는 funnel 만) */}
+              {activeTab === 'matchreview' && (
               <div style={{ ...GLASS.L3, border: `1px solid ${COLORS.borderBlue}`, borderRadius: 12, padding: '14px 20px', marginBottom: 12 }}>
                 <div style={{ fontSize: 14, fontWeight: 600, color: COLORS.textPrimary, marginBottom: 4 }}>
                   매칭 검수 — entity 중심 ({data?.summary.totalEntities || 0} entity · {data?.summary.totalMatched || 0} 매칭 · {data?.summary.totalUnmatched || 0} 미매칭)
@@ -5934,6 +5935,7 @@ export default function BankCardPage() {
                   </div>
                 )}
               </div>
+              )}
 
               {/* PR-UX1: 통합 자동 매칭 결과 패널 (Glass L4 — Rule 20) */}
               {autoMatchAllResult && (() => {
@@ -6505,8 +6507,8 @@ export default function BankCardPage() {
                 </div>
               )}
 
-              {/* 미매칭 안내 */}
-              {data && data.unmatched.count > 0 && (
+              {/* 미매칭 안내 (PR-UX7: matchreview 에서만) */}
+              {activeTab === 'matchreview' && data && data.unmatched.count > 0 && (
                 <div style={{ ...GLASS.L4, padding: '10px 16px', borderRadius: 10, marginBottom: 12, border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(254,226,226,0.25)' }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: '#b91c1c' }}>
                     🚧 미매칭 거래 {data.unmatched.count}건 ({nf(data.unmatched.totalAmount)}원)
@@ -6517,8 +6519,8 @@ export default function BankCardPage() {
                 </div>
               )}
 
-              {/* entity 카드 grid — type 별 그룹 */}
-              {filteredEntityTypes.map(([type, entityList]) => (
+              {/* entity 카드 grid — type 별 그룹 (PR-UX7: matchreview 탭에서만) */}
+              {activeTab === 'matchreview' && filteredEntityTypes.map(([type, entityList]) => (
                 <div key={type} style={{ marginBottom: 14 }}>
                   <div style={{ fontSize: 12, fontWeight: 700, color: COLORS.textSecondary, marginBottom: 6, padding: '0 4px' }}>
                     {entityList[0]?.typeLabel || type} <span style={{ color: COLORS.textMuted, fontWeight: 400 }}>· {entityList.length} entity</span>
