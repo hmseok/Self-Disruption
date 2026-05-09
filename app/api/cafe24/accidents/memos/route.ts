@@ -15,6 +15,7 @@
  */
 import { NextResponse } from 'next/server'
 import { verifyUser } from '@/lib/auth-server'
+import { canAccessPage } from '@/lib/page-access'
 import { cafe24Db } from '@/lib/cafe24-db'
 import type { RowDataPacket } from 'mysql2'
 
@@ -40,7 +41,8 @@ export async function GET(request: Request) {
   if (!user) {
     return NextResponse.json({ success: false, error: 'unauthorized' }, { status: 401 })
   }
-  if (user.role !== 'admin') {
+  const allowed = await canAccessPage(user, '/RideAccidents')
+  if (!allowed) {
     return NextResponse.json({ success: false, error: 'forbidden' }, { status: 403 })
   }
 

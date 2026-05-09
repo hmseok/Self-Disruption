@@ -12,6 +12,7 @@
  */
 import { NextResponse } from 'next/server'
 import { verifyUser } from '@/lib/auth-server'
+import { canAccessPage } from '@/lib/page-access'
 import { cafe24Db } from '@/lib/cafe24-db'
 import type { RowDataPacket } from 'mysql2'
 
@@ -31,7 +32,15 @@ export async function GET(request: Request) {
       { status: 401 }
     )
   }
-  if (user.role !== 'admin') {
+  // 차량 검색 — 차량등록 / 정산서 / 사고/긴출 어디서든 권한 있으면 통과
+  const allowed = await canAccessPage(user, [
+    '/RideVehicleRegistry',
+    '/RideAccidents',
+    '/RideAccidentReports',
+    '/RideSettlements',
+    '/RideCustomerData',
+  ])
+  if (!allowed) {
     return NextResponse.json(
       { success: false, data: [], error: 'forbidden' },
       { status: 403 }
