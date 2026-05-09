@@ -1,0 +1,73 @@
+name: Cowork validate
+
+# CLAUDE.md 규칙 21 — Cowork 멀티 세션 staging 침범 방지 (서버 검증)
+# push 시 새 commit 들에 대해 cowork-staging-lint 자동 실행.
+# 위반 commit 발견 시 workflow 실패 → GitHub UI 에 ❌ 표시.
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  cowork-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Determine push range
+        id: range
+        run: |
+          BEFORE="${{ github.event.before }}"
+          AFTER="${{ github.event.after }}"
+          if [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
+            echo "range=HEAD~20..HEAD" >> $GITHUB_OUTPUT
+          else
+            echo "range=$BEFORE..$AFTER" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Run cowork-staging-lint per commit
+        run: |
+          RANGE="${{ steps.range.outputs.range }}"
+          echo "Validating commits in $RANGE"
+          COMMITS=$(git rev-list --max-count=200 "$RANGE" 2>/dev/null || git rev-list --max-count=20 HEAD)
+          if [ -z "$COMMITS" ]; then
+            echo "No commits to check — skip"
+            exit 0
+          fi
+
+          EXIT_CODE=0
+          for commit in $COMMITS; do
+            echo ""
+            echo "▸ commit $commit"
+            node harness-engineering/scripts/cowork-staging-lint.js --check-commit "$commit"
+            R=$?
+            if [ $R -ne 0 ]; then
+              echo "❌ commit $commit 위반"
+              EXIT_CODE=1
+            fi
+          done
+
+          if [ $EXIT_CODE -ne 0 ]; then
+            echo ""
+            echo "════════════════════════════════════════════════════════════"
+            echo "❌ Cowork 협업 위반 감지 (CLAUDE.md 규칙 21)"
+            echo "  한 commit 에 여러 모듈 영역 동시 staged."
+            echo "  다른 cowork 세션 작업물 흡수 가능성."
+            echo ""
+            echo "  로컬 조치:"
+            echo "    git reset --soft HEAD~N"
+            echo "    자기 모듈만 git add 후 다시 commit"
+            echo ""
+            echo "  의도적 cross-module commit 이라면:"
+            echo "    COWORK_ALLOW_MULTI_MODULE=1 git push origin main"
+            echo "════════════════════════════════════════════════════════════"
+          fi
+          exit $EXIT_CODE
