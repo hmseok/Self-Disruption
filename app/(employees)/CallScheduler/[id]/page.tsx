@@ -14,6 +14,7 @@ import ScheduleGrid from '../components/ScheduleGrid'
 // PR-2EE (2026-05-04): ComposeMode 폐기 — 셋팅 → 자동 생성 → 표출/수정 흐름으로 단순화
 // import ComposeMode from '../components/ComposeMode'
 import DayView from '../components/DayView'
+import WeekView from '../components/WeekView'
 import AnalyticsDrawer from '../components/AnalyticsDrawer'
 import DistributionDialog from '../components/DistributionDialog'
 import EmployeeRequestsPanel from '../components/EmployeeRequestsPanel'
@@ -34,7 +35,7 @@ export default function CallSchedulerDetailPage({
   )
 }
 
-type ViewMode = 'view' | 'day'  // PR-2EE: compose 폐기
+type ViewMode = 'view' | 'week' | 'day'  // L-1: week 추가
 
 function DetailInner({ id }: { id: string }) {
   const router = useRouter()
@@ -214,6 +215,20 @@ function DetailInner({ id }: { id: string }) {
             </button>
             <button
               type="button"
+              onClick={() => setMode('week')}
+              style={{
+                padding: '6px 14px', fontSize: 12, fontWeight: 700,
+                background: mode === 'week' ? COLORS.primary : 'transparent',
+                color: mode === 'week' ? '#fff' : COLORS.textSecondary,
+                border: 'none', cursor: 'pointer',
+                borderLeft: `1px solid ${COLORS.borderFaint}`,
+              }}
+              title="주간 뷰 — 1주 7일 × 슬롯 (좁은 화면)"
+            >
+              📆 주간
+            </button>
+            <button
+              type="button"
               onClick={() => setMode('day')}
               style={{
                 padding: '6px 14px', fontSize: 12, fontWeight: 700,
@@ -371,6 +386,7 @@ function DetailInner({ id }: { id: string }) {
       ) : (
         <>
           {mode === 'view' && <ScheduleGrid detail={detail} onChanged={() => reload(id)} />}
+          {mode === 'week' && <WeekView detail={detail} />}
           {mode === 'day' && <DayView detail={detail} />}
         </>
       )}

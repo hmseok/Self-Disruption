@@ -20,6 +20,31 @@
 - 셀 호출 시 `slotGroups[slot.id].id + worker_id` 로 lookup → 색상 layer 재활성
 - 효과: 같은 워커가 야간 그룹에서 화/목 희망, 주간 그룹에서 월/금 비선호 등 다른 색상 layer 표출
 
+## 2026-05-09 (Phase L-1) — WeekView 신규 + 매니저 매트릭스 viewMode (월/주/일)
+
+### 사용자 요청
+> "뷰도 일별로 보기 / 주간보기 / 내것만보기 등 지원"
+
+### WeekView 신규 컴포넌트
+- 1주 7일 × 슬롯 매트릭스 (좁은 화면 가독성)
+- ◀ 이전 주 / 이번 달 첫 주 / 다음 주 ▶ 이동
+- 셀 폭 70px (월간 매트릭스보다 넓게 — 가독성)
+- 슬롯 좌측 그룹 헤더 + 24h 시간 막대 + 6h 눈금 (ScheduleGrid 와 동일)
+- 멤버 dow 색상 layer 재활성 (memberCfgMap)
+- 월 경계 넘는 날짜는 흐릿하게 + 월 표시 (예: "5/3")
+- 주간 뷰는 read-only — 편집은 매트릭스 모드 안내
+
+### 매니저 [id]/page.tsx
+- ViewMode 'week' 추가 — 토글 버튼 「📆 주간」
+- 기존 「📋 매트릭스」 / 「📅 날짜별」 사이에 위치
+
+### 검증
+- tsc CallScheduler 0 errors
+
+### L-2 (다음) 예정
+- ScheduleGrid 에 「내것만 보기」 토글 (본인 워커 ID 매칭만 강조)
+- MyScheduleView 에 viewMode (월/주/일 토글)
+
 ## 2026-05-09 (Phase K-2) — GroupEditor 멤버 카드 인라인 설정
 
 ### 사용자 의도
