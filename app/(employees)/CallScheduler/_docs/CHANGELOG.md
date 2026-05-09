@@ -20,6 +20,26 @@
 - 셀 호출 시 `slotGroups[slot.id].id + worker_id` 로 lookup → 색상 layer 재활성
 - 효과: 같은 워커가 야간 그룹에서 화/목 희망, 주간 그룹에서 월/금 비선호 등 다른 색상 layer 표출
 
+## 2026-05-09 (Phase N-6) — 메인 페이지 운영 셋팅 요약 카드
+
+### 사용자 피드백
+> "결국에 메인에 근무시간표 리스트 밖에없는데 설정에 저많은것들을 따로 들어가서 봐야하나?"
+
+### 변경
+- 메인 페이지에 「⚙️ 운영 셋팅 요약」 영역 신설 (스케줄 list 위)
+- 4 카드 grid:
+  · 🕐 시프트 N개 (시간대 정의) → /settings?tab=shifts
+  · 🚧 그룹 N개 (시프트 + 멤버 + 패턴) → /settings?tab=groups
+  · 👥 콜센터 워커 N명 → /settings?tab=workers
+  · 💼 휴가 quota 셋팅 N/M 명 → /settings?tab=leaves
+- 카드 hover translateY(-2px) + boxShadow
+- 휴가 quota 셋팅 < 워커 수면 빨강 (위급 알림)
+- 「전체 설정 →」 link 우측
+
+### 운영 효과
+- 매니저 메인에서 운영 상태 한눈에 (스케줄 list + 셋팅 요약)
+- 설정 들어갈 필요 없이 카드 클릭 1번으로 해당 탭 직접 진입
+
 ## 2026-05-09 (Phase N-5) — GroupEditor 레이아웃 정리 (2분할 → 수직 1컬럼)
 
 ### 사용자 피드백

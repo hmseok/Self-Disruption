@@ -37,8 +37,15 @@ export default function CallSchedulerListPage() {
   const [sortDir, setSortDir] = useState<SortDir>('desc')
   // M-2 — 직원 요청 대기 카운트 (회피 + 휴가 + 교체 합산)
   const [pendingCount, setPendingCount] = useState(0)
+  // N-6 — 운영 셋팅 요약 (시프트/그룹/워커/휴가 quota)
+  const [opsCounts, setOpsCounts] = useState<{
+    slots: number
+    groups: number
+    workers: number
+    quotaWorkers: number
+  } | null>(null)
 
-  // 직원 요청 대기 카운트 fetch
+  // 직원 요청 대기 카운트 fetch + N-6 운영 셋팅 요약
   useEffect(() => {
     let abort = false
     ;(async () => {
@@ -48,10 +55,14 @@ export default function CallSchedulerListPage() {
         const monthStart = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-01`
         const future = new Date(today); future.setDate(future.getDate() + 90)
         const futureEnd = `${future.getFullYear()}-${String(future.getMonth()+1).padStart(2,'0')}-${String(future.getDate()).padStart(2,'0')}`
-        const [skipR, leaveR, swapR] = await Promise.all([
+        const [skipR, leaveR, swapR, slotR, groupR, workerR, quotaR] = await Promise.all([
           fetch(`/api/call-scheduler/skip-dates?from=${monthStart}&to=${futureEnd}&status=requested`, { headers: auth }),
           fetch('/api/call-scheduler/leaves?status=pending', { headers: auth }),
           fetch('/api/call-scheduler/swap-requests?status=pending', { headers: auth }),
+          fetch('/api/call-scheduler/shift-slots', { headers: auth }),
+          fetch('/api/call-scheduler/shift-groups', { headers: auth }),
+          fetch('/api/call-scheduler/workers', { headers: auth }),
+          fetch(`/api/call-scheduler/leave-quotas?year=${today.getFullYear()}`, { headers: auth }),
         ])
         if (abort) return
         const skipJ = skipR.ok ? await skipR.json() : { data: [] }
@@ -59,6 +70,20 @@ export default function CallSchedulerListPage() {
         const swapJ = swapR.ok ? await swapR.json() : { data: [] }
         const sum = (skipJ.data?.length || 0) + (leaveJ.data?.length || 0) + (swapJ.data?.length || 0)
         if (!abort) setPendingCount(sum)
+        const slotJ = slotR.ok ? await slotR.json() : { data: [] }
+        const groupJ = groupR.ok ? await groupR.json() : { data: [] }
+        const workerJ = workerR.ok ? await workerR.json() : { data: [] }
+        const quotaJ = quotaR.ok ? await quotaR.json() : { data: [] }
+        // 휴가 quota 셋팅된 워커 = unique worker_id (granted > 0)
+        const quotaWorkerSet = new Set(
+          (quotaJ.data || []).filter((q: any) => Number(q.granted_days || 0) > 0).map((q: any) => q.worker_id),
+        )
+        if (!abort) setOpsCounts({
+          slots: (slotJ.data || []).length,
+          groups: (groupJ.data || []).filter((g: any) => g.is_active !== false).length,
+          workers: (workerJ.data || []).length,
+          quotaWorkers: quotaWorkerSet.size,
+        })
       } catch { /* graceful */ }
     })()
     return () => { abort = true }
@@ -193,12 +218,56 @@ export default function CallSchedulerListPage() {
       {aggregate && (
         <div style={{
           display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12,
-          marginBottom: 16,
+          marginBottom: 12,
         }}>
           <KpiTile label="활성 스케줄" value={items.length.toString()} sub={`초안 ${aggregate.draft} · 공지 ${aggregate.published}`} tone="blue" />
           <KpiTile label="공지 완료" value={aggregate.published.toString()} sub={`전체 중 ${Math.round(aggregate.published / items.length * 100)}%`} tone="green" />
           <KpiTile label="총 근무자" value={aggregate.totalWorkers.toString()} sub="누적 (중복 포함)" tone="amber" />
           <KpiTile label="평균 충원율" value={`${Math.round(aggregate.avgFill * 1000) / 10}%`} sub="전체 평균" tone={aggregate.avgFill > 0.9 ? 'green' : 'red'} />
+        </div>
+      )}
+
+      {/* N-6 — 운영 셋팅 요약 (시프트/그룹/워커/휴가 quota — 클릭 시 해당 탭) */}
+      {opsCounts && (
+        <div style={{
+          ...GLASS.L4, borderRadius: 12, padding: 14, marginBottom: 16,
+        }}>
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            marginBottom: 10,
+          }}>
+            <div style={{ fontSize: 13, fontWeight: 800, color: COLORS.textPrimary }}>
+              ⚙️ 운영 셋팅 요약
+              <span style={{ fontSize: 11, fontWeight: 500, color: COLORS.textMuted, marginLeft: 6 }}>
+                카드 클릭 → 해당 설정 탭으로
+              </span>
+            </div>
+            <Link href="/CallScheduler/settings"
+                  style={{
+                    fontSize: 11, color: COLORS.info, textDecoration: 'none', fontWeight: 700,
+                  }}>
+              전체 설정 →
+            </Link>
+          </div>
+          <div style={{
+            display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10,
+          }}>
+            <SettingsTile href="/CallScheduler/settings?tab=shifts"
+                          icon="🕐" label="시프트" value={opsCounts.slots}
+                          sub="시간대 정의" tone="blue" />
+            <SettingsTile href="/CallScheduler/settings?tab=groups"
+                          icon="🚧" label="그룹" value={opsCounts.groups}
+                          sub="시프트 + 멤버 + 패턴" tone="violet" />
+            <SettingsTile href="/CallScheduler/settings?tab=workers"
+                          icon="👥" label="콜센터 워커" value={opsCounts.workers}
+                          sub="정체성 + 외부 cycle" tone="amber" />
+            <SettingsTile href="/CallScheduler/settings?tab=leaves"
+                          icon="💼" label="휴가 quota" value={opsCounts.quotaWorkers}
+                          sub={opsCounts.workers > 0
+                            ? `워커 ${opsCounts.quotaWorkers}/${opsCounts.workers} 셋팅됨`
+                            : '직원별 잔여'}
+                          tone={opsCounts.quotaWorkers < opsCounts.workers ? 'red' : 'green'} />
+          </div>
         </div>
       )}
 
@@ -344,5 +413,49 @@ function KpiTile({ label, value, sub, tone }: {
       <div style={{ fontSize: 24, fontWeight: 800, color: tintMap.color, lineHeight: 1.1 }}>{value}</div>
       <div style={{ fontSize: 11, color: COLORS.textMuted }}>{sub}</div>
     </div>
+  )
+}
+
+// N-6 — 운영 셋팅 카드 (클릭 시 해당 설정 탭으로)
+function SettingsTile({ href, icon, label, value, sub, tone }: {
+  href: string
+  icon: string
+  label: string
+  value: number
+  sub: string
+  tone: 'blue' | 'green' | 'amber' | 'red' | 'violet'
+}) {
+  const tintMap = {
+    blue:   { bg: COLORS.bgBlue,   border: COLORS.borderBlue,   color: COLORS.info },
+    green:  { bg: COLORS.bgGreen,  border: COLORS.borderGreen,  color: COLORS.success },
+    amber:  { bg: COLORS.bgAmber,  border: COLORS.borderAmber,  color: COLORS.warning },
+    red:    { bg: COLORS.bgRed,    border: COLORS.borderRed,    color: COLORS.danger },
+    violet: { bg: COLORS.bgViolet, border: COLORS.borderViolet, color: '#7c3aed' },
+  }[tone]
+  return (
+    <Link href={href}
+          style={{
+            ...GLASS.L1, background: tintMap.bg, border: `1.5px solid ${tintMap.border}`,
+            borderRadius: 10, padding: '12px 14px',
+            display: 'flex', flexDirection: 'column', gap: 4,
+            textDecoration: 'none', cursor: 'pointer',
+            transition: 'transform 0.12s, box-shadow 0.12s',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'translateY(-2px)'
+            e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = ''
+            e.currentTarget.style.boxShadow = ''
+          }}>
+      <div style={{ fontSize: 12, color: COLORS.textSecondary, fontWeight: 700 }}>
+        {icon} {label}
+      </div>
+      <div style={{ fontSize: 22, fontWeight: 800, color: tintMap.color, lineHeight: 1.1 }}>
+        {value}
+      </div>
+      <div style={{ fontSize: 11, color: COLORS.textMuted }}>{sub}</div>
+    </Link>
   )
 }
