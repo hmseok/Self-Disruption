@@ -21,7 +21,10 @@
     "lint:db-sync": "node harness-engineering/scripts/db-sync-check.js --skip-if-no-db",
     "lint:api": "node harness-engineering/scripts/api-call-trace.js",
     "lint:ui": "node harness-engineering/scripts/ui-data-coverage.js",
-    "harness:install-hook": "node harness-engineering/scripts/install-hook.js"
+    "harness:install-hook": "node harness-engineering/scripts/install-hook.js",
+    "cowork:check": "node harness-engineering/scripts/cowork-health-check.js",
+    "cowork:fix": "node harness-engineering/scripts/cowork-health-check.js --fix",
+    "cowork:init": "node harness-engineering/scripts/cowork-init.js"
   },
   "dependencies": {
     "@fontsource/nanum-gothic": "^5.2.7",

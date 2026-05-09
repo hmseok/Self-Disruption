@@ -1,0 +1,62 @@
+#!/bin/sh
+# cowork-pre-push-hook v2 (PR-COWORK 2026-05-09)
+# Repo-tracked pre-push hook — 모든 cowork 세션 공유.
+# 설치: git config core.hooksPath harness-engineering/git-hooks
+#
+# CLAUDE.md 규칙 21 — Cowork 멀티 세션 staging 침범 방지 (강력 차단)
+# pre-commit 이 --no-verify 로 우회되어도 push 단계에서 또 차단.
+
+# COWORK_ALLOW_MULTI_MODULE=1 면 우회 (의도적 cross-module push)
+if [ "$COWORK_ALLOW_MULTI_MODULE" = "1" ]; then
+  echo "⚠ COWORK_ALLOW_MULTI_MODULE=1 — multi-module push 허용"
+  exit 0
+fi
+
+# stdin 으로 push 대상 ref 들 받음
+EXIT_CODE=0
+while read local_ref local_sha remote_ref remote_sha; do
+  # 삭제 push skip
+  if [ "$local_sha" = "0000000000000000000000000000000000000000" ]; then
+    continue
+  fi
+
+  # 새 branch push 면 — 너무 많은 commit 검사 회피, 최근 20개만
+  if [ "$remote_sha" = "0000000000000000000000000000000000000000" ]; then
+    RANGE="$local_sha"
+    LIMIT=20
+  else
+    RANGE="$remote_sha..$local_sha"
+    LIMIT=200
+  fi
+
+  COMMITS=$(git rev-list --max-count=$LIMIT "$RANGE" 2>/dev/null)
+  if [ -z "$COMMITS" ]; then
+    continue
+  fi
+
+  for commit in $COMMITS; do
+    node harness-engineering/scripts/cowork-staging-lint.js --check-commit "$commit" > /dev/null 2>&1
+    LINT_R=$?
+    if [ $LINT_R -ne 0 ]; then
+      echo ""
+      echo "❌ pre-push 차단 — commit $commit 가 multi-module 위반"
+      echo "   (CLAUDE.md 규칙 21 — Cowork 멀티 세션 staging 침범 방지)"
+      echo ""
+      node harness-engineering/scripts/cowork-staging-lint.js --check-commit "$commit"
+      EXIT_CODE=1
+    fi
+  done
+done
+
+if [ $EXIT_CODE -ne 0 ]; then
+  echo ""
+  echo "  조치 옵션:"
+  echo "    1. 잘못된 commit 분리:"
+  echo "       git reset --soft HEAD~N"
+  echo "       자기 모듈만 git add → commit → push"
+  echo ""
+  echo "    2. 의도된 cross-module push (드물게):"
+  echo "       COWORK_ALLOW_MULTI_MODULE=1 git push origin main"
+  exit 1
+fi
+exit 0

@@ -15,10 +15,41 @@
  */
 const fs = require('fs')
 const path = require('path')
+const { execSync } = require('child_process')
 
 const ROOT = path.resolve(__dirname, '../..')
 const HOOK_PATH = path.join(ROOT, '.git/hooks/pre-commit')
 const HOOK_MARKER = '# harness-lint-hook v1'
+
+// PR-COWORK (2026-05-09): hooksPath 자가 진단
+//   다른 cowork 세션이 git config 오염 시 (예: hooksPath 가 다른 세션 경로) 자동 감지 + 수정
+function checkHooksPath() {
+  try {
+    const out = execSync('git config --get core.hooksPath', { cwd: ROOT, encoding: 'utf-8' }).trim()
+    if (!out) return { ok: true, hooksPath: null }
+    // hooksPath 가 ROOT/.git/hooks 와 일치하는지 확인
+    const expected = path.join(ROOT, '.git/hooks')
+    const actual = path.resolve(ROOT, out)
+    if (actual !== expected) {
+      return { ok: false, hooksPath: out, expected, reason: 'mismatch' }
+    }
+    return { ok: true, hooksPath: out }
+  } catch (e) {
+    // git config --get 가 fail = hooksPath 미설정 (정상)
+    return { ok: true, hooksPath: null }
+  }
+}
+
+function fixHooksPath() {
+  try {
+    execSync('git config --unset core.hooksPath', { cwd: ROOT })
+    console.log('[install-hook] ✅ core.hooksPath unset 완료 (기본 .git/hooks 사용)')
+    return true
+  } catch (e) {
+    console.error('[install-hook] ❌ core.hooksPath unset 실패:', e.message)
+    return false
+  }
+}
 // PR-2SS-Z3 — pre-push hook (강력 차단 — pre-commit 우회 시에도 push 차단)
 const PUSH_HOOK_PATH = path.join(ROOT, '.git/hooks/pre-push')
 const PUSH_HOOK_MARKER = '# cowork-pre-push-hook v1'
@@ -173,6 +204,23 @@ function install() {
   if (!fs.existsSync(gitDir)) {
     console.error('[install-hook] ❌ .git 디렉토리 없음 — git 저장소가 아님')
     process.exit(1)
+  }
+
+  // PR-COWORK: hooksPath 자가 진단 (cowork 세션 오염 감지)
+  const hpCheck = checkHooksPath()
+  if (!hpCheck.ok) {
+    console.warn('')
+    console.warn('⚠ core.hooksPath 가 잘못 설정됨:')
+    console.warn(`    현재: ${hpCheck.hooksPath}`)
+    console.warn(`    기대: ${hpCheck.expected}`)
+    console.warn('  → 다른 cowork 세션에서 오염되었을 가능성. 자동 수정 진행:')
+    if (args.has('--no-fix-config')) {
+      console.warn('  --no-fix-config 플래그 — 자가 수정 skip')
+    } else {
+      fixHooksPath()
+    }
+  } else {
+    console.log('[install-hook] ✓ core.hooksPath 정상 (기본 .git/hooks 사용)')
   }
 
   installOne(HOOK_PATH, HOOK_CONTENT, HOOK_MARKER, 'pre-commit')

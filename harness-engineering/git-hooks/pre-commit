@@ -1,0 +1,30 @@
+#!/bin/sh
+# harness-lint-hook v2 (PR-COWORK 2026-05-09)
+# Repo-tracked pre-commit hook — 모든 cowork 세션 공유.
+# 설치: git config core.hooksPath harness-engineering/git-hooks
+#       (또는 npm run cowork:init)
+#
+# 평가 → 훅 → 기록 → 개선 사이클 자동화
+
+# .ts/.tsx/.sql/prisma 파일 변경된 경우만 lint 실행 (성능)
+RELEVANT_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(ts|tsx|sql|prisma)$' || true)
+if [ -z "$RELEVANT_FILES" ]; then
+  exit 0
+fi
+
+echo ""
+echo "▸ harness-lint pre-commit hook 실행 (v2 repo-tracked)..."
+node harness-engineering/scripts/harness-lint.js
+RESULT=$?
+
+if [ $RESULT -ne 0 ]; then
+  echo ""
+  echo "❌ harness-lint 실패 — commit 차단"
+  echo "   수정 후 재시도, 또는 의도된 변경이라면:"
+  echo "     npm run lint:harness:baseline"
+  echo ""
+  echo "   강제 우회 (CLAUDE.md 규칙 21 — 절대 권장 X):"
+  echo "     git commit --no-verify"
+  exit 1
+fi
+exit 0
