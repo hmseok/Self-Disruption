@@ -789,7 +789,8 @@ export default function BankCardPage() {
       `④ 투자/지입 매칭\n` +
       `⑤ 직원 매칭\n` +
       `⑥ 프리랜서 매칭\n` +
-      (autoConfirm ? `⑦ 자동 매칭 결과 자동 확정 (사용자 검수 skip)\n` : '') +
+      `⑦ 보험료 분담금 (insurance_contracts 등록된 경우)\n` +
+      (autoConfirm ? `⑧ 자동 매칭 결과 자동 확정 (사용자 검수 skip)\n` : '') +
       `\n· 약 2~5분 소요 · 중간 정지 불가\n\n계속할까요?`
     )) return
     setRunWorkflowLoading(true)
@@ -802,6 +803,8 @@ export default function BankCardPage() {
       const steps = [
         'classify-rule', 'classify-ai',
         'match-fmi-rental', 'match-investor-jiip', 'match-employee', 'match-freelancer',
+        // PR-UX9.1: 보험료 분담금 매처 (insurance_contracts 등록된 경우만)
+        'match-insurance-premium',
       ]
       if (autoConfirm) steps.push('auto-confirm')
       const { ok, json, status } = await fetchWithAuth('/api/finance/transactions/run-workflow', {
