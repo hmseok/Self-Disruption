@@ -16,6 +16,7 @@ const TABS = [
   { href: '/factory-search/mgmt',     label: '공장 목록', emoji: '🔧' },
   { href: '/factory-search/groups',   label: '그룹 구성', emoji: '🏷' },
   { href: '/factory-search/mapping',  label: '매핑',      emoji: '🔗' },
+  { href: '/factory-search/cafe24-import', label: '카페24 가져오기', emoji: '📥' },  // PR-6.12.b
 ]
 
 export default function SubNav() {
