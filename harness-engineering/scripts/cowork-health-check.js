@@ -57,6 +57,10 @@ console.log(`  ROOT: ${ROOT}`)
 console.log('')
 
 // 1. core.hooksPath
+//    유효한 path 목록 (둘 중 하나면 OK):
+//      a. 미설정 (기본 .git/hooks/ 사용)
+//      b. ROOT/.git/hooks (절대 경로 명시)
+//      c. harness-engineering/git-hooks (repo-tracked — cowork-init 가 설정)
 console.log('▸ git config — core.hooksPath')
 let hooksPathRaw = ''
 try {
@@ -64,21 +68,27 @@ try {
 } catch {
   hooksPathRaw = ''
 }
-const expectedHooksPath = path.join(ROOT, '.git/hooks')
+const validPaths = [
+  '',                                                 // (a) 미설정
+  path.join(ROOT, '.git/hooks'),                      // (b) 본 세션 .git/hooks
+  path.join(ROOT, 'harness-engineering/git-hooks'),   // (c) repo-tracked
+]
 if (!hooksPathRaw) {
-  check('core.hooksPath 미설정 (기본값 사용)', true)
+  check('core.hooksPath 미설정 (기본 .git/hooks 사용)', true)
 } else {
   const actualHooksPath = path.resolve(ROOT, hooksPathRaw)
-  if (actualHooksPath === expectedHooksPath) {
-    check('core.hooksPath 정상', true)
+  const isValid = validPaths.some(vp => vp && actualHooksPath === vp)
+  if (isValid) {
+    const isRepoTracked = actualHooksPath === path.join(ROOT, 'harness-engineering/git-hooks')
+    check(`core.hooksPath 정상${isRepoTracked ? ' (repo-tracked)' : ''}`, true)
   } else {
     check(
-      `core.hooksPath 다른 경로 가리킴`,
+      `core.hooksPath 잘못된 경로 가리킴`,
       false,
-      `현재: ${hooksPathRaw}\n     기대: ${expectedHooksPath}`,
+      `현재: ${hooksPathRaw}\n     허용: 미설정 / .git/hooks / harness-engineering/git-hooks`,
       () => {
         execSync('git config --unset core.hooksPath', { cwd: ROOT })
-        console.log('     ✅ unset 완료')
+        console.log('     ✅ unset 완료 (기본 .git/hooks 사용)')
       },
     )
   }
