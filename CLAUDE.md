@@ -809,11 +809,25 @@ const cardColumns: TableColumn<Transaction>[] = [
    - 화이트리스트: 진짜 confirm 필요한 경우 (data-loss 위험 등)
 ```
 
-### 규칙 21 — Cowork 멀티 세션 협업 (2026-05-03 신설)
+### 규칙 21 — Cowork 멀티 세션 협업 (2026-05-03 신설, 2026-05-10 강화)
 
-> **사용자 명령**: "이거 하네스에 매번"
+> **사용자 명령** (2026-05-10): 「다른 세션에서 자꾸 커밋 배포 문제가 나는데 조율할 수 있는 기준이 없을까?」
 > 동시에 여러 코워크 세션이 같은 git repo 작업 시 conflict / 침범 회피 의무.
 > 코워크 세션은 같은 workspace 폴더를 공유하므로, 한 세션의 commit 은 다른 세션 디스크에 즉시 반영됨.
+>
+> **상세 조율 가이드**: `_docs/SESSIONS-COORDINATION.md`
+>   - 모듈 ↔ 세션 매핑 표 (자율 commit 영역)
+>   - 공통 파일 합의 프로토콜 (변경 전 사용자 사전 보고)
+>   - 충돌 처리 절차
+>
+> **공통 파일** (`app/components/PageTitle.tsx`, `lib/menu-registry.ts`, `prisma/schema.prisma` 등):
+>   - 변경 전 사용자에게 사전 보고 의무
+>   - GO 받기 전 commit 금지
+>   - 작은 단위 별도 commit (모듈 파일과 섞지 X)
+>
+> **모듈 영역** (`app/finance/*`, `app/(employees)/CallScheduler/*` 등):
+>   - 해당 세션만 자율 commit
+>   - 다른 세션 모듈 직접 수정 금지 (요청 시만)
 
 **다음 중 하나라도 해당하면 협업 모드 발동**:
 
