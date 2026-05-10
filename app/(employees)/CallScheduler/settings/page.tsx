@@ -44,8 +44,8 @@ function SettingsInner() {
         <Link href="/CallScheduler" style={{ fontSize: 12, color: COLORS.info, textDecoration: 'none' }}>
           ← CallScheduler
         </Link>
-        <h1 style={{ fontSize: 22, fontWeight: 800, color: COLORS.textPrimary, margin: '8px 0 4px' }}>
-          ⚙️ CallScheduler 설정
+        <h1 style={{ fontSize: 20, fontWeight: 700, color: '#0f2440', margin: '8px 0 4px' }}>
+          CallScheduler 설정
         </h1>
         <div style={{ fontSize: 12, color: COLORS.textMuted }}>
           시간 · 그룹 · 직원 · 회사 휴일(공통) · 직원 휴가(개인)

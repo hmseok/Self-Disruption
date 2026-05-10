@@ -118,7 +118,7 @@ export default function CallSchedulerNewPage() {
         }}>
           ← 목록으로
         </Link>
-        <h1 style={{ fontSize: 22, fontWeight: 800, color: COLORS.textPrimary, margin: '8px 0 4px' }}>
+        <h1 style={{ fontSize: 20, fontWeight: 700, color: '#0f2440', margin: '8px 0 4px' }}>
           새 월 스케줄 생성
         </h1>
         <div style={{ fontSize: 12, color: COLORS.textMuted }}>

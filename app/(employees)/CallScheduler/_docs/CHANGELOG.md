@@ -20,6 +20,34 @@
 - 셀 호출 시 `slotGroups[slot.id].id + worker_id` 로 lookup → 색상 layer 재활성
 - 효과: 같은 워커가 야간 그룹에서 화/목 희망, 주간 그룹에서 월/금 비선호 등 다른 색상 layer 표출
 
+## 2026-05-10 (Phase N-10) — UI 디자인 표준 적용 (정산 관리 기준)
+
+### 사용자 명령
+> "CLAUDE.md 0-0 섹션 + 10 섹션 정독. 디자인 기준 = /finance/settlement (정산 관리).
+>  표준 문서: _docs/UI-DESIGN-STANDARD.md. DcStatStrip + DcToolbar 의무 사용.
+>  검증: npm run lint:ui-design"
+
+### 변경 (UI-DESIGN-STANDARD.md §6.1 위반 정정)
+- **메인 page.tsx**:
+  · Breadcrumb 추가 ("운영 › 근무시간표 분석")
+  · 페이지 제목 fontSize 22 → 20 / fontWeight 800 → 700 / 색 #0f2440
+  · 컬러 점 (red/yellow/green) — 정산 관리와 동일
+  · 큰 description 제거
+  · 자체 KpiTile 4 카드 → **DcStatStrip 5 stat** (활성/공지/근무자/충원율/직원요청)
+  · 헤더 액션 버튼 — 정산 관리 인라인 스타일 (5/12, 11/12)
+- **[id]/page.tsx, settings/page.tsx, requests/page.tsx, new/page.tsx, skips/page.tsx**:
+  · 페이지 제목 fontSize 22 → 20 / fontWeight 800 → 700 / 색 #0f2440
+  · 큰 이모지 prefix 제거 (정산 관리 기준은 단순)
+- **자체 stat 카드 (KpiTile, SettingsTile)** fontSize 24/22 → 18 (24px+ 위반 제거)
+
+### 검증
+- tsc CallScheduler 0 errors
+- npm run lint:ui-design — CallScheduler 영역 위반 0건 ✓
+
+### 표준 따라가야 할 다음 영역
+- 자체 stat 카드 (KpiTile / SettingsTile) → DcStatStrip 으로 마이그 가능
+- 검색바 → DcToolbar 적용 (현재 자체 구현 없음)
+
 ## 2026-05-09 (Phase N-9) — SubNav 표준 패턴 정정 (ClientLayout 중첩 제거)
 
 ### 사용자 피드백

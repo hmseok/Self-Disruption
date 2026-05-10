@@ -162,8 +162,8 @@ export default function RequestsPage() {
           <Link href="/CallScheduler" style={{ fontSize: 12, color: COLORS.info, textDecoration: 'none' }}>
             ← 매트릭스로
           </Link>
-          <h1 style={{ fontSize: 22, fontWeight: 800, color: COLORS.textPrimary, margin: '6px 0' }}>
-            📋 직원 요청 통합 검토
+          <h1 style={{ fontSize: 20, fontWeight: 700, color: '#0f2440', margin: '6px 0' }}>
+            직원 요청 통합 검토
             {totalPending > 0 && (
               <span style={{ ...pillStyle('warning'), fontSize: 12, marginLeft: 8 }}>
                 대기 {totalPending}건

@@ -9,6 +9,7 @@ import Link from 'next/link'
 import { COLORS, GLASS, BTN, pillStyle } from '@/app/utils/ui-tokens'
 import { TONE_BG, TONE_TEXT } from './utils/palette'
 import { getAuthHeader } from '@/app/utils/auth-client'
+import DcStatStrip, { StatItem } from '@/app/components/DcStatStrip'
 
 export const dynamic = 'force-dynamic'
 
@@ -163,61 +164,73 @@ export default function CallSchedulerListPage() {
     else { setSortKey(k); setSortDir('desc') }
   }
 
+  // N-10 — DcStatStrip 용 5 stat (정산 관리 기준)
+  const statItems: StatItem[] = useMemo(() => {
+    if (!aggregate) return []
+    return [
+      { label: '활성 스케줄', value: items.length, subValue: `초안 ${aggregate.draft} · 공지 ${aggregate.published}`, tint: 'blue' as const },
+      { label: '공지 완료', value: aggregate.published, subValue: items.length > 0 ? `${Math.round(aggregate.published / items.length * 100)}%` : '0%', tint: 'green' as const },
+      { label: '총 근무자', value: aggregate.totalWorkers, subValue: '누적', tint: 'amber' as const },
+      { label: '평균 충원율', value: `${Math.round(aggregate.avgFill * 1000) / 10}%`, subValue: '전체', tint: (aggregate.avgFill > 0.9 ? 'green' : 'red') as 'green' | 'red' },
+      { label: '직원 요청', value: pendingCount, subValue: pendingCount > 0 ? '대기' : '없음', tint: 'purple' as const },
+    ]
+  }, [aggregate, items.length, pendingCount])
+
   return (
-    <div style={{ padding: 24, maxWidth: 1280, margin: '0 auto' }}>
+    <div style={{ padding: '20px 24px', maxWidth: 1400, margin: '0 auto' }}>
+      {/* Breadcrumb (정산 관리 기준) */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 6,
+        fontSize: 12, color: '#64748b', marginBottom: 4,
+      }}>
+        <span>운영</span>
+        <span>›</span>
+        <span style={{ color: '#0f2440', fontWeight: 600 }}>근무시간표 분석</span>
+      </div>
+
+      {/* 페이지 제목 (fontSize 20, fontWeight 700, 단순) */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        marginBottom: 16,
+        marginBottom: 16, gap: 12, flexWrap: 'wrap',
       }}>
-        <div>
-          <h1 style={{ fontSize: 22, fontWeight: 800, color: COLORS.textPrimary, margin: 0 }}>
-            ⏰ 근무시간표 분석 & 배포
-          </h1>
-          <div style={{ fontSize: 12, color: COLORS.textMuted, marginTop: 4 }}>
-            월별 콜 스케줄 작성 · 분석 · 공지
-            {pendingCount > 0 && (
-              <Link href="/CallScheduler/requests" style={{
-                marginLeft: 10, padding: '2px 10px', borderRadius: 99,
-                background: COLORS.bgAmber, color: COLORS.warning,
-                border: `1px solid ${COLORS.borderAmber}`,
-                fontSize: 11, fontWeight: 800, textDecoration: 'none',
-              }}>
-                ⏳ 직원 요청 {pendingCount}건
-              </Link>
-            )}
-          </div>
-        </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ width: 8, height: 8, borderRadius: 4, background: '#dc2626' }} />
+          <span style={{ width: 8, height: 8, borderRadius: 4, background: '#f59e0b' }} />
+          <span style={{ width: 8, height: 8, borderRadius: 4, background: '#16a34a' }} />
+          <h1 style={{ fontSize: 20, fontWeight: 700, color: '#0f2440', margin: 0 }}>
+            근무시간표 분석 & 배포
+          </h1>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {pendingCount > 0 && (
+            <Link href="/CallScheduler/requests" style={{
+              padding: '4px 10px', borderRadius: 99,
+              background: COLORS.bgAmber, color: COLORS.warning,
+              border: `1px solid ${COLORS.borderAmber}`,
+              fontSize: 11, fontWeight: 700, textDecoration: 'none',
+            }}>
+              ⏳ 직원 요청 {pendingCount}
+            </Link>
+          )}
           <Link href="/RideEmployees" style={{
-            ...BTN.md, background: 'transparent', color: COLORS.textSecondary,
-            border: `1px solid ${COLORS.borderFaint}`,
-            textDecoration: 'none', display: 'inline-block',
+            padding: '5px 12px', fontSize: 12, fontWeight: 700, borderRadius: 8,
+            border: '1px solid rgba(0,0,0,0.06)', background: 'rgba(255,255,255,0.6)',
+            color: '#334155', textDecoration: 'none',
           }}>
             📋 직원 마스터
           </Link>
           <Link href="/CallScheduler/new" style={{
-            ...BTN.lg, background: COLORS.primary, color: '#fff',
-            textDecoration: 'none', display: 'inline-block',
+            padding: '5px 12px', fontSize: 11, fontWeight: 700, borderRadius: 8,
+            border: 'none', background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)',
+            color: '#fff', textDecoration: 'none',
           }}>
             + 새 월 만들기
           </Link>
         </div>
       </div>
 
-      {aggregate && (
-        <div style={{
-          display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12,
-          marginBottom: 12,
-        }}>
-          <KpiTile label="활성 스케줄" value={items.length.toString()}
-                   sub={`초안 ${aggregate.draft} · 공지 ${aggregate.published}`} tone="blue" />
-          <KpiTile label="공지 완료" value={aggregate.published.toString()}
-                   sub={`전체 중 ${Math.round(aggregate.published / items.length * 100)}%`} tone="green" />
-          <KpiTile label="총 근무자" value={aggregate.totalWorkers.toString()} sub="누적 (중복 포함)" tone="amber" />
-          <KpiTile label="평균 충원율" value={`${Math.round(aggregate.avgFill * 1000) / 10}%`}
-                   sub="전체 평균" tone={aggregate.avgFill > 0.9 ? 'green' : 'red'} />
-        </div>
-      )}
+      {/* DcStatStrip — 5 카드 (정산 관리 기준) */}
+      {statItems.length > 0 && <DcStatStrip stats={statItems} />}
 
       {/* 운영 셋팅 펼침 (영역 한눈에 확인 — 깊은 편집은 SubNav 의 시프트/그룹/... 탭) */}
       {opsCounts && (
@@ -402,7 +415,7 @@ function KpiTile({ label, value, sub, tone }: {
       display: 'flex', flexDirection: 'column', gap: 4,
     }}>
       <div style={{ fontSize: 12, color: COLORS.textSecondary, fontWeight: 600 }}>{label}</div>
-      <div style={{ fontSize: 24, fontWeight: 800, color: tintMap.color, lineHeight: 1.1 }}>{value}</div>
+      <div style={{ fontSize: 18, fontWeight: 800, color: tintMap.color, lineHeight: 1.1 }}>{value}</div>
       <div style={{ fontSize: 11, color: COLORS.textMuted }}>{sub}</div>
     </div>
   )
@@ -442,7 +455,7 @@ function SettingsTile({ expanded, onToggle, icon, label, value, sub, tone }: {
           {expanded ? '▼' : '▶'}
         </span>
       </div>
-      <div style={{ fontSize: 22, fontWeight: 800, color: tintMap.color, lineHeight: 1.1 }}>
+      <div style={{ fontSize: 18, fontWeight: 800, color: tintMap.color, lineHeight: 1.1 }}>
         {value}
       </div>
       <div style={{ fontSize: 11, color: COLORS.textMuted }}>{sub}</div>

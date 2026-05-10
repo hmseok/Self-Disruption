@@ -203,7 +203,7 @@ function DetailInner({ id }: { id: string }) {
           </Link>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 4 }}>
             <h1 style={{
-              fontSize: 22, fontWeight: 800, color: COLORS.textPrimary, margin: 0,
+              fontSize: 20, fontWeight: 700, color: '#0f2440', margin: 0,
             }}>
               {schedule.year}년 {schedule.month}월
             </h1>
