@@ -23,6 +23,7 @@
     "lint:ui": "node harness-engineering/scripts/ui-data-coverage.js",
     "lint:ui-token": "node harness-engineering/scripts/ui-token-lint.js",
     "lint:menu-dup": "node harness-engineering/scripts/menu-path-duplicate-lint.js",
+    "lint:ui-design": "node harness-engineering/scripts/ui-design-lint.js",
     "harness:install-hook": "node harness-engineering/scripts/install-hook.js",
     "cowork:check": "node harness-engineering/scripts/cowork-health-check.js",
     "cowork:fix": "node harness-engineering/scripts/cowork-health-check.js --fix",
