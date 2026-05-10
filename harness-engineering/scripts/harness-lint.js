@@ -35,6 +35,8 @@ const sqlReservedAliasLint = require('./sql-reserved-alias-lint')
 const sqlGroupByLint = require('./sql-group-by-lint')
 const menuSyncLint = require('./menu-sync-lint')
 const coworkStagingLint = require('./cowork-staging-lint')
+const uiTokenLint = require('./ui-token-lint')
+const menuPathDupLint = require('./menu-path-duplicate-lint')
 
 const flags = new Set(process.argv.slice(2))
 
@@ -203,6 +205,14 @@ function main() {
     console.error(`  ❌ menu-registry 에 등록 안 된 페이지: ${v}/page.tsx`)
   }
 
+  // [평가] 3.6.b — menu-registry path 중복 차단 (PR-HARNESS-1, 트리거: PR-6.13)
+  console.log('\n▸ [3.6.b] menu-path-duplicate-lint — registry path 중복 차단')
+  const menuDupR = menuPathDupLint.main() || { total: 0, newCount: 0, knownCount: 0, newViolations: [] }
+
+  // [평가] 3.8 — UI 토큰 hardcode 차단 (PR-HARNESS-1, 트리거: PR-6.13)
+  console.log('\n▸ [3.8] ui-token-lint — Soft Ice Glass / COLORS 토큰 사용 강제')
+  const uiTokenR = uiTokenLint.main() || { total: 0, newCount: 0, knownCount: 0, newViolations: [] }
+
   // [평가] 3.7. cowork-staging — 한 commit 에 여러 모듈 영역 동시 staged 차단 (CLAUDE.md 규칙 21)
   // 회귀 케이스: 2026-05-06 — 두 세션 동시 작업 시 git add . 로 다른 세션 작업물 흡수 사고
   console.log('\n▸ [3.7] cowork-staging-lint — 멀티 세션 staging 침범 차단')
@@ -282,7 +292,12 @@ function main() {
     coworkR.skip || process.env.COWORK_ALLOW_MULTI_MODULE === '1'
       ? 0
       : coworkR.violations.length
-  const newCritical = newSqlViolations.length + fnR.violations.length + newApiBroken.length + newSign.length + newHelper.length + newAlias.length + newGb.length + menuR.violations.length + coworkCritical
+  // PR-HARNESS-1 — ui-token / menu-path-duplicate critical 합산
+  const newCritical =
+    newSqlViolations.length + fnR.violations.length + newApiBroken.length +
+    newSign.length + newHelper.length + newAlias.length + newGb.length +
+    menuR.violations.length + coworkCritical +
+    (uiTokenR.newCount || 0) + (menuDupR.newCount || 0)
   console.log('\n═══ 결과 ═══')
   console.log(`  새 critical 위반: ${newCritical}`)
   console.log(`  known issue: ${knownSqlViolations.length} SQL + ${apiR.brokenCalls.length - newApiBroken.length} broken-call`)

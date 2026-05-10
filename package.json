@@ -21,6 +21,8 @@
     "lint:db-sync": "node harness-engineering/scripts/db-sync-check.js --skip-if-no-db",
     "lint:api": "node harness-engineering/scripts/api-call-trace.js",
     "lint:ui": "node harness-engineering/scripts/ui-data-coverage.js",
+    "lint:ui-token": "node harness-engineering/scripts/ui-token-lint.js",
+    "lint:menu-dup": "node harness-engineering/scripts/menu-path-duplicate-lint.js",
     "harness:install-hook": "node harness-engineering/scripts/install-hook.js",
     "cowork:check": "node harness-engineering/scripts/cowork-health-check.js",
     "cowork:fix": "node harness-engineering/scripts/cowork-health-check.js --fix",

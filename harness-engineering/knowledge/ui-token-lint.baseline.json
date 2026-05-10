@@ -1,0 +1,3360 @@
+{
+  "violations": [
+    {
+      "file": "app/(employees)/CallScheduler/_components/SubNav.tsx",
+      "line": 37,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div style={{ padding: '0 24px', borderBottom: `1px solid ${COLORS.borderFaint}`, background: 'rgba(255,255,255,0.6)' }}"
+    },
+    {
+      "file": "app/(employees)/CallScheduler/components/DayView.tsx",
+      "line": 125,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: isWeekend ? COLORS.bgRed : 'rgba(255,255,255,0.6)',"
+    },
+    {
+      "file": "app/(employees)/CallScheduler/components/DayView.tsx",
+      "line": 415,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: TONE_BG[w.tone] !== 'transparent' ? TONE_BG[w.tone] : 'rgba(255,255,255,0.7)',"
+    },
+    {
+      "file": "app/(employees)/CallScheduler/components/MyScheduleView.tsx",
+      "line": 313,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: viewMode === opt.v ? COLORS.primary : 'rgba(255,255,255,0.7)',"
+    },
+    {
+      "file": "app/(employees)/CallScheduler/components/ScheduleGrid.tsx",
+      "line": 769,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.95)',"
+    },
+    {
+      "file": "app/(employees)/CallScheduler/components/ScheduleGrid.tsx",
+      "line": 821,
+      "label": "glass-bg-hardcode",
+      "snippet": "borderLeft: `1px dashed rgba(255,255,255,0.7)`,"
+    },
+    {
+      "file": "app/(employees)/CallScheduler/components/SkipRequestDialog.tsx",
+      "line": 146,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: active ? COLORS.bgBlue : 'rgba(255,255,255,0.6)',"
+    },
+    {
+      "file": "app/(employees)/CallScheduler/components/SkipRequestDialog.tsx",
+      "line": 222,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.85)',"
+    },
+    {
+      "file": "app/(employees)/CallScheduler/components/WeekView.tsx",
+      "line": 211,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.95)', color: COLORS.textPrimary,"
+    },
+    {
+      "file": "app/(employees)/CallScheduler/components/WeekView.tsx",
+      "line": 247,
+      "label": "glass-bg-hardcode",
+      "snippet": "borderLeft: `1px dashed rgba(255,255,255,0.7)`,"
+    },
+    {
+      "file": "app/(employees)/CallScheduler/page.tsx",
+      "line": 514,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.7)', color: COLORS.textPrimary,"
+    },
+    {
+      "file": "app/(employees)/CallScheduler/page.tsx",
+      "line": 544,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: TONE_BG[tone] !== 'transparent' ? TONE_BG[tone] : 'rgba(255,255,255,0.7)',"
+    },
+    {
+      "file": "app/(employees)/CallScheduler/page.tsx",
+      "line": 590,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: TONE_BG[tone] !== 'transparent' ? TONE_BG[tone] : 'rgba(255,255,255,0.7)',"
+    },
+    {
+      "file": "app/(employees)/CallScheduler/requests/page.tsx",
+      "line": 184,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: statusFilter === s ? COLORS.primary : 'rgba(255,255,255,0.6)',"
+    },
+    {
+      "file": "app/(employees)/CallScheduler/requests/page.tsx",
+      "line": 216,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: tab === t.v ? 'rgba(255,255,255,0.25)' : COLORS.bgAmber,"
+    },
+    {
+      "file": "app/(employees)/CallScheduler/settings/GroupEditor.tsx",
+      "line": 581,
+      "label": "glass-bg-hardcode",
+      "snippet": "boxShadow: active ? `0 0 0 2px rgba(255,255,255,0.9)` : 'none',"
+    },
+    {
+      "file": "app/(employees)/CallScheduler/settings/GroupEditor.tsx",
+      "line": 655,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.85)',"
+    },
+    {
+      "file": "app/(employees)/CallScheduler/settings/GroupEditor.tsx",
+      "line": 686,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: isWeekend ? COLORS.bgGray : 'rgba(255,255,255,0.85)',"
+    },
+    {
+      "file": "app/(employees)/CallScheduler/settings/GroupEditor.tsx",
+      "line": 712,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.7)', padding: '1px 6px', borderRadius: 99,"
+    },
+    {
+      "file": "app/(employees)/CallScheduler/settings/GroupEditor.tsx",
+      "line": 720,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.85)', borderRadius: 8, padding: 10,"
+    },
+    {
+      "file": "app/(employees)/CallScheduler/settings/GroupEditor.tsx",
+      "line": 764,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.5)',"
+    },
+    {
+      "file": "app/(employees)/CallScheduler/settings/GroupEditor.tsx",
+      "line": 835,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: expandedCfgWorkerId === w.id ? COLORS.bgBlue : 'rgba(255,255,255,0.5)',"
+    },
+    {
+      "file": "app/(employees)/CallScheduler/settings/GroupEditor.tsx",
+      "line": 851,
+      "label": "glass-bg-hardcode",
+      "snippet": ": 'rgba(255,255,255,0.5)',"
+    },
+    {
+      "file": "app/(employees)/CallScheduler/settings/GroupEditor.tsx",
+      "line": 878,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.96)',"
+    },
+    {
+      "file": "app/(employees)/CallScheduler/settings/GroupEditor.tsx",
+      "line": 1126,
+      "label": "glass-bg-hardcode",
+      "snippet": "? (kind === 'prefer' ? COLORS.bgGreen : COLORS.bgRed) : 'rgba(255,255,255,0.7)',"
+    },
+    {
+      "file": "app/(employees)/CallScheduler/settings/GroupEditor.tsx",
+      "line": 1148,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.96)',"
+    },
+    {
+      "file": "app/(employees)/CallScheduler/settings/GroupEditor.tsx",
+      "line": 1166,
+      "label": "glass-bg-hardcode",
+      "snippet": ": 'rgba(255,255,255,0.7)',"
+    },
+    {
+      "file": "app/(employees)/CallScheduler/settings/GroupEditor.tsx",
+      "line": 1240,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: active ? COLORS.bgRed : 'rgba(255,255,255,0.7)',"
+    },
+    {
+      "file": "app/(employees)/CallScheduler/settings/GroupSkipDatesModal.tsx",
+      "line": 141,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.7)',"
+    },
+    {
+      "file": "app/(employees)/CallScheduler/settings/GroupSkipDatesModal.tsx",
+      "line": 234,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.85)', marginTop: 2,"
+    },
+    {
+      "file": "app/(employees)/CallScheduler/settings/GroupsTab.tsx",
+      "line": 240,
+      "label": "glass-bg-hardcode",
+      "snippet": "fontSize: 12, background: 'rgba(255,255,255,0.8)', cursor: 'pointer',"
+    },
+    {
+      "file": "app/(employees)/CallScheduler/settings/GroupsTab.tsx",
+      "line": 314,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: active ? COLORS.primary : 'rgba(255,255,255,0.8)',"
+    },
+    {
+      "file": "app/(employees)/CallScheduler/settings/GroupsTab.tsx",
+      "line": 357,
+      "label": "glass-bg-hardcode",
+      "snippet": "const cardBg = tone !== 'none' ? TONE_BG[tone] : 'rgba(255,255,255,0.72)'"
+    },
+    {
+      "file": "app/(employees)/CallScheduler/settings/GroupsTab.tsx",
+      "line": 409,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.85)',"
+    },
+    {
+      "file": "app/(employees)/CallScheduler/settings/GroupsTab.tsx",
+      "line": 461,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.4)',"
+    },
+    {
+      "file": "app/(employees)/CallScheduler/settings/GroupsTab.tsx",
+      "line": 470,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: TONE_BG[m.color_tone] !== 'transparent' ? TONE_BG[m.color_tone] : 'rgba(255,255,255,0.7)',"
+    },
+    {
+      "file": "app/(employees)/CallScheduler/settings/GroupsTab.tsx",
+      "line": 506,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.7)', cursor: 'pointer',"
+    },
+    {
+      "file": "app/(employees)/CallScheduler/settings/GroupsTab.tsx",
+      "line": 519,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: enabled ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.3)',"
+    },
+    {
+      "file": "app/(employees)/CallScheduler/settings/LeaveBulkUploadDialog.tsx",
+      "line": 359,
+      "label": "glass-bg-hardcode",
+      "snippet": "neutral: { bg: 'rgba(255,255,255,0.6)', color: COLORS.textPrimary },"
+    },
+    {
+      "file": "app/(employees)/CallScheduler/settings/WorkersTab.tsx",
+      "line": 378,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.5)',"
+    },
+    {
+      "file": "app/(employees)/CallScheduler/settings/WorkersTab.tsx",
+      "line": 488,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.6)', color: COLORS.textPrimary,"
+    },
+    {
+      "file": "app/(employees)/CallScheduler/skips/page.tsx",
+      "line": 120,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: filterStatus === s ? COLORS.primary : 'rgba(255,255,255,0.6)',"
+    },
+    {
+      "file": "app/(employees)/RideAccidentReports/page.tsx",
+      "line": 526,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: rgstFilter === v ? COLORS.bgBlue : 'rgba(255,255,255,0.6)',"
+    },
+    {
+      "file": "app/(employees)/RideAccidentReports/page.tsx",
+      "line": 564,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.6)',"
+    },
+    {
+      "file": "app/(employees)/RideAccidentReports/page.tsx",
+      "line": 703,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.6)',"
+    },
+    {
+      "file": "app/(employees)/RideAccidents/page.tsx",
+      "line": 492,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: rgstFilter === v ? COLORS.bgBlue : 'rgba(255,255,255,0.6)',"
+    },
+    {
+      "file": "app/(employees)/RideAccidents/page.tsx",
+      "line": 530,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.6)',"
+    },
+    {
+      "file": "app/(employees)/RideAccidents/page.tsx",
+      "line": 674,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.6)',"
+    },
+    {
+      "file": "app/(employees)/RideCustomerData/page.tsx",
+      "line": 578,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: tab === id ? COLORS.primary : 'rgba(255,255,255,0.50)',"
+    },
+    {
+      "file": "app/(employees)/RideCustomerData/page.tsx",
+      "line": 1312,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: hover ? 'rgba(59,110,181,0.08)' : 'rgba(255,255,255,0.40)',"
+    },
+    {
+      "file": "app/(employees)/RideCustomerData/page.tsx",
+      "line": 1312,
+      "label": "primary-hardcode",
+      "snippet": "background: hover ? 'rgba(59,110,181,0.08)' : 'rgba(255,255,255,0.40)',"
+    },
+    {
+      "file": "app/(employees)/RideCustomerData/page.tsx",
+      "line": 1500,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div style={{ overflow: 'auto', maxHeight: 200, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 6, background: 'rgba"
+    },
+    {
+      "file": "app/(employees)/RideCustomerData/page.tsx",
+      "line": 1650,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.6)',"
+    },
+    {
+      "file": "app/(employees)/RideEmployees/components/BulkUploadDialog.tsx",
+      "line": 333,
+      "label": "glass-bg-hardcode",
+      "snippet": "neutral: { bg: 'rgba(255,255,255,0.6)', color: COLORS.textPrimary },"
+    },
+    {
+      "file": "app/(employees)/RideSettlements/page.tsx",
+      "line": 531,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: hover ? 'rgba(59,110,181,0.08)' : 'rgba(255,255,255,0.40)',"
+    },
+    {
+      "file": "app/(employees)/RideSettlements/page.tsx",
+      "line": 531,
+      "label": "primary-hardcode",
+      "snippet": "background: hover ? 'rgba(59,110,181,0.08)' : 'rgba(255,255,255,0.40)',"
+    },
+    {
+      "file": "app/(employees)/RideSettlements/page.tsx",
+      "line": 630,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div style={{ fontSize: 10, color: COLORS.textSecondary, padding: 6, background: 'rgba(255,255,255,0.5)', borderRadius: "
+    },
+    {
+      "file": "app/(employees)/RideSettlements/page.tsx",
+      "line": 814,
+      "label": "glass-bg-hardcode",
+      "snippet": "<span style={{ color: cur.color, fontSize: 12, fontWeight: 700, padding: '4px 10px', background: 'rgba(255,255,255,0.5)'"
+    },
+    {
+      "file": "app/(employees)/RideSettlements/page.tsx",
+      "line": 867,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div key={c.id} style={{ fontSize: 11, padding: '4px 8px', background: 'rgba(255,255,255,0.5)', borderRadius: 4, display"
+    },
+    {
+      "file": "app/(employees)/RideVehicleRegistry/page.tsx",
+      "line": 364,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: statusFilter === v ? COLORS.bgBlue : 'rgba(255,255,255,0.6)',"
+    },
+    {
+      "file": "app/(employees)/RideVehicleRegistry/page.tsx",
+      "line": 395,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.6)',"
+    },
+    {
+      "file": "app/(employees)/RideVehicleRegistry/page.tsx",
+      "line": 819,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.6)',"
+    },
+    {
+      "file": "app/(employees)/RideVehicleRegistry/page.tsx",
+      "line": 970,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.6)',"
+    },
+    {
+      "file": "app/(employees)/factory-search/_components/ui.tsx",
+      "line": 149,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: active ? 'rgba(255,255,255,0.20)' : COLORS.bgGray,"
+    },
+    {
+      "file": "app/(employees)/factory-search/cafe24-import/page.tsx",
+      "line": 668,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: rightTab === 'snapshot' ? COLORS.primary : 'rgba(255,255,255,0.50)',"
+    },
+    {
+      "file": "app/(employees)/factory-search/cafe24-import/page.tsx",
+      "line": 683,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: rightTab === 'partners' ? COLORS.primary : 'rgba(255,255,255,0.50)',"
+    },
+    {
+      "file": "app/admin/contract-terms/page.tsx",
+      "line": 1708,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ width: 80, border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '4px 8px', fontSize: 13, textAl"
+    },
+    {
+      "file": "app/admin/contract-terms/page.tsx",
+      "line": 1718,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ width: '100%', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '6px 8px', fontSize: 13, re"
+    },
+    {
+      "file": "app/admin/contract-terms/page.tsx",
+      "line": 1739,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ width: 80, border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '4px 8px', fontSize: 13, textAl"
+    },
+    {
+      "file": "app/admin/contract-terms/page.tsx",
+      "line": 1747,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ width: 80, border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '4px 8px', fontSize: 13, textAl"
+    },
+    {
+      "file": "app/admin/contract-terms/page.tsx",
+      "line": 1780,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ width: 90, border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '4px 6px', fontSize: 13, textAl"
+    },
+    {
+      "file": "app/admin/contract-terms/page.tsx",
+      "line": 1793,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ width: 90, border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '4px 6px', fontSize: 13, textAl"
+    },
+    {
+      "file": "app/admin/contract-terms/page.tsx",
+      "line": 1819,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ width: 80, border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '4px 8px', fontSize: 13, textAl"
+    },
+    {
+      "file": "app/admin/contract-terms/page.tsx",
+      "line": 1842,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ width: 80, border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '4px 8px', fontSize: 13, textAl"
+    },
+    {
+      "file": "app/admin/contract-terms/page.tsx",
+      "line": 1872,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ width: 80, border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '4px 8px', fontSize: 13, textAl"
+    },
+    {
+      "file": "app/admin/contract-terms/page.tsx",
+      "line": 1913,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ width: 60, border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '4px 6px', fontSize: 13, textAl"
+    },
+    {
+      "file": "app/admin/contract-terms/page.tsx",
+      "line": 1921,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ width: 70, border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '4px 6px', fontSize: 13, textAl"
+    },
+    {
+      "file": "app/admin/contract-terms/page.tsx",
+      "line": 1952,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ width: 60, border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '4px 6px', fontSize: 13, textAl"
+    },
+    {
+      "file": "app/admin/contract-terms/page.tsx",
+      "line": 1960,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ width: 70, border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '4px 6px', fontSize: 13, textAl"
+    },
+    {
+      "file": "app/admin/contract-terms/page.tsx",
+      "line": 1993,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ width: 60, border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '4px 6px', fontSize: 13, textAl"
+    },
+    {
+      "file": "app/admin/contract-terms/page.tsx",
+      "line": 2001,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ width: 60, border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '4px 6px', fontSize: 13, textAl"
+    },
+    {
+      "file": "app/admin/contract-terms/page.tsx",
+      "line": 2009,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ width: 70, border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '4px 6px', fontSize: 13, textAl"
+    },
+    {
+      "file": "app/admin/locations/page.tsx",
+      "line": 288,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.7)', color: COLORS.textPrimary,"
+    },
+    {
+      "file": "app/admin/market-prices/MarketPricesManager.tsx",
+      "line": 100,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div className=\"rounded-2xl overflow-hidden\" style={{ background: 'rgba(255,255,255,0.72)', border: '1px solid rgba(0,0,"
+    },
+    {
+      "file": "app/cars/CarList.tsx",
+      "line": 297,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.72)',"
+    },
+    {
+      "file": "app/cars/CarList.tsx",
+      "line": 300,
+      "label": "glass-bg-hardcode",
+      "snippet": "boxShadow: '6px 6px 18px rgba(140,170,210,0.14), -6px -6px 18px rgba(255,255,255,0.47)',"
+    },
+    {
+      "file": "app/cars/CarList.tsx",
+      "line": 325,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.72)',"
+    },
+    {
+      "file": "app/cars/CarList.tsx",
+      "line": 330,
+      "label": "glass-bg-hardcode",
+      "snippet": "boxShadow: '4px 4px 12px rgba(140,170,210,0.14), -4px -4px 12px rgba(255,255,255,0.47)',"
+    },
+    {
+      "file": "app/cars/CarList.tsx",
+      "line": 344,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.60)',"
+    },
+    {
+      "file": "app/cars/CarList.tsx",
+      "line": 351,
+      "label": "glass-bg-hardcode",
+      "snippet": "boxShadow: '2px 2px 6px rgba(140,170,210,0.08), -2px -2px 6px rgba(255,255,255,0.35)',"
+    },
+    {
+      "file": "app/cars/CarList.tsx",
+      "line": 381,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.72)',"
+    },
+    {
+      "file": "app/cars/CarList.tsx",
+      "line": 386,
+      "label": "glass-bg-hardcode",
+      "snippet": "boxShadow: '4px 4px 12px rgba(140,170,210,0.14), -4px -4px 12px rgba(255,255,255,0.47)',"
+    },
+    {
+      "file": "app/cars/CarList.tsx",
+      "line": 400,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.60)',"
+    },
+    {
+      "file": "app/cars/CarList.tsx",
+      "line": 407,
+      "label": "glass-bg-hardcode",
+      "snippet": "boxShadow: '2px 2px 6px rgba(140,170,210,0.08), -2px -2px 6px rgba(255,255,255,0.35)',"
+    },
+    {
+      "file": "app/cars/[id]/CarDetail.tsx",
+      "line": 48,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.7)',"
+    },
+    {
+      "file": "app/cars/[id]/CarDetail.tsx",
+      "line": 74,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.7)',"
+    },
+    {
+      "file": "app/components/DarkHeader.tsx",
+      "line": 42,
+      "label": "glass-bg-hardcode",
+      "snippet": "boxShadow: '3px 3px 8px rgba(140,170,210,0.19), -1px -1px 4px rgba(255,255,255,0.47)',"
+    },
+    {
+      "file": "app/components/DarkHeader.tsx",
+      "line": 45,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.60)',"
+    },
+    {
+      "file": "app/components/DarkHeader.tsx",
+      "line": 47,
+      "label": "glass-bg-hardcode",
+      "snippet": "border: '1px solid rgba(255,255,255,0.30)',"
+    },
+    {
+      "file": "app/components/DarkHeader.tsx",
+      "line": 48,
+      "label": "glass-bg-hardcode",
+      "snippet": "boxShadow: '2px 2px 6px rgba(140,170,210,0.19), -2px -2px 6px rgba(255,255,255,0.47)',"
+    },
+    {
+      "file": "app/components/DarkHeader.tsx",
+      "line": 60,
+      "label": "glass-bg-hardcode",
+      "snippet": "white: { color: '#1e293b', bgColor: 'rgba(255,255,255,0.60)', borderColor: 'rgba(255,255,255,0.30)', labelColor: '#64748"
+    },
+    {
+      "file": "app/components/DarkHeader.tsx",
+      "line": 77,
+      "label": "glass-bg-hardcode",
+      "snippet": "boxShadow: '8px 8px 20px rgba(140,170,210,0.19), -8px -8px 20px rgba(255,255,255,0.47)',"
+    },
+    {
+      "file": "app/components/DarkHeader.tsx",
+      "line": 82,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.72)',"
+    },
+    {
+      "file": "app/components/DarkHeader.tsx",
+      "line": 85,
+      "label": "glass-bg-hardcode",
+      "snippet": "border: '1px solid rgba(255,255,255,0.30)',"
+    },
+    {
+      "file": "app/components/DarkHeader.tsx",
+      "line": 122,
+      "label": "glass-bg-hardcode",
+      "snippet": "boxShadow: '4px 4px 12px rgba(140,170,210,0.19), -4px -4px 12px rgba(255,255,255,0.47)',"
+    },
+    {
+      "file": "app/components/DarkHeader.tsx",
+      "line": 127,
+      "label": "glass-bg-hardcode",
+      "snippet": ";(e.currentTarget as HTMLDivElement).style.boxShadow = '6px 6px 16px rgba(140,170,210,0.25), -6px -6px 16px rgba(255,255"
+    },
+    {
+      "file": "app/components/DarkHeader.tsx",
+      "line": 131,
+      "label": "glass-bg-hardcode",
+      "snippet": ";(e.currentTarget as HTMLDivElement).style.boxShadow = '4px 4px 12px rgba(140,170,210,0.19), -4px -4px 12px rgba(255,255"
+    },
+    {
+      "file": "app/components/DarkHeader.tsx",
+      "line": 146,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.60)',"
+    },
+    {
+      "file": "app/components/DarkHeader.tsx",
+      "line": 147,
+      "label": "glass-bg-hardcode",
+      "snippet": "borderLeft: '1px solid rgba(255,255,255,0.30)',"
+    },
+    {
+      "file": "app/components/DarkHeader.tsx",
+      "line": 148,
+      "label": "glass-bg-hardcode",
+      "snippet": "borderRight: '1px solid rgba(255,255,255,0.30)',"
+    },
+    {
+      "file": "app/components/DarkHeader.tsx",
+      "line": 149,
+      "label": "glass-bg-hardcode",
+      "snippet": "borderBottom: '1px solid rgba(255,255,255,0.30)',"
+    },
+    {
+      "file": "app/components/DarkHeader.tsx",
+      "line": 178,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.40)',"
+    },
+    {
+      "file": "app/components/DarkHeader.tsx",
+      "line": 182,
+      "label": "glass-bg-hardcode",
+      "snippet": "boxShadow: 'inset 2px 2px 6px rgba(140,170,210,0.12), inset -2px -2px 6px rgba(255,255,255,0.35)',"
+    },
+    {
+      "file": "app/components/DarkHeader.tsx",
+      "line": 206,
+      "label": "glass-bg-hardcode",
+      "snippet": "color: active ? 'rgba(255,255,255,0.8)' : '#8aabc7',"
+    },
+    {
+      "file": "app/components/DarkHeader.tsx",
+      "line": 246,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.50)',"
+    },
+    {
+      "file": "app/components/DarkHeader.tsx",
+      "line": 254,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: active ? 'linear-gradient(135deg, #3b6eb5, #5a8fd4)' : 'rgba(255,255,255,0.50)',"
+    },
+    {
+      "file": "app/components/DarkHeader.tsx",
+      "line": 256,
+      "label": "glass-bg-hardcode",
+      "snippet": "border: active ? 'none' : '1px solid rgba(255,255,255,0.30)',"
+    },
+    {
+      "file": "app/components/DarkHeader.tsx",
+      "line": 259,
+      "label": "glass-bg-hardcode",
+      "snippet": ": '2px 2px 6px rgba(140,170,210,0.12), -2px -2px 6px rgba(255,255,255,0.30)',"
+    },
+    {
+      "file": "app/components/DarkHeader.tsx",
+      "line": 304,
+      "label": "glass-bg-hardcode",
+      "snippet": "boxShadow: 'inset 0 2px 4px rgba(255,255,255,0.15)',"
+    },
+    {
+      "file": "app/components/DarkHeader.tsx",
+      "line": 308,
+      "label": "glass-bg-hardcode",
+      "snippet": "{i > 0 && <span style={{ width: 1, height: 18, background: 'rgba(255,255,255,0.25)', display: 'inline-block' }} />}"
+    },
+    {
+      "file": "app/components/DarkHeader.tsx",
+      "line": 309,
+      "label": "glass-bg-hardcode",
+      "snippet": "<span style={{ fontSize: 12, color: 'rgba(255,255,255,0.85)' }}>"
+    },
+    {
+      "file": "app/components/DarkHeader.tsx",
+      "line": 325,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.95)', color: '#3b6eb5', border: 'none', fontWeight: 800,"
+    },
+    {
+      "file": "app/components/DarkHeader.tsx",
+      "line": 329,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.12)', color: '#e0ecf8',"
+    },
+    {
+      "file": "app/components/DarkHeader.tsx",
+      "line": 330,
+      "label": "glass-bg-hardcode",
+      "snippet": "border: '1px solid rgba(255,255,255,0.2)',"
+    },
+    {
+      "file": "app/components/DcStatStrip.tsx",
+      "line": 114,
+      "label": "glass-bg-hardcode",
+      "snippet": "boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -2px -2px 8px rgba(255,255,255,0.6)',"
+    },
+    {
+      "file": "app/components/DcStatStrip.tsx",
+      "line": 204,
+      "label": "glass-bg-hardcode",
+      "snippet": ": 'rgba(255,255,255,0.72)',"
+    },
+    {
+      "file": "app/components/DcStatStrip.tsx",
+      "line": 215,
+      "label": "glass-bg-hardcode",
+      "snippet": "? '4px 4px 12px rgba(59,110,181,0.25), -2px -2px 6px rgba(255,255,255,0.3)'"
+    },
+    {
+      "file": "app/components/DcStatStrip.tsx",
+      "line": 215,
+      "label": "primary-hardcode",
+      "snippet": "? '4px 4px 12px rgba(59,110,181,0.25), -2px -2px 6px rgba(255,255,255,0.3)'"
+    },
+    {
+      "file": "app/components/DcStatStrip.tsx",
+      "line": 216,
+      "label": "glass-bg-hardcode",
+      "snippet": ": '4px 4px 10px rgba(140,170,210,0.15), -2px -2px 6px rgba(255,255,255,0.6)',"
+    },
+    {
+      "file": "app/components/DcToolbar.tsx",
+      "line": 45,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.72)',"
+    },
+    {
+      "file": "app/components/DcToolbar.tsx",
+      "line": 48,
+      "label": "glass-bg-hardcode",
+      "snippet": "boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -4px -4px 12px rgba(255,255,255,0.5)',"
+    },
+    {
+      "file": "app/components/DcToolbar.tsx",
+      "line": 111,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: activeFilter === f.key ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.06)',"
+    },
+    {
+      "file": "app/components/DcToolbar.tsx",
+      "line": 112,
+      "label": "glass-bg-hardcode",
+      "snippet": "color: activeFilter === f.key ? 'rgba(255,255,255,0.8)' : '#8aabc7',"
+    },
+    {
+      "file": "app/components/NeuDataTable.tsx",
+      "line": 106,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.72)',"
+    },
+    {
+      "file": "app/components/NeuDataTable.tsx",
+      "line": 109,
+      "label": "glass-bg-hardcode",
+      "snippet": "boxShadow: '6px 6px 18px rgba(140,170,210,0.14), -6px -6px 18px rgba(255,255,255,0.47)',"
+    },
+    {
+      "file": "app/components/NeuDataTable.tsx",
+      "line": 123,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.72)',"
+    },
+    {
+      "file": "app/components/NeuDataTable.tsx",
+      "line": 126,
+      "label": "glass-bg-hardcode",
+      "snippet": "boxShadow: '6px 6px 18px rgba(140,170,210,0.14), -6px -6px 18px rgba(255,255,255,0.47)',"
+    },
+    {
+      "file": "app/components/NeuDataTable.tsx",
+      "line": 138,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.72)',"
+    },
+    {
+      "file": "app/components/NeuDataTable.tsx",
+      "line": 141,
+      "label": "glass-bg-hardcode",
+      "snippet": "boxShadow: '6px 6px 18px rgba(140,170,210,0.14), -6px -6px 18px rgba(255,255,255,0.47)',"
+    },
+    {
+      "file": "app/components/NeuDataTable.tsx",
+      "line": 168,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.40)',"
+    },
+    {
+      "file": "app/components/NeuDataTable.tsx",
+      "line": 201,
+      "label": "primary-hardcode",
+      "snippet": "if (onRowClick) e.currentTarget.style.background = 'rgba(59,110,181,0.03)'"
+    },
+    {
+      "file": "app/components/NeuFilterTabs.tsx",
+      "line": 31,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.40)',"
+    },
+    {
+      "file": "app/components/NeuFilterTabs.tsx",
+      "line": 34,
+      "label": "glass-bg-hardcode",
+      "snippet": "boxShadow: 'inset 2px 2px 5px rgba(140,170,210,0.10), inset -2px -2px 5px rgba(255,255,255,0.30)',"
+    },
+    {
+      "file": "app/components/NeuFilterTabs.tsx",
+      "line": 60,
+      "label": "glass-bg-hardcode",
+      "snippet": "boxShadow: '2px 2px 6px rgba(140,170,210,0.22), -1px -1px 4px rgba(255,255,255,0.40)',"
+    },
+    {
+      "file": "app/components/NeuFilterTabs.tsx",
+      "line": 75,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.25)',"
+    },
+    {
+      "file": "app/components/NeuSearchBar.tsx",
+      "line": 72,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.40)',"
+    },
+    {
+      "file": "app/components/NeuSearchBar.tsx",
+      "line": 76,
+      "label": "glass-bg-hardcode",
+      "snippet": "boxShadow: 'inset 2px 2px 4px rgba(140,170,210,0.12), inset -2px -2px 4px rgba(255,255,255,0.35)',"
+    },
+    {
+      "file": "app/components/NeuSearchBar.tsx",
+      "line": 79,
+      "label": "glass-bg-hardcode",
+      "snippet": "onFocus={e => { e.currentTarget.style.boxShadow = 'inset 2px 2px 4px rgba(140,170,210,0.12), inset -2px -2px 4px rgba(25"
+    },
+    {
+      "file": "app/components/NeuSearchBar.tsx",
+      "line": 79,
+      "label": "primary-hardcode",
+      "snippet": "onFocus={e => { e.currentTarget.style.boxShadow = 'inset 2px 2px 4px rgba(140,170,210,0.12), inset -2px -2px 4px rgba(25"
+    },
+    {
+      "file": "app/components/NeuSearchBar.tsx",
+      "line": 80,
+      "label": "glass-bg-hardcode",
+      "snippet": "onBlur={e => { e.currentTarget.style.boxShadow = 'inset 2px 2px 4px rgba(140,170,210,0.12), inset -2px -2px 4px rgba(255"
+    },
+    {
+      "file": "app/components/NeuSearchBar.tsx",
+      "line": 117,
+      "label": "glass-bg-hardcode",
+      "snippet": "boxShadow: '3px 3px 8px rgba(140,170,210,0.19), -1px -1px 4px rgba(255,255,255,0.47)',"
+    },
+    {
+      "file": "app/components/NeuSearchBar.tsx",
+      "line": 122,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.60)',"
+    },
+    {
+      "file": "app/components/NeuSearchBar.tsx",
+      "line": 125,
+      "label": "glass-bg-hardcode",
+      "snippet": "boxShadow: '2px 2px 6px rgba(140,170,210,0.10), -2px -2px 6px rgba(255,255,255,0.40)',"
+    },
+    {
+      "file": "app/components/NeuStatCards.tsx",
+      "line": 79,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.72)',"
+    },
+    {
+      "file": "app/components/NeuStatCards.tsx",
+      "line": 80,
+      "label": "glass-bg-hardcode",
+      "snippet": "border: `1.5px solid ${isActive ? tint.border : 'rgba(255,255,255,0.30)'}`,"
+    },
+    {
+      "file": "app/components/NeuStatCards.tsx",
+      "line": 88,
+      "label": "glass-bg-hardcode",
+      "snippet": "? `6px 6px 16px ${tint.shadow}, -4px -4px 12px rgba(255,255,255,0.47), inset 0 0 0 1px ${tint.border}`"
+    },
+    {
+      "file": "app/components/NeuStatCards.tsx",
+      "line": 90,
+      "label": "glass-bg-hardcode",
+      "snippet": "? '6px 6px 16px rgba(140,170,210,0.22), -4px -4px 12px rgba(255,255,255,0.5)'"
+    },
+    {
+      "file": "app/components/NeuStatCards.tsx",
+      "line": 91,
+      "label": "glass-bg-hardcode",
+      "snippet": ": '4px 4px 12px rgba(140,170,210,0.14), -4px -4px 12px rgba(255,255,255,0.47)',"
+    },
+    {
+      "file": "app/components/PageTitle.tsx",
+      "line": 116,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.75)',"
+    },
+    {
+      "file": "app/components/QuickTxModal.tsx",
+      "line": 216,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.55)',"
+    },
+    {
+      "file": "app/components/QuickTxModal.tsx",
+      "line": 231,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: active ? 'rgba(255,255,255,0.95)' : 'transparent',"
+    },
+    {
+      "file": "app/components/QuickTxModal.tsx",
+      "line": 403,
+      "label": "primary-hardcode",
+      "snippet": "boxShadow: '0 4px 12px rgba(59,110,181,0.25)',"
+    },
+    {
+      "file": "app/components/auth/ClientLayout.tsx",
+      "line": 101,
+      "label": "glass-bg-hardcode",
+      "snippet": "boxShadow: '3px 3px 8px rgba(140,170,210,0.19), -1px -1px 4px rgba(255,255,255,0.47)',"
+    },
+    {
+      "file": "app/components/auth/ClientLayout.tsx",
+      "line": 292,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div className=\"fixed top-0 left-0 right-0 z-30 safe-top\" style={{ background: 'rgba(255,255,255,0.85)', backdropFilter:"
+    },
+    {
+      "file": "app/components/auth/ClientLayout.tsx",
+      "line": 318,
+      "label": "glass-bg-hardcode",
+      "snippet": "<aside className={`${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} w-60 transition-transform duration-300 overf"
+    },
+    {
+      "file": "app/components/auth/ClientLayout.tsx",
+      "line": 333,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div className=\"rounded-lg px-3 py-3\" style={{ background: 'rgba(0,0,0,0.02)', border: '1px solid rgba(0,0,0,0.06)', box"
+    },
+    {
+      "file": "app/components/auth/ClientLayout.tsx",
+      "line": 373,
+      "label": "glass-bg-hardcode",
+      "snippet": "boxShadow: '3px 3px 8px rgba(140,170,210,0.19), -1px -1px 4px rgba(255,255,255,0.47)',"
+    },
+    {
+      "file": "app/components/auth/ClientLayout.tsx",
+      "line": 391,
+      "label": "glass-bg-hardcode",
+      "snippet": "boxShadow: '3px 3px 8px rgba(16,185,129,0.22), -1px -1px 4px rgba(255,255,255,0.47)',"
+    },
+    {
+      "file": "app/components/auth/ClientLayout.tsx",
+      "line": 398,
+      "label": "glass-bg-hardcode",
+      "snippet": "'4px 4px 12px rgba(16,185,129,0.30), -1px -1px 4px rgba(255,255,255,0.55)'"
+    },
+    {
+      "file": "app/components/auth/ClientLayout.tsx",
+      "line": 403,
+      "label": "glass-bg-hardcode",
+      "snippet": "'3px 3px 8px rgba(16,185,129,0.22), -1px -1px 4px rgba(255,255,255,0.47)'"
+    },
+    {
+      "file": "app/components/auth/ClientLayout.tsx",
+      "line": 547,
+      "label": "glass-bg-hardcode",
+      "snippet": "boxShadow: '12px 12px 30px rgba(140,170,210,0.25), -8px -8px 20px rgba(255,255,255,0.5)',"
+    },
+    {
+      "file": "app/components/auth/ClientLayout.tsx",
+      "line": 640,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div style={{ width: 14, height: 14, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '5"
+    },
+    {
+      "file": "app/components/auth/ClientLayout.tsx",
+      "line": 658,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(22,32,54,0.97)', backdropFilter: 'blur(16px)', boxShadow: '0 8px 32px rgba(0,0,0,0.4), 0 0 0 1px rgba("
+    },
+    {
+      "file": "app/components/auth/ClientLayout.tsx",
+      "line": 672,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div style={{ width: 16, height: 16, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '5"
+    },
+    {
+      "file": "app/components/auth/ClientLayout.tsx",
+      "line": 682,
+      "label": "glass-bg-hardcode",
+      "snippet": "<span style={{ fontSize: 11, fontWeight: 700, color: '#fff', background: 'rgba(255,255,255,0.2)', padding: '2px 8px', bo"
+    },
+    {
+      "file": "app/components/auth/ClientLayout.tsx",
+      "line": 687,
+      "label": "glass-bg-hardcode",
+      "snippet": "<span style={{ fontSize: 11, fontWeight: 700, color: '#fff', background: 'rgba(255,255,255,0.25)', padding: '2px 8px', b"
+    },
+    {
+      "file": "app/components/auth/ClientLayout.tsx",
+      "line": 692,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ background: 'rgba(255,255,255,0.15)', border: 'none', cursor: 'pointer', borderRadius: 6, padding: '2px 6px', c"
+    },
+    {
+      "file": "app/components/auth/ClientLayout.tsx",
+      "line": 698,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ background: 'rgba(255,255,255,0.15)', border: 'none', cursor: 'pointer', borderRadius: 6, padding: '2px 6px', c"
+    },
+    {
+      "file": "app/components/auth/ClientLayout.tsx",
+      "line": 710,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 6, height: 5, overflow: 'hidden', marginBottom: 8 }}>"
+    },
+    {
+      "file": "app/contracts/ContractListMain.tsx",
+      "line": 357,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.72)',"
+    },
+    {
+      "file": "app/contracts/ContractListMain.tsx",
+      "line": 360,
+      "label": "glass-bg-hardcode",
+      "snippet": "boxShadow: '6px 6px 18px rgba(140,170,210,0.14), -6px -6px 18px rgba(255,255,255,0.47)',"
+    },
+    {
+      "file": "app/contracts/page.tsx",
+      "line": 28,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.50)',"
+    },
+    {
+      "file": "app/contracts/page.tsx",
+      "line": 43,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: mainTab === t.key ? 'rgba(255,255,255,0.85)' : 'transparent',"
+    },
+    {
+      "file": "app/contracts/page.tsx",
+      "line": 49,
+      "label": "glass-bg-hardcode",
+      "snippet": "? '6px 6px 16px rgba(140,170,210,0.12), -4px -4px 12px rgba(255,255,255,0.5)'"
+    },
+    {
+      "file": "app/customers/CustomerList.tsx",
+      "line": 675,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.72)',"
+    },
+    {
+      "file": "app/customers/CustomerList.tsx",
+      "line": 678,
+      "label": "glass-bg-hardcode",
+      "snippet": "boxShadow: '6px 6px 18px rgba(140,170,210,0.14), -6px -6px 18px rgba(255,255,255,0.47)',"
+    },
+    {
+      "file": "app/customers/CustomerList.tsx",
+      "line": 718,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.40)',"
+    },
+    {
+      "file": "app/customers/CustomerList.tsx",
+      "line": 937,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.60)', color: '#1e293b',"
+    },
+    {
+      "file": "app/customers/CustomerList.tsx",
+      "line": 962,
+      "label": "primary-hardcode",
+      "snippet": "<div style={{ padding: 12, background: 'rgba(59,110,181,0.05)', borderRadius: 8, marginBottom: 12 }}>"
+    },
+    {
+      "file": "app/customers/CustomerList.tsx",
+      "line": 984,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.60)', color: '#1e293b',"
+    },
+    {
+      "file": "app/customers/CustomerList.tsx",
+      "line": 996,
+      "label": "glass-bg-hardcode",
+      "snippet": "padding: 12, background: 'rgba(255,255,255,0.40)', borderRadius: 8,"
+    },
+    {
+      "file": "app/customers/CustomerList.tsx",
+      "line": 1033,
+      "label": "primary-hardcode",
+      "snippet": "<div style={{ padding: 12, background: 'rgba(59,110,181,0.05)', borderRadius: 8, marginBottom: 12 }}>"
+    },
+    {
+      "file": "app/customers/CustomerList.tsx",
+      "line": 1053,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.60)', color: '#1e293b',"
+    },
+    {
+      "file": "app/customers/CustomerList.tsx",
+      "line": 1065,
+      "label": "glass-bg-hardcode",
+      "snippet": "padding: 12, background: 'rgba(255,255,255,0.40)', borderRadius: 8,"
+    },
+    {
+      "file": "app/customers/CustomerList.tsx",
+      "line": 1134,
+      "label": "glass-bg-hardcode",
+      "snippet": "padding: 12, background: 'rgba(255,255,255,0.40)', borderRadius: 8,"
+    },
+    {
+      "file": "app/customers/CustomerList.tsx",
+      "line": 1288,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.60)', color: '#1e293b',"
+    },
+    {
+      "file": "app/dashboard/page.tsx",
+      "line": 214,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div className=\"si-card rounded-2xl p-5 border border-black/[0.06]\" style={{ background: 'linear-gradient(135deg, rgba(2"
+    },
+    {
+      "file": "app/dashboard/page.tsx",
+      "line": 275,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div className=\"si-card rounded-2xl p-5 border border-black/[0.06]\" style={{ background: 'linear-gradient(135deg, rgba(2"
+    },
+    {
+      "file": "app/dashboard/page.tsx",
+      "line": 302,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div className=\"si-card rounded-2xl p-5 border border-black/[0.06]\" style={{ background: 'linear-gradient(135deg, rgba(2"
+    },
+    {
+      "file": "app/dashboard/page.tsx",
+      "line": 346,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div className=\"si-card rounded-2xl p-5 border border-red-500/20\" style={{ background: 'linear-gradient(135deg, rgba(255"
+    },
+    {
+      "file": "app/dashboard/page.tsx",
+      "line": 365,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div className=\"si-card rounded-2xl p-5 border border-emerald-500/20\" style={{ background: 'linear-gradient(135deg, rgba"
+    },
+    {
+      "file": "app/dashboard/page.tsx",
+      "line": 376,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div className=\"si-card rounded-2xl p-5 border border-black/[0.06]\" style={{ background: 'linear-gradient(135deg, rgba(2"
+    },
+    {
+      "file": "app/dashboard/page.tsx",
+      "line": 404,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div className=\"si-card rounded-2xl p-6 border border-black/[0.06] text-center\" style={{ background: 'linear-gradient(13"
+    },
+    {
+      "file": "app/db/lotte/page.tsx",
+      "line": 359,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ padding: '6px 10px', fontSize: 12, fontWeight: 600, borderRadius: 8, border: '1px solid rgba(0,0,0,0.06)', back"
+    },
+    {
+      "file": "app/db/lotte/page.tsx",
+      "line": 364,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ padding: '6px 10px', fontSize: 12, fontWeight: 600, borderRadius: 8, border: '1px solid rgba(0,0,0,0.06)', back"
+    },
+    {
+      "file": "app/db/pricing-standards/BusinessRulesTab.tsx",
+      "line": 191,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.72)',"
+    },
+    {
+      "file": "app/db/pricing-standards/BusinessRulesTab.tsx",
+      "line": 195,
+      "label": "glass-bg-hardcode",
+      "snippet": "boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -4px -4px 12px rgba(255,255,255,0.5)',"
+    },
+    {
+      "file": "app/db/pricing-standards/BusinessRulesTab.tsx",
+      "line": 234,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.6)',"
+    },
+    {
+      "file": "app/db/pricing-standards/BusinessRulesTab.tsx",
+      "line": 267,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.72)',"
+    },
+    {
+      "file": "app/db/pricing-standards/BusinessRulesTab.tsx",
+      "line": 270,
+      "label": "glass-bg-hardcode",
+      "snippet": "boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.9)',"
+    },
+    {
+      "file": "app/db/pricing-standards/BusinessRulesTab.tsx",
+      "line": 367,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.95)',"
+    },
+    {
+      "file": "app/db/pricing-standards/BusinessRulesTab.tsx",
+      "line": 383,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.95)',"
+    },
+    {
+      "file": "app/db/pricing-standards/BusinessRulesTab.tsx",
+      "line": 401,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.95)',"
+    },
+    {
+      "file": "app/db/pricing-standards/BusinessRulesTab.tsx",
+      "line": 432,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.72)',"
+    },
+    {
+      "file": "app/db/pricing-standards/BusinessRulesTab.tsx",
+      "line": 436,
+      "label": "glass-bg-hardcode",
+      "snippet": "boxShadow: '8px 8px 20px rgba(140,170,210,0.14), -4px -4px 14px rgba(255,255,255,0.6)',"
+    },
+    {
+      "file": "app/db/pricing-standards/BusinessRulesTab.tsx",
+      "line": 450,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.60)',"
+    },
+    {
+      "file": "app/db/pricing-standards/BusinessRulesTab.tsx",
+      "line": 464,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.60)',"
+    },
+    {
+      "file": "app/db/pricing-standards/BusinessRulesTab.tsx",
+      "line": 478,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.60)',"
+    },
+    {
+      "file": "app/db/pricing-standards/BusinessRulesTab.tsx",
+      "line": 492,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.50)',"
+    },
+    {
+      "file": "app/db/pricing-standards/BusinessRulesTab.tsx",
+      "line": 526,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.40)',"
+    },
+    {
+      "file": "app/db/pricing-standards/CostStandardsTab.tsx",
+      "line": 180,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.72)', borderRadius: 14,"
+    },
+    {
+      "file": "app/db/pricing-standards/CostStandardsTab.tsx",
+      "line": 182,
+      "label": "glass-bg-hardcode",
+      "snippet": "boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -4px -4px 12px rgba(255,255,255,0.5)',"
+    },
+    {
+      "file": "app/db/pricing-standards/CostStandardsTab.tsx",
+      "line": 194,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: filter === f ? 'rgba(59,130,246,0.15)' : 'rgba(255,255,255,0.4)',"
+    },
+    {
+      "file": "app/db/pricing-standards/CostStandardsTab.tsx",
+      "line": 209,
+      "label": "glass-bg-hardcode",
+      "snippet": "border: '1px solid rgba(0,0,0,0.05)', background: 'rgba(255,255,255,0.4)',"
+    },
+    {
+      "file": "app/db/pricing-standards/CostStandardsTab.tsx",
+      "line": 249,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: selectedId === s.id ? 'rgba(59,130,246,0.08)' : 'rgba(255,255,255,0.35)',"
+    },
+    {
+      "file": "app/db/pricing-standards/CostStandardsTab.tsx",
+      "line": 273,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.72)', borderRadius: 14, padding: 40,"
+    },
+    {
+      "file": "app/db/pricing-standards/CostStandardsTab.tsx",
+      "line": 283,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.72)', borderRadius: 14, padding: 20,"
+    },
+    {
+      "file": "app/db/pricing-standards/CostStandardsTab.tsx",
+      "line": 285,
+      "label": "glass-bg-hardcode",
+      "snippet": "boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -4px -4px 12px rgba(255,255,255,0.5)',"
+    },
+    {
+      "file": "app/db/pricing-standards/CostStandardsTab.tsx",
+      "line": 330,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.45)',"
+    },
+    {
+      "file": "app/db/pricing-standards/CostStandardsTab.tsx",
+      "line": 409,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.5)', border: '1px solid rgba(0,0,0,0.05)',"
+    },
+    {
+      "file": "app/db/pricing-standards/EvidenceDrawer.tsx",
+      "line": 204,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.82)',"
+    },
+    {
+      "file": "app/db/pricing-standards/EvidenceDrawer.tsx",
+      "line": 232,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.6)', cursor: 'pointer',"
+    },
+    {
+      "file": "app/db/pricing-standards/EvidenceDrawer.tsx",
+      "line": 370,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.55)',"
+    },
+    {
+      "file": "app/db/pricing-standards/EvidenceDrawer.tsx",
+      "line": 486,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.72)',"
+    },
+    {
+      "file": "app/db/pricing-standards/EvidenceDrawer.tsx",
+      "line": 490,
+      "label": "glass-bg-hardcode",
+      "snippet": "boxShadow: '6px 6px 14px rgba(140,170,210,0.10), -4px -4px 10px rgba(255,255,255,0.45)',"
+    },
+    {
+      "file": "app/db/pricing-standards/EvidenceDrawer.tsx",
+      "line": 504,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.72)',"
+    },
+    {
+      "file": "app/db/pricing-standards/MarketPriceTab.tsx",
+      "line": 53,
+      "label": "glass-bg-hardcode",
+      "snippet": "level4: { background: 'rgba(255,255,255,0.72)', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 16, boxShadow: '6px "
+    },
+    {
+      "file": "app/db/pricing-standards/MarketPriceTab.tsx",
+      "line": 54,
+      "label": "glass-bg-hardcode",
+      "snippet": "level3Blue:   { background: 'rgba(255,255,255,0.60)', border: '1px solid rgba(191,219,254,0.80)',  borderRadius: 14 },"
+    },
+    {
+      "file": "app/db/pricing-standards/MarketPriceTab.tsx",
+      "line": 55,
+      "label": "glass-bg-hardcode",
+      "snippet": "level3Green:  { background: 'rgba(255,255,255,0.60)', border: '1px solid rgba(187,247,208,0.80)',  borderRadius: 14 },"
+    },
+    {
+      "file": "app/db/pricing-standards/MarketPriceTab.tsx",
+      "line": 56,
+      "label": "glass-bg-hardcode",
+      "snippet": "level3Violet: { background: 'rgba(255,255,255,0.60)', border: '1px solid rgba(221,214,254,0.80)',  borderRadius: 14 },"
+    },
+    {
+      "file": "app/db/pricing-standards/MarketPriceTab.tsx",
+      "line": 57,
+      "label": "glass-bg-hardcode",
+      "snippet": "level3Amber:  { background: 'rgba(255,255,255,0.60)', border: '1px solid rgba(253,230,138,0.80)',  borderRadius: 14 },"
+    },
+    {
+      "file": "app/db/pricing-standards/MarketPriceTab.tsx",
+      "line": 59,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.40)',"
+    },
+    {
+      "file": "app/db/pricing-standards/MarketPriceTab.tsx",
+      "line": 61,
+      "label": "glass-bg-hardcode",
+      "snippet": "boxShadow: 'inset 2px 2px 4px rgba(140,170,210,0.08), inset -1px -1px 2px rgba(255,255,255,0.5)',"
+    },
+    {
+      "file": "app/db/pricing-standards/MarketPriceTab.tsx",
+      "line": 215,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.95)', borderRadius: 12, padding: 6,"
+    },
+    {
+      "file": "app/db/pricing-standards/MarketPriceTab.tsx",
+      "line": 444,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ width: 120, padding: '4px 8px', border: '1px solid rgba(59,130,246,0.4)', borderRadius: 6, fontSize: 12, backgr"
+    },
+    {
+      "file": "app/db/pricing-standards/MarketPriceTab.tsx",
+      "line": 506,
+      "label": "glass-bg-hardcode",
+      "snippet": "border: '1px solid rgba(0,0,0,0.08)', background: 'rgba(255,255,255,0.6)', color: '#475569',"
+    },
+    {
+      "file": "app/db/pricing-standards/PresetsTab.tsx",
+      "line": 181,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ background: 'rgba(255,255,255,0.72)', borderColor: 'rgba(0,0,0,0.06)' }}"
+    },
+    {
+      "file": "app/db/pricing-standards/PresetsTab.tsx",
+      "line": 193,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.72)',"
+    },
+    {
+      "file": "app/db/pricing-standards/PresetsTab.tsx",
+      "line": 195,
+      "label": "glass-bg-hardcode",
+      "snippet": "boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -4px -4px 12px rgba(255,255,255,0.5)',"
+    },
+    {
+      "file": "app/db/pricing-standards/PresetsTab.tsx",
+      "line": 240,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ background: 'rgba(255,255,255,0.60)', borderColor: 'rgba(0,0,0,0.06)' }}"
+    },
+    {
+      "file": "app/db/pricing-standards/PresetsTab.tsx",
+      "line": 255,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.72)',"
+    },
+    {
+      "file": "app/db/pricing-standards/PresetsTab.tsx",
+      "line": 257,
+      "label": "glass-bg-hardcode",
+      "snippet": "boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -4px -4px 12px rgba(255,255,255,0.5)',"
+    },
+    {
+      "file": "app/db/pricing-standards/PresetsTab.tsx",
+      "line": 321,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.75)',"
+    },
+    {
+      "file": "app/db/pricing-standards/page.tsx",
+      "line": 74,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: showSimulation ? 'rgba(59,130,246,0.1)' : 'rgba(255,255,255,0.6)',"
+    },
+    {
+      "file": "app/db/pricing-standards/page.tsx",
+      "line": 86,
+      "label": "glass-bg-hardcode",
+      "snippet": "border: '1px solid rgba(0,0,0,0.06)', background: 'rgba(255,255,255,0.6)',"
+    },
+    {
+      "file": "app/db/pricing-standards/page.tsx",
+      "line": 100,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.72)',"
+    },
+    {
+      "file": "app/db/pricing-standards/page.tsx",
+      "line": 105,
+      "label": "glass-bg-hardcode",
+      "snippet": "boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -4px -4px 12px rgba(255,255,255,0.5)',"
+    },
+    {
+      "file": "app/e-contract/EContractListMain.tsx",
+      "line": 138,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div style={{ maxWidth: 1200, margin: '0 auto', padding: '24px 16px', minHeight: '100vh', background: 'rgba(255,255,255,"
+    },
+    {
+      "file": "app/e-contract/EContractListMain.tsx",
+      "line": 167,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: statusFilter === chip.id ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.06)',"
+    },
+    {
+      "file": "app/e-contract/EContractListMain.tsx",
+      "line": 195,
+      "label": "glass-bg-hardcode",
+      "snippet": "padding: '6px 10px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8,"
+    },
+    {
+      "file": "app/e-contract/EContractListMain.tsx",
+      "line": 211,
+      "label": "glass-bg-hardcode",
+      "snippet": "flex: 1, padding: '7px 14px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8,"
+    },
+    {
+      "file": "app/finance/bank-card/page.tsx",
+      "line": 3514,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'linear-gradient(90deg, rgba(245,243,255,0.97), rgba(255,255,255,0.97))',"
+    },
+    {
+      "file": "app/finance/bank-card/page.tsx",
+      "line": 3778,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'linear-gradient(180deg, rgba(245,243,255,0.6), rgba(255,255,255,0.4))',"
+    },
+    {
+      "file": "app/finance/bank-card/page.tsx",
+      "line": 3797,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: r.ok ? (r.applied > 0 ? 'rgba(240,253,244,0.5)' : 'rgba(255,255,255,0.4)') : 'rgba(254,226,226,0.4)',"
+    },
+    {
+      "file": "app/finance/bank-card/page.tsx",
+      "line": 3821,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: ai.error ? 'rgba(254,226,226,0.4)' : ai.applied > 0 ? 'rgba(240,253,244,0.5)' : 'rgba(255,255,255,0.4)',"
+    },
+    {
+      "file": "app/finance/bank-card/page.tsx",
+      "line": 3864,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'linear-gradient(180deg, rgba(250,245,255,0.6), rgba(255,255,255,0.4))',"
+    },
+    {
+      "file": "app/finance/bank-card/page.tsx",
+      "line": 4574,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: allSelected ? 'rgba(245,243,255,0.6)' : 'rgba(255,255,255,0.5)',"
+    },
+    {
+      "file": "app/finance/bank-card/page.tsx",
+      "line": 4601,
+      "label": "glass-bg-hardcode",
+      "snippet": "<thead style={{ position: 'sticky', top: 0, background: 'rgba(255,255,255,0.95)', zIndex: 1 }}>"
+    },
+    {
+      "file": "app/finance/bank-card/page.tsx",
+      "line": 6146,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div style={{ fontSize: 11, padding: '6px 8px', background: 'rgba(255,255,255,0.6)', borderRadius: 6 }}>"
+    },
+    {
+      "file": "app/finance/bank-card/page.tsx",
+      "line": 6276,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div style={{ fontSize: 11, padding: '6px 8px', background: 'rgba(255,255,255,0.6)', borderRadius: 6 }}>후보 거래 <b>{invest"
+    },
+    {
+      "file": "app/finance/bank-card/page.tsx",
+      "line": 6365,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div style={{ fontSize: 11, padding: '6px 8px', background: 'rgba(255,255,255,0.6)', borderRadius: 6 }}>후보 거래 <b>{employ"
+    },
+    {
+      "file": "app/finance/bank-card/page.tsx",
+      "line": 6460,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div style={{ fontSize: 11, padding: '6px 8px', background: 'rgba(255,255,255,0.6)', borderRadius: 6 }}>후보 거래 <b>{freela"
+    },
+    {
+      "file": "app/finance/bank-card/page.tsx",
+      "line": 6709,
+      "label": "primary-hardcode",
+      "snippet": "border: `1px solid ${smsStatusFilter === s ? 'rgba(59,110,181,0.4)' : 'rgba(0,0,0,0.06)'}`,"
+    },
+    {
+      "file": "app/finance/bank-card/page.tsx",
+      "line": 6710,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: smsStatusFilter === s ? 'rgba(191,219,254,0.6)' : 'rgba(255,255,255,0.72)',"
+    },
+    {
+      "file": "app/finance/bank-card/page.tsx",
+      "line": 6720,
+      "label": "primary-hardcode",
+      "snippet": "border: `1px solid ${smsIssuerFilter === i ? 'rgba(59,110,181,0.4)' : 'rgba(0,0,0,0.06)'}`,"
+    },
+    {
+      "file": "app/finance/bank-card/page.tsx",
+      "line": 6721,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: smsIssuerFilter === i ? 'rgba(191,219,254,0.6)' : 'rgba(255,255,255,0.72)',"
+    },
+    {
+      "file": "app/finance/bank-card/page.tsx",
+      "line": 6742,
+      "label": "glass-bg-hardcode",
+      "snippet": "boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -2px -2px 8px rgba(255,255,255,0.6)',"
+    },
+    {
+      "file": "app/finance/bank-card/page.tsx",
+      "line": 6806,
+      "label": "primary-hardcode",
+      "snippet": "border: `1px solid ${mappingSub === 'card' ? 'rgba(59,110,181,0.4)' : 'rgba(0,0,0,0.06)'}`,"
+    },
+    {
+      "file": "app/finance/bank-card/page.tsx",
+      "line": 6807,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: mappingSub === 'card' ? 'rgba(191,219,254,0.6)' : 'rgba(255,255,255,0.72)',"
+    },
+    {
+      "file": "app/finance/bank-card/page.tsx",
+      "line": 6813,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: mappingSub === 'bank' ? 'rgba(167,243,208,0.4)' : 'rgba(255,255,255,0.72)',"
+    },
+    {
+      "file": "app/finance/bank-card/page.tsx",
+      "line": 7093,
+      "label": "primary-hardcode",
+      "snippet": "border: `1px solid ${ruleFilter === f ? 'rgba(59,110,181,0.4)' : 'rgba(0,0,0,0.06)'}`,"
+    },
+    {
+      "file": "app/finance/bank-card/page.tsx",
+      "line": 7094,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: ruleFilter === f ? 'rgba(191,219,254,0.5)' : 'rgba(255,255,255,0.72)',"
+    },
+    {
+      "file": "app/finance/bank-card/page.tsx",
+      "line": 7173,
+      "label": "primary-hardcode",
+      "snippet": "background: 'rgba(191,219,254,0.5)', border: '1px solid rgba(59,110,181,0.2)', color: '#1e40af', marginRight: 4 }}"
+    },
+    {
+      "file": "app/finance/bank-card/page.tsx",
+      "line": 7726,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: i === currentFileIndex ? COLORS.primary : 'rgba(255,255,255,0.6)',"
+    },
+    {
+      "file": "app/finance/bank-card/page.tsx",
+      "line": 7858,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div style={{ marginTop: 6, padding: '6px 8px', background: 'rgba(255,255,255,0.5)', borderRadius: 6, fontSize: 12 }}>"
+    },
+    {
+      "file": "app/finance/cost-analysis/page.tsx",
+      "line": 141,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.72)', borderRadius: 14,"
+    },
+    {
+      "file": "app/finance/cost-analysis/page.tsx",
+      "line": 143,
+      "label": "glass-bg-hardcode",
+      "snippet": "boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -4px -4px 12px rgba(255,255,255,0.5)',"
+    },
+    {
+      "file": "app/finance/cost-analysis/page.tsx",
+      "line": 153,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.5)', outline: 'none',"
+    },
+    {
+      "file": "app/finance/cost-analysis/page.tsx",
+      "line": 162,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.5)', outline: 'none',"
+    },
+    {
+      "file": "app/finance/cost-analysis/page.tsx",
+      "line": 182,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.72)', borderRadius: 14,"
+    },
+    {
+      "file": "app/finance/cost-analysis/page.tsx",
+      "line": 219,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.72)', borderRadius: 14,"
+    },
+    {
+      "file": "app/finance/cost-analysis/page.tsx",
+      "line": 284,
+      "label": "glass-bg-hardcode",
+      "snippet": "marginTop: 16, background: 'rgba(255,255,255,0.72)', borderRadius: 14,"
+    },
+    {
+      "file": "app/finance/cost-analysis/page.tsx",
+      "line": 324,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.72)', borderRadius: 14, padding: 60,"
+    },
+    {
+      "file": "app/finance/fleet/page.tsx",
+      "line": 405,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ padding: '6px 10px', fontSize: 12, fontWeight: 600, borderRadius: 8, border: '1px solid rgba(0,0,0,0.06)', back"
+    },
+    {
+      "file": "app/finance/fleet/page.tsx",
+      "line": 407,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ padding: '6px 10px', fontSize: 12, fontWeight: 600, borderRadius: 8, border: '1px solid rgba(0,0,0,0.06)', back"
+    },
+    {
+      "file": "app/finance/fleet/page.tsx",
+      "line": 420,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div style={{ background: 'rgba(255,255,255,0.72)', borderRadius: 16, border: '1px solid rgba(0,0,0,0.05)', overflow: 'h"
+    },
+    {
+      "file": "app/finance/settlement/ContractsTab.tsx",
+      "line": 358,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.60)',"
+    },
+    {
+      "file": "app/finance/settlement/ContractsTab.tsx",
+      "line": 360,
+      "label": "primary-hardcode",
+      "snippet": ": k.tint === 'blue' ? 'rgba(59,110,181,0.25)'"
+    },
+    {
+      "file": "app/finance/settlement/ContractsTab.tsx",
+      "line": 363,
+      "label": "glass-bg-hardcode",
+      "snippet": "boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -4px -4px 12px rgba(255,255,255,0.5)',"
+    },
+    {
+      "file": "app/finance/settlement/SettlementDashboard.tsx",
+      "line": 1006,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ padding: '5px 10px', fontSize: 12, fontWeight: 700, borderRadius: 8, border: '1px solid rgba(0,0,0,0.06)', back"
+    },
+    {
+      "file": "app/finance/settlement/SettlementDashboard.tsx",
+      "line": 1008,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ padding: '5px 12px', fontSize: 11, fontWeight: 600, borderRadius: 8, border: '1px solid rgba(0,0,0,0.06)', back"
+    },
+    {
+      "file": "app/finance/settlement/SettlementDashboard.tsx",
+      "line": 1020,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div style={{ background: 'rgba(255,255,255,0.72)', borderRadius: 16, border: '1px solid rgba(0,0,0,0.05)', boxShadow: '"
+    },
+    {
+      "file": "app/finance/settlement/SettlementDashboard.tsx",
+      "line": 1298,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.5)', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 12, padding: 16,"
+    },
+    {
+      "file": "app/finance/settlement/SettlementDashboard.tsx",
+      "line": 1307,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.5)', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 12, padding: 16,"
+    },
+    {
+      "file": "app/finance/settlement/SettlementDashboard.tsx",
+      "line": 1347,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.5)', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 12, padding: 16,"
+    },
+    {
+      "file": "app/finance/settlement/SettlementDashboard.tsx",
+      "line": 1365,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.5)', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 12, padding: 16,"
+    },
+    {
+      "file": "app/finance/settlement/SettlementDashboard.tsx",
+      "line": 1424,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.5)', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 12, padding: 16,"
+    },
+    {
+      "file": "app/finance/settlement/SettlementDashboard.tsx",
+      "line": 1437,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.5)', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 12, padding: 16,"
+    },
+    {
+      "file": "app/finance/settlement/statement/page.tsx",
+      "line": 165,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.95)', borderBottom: '1px solid #e2e8f0',"
+    },
+    {
+      "file": "app/finance/settlement/statement/page.tsx",
+      "line": 431,
+      "label": "primary-hardcode",
+      "snippet": "boxShadow: '0 2px 8px rgba(59,110,181,0.25)',"
+    },
+    {
+      "file": "app/finance/sms/page.tsx",
+      "line": 127,
+      "label": "primary-hardcode",
+      "snippet": "border: `1px solid ${statusFilter === s ? 'rgba(59,110,181,0.4)' : 'rgba(0,0,0,0.06)'}`,"
+    },
+    {
+      "file": "app/finance/sms/page.tsx",
+      "line": 128,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: statusFilter === s ? 'rgba(191,219,254,0.6)' : 'rgba(255,255,255,0.72)',"
+    },
+    {
+      "file": "app/finance/sms/page.tsx",
+      "line": 146,
+      "label": "primary-hardcode",
+      "snippet": "border: `1px solid ${issuerFilter === i ? 'rgba(59,110,181,0.4)' : 'rgba(0,0,0,0.06)'}`,"
+    },
+    {
+      "file": "app/finance/sms/page.tsx",
+      "line": 147,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: issuerFilter === i ? 'rgba(191,219,254,0.6)' : 'rgba(255,255,255,0.72)',"
+    },
+    {
+      "file": "app/finance/sms/page.tsx",
+      "line": 161,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.72)',"
+    },
+    {
+      "file": "app/finance/sms/page.tsx",
+      "line": 167,
+      "label": "glass-bg-hardcode",
+      "snippet": "boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -2px -2px 8px rgba(255,255,255,0.6)',"
+    },
+    {
+      "file": "app/finance/tax/page.tsx",
+      "line": 506,
+      "label": "glass-bg-hardcode",
+      "snippet": "<button onClick={() => changeMonth(-1)} style={{ padding: '5px 10px', border: '1px solid rgba(0,0,0,0.06)', borderRadius"
+    },
+    {
+      "file": "app/finance/tax/page.tsx",
+      "line": 510,
+      "label": "glass-bg-hardcode",
+      "snippet": "<button onClick={() => changeMonth(1)} style={{ padding: '5px 10px', border: '1px solid rgba(0,0,0,0.06)', borderRadius:"
+    },
+    {
+      "file": "app/hr/_components/PayrollOps.tsx",
+      "line": 623,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div style={{ background: 'rgba(255,255,255,0.72)', borderRadius: 16, border: '1px solid rgba(0,0,0,0.06)', padding: '48"
+    },
+    {
+      "file": "app/hr/page.tsx",
+      "line": 1147,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.72)',"
+    },
+    {
+      "file": "app/hr/page.tsx",
+      "line": 1150,
+      "label": "glass-bg-hardcode",
+      "snippet": "boxShadow: '6px 6px 18px rgba(140,170,210,0.14), -6px -6px 18px rgba(255,255,255,0.47)',"
+    },
+    {
+      "file": "app/hr/page.tsx",
+      "line": 1157,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.40)',"
+    },
+    {
+      "file": "app/hr/page.tsx",
+      "line": 1238,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ width: '100%', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, padding: '8px 12px', fontSize: 13, outli"
+    },
+    {
+      "file": "app/hr/page.tsx",
+      "line": 1244,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ width: '100%', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, padding: '8px 12px', fontSize: 13, outli"
+    },
+    {
+      "file": "app/hr/page.tsx",
+      "line": 1286,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ width: '100%', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, padding: '8px 12px', fontSize: 13, outli"
+    },
+    {
+      "file": "app/hr/page.tsx",
+      "line": 1376,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: isDragging ? 'rgba(59,130,246,0.05)' : aiParsing ? 'rgba(34,197,94,0.04)' : 'rgba(255,255,255,0.4)',"
+    },
+    {
+      "file": "app/hr/page.tsx",
+      "line": 1400,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div style={{ background: 'rgba(255,255,255,0.6)', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 10, padding: 12, "
+    },
+    {
+      "file": "app/hr/page.tsx",
+      "line": 1593,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ width: '100%', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, padding: '8px 12px', fontSize: 13, outli"
+    },
+    {
+      "file": "app/hr/page.tsx",
+      "line": 1599,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ width: '100%', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, padding: '8px 12px', fontSize: 13, outli"
+    },
+    {
+      "file": "app/hr/page.tsx",
+      "line": 1605,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div style={{ padding: '10px 16px', borderBottom: '1px solid rgba(0,0,0,0.06)', background: 'rgba(255,255,255,0.40)' }}>"
+    },
+    {
+      "file": "app/hr/page.tsx",
+      "line": 1648,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ width: '100%', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, padding: '8px 12px', fontSize: 13, outli"
+    },
+    {
+      "file": "app/hr/page.tsx",
+      "line": 1654,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div style={{ padding: '10px 16px', borderBottom: '1px solid rgba(0,0,0,0.06)', background: 'rgba(255,255,255,0.40)' }}>"
+    },
+    {
+      "file": "app/hr/page.tsx",
+      "line": 1828,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div style={{ padding: '10px 16px', background: 'rgba(255,255,255,0.40)', borderBottom: '1px solid rgba(0,0,0,0.06)', po"
+    },
+    {
+      "file": "app/hr/page.tsx",
+      "line": 1862,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ fontSize: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 6, padding: '2px 6px', background: 'rgba(255,"
+    },
+    {
+      "file": "app/hr/page.tsx",
+      "line": 1906,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ background: 'rgba(255,255,255,0.92)', borderRadius: 20, width: '100%', maxWidth: 560, boxShadow: '0 25px 50px r"
+    },
+    {
+      "file": "app/hr/page.tsx",
+      "line": 1907,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div style={{ padding: '20px 24px', borderBottom: '1px solid rgba(0,0,0,0.06)', background: 'rgba(255,255,255,0.40)', di"
+    },
+    {
+      "file": "app/hr/page.tsx",
+      "line": 1919,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none"
+    },
+    {
+      "file": "app/hr/page.tsx",
+      "line": 1925,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none"
+    },
+    {
+      "file": "app/hr/page.tsx",
+      "line": 1932,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none"
+    },
+    {
+      "file": "app/hr/page.tsx",
+      "line": 1937,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none"
+    },
+    {
+      "file": "app/hr/page.tsx",
+      "line": 1944,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none"
+    },
+    {
+      "file": "app/hr/page.tsx",
+      "line": 1951,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none"
+    },
+    {
+      "file": "app/hr/page.tsx",
+      "line": 1962,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none"
+    },
+    {
+      "file": "app/hr/page.tsx",
+      "line": 1969,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none"
+    },
+    {
+      "file": "app/hr/page.tsx",
+      "line": 1975,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none"
+    },
+    {
+      "file": "app/hr/page.tsx",
+      "line": 1985,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none"
+    },
+    {
+      "file": "app/hr/page.tsx",
+      "line": 1998,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none"
+    },
+    {
+      "file": "app/hr/page.tsx",
+      "line": 2001,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div style={{ padding: '14px 20px', borderTop: '1px solid rgba(0,0,0,0.06)', background: 'rgba(255,255,255,0.40)', displ"
+    },
+    {
+      "file": "app/hr/page.tsx",
+      "line": 2003,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ flex: 1, padding: '10px 0', border: '1px solid rgba(0,0,0,0.08)', background: 'rgba(255,255,255,0.8)', color: '"
+    },
+    {
+      "file": "app/hr/page.tsx",
+      "line": 2020,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ background: 'rgba(255,255,255,0.92)', borderRadius: 20, width: '100%', maxWidth: 880, boxShadow: '0 25px 50px r"
+    },
+    {
+      "file": "app/hr/page.tsx",
+      "line": 2023,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div style={{ padding: '20px 24px', borderBottom: '1px solid rgba(0,0,0,0.06)', background: 'rgba(255,255,255,0.40)', di"
+    },
+    {
+      "file": "app/hr/page.tsx",
+      "line": 2042,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div style={{ display: 'flex', borderBottom: '1px solid rgba(0,0,0,0.06)', background: 'rgba(255,255,255,0.30)', flexShr"
+    },
+    {
+      "file": "app/hr/page.tsx",
+      "line": 2069,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, outline: 'non"
+    },
+    {
+      "file": "app/hr/page.tsx",
+      "line": 2074,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, outline: 'non"
+    },
+    {
+      "file": "app/hr/page.tsx",
+      "line": 2080,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, background: '"
+    },
+    {
+      "file": "app/hr/page.tsx",
+      "line": 2089,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, background: '"
+    },
+    {
+      "file": "app/hr/page.tsx",
+      "line": 2100,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, background: '"
+    },
+    {
+      "file": "app/hr/page.tsx",
+      "line": 2108,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, background: '"
+    },
+    {
+      "file": "app/hr/page.tsx",
+      "line": 2124,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, outline: 'non"
+    },
+    {
+      "file": "app/hr/page.tsx",
+      "line": 2138,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, background: '"
+    },
+    {
+      "file": "app/hr/page.tsx",
+      "line": 2152,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ width: '100%', padding: 10, border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, fontSize: 13, outline: 'n"
+    },
+    {
+      "file": "app/hr/page.tsx",
+      "line": 2159,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ width: '100%', padding: 10, border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, fontSize: 13, outline: 'n"
+    },
+    {
+      "file": "app/hr/page.tsx",
+      "line": 2169,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div style={{ background: 'rgba(255,255,255,0.40)', borderRadius: 10, padding: 12, border: '1px solid rgba(0,0,0,0.05)',"
+    },
+    {
+      "file": "app/hr/page.tsx",
+      "line": 2194,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, outline: 'non"
+    },
+    {
+      "file": "app/hr/page.tsx",
+      "line": 2209,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, outline: 'non"
+    },
+    {
+      "file": "app/hr/page.tsx",
+      "line": 2235,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div key={k} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, padding: 8, background: 'rgba(255,"
+    },
+    {
+      "file": "app/hr/page.tsx",
+      "line": 2243,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ width: 130, padding: 8, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none', b"
+    },
+    {
+      "file": "app/hr/page.tsx",
+      "line": 2287,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, background: '"
+    },
+    {
+      "file": "app/hr/page.tsx",
+      "line": 2299,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, outline: 'non"
+    },
+    {
+      "file": "app/hr/page.tsx",
+      "line": 2306,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, outline: 'non"
+    },
+    {
+      "file": "app/hr/page.tsx",
+      "line": 2314,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, outline: 'non"
+    },
+    {
+      "file": "app/hr/page.tsx",
+      "line": 2339,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div style={{ padding: '8px 14px', background: 'rgba(255,255,255,0.40)', borderBottom: '1px solid rgba(0,0,0,0.06)', pos"
+    },
+    {
+      "file": "app/hr/page.tsx",
+      "line": 2372,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ fontSize: 11, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 6, padding: '2px 6px', background: 'rgba(255,"
+    },
+    {
+      "file": "app/hr/page.tsx",
+      "line": 2399,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ padding: '6px 12px', fontSize: 12, fontWeight: 600, color: '#dc2626', border: '1px solid rgba(239,68,68,0.3)', "
+    },
+    {
+      "file": "app/hr/page.tsx",
+      "line": 2412,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div style={{ padding: '16px 24px', borderTop: '1px solid rgba(0,0,0,0.06)', background: 'rgba(255,255,255,0.40)', displ"
+    },
+    {
+      "file": "app/hr/page.tsx",
+      "line": 2414,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ flex: 1, padding: '10px 0', border: '1px solid rgba(0,0,0,0.08)', background: 'rgba(255,255,255,0.8)', color: '"
+    },
+    {
+      "file": "app/insurance/page.tsx",
+      "line": 943,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.6)',"
+    },
+    {
+      "file": "app/loans/backtrace/page.tsx",
+      "line": 206,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ background: 'rgba(255,255,255,0.72)', borderColor: 'rgba(0,0,0,0.06)' }}"
+    },
+    {
+      "file": "app/loans/backtrace/page.tsx",
+      "line": 279,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ background: 'rgba(255,255,255,0.60)', borderColor: 'rgba(191,219,254,0.80)' }}>"
+    },
+    {
+      "file": "app/loans/backtrace/page.tsx",
+      "line": 284,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ background: 'rgba(255,255,255,0.60)', borderColor: 'rgba(187,247,208,0.80)' }}>"
+    },
+    {
+      "file": "app/loans/backtrace/page.tsx",
+      "line": 292,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ background: 'rgba(255,255,255,0.60)', borderColor: 'rgba(221,214,254,0.80)' }}>"
+    },
+    {
+      "file": "app/loans/backtrace/page.tsx",
+      "line": 299,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ background: 'rgba(255,255,255,0.60)', borderColor: 'rgba(253,230,138,0.80)' }}>"
+    },
+    {
+      "file": "app/loans/backtrace/page.tsx",
+      "line": 311,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ background: 'rgba(255,255,255,0.72)', borderColor: 'rgba(0,0,0,0.06)' }}"
+    },
+    {
+      "file": "app/loans/backtrace/page.tsx",
+      "line": 392,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ background: 'rgba(255,255,255,0.72)', borderColor: 'rgba(0,0,0,0.06)' }}"
+    },
+    {
+      "file": "app/loans-out/page.tsx",
+      "line": 104,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.60)',"
+    },
+    {
+      "file": "app/loans-out/page.tsx",
+      "line": 106,
+      "label": "primary-hardcode",
+      "snippet": "k.tint === 'blue' ? 'rgba(59,110,181,0.25)' :"
+    },
+    {
+      "file": "app/loans-out/page.tsx",
+      "line": 111,
+      "label": "glass-bg-hardcode",
+      "snippet": "boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -4px -4px 12px rgba(255,255,255,0.5)',"
+    },
+    {
+      "file": "app/maintenance/MaintenanceMain.tsx",
+      "line": 582,
+      "label": "glass-bg-hardcode",
+      "snippet": "boxShadow: '3px 3px 8px rgba(140,170,210,0.19), -1px -1px 4px rgba(255,255,255,0.47)',"
+    },
+    {
+      "file": "app/maintenance/MaintenanceMain.tsx",
+      "line": 601,
+      "label": "glass-bg-hardcode",
+      "snippet": "boxShadow: '3px 3px 8px rgba(140,170,210,0.19), -1px -1px 4px rgba(255,255,255,0.47)',"
+    },
+    {
+      "file": "app/maintenance/MaintenanceMain.tsx",
+      "line": 629,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.40)',"
+    },
+    {
+      "file": "app/maintenance/MaintenanceMain.tsx",
+      "line": 651,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.40)',"
+    },
+    {
+      "file": "app/maintenance/MaintenanceMain.tsx",
+      "line": 673,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.40)',"
+    },
+    {
+      "file": "app/maintenance/MaintenanceMain.tsx",
+      "line": 700,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.40)',"
+    },
+    {
+      "file": "app/meetings/page.tsx",
+      "line": 149,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.7)', minWidth: 200,"
+    },
+    {
+      "file": "app/meetings/page.tsx",
+      "line": 633,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.7)',"
+    },
+    {
+      "file": "app/operations/FleetBoard.tsx",
+      "line": 217,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.7)', color: COLORS.textSecondary,"
+    },
+    {
+      "file": "app/operations/FleetBoard.tsx",
+      "line": 277,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.7)', minWidth: 200,"
+    },
+    {
+      "file": "app/operations/OperationsMain.tsx",
+      "line": 684,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.60)',"
+    },
+    {
+      "file": "app/operations/TransportRequestModal.tsx",
+      "line": 313,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.7)',"
+    },
+    {
+      "file": "app/operations/TransportRequestModal.tsx",
+      "line": 657,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.7)', color: COLORS.textPrimary,"
+    },
+    {
+      "file": "app/operations/intake/page.tsx",
+      "line": 451,
+      "label": "glass-bg-hardcode",
+      "snippet": "<span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 10, border: `1px solid ${stage?.color || 'rgba(255,255,25"
+    },
+    {
+      "file": "app/operations/intake/page.tsx",
+      "line": 485,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ fontSize: 12, padding: '4px 8px', borderRadius: 6, border: `1.5px solid ${stage?.color || 'rgba(255,255,255,0.1"
+    },
+    {
+      "file": "app/quotes/QuoteListMain.tsx",
+      "line": 259,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div style={{ position: 'fixed', top: pos.top, right: pos.right, background: 'rgba(255,255,255,0.72)', borderRadius: 8, "
+    },
+    {
+      "file": "app/quotes/QuoteListMain.tsx",
+      "line": 985,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.72)',"
+    },
+    {
+      "file": "app/quotes/QuoteListMain.tsx",
+      "line": 989,
+      "label": "glass-bg-hardcode",
+      "snippet": "boxShadow: '4px 4px 10px rgba(140,170,210,0.1), -3px -3px 8px rgba(255,255,255,0.5)',"
+    },
+    {
+      "file": "app/quotes/QuoteListMain.tsx",
+      "line": 1002,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: active ? 'rgba(255,255,255,0.95)' : 'transparent',"
+    },
+    {
+      "file": "app/quotes/QuoteListMain.tsx",
+      "line": 1012,
+      "label": "primary-hardcode",
+      "snippet": "background: active ? 'rgba(59,110,181,0.15)' : 'rgba(0,0,0,0.06)',"
+    },
+    {
+      "file": "app/quotes/QuoteListMain.tsx",
+      "line": 1376,
+      "label": "glass-bg-hardcode",
+      "snippet": "const iS = { width: '100%', padding: '8px 10px', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 6, fontSize: 12, bo"
+    },
+    {
+      "file": "app/quotes/QuoteListMain.tsx",
+      "line": 1385,
+      "label": "glass-bg-hardcode",
+      "snippet": "position: 'relative', background: 'rgba(255,255,255,0.88)', borderRadius: 16, padding: '24px 28px',"
+    },
+    {
+      "file": "app/quotes/QuoteListMain.tsx",
+      "line": 1388,
+      "label": "glass-bg-hardcode",
+      "snippet": "boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -4px -4px 12px rgba(255,255,255,0.5), 0 20px 60px rgba(0,0,0,0.15)',"
+    },
+    {
+      "file": "app/quotes/QuoteListMain.tsx",
+      "line": 1408,
+      "label": "glass-bg-hardcode",
+      "snippet": "<button onClick={() => openDaumPostcode((addr) => setField('tenant_address', addr))} type=\"button\" style={{ padding: '6p"
+    },
+    {
+      "file": "app/quotes/QuoteListMain.tsx",
+      "line": 1491,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ padding: '6px 14px', border: '1px solid #3b6eb5', borderRadius: 8, background: 'linear-gradient(135deg, #3b6eb5"
+    },
+    {
+      "file": "app/quotes/QuoteListMain.tsx",
+      "line": 1514,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ padding: '10px 24px', border: 'none', borderRadius: 8, background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)',"
+    },
+    {
+      "file": "app/quotes/[id]/page.tsx",
+      "line": 19,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div className=\"flex-1 rounded-full h-2.5 overflow-hidden\" style={{ background: 'rgba(255,255,255,0.40)' }}>"
+    },
+    {
+      "file": "app/quotes/[id]/page.tsx",
+      "line": 31,
+      "label": "glass-bg-hardcode",
+      "snippet": "<td className=\"px-4 py-2.5 font-bold text-slate-500 w-32 text-sm\" style={{ background: 'rgba(255,255,255,0.40)' }}>{labe"
+    },
+    {
+      "file": "app/quotes/[id]/page.tsx",
+      "line": 84,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div style={{ background: 'rgba(255,255,255,0.72)', borderRadius: 16, border: '1px solid rgba(0,0,0,0.06)', overflow: 'h"
+    },
+    {
+      "file": "app/quotes/[id]/page.tsx",
+      "line": 741,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div ref={printRef} className=\"rounded-2xl print:shadow-none print:rounded-none\" style={{ background: 'rgba(255,255,255,"
+    },
+    {
+      "file": "app/quotes/[id]/page.tsx",
+      "line": 769,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div className=\"p-3\" style={{ background: 'rgba(255,255,255,0.60)', borderRadius: 12, border: '1px solid rgba(59,130,246"
+    },
+    {
+      "file": "app/quotes/[id]/page.tsx",
+      "line": 780,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div className=\"p-3\" style={{ background: 'rgba(255,255,255,0.60)', borderRadius: 12, border: '1px solid rgba(59,130,246"
+    },
+    {
+      "file": "app/quotes/[id]/page.tsx",
+      "line": 794,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div style={{ background: 'rgba(255,255,255,0.72)', border: '1px solid rgba(255,255,255,0.30)', boxShadow: '8px 8px 20px"
+    },
+    {
+      "file": "app/quotes/[id]/page.tsx",
+      "line": 820,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div className=\"p-3 text-sm text-slate-600\" style={{ background: 'rgba(255,255,255,0.60)', borderRadius: 12, border: '1p"
+    },
+    {
+      "file": "app/quotes/[id]/page.tsx",
+      "line": 828,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div className=\"p-3 text-xs space-y-0.5\" style={{ background: 'rgba(255,255,255,0.60)', borderRadius: 12, border: '1px s"
+    },
+    {
+      "file": "app/quotes/[id]/page.tsx",
+      "line": 848,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div ref={printRef} className=\"rounded-2xl print:shadow-none print:rounded-none\" style={{ background: 'rgba(255,255,255,"
+    },
+    {
+      "file": "app/quotes/[id]/page.tsx",
+      "line": 876,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div className=\"p-3 text-xs space-y-0.5\" style={{ background: 'rgba(255,255,255,0.60)', borderRadius: 12, border: '1px s"
+    },
+    {
+      "file": "app/quotes/[id]/page.tsx",
+      "line": 886,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div className=\"p-3 text-xs space-y-0.5\" style={{ background: 'rgba(255,255,255,0.60)', borderRadius: 12, border: '1px s"
+    },
+    {
+      "file": "app/quotes/[id]/page.tsx",
+      "line": 1263,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div key={i} className=\"flex justify-between px-3 py-2 rounded-lg\" style={{ background: 'rgba(255,255,255,0.60)', border"
+    },
+    {
+      "file": "app/quotes/[id]/page.tsx",
+      "line": 1286,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div key={i} className=\"p-3 text-center\" style={{ background: 'rgba(255,255,255,0.60)', borderRadius: 12, border: '1px s"
+    },
+    {
+      "file": "app/quotes/[id]/page.tsx",
+      "line": 1318,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div className=\"flex justify-between px-3 py-2 rounded-lg\" style={{ background: 'rgba(255,255,255,0.60)', border: '1px s"
+    },
+    {
+      "file": "app/quotes/[id]/page.tsx",
+      "line": 1319,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div className=\"flex justify-between px-3 py-2 rounded-lg\" style={{ background: 'rgba(255,255,255,0.60)', border: '1px s"
+    },
+    {
+      "file": "app/quotes/[id]/page.tsx",
+      "line": 1321,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div className=\"flex justify-between px-3 py-2 rounded-lg\" style={{ background: 'rgba(255,255,255,0.60)', border: '1px s"
+    },
+    {
+      "file": "app/quotes/[id]/page.tsx",
+      "line": 1329,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div className=\"flex justify-between px-3 py-2 rounded-lg\" style={{ background: 'rgba(255,255,255,0.60)', border: '1px s"
+    },
+    {
+      "file": "app/quotes/[id]/page.tsx",
+      "line": 1330,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div className=\"flex justify-between px-3 py-2 rounded-lg\" style={{ background: 'rgba(255,255,255,0.60)', border: '1px s"
+    },
+    {
+      "file": "app/quotes/[id]/page.tsx",
+      "line": 1332,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div className=\"flex justify-between px-3 py-2 rounded-lg\" style={{ background: 'rgba(255,255,255,0.60)', border: '1px s"
+    },
+    {
+      "file": "app/quotes/[id]/page.tsx",
+      "line": 1451,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div className=\"rounded-2xl shadow-2xl p-6 max-w-lg w-full mx-4\" style={{ background: 'rgba(255,255,255,0.92)', backdrop"
+    },
+    {
+      "file": "app/quotes/create/page.tsx",
+      "line": 36,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ background: 'rgba(255,255,255,0.35)', border: '1px solid rgba(0,0,0,0.05)' }}"
+    },
+    {
+      "file": "app/quotes/invoice/[id]/page.tsx",
+      "line": 311,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div className=\"no-print\" style={{ background: 'rgba(255,255,255,0.72)', borderBottom: '1px solid rgba(0,0,0,0.06)', pad"
+    },
+    {
+      "file": "app/quotes/invoice/[id]/page.tsx",
+      "line": 339,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div ref={printRef} style={{ background: 'rgba(255,255,255,0.72)', borderRadius: 20, boxShadow: '6px 6px 16px rgba(140,1"
+    },
+    {
+      "file": "app/quotes/invoice/[id]/page.tsx",
+      "line": 342,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div style={{ background: 'rgba(255,255,255,0.72)', border: '1px solid rgba(0,0,0,0.06)', boxShadow: '6px 6px 16px rgba("
+    },
+    {
+      "file": "app/quotes/invoice/[id]/page.tsx",
+      "line": 365,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div style={{ background: 'rgba(255,255,255,0.60)', borderRadius: 12, padding: 16, border: '1px solid rgba(59,130,246,0."
+    },
+    {
+      "file": "app/quotes/invoice/[id]/page.tsx",
+      "line": 373,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div style={{ background: 'rgba(255,255,255,0.60)', borderRadius: 12, padding: 16, border: '1px solid rgba(59,130,246,0."
+    },
+    {
+      "file": "app/quotes/invoice/[id]/page.tsx",
+      "line": 383,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div style={{ background: 'rgba(255,255,255,0.72)', border: '1px solid rgba(0,0,0,0.06)', boxShadow: '6px 6px 16px rgba("
+    },
+    {
+      "file": "app/quotes/invoice/[id]/page.tsx",
+      "line": 406,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div style={{ background: 'rgba(255,255,255,0.60)', borderRadius: 12, padding: 16, fontSize: 13, color: '#4b5563', lineH"
+    },
+    {
+      "file": "app/quotes/invoice/[id]/page.tsx",
+      "line": 427,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div style={{ background: 'rgba(255,255,255,0.60)', borderRadius: 12, padding: 16, border: '1px solid rgba(59,130,246,0."
+    },
+    {
+      "file": "app/quotes/invoice/[id]/page.tsx",
+      "line": 449,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div style={{ background: 'rgba(255,255,255,0.92)', borderRadius: 20, boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -"
+    },
+    {
+      "file": "app/quotes/invoice/[id]/page.tsx",
+      "line": 465,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div style={{ background: 'rgba(255,255,255,0.60)', borderRadius: 12, padding: '12px 16px', border: '1px solid rgba(59,1"
+    },
+    {
+      "file": "app/quotes/invoice/[id]/page.tsx",
+      "line": 518,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ background: 'rgba(255,255,255,0.40)', boxShadow: 'inset 2px 2px 4px rgba(140,170,210,0.12)', border: '1px solid"
+    },
+    {
+      "file": "app/quotes/invoice/[id]/page.tsx",
+      "line": 528,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ background: 'rgba(255,255,255,0.40)', boxShadow: 'inset 2px 2px 4px rgba(140,170,210,0.12)', border: '1px solid"
+    },
+    {
+      "file": "app/quotes/operational-learning/AccuracyChart.tsx",
+      "line": 40,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.60)',"
+    },
+    {
+      "file": "app/quotes/operational-learning/AccuracyChart.tsx",
+      "line": 46,
+      "label": "primary-hardcode",
+      "snippet": "boxShadow: '4px 4px 12px rgba(59,110,181,0.08)',"
+    },
+    {
+      "file": "app/quotes/operational-learning/AccuracyChart.tsx",
+      "line": 85,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: active ? 'rgba(255,255,255,0.90)' : 'transparent',"
+    },
+    {
+      "file": "app/quotes/operational-learning/AccuracyChart.tsx",
+      "line": 469,
+      "label": "glass-bg-hardcode",
+      "snippet": "rx=\"6\" fill=\"rgba(255,255,255,0.95)\""
+    },
+    {
+      "file": "app/quotes/operational-learning/ActualInputModal.tsx",
+      "line": 175,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.40)',"
+    },
+    {
+      "file": "app/quotes/operational-learning/ActualInputModal.tsx",
+      "line": 186,
+      "label": "glass-bg-hardcode",
+      "snippet": "<thead style={{ position: 'sticky', top: 0, background: 'rgba(255,255,255,0.95)', zIndex: 2 }}>"
+    },
+    {
+      "file": "app/quotes/operational-learning/ActualInputModal.tsx",
+      "line": 261,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.92)',"
+    },
+    {
+      "file": "app/quotes/operational-learning/ActualInputModal.tsx",
+      "line": 312,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.40)',"
+    },
+    {
+      "file": "app/quotes/operational-learning/ActualInputModal.tsx",
+      "line": 334,
+      "label": "primary-hardcode",
+      "snippet": "boxShadow: '4px 4px 12px rgba(59,110,181,0.25)',"
+    },
+    {
+      "file": "app/quotes/operational-learning/ActualInputModal.tsx",
+      "line": 341,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.72)',"
+    },
+    {
+      "file": "app/quotes/operational-learning/ComparisonDetail.tsx",
+      "line": 15,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.72)',"
+    },
+    {
+      "file": "app/quotes/operational-learning/FilterPanel.tsx",
+      "line": 33,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.35)',"
+    },
+    {
+      "file": "app/quotes/operational-learning/FilterPanel.tsx",
+      "line": 110,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.72)',"
+    },
+    {
+      "file": "app/quotes/operational-learning/KpiStrip.tsx",
+      "line": 79,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.60)',"
+    },
+    {
+      "file": "app/quotes/operational-learning/KpiStrip.tsx",
+      "line": 88,
+      "label": "glass-bg-hardcode",
+      "snippet": "boxShadow: '4px 4px 12px rgba(0,0,0,0.04), -2px -2px 6px rgba(255,255,255,0.5)',"
+    },
+    {
+      "file": "app/quotes/operational-learning/RuleSuggestionPanel.tsx",
+      "line": 56,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.60)',"
+    },
+    {
+      "file": "app/quotes/operational-learning/RuleSuggestionPanel.tsx",
+      "line": 103,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.65)',"
+    },
+    {
+      "file": "app/quotes/operational-learning/SnapshotTable.tsx",
+      "line": 33,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.72)',"
+    },
+    {
+      "file": "app/quotes/operational-learning/SnapshotTable.tsx",
+      "line": 89,
+      "label": "primary-hardcode",
+      "snippet": "background: isSel ? 'rgba(59,110,181,0.08)' : 'transparent',"
+    },
+    {
+      "file": "app/quotes/operational-learning/SnapshotTable.tsx",
+      "line": 196,
+      "label": "glass-bg-hardcode",
+      "snippet": ": 'rgba(255,255,255,0.72)',"
+    },
+    {
+      "file": "app/quotes/pricing/CustomerPreviewStep.tsx",
+      "line": 30,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0, marginBottom: 24, background: 'rg"
+    },
+    {
+      "file": "app/quotes/pricing/CustomerPreviewStep.tsx",
+      "line": 57,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div style={{ fontSize: 11, color: s.key === 'customer' ? 'rgba(255,255,255,0.7)' : '#9ca3af' }}>{s.desc}</div>"
+    },
+    {
+      "file": "app/quotes/pricing/CustomerPreviewStep.tsx",
+      "line": 87,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div className=\"rounded-2xl border border-black/[0.06] p-6 mb-4\" style={{ background: 'rgba(255,255,255,0.72)', boxShado"
+    },
+    {
+      "file": "app/quotes/pricing/CustomerPreviewStep.tsx",
+      "line": 156,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div className=\"rounded-2xl border border-black/[0.06] p-6 mb-4\" style={{ background: 'rgba(255,255,255,0.72)', boxShado"
+    },
+    {
+      "file": "app/quotes/pricing/CustomerPreviewStep.tsx",
+      "line": 174,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div className=\"rounded-2xl border border-black/[0.06] p-6 mb-6\" style={{ background: 'rgba(255,255,255,0.72)', boxShado"
+    },
+    {
+      "file": "app/quotes/pricing/CustomerPreviewStep.tsx",
+      "line": 266,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div style={{ fontSize: 11, color: s.key === 'preview' ? 'rgba(255,255,255,0.7)' : '#9ca3af' }}>{s.desc}</div>"
+    },
+    {
+      "file": "app/quotes/pricing/OptionHPanel.tsx",
+      "line": 124,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ background: 'rgba(255,255,255,0.60)', border: '1px solid rgba(0,0,0,0.05)' }}"
+    },
+    {
+      "file": "app/quotes/pricing/OptionHPanel.tsx",
+      "line": 137,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ background: 'rgba(255,255,255,0.70)', border: '1px solid rgba(0,0,0,0.05)' }}>"
+    },
+    {
+      "file": "app/quotes/pricing/OptionHPanel.tsx",
+      "line": 152,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ background: 'rgba(255,255,255,0.50)', border: '1px dashed rgba(0,0,0,0.15)' }}>"
+    },
+    {
+      "file": "app/quotes/pricing/OptionHPanel.tsx",
+      "line": 167,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ background: 'rgba(255,255,255,0.60)', border: '1px solid rgba(0,0,0,0.05)' }}>"
+    },
+    {
+      "file": "app/quotes/pricing/OptionHPanel.tsx",
+      "line": 176,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ background: 'rgba(255,255,255,0.60)', border: '1px solid rgba(0,0,0,0.05)', boxShadow: 'inset 2px 2px 4px rgba("
+    },
+    {
+      "file": "app/quotes/pricing/OptionHPanel.tsx",
+      "line": 195,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ background: 'rgba(255,255,255,0.55)', border: '1px solid rgba(0,0,0,0.05)' }}"
+    },
+    {
+      "file": "app/quotes/pricing/OptionHPanel.tsx",
+      "line": 202,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ background: 'rgba(255,255,255,0.30)', border: '1px dashed rgba(0,0,0,0.08)' }}>"
+    },
+    {
+      "file": "app/quotes/pricing/OptionHPanel.tsx",
+      "line": 214,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ background: 'rgba(255,255,255,0.55)', border: '1px solid rgba(0,0,0,0.05)' }}>"
+    },
+    {
+      "file": "app/quotes/pricing/OptionHTable.tsx",
+      "line": 54,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ background: 'rgba(255,255,255,0.72)', border: '1px solid rgba(0,0,0,0.06)', boxShadow: '6px 6px 16px rgba(140,1"
+    },
+    {
+      "file": "app/quotes/pricing/RentPricingBuilder.tsx",
+      "line": 2403,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0, background: 'rgba(255,255,255,0.7"
+    },
+    {
+      "file": "app/quotes/pricing/RentPricingBuilder.tsx",
+      "line": 2440,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div style={{ fontSize: 11, color: active ? 'rgba(255,255,255,0.7)' : '#9ca3af' }}>{s.desc}</div>"
+    },
+    {
+      "file": "app/quotes/pricing/VehicleStep.tsx",
+      "line": 227,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div className=\"rounded-2xl border border-black/[0.06] mb-6 overflow-hidden\" style={{ background: 'rgba(255,255,255,0.72"
+    },
+    {
+      "file": "app/quotes/pricing/VehicleStep.tsx",
+      "line": 260,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ background: 'rgba(255,255,255,0.4)', boxShadow: 'inset 2px 2px 4px rgba(140,170,210,0.10)' }}"
+    },
+    {
+      "file": "app/quotes/pricing/VehicleStep.tsx",
+      "line": 467,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div style={{ background: 'rgba(255,255,255,0.72)', borderRadius: 16, boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -"
+    },
+    {
+      "file": "app/quotes/pricing/VehicleStep.tsx",
+      "line": 527,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div style={{ maxHeight: 420, overflowY: 'auto', overflowX: 'auto', borderRadius: 12, border: '1px solid rgba(0,0,0,0.06"
+    },
+    {
+      "file": "app/quotes/pricing/VehicleStep.tsx",
+      "line": 530,
+      "label": "glass-bg-hardcode",
+      "snippet": "<tr style={{ background: 'rgba(255,255,255,0.40)', boxShadow: 'inset 2px 2px 4px rgba(140,170,210,0.12)', borderBottom: "
+    },
+    {
+      "file": "app/quotes/pricing/VehicleStep.tsx",
+      "line": 631,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div className=\"mt-4 p-5 border border-steel-200 rounded-2xl space-y-4\" style={{ background: 'rgba(255,255,255,0.72)', b"
+    },
+    {
+      "file": "app/quotes/pricing/VehicleStep.tsx",
+      "line": 1096,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div className=\"p-5 border border-steel-200 rounded-2xl space-y-4\" style={{ background: 'rgba(255,255,255,0.72)', boxSha"
+    },
+    {
+      "file": "app/quotes/pricing/components.tsx",
+      "line": 13,
+      "label": "glass-bg-hardcode",
+      "snippet": "<span style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', width: 28, textAlign: 'right' }}>{label}</span>"
+    },
+    {
+      "file": "app/quotes/pricing/components.tsx",
+      "line": 14,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div style={{ flex: 1, height: 6, background: 'rgba(255,255,255,0.1)', borderRadius: 3, overflow: 'hidden' }}>"
+    },
+    {
+      "file": "app/quotes/pricing/components.tsx",
+      "line": 17,
+      "label": "glass-bg-hardcode",
+      "snippet": "<span style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', width: 60, textAlign: 'right', fontWeight: 600 }}>{f(value)"
+    },
+    {
+      "file": "app/quotes/pricing/components.tsx",
+      "line": 18,
+      "label": "glass-bg-hardcode",
+      "snippet": "<span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', width: 28, textAlign: 'right' }}>{pct.toFixed(0)}%</span>"
+    },
+    {
+      "file": "app/quotes/pricing/components.tsx",
+      "line": 31,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div style={{ background: 'rgba(255,255,255,0.72)', borderRadius: 12, border: '1px solid rgba(0,0,0,0.06)', overflow: 'h"
+    },
+    {
+      "file": "app/quotes/pricing/components.tsx",
+      "line": 79,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ background: 'rgba(255,255,255,0.40)', boxShadow: 'inset 2px 2px 4px rgba(140,170,210,0.12)' }}"
+    },
+    {
+      "file": "app/quotes/pricing/components.tsx",
+      "line": 120,
+      "label": "primary-hardcode",
+      "snippet": "<div className=\"flex justify-between items-center py-2 px-2.5 rounded-lg\" style={{ background: 'rgba(59,110,181,0.06)' }"
+    },
+    {
+      "file": "app/quotes/short-term/ShortTermCalcPage.tsx",
+      "line": 275,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div className=\"p-12 md:p-20 text-center text-slate-500 text-sm rounded-2xl\" style={{ background: 'rgba(255,255,255,0.72"
+    },
+    {
+      "file": "app/quotes/short-term/ShortTermCalcPage.tsx",
+      "line": 287,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div style={{ background: 'rgba(255,255,255,0.72)', borderRadius: 16, border: '1px solid rgba(0,0,0,0.06)', overflow: 'h"
+    },
+    {
+      "file": "app/quotes/short-term/ShortTermCalcPage.tsx",
+      "line": 301,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ width: 52, textAlign: 'center', border: '1px solid rgba(0,0,0,0.05)', borderRadius: 8, padding: '6px 4px', font"
+    },
+    {
+      "file": "app/quotes/short-term/ShortTermCalcPage.tsx",
+      "line": 313,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ padding: '6px 10px', border: '1px solid rgba(0,0,0,0.05)', borderRadius: 8, fontSize: 12, fontWeight: 600, back"
+    },
+    {
+      "file": "app/quotes/short-term/ShortTermCalcPage.tsx",
+      "line": 320,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ flex: 1, padding: '7px 12px', border: '1px solid rgba(0,0,0,0.05)', borderRadius: 8, fontSize: 13, background: "
+    },
+    {
+      "file": "app/quotes/short-term/ShortTermCalcPage.tsx",
+      "line": 333,
+      "label": "primary-hardcode",
+      "snippet": "background: calcSelected === v ? 'rgba(59,110,181,0.08)' : 'transparent',"
+    },
+    {
+      "file": "app/quotes/short-term/ShortTermCalcPage.tsx",
+      "line": 357,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div style={{ background: 'rgba(255,255,255,0.72)', borderRadius: 12, border: '1px solid rgba(0,0,0,0.06)', padding: '2p"
+    },
+    {
+      "file": "app/quotes/short-term/ShortTermCalcPage.tsx",
+      "line": 361,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div style={{ display: 'flex', alignItems: 'center', background: 'rgba(255,255,255,0.40)', borderRadius: 8, overflow: 'h"
+    },
+    {
+      "file": "app/quotes/short-term/ShortTermCalcPage.tsx",
+      "line": 370,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div style={{ display: 'flex', alignItems: 'center', background: 'rgba(255,255,255,0.40)', borderRadius: 8, overflow: 'h"
+    },
+    {
+      "file": "app/quotes/short-term/ShortTermCalcPage.tsx",
+      "line": 391,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div style={{ display: 'flex', alignItems: 'center', background: 'rgba(255,255,255,0.40)', borderRadius: 8, overflow: 'h"
+    },
+    {
+      "file": "app/quotes/short-term/ShortTermCalcPage.tsx",
+      "line": 399,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div style={{ display: 'flex', alignItems: 'center', background: 'rgba(255,255,255,0.40)', borderRadius: 8, overflow: 'h"
+    },
+    {
+      "file": "app/quotes/short-term/ShortTermCalcPage.tsx",
+      "line": 410,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div style={{ display: 'flex', alignItems: 'center', background: 'rgba(255,255,255,0.40)', borderRadius: 8, overflow: 'h"
+    },
+    {
+      "file": "app/quotes/short-term/ShortTermCalcPage.tsx",
+      "line": 419,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div style={{ background: 'rgba(255,255,255,0.72)', border: '1px solid rgba(0,0,0,0.06)', boxShadow: '8px 8px 20px rgba("
+    },
+    {
+      "file": "app/quotes/short-term/ShortTermCalcPage.tsx",
+      "line": 498,
+      "label": "glass-bg-hardcode",
+      "snippet": "const iS = { width: '100%', padding: '8px 10px', border: '1px solid rgba(0,0,0,0.05)', borderRadius: 8, fontSize: 12, bo"
+    },
+    {
+      "file": "app/quotes/short-term/ShortTermCalcPage.tsx",
+      "line": 508,
+      "label": "glass-bg-hardcode",
+      "snippet": "position: 'relative', background: 'rgba(255,255,255,0.92)', backdropFilter: 'blur(20px)', borderRadius: 16, padding: '24"
+    },
+    {
+      "file": "app/quotes/short-term/ShortTermCalcPage.tsx",
+      "line": 520,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div style={{ background: 'rgba(255,255,255,0.72)', border: '1px solid rgba(0,0,0,0.06)', boxShadow: '8px 8px 20px rgba("
+    },
+    {
+      "file": "app/quotes/short-term/ShortTermCalcPage.tsx",
+      "line": 536,
+      "label": "glass-bg-hardcode",
+      "snippet": "<button onClick={() => openDaumPostcode((addr) => setField('tenant_address', addr))} type=\"button\" style={{ padding: '6p"
+    },
+    {
+      "file": "app/quotes/short-term/ShortTermCalcPage.tsx",
+      "line": 607,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ padding: '6px 14px', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 8, background: 'rgba(255,255,255,0.60)"
+    },
+    {
+      "file": "app/quotes/short-term/ShortTermCalcPage.tsx",
+      "line": 641,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ padding: '10px 24px', border: 'none', borderRadius: 8, background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)',"
+    },
+    {
+      "file": "app/quotes/short-term/ShortTermReplacementBuilder.tsx",
+      "line": 754,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div style={{ background: 'rgba(255,255,255,0.72)', borderRadius: 12, border: '1px solid rgba(0,0,0,0.06)', overflow: 'h"
+    },
+    {
+      "file": "app/quotes/short-term/ShortTermReplacementBuilder.tsx",
+      "line": 950,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div style={{ background: 'rgba(255,255,255,0.72)', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 10, padding: 18,"
+    },
+    {
+      "file": "app/quotes/short-term/ShortTermReplacementBuilder.tsx",
+      "line": 1014,
+      "label": "glass-bg-hardcode",
+      "snippet": "fontWeight: 800, fontSize: 13, boxShadow: '3px 3px 8px rgba(140,170,210,0.19), -1px -1px 4px rgba(255,255,255,0.47)',"
+    },
+    {
+      "file": "app/quotes/short-term/ShortTermReplacementBuilder.tsx",
+      "line": 1028,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div style={{ background: 'rgba(255,255,255,0.72)', borderRadius: 12, border: '1px solid rgba(0,0,0,0.06)', overflow: 'h"
+    },
+    {
+      "file": "app/quotes/short-term/ShortTermReplacementBuilder.tsx",
+      "line": 1160,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div style={{ background: 'rgba(255,255,255,0.72)', borderRadius: 12, border: '1px solid rgba(0,0,0,0.06)', overflow: 'h"
+    },
+    {
+      "file": "app/quotes/short-term/ShortTermReplacementBuilder.tsx",
+      "line": 1375,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div style={{ background: 'rgba(255,255,255,0.72)', borderRadius: 12, border: '1px solid rgba(0,0,0,0.06)', overflow: 'h"
+    },
+    {
+      "file": "app/quotes/short-term/ShortTermReplacementBuilder.tsx",
+      "line": 1428,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div style={{ background: 'rgba(255,255,255,0.40)', borderRadius: 12, border: '1px solid rgba(0,0,0,0.05)', boxShadow: '"
+    },
+    {
+      "file": "app/quotes/short-term/ShortTermReplacementBuilder.tsx",
+      "line": 1473,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div style={{ background: 'rgba(255,255,255,0.72)', borderRadius: 12, border: '1px solid rgba(0,0,0,0.06)', overflow: 'h"
+    },
+    {
+      "file": "app/quotes/short-term/ShortTermReplacementBuilder.tsx",
+      "line": 1504,
+      "label": "glass-bg-hardcode",
+      "snippet": "<tr style={{ background: 'rgba(255,255,255,0.40)', boxShadow: 'inset 2px 2px 4px rgba(140,170,210,0.12)' }} className=\"t"
+    },
+    {
+      "file": "app/quotes/short-term/ShortTermReplacementBuilder.tsx",
+      "line": 1552,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div style={{ background: 'rgba(255,255,255,0.72)', borderRadius: 12, border: '1px solid rgba(0,0,0,0.06)', overflow: 'h"
+    },
+    {
+      "file": "app/quotes/simple/page.tsx",
+      "line": 654,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div style={{ marginTop: 10, padding: 10, background: 'rgba(255,255,255,0.6)', borderRadius: 10, fontSize: 11, color: '#"
+    },
+    {
+      "file": "app/quotes/simple/page.tsx",
+      "line": 871,
+      "label": "glass-bg-hardcode",
+      "snippet": "<div style={{ marginTop: 14, padding: 12, background: 'rgba(255,255,255,0.6)', borderRadius: 10 }}>"
+    },
+    {
+      "file": "app/quotes/simple/page.tsx",
+      "line": 926,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.72)',"
+    },
+    {
+      "file": "app/quotes/simple/page.tsx",
+      "line": 929,
+      "label": "glass-bg-hardcode",
+      "snippet": "boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -4px -4px 12px rgba(255,255,255,0.5)',"
+    },
+    {
+      "file": "app/quotes/simple/page.tsx",
+      "line": 932,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.60)',"
+    },
+    {
+      "file": "app/quotes/simple/page.tsx",
+      "line": 937,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.60)',"
+    },
+    {
+      "file": "app/quotes/simple/page.tsx",
+      "line": 942,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.60)',"
+    },
+    {
+      "file": "app/quotes/simple/page.tsx",
+      "line": 947,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.60)',"
+    },
+    {
+      "file": "app/quotes/simple/page.tsx",
+      "line": 952,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.60)',"
+    },
+    {
+      "file": "app/quotes/simple/page.tsx",
+      "line": 957,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.60)',"
+    },
+    {
+      "file": "app/quotes/simple/page.tsx",
+      "line": 962,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.60)',"
+    },
+    {
+      "file": "app/quotes/simple/page.tsx",
+      "line": 967,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.55)',"
+    },
+    {
+      "file": "app/quotes/simple/page.tsx",
+      "line": 973,
+      "label": "glass-bg-hardcode",
+      "snippet": "boxShadow: 'inset 2px 2px 4px rgba(140,170,210,0.08), inset -1px -1px 2px rgba(255,255,255,0.5)',"
+    },
+    {
+      "file": "app/quotes/simple/page.tsx",
+      "line": 987,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: active ? 'rgba(139,92,246,0.15)' : 'rgba(255,255,255,0.55)',"
+    },
+    {
+      "file": "app/quotes/simple/page.tsx",
+      "line": 994,
+      "label": "glass-bg-hardcode",
+      "snippet": "border: '1px solid rgba(0,0,0,0.08)', background: 'rgba(255,255,255,0.6)',"
+    },
+    {
+      "file": "app/report/ReportDashboard.tsx",
+      "line": 264,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: periodMonths === m ? '#0f2440' : 'rgba(255,255,255,0.6)',"
+    },
+    {
+      "file": "app/work-essentials/receipts/page.tsx",
+      "line": 1068,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.72)',"
+    },
+    {
+      "file": "app/work-essentials/receipts/page.tsx",
+      "line": 1073,
+      "label": "glass-bg-hardcode",
+      "snippet": "boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -4px -4px 12px rgba(255,255,255,0.5)',"
+    },
+    {
+      "file": "app/work-essentials/receipts/page.tsx",
+      "line": 1128,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: isDragOver ? 'rgba(59,110,181,0.08)' : 'rgba(255,255,255,0.45)',"
+    },
+    {
+      "file": "app/work-essentials/receipts/page.tsx",
+      "line": 1128,
+      "label": "primary-hardcode",
+      "snippet": "background: isDragOver ? 'rgba(59,110,181,0.08)' : 'rgba(255,255,255,0.45)',"
+    },
+    {
+      "file": "app/work-essentials/receipts/page.tsx",
+      "line": 1194,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.10)', color: '#fff',"
+    },
+    {
+      "file": "app/work-essentials/receipts/page.tsx",
+      "line": 1251,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.72)', color: '#1e293b', borderRadius: isMobile ? '16px 16px 0 0' : 16,"
+    },
+    {
+      "file": "app/work-essentials/receipts/page.tsx",
+      "line": 1253,
+      "label": "glass-bg-hardcode",
+      "snippet": "border: '1px solid rgba(255,255,255,0.30)', boxShadow: '8px 8px 20px rgba(140,170,210,0.19), -8px -8px 20px rgba(255,255"
+    },
+    {
+      "file": "app/work-essentials/receipts/page.tsx",
+      "line": 1271,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ padding: '7px 8px', borderRadius: 8, border: '1px solid rgba(0,0,0,0.06)', background: 'rgba(255,255,255,0.40)'"
+    },
+    {
+      "file": "app/work-essentials/receipts/page.tsx",
+      "line": 1283,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ padding: '7px 10px', borderRadius: 8, border: '1px solid rgba(0,0,0,0.06)', background: 'rgba(255,255,255,0.40)"
+    },
+    {
+      "file": "app/work-essentials/receipts/page.tsx",
+      "line": 1289,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ padding: '7px 10px', borderRadius: 8, border: '1px solid rgba(0,0,0,0.06)', background: 'rgba(255,255,255,0.40)"
+    },
+    {
+      "file": "app/work-essentials/receipts/page.tsx",
+      "line": 1340,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.72)',"
+    },
+    {
+      "file": "app/work-essentials/receipts/page.tsx",
+      "line": 1343,
+      "label": "glass-bg-hardcode",
+      "snippet": "boxShadow: '6px 6px 18px rgba(140,170,210,0.14), -6px -6px 18px rgba(255,255,255,0.47)',"
+    },
+    {
+      "file": "app/work-essentials/receipts/page.tsx",
+      "line": 1348,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.72)',"
+    },
+    {
+      "file": "app/work-essentials/receipts/page.tsx",
+      "line": 1351,
+      "label": "glass-bg-hardcode",
+      "snippet": "boxShadow: '6px 6px 18px rgba(140,170,210,0.14), -6px -6px 18px rgba(255,255,255,0.47)',"
+    },
+    {
+      "file": "app/work-essentials/receipts/page.tsx",
+      "line": 1388,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.72)',"
+    },
+    {
+      "file": "app/work-essentials/receipts/page.tsx",
+      "line": 1391,
+      "label": "glass-bg-hardcode",
+      "snippet": "boxShadow: '6px 6px 18px rgba(140,170,210,0.14), -6px -6px 18px rgba(255,255,255,0.47)',"
+    }
+  ],
+  "generatedAt": "2026-05-10T04:20:25.165Z",
+  "note": "UI 토큰 hardcode (inline rgba). 기존 위반 동결, 새 위반만 차단."
+}
