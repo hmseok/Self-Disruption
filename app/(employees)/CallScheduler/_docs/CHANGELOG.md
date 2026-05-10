@@ -20,7 +20,29 @@
 - 셀 호출 시 `slotGroups[slot.id].id + worker_id` 로 lookup → 색상 layer 재활성
 - 효과: 같은 워커가 야간 그룹에서 화/목 희망, 주간 그룹에서 월/금 비선호 등 다른 색상 layer 표출
 
-## 2026-05-09 (Phase N-8) — 사이드바 layout 통합 (매니저 통합 콘솔)
+## 2026-05-09 (Phase N-9) — SubNav 표준 패턴 정정 (ClientLayout 중첩 제거)
+
+### 사용자 피드백
+> "ui 기준 다 어디갔나요? 컴포넌트? 기준 하네스? 다 아웃됌?"
+
+### 문제 (N-8 잘못)
+- ClientLayout (메인 사이드바 + 헤더 — `app/components/auth/ClientLayout.tsx`) 위에 자체 사이드바 만들어서 **중첩**
+- factory-search 의 SubNav 패턴 (모듈 내 탭 line) 무시
+- `lib/menu-registry.ts` SSOT 패턴 무시
+
+### 정정
+- `_components/SubNav.tsx` 신설 (factory-search 와 같은 탭 line 패턴)
+  · 📊 대시보드 / 📋 직원 요청 / 🕐 시프트 / 🚧 그룹 / 👥 워커 / 🎌 공휴일 / 💼 휴가
+  · settings 페이지는 `?tab=...` 매칭으로 활성 탭 표시
+- `layout.tsx` 신설 — SubNav 자동 적용 (모든 자식 페이지)
+- `page.tsx` 자체 사이드바 layout 제거 → 기존 단순 페이지 (대시보드)
+- 기존 ClientLayout 메인 사이드바 그대로 (CallScheduler 메뉴 1개 — menu-registry SSOT)
+
+### 결과
+- ERP 표준 layout 회복: 메인 사이드바 (ClientLayout) + 모듈 SubNav (CallScheduler) + 페이지 컨텐트
+- 다른 모듈 (factory-search 등) 과 동일 패턴
+
+## 2026-05-09 (Phase N-8) — 사이드바 layout 통합 (매니저 통합 콘솔) [revert by N-9]
 
 ### 사용자 피드백
 > "하위 편집도 기존 설정 페이지, 운영요약 전체설정 눌러도 기존페이지 이상하지않아요?

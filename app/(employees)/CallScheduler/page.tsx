@@ -1,30 +1,16 @@
 'use client'
 // ═══════════════════════════════════════════════════════════════════
-// /CallScheduler — 매니저 통합 콘솔 (Phase N-8: 사이드바 layout)
-//   nav: 📊 대시보드 / 📅 스케줄 / 📋 직원 요청
-//        🕐 시프트 / 🚧 그룹 / 👥 워커 / 🎌 공휴일 / 💼 휴가 quota
-//   URL ?view=... deep-link
+// /CallScheduler — 대시보드 (월별 스케줄 list + 운영 셋팅 펼침)
+// CLAUDE.md §10 Soft Ice 글래스 + 규칙 18 정렬 적용
+// SubNav 는 layout.tsx 에서 자동 적용 (factory-search 패턴)
 // ═══════════════════════════════════════════════════════════════════
-import { useEffect, useState, useMemo, Suspense } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
-import { useSearchParams, useRouter } from 'next/navigation'
 import { COLORS, GLASS, BTN, pillStyle } from '@/app/utils/ui-tokens'
 import { TONE_BG, TONE_TEXT } from './utils/palette'
 import { getAuthHeader } from '@/app/utils/auth-client'
-import ShiftsTab from './settings/ShiftsTab'
-import GroupsTab from './settings/GroupsTab'
-import WorkersTab from './settings/WorkersTab'
-import HolidaysTab from './settings/HolidaysTab'
-import LeavesTab from './settings/LeavesTab'
 
 export const dynamic = 'force-dynamic'
-
-type ViewKey = 'dashboard' | 'schedules' | 'requests'
-              | 'shifts' | 'groups' | 'workers' | 'holidays' | 'leaves'
-const VALID_VIEWS: ViewKey[] = [
-  'dashboard', 'schedules', 'requests',
-  'shifts', 'groups', 'workers', 'holidays', 'leaves',
-]
 
 interface ScheduleListItem {
   id: string
@@ -46,29 +32,6 @@ type SortKey = 'year_month' | 'status' | 'workers' | 'fill' | 'updated'
 type SortDir = 'asc' | 'desc'
 
 export default function CallSchedulerListPage() {
-  return (
-    <Suspense fallback={<div style={{ padding: 60, textAlign: 'center', color: COLORS.textMuted }}>로딩 중...</div>}>
-      <CallSchedulerInner />
-    </Suspense>
-  )
-}
-
-function CallSchedulerInner() {
-  const sp = useSearchParams()
-  const router = useRouter()
-  const initialView = (sp?.get('view') as ViewKey) || 'dashboard'
-  const [view, setView] = useState<ViewKey>(VALID_VIEWS.includes(initialView) ? initialView : 'dashboard')
-  const navigate = (v: ViewKey) => {
-    setView(v)
-    const url = v === 'dashboard' ? '/CallScheduler' : `/CallScheduler?view=${v}`
-    router.replace(url)
-  }
-  useEffect(() => {
-    const v = sp?.get('view') as ViewKey
-    if (v && VALID_VIEWS.includes(v) && v !== view) setView(v)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sp])
-
   const [items, setItems] = useState<ScheduleListItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -148,7 +111,6 @@ function CallSchedulerInner() {
     return () => { abort = true }
   }, [])
 
-  // 스케줄 list fetch
   useEffect(() => {
     let abort = false
     ;(async () => {
@@ -202,208 +164,44 @@ function CallSchedulerInner() {
   }
 
   return (
-    <div style={{ display: 'flex', minHeight: 'calc(100vh - 60px)' }}>
-      {/* 좌측 사이드바 */}
-      <Sidebar view={view} onNavigate={navigate} pendingCount={pendingCount} opsCounts={opsCounts} />
-
-      {/* 우측 컨텐트 */}
-      <div style={{ flex: 1, padding: '20px 24px', minWidth: 0 }}>
-        {view === 'dashboard' && (
-          <DashboardContent
-            items={items} sorted={sorted} aggregate={aggregate}
-            loading={loading} error={error}
-            sortKey={sortKey} sortDir={sortDir} toggle={toggle}
-            opsCounts={opsCounts} opsData={opsData}
-            expandedCard={expandedCard} setExpandedCard={setExpandedCard}
-            pendingCount={pendingCount}
-          />
-        )}
-        {view === 'schedules' && (
-          <SchedulesContent
-            items={items} sorted={sorted}
-            loading={loading} error={error}
-            sortKey={sortKey} sortDir={sortDir} toggle={toggle}
-          />
-        )}
-        {view === 'requests' && <RequestsContent />}
-        {view === 'shifts' && <SettingsViewWrap title="🕐 시프트"><ShiftsTab /></SettingsViewWrap>}
-        {view === 'groups' && <SettingsViewWrap title="🚧 그룹"><GroupsTab /></SettingsViewWrap>}
-        {view === 'workers' && <SettingsViewWrap title="👥 콜센터 워커"><WorkersTab /></SettingsViewWrap>}
-        {view === 'holidays' && <SettingsViewWrap title="🎌 공휴일"><HolidaysTab /></SettingsViewWrap>}
-        {view === 'leaves' && <SettingsViewWrap title="💼 휴가 quota"><LeavesTab /></SettingsViewWrap>}
-      </div>
-    </div>
-  )
-}
-
-// ── 사이드바 ────────────────────────────────────────────────────────
-function Sidebar({ view, onNavigate, pendingCount, opsCounts }: {
-  view: ViewKey
-  onNavigate: (v: ViewKey) => void
-  pendingCount: number
-  opsCounts: { slots: number; groups: number; workers: number; quotaWorkers: number } | null
-}) {
-  return (
-    <div style={{
-      width: 220, minHeight: 'calc(100vh - 60px)',
-      ...GLASS.L2, borderRight: `1px solid ${COLORS.borderFaint}`,
-      padding: '20px 12px',
-      display: 'flex', flexDirection: 'column', gap: 4,
-      position: 'sticky', top: 0, alignSelf: 'flex-start',
-    }}>
-      <div style={{ padding: '0 8px 12px' }}>
-        <div style={{ fontSize: 14, fontWeight: 800, color: COLORS.textPrimary }}>
-          ⏰ CallScheduler
-        </div>
-        <div style={{ fontSize: 10, color: COLORS.textMuted, marginTop: 2 }}>
-          매니저 통합 콘솔
-        </div>
-      </div>
-
-      <NavItem active={view === 'dashboard'} onClick={() => onNavigate('dashboard')}
-               emoji="📊" label="대시보드" />
-      <NavItem active={view === 'schedules'} onClick={() => onNavigate('schedules')}
-               emoji="📅" label="스케줄" />
-      <NavItem active={view === 'requests'} onClick={() => onNavigate('requests')}
-               emoji="📋" label="직원 요청"
-               badge={pendingCount > 0 ? pendingCount : undefined} badgeTone="warning" />
-
-      <div style={{
-        margin: '14px 8px 8px', paddingTop: 10,
-        borderTop: `1px solid ${COLORS.borderFaint}`,
-        fontSize: 10, fontWeight: 700, color: COLORS.textMuted,
-      }}>
-        ⚙ 운영 셋팅
-      </div>
-      <NavItem active={view === 'shifts'} onClick={() => onNavigate('shifts')}
-               emoji="🕐" label="시프트" badge={opsCounts?.slots} />
-      <NavItem active={view === 'groups'} onClick={() => onNavigate('groups')}
-               emoji="🚧" label="그룹" badge={opsCounts?.groups} />
-      <NavItem active={view === 'workers'} onClick={() => onNavigate('workers')}
-               emoji="👥" label="워커" badge={opsCounts?.workers} />
-      <NavItem active={view === 'holidays'} onClick={() => onNavigate('holidays')}
-               emoji="🎌" label="공휴일" />
-      <NavItem active={view === 'leaves'} onClick={() => onNavigate('leaves')}
-               emoji="💼" label="휴가 quota" />
-
-      <div style={{ flex: 1 }} />
-
-      <Link href="/RideEmployees" style={{
-        margin: '0 8px', padding: '8px 10px', borderRadius: 8, fontSize: 11, fontWeight: 600,
-        color: COLORS.textSecondary, textDecoration: 'none',
-        border: `1px solid ${COLORS.borderFaint}`,
-        textAlign: 'center',
-      }}>
-        → 직원 마스터
-      </Link>
-    </div>
-  )
-}
-
-function NavItem({ active, onClick, emoji, label, badge, badgeTone }: {
-  active: boolean
-  onClick: () => void
-  emoji: string
-  label: string
-  badge?: number
-  badgeTone?: 'warning' | 'info'
-}) {
-  return (
-    <button type="button" onClick={onClick}
-            style={{
-              padding: '10px 12px', borderRadius: 8,
-              background: active ? COLORS.primary : 'transparent',
-              color: active ? '#fff' : COLORS.textPrimary,
-              border: 'none', cursor: 'pointer', textAlign: 'left',
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              fontSize: 13, fontWeight: active ? 800 : 600,
-              transition: 'background 0.12s',
-            }}
-            onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = 'rgba(0,0,0,0.04)' }}
-            onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = 'transparent' }}>
-      <span>{emoji} {label}</span>
-      {badge != null && badge > 0 && (
-        <span style={{
-          fontSize: 10, fontWeight: 800,
-          padding: '2px 7px', borderRadius: 99,
-          background: active ? 'rgba(255,255,255,0.25)'
-                    : badgeTone === 'warning' ? COLORS.warning : COLORS.info,
-          color: '#fff',
-        }}>
-          {badgeTone === 'warning' ? `⏳ ${badge}` : badge}
-        </span>
-      )}
-    </button>
-  )
-}
-
-// ── 컨텐트 wrappers ────────────────────────────────────────────────
-function SettingsViewWrap({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <h1 style={{ fontSize: 20, fontWeight: 800, color: COLORS.textPrimary, margin: '0 0 14px' }}>
-        {title}
-      </h1>
-      {children}
-    </div>
-  )
-}
-
-function RequestsContent() {
-  return (
-    <div>
-      <h1 style={{ fontSize: 20, fontWeight: 800, color: COLORS.textPrimary, margin: '0 0 14px' }}>
-        📋 직원 요청 통합 검토
-      </h1>
-      <div style={{ ...GLASS.L4, borderRadius: 12, padding: 40, textAlign: 'center' }}>
-        <div style={{ fontSize: 14, color: COLORS.textSecondary, marginBottom: 8 }}>
-          회피일 / 휴가 / 시프트 교체 — 일괄 처리
-        </div>
-        <Link href="/CallScheduler/requests" style={{
-          ...BTN.lg, background: COLORS.primary, color: '#fff',
-          textDecoration: 'none', display: 'inline-block', marginTop: 12,
-        }}>
-          전체 페이지 열기 →
-        </Link>
-      </div>
-    </div>
-  )
-}
-
-// ── 대시보드 컨텐트 ──────────────────────────────────────────────
-function DashboardContent(props: {
-  items: ScheduleListItem[]; sorted: ScheduleListItem[]
-  aggregate: { draft: number; published: number; totalWorkers: number; avgFill: number } | null
-  loading: boolean; error: string | null
-  sortKey: SortKey; sortDir: SortDir; toggle: (k: SortKey) => void
-  opsCounts: { slots: number; groups: number; workers: number; quotaWorkers: number } | null
-  opsData: any
-  expandedCard: 'shifts' | 'groups' | 'workers' | 'quota' | null
-  setExpandedCard: (c: any) => void
-  pendingCount: number
-}) {
-  const { items, sorted, aggregate, loading, error, sortKey, sortDir, toggle,
-          opsCounts, opsData, expandedCard, setExpandedCard } = props
-  return (
-    <>
+    <div style={{ padding: 24, maxWidth: 1280, margin: '0 auto' }}>
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         marginBottom: 16,
       }}>
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 800, color: COLORS.textPrimary, margin: 0 }}>
-            📊 대시보드
+            ⏰ 근무시간표 분석 & 배포
           </h1>
           <div style={{ fontSize: 12, color: COLORS.textMuted, marginTop: 4 }}>
             월별 콜 스케줄 작성 · 분석 · 공지
+            {pendingCount > 0 && (
+              <Link href="/CallScheduler/requests" style={{
+                marginLeft: 10, padding: '2px 10px', borderRadius: 99,
+                background: COLORS.bgAmber, color: COLORS.warning,
+                border: `1px solid ${COLORS.borderAmber}`,
+                fontSize: 11, fontWeight: 800, textDecoration: 'none',
+              }}>
+                ⏳ 직원 요청 {pendingCount}건
+              </Link>
+            )}
           </div>
         </div>
-        <Link href="/CallScheduler/new" style={{
-          ...BTN.lg, background: COLORS.primary, color: '#fff',
-          textDecoration: 'none', display: 'inline-block',
-        }}>
-          + 새 월 만들기
-        </Link>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Link href="/RideEmployees" style={{
+            ...BTN.md, background: 'transparent', color: COLORS.textSecondary,
+            border: `1px solid ${COLORS.borderFaint}`,
+            textDecoration: 'none', display: 'inline-block',
+          }}>
+            📋 직원 마스터
+          </Link>
+          <Link href="/CallScheduler/new" style={{
+            ...BTN.lg, background: COLORS.primary, color: '#fff',
+            textDecoration: 'none', display: 'inline-block',
+          }}>
+            + 새 월 만들기
+          </Link>
+        </div>
       </div>
 
       {aggregate && (
@@ -421,11 +219,9 @@ function DashboardContent(props: {
         </div>
       )}
 
-      {/* 운영 셋팅 인라인 카드 (사이드바 nav 와 별개 — 한눈에 펼쳐서 확인) */}
+      {/* 운영 셋팅 펼침 (영역 한눈에 확인 — 깊은 편집은 SubNav 의 시프트/그룹/... 탭) */}
       {opsCounts && (
-        <div style={{
-          ...GLASS.L4, borderRadius: 12, padding: 14, marginBottom: 16,
-        }}>
+        <div style={{ ...GLASS.L4, borderRadius: 12, padding: 14, marginBottom: 16 }}>
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             marginBottom: 10,
@@ -433,7 +229,7 @@ function DashboardContent(props: {
             <div style={{ fontSize: 13, fontWeight: 800, color: COLORS.textPrimary }}>
               ⚙️ 운영 셋팅 펼침
               <span style={{ fontSize: 11, fontWeight: 500, color: COLORS.textMuted, marginLeft: 6 }}>
-                카드 클릭 → 인라인 펼침 (편집은 좌측 nav)
+                카드 클릭 → 인라인 펼침 / 깊은 편집은 위 탭에서
               </span>
             </div>
           </div>
@@ -442,16 +238,13 @@ function DashboardContent(props: {
           }}>
             <SettingsTile expanded={expandedCard === 'shifts'}
                           onToggle={() => setExpandedCard(expandedCard === 'shifts' ? null : 'shifts')}
-                          icon="🕐" label="시프트" value={opsCounts.slots}
-                          sub="시간대 정의" tone="blue" />
+                          icon="🕐" label="시프트" value={opsCounts.slots} sub="시간대 정의" tone="blue" />
             <SettingsTile expanded={expandedCard === 'groups'}
                           onToggle={() => setExpandedCard(expandedCard === 'groups' ? null : 'groups')}
-                          icon="🚧" label="그룹" value={opsCounts.groups}
-                          sub="시프트 + 멤버 + 패턴" tone="violet" />
+                          icon="🚧" label="그룹" value={opsCounts.groups} sub="시프트 + 멤버 + 패턴" tone="violet" />
             <SettingsTile expanded={expandedCard === 'workers'}
                           onToggle={() => setExpandedCard(expandedCard === 'workers' ? null : 'workers')}
-                          icon="👥" label="콜센터 워커" value={opsCounts.workers}
-                          sub="정체성 + 외부 cycle" tone="amber" />
+                          icon="👥" label="콜센터 워커" value={opsCounts.workers} sub="정체성 + 외부 cycle" tone="amber" />
             <SettingsTile expanded={expandedCard === 'quota'}
                           onToggle={() => setExpandedCard(expandedCard === 'quota' ? null : 'quota')}
                           icon="💼" label="휴가 quota" value={opsCounts.quotaWorkers}
@@ -475,157 +268,97 @@ function DashboardContent(props: {
         </div>
       )}
 
-      {/* 최근 스케줄 list (컴팩트 5개) */}
-      <SchedulesTable
-        loading={loading} error={error} items={sorted.slice(0, 5)}
-        sortKey={sortKey} sortDir={sortDir} toggle={toggle}
-        title="📅 최근 스케줄" hintMore={items.length > 5 ? `+${items.length - 5}건 더 (스케줄 탭에서 전체)` : undefined}
-      />
-    </>
-  )
-}
-
-// ── 스케줄 list 컨텐트 ────────────────────────────────────────────
-function SchedulesContent(props: {
-  items: ScheduleListItem[]; sorted: ScheduleListItem[]
-  loading: boolean; error: string | null
-  sortKey: SortKey; sortDir: SortDir; toggle: (k: SortKey) => void
-}) {
-  const { sorted, loading, error, sortKey, sortDir, toggle } = props
-  return (
-    <div>
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        marginBottom: 14,
-      }}>
-        <h1 style={{ fontSize: 20, fontWeight: 800, color: COLORS.textPrimary, margin: 0 }}>
-          📅 월별 스케줄
-        </h1>
-        <Link href="/CallScheduler/new" style={{
-          ...BTN.lg, background: COLORS.primary, color: '#fff',
-          textDecoration: 'none', display: 'inline-block',
-        }}>
-          + 새 월 만들기
-        </Link>
-      </div>
-      <SchedulesTable
-        loading={loading} error={error} items={sorted}
-        sortKey={sortKey} sortDir={sortDir} toggle={toggle}
-      />
-    </div>
-  )
-}
-
-// ── 스케줄 테이블 (재사용) ────────────────────────────────────────
-function SchedulesTable({ loading, error, items, sortKey, sortDir, toggle, title, hintMore }: {
-  loading: boolean; error: string | null
-  items: ScheduleListItem[]
-  sortKey: SortKey; sortDir: SortDir; toggle: (k: SortKey) => void
-  title?: string
-  hintMore?: string
-}) {
-  return (
-    <div style={{ ...GLASS.L4, borderRadius: 12, padding: 12, overflow: 'auto' }}>
-      {title && (
-        <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '4px 6px 10px',
-        }}>
-          <div style={{ fontSize: 13, fontWeight: 800, color: COLORS.textPrimary }}>{title}</div>
-          {hintMore && (
-            <div style={{ fontSize: 11, color: COLORS.textMuted }}>{hintMore}</div>
-          )}
-        </div>
-      )}
-      {loading && (
-        <div style={{ padding: 40, textAlign: 'center', color: COLORS.textMuted }}>로딩 중...</div>
-      )}
-      {error && (
-        <div style={{
-          padding: 12, background: COLORS.bgRed, border: `1px solid ${COLORS.borderRed}`,
-          borderRadius: 8, color: COLORS.danger, fontSize: 13,
-        }}>
-          ❌ {error}
-        </div>
-      )}
-      {!loading && !error && items.length === 0 && (
-        <div style={{ padding: 60, textAlign: 'center' }}>
-          <div style={{ fontSize: 14, color: COLORS.textSecondary, marginBottom: 12 }}>
-            아직 작성된 스케줄이 없습니다.
-          </div>
-          <Link href="/CallScheduler/new" style={{
-            ...BTN.md, background: COLORS.primary, color: '#fff',
-            textDecoration: 'none', display: 'inline-block',
+      <div style={{ ...GLASS.L4, borderRadius: 12, padding: 12, overflow: 'auto' }}>
+        {loading && (
+          <div style={{ padding: 40, textAlign: 'center', color: COLORS.textMuted }}>로딩 중...</div>
+        )}
+        {error && (
+          <div style={{
+            padding: 12, background: COLORS.bgRed, border: `1px solid ${COLORS.borderRed}`,
+            borderRadius: 8, color: COLORS.danger, fontSize: 13,
           }}>
-            첫 스케줄 만들기
-          </Link>
-        </div>
-      )}
-      {!loading && !error && items.length > 0 && (
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-          <thead>
-            <tr style={{ borderBottom: `1px solid ${COLORS.borderFaint}` }}>
-              <Th sortKey="year_month" current={sortKey} dir={sortDir} onClick={toggle}>년/월</Th>
-              <Th sortKey="status" current={sortKey} dir={sortDir} onClick={toggle}>상태</Th>
-              <Th sortKey="workers" current={sortKey} dir={sortDir} onClick={toggle} align="right">근무자</Th>
-              <Th sortKey="fill" current={sortKey} dir={sortDir} onClick={toggle} align="right">충원율</Th>
-              <Th sortKey="updated" current={sortKey} dir={sortDir} onClick={toggle} align="right">최근 수정</Th>
-              <th style={{ padding: '8px 10px', textAlign: 'right' }}></th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map(s => {
-              const fillPct = Math.round(s.fill_rate * 1000) / 10
-              const fillTone = s.fill_rate >= 0.9 ? 'success' : s.fill_rate >= 0.7 ? 'warning' : 'danger'
-              const statusTone = s.status === 'published' ? 'success' : s.status === 'draft' ? 'info' : 'neutral'
-              const statusLabel = s.status === 'published' ? '공지됨' : s.status === 'draft' ? '초안' : '보관'
-              return (
-                <tr key={s.id} style={{ borderBottom: `1px solid ${COLORS.borderFaint}` }}>
-                  <td style={{ padding: '10px', whiteSpace: 'nowrap' }}>
-                    <Link href={`/CallScheduler/${s.id}`} style={{
-                      color: COLORS.primary, fontWeight: 700, textDecoration: 'none',
+            ❌ {error}
+          </div>
+        )}
+        {!loading && !error && items.length === 0 && (
+          <div style={{ padding: 60, textAlign: 'center' }}>
+            <div style={{ fontSize: 14, color: COLORS.textSecondary, marginBottom: 12 }}>
+              아직 작성된 스케줄이 없습니다.
+            </div>
+            <Link href="/CallScheduler/new" style={{
+              ...BTN.md, background: COLORS.primary, color: '#fff',
+              textDecoration: 'none', display: 'inline-block',
+            }}>
+              첫 스케줄 만들기
+            </Link>
+          </div>
+        )}
+        {!loading && !error && items.length > 0 && (
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <thead>
+              <tr style={{ borderBottom: `1px solid ${COLORS.borderFaint}` }}>
+                <Th sortKey="year_month" current={sortKey} dir={sortDir} onClick={toggle}>년/월</Th>
+                <Th sortKey="status" current={sortKey} dir={sortDir} onClick={toggle}>상태</Th>
+                <Th sortKey="workers" current={sortKey} dir={sortDir} onClick={toggle} align="right">근무자</Th>
+                <Th sortKey="fill" current={sortKey} dir={sortDir} onClick={toggle} align="right">충원율</Th>
+                <Th sortKey="updated" current={sortKey} dir={sortDir} onClick={toggle} align="right">최근 수정</Th>
+                <th style={{ padding: '8px 10px', textAlign: 'right' }}></th>
+              </tr>
+            </thead>
+            <tbody>
+              {sorted.map(s => {
+                const fillPct = Math.round(s.fill_rate * 1000) / 10
+                const fillTone = s.fill_rate >= 0.9 ? 'success' : s.fill_rate >= 0.7 ? 'warning' : 'danger'
+                const statusTone = s.status === 'published' ? 'success' : s.status === 'draft' ? 'info' : 'neutral'
+                const statusLabel = s.status === 'published' ? '공지됨' : s.status === 'draft' ? '초안' : '보관'
+                return (
+                  <tr key={s.id} style={{ borderBottom: `1px solid ${COLORS.borderFaint}` }}>
+                    <td style={{ padding: '10px', whiteSpace: 'nowrap' }}>
+                      <Link href={`/CallScheduler/${s.id}`} style={{
+                        color: COLORS.primary, fontWeight: 700, textDecoration: 'none',
+                      }}>
+                        {s.year}년 {s.month}월
+                      </Link>
+                      {s.title && (
+                        <span style={{ marginLeft: 8, fontSize: 11, color: COLORS.textMuted }}>
+                          {s.title}
+                        </span>
+                      )}
+                    </td>
+                    <td style={{ padding: '10px' }}>
+                      <span style={pillStyle(statusTone)}>{statusLabel}</span>
+                    </td>
+                    <td style={{ padding: '10px', textAlign: 'right', color: COLORS.textPrimary }}>
+                      {s.worker_count}명
+                    </td>
+                    <td style={{ padding: '10px', textAlign: 'right' }}>
+                      <span style={pillStyle(fillTone)}>{fillPct}%</span>
+                    </td>
+                    <td style={{
+                      padding: '10px', textAlign: 'right',
+                      color: COLORS.textMuted, fontSize: 11,
                     }}>
-                      {s.year}년 {s.month}월
-                    </Link>
-                    {s.title && (
-                      <span style={{ marginLeft: 8, fontSize: 11, color: COLORS.textMuted }}>
-                        {s.title}
-                      </span>
-                    )}
-                  </td>
-                  <td style={{ padding: '10px' }}>
-                    <span style={pillStyle(statusTone)}>{statusLabel}</span>
-                  </td>
-                  <td style={{ padding: '10px', textAlign: 'right', color: COLORS.textPrimary }}>
-                    {s.worker_count}명
-                  </td>
-                  <td style={{ padding: '10px', textAlign: 'right' }}>
-                    <span style={pillStyle(fillTone)}>{fillPct}%</span>
-                  </td>
-                  <td style={{
-                    padding: '10px', textAlign: 'right',
-                    color: COLORS.textMuted, fontSize: 11,
-                  }}>
-                    {new Date(s.updated_at).toLocaleString('ko-KR', {
-                      year: '2-digit', month: '2-digit', day: '2-digit',
-                      hour: '2-digit', minute: '2-digit',
-                    })}
-                  </td>
-                  <td style={{ padding: '10px', textAlign: 'right' }}>
-                    <Link href={`/CallScheduler/${s.id}`} style={{
-                      ...BTN.sm, background: COLORS.bgBlue, color: COLORS.info,
-                      border: `1px solid ${COLORS.borderBlue}`,
-                      textDecoration: 'none', display: 'inline-block',
-                    }}>
-                      열기
-                    </Link>
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      )}
+                      {new Date(s.updated_at).toLocaleString('ko-KR', {
+                        year: '2-digit', month: '2-digit', day: '2-digit',
+                        hour: '2-digit', minute: '2-digit',
+                      })}
+                    </td>
+                    <td style={{ padding: '10px', textAlign: 'right' }}>
+                      <Link href={`/CallScheduler/${s.id}`} style={{
+                        ...BTN.sm, background: COLORS.bgBlue, color: COLORS.info,
+                        border: `1px solid ${COLORS.borderBlue}`,
+                        textDecoration: 'none', display: 'inline-block',
+                      }}>
+                        열기
+                      </Link>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
     </div>
   )
 }
@@ -717,7 +450,6 @@ function SettingsTile({ expanded, onToggle, icon, label, value, sub, tone }: {
   )
 }
 
-// ── Expanded card 컨텐트 ──────────────────────────────────────────
 function ExpandedShifts({ slots }: { slots: any[] }) {
   return (
     <div>
