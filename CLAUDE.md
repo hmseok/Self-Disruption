@@ -32,6 +32,19 @@ npm run cowork:check           # 진단만 (수정 X)
 npm run cowork:fix             # 자동 수정 모드
 ```
 
+### 🎨 페이지 디자인 표준 (2026-05-10 — 필독)
+
+새 페이지 / 기존 페이지 수정 작업 시 **반드시**:
+
+1. **`_docs/UI-DESIGN-STANDARD.md`** 정독 — 디자인 표준
+2. **`/finance/settlement`** 페이지 참고 — 기준 동작 확인
+3. **`DcStatStrip` / `DcToolbar`** 의무 사용
+4. **`npm run lint:ui-design`** 으로 자가 검증
+
+> 사용자 명시: 「정산 관리가 우리의 기준입니다. 다른 세션들이 하네스를 지키지만 다른 방향으로 나오고 있어서 강화 필요」
+>
+> 자세한 패턴은 본 파일 § 10 + `_docs/UI-DESIGN-STANDARD.md`
+
 ---
 
 ## 🚨 0-1. 강제 규제 조항 (NON-NEGOTIABLE — 2026-04-29 사용자 명령)
@@ -1467,6 +1480,27 @@ prisma.$executeRaw`UPDATE table SET column = ${value} WHERE id = ${id}`
 ---
 
 ## 10. Soft Ice 글래스 디자인 시스템
+
+> **🎨 페이지 디자인 표준 (필독 — 2026-05-10 사용자 명령 기반)**
+> 「**정산 관리** 가 우리의 디자인 기준입니다」
+>
+> ### 모든 cowork 세션은 새 페이지 / 기존 페이지 수정 시 **반드시 다음 확인**:
+>
+> 1. **`_docs/UI-DESIGN-STANDARD.md`** — 페이지 디자인 표준 문서 (header / breadcrumb / DcStatStrip / DcToolbar / 탭 / Glass)
+> 2. **`/finance/settlement`** — 기준 페이지 (실제 동작 확인)
+> 3. **`app/components/DcStatStrip.tsx`** — 5 카드 stat strip 의무 사용
+> 4. **`app/components/DcToolbar.tsx`** — 검색 + 필터 toolbar 의무 사용
+> 5. **`npm run lint:ui-design`** — 자동 검증 (108 페이지 자동 스캔)
+>
+> ### 자주 발생하는 위반 (피해야 할 패턴):
+> - ❌ 큰 헤더 박스 + 24px+ 페이지 제목 (기준은 20px)
+> - ❌ Breadcrumb 「Employee of Ride Inc.」 회사명 (그룹명 사용)
+> - ❌ stat 카드 자체 div 구현 (DcStatStrip 사용)
+> - ❌ 검색바 + 필터 자체 구현 (DcToolbar 사용)
+>
+> 신규 세션 시작 시 `_docs/UI-DESIGN-STANDARD.md` 1회 정독 권장.
+
+---
 
 뤼키드 글래스 디자인 적극활용 (카드 항목 제목은 투톤 추천)
 
