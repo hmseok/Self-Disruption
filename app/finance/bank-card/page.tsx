@@ -623,6 +623,10 @@ export default function BankCardPage() {
     is_canceled?: boolean
     sms_merchant?: string | null
     sms_holder?: string | null
+    // PR-UX10: entity 타입 라벨 + corporate_cards 정보
+    matched_type_label?: string
+    cc_card_alias?: string | null
+    cc_holder_name?: string | null
   }
   const [reviewQueue, setReviewQueue] = useState<{
     items: PendingReviewItem[]
@@ -5565,11 +5569,13 @@ export default function BankCardPage() {
                               {Number(it.tx_amount).toLocaleString()}원
                             </div>
                             <div style={{ flex: '0 0 12px', fontSize: 13, color: '#d97706' }}>→</div>
-                            <div style={{ flex: '1 1 180px', minWidth: 0, display: 'flex', alignItems: 'center', gap: 4 }}>
-                              <span style={{ fontSize: 14 }}>{matchedIcon}</span>
-                              <span style={{ fontSize: 12, fontWeight: 600, color: '#7c3aed', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            <div style={{ flex: '1 1 220px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
+                              <div style={{ fontSize: 10, color: COLORS.textMuted, fontWeight: 600 }}>
+                                {it.matched_type_label || matchedIcon}
+                              </div>
+                              <div style={{ fontSize: 12, fontWeight: 600, color: '#7c3aed', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                 {it.matched_name}
-                              </span>
+                              </div>
                             </div>
                             {it.suspect && (
                               <div style={{ flex: '0 0 auto', fontSize: 9, color: '#d97706', background: 'rgba(217,119,6,0.1)', padding: '2px 6px', borderRadius: 4 }}

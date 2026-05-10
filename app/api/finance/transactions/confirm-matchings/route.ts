@@ -83,8 +83,10 @@ export async function POST(request: NextRequest) {
         updated += Number(result || 0)
       }
     } else if (mode === 'reject' && (assignmentIds.length > 0 || transactionIds.length > 0)) {
+      // PR-UX11: 거부 시 transactions.related_type 도 NULL — 자동 재매칭 가능 상태로
       if (assignmentIds.length > 0) {
         const placeholders = assignmentIds.map(() => '?').join(',')
+        // 1) ta.status='rejected'
         const result = await prisma.$executeRawUnsafe(
           `UPDATE transaction_assignments
               SET status = 'rejected',
@@ -96,6 +98,18 @@ export async function POST(request: NextRequest) {
           ...assignmentIds,
         )
         updated += Number(result || 0)
+        // 2) transactions.related_type/id NULL (해당 assignment 의 tx 들)
+        try {
+          await prisma.$executeRawUnsafe(
+            `UPDATE transactions t
+               JOIN transaction_assignments ta ON ta.transaction_id = t.id
+                SET t.related_type = NULL, t.related_id = NULL, t.updated_at = NOW()
+              WHERE ta.id IN (${placeholders})`,
+            ...assignmentIds,
+          )
+        } catch (e: any) {
+          console.warn('[reject] transactions.related_type NULL failed:', e?.message)
+        }
       }
       if (transactionIds.length > 0) {
         const placeholders = transactionIds.map(() => '?').join(',')
@@ -110,6 +124,14 @@ export async function POST(request: NextRequest) {
           ...transactionIds,
         )
         updated += Number(result || 0)
+        // transactions.related_type NULL 처리
+        try {
+          await prisma.$executeRawUnsafe(
+            `UPDATE transactions SET related_type = NULL, related_id = NULL, updated_at = NOW()
+              WHERE id IN (${placeholders})`,
+            ...transactionIds,
+          )
+        } catch {}
       }
     } else {
       return NextResponse.json({

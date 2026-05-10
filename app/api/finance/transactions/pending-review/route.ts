@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyUser } from '@/lib/auth-server'
 import { prisma } from '@/lib/prisma'
+import { bankMappingJoinSql, cardMappingJoinSql } from '@/lib/last4-match'
 
 /**
  * /api/finance/transactions/pending-review
@@ -61,6 +62,9 @@ export async function GET(request: NextRequest) {
           sms.merchant         AS sms_merchant,
           sms.holder_name      AS sms_holder,
           sms.transaction_type AS sms_transaction_type,
+          /* PR-UX10: 법인 카드 정보 (사용자 매핑 사전) */
+          cc.card_alias        AS cc_card_alias,
+          cc.holder_name       AS cc_holder_name,
           /* 통장 매핑 정보 */
           bam.account_alias    AS bank_account_alias,
           bam.account_holder   AS bank_account_holder
@@ -68,8 +72,10 @@ export async function GET(request: NextRequest) {
         JOIN transactions t ON t.id = ta.transaction_id
         LEFT JOIN card_sms_transactions sms
           ON sms.transaction_id COLLATE utf8mb4_unicode_ci = t.id COLLATE utf8mb4_unicode_ci
+        LEFT JOIN corporate_cards cc
+          ON ${cardMappingJoinSql('cc', 'sms', 't')}
         LEFT JOIN bank_account_mappings bam
-          ON bam.account_number = t.codef_org_code
+          ON ${bankMappingJoinSql('bam', 'sms', 't')}
         WHERE ta.status = 'pending'
           AND ta.source = 'auto'
           AND t.deleted_at IS NULL
@@ -173,15 +179,43 @@ export async function GET(request: NextRequest) {
         for (const r of rows) entityNameMap[`freelancer:${r.id}`] = String(r.name || '?') + (r.bank_name ? `(${r.bank_name})` : '(프리랜서)')
       } catch {}
     }
-    // car
+    // car — PR-UX10: brand + model + 차량번호 (cars 테이블 + fmi_rentals fallback)
     if (idsByType['car']?.length) {
       const ids = idsByType['car']
       try {
         const rows = await prisma.$queryRawUnsafe<Array<any>>(
-          `SELECT id, number, model FROM cars WHERE id IN (${ids.map(() => '?').join(',')})`,
+          `SELECT id, number, brand, model FROM cars WHERE id IN (${ids.map(() => '?').join(',')})`,
           ...ids,
         )
-        for (const r of rows) entityNameMap[`car:${r.id}`] = String(r.number || '?') + (r.model ? ` ${r.model}` : '')
+        for (const r of rows) {
+          const num = String(r.number || '').trim()
+          const car = `${r.brand || ''} ${r.model || ''}`.trim()
+          entityNameMap[`car:${r.id}`] = num
+            ? (car ? `${num} ${car}` : num)
+            : `차량 #${String(r.id).slice(0, 8)}`
+        }
+        // cars 매칭 안 된 ID — fmi_rentals 폴백 (vehicle_id, customer_car_number)
+        const foundIds = new Set(rows.map(r => String(r.id)))
+        const missingIds = ids.filter(i => !foundIds.has(String(i)))
+        if (missingIds.length > 0) {
+          try {
+            const fmi = await prisma.$queryRawUnsafe<Array<any>>(
+              `SELECT id, vehicle_car_number, customer_car_number, insurance_company
+                 FROM fmi_rentals WHERE id IN (${missingIds.map(() => '?').join(',')})`,
+              ...missingIds,
+            )
+            for (const r of fmi) {
+              const num = r.vehicle_car_number || r.customer_car_number || ''
+              entityNameMap[`car:${r.id}`] = num
+                ? `${num} (대차건 ${r.insurance_company || ''})`.trim()
+                : `대차건 #${String(r.id).slice(0, 8)}`
+            }
+          } catch {}
+          // 마지막 폴백 — 매핑 없으면 「차량 미등록」
+          for (const id of missingIds) {
+            if (!entityNameMap[`car:${id}`]) entityNameMap[`car:${id}`] = `차량 미등록 (${String(id).slice(0, 8)})`
+          }
+        }
       } catch {}
     }
     // fmi_rental
@@ -210,9 +244,11 @@ export async function GET(request: NextRequest) {
       if (importedFrom === 'sms' || importedFrom.startsWith('excel_card') || importedFrom.startsWith('pdf_card')) {
         sourceType = 'card'
         sourceLabel = '💳 카드'
-        // sms_card_alias 있으면 카드 정보, sms_transaction_type='canceled' 면 취소
-        const cardAlias = it.sms_card_alias || it.payment_method || ''
-        sourceDetail = cardAlias ? `${cardAlias}` : '카드'
+        // PR-UX10: corporate_cards 우선, sms_card_alias fallback, payment_method 마지막
+        const cardAlias = it.cc_card_alias || it.sms_card_alias || it.payment_method || ''
+        const holder = it.cc_holder_name || it.sms_holder || ''
+        sourceDetail = cardAlias || '카드 미매핑'
+        if (holder && !sourceDetail.includes(holder)) sourceDetail += ` · ${holder}`
         if (it.sms_transaction_type === 'canceled') sourceDetail += ' (취소)'
       } else if (importedFrom.startsWith('excel_bank') || importedFrom === 'sms_bank') {
         sourceType = 'bank'
@@ -226,10 +262,25 @@ export async function GET(request: NextRequest) {
       }
 
       const matchedKey = `${it.matched_type}:${it.matched_id}`
+
+      // PR-UX10: entity 타입 라벨 (한국어)
+      const matchedTypeLabel = (() => {
+        switch (it.matched_type) {
+          case 'invest':     return '📈 투자자'
+          case 'jiip':       return '🤝 지입자'
+          case 'employee':   return '👥 직원'
+          case 'freelancer': return '💼 프리랜서'
+          case 'car':        return '🚗 차량'
+          case 'fmi_rental': return '📥 대차건'
+          default:           return `🔗 ${it.matched_type}`
+        }
+      })()
+
       return {
         ...it,
         tx_amount: Number(it.tx_amount || 0),
         matched_name: entityNameMap[matchedKey] || `${it.matched_type}:${String(it.matched_id).slice(0, 8)}`,
+        matched_type_label: matchedTypeLabel,
         // PR-UX7.1: 출처 라벨
         source_type: sourceType,
         source_label: sourceLabel,
