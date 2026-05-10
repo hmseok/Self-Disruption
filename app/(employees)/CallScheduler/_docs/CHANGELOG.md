@@ -20,6 +20,28 @@
 - 셀 호출 시 `slotGroups[slot.id].id + worker_id` 로 lookup → 색상 layer 재활성
 - 효과: 같은 워커가 야간 그룹에서 화/목 희망, 주간 그룹에서 월/금 비선호 등 다른 색상 layer 표출
 
+## 2026-05-10 (Phase N-11) — SubNav 검정 pill 패턴 (정산 관리 §4 준수)
+
+### 사용자 피드백
+> "상단부분이 정산페이지처럼 되어야합니다" + 정산/CallScheduler/factory-search 3 스크린샷 비교
+
+### 문제
+- N-9 의 SubNav 는 underline 스타일 (factory-search 와 같은 잘못)
+- UI-DESIGN-STANDARD.md §4: **활성 검정 배경 #0f2440 + 흰 글씨**, 비활성 투명 + #64748b
+- §6.2 factory-search 의 hr underline 위반 사례 명시
+
+### 변경
+- SubNav.tsx 재작성:
+  · borderBottom 제거 (단순 padding-only 컨테이너)
+  · 활성 탭: `background: #0f2440 + color: #fff + borderRadius: 8` (검정 pill)
+  · 비활성 탭: `background: transparent + color: #64748b`
+  · padding 8/16 fontSize 13 fontWeight 700 — 정산 관리 §4 동일
+- 이모지 + 라벨 같은 string (fontSize 통일)
+
+### 검증
+- tsc CallScheduler 0 errors
+- lint:ui-design CallScheduler 위반 0건
+
 ## 2026-05-10 (Phase N-10) — UI 디자인 표준 적용 (정산 관리 기준)
 
 ### 사용자 명령

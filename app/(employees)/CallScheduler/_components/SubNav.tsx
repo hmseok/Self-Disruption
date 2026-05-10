@@ -1,20 +1,20 @@
 'use client'
 // ───────────────────────────────────────────────────────────────
-// SubNav — CallScheduler 모듈 공통 탭 line (factory-search 와 같은 패턴)
-//   매니저 영역만 표출. 직원 본인 페이지 (/me, /e/[token]) 는 별개 layout.
+// SubNav — CallScheduler 모듈 공통 탭 (정산 관리 §4 검정 pill 패턴)
+//   활성: 검정 배경 #0f2440 + 흰 글씨
+//   비활성: 투명 + 회색 #64748b
 // ───────────────────────────────────────────────────────────────
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
-import { COLORS } from '@/app/utils/ui-tokens'
 
-const TABS: Array<{ href: string; label: string; emoji: string; matchTab?: string }> = [
-  { href: '/CallScheduler',                          label: '대시보드',  emoji: '📊' },
-  { href: '/CallScheduler/requests',                 label: '직원 요청', emoji: '📋' },
-  { href: '/CallScheduler/settings?tab=shifts',      label: '시프트',    emoji: '🕐', matchTab: 'shifts' },
-  { href: '/CallScheduler/settings?tab=groups',      label: '그룹',      emoji: '🚧', matchTab: 'groups' },
-  { href: '/CallScheduler/settings?tab=workers',     label: '워커',      emoji: '👥', matchTab: 'workers' },
-  { href: '/CallScheduler/settings?tab=holidays',    label: '공휴일',    emoji: '🎌', matchTab: 'holidays' },
-  { href: '/CallScheduler/settings?tab=leaves',      label: '휴가',      emoji: '💼', matchTab: 'leaves' },
+const TABS: Array<{ href: string; label: string; matchTab?: string }> = [
+  { href: '/CallScheduler',                          label: '📊 대시보드' },
+  { href: '/CallScheduler/requests',                 label: '📋 직원 요청' },
+  { href: '/CallScheduler/settings?tab=shifts',      label: '🕐 시프트',    matchTab: 'shifts' },
+  { href: '/CallScheduler/settings?tab=groups',      label: '🚧 그룹',      matchTab: 'groups' },
+  { href: '/CallScheduler/settings?tab=workers',     label: '👥 워커',      matchTab: 'workers' },
+  { href: '/CallScheduler/settings?tab=holidays',    label: '🎌 공휴일',    matchTab: 'holidays' },
+  { href: '/CallScheduler/settings?tab=leaves',      label: '💼 휴가',      matchTab: 'leaves' },
 ]
 
 export default function SubNav() {
@@ -22,7 +22,6 @@ export default function SubNav() {
   const sp = useSearchParams()
   const currentTab = sp?.get('tab')
 
-  // 활성 탭 결정: settings 페이지는 ?tab= 매칭, 그 외 pathname 매칭
   const isActive = (tab: typeof TABS[number]): boolean => {
     if (tab.matchTab) {
       return pathname === '/CallScheduler/settings' && currentTab === tab.matchTab
@@ -34,31 +33,28 @@ export default function SubNav() {
   }
 
   return (
-    <div style={{ padding: '0 24px', borderBottom: `1px solid ${COLORS.borderFaint}`, background: 'rgba(255,255,255,0.6)' }}>
-      <div style={{ display: 'flex', gap: 0, marginBottom: -1, flexWrap: 'wrap' }}>
-        {TABS.map(tab => {
-          const active = isActive(tab)
-          return (
-            <Link
-              key={tab.href}
-              href={tab.href}
-              style={{
-                display: 'inline-flex', alignItems: 'center', gap: 6,
-                padding: '10px 16px',
-                fontSize: 13, fontWeight: 700,
-                textDecoration: 'none',
-                borderBottom: `2px solid ${active ? COLORS.primary : 'transparent'}`,
-                color: active ? COLORS.primary : COLORS.textSecondary,
-                background: active ? COLORS.bgBlue : 'transparent',
-                transition: 'all 0.15s',
-              }}
-            >
-              <span>{tab.emoji}</span>
-              <span>{tab.label}</span>
-            </Link>
-          )
-        })}
-      </div>
+    <div style={{ display: 'flex', gap: 8, padding: '12px 24px 0', flexWrap: 'wrap' }}>
+      {TABS.map(tab => {
+        const active = isActive(tab)
+        return (
+          <Link
+            key={tab.href}
+            href={tab.href}
+            style={{
+              padding: '8px 16px', borderRadius: 8,
+              fontSize: 13, fontWeight: 700,
+              textDecoration: 'none',
+              background: active ? '#0f2440' : 'transparent',
+              color: active ? '#fff' : '#64748b',
+              border: active ? 'none' : '1px solid transparent',
+              transition: 'all 0.15s',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {tab.label}
+          </Link>
+        )
+      })}
     </div>
   )
 }
