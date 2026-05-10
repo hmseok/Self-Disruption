@@ -375,6 +375,17 @@ export async function POST(request: NextRequest) {
       // cars 실제 컬럼명: 'number' (schema.prisma 의 car_number 는 stale)
       let vehicleId: string | null = pick.vehicle_id ? String(pick.vehicle_id).trim() : null
       let vehicleLookupFailed = false
+
+      // PR-UX12: vehicle_id 있어도 cars 테이블 hit 검증 (orphan id 방지)
+      if (vehicleId) {
+        try {
+          const check = await prisma.$queryRawUnsafe<Array<any>>(
+            `SELECT id FROM cars WHERE id = ? LIMIT 1`, vehicleId,
+          )
+          if (!check[0]) vehicleId = null  // orphan — fallback 으로 진입
+        } catch {}
+      }
+
       if (!vehicleId && pick.vehicle_car_number) {
         const rawCarNum = String(pick.vehicle_car_number).trim()
         const normalized = rawCarNum.replace(/\s+/g, '')
@@ -431,16 +442,20 @@ export async function POST(request: NextRequest) {
            WHERE id = ${tx.id}
         `
         // (b) 2차 매칭 — transaction_assignments INSERT 차량 (FMI 보유 차량)
-        await prisma.$executeRaw`
-          INSERT IGNORE INTO transaction_assignments
-            (id, transaction_id, assignment_type, assignment_id, ratio, source, created_at, updated_at)
-          VALUES
-            (${randomUUID()}, ${tx.id}, 'car', ${pick.vehicle_id}, 100.00, 'auto', NOW(), NOW())
-        `
+        // PR-UX12: vehicleId (cars.id 매핑 결과) 사용. vehicle_id NULL 이면 INSERT skip
+        if (vehicleId) {
+          await prisma.$executeRaw`
+            INSERT IGNORE INTO transaction_assignments
+              (id, transaction_id, assignment_type, assignment_id, ratio, source, created_at, updated_at)
+            VALUES
+              (${randomUUID()}, ${tx.id}, 'car', ${vehicleId}, 100.00, 'auto', NOW(), NOW())
+          `
+        }
         // (c) 3차 매칭 — 그 차량의 지입/투자 계약 자동 추가 (있는 경우)
         try {
+          if (!vehicleId) throw new Error('no vehicleId') // skip jiip/invest lookup
           const jiip = await prisma.jiipContract.findFirst({
-            where: { car_id: String(pick.vehicle_id), status: 'active' },
+            where: { car_id: vehicleId, status: 'active' },
             select: { id: true },
           })
           if (jiip?.id) {
@@ -453,8 +468,9 @@ export async function POST(request: NextRequest) {
           }
         } catch {}
         try {
+          if (!vehicleId) throw new Error('no vehicleId')
           const invest = await prisma.generalInvestment.findFirst({
-            where: { car_id: String(pick.vehicle_id), status: 'active' },
+            where: { car_id: vehicleId, status: 'active' },
             select: { id: true },
           })
           if (invest?.id) {
