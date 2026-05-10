@@ -20,6 +20,36 @@
 - 셀 호출 시 `slotGroups[slot.id].id + worker_id` 로 lookup → 색상 layer 재활성
 - 효과: 같은 워커가 야간 그룹에서 화/목 희망, 주간 그룹에서 월/금 비선호 등 다른 색상 layer 표출
 
+## 2026-05-09 (Phase N-8) — 사이드바 layout 통합 (매니저 통합 콘솔)
+
+### 사용자 피드백
+> "하위 편집도 기존 설정 페이지, 운영요약 전체설정 눌러도 기존페이지 이상하지않아요?
+>  뭔가 페이지랑 구조가 정상적이지않을것같은데 전체 플로우를 점검해야하나"
+> "B (사이드바 + 컨텐트) 가 쓰기엔 편하겠지?"
+
+### 변경
+- /CallScheduler 메인을 **사이드바 + 컨텐트 layout** 으로 재구성
+- **좌측 사이드바** (220px sticky):
+  · 📊 대시보드 / 📅 스케줄 / 📋 직원 요청 (⏳ 대기 카운트 배지)
+  · ⚙ 운영 셋팅: 🕐 시프트 / 🚧 그룹 / 👥 워커 / 🎌 공휴일 / 💼 휴가 quota
+  · 카운트 배지 (시프트/그룹/워커 N개)
+  · 외부 link: 직원 마스터
+- **우측 컨텐트** view 분기:
+  · dashboard: 4 stat 카드 + 운영 셋팅 펼침 카드 + 최근 스케줄 5개
+  · schedules: 전체 스케줄 list
+  · requests: /CallScheduler/requests 페이지 link
+  · shifts/groups/workers/holidays/leaves: settings tab 컴포넌트 임포트 (인플레이스 표출)
+- **URL ?view=...** deep-link 동기화
+- 기존 /CallScheduler/settings, /requests 페이지는 그대로 유지 (호환)
+
+### 효과
+- 매니저 1 페이지에서 모든 운영 영역 즉시 접근 (좌측 nav 1 클릭)
+- "하위 편집이 같은 탭" 문제 해결 — 운영 셋팅이 메인 안에서 직접 표출/편집
+- ERP 표준 layout — 데스크톱 운영팀에 익숙
+
+### 검증
+- tsc CallScheduler 0 errors
+
 ## 2026-05-09 (Phase N-7) — 메인 운영 셋팅 카드 인라인 펼침
 
 ### 사용자 피드백
