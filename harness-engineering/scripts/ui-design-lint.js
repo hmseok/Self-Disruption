@@ -64,11 +64,16 @@ for (const fp of pageFiles) {
   const checks = {
     hasDcStatStrip: /DcStatStrip/.test(content),
     hasDcToolbar: /DcToolbar/.test(content),
+    hasNeuDataTable: /NeuDataTable/.test(content),
     hasStatCardPattern: /flex.*minWidth.*120|gridTemplateColumns.*minmax\(1[0-9][0-9]/.test(content),
     hasSearchInput: /<input[^>]*placeholder=["'][^"']*검색/.test(content)
                   || /onChange={[^}]*setSearch/.test(content),
     hasEmployeeOfRideHeader: /Employee of Ride Inc/.test(content),
     hasLargeHeader: /fontSize:\s*(2[4-9]|3[0-9])/.test(content),
+    // PR-DESIGN-3: 자체 헤더 박스 만드는 패턴
+    hasCustomBigTitle: /<h1[^>]*style[^>]*fontSize:\s*(2[4-9]|3[0-9])/.test(content)
+                     || /<h2[^>]*style[^>]*fontSize:\s*(3[0-9]|4[0-9])/.test(content),
+    hasCustomBreadcrumbBox: /Employee of Ride Inc[^<]*›|차량관리[^<]*›|재무\/경영[^<]*›/.test(content),
   }
 
   // 1) stat strip 자체 구현 (5+ 카드 패턴 있는데 DcStatStrip 미사용)
@@ -91,7 +96,23 @@ for (const fp of pageFiles) {
 
   // 4) 큰 페이지 제목 (24px+) — 기준은 20px
   if (checks.hasLargeHeader) {
-    warnings.push({ file: rel, issue: '페이지 제목 크기 24px+ — 기준 20px (정산 관리)' })
+    warnings.push({ file: rel, issue: '페이지 제목 크기 24px+ — 기준 20px (대출 관리)' })
+  }
+
+  // 5) PR-DESIGN-3: 자체 헤더 박스 (PageTitle 가 자동 처리하므로 불필요)
+  if (checks.hasCustomBigTitle) {
+    warnings.push({
+      file: rel,
+      issue: '자체 큰 제목 (h1/h2 24px+) — PageTitle 컴포넌트가 자동 헤더 (path/그룹/이름) 표시. ClientLayout 에 path 등록만 하면 됨',
+    })
+  }
+
+  // 6) PR-DESIGN-3: 자체 breadcrumb (PageTitle 의 자동 breadcrumb 와 중복)
+  if (checks.hasCustomBreadcrumbBox) {
+    warnings.push({
+      file: rel,
+      issue: '자체 breadcrumb (그룹 › 페이지명) — PageTitle 가 자동으로 표시. 자체 추가 시 중복',
+    })
   }
 }
 

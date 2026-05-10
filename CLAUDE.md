@@ -1482,21 +1482,43 @@ prisma.$executeRaw`UPDATE table SET column = ${value} WHERE id = ${id}`
 ## 10. Soft Ice 글래스 디자인 시스템
 
 > **🎨 페이지 디자인 표준 (필독 — 2026-05-10 사용자 명령 기반)**
-> 「**정산 관리** 가 우리의 디자인 기준입니다」
+> 「**대출 관리 / 정산 관리** 가 우리의 디자인 기준입니다」
 >
-> ### 모든 cowork 세션은 새 페이지 / 기존 페이지 수정 시 **반드시 다음 확인**:
+> ### 페이지 헤더는 자동 (PageTitle 컴포넌트):
+> - `app/components/PageTitle.tsx` 가 ClientLayout 에 자동 mount
+> - 페이지 path → 그룹 → 페이지명 자동 breadcrumb + 블루 도트
+> - **페이지 자체에서 헤더 만들지 말 것** (PageTitle 이 이미 표시)
+> - 새 페이지 등록 시: `PageTitle.tsx` 의 `PATH_TO_GROUP` + `PAGE_NAMES` 에 추가만
 >
-> 1. **`_docs/UI-DESIGN-STANDARD.md`** — 페이지 디자인 표준 문서 (header / breadcrumb / DcStatStrip / DcToolbar / 탭 / Glass)
-> 2. **`/finance/settlement`** — 기준 페이지 (실제 동작 확인)
-> 3. **`app/components/DcStatStrip.tsx`** — 5 카드 stat strip 의무 사용
-> 4. **`app/components/DcToolbar.tsx`** — 검색 + 필터 toolbar 의무 사용
-> 5. **`npm run lint:ui-design`** — 자동 검증 (108 페이지 자동 스캔)
+> ### 본문 레이아웃 표준:
+> ```
+> [PageTitle 자동 헤더]
+> ─────── 디바이더 ───────
+> DcStatStrip (5 카드 + 액션 버튼)
+> (선택) 드롭존 / 배너
+> DcToolbar (검색 + 필터)
+> NeuDataTable (데이터 테이블)
+> ```
+>
+> ### 의무 사용 컴포넌트:
+> 1. **`DcStatStrip`** — 5 stat 카드 + 액션 버튼
+> 2. **`DcToolbar`** — 검색 + 필터 통합 바
+> 3. **`NeuDataTable`** — 정렬 가능한 테이블
 >
 > ### 자주 발생하는 위반 (피해야 할 패턴):
-> - ❌ 큰 헤더 박스 + 24px+ 페이지 제목 (기준은 20px)
-> - ❌ Breadcrumb 「Employee of Ride Inc.」 회사명 (그룹명 사용)
-> - ❌ stat 카드 자체 div 구현 (DcStatStrip 사용)
-> - ❌ 검색바 + 필터 자체 구현 (DcToolbar 사용)
+> - ❌ 자체 큰 헤더 박스 (`<h1>출고/반납 관리</h1>` 같은 — PageTitle 자동)
+> - ❌ 자체 breadcrumb (`Employee of Ride Inc. > ...` — PageTitle 자동)
+> - ❌ stat 카드 자체 div 구현 (DcStatStrip 사용 의무)
+> - ❌ 검색바 + 필터 자체 구현 (DcToolbar 사용 의무)
+> - ❌ 페이지 제목 24px+ (PageTitle 가 자동 — 직접 만들면 안 됨)
+>
+> ### 검증 도구:
+> - `npm run lint:ui-design` — 108 페이지 자동 스캔 (`harness-engineering/scripts/ui-design-lint.js`)
+> - 자세한 패턴: `_docs/UI-DESIGN-STANDARD.md`
+>
+> ### 기준 페이지 (실제 동작 확인):
+> - `/loans` (대출 관리) ← 가장 깔끔한 기준
+> - `/finance/settlement` (정산 관리) ← 복잡한 케이스 기준
 >
 > 신규 세션 시작 시 `_docs/UI-DESIGN-STANDARD.md` 1회 정독 권장.
 

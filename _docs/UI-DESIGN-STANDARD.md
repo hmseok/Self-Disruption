@@ -15,40 +15,79 @@
 
 ---
 
-## 1. 페이지 헤더 표준 (정산 관리 기준)
+## 1. 페이지 헤더 표준 — **자동 (PageTitle 컴포넌트)**
 
-### 1.1 Breadcrumb (필수)
-```tsx
-{/* 작은 회색 텍스트 — 그룹 / 페이지명 */}
-<div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#64748b', marginBottom: 4 }}>
-  <span>영업/계약</span>
-  <span>›</span>
-  <span style={{ color: '#0f2440', fontWeight: 600 }}>정산 관리</span>
-</div>
+**ClientLayout 이 자동으로 PageTitle 컴포넌트를 모든 페이지에 렌더링**.
+따라서 페이지 자체에서 헤더를 만들 필요 X.
+
+### 1.1 자동 표시 내용 (PageTitle 컴포넌트):
+```
+[블루 도트 점] 페이지명 ····················· 그룹 > 페이지명
+─────────────────────── 디바이더 ─────────────────────────
 ```
 
-### 1.2 페이지 제목 영역 (단순)
-```tsx
-{/* 컬러 점 (red/yellow/green) + 제목 — 또는 아이콘 + 제목 */}
-<div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-  <span style={{ width: 8, height: 8, borderRadius: 4, background: '#dc2626' }} />
-  <span style={{ width: 8, height: 8, borderRadius: 4, background: '#f59e0b' }} />
-  <span style={{ width: 8, height: 8, borderRadius: 4, background: '#16a34a' }} />
-  <h1 style={{ fontSize: 20, fontWeight: 700, color: '#0f2440', margin: 0 }}>정산 관리</h1>
-</div>
+- `app/components/PageTitle.tsx` — 그룹/페이지 매핑 + neumorphism 스타일
+- 페이지 path 만 등록하면 자동 렌더링 (PageTitle.tsx 의 `PATH_TO_GROUP` + `PAGE_NAMES`)
+
+### 1.2 페이지 자체에서 해야 할 일
+- ❌ 자체 큰 헤더 박스 만들기 (PageTitle 이 이미 함)
+- ❌ `<h1>출고/반납 관리</h1>` 같은 커스텀 큰 제목
+- ❌ 「Employee of Ride Inc.」 회사명 직접 추가
+- ❌ 빨강 / 노랑 / 녹색 점 직접 추가 (PageTitle 의 블루 도트 자동)
+- ✅ PageTitle 자동 표시 — 페이지 컨텐츠만 작성
+
+### 1.3 새 페이지 등록 절차
+1. 새 페이지 path 추가 (예: `/finance/new-feature`)
+2. `app/components/PageTitle.tsx` 의 `PATH_TO_GROUP` 에 path → group 추가:
+   ```ts
+   '/finance/new-feature': 'finance',
+   ```
+3. `PAGE_NAMES` 에 path → 페이지명 추가:
+   ```ts
+   '/finance/new-feature': '신규 기능',
+   ```
+4. 자동으로 「재무/경영 > 신규 기능」 breadcrumb 표시
+
+**그 외에 헤더 영역에 손대지 마세요**.
+
+---
+
+## 1.5 페이지 본문 레이아웃 표준 (대출 관리 / 정산 관리 기준)
+
+PageTitle 자동 헤더 아래 페이지 본문 구조:
+
+```
+┌─────────────────────────────────────────────────┐
+│ [PageTitle 자동 헤더]                              │
+│ ─────────────────── 디바이더 ──────────────────── │
+│                                                  │
+│ ┌─DcStatStrip (5 카드 + 액션 버튼)─┐               │
+│ │ 통계 카드 1│2│3│4│5  [+ 직접 등록] │               │
+│ └─────────────────────────────────────┘               │
+│                                                  │
+│ ┌─선택: 드롭존 / 배너 / 안내─────────┐            │
+│ │ AI 자동 인식 / 만기 임박 등         │            │
+│ └────────────────────────────────────┘            │
+│                                                  │
+│ ┌─DcToolbar (검색 + 필터)───────────┐             │
+│ │ 🔍 검색  [전체│할부│리스│렌트]  ↕   │             │
+│ └────────────────────────────────────┘             │
+│                                                  │
+│ ┌─NeuDataTable (데이터 테이블)──────┐             │
+│ │ 정렬 가능한 컬럼들                  │             │
+│ └────────────────────────────────────┘             │
+└─────────────────────────────────────────────────┘
 ```
 
-또는 아이콘 + 제목만:
-```tsx
-<h1 style={{ fontSize: 20, fontWeight: 700, color: '#0f2440', margin: 0 }}>
-  💰 통장/카드 관리
-</h1>
-```
+### 의무 사용 컴포넌트
+- **`DcStatStrip`** (`app/components/DcStatStrip.tsx`) — 5 stat 카드 + 액션 버튼
+- **`DcToolbar`** (`app/components/DcToolbar.tsx`) — 검색 + 필터
+- **`NeuDataTable`** (`app/components/NeuDataTable.tsx`) — 데이터 테이블
 
 ❌ **금지**:
-- 큰 박스로 헤더 강조
-- 헤더에 "Employee of Ride Inc." 같은 회사명 (breadcrumb 만)
-- 제목 옆에 큰 설명 (description)
+- 자체 div 로 stat 카드 만들기
+- 자체 검색바 + 필터 영역 만들기
+- 자체 테이블 만들기 (NeuDataTable 사용)
 
 ---
 
