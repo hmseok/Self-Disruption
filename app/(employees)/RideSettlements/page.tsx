@@ -1,7 +1,7 @@
 'use client'
 
 /**
- * /RideSettlements — 라이드 정산서 등록 / 검수 / 매칭
+ * /RideSettlements — 고객사 마감자료 등록 / 검수 / 매칭
  *
  * PR-6.11.a (UI 1차)
  *
@@ -11,7 +11,7 @@
  *   · 차량/실행번호 → 카페24 매칭 (PR-6.11.b)
  *   · 미등록 고객 후보 추출 (PR-6.11.d)
  *
- * 사이드바: Employee of Ride Inc. > 관리자 운영 > 💰 라이드 정산서
+ * 사이드바: Employee of Ride Inc. > 관리자 운영 > 💰 고객사 마감자료
  * admin 전용
  */
 
@@ -20,6 +20,7 @@ import { getStoredToken, getStoredUser } from '@/lib/auth-client'
 import { usePermission } from '@/app/hooks/usePermission'
 import NeuDataTable, { type TableColumn } from '@/app/components/NeuDataTable'
 import { COLORS, GLASS, BTN } from '@/app/utils/ui-tokens'
+import RideOpsNavTabs from '@/app/components/ride-ops/NavTabs'
 
 interface Settlement {
   id: string
@@ -256,10 +257,12 @@ export default function RideSettlementsPage() {
   ]
 
   return (
+    <>
+    <RideOpsNavTabs />
     <div style={{ padding: 16, maxWidth: 1600, margin: '0 auto' }}>
       <div style={{ ...GLASS.L5, padding: '16px 20px', borderRadius: 16, marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
-          <div style={{ fontSize: 20, fontWeight: 700, color: COLORS.textPrimary }}>💰 라이드 정산서</div>
+          <div style={{ fontSize: 20, fontWeight: 700, color: COLORS.textPrimary }}>💰 고객사 마감자료</div>
           <div style={{ fontSize: 12, color: COLORS.textSecondary, marginTop: 4 }}>
             정산 포함 = 진행 중 / 미포함 = 종료 · 검수 확정 / 이의제기 · 차량 매칭 · 미등록 고객 추출
           </div>
@@ -348,10 +351,24 @@ export default function RideSettlementsPage() {
         />
       )}
     </div>
+    </>
   )
 }
 
 // ────────────────────────── 업로드 모달 ────────────────────────────
+// PR-6.11.a-fix — 다중 파일 업로드 지원
+interface FileItem {
+  id: string
+  file: File
+  customerId: string
+  periodLabel: string
+  layout: 'auto' | 'meritz' | 'im' | 'mg' | 'ride-integrated'
+  busy: boolean
+  result: { parent_settlement_id: string | null; total_inserted: number; children: { sheet: string; settlement_id: string; inserted: number }[] } | null
+  detected: { layout?: string; period_label?: string; customer_name?: string; sheet_count?: number; total_items?: number } | null
+  error: string | null
+}
+
 function UploadModal({
   companies,
   onClose,
@@ -361,29 +378,46 @@ function UploadModal({
   onClose: () => void
   onApplied: () => void
 }) {
-  const [file, setFile] = useState<File | null>(null)
-  const [customerId, setCustomerId] = useState('')
-  const [periodLabel, setPeriodLabel] = useState('')
-  const [layout, setLayout] = useState<'auto' | 'meritz' | 'im' | 'mg' | 'ride-integrated'>('auto')
-  const [busy, setBusy] = useState(false)
-  const [preview, setPreview] = useState<{ detected?: { layout?: string; period_label?: string; customer_name?: string; sheet_count?: number; total_items?: number }; sheets?: { sheet_name: string; customer_name: string | null; category: string; item_count: number; sample: unknown[]; vehicle_status_count: number }[] } | null>(null)
-  const [result, setResult] = useState<{ result?: { parent_settlement_id: string | null; total_inserted: number; children: { sheet: string; settlement_id: string; inserted: number }[] } } | null>(null)
-  const [err, setErr] = useState<string | null>(null)
+  const [files, setFiles] = useState<FileItem[]>([])
+  const [defaultCustomerId, setDefaultCustomerId] = useState('')
+  const [bulkApplying, setBulkApplying] = useState(false)
+  const [hover, setHover] = useState(false)
 
-  const submit = async (mode: 'preview' | 'apply') => {
-    if (!file) {
-      setErr('파일 선택 필요')
-      return
-    }
-    setErr(null)
-    setBusy(true)
+  const addFiles = (fl: FileList | null) => {
+    if (!fl || fl.length === 0) return
+    const items: FileItem[] = Array.from(fl).map(f => ({
+      id: `${f.name}-${f.size}-${Date.now()}-${Math.random()}`,
+      file: f,
+      customerId: defaultCustomerId,
+      periodLabel: '',
+      layout: 'auto',
+      busy: false,
+      result: null,
+      detected: null,
+      error: null,
+    }))
+    setFiles(prev => [...prev, ...items])
+  }
+
+  const updateField = (id: string, patch: Partial<FileItem>) => {
+    setFiles(prev => prev.map(f => (f.id === id ? { ...f, ...patch } : f)))
+  }
+
+  const removeFile = (id: string) => {
+    setFiles(prev => prev.filter(f => f.id !== id))
+  }
+
+  const submitOne = async (id: string, mode: 'preview' | 'apply') => {
+    const item = files.find(f => f.id === id)
+    if (!item) return
+    updateField(id, { busy: true, error: null })
     try {
       const token = getStoredToken()
       const fd = new FormData()
-      fd.append('file', file)
-      if (customerId) fd.append('customer_id', customerId)
-      if (periodLabel) fd.append('period_label', periodLabel)
-      fd.append('layout', layout)
+      fd.append('file', item.file)
+      if (item.customerId) fd.append('customer_id', item.customerId)
+      if (item.periodLabel) fd.append('period_label', item.periodLabel)
+      fd.append('layout', item.layout)
       fd.append('mode', mode)
       const res = await fetch('/api/ride-settlements/upload', {
         method: 'POST',
@@ -391,30 +425,39 @@ function UploadModal({
         body: fd,
       })
       const text = await res.text()
-      let json: { success?: boolean; error?: string; detected?: unknown; sheets?: unknown[]; result?: unknown }
+      let json: { success?: boolean; error?: string; detected?: { layout?: string; period_label?: string; customer_name?: string; sheet_count?: number; total_items?: number }; result?: { parent_settlement_id: string | null; total_inserted: number; children: { sheet: string; settlement_id: string; inserted: number }[] } }
       try {
         json = JSON.parse(text)
       } catch {
-        setErr(`서버 ${res.status}: ${text.slice(0, 100)}`)
+        updateField(id, { busy: false, error: `서버 ${res.status}: ${text.slice(0, 80)}` })
         return
       }
       if (!res.ok || !json.success) {
-        setErr(json.error || `HTTP ${res.status}`)
+        updateField(id, { busy: false, error: json.error || `HTTP ${res.status}` })
         return
       }
       if (mode === 'preview') {
-        setPreview(json as { detected: { layout: string; period_label: string }; sheets: { sheet_name: string; customer_name: string | null; category: string; item_count: number; sample: unknown[]; vehicle_status_count: number }[] })
-        setResult(null)
+        updateField(id, { busy: false, detected: json.detected || null })
       } else {
-        setResult(json as { result: { parent_settlement_id: string | null; total_inserted: number; children: { sheet: string; settlement_id: string; inserted: number }[] } })
+        updateField(id, { busy: false, result: json.result || null, detected: json.detected || null })
         onApplied()
       }
     } catch (e) {
-      setErr(String(e))
-    } finally {
-      setBusy(false)
+      updateField(id, { busy: false, error: String(e) })
     }
   }
+
+  const applyAll = async () => {
+    setBulkApplying(true)
+    for (const f of files) {
+      if (f.result) continue
+      await submitOne(f.id, 'apply')
+    }
+    setBulkApplying(false)
+  }
+
+  const totalInserted = files.reduce((s, f) => s + (f.result?.total_inserted || 0), 0)
+  const pendingCount = files.filter(f => !f.result).length
 
   return (
     <div
@@ -432,41 +475,31 @@ function UploadModal({
     >
       <div
         onClick={e => e.stopPropagation()}
-        style={{ ...GLASS.L4, borderRadius: 16, padding: 20, width: '100%', maxWidth: 720, maxHeight: '90vh', overflow: 'auto' }}
+        style={{ ...GLASS.L4, borderRadius: 16, padding: 20, width: '100%', maxWidth: 900, maxHeight: '92vh', overflow: 'auto' }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-          <span style={{ fontSize: 16, fontWeight: 700 }}>📥 정산서 업로드 (양식 자동 감지)</span>
+          <span style={{ fontSize: 16, fontWeight: 700 }}>📥 마감자료 업로드 (다중 파일 + 양식 자동 감지)</span>
           <button style={{ ...BTN.sm, background: 'transparent', color: COLORS.textMuted }} onClick={onClose}>
             ✕
           </button>
         </div>
+
         <div style={{ display: 'grid', gap: 12 }}>
-          <div>
-            <label style={{ fontSize: 12, color: COLORS.textSecondary, fontWeight: 600 }}>엑셀 파일</label>
-            <input
-              type="file"
-              accept=".xlsx,.xls"
-              onChange={e => {
-                setFile(e.target.files?.[0] || null)
-                setPreview(null)
-                setResult(null)
-              }}
-              style={{ width: '100%', padding: 8, borderRadius: 8, border: '1px solid rgba(0,0,0,0.10)', marginTop: 4 }}
-            />
-            {file && (
-              <div style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 4 }}>
-                {file.name} ({(file.size / 1024).toFixed(1)} KB)
-              </div>
-            )}
-          </div>
-          <div>
-            <label style={{ fontSize: 12, color: COLORS.textSecondary, fontWeight: 600 }}>위탁사 (수동 지정 — 미지정 시 자동 추정)</label>
+          {/* 기본 위탁사 (모든 파일 일괄 적용) */}
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 12, color: COLORS.textSecondary, fontWeight: 600 }}>
+              기본 위탁사 (모든 파일):
+            </span>
             <select
-              value={customerId}
-              onChange={e => setCustomerId(e.target.value)}
-              style={{ width: '100%', padding: 8, borderRadius: 8, border: '1px solid rgba(0,0,0,0.10)', marginTop: 4 }}
+              value={defaultCustomerId}
+              onChange={e => {
+                const v = e.target.value
+                setDefaultCustomerId(v)
+                setFiles(prev => prev.map(f => ({ ...f, customerId: v, result: null })))
+              }}
+              style={{ padding: 6, borderRadius: 6, border: '1px solid rgba(0,0,0,0.10)', minWidth: 200 }}
             >
-              <option value="">자동 추정</option>
+              <option value="">파일별 자동 추정</option>
               {companies.map(c => (
                 <option key={c.id} value={c.id}>
                   {c.name}
@@ -474,88 +507,169 @@ function UploadModal({
               ))}
             </select>
           </div>
-          <div style={{ display: 'flex', gap: 12 }}>
-            <div style={{ flex: 1 }}>
-              <label style={{ fontSize: 12, color: COLORS.textSecondary, fontWeight: 600 }}>기간 (예: 2026-04)</label>
-              <input
-                type="text"
-                value={periodLabel}
-                onChange={e => setPeriodLabel(e.target.value)}
-                placeholder="자동 추정 (파일명)"
-                style={{ width: '100%', padding: 8, borderRadius: 8, border: '1px solid rgba(0,0,0,0.10)', marginTop: 4 }}
-              />
-            </div>
-            <div style={{ flex: 1 }}>
-              <label style={{ fontSize: 12, color: COLORS.textSecondary, fontWeight: 600 }}>양식</label>
-              <select
-                value={layout}
-                onChange={e => setLayout(e.target.value as 'auto' | 'meritz' | 'im' | 'mg' | 'ride-integrated')}
-                style={{ width: '100%', padding: 8, borderRadius: 8, border: '1px solid rgba(0,0,0,0.10)', marginTop: 4 }}
-              >
-                <option value="auto">자동 감지</option>
-                <option value="meritz">메리츠</option>
-                <option value="im">iM캐피탈</option>
-                <option value="mg">MG캐피탈 (턴키/실비)</option>
-                <option value="ride-integrated">라이드 통합 마감 (multi-sheet)</option>
-              </select>
-            </div>
-          </div>
 
-          {preview && preview.detected && (
-            <div style={{ ...GLASS.L3, border: `1px solid ${COLORS.borderBlue}`, padding: 12, borderRadius: 8 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 6 }}>
-                감지: {preview.detected.layout} · {preview.detected.period_label || '?'} · {preview.detected.customer_name || '미지정'}
-              </div>
-              <div style={{ fontSize: 11, color: COLORS.textSecondary }}>
-                {preview.detected.sheet_count} 시트 / 총 {preview.detected.total_items}건
-              </div>
-              {preview.sheets && (
-                <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 200, overflow: 'auto' }}>
-                  {preview.sheets.map((s, i: number) => (
-                    <div key={i} style={{ fontSize: 11, padding: '4px 8px', background: 'rgba(255,255,255,0.5)', borderRadius: 4 }}>
-                      📄 <b>{s.sheet_name}</b> · {s.customer_name || '미지정'} · {s.category} · <b>{s.item_count}</b>건
-                      {s.vehicle_status_count > 0 && ` · 운행상태 ${s.vehicle_status_count}건`}
+          {/* 드래그 & 드롭 영역 */}
+          <label
+            onDragOver={e => {
+              e.preventDefault()
+              setHover(true)
+            }}
+            onDragLeave={() => setHover(false)}
+            onDrop={e => {
+              e.preventDefault()
+              setHover(false)
+              addFiles(e.dataTransfer.files)
+            }}
+            style={{
+              ...GLASS.L1,
+              display: 'block',
+              border: hover ? `2px dashed ${COLORS.primary}` : '2px dashed rgba(0,0,0,0.15)',
+              borderRadius: 12,
+              padding: '20px 16px',
+              textAlign: 'center',
+              cursor: 'pointer',
+              background: hover ? 'rgba(59,110,181,0.08)' : 'rgba(255,255,255,0.40)',
+            }}
+          >
+            <input
+              type="file"
+              accept=".xlsx,.xls"
+              multiple
+              onChange={e => {
+                addFiles(e.target.files)
+                e.target.value = ''
+              }}
+              style={{ display: 'none' }}
+            />
+            <div style={{ fontSize: 22, marginBottom: 4 }}>📁</div>
+            <div style={{ fontSize: 13, fontWeight: 700 }}>파일을 끌어오거나 클릭해서 선택</div>
+            <div style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 4 }}>
+              .xlsx / .xls — 여러 파일 동시 선택 · 파일별 양식 자동 감지
+            </div>
+          </label>
+
+          {/* 파일별 카드 */}
+          {files.length === 0 ? (
+            <div style={{ textAlign: 'center', color: COLORS.textMuted, fontSize: 12, padding: 16 }}>
+              파일을 추가하면 파일별 설정이 노출됩니다
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gap: 10, maxHeight: '50vh', overflow: 'auto' }}>
+              {files.map(f => (
+                <div
+                  key={f.id}
+                  style={{
+                    ...GLASS.L3,
+                    border: `1px solid ${
+                      f.result ? COLORS.borderGreen : f.error ? COLORS.borderRed : f.detected ? COLORS.borderBlue : COLORS.borderSubtle
+                    }`,
+                    borderRadius: 10,
+                    padding: 10,
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 12, fontWeight: 700, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      📄 {f.file.name}
+                    </span>
+                    <span style={{ fontSize: 10, color: COLORS.textMuted, whiteSpace: 'nowrap' }}>
+                      {(f.file.size / 1024).toFixed(0)} KB
+                    </span>
+                    <button onClick={() => removeFile(f.id)} style={{ ...BTN.sm, background: 'transparent', color: COLORS.textMuted }}>
+                      ✕
+                    </button>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginBottom: 6 }}>
+                    <select
+                      value={f.layout}
+                      onChange={e => updateField(f.id, { layout: e.target.value as FileItem['layout'], result: null, detected: null })}
+                      style={{ fontSize: 11, padding: '4px 8px', borderRadius: 6, border: '1px solid rgba(0,0,0,0.10)' }}
+                    >
+                      <option value="auto">양식: 자동</option>
+                      <option value="meritz">메리츠</option>
+                      <option value="im">iM캐피탈</option>
+                      <option value="mg">MG (턴키/실비)</option>
+                      <option value="ride-integrated">라이드 통합</option>
+                    </select>
+                    <select
+                      value={f.customerId}
+                      onChange={e => updateField(f.id, { customerId: e.target.value, result: null })}
+                      style={{ fontSize: 11, padding: '4px 8px', borderRadius: 6, border: '1px solid rgba(0,0,0,0.10)' }}
+                    >
+                      <option value="">위탁사 자동</option>
+                      {companies.map(c => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      type="text"
+                      placeholder="기간 (자동)"
+                      value={f.periodLabel}
+                      onChange={e => updateField(f.id, { periodLabel: e.target.value })}
+                      style={{ fontSize: 11, padding: '4px 8px', borderRadius: 6, border: '1px solid rgba(0,0,0,0.10)', width: 110 }}
+                    />
+                    <button
+                      style={{ ...BTN.sm, background: COLORS.bgBlue, color: COLORS.primary, marginLeft: 'auto' }}
+                      onClick={() => submitOne(f.id, 'preview')}
+                      disabled={f.busy}
+                    >
+                      {f.busy ? '...' : '👁 미리보기'}
+                    </button>
+                    <button
+                      style={{ ...BTN.sm, background: COLORS.success, color: '#fff' }}
+                      onClick={() => submitOne(f.id, 'apply')}
+                      disabled={f.busy || !!f.result}
+                    >
+                      {f.busy ? '...' : '💾 저장'}
+                    </button>
+                  </div>
+
+                  {f.detected && (
+                    <div style={{ fontSize: 10, color: COLORS.textSecondary, padding: 6, background: 'rgba(255,255,255,0.5)', borderRadius: 4 }}>
+                      감지: <b>{f.detected.layout}</b> · {f.detected.period_label || '?'} · {f.detected.customer_name || '미지정'} · {f.detected.sheet_count} 시트 / 총 <b>{f.detected.total_items}</b>건
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {result && result.result && (
-            <div style={{ ...GLASS.L3, border: `1px solid ${COLORS.borderGreen}`, padding: 12, borderRadius: 8 }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.success }}>
-                ✅ 업로드 완료 · 총 {result.result.total_inserted}건 적재
-              </div>
-              {result.result.children.map((c, i: number) => (
-                <div key={i} style={{ fontSize: 11, marginTop: 4 }}>
-                  📄 {c.sheet} → {c.inserted}건
+                  )}
+                  {f.error && (
+                    <div style={{ fontSize: 10, color: COLORS.danger, padding: 6, background: COLORS.bgRed, borderRadius: 4, marginTop: 4 }}>
+                      ❌ {f.error}
+                    </div>
+                  )}
+                  {f.result && (
+                    <div style={{ fontSize: 10, color: COLORS.success, padding: 6, background: COLORS.bgGreen, borderRadius: 4, marginTop: 4 }}>
+                      ✅ 적재 <b>{f.result.total_inserted}</b>건
+                      {f.result.children.length > 0 && ` (시트 ${f.result.children.length}개)`}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
           )}
 
-          {err && <div style={{ color: COLORS.danger, fontSize: 12 }}>❌ {err}</div>}
-
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-            <button style={{ ...BTN.md, background: COLORS.bgGray, color: COLORS.textSecondary }} onClick={onClose}>
-              닫기
-            </button>
-            <button
-              style={{ ...BTN.md, background: COLORS.bgBlue, color: COLORS.primary }}
-              onClick={() => submit('preview')}
-              disabled={busy || !file}
-            >
-              {busy ? '...' : '미리보기'}
-            </button>
-            <button
-              style={{ ...BTN.md, background: COLORS.success, color: '#fff' }}
-              onClick={() => submit('apply')}
-              disabled={busy || !file}
-            >
-              {busy ? '저장 중…' : '저장'}
-            </button>
-          </div>
+          {/* 총계 + 액션 */}
+          {files.length > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, paddingTop: 8, borderTop: '1px solid rgba(0,0,0,0.05)' }}>
+              <div style={{ fontSize: 12, color: COLORS.textSecondary }}>
+                파일 <b>{files.length}</b>개 · 저장 대기 <b>{pendingCount}</b>개
+                {totalInserted > 0 && (
+                  <span> · 누적 적재 <b style={{ color: COLORS.success }}>{totalInserted}</b>건</span>
+                )}
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button style={{ ...BTN.md, background: COLORS.bgGray, color: COLORS.textSecondary }} onClick={onClose}>
+                  닫기
+                </button>
+                <button
+                  style={{ ...BTN.md, background: COLORS.success, color: '#fff', opacity: pendingCount === 0 ? 0.5 : 1 }}
+                  onClick={applyAll}
+                  disabled={bulkApplying || pendingCount === 0}
+                >
+                  {bulkApplying ? '저장 중…' : `📥 ${pendingCount}개 일괄 저장`}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

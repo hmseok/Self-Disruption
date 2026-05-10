@@ -20,6 +20,7 @@ import { getStoredToken, getStoredUser } from '@/lib/auth-client'
 import { usePermission } from '@/app/hooks/usePermission'
 import NeuDataTable, { type TableColumn } from '@/app/components/NeuDataTable'
 import { COLORS, GLASS, BTN } from '@/app/utils/ui-tokens'
+import RideOpsNavTabs from '@/app/components/ride-ops/NavTabs'
 
 // ───────────────────────── 타입 ──────────────────────────────────
 interface Company {
@@ -580,6 +581,8 @@ export default function RideCustomerDataPage() {
   })
 
   return (
+    <>
+    <RideOpsNavTabs />
     <div style={{ padding: 16, maxWidth: 1600, margin: '0 auto' }}>
       {/* ─── 헤더 ─── */}
       <div style={{ ...GLASS.L5, padding: '16px 20px', borderRadius: 16, marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -783,6 +786,7 @@ export default function RideCustomerDataPage() {
         />
       )}
     </div>
+    </>
   )
 }
 

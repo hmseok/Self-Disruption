@@ -18,6 +18,7 @@ import { getStoredToken, getStoredUser } from '@/lib/auth-client'
 import { usePermission } from '@/app/hooks/usePermission'
 import NeuDataTable, { type TableColumn } from '@/app/components/NeuDataTable'
 import { COLORS, GLASS, BTN } from '@/app/utils/ui-tokens'
+import RideOpsNavTabs from '@/app/components/ride-ops/NavTabs'
 
 interface RideVehicle {
   id: string
@@ -300,6 +301,8 @@ export default function RideVehicleRegistryPage() {
   ]
 
   return (
+    <>
+    <RideOpsNavTabs />
     <div style={{ padding: '20px 24px', maxWidth: 1600, margin: '0 auto' }}>
       {/* 헤더 */}
       <div
@@ -595,6 +598,7 @@ export default function RideVehicleRegistryPage() {
         />
       )}
     </div>
+    </>
   )
 }
 
