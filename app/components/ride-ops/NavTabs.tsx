@@ -21,14 +21,21 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { COLORS } from '@/app/utils/ui-tokens'
+import { COLORS, GLASS } from '@/app/utils/ui-tokens'
 
+/**
+ * §10 Soft Ice Glass 디자인 시스템 준수:
+ *   · 외곽 wrapper: GLASS.L5 (네비 — 가장 위, 가장 불투명)
+ *   · 활성 탭: COLORS.bgBlue 틴트 + COLORS.primary 보더
+ *   · 비활성: COLORS.textSecondary
+ *   · 보더: COLORS.borderSubtle (Level 5)
+ */
 const TABS = [
-  { href: '/RideVehicleRegistry', label: '차량등록', emoji: '🚗' },
+  { href: '/RideVehicleRegistry', label: '차량등록',     emoji: '🚗' },
   { href: '/RideCustomerData',    label: '고객사 데이터', emoji: '🏢' },
-  { href: '/RideSettlements',     label: '마감자료', emoji: '💰' },
+  { href: '/RideSettlements',     label: '마감자료',     emoji: '💰' },
   // PR-6.13.b 예정 — 메일 파싱
-  // { href: '/RideMailImport',   label: '메일 파싱', emoji: '📧' },
+  // { href: '/RideMailImport',   label: '메일 파싱',    emoji: '📧' },
 ] as const
 
 export default function RideOpsNavTabs() {
@@ -37,13 +44,14 @@ export default function RideOpsNavTabs() {
   return (
     <div
       style={{
+        ...GLASS.L5,
         padding: '0 24px',
-        borderBottom: `1px solid ${COLORS.borderSubtle}`,
-        background: 'rgba(255,255,255,0.45)',
-        backdropFilter: 'blur(12px)',
+        borderTop: 'none',
+        borderLeft: 'none',
+        borderRight: 'none',
       }}
     >
-      <div style={{ display: 'flex', gap: 0, marginBottom: -1, alignItems: 'center' }}>
+      <div style={{ display: 'flex', gap: 0, alignItems: 'center' }}>
         <span
           style={{
             fontSize: 11,
@@ -66,7 +74,7 @@ export default function RideOpsNavTabs() {
                 fontSize: 13,
                 fontWeight: isActive ? 700 : 600,
                 color: isActive ? COLORS.primary : COLORS.textSecondary,
-                background: isActive ? 'rgba(59,110,181,0.06)' : 'transparent',
+                background: isActive ? COLORS.bgBlue : 'transparent',
                 borderBottom: isActive ? `2px solid ${COLORS.primary}` : '2px solid transparent',
                 textDecoration: 'none',
                 whiteSpace: 'nowrap',

@@ -106,12 +106,12 @@ export const MENUS: MenuEntry[] = [
   { id: 'mod-ride-accidents',     name: '라이드 긴급출동',  displayName: '🚨 라이드 긴급출동',  path: '/RideAccidents',         iconKey: 'Clipboard', group: 'cx-team', sortOrder: 63, requirePermission: true },
   { id: 'mod-ride-accident-rep',  name: '라이드 사고접수',  displayName: '🚗 라이드 사고접수',  path: '/RideAccidentReports',   iconKey: 'Wrench',    group: 'cx-team', sortOrder: 64, requirePermission: true },
   // PR-6.13 (2026-05-09) — 라이드 운영 통합 (NavTabs 1개 메뉴 + 3 sub-page)
-  // 사이드바 메뉴: 「🚗 라이드 운영」 → /RideVehicleRegistry 진입 → 페이지 내 NavTabs 로 sub-route
-  { id: 'mod-ride-operations',    name: '라이드 운영',       displayName: '🚗 라이드 운영',         path: '/RideVehicleRegistry',   iconKey: 'Car',       group: 'admin-ops', sortOrder: 80, requirePermission: true },
-  // 하위 sub-page 들 — 사이드바 hidden (NavTabs 로만 진입)
-  { id: 'mod-ride-vehicle-reg',   name: '라이드 차량등록',  displayName: '🚗 차량등록',         path: '/RideVehicleRegistry',   iconKey: 'Car',       group: 'admin-ops', sortOrder: 80, requirePermission: true, sidebarHidden: true },
-  { id: 'mod-ride-customer-data', name: '라이드 고객사 데이터', displayName: '🏢 고객사 데이터', path: '/RideCustomerData',     iconKey: 'Building',  group: 'admin-ops', sortOrder: 81, requirePermission: true, sidebarHidden: true },
-  { id: 'mod-ride-settlements',  name: '고객사 마감자료',    displayName: '💰 마감자료',         path: '/RideSettlements',      iconKey: 'Money',     group: 'admin-ops', sortOrder: 82, requirePermission: true, sidebarHidden: true },
+  // 사이드바 메뉴 1개 (mod-ride-vehicle-reg) → /RideVehicleRegistry 진입 → 페이지 내 NavTabs 로 sub-route
+  // path 중복 회피 — 기존 entry 의 displayName 만 「라이드 운영」 으로 변경
+  { id: 'mod-ride-vehicle-reg',   name: '라이드 운영',       displayName: '🚗 라이드 운영',         path: '/RideVehicleRegistry',   iconKey: 'Car',       group: 'admin-ops', sortOrder: 80, requirePermission: true },
+  // sub-page 들 — 사이드바 hidden (NavTabs 로만 진입)
+  { id: 'mod-ride-customer-data', name: '라이드 고객사 데이터', displayName: '🏢 고객사 데이터',  path: '/RideCustomerData',      iconKey: 'Building',  group: 'admin-ops', sortOrder: 81, requirePermission: true, sidebarHidden: true },
+  { id: 'mod-ride-settlements',   name: '고객사 마감자료',    displayName: '💰 마감자료',          path: '/RideSettlements',       iconKey: 'Money',     group: 'admin-ops', sortOrder: 82, requirePermission: true, sidebarHidden: true },
   { id: 'mod-call-scheduler',  name: '근무시간표 분석 & 배포', displayName: '📅 근무시간표 분석 & 배포', path: '/CallScheduler', iconKey: 'Setting', group: 'cx-team', sortOrder: 60, requirePermission: true },
   // 직원 마스터 — 사이드바 숨김. 근무스케줄 페이지 안에서 sub-nav 로 접근 (권한 페이지에는 노출 유지)
   { id: 'mod-ride-employees',  name: '직원 마스터',   path: '/RideEmployees',  iconKey: 'Users',   group: 'cx-team', sortOrder: 61, requirePermission: true, sidebarHidden: true },
