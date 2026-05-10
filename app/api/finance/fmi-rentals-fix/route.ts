@@ -108,7 +108,9 @@ export async function POST(request: NextRequest) {
     let updated = 0
     let multiMatch = 0
     let noMatch = 0
+    let updateErrors = 0
     const samples: any[] = []
+    const errors: any[] = []
 
     for (const r of candidates) {
       const carIds = r.car_ids ? String(r.car_ids).split(',').filter(Boolean) : []
@@ -134,12 +136,38 @@ export async function POST(request: NextRequest) {
         })
       }
       if (!dryRun) {
-        await prisma.$executeRawUnsafe(
-          `UPDATE fmi_rentals SET vehicle_id = ?, updated_at = NOW() WHERE id = ?`,
-          carId, r.id,
-        )
+        try {
+          // FK 안전 검증 — UPDATE 직전 cars 존재 재확인 (race condition 방지)
+          const checkCar = await prisma.$queryRawUnsafe<Array<any>>(
+            `SELECT id FROM cars WHERE id = ? LIMIT 1`, carId,
+          )
+          if (!checkCar[0]) {
+            updateErrors++
+            if (errors.length < 20) {
+              errors.push({
+                fmi_id: r.id, car_id: carId,
+                reason: 'cars 테이블에 없음 (삭제됐거나 collation 충돌)',
+              })
+            }
+            continue
+          }
+          await prisma.$executeRawUnsafe(
+            `UPDATE fmi_rentals SET vehicle_id = ?, updated_at = NOW() WHERE id = ?`,
+            carId, r.id,
+          )
+          updated++
+        } catch (e: any) {
+          updateErrors++
+          if (errors.length < 20) {
+            errors.push({
+              fmi_id: r.id, car_id: carId,
+              reason: e?.message?.slice(0, 200) || String(e),
+            })
+          }
+        }
+      } else {
+        updated++ // dry-run
       }
-      updated++
     }
 
     return NextResponse.json({
@@ -148,11 +176,13 @@ export async function POST(request: NextRequest) {
       updated,
       multi_match: multiMatch,
       no_match: noMatch,
+      update_errors: updateErrors,
       total_candidates: candidates.length,
       samples,
+      errors,
       message: dryRun
         ? `dry-run — ${updated}건 자동 매핑 가능 / ${multiMatch}건 다중 / ${noMatch}건 매핑 불가`
-        : `${updated}건 vehicle_id 자동 채움 (${multiMatch}건 수동 결정 필요)`,
+        : `${updated}건 vehicle_id 자동 채움 (${multiMatch}건 수동 / ${updateErrors}건 FK 오류)`,
     })
   } catch (e: any) {
     console.error('[fmi-rentals-fix POST]', e)
