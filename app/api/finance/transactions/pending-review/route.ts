@@ -179,30 +179,48 @@ export async function GET(request: NextRequest) {
         for (const r of rows) entityNameMap[`freelancer:${r.id}`] = String(r.name || '?') + (r.bank_name ? `(${r.bank_name})` : '(프리랜서)')
       } catch {}
     }
-    // car — PR-UX10: brand + model + 차량번호 (cars 테이블 + fmi_rentals fallback)
+    // car — PR-UX13 hotfix: fmi_vehicles 우선 + cars 폴백 + fmi_rentals 폴백
     if (idsByType['car']?.length) {
       const ids = idsByType['car']
       try {
-        const rows = await prisma.$queryRawUnsafe<Array<any>>(
-          `SELECT id, number, brand, model FROM cars WHERE id IN (${ids.map(() => '?').join(',')})`,
+        // 1차: fmi_vehicles (FK 대상 — UUID)
+        const fvRows = await prisma.$queryRawUnsafe<Array<any>>(
+          `SELECT id, car_number, car_brand, car_model FROM fmi_vehicles WHERE id IN (${ids.map(() => '?').join(',')})`,
           ...ids,
         )
-        for (const r of rows) {
-          const num = String(r.number || '').trim()
-          const car = `${r.brand || ''} ${r.model || ''}`.trim()
+        for (const r of fvRows) {
+          const num = String(r.car_number || '').trim()
+          const car = `${r.car_brand || ''} ${r.car_model || ''}`.trim()
           entityNameMap[`car:${r.id}`] = num
             ? (car ? `${num} ${car}` : num)
             : `차량 #${String(r.id).slice(0, 8)}`
         }
-        // cars 매칭 안 된 ID — fmi_rentals 폴백 (vehicle_id, customer_car_number)
-        const foundIds = new Set(rows.map(r => String(r.id)))
+        const foundIds = new Set(fvRows.map(r => String(r.id)))
         const missingIds = ids.filter(i => !foundIds.has(String(i)))
+        // 2차: cars (legacy INT — 일부 매칭 잔재)
         if (missingIds.length > 0) {
+          try {
+            const carRows = await prisma.$queryRawUnsafe<Array<any>>(
+              `SELECT id, number, brand, model FROM cars WHERE id IN (${missingIds.map(() => '?').join(',')})`,
+              ...missingIds,
+            )
+            for (const r of carRows) {
+              const num = String(r.number || '').trim()
+              const car = `${r.brand || ''} ${r.model || ''}`.trim()
+              entityNameMap[`car:${r.id}`] = num
+                ? (car ? `${num} ${car} (legacy)` : `${num} (legacy)`)
+                : `legacy 차량 #${String(r.id).slice(0, 8)}`
+            }
+          } catch {}
+        }
+        // 3차: fmi_rentals (대차건 자체 ID 가 매칭됐을 때 — 사고 차량)
+        const stillMissing = ids.filter(i => !entityNameMap[`car:${i}`])
+        if (stillMissing.length > 0) {
           try {
             const fmi = await prisma.$queryRawUnsafe<Array<any>>(
               `SELECT id, vehicle_car_number, customer_car_number, insurance_company
-                 FROM fmi_rentals WHERE id IN (${missingIds.map(() => '?').join(',')})`,
-              ...missingIds,
+                 FROM fmi_rentals WHERE id IN (${stillMissing.map(() => '?').join(',')})`,
+              ...stillMissing,
             )
             for (const r of fmi) {
               const num = r.vehicle_car_number || r.customer_car_number || ''
@@ -211,10 +229,10 @@ export async function GET(request: NextRequest) {
                 : `대차건 #${String(r.id).slice(0, 8)}`
             }
           } catch {}
-          // 마지막 폴백 — 매핑 없으면 「차량 미등록」
-          for (const id of missingIds) {
-            if (!entityNameMap[`car:${id}`]) entityNameMap[`car:${id}`] = `차량 미등록 (${String(id).slice(0, 8)})`
-          }
+        }
+        // 최종 폴백
+        for (const id of ids) {
+          if (!entityNameMap[`car:${id}`]) entityNameMap[`car:${id}`] = `차량 미등록 (${String(id).slice(0, 8)})`
         }
       } catch {}
     }
