@@ -27,6 +27,19 @@ const PATH_TO_GROUP: Record<string, string> = {
   // ── 기타 ──
   '/work-essentials/my-info': 'work',
   '/work-essentials/receipts': 'work',
+  // ── 관리자 운영 (admin-ops) ── (PR-6.13.c)
+  '/RideVehicleRegistry':       'admin-ops',
+  '/RideCustomerData':          'admin-ops',
+  '/RideSettlements':           'admin-ops',
+  '/RideAccidents':             'admin-ops',
+  '/RideAccidentReports':       'admin-ops',
+  // ── CX팀 (콜센터 등) — Phase N-12 ──
+  '/CallScheduler':                                'cx',
+  '/CallScheduler/new':                            'cx',
+  '/CallScheduler/settings':                       'cx',
+  '/CallScheduler/requests':                       'cx',
+  '/CallScheduler/skips':                          'cx',
+  '/CallScheduler/me':                             'cx',
 }
 
 // 그룹 ID → 섹션 라벨
@@ -36,6 +49,8 @@ const GROUP_LABELS: Record<string, string> = {
   finance: '재무/경영',
   work: 'Employee of Ride Inc.',
   settings: '설정',
+  'admin-ops': '관리자 운영',  // PR-6.13.c
+  cx: 'CX팀',                  // N-12 — CallScheduler 등
 }
 
 // 경로 → 페이지 이름 (사이드바 NAME_OVERRIDES와 동기화)
@@ -79,6 +94,19 @@ const PAGE_NAMES: Record<string, string> = {
   '/admin/employees': '조직/권한 관리',
   '/admin/contract-terms': '계약 약관 관리',
   '/admin/message-templates': '메시지 센터',
+  // 관리자 운영 (PR-6.13.c)
+  '/RideVehicleRegistry':  '라이드 운영',
+  '/RideCustomerData':     '라이드 고객사 데이터',
+  '/RideSettlements':      '고객사 마감자료',
+  '/RideAccidents':        '라이드 긴급출동',
+  '/RideAccidentReports':  '라이드 사고접수',
+  // CX팀 (Phase N-12)
+  '/CallScheduler':                  '근무시간표 분석 & 배포',
+  '/CallScheduler/new':              '새 월 만들기',
+  '/CallScheduler/settings':         '설정',
+  '/CallScheduler/requests':         '직원 요청 검토',
+  '/CallScheduler/skips':            '회피일 검토',
+  '/CallScheduler/me':               '내 시간표',
 }
 
 // 설정 그룹 매핑

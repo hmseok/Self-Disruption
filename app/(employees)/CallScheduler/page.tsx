@@ -9,7 +9,8 @@ import Link from 'next/link'
 import { COLORS, GLASS, BTN, pillStyle } from '@/app/utils/ui-tokens'
 import { TONE_BG, TONE_TEXT } from './utils/palette'
 import { getAuthHeader } from '@/app/utils/auth-client'
-import DcStatStrip, { StatItem } from '@/app/components/DcStatStrip'
+import DcStatStrip, { StatItem, ActionButton } from '@/app/components/DcStatStrip'
+import { useRouter } from 'next/navigation'
 
 export const dynamic = 'force-dynamic'
 
@@ -33,6 +34,7 @@ type SortKey = 'year_month' | 'status' | 'workers' | 'fill' | 'updated'
 type SortDir = 'asc' | 'desc'
 
 export default function CallSchedulerListPage() {
+  const router = useRouter()
   const [items, setItems] = useState<ScheduleListItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -176,61 +178,18 @@ export default function CallSchedulerListPage() {
     ]
   }, [aggregate, items.length, pendingCount])
 
+  // N-12 — 액션 버튼 (DcStatStrip actions 슬롯)
+  const statActions: ActionButton[] = [
+    { label: '새 월 만들기', onClick: () => router.push('/CallScheduler/new'), variant: 'primary', icon: '+' },
+    { label: '직원 마스터', onClick: () => router.push('/RideEmployees'), variant: 'secondary', icon: '👥' },
+  ]
+
   return (
     <div style={{ padding: '20px 24px', maxWidth: 1400, margin: '0 auto' }}>
-      {/* Breadcrumb (정산 관리 기준) */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 6,
-        fontSize: 12, color: '#64748b', marginBottom: 4,
-      }}>
-        <span>운영</span>
-        <span>›</span>
-        <span style={{ color: '#0f2440', fontWeight: 600 }}>근무시간표 분석</span>
-      </div>
+      {/* N-12 — 자체 헤더 제거 (PageTitle 자동) */}
 
-      {/* 페이지 제목 (fontSize 20, fontWeight 700, 단순) */}
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        marginBottom: 16, gap: 12, flexWrap: 'wrap',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ width: 8, height: 8, borderRadius: 4, background: '#dc2626' }} />
-          <span style={{ width: 8, height: 8, borderRadius: 4, background: '#f59e0b' }} />
-          <span style={{ width: 8, height: 8, borderRadius: 4, background: '#16a34a' }} />
-          <h1 style={{ fontSize: 20, fontWeight: 700, color: '#0f2440', margin: 0 }}>
-            근무시간표 분석 & 배포
-          </h1>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          {pendingCount > 0 && (
-            <Link href="/CallScheduler/requests" style={{
-              padding: '4px 10px', borderRadius: 99,
-              background: COLORS.bgAmber, color: COLORS.warning,
-              border: `1px solid ${COLORS.borderAmber}`,
-              fontSize: 11, fontWeight: 700, textDecoration: 'none',
-            }}>
-              ⏳ 직원 요청 {pendingCount}
-            </Link>
-          )}
-          <Link href="/RideEmployees" style={{
-            padding: '5px 12px', fontSize: 12, fontWeight: 700, borderRadius: 8,
-            border: '1px solid rgba(0,0,0,0.06)', background: 'rgba(255,255,255,0.6)',
-            color: '#334155', textDecoration: 'none',
-          }}>
-            📋 직원 마스터
-          </Link>
-          <Link href="/CallScheduler/new" style={{
-            padding: '5px 12px', fontSize: 11, fontWeight: 700, borderRadius: 8,
-            border: 'none', background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)',
-            color: '#fff', textDecoration: 'none',
-          }}>
-            + 새 월 만들기
-          </Link>
-        </div>
-      </div>
-
-      {/* DcStatStrip — 5 카드 (정산 관리 기준) */}
-      {statItems.length > 0 && <DcStatStrip stats={statItems} />}
+      {/* DcStatStrip — 5 카드 + 액션 (정산 관리 기준) */}
+      {statItems.length > 0 && <DcStatStrip stats={statItems} actions={statActions} />}
 
       {/* 운영 셋팅 펼침 (영역 한눈에 확인 — 깊은 편집은 SubNav 의 시프트/그룹/... 탭) */}
       {opsCounts && (

@@ -20,6 +20,43 @@
 - 셀 호출 시 `slotGroups[slot.id].id + worker_id` 로 lookup → 색상 layer 재활성
 - 효과: 같은 워커가 야간 그룹에서 화/목 희망, 주간 그룹에서 월/금 비선호 등 다른 색상 layer 표출
 
+## 2026-05-10 (Phase N-12) — PageTitle 자동 + 자체 헤더 모두 제거 (정산/대출 기준)
+
+### 사용자 명령
+> "CLAUDE.md 0-0 + 「🎨 페이지 디자인 표준」 정독.
+>  페이지 헤더는 PageTitle 자동 — 자체 헤더 만들지 마세요.
+>  기준: /loans (대출) 또는 /finance/settlement.
+>  의무: DcStatStrip + DcToolbar + NeuDataTable.
+>  검증: npm run lint:ui-design"
+
+### PageTitle 등록 (`app/components/PageTitle.tsx`)
+- PATH_TO_GROUP 에 CallScheduler 영역 추가 → group `cx`
+- GROUP_LABELS 에 `cx: 'CX팀'` 신규
+- PAGE_NAMES 에 6 페이지 등록:
+  · /CallScheduler — 근무시간표 분석 & 배포
+  · /CallScheduler/new — 새 월 만들기
+  · /CallScheduler/settings — 설정
+  · /CallScheduler/requests — 직원 요청 검토
+  · /CallScheduler/skips — 회피일 검토
+  · /CallScheduler/me — 내 시간표
+
+### 자체 헤더 제거 (CLAUDE.md §10 위반 정정)
+- **page.tsx**: Breadcrumb / 컬러점 / h1 / description 제거
+  · 액션 버튼 (새 월 만들기 / 직원 마스터) → DcStatStrip actions 슬롯으로 이동
+- **settings/page.tsx**: ← 링크 / h1 / description 제거
+- **requests/page.tsx**: ← 링크 / h1 / description 제거 (필터만 우측 정렬)
+- **new/page.tsx**: ← 링크 / h1 / description 제거
+- **skips/page.tsx**: ← 링크 / h1 / description 제거 (필터만 우측 정렬)
+- **[id]/page.tsx**: ← 링크 / h1 제거 (월 정보 + status pill 만 유지)
+
+### 검증
+- tsc CallScheduler 0 errors
+- lint:ui-design CallScheduler 위반 0건
+
+### 남은 작업 (선택)
+- 메인 page.tsx 의 자체 `<table>` (스케줄 list) → NeuDataTable 마이그
+- 운영 셋팅 펼침 (자체 SettingsTile div) → DcStatStrip 또는 DcToolbar 변형 사용
+
 ## 2026-05-10 (Phase N-11) — SubNav 검정 pill 패턴 (정산 관리 §4 준수)
 
 ### 사용자 피드백

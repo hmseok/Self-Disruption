@@ -21,7 +21,6 @@ import { usePermission } from '@/app/hooks/usePermission'
 import NeuDataTable, { type TableColumn } from '@/app/components/NeuDataTable'
 import { COLORS, GLASS, BTN } from '@/app/utils/ui-tokens'
 import RideOpsNavTabs from '@/app/components/ride-ops/NavTabs'
-import RideOpsPageHeader from '@/app/components/ride-ops/PageHeader'
 
 // ───────────────────────── 타입 ──────────────────────────────────
 interface Company {
@@ -585,21 +584,15 @@ export default function RideCustomerDataPage() {
     <>
     <RideOpsNavTabs />
     <div style={{ padding: 16, maxWidth: 1600, margin: '0 auto' }}>
-      {/* PR-6.13.b — 디자인 표준 헤더 */}
-      <RideOpsPageHeader
-        breadcrumb="관리자 운영"
-        title="라이드 고객사 데이터"
-        emoji="🏢"
-        sub="📜 장기 계약 (B2B 만료/해지) · 📥 업로드 이력 (캐피탈 raw 누적)"
-        actions={
-          <button
-            style={{ ...BTN.md, background: COLORS.bgViolet, color: '#7c3aed', border: `1px solid ${COLORS.borderViolet}` }}
-            onClick={() => setCompanyModal({})}
-          >
-            + 고객사 추가
-          </button>
-        }
-      />
+      {/* PR-6.13.c — PageTitle 자동 mount, 자체 헤더 X */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
+        <button
+          style={{ ...BTN.md, background: COLORS.bgViolet, color: '#7c3aed', border: `1px solid ${COLORS.borderViolet}` }}
+          onClick={() => setCompanyModal({})}
+        >
+          + 고객사 추가
+        </button>
+      </div>
 
       {/* ─── 탭 — 운영 메인 (장기 계약) → 마스터 → 히스토리 ─── */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>

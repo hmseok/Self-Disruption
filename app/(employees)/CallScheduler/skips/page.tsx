@@ -87,30 +87,11 @@ export default function SkipsReviewPage() {
 
   return (
     <div style={{ maxWidth: 1200, margin: '0 auto', padding: '20px 24px' }}>
+      {/* N-12 — 자체 헤더 제거 (PageTitle 자동) */}
       <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        marginBottom: 16,
+        display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
+        marginBottom: 12,
       }}>
-        <div>
-          <Link href="/CallScheduler" style={{
-            fontSize: 12, color: COLORS.info, textDecoration: 'none',
-          }}>← 매트릭스로</Link>
-          <h1 style={{
-            fontSize: 20, fontWeight: 700, color: '#0f2440', margin: '6px 0',
-          }}>
-            회피일 검토 {requestedCount > 0 && (
-              <span style={{
-                ...pillStyle('warning'), fontSize: 12, marginLeft: 8,
-              }}>
-                대기 {requestedCount}건
-              </span>
-            )}
-          </h1>
-          <div style={{ fontSize: 12, color: COLORS.textMuted }}>
-            직원 회피일 신청 일괄 승인/거절 — 정식 휴가 X, 단순 회피 (그룹 차원)
-          </div>
-        </div>
-
         <div style={{ display: 'flex', gap: 6 }}>
           {(['requested', 'approved', 'all'] as const).map(s => (
             <button key={s} type="button"

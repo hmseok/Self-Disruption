@@ -1,12 +1,6 @@
 {
   "violations": [
     {
-      "file": "app/(employees)/CallScheduler/_components/SubNav.tsx",
-      "line": 37,
-      "label": "glass-bg-hardcode",
-      "snippet": "<div style={{ padding: '0 24px', borderBottom: `1px solid ${COLORS.borderFaint}`, background: 'rgba(255,255,255,0.6)' }}"
-    },
-    {
       "file": "app/(employees)/CallScheduler/components/DayView.tsx",
       "line": 125,
       "label": "glass-bg-hardcode",
@@ -62,31 +56,31 @@
     },
     {
       "file": "app/(employees)/CallScheduler/page.tsx",
-      "line": 514,
+      "line": 486,
       "label": "glass-bg-hardcode",
       "snippet": "background: 'rgba(255,255,255,0.7)', color: COLORS.textPrimary,"
     },
     {
       "file": "app/(employees)/CallScheduler/page.tsx",
-      "line": 544,
+      "line": 516,
       "label": "glass-bg-hardcode",
       "snippet": "background: TONE_BG[tone] !== 'transparent' ? TONE_BG[tone] : 'rgba(255,255,255,0.7)',"
     },
     {
       "file": "app/(employees)/CallScheduler/page.tsx",
-      "line": 590,
+      "line": 562,
       "label": "glass-bg-hardcode",
       "snippet": "background: TONE_BG[tone] !== 'transparent' ? TONE_BG[tone] : 'rgba(255,255,255,0.7)',"
     },
     {
       "file": "app/(employees)/CallScheduler/requests/page.tsx",
-      "line": 184,
+      "line": 168,
       "label": "glass-bg-hardcode",
       "snippet": "background: statusFilter === s ? COLORS.primary : 'rgba(255,255,255,0.6)',"
     },
     {
       "file": "app/(employees)/CallScheduler/requests/page.tsx",
-      "line": 216,
+      "line": 200,
       "label": "glass-bg-hardcode",
       "snippet": "background: tab === t.v ? 'rgba(255,255,255,0.25)' : COLORS.bgAmber,"
     },
@@ -248,7 +242,7 @@
     },
     {
       "file": "app/(employees)/CallScheduler/skips/page.tsx",
-      "line": 120,
+      "line": 101,
       "label": "glass-bg-hardcode",
       "snippet": "background: filterStatus === s ? COLORS.primary : 'rgba(255,255,255,0.6)',"
     },
@@ -296,25 +290,25 @@
     },
     {
       "file": "app/(employees)/RideCustomerData/page.tsx",
-      "line": 1312,
+      "line": 1301,
       "label": "glass-bg-hardcode",
       "snippet": "background: hover ? 'rgba(59,110,181,0.08)' : 'rgba(255,255,255,0.40)',"
     },
     {
       "file": "app/(employees)/RideCustomerData/page.tsx",
-      "line": 1312,
+      "line": 1301,
       "label": "primary-hardcode",
       "snippet": "background: hover ? 'rgba(59,110,181,0.08)' : 'rgba(255,255,255,0.40)',"
     },
     {
       "file": "app/(employees)/RideCustomerData/page.tsx",
-      "line": 1500,
+      "line": 1489,
       "label": "glass-bg-hardcode",
       "snippet": "<div style={{ overflow: 'auto', maxHeight: 200, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 6, background: 'rgba"
     },
     {
       "file": "app/(employees)/RideCustomerData/page.tsx",
-      "line": 1650,
+      "line": 1639,
       "label": "glass-bg-hardcode",
       "snippet": "background: 'rgba(255,255,255,0.6)',"
     },
@@ -326,55 +320,55 @@
     },
     {
       "file": "app/(employees)/RideSettlements/page.tsx",
-      "line": 531,
+      "line": 524,
       "label": "glass-bg-hardcode",
       "snippet": "background: hover ? 'rgba(59,110,181,0.08)' : 'rgba(255,255,255,0.40)',"
     },
     {
       "file": "app/(employees)/RideSettlements/page.tsx",
-      "line": 531,
+      "line": 524,
       "label": "primary-hardcode",
       "snippet": "background: hover ? 'rgba(59,110,181,0.08)' : 'rgba(255,255,255,0.40)',"
     },
     {
       "file": "app/(employees)/RideSettlements/page.tsx",
-      "line": 630,
+      "line": 623,
       "label": "glass-bg-hardcode",
       "snippet": "<div style={{ fontSize: 10, color: COLORS.textSecondary, padding: 6, background: 'rgba(255,255,255,0.5)', borderRadius: "
     },
     {
       "file": "app/(employees)/RideSettlements/page.tsx",
-      "line": 814,
+      "line": 807,
       "label": "glass-bg-hardcode",
       "snippet": "<span style={{ color: cur.color, fontSize: 12, fontWeight: 700, padding: '4px 10px', background: 'rgba(255,255,255,0.5)'"
     },
     {
       "file": "app/(employees)/RideSettlements/page.tsx",
-      "line": 867,
+      "line": 860,
       "label": "glass-bg-hardcode",
       "snippet": "<div key={c.id} style={{ fontSize: 11, padding: '4px 8px', background: 'rgba(255,255,255,0.5)', borderRadius: 4, display"
     },
     {
       "file": "app/(employees)/RideVehicleRegistry/page.tsx",
-      "line": 364,
+      "line": 351,
       "label": "glass-bg-hardcode",
       "snippet": "background: statusFilter === v ? COLORS.bgBlue : 'rgba(255,255,255,0.6)',"
     },
     {
       "file": "app/(employees)/RideVehicleRegistry/page.tsx",
-      "line": 395,
+      "line": 382,
       "label": "glass-bg-hardcode",
       "snippet": "background: 'rgba(255,255,255,0.6)',"
     },
     {
       "file": "app/(employees)/RideVehicleRegistry/page.tsx",
-      "line": 819,
+      "line": 806,
       "label": "glass-bg-hardcode",
       "snippet": "background: 'rgba(255,255,255,0.6)',"
     },
     {
       "file": "app/(employees)/RideVehicleRegistry/page.tsx",
-      "line": 970,
+      "line": 957,
       "label": "glass-bg-hardcode",
       "snippet": "background: 'rgba(255,255,255,0.6)',"
     },
@@ -950,7 +944,7 @@
     },
     {
       "file": "app/components/PageTitle.tsx",
-      "line": 116,
+      "line": 144,
       "label": "glass-bg-hardcode",
       "snippet": "background: 'rgba(255,255,255,0.75)',"
     },
@@ -3355,6 +3349,6 @@
       "snippet": "boxShadow: '6px 6px 18px rgba(140,170,210,0.14), -6px -6px 18px rgba(255,255,255,0.47)',"
     }
   ],
-  "generatedAt": "2026-05-10T04:20:25.165Z",
+  "generatedAt": "2026-05-10T05:34:11.428Z",
   "note": "UI 토큰 hardcode (inline rgba). 기존 위반 동결, 새 위반만 차단."
 }

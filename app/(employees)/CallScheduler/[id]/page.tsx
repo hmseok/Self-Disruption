@@ -195,23 +195,15 @@ function DetailInner({ id }: { id: string }) {
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         marginBottom: 14, flexWrap: 'wrap', gap: 12,
       }}>
-        <div>
-          <Link href="/CallScheduler" style={{
-            fontSize: 12, color: COLORS.info, textDecoration: 'none',
-          }}>
-            ← 목록
-          </Link>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 4 }}>
-            <h1 style={{
-              fontSize: 20, fontWeight: 700, color: '#0f2440', margin: 0,
-            }}>
-              {schedule.year}년 {schedule.month}월
-            </h1>
-            <span style={pillStyle(statusTone)}>{statusLabel}</span>
-            {schedule.title && (
-              <span style={{ fontSize: 12, color: COLORS.textMuted }}>{schedule.title}</span>
-            )}
-          </div>
+        {/* N-12 — 자체 헤더 제거 (PageTitle 자동), 월 정보는 status pill 만 유지 */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <span style={{ fontSize: 14, fontWeight: 700, color: '#0f2440' }}>
+            {schedule.year}년 {schedule.month}월
+          </span>
+          <span style={pillStyle(statusTone)}>{statusLabel}</span>
+          {schedule.title && (
+            <span style={{ fontSize: 12, color: COLORS.textMuted }}>{schedule.title}</span>
+          )}
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', position: 'relative' }}>
           {/* 모드 토글 (매트릭스 / 날짜별) — PR-2EE 단순화 */}

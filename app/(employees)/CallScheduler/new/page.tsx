@@ -112,19 +112,7 @@ export default function CallSchedulerNewPage() {
 
   return (
     <div style={{ padding: 24, maxWidth: 720, margin: '0 auto' }}>
-      <div style={{ marginBottom: 16 }}>
-        <Link href="/CallScheduler" style={{
-          fontSize: 12, color: COLORS.info, textDecoration: 'none',
-        }}>
-          ← 목록으로
-        </Link>
-        <h1 style={{ fontSize: 20, fontWeight: 700, color: '#0f2440', margin: '8px 0 4px' }}>
-          새 월 스케줄 생성
-        </h1>
-        <div style={{ fontSize: 12, color: COLORS.textMuted }}>
-          연/월 선택 후 빈 그리드 또는 전월 패턴 복제로 시작
-        </div>
-      </div>
+      {/* N-12 — 자체 헤더 제거 (PageTitle 자동) */}
 
       <div style={{
         ...GLASS.L4, borderRadius: 12, padding: 20,

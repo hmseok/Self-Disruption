@@ -40,17 +40,7 @@ function SettingsInner() {
 
   return (
     <div style={{ padding: '16px 24px', maxWidth: 1280, margin: '0 auto' }}>
-      <div style={{ marginBottom: 14 }}>
-        <Link href="/CallScheduler" style={{ fontSize: 12, color: COLORS.info, textDecoration: 'none' }}>
-          ← CallScheduler
-        </Link>
-        <h1 style={{ fontSize: 20, fontWeight: 700, color: '#0f2440', margin: '8px 0 4px' }}>
-          CallScheduler 설정
-        </h1>
-        <div style={{ fontSize: 12, color: COLORS.textMuted }}>
-          시간 · 그룹 · 직원 · 회사 휴일(공통) · 직원 휴가(개인)
-        </div>
-      </div>
+      {/* N-12 — 자체 헤더 제거 (PageTitle 자동) */}
 
       {/* 탭 — 운영 흐름 순서 (시간 → 그룹 → 직원 → 휴일 → 연차) */}
       <div style={{
