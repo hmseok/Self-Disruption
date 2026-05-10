@@ -8,7 +8,7 @@
  *
  * 백엔드: /api/cafe24/acrents (목록) + /api/cafe24/acrents/detail (상세)
  *
- * - 사이드바 그룹: Employee of Ride Inc. > CX팀
+ * - 사이드바 그룹: CX팀 > 라이드 사고접수
  * - admin 전용 (Q8=D)
  * - 캐시 30s
  * - 모든 컬럼 sortBy 의무 (CLAUDE.md 규칙 18)

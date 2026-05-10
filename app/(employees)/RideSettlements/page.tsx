@@ -11,7 +11,7 @@
  *   · 차량/실행번호 → 카페24 매칭 (PR-6.11.b)
  *   · 미등록 고객 후보 추출 (PR-6.11.d)
  *
- * 사이드바: Employee of Ride Inc. > 관리자 운영 > 💰 고객사 마감자료
+ * 사이드바: 관리자 운영 > 💰 고객사 마감자료
  * admin 전용
  */
 
@@ -21,6 +21,7 @@ import { usePermission } from '@/app/hooks/usePermission'
 import NeuDataTable, { type TableColumn } from '@/app/components/NeuDataTable'
 import { COLORS, GLASS, BTN } from '@/app/utils/ui-tokens'
 import RideOpsNavTabs from '@/app/components/ride-ops/NavTabs'
+import RideOpsPageHeader from '@/app/components/ride-ops/PageHeader'
 
 interface Settlement {
   id: string
@@ -260,22 +261,21 @@ export default function RideSettlementsPage() {
     <>
     <RideOpsNavTabs />
     <div style={{ padding: 16, maxWidth: 1600, margin: '0 auto' }}>
-      <div style={{ ...GLASS.L5, padding: '16px 20px', borderRadius: 16, marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div>
-          <div style={{ fontSize: 20, fontWeight: 700, color: COLORS.textPrimary }}>💰 고객사 마감자료</div>
-          <div style={{ fontSize: 12, color: COLORS.textSecondary, marginTop: 4 }}>
-            정산 포함 = 진행 중 / 미포함 = 종료 · 검수 확정 / 이의제기 · 차량 매칭 · 미등록 고객 추출
-          </div>
-        </div>
-        <div style={{ display: 'flex', gap: 8 }}>
+      {/* PR-6.13.b — 디자인 표준 헤더 */}
+      <RideOpsPageHeader
+        breadcrumb="관리자 운영"
+        title="고객사 마감자료"
+        emoji="💰"
+        sub="정산 포함 = 진행 중 / 미포함 = 종료 · 검수 / 매칭 / 미등록 고객 추출"
+        actions={
           <button
             style={{ ...BTN.md, background: COLORS.bgGreen, color: COLORS.success, border: `1px solid ${COLORS.borderGreen}` }}
             onClick={() => setUploadOpen(true)}
           >
             📥 정산서 업로드
           </button>
-        </div>
-      </div>
+        }
+      />
 
       {/* 필터 */}
       <div style={{ ...GLASS.L4, padding: 16, borderRadius: 16 }}>

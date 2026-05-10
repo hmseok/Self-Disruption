@@ -8,7 +8,7 @@
  * 사용자 노출 명칭: "라이드 사고접수"
  * 백엔드 데이터 source: 카페24 ERP (skyautosvc.co.kr) aceesosh + pmccarsm 조인
  *
- * - 사이드바 그룹: Employee of Ride Inc. > CX팀
+ * - 사이드바 그룹: CX팀 > 라이드 긴급출동
  * - admin 전용 (Q8=D)
  * - 캐시 30s (Q7=A 분당 변동 정책)
  * - 모든 컬럼 sortBy 의무 (CLAUDE.md 규칙 18)

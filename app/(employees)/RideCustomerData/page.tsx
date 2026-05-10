@@ -11,7 +11,7 @@
  *   3) 계약 마스터  (ride_contracts — 전산등록 B2B)
  *   4) 통합 검색    (차량번호 cross 검색 — 보고/계약/카페24)
  *
- * 사이드바: Employee of Ride Inc. > 관리자 운영 > 라이드 고객사 데이터
+ * 사이드바: 관리자 운영 > 라이드 고객사 데이터
  * admin 전용
  */
 
@@ -21,6 +21,7 @@ import { usePermission } from '@/app/hooks/usePermission'
 import NeuDataTable, { type TableColumn } from '@/app/components/NeuDataTable'
 import { COLORS, GLASS, BTN } from '@/app/utils/ui-tokens'
 import RideOpsNavTabs from '@/app/components/ride-ops/NavTabs'
+import RideOpsPageHeader from '@/app/components/ride-ops/PageHeader'
 
 // ───────────────────────── 타입 ──────────────────────────────────
 interface Company {
@@ -584,26 +585,21 @@ export default function RideCustomerDataPage() {
     <>
     <RideOpsNavTabs />
     <div style={{ padding: 16, maxWidth: 1600, margin: '0 auto' }}>
-      {/* ─── 헤더 ─── */}
-      <div style={{ ...GLASS.L5, padding: '16px 20px', borderRadius: 16, marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div>
-          <div style={{ fontSize: 20, fontWeight: 700, color: COLORS.textPrimary }}>
-            🏢 라이드 고객사 데이터
-          </div>
-          <div style={{ fontSize: 12, color: COLORS.textSecondary, marginTop: 4 }}>
-            📜 <b>장기 계약</b> = 활성 계약 1건 = 1 row (B2B · 만료/해지 관리)  ·
-            📥 <b>업로드 이력</b> = 캐피탈에서 받은 보고를 업로드한 raw 누적 이력
-          </div>
-        </div>
-        <div style={{ display: 'flex', gap: 8 }}>
+      {/* PR-6.13.b — 디자인 표준 헤더 */}
+      <RideOpsPageHeader
+        breadcrumb="관리자 운영"
+        title="라이드 고객사 데이터"
+        emoji="🏢"
+        sub="📜 장기 계약 (B2B 만료/해지) · 📥 업로드 이력 (캐피탈 raw 누적)"
+        actions={
           <button
             style={{ ...BTN.md, background: COLORS.bgViolet, color: '#7c3aed', border: `1px solid ${COLORS.borderViolet}` }}
             onClick={() => setCompanyModal({})}
           >
             + 고객사 추가
           </button>
-        </div>
-      </div>
+        }
+      />
 
       {/* ─── 탭 — 운영 메인 (장기 계약) → 마스터 → 히스토리 ─── */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
@@ -1325,7 +1321,7 @@ function DropZone({ onFiles }: { onFiles: (fl: FileList | null) => void }) {
         }}
         style={{ display: 'none' }}
       />
-      <div style={{ fontSize: 24, marginBottom: 4 }}>📁</div>
+      <div style={{ fontSize: 22, marginBottom: 4 }}>📁</div>
       <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.textPrimary }}>
         파일을 끌어오거나 클릭해서 선택
       </div>

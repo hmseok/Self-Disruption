@@ -9,7 +9,7 @@
  * - 좌측: 자체 DB ride_vehicles (관리/편집)
  * - 우측: 카페24 차량 검색 (참조 + "→ 자체 DB 등록" 버튼)
  *
- * 사이드바: Employee of Ride Inc. > CX팀 > 라이드 차량등록
+ * 사이드바: 관리자 운영 > 라이드 차량등록
  * admin 전용
  */
 
@@ -19,6 +19,7 @@ import { usePermission } from '@/app/hooks/usePermission'
 import NeuDataTable, { type TableColumn } from '@/app/components/NeuDataTable'
 import { COLORS, GLASS, BTN } from '@/app/utils/ui-tokens'
 import RideOpsNavTabs from '@/app/components/ride-ops/NavTabs'
+import RideOpsPageHeader from '@/app/components/ride-ops/PageHeader'
 
 interface RideVehicle {
   id: string
@@ -304,35 +305,28 @@ export default function RideVehicleRegistryPage() {
     <>
     <RideOpsNavTabs />
     <div style={{ padding: '20px 24px', maxWidth: 1600, margin: '0 auto' }}>
-      {/* 헤더 */}
-      <div
-        style={{
-          ...GLASS.L5,
-          borderRadius: 14,
-          padding: '14px 20px',
-          marginBottom: 14,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-        }}
-      >
-        <span style={{ fontSize: 18, fontWeight: 800, color: COLORS.textPrimary }}>
-          🚗 라이드 차량등록현황
-        </span>
-        <button
-          onClick={openRegisterEmpty}
-          style={{
-            ...BTN.md,
-            border: `1px solid ${COLORS.borderSubtle}`,
-            background: COLORS.bgGreen,
-            color: COLORS.success,
-            cursor: 'pointer',
-            fontWeight: 700,
-          }}
-        >
-          + 신규 등록
-        </button>
-      </div>
+      {/* PR-6.13.b — 디자인 표준: breadcrumb (그룹명) + fontSize 20 + 헤더 박스 X */}
+      <RideOpsPageHeader
+        breadcrumb="관리자 운영"
+        title="라이드 차량등록"
+        emoji="🚗"
+        sub="자체 DB + 카페24 read 통합"
+        actions={
+          <button
+            onClick={openRegisterEmpty}
+            style={{
+              ...BTN.md,
+              border: `1px solid ${COLORS.borderSubtle}`,
+              background: COLORS.bgGreen,
+              color: COLORS.success,
+              cursor: 'pointer',
+              fontWeight: 700,
+            }}
+          >
+            + 신규 등록
+          </button>
+        }
+      />
 
       {/* 좌우 2단 */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
