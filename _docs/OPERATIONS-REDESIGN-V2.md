@@ -281,3 +281,15 @@ Phase 2/3 동일 절차.
 ---
 
 본 설계서는 Phase 진행 중 변경 사항 발생 시 갱신.
+
+---
+
+## 11. 진행 상태 (CHANGELOG)
+
+| 일자 | Phase | commit | 내용 |
+|------|-------|--------|------|
+| 2026-05-11 | 설계 | bfb9386 | 설계서 v2 + operations 메인 세션 재배정 |
+| 2026-05-11 | Phase 1.1 | (TBD) | 마이그레이션 SQL + GET/POST API 신설 |
+| TBD | Phase 1.2 | TBD | PATCH/confirm API + UI 리뉴얼 |
+| TBD | Phase 2 | TBD | 차량 일정 리뉴얼 + 정비 sub-tab |
+| TBD | Phase 3 | TBD | 보험 청구 통합 + 입금% 표출 |
