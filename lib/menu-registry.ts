@@ -57,6 +57,8 @@ export const GROUPS: MenuGroup[] = [
   { id: 'cx-team',         label: 'CX팀',         section: 'work-essentials', sortOrder: 11 },
   // PR-6.9.b (2026-05-06) — 관리자 운영 그룹 신설 (Employee of Ride Inc. 하위)
   { id: 'admin-ops',       label: '관리자 운영',   section: 'work-essentials', sortOrder: 12 },
+  // PR-MT-OPS (2026-05-11) — MT팀 운영 그룹 (위탁: 다른 세션 작업, 본 세션 단독 commit)
+  { id: 'mt-team',         label: '🔧 MT팀',      section: 'work-essentials', sortOrder: 13 },
   // 설정 (admin 전용 — 사이드바 별도 섹션)
   { id: 'settings',        label: '설정',         section: 'settings',         sortOrder: 20 },
 ]
@@ -117,6 +119,13 @@ export const MENUS: MenuEntry[] = [
   { id: 'mod-ride-employees',  name: '직원 마스터',   path: '/RideEmployees',  iconKey: 'Users',   group: 'cx-team', sortOrder: 61, requirePermission: true, sidebarHidden: true },
   // 협력공장 추천 — 사고 발생 시 가까운 공장 추천이 메인. 서브: /factory-search/{map,mgmt,groups} (SubNav 진입)
   { id: 'mod-factory-search',  name: '협력공장 추천', displayName: '🚨 협력공장 추천', path: '/factory-search', iconKey: 'Wrench', group: 'cx-team', sortOrder: 62, requirePermission: true },
+
+  // PR-MT-OPS (2026-05-11) — MT팀 운영 (위탁: 다른 세션 작업, 본 세션 단독 commit — Rule 21 § 2.1)
+  // 사이드바 메뉴 1개 (mod-mt-tours) → /RideMTOps/maintenance-tours 진입 → NavTabs 로 3 sub-page
+  // path 중복 회피 — 다른 sub-page 는 sidebarHidden: true (menu-path-duplicate-lint 통과)
+  { id: 'mod-mt-tours',    name: '순회정비', displayName: '🚗 순회정비', path: '/RideMTOps/maintenance-tours', iconKey: 'Wrench',    group: 'mt-team', sortOrder: 50, requirePermission: true },
+  { id: 'mod-mt-inspect',  name: '법정검사', displayName: '📋 법정검사', path: '/RideMTOps/legal-inspections', iconKey: 'Clipboard', group: 'mt-team', sortOrder: 51, requirePermission: true, sidebarHidden: true },
+  { id: 'mod-mt-chargers', name: '충전기',   displayName: '🔌 충전기',   path: '/RideMTOps/chargers',          iconKey: 'Bolt',      group: 'mt-team', sortOrder: 52, requirePermission: true, sidebarHidden: true },
 
   // ── 설정 (settings) ── admin 전용 (사이드바 별도 섹션)
   // 권한 부여 대상 — 일부 사용자에게 회사 정보 / 메시지 센터 등 위임 가능

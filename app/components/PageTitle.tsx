@@ -1,5 +1,6 @@
 'use client'
 import { usePathname } from 'next/navigation'
+import { GLASS } from '../utils/ui-tokens'
 
 // ═══════════════════════════════════════════════════════════════
 // PageTitle — Neumorphism (Style E) 페이지 타이틀 컴포넌트
@@ -40,6 +41,10 @@ const PATH_TO_GROUP: Record<string, string> = {
   '/CallScheduler/requests':                       'cx',
   '/CallScheduler/skips':                          'cx',
   '/CallScheduler/me':                             'cx',
+  // ── MT팀 운영 — PR-MT-OPS (2026-05-11) ──
+  '/RideMTOps/maintenance-tours':                  'mt-team',
+  '/RideMTOps/legal-inspections':                  'mt-team',
+  '/RideMTOps/chargers':                           'mt-team',
 }
 
 // 그룹 ID → 섹션 라벨
@@ -51,6 +56,7 @@ const GROUP_LABELS: Record<string, string> = {
   settings: '설정',
   'admin-ops': '관리자 운영',  // PR-6.13.c
   cx: 'CX팀',                  // N-12 — CallScheduler 등
+  'mt-team': 'MT팀',           // PR-MT-OPS (2026-05-11)
 }
 
 // 경로 → 페이지 이름 (사이드바 NAME_OVERRIDES와 동기화)
@@ -107,6 +113,10 @@ const PAGE_NAMES: Record<string, string> = {
   '/CallScheduler/requests':         '직원 요청 검토',
   '/CallScheduler/skips':            '회피일 검토',
   '/CallScheduler/me':               '내 시간표',
+  // MT팀 운영 (PR-MT-OPS — 2026-05-11)
+  '/RideMTOps/maintenance-tours':    '순회정비',
+  '/RideMTOps/legal-inspections':    '법정검사',
+  '/RideMTOps/chargers':             '충전기',
 }
 
 // 설정 그룹 매핑
@@ -141,7 +151,7 @@ export default function PageTitle({ dynamicMenuName }: PageTitleProps) {
 
   return (
     <div style={{
-      background: 'rgba(255,255,255,0.75)',
+      background: GLASS.L5.background,
       backdropFilter: 'blur(12px)',
       WebkitBackdropFilter: 'blur(12px)',
       padding: '14px 24px',
