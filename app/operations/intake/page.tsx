@@ -101,8 +101,9 @@ export default function OperationsIntakePage() {
   // ── Fetch ────────────────────────────────────────────────────────
   const fetchCafe24 = useCallback(async () => {
     try {
-      const params = new URLSearchParams({ days: '90', limit: '500' })
-      const res = await fetch(`/api/cafe24/accidents?${params}`)
+      const params = new URLSearchParams({ days: '365', limit: '500' })
+      const headers = await getAuthHeader()
+      const res = await fetch(`/api/cafe24/accidents?${params}`, { headers })
       if (!res.ok) { setCafe24Accidents([]); return }
       const data = await res.json()
       const records = Array.isArray(data) ? data : (data.records || data.data || [])
