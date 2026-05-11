@@ -1,10 +1,19 @@
 #!/bin/sh
-# harness-lint-hook v2 (PR-COWORK 2026-05-09)
+# harness-lint-hook v2.1 (PR-COWORK-LOCK 2026-05-11)
 # Repo-tracked pre-commit hook — 모든 cowork 세션 공유.
 # 설치: git config core.hooksPath harness-engineering/git-hooks
 #       (또는 npm run cowork:init)
 #
 # 평가 → 훅 → 기록 → 개선 사이클 자동화
+#
+# v2.1 (2026-05-11): stale .lock 자동 정리
+#   - 다른 cowork 세션 진단 (friendly-laughing-pascal) 보고로 추가
+#   - workspace mount 환경에서 본 세션이 만든 lock 도 unlink 못 하는 케이스 보완
+#   - 3분 이상 된 lock = stale (일반 push/commit 1분 내 종료, 3분이면 확실)
+#   - mount 권한 거부 시 silent skip (|| true) — 다른 세션이 처리하게 양보
+
+GIT_DIR=$(git rev-parse --git-dir 2>/dev/null || echo ".git")
+find "$GIT_DIR" -maxdepth 2 -name "*.lock" -mmin +3 -delete 2>/dev/null || true
 
 # .ts/.tsx/.sql/prisma 파일 변경된 경우만 lint 실행 (성능)
 RELEVANT_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(ts|tsx|sql|prisma)$' || true)
