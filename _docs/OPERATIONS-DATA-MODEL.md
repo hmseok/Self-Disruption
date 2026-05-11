@@ -28,10 +28,11 @@
 ```
 
 ### 1.1 `cars` — 레거시 차량 테이블 (INT id)
-- **목적**: 초기 데이터 — 회사 보유 차량 등록 (1500+건)
+- **목적**: **회사 직영 대차용 차량 등록 (2026-05-11 진단: 18건)**
 - **PK**: `id INT AUTO_INCREMENT`
 - **컬럼**: `number` (차량번호), `brand`, `model`, `year`, `status`
-- **상태**: 운영 데이터 다수 + 신규 등록 일부 진행 중
+- **상태**: 18건 (활성), 모두 2025년식 (1건 2023 G80) — EV6/Model Y/아이오닉/카니발/벤츠 등
+- **중요**: `fmi_rentals.customer_car_number` (고객차) 는 여기 안 들어감 — **회사 보유 차량만**
 - **문제**: `fmi_rentals.vehicle_id FK` 가 `fmi_vehicles.id (UUID)` 를 가리키는데 cars 는 INT id → 매핑 불가
 
 ### 1.2 `fmi_vehicles` — 신규 FK 대상 테이블 (UUID)
@@ -98,9 +99,9 @@
 
 | 테이블 | 건수 | 상태 | 비고 |
 |--------|------|------|------|
-| `cars` | 1500+ | 운영 데이터 | 차량번호 / 브랜드 / 모델 등록 |
-| `fmi_vehicles` | **0** | 비어있음 | **PR-UX14 동기화 대상** |
-| `fmi_rentals` | 546 | 모두 vehicle_id NULL | PR-UX13 일괄 매핑 도구 신설 |
+| `cars` | **18** (2026-05-11 진단) | 회사 직영 대차용 | EV6 / Model Y / 아이오닉 / 카니발 등 |
+| `fmi_vehicles` | **0** | 비어있음 | **PR-UX14 동기화 대상 (18건)** |
+| `fmi_rentals` | 546 (이전 진단) | 모두 vehicle_id NULL | PR-UX13 일괄 매핑 도구 신설 |
 | `transactions` | 다수 | finance 매처 가동 중 | 검수 큐 운영 |
 | `ride_vehicles` | (다른 세션) | — | 본 세션 미참조 |
 
