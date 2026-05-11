@@ -6,6 +6,8 @@ import DcStatStrip, { StatItem, ActionButton } from '../../components/DcStatStri
 import DcToolbar, { FilterItem } from '../../components/DcToolbar'
 import NeuDataTable, { TableColumn, MobileCardConfig } from '../../components/NeuDataTable'
 import { GLASS } from '../../utils/ui-tokens'
+import IntakeModalV2 from './IntakeModalV2'
+import type { Cafe24Accident, DispatchOrder, MergedRow, ResultMsg } from './types'
 
 // ═══════════════════════════════════════════════════════════════════
 // /operations/intake — 접수/오더 (PR-OPS-REDESIGN Phase 1.3)
@@ -31,45 +33,7 @@ async function getAuthHeader(): Promise<Record<string, string>> {
   }
 }
 
-// ── Types ─────────────────────────────────────────────────────────
-type Cafe24Accident = {
-  id: number              // negative pseudo id
-  accidentNo: string
-  accident_date: string
-  accident_time: string
-  accident_location: string
-  driver_name: string
-  driver_phone: string
-  customer_car_number: string
-  rental_car_number: string
-  rental_car_model: string
-  insurance_company: string
-  insurance_claim_no: string
-  repair_shop_name: string
-  rental_from_date: string
-  rental_to_date: string
-  workflow_stage: string  // cafe24 mapping
-  notes: string
-}
-
-type DispatchOrder = {
-  id: string
-  ride_accident_id: number
-  consultation_note: string | null
-  customer_request: string | null
-  expected_dispatch_date: string | null
-  expected_return_date: string | null
-  status: 'new' | 'consulting' | 'scheduled' | 'dispatched' | 'done' | 'cancelled'
-  assigned_to: string | null
-  fmi_rental_id: string | null
-  created_at: string
-  updated_at: string
-}
-
-type MergedRow = Cafe24Accident & {
-  dispatch_order?: DispatchOrder
-  unified_stage: 'new' | 'consulting' | 'scheduled' | 'dispatched' | 'done'
-}
+// ── Types ─── ./types.ts 에서 공유 ───────────────────────────────
 
 const STAGE_LABEL: Record<string, string> = {
   new: '🆕 신규',
@@ -96,7 +60,7 @@ export default function OperationsIntakePage() {
   const [stageFilter, setStageFilter] = useState<string>('all')
   const [search, setSearch] = useState('')
   const [selectedRow, setSelectedRow] = useState<MergedRow | null>(null)
-  const [resultMsg, setResultMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
+  const [resultMsg, setResultMsg] = useState<ResultMsg | null>(null)
 
   // ── Fetch ────────────────────────────────────────────────────────
   // cafe24 응답 (PR-OPS-REDESIGN P1.3 hotfix):
@@ -126,8 +90,14 @@ export default function OperationsIntakePage() {
       const mapped: Cafe24Accident[] = records.map((r: any, idx: number) => {
         const idno = String(r.esosidno || '')
         const idnoInt = parseInt(idno.replace(/[^0-9]/g, '').slice(0, 9) || '0', 10) || (idx + 1)
+        // PR-OPS-1.4b — detail/memos 호출 키 보존
+        const mddt = String(r.esosmddt || '')
+        const srno = Number(r.esossrno || 0)
         return {
           id: idnoInt,
+          esosidno: idno,
+          esosmddt: mddt,
+          esossrno: srno,
           accidentNo: idno || `pseudo-${idx}`,
           accident_date: fmtDate(r.esosacdt || r.esosmddt || ''),
           accident_time: fmtTime(r.esosactm || ''),
@@ -436,9 +406,9 @@ export default function OperationsIntakePage() {
           defaultSort={{ key: 'accident_date', dir: 'desc' }}
         />
 
-        {/* 모달 — 사고 상세 + dispatch_order 폼 */}
+        {/* 모달 v2 — A 사고상세 / B 콜센터메모 / C 상담히스토리 / D 새상담 / E dispatch_order */}
         {selectedRow && (
-          <IntakeModal
+          <IntakeModalV2
             row={selectedRow}
             onClose={() => setSelectedRow(null)}
             onResult={(msg) => { setResultMsg(msg); refresh() }}
@@ -449,334 +419,3 @@ export default function OperationsIntakePage() {
   )
 }
 
-// ═══ Modal Component ═════════════════════════════════════════════
-function IntakeModal({
-  row,
-  onClose,
-  onResult,
-}: {
-  row: MergedRow
-  onClose: () => void
-  onResult: (msg: { type: 'ok' | 'err'; text: string }) => void
-}) {
-  const existing = row.dispatch_order
-  const [consultation, setConsultation] = useState(existing?.consultation_note || '')
-  const [customerReq, setCustomerReq] = useState(existing?.customer_request || '')
-  const [expDispatch, setExpDispatch] = useState(existing?.expected_dispatch_date || '')
-  const [expReturn, setExpReturn] = useState(existing?.expected_return_date || '')
-  const [status, setStatus] = useState<DispatchOrder['status']>(existing?.status || 'consulting')
-  const [busy, setBusy] = useState(false)
-
-  const save = async () => {
-    if (busy) return
-    setBusy(true)
-    try {
-      const headers = { ...(await getAuthHeader()), 'Content-Type': 'application/json' }
-      if (existing) {
-        // PATCH
-        const res = await fetch(`/api/operations/dispatch-orders/${existing.id}`, {
-          method: 'PATCH',
-          headers,
-          body: JSON.stringify({
-            consultation_note: consultation,
-            customer_request: customerReq,
-            expected_dispatch_date: expDispatch || null,
-            expected_return_date: expReturn || null,
-            status,
-          }),
-        })
-        const json = await res.json()
-        if (json.error) throw new Error(json.error)
-        onResult({ type: 'ok', text: 'dispatch_order 수정 완료' })
-      } else {
-        // POST 신규
-        const res = await fetch(`/api/operations/dispatch-orders`, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({
-            ride_accident_id: row.id,
-            consultation_note: consultation,
-            customer_request: customerReq,
-            expected_dispatch_date: expDispatch || null,
-            expected_return_date: expReturn || null,
-            status,
-          }),
-        })
-        const json = await res.json()
-        if (json.error) throw new Error(json.error)
-        onResult({ type: 'ok', text: 'dispatch_order 신설 완료' })
-      }
-      onClose()
-    } catch (e: any) {
-      onResult({ type: 'err', text: e.message || '저장 실패' })
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const confirmDispatch = async () => {
-    if (!existing) {
-      onResult({ type: 'err', text: '먼저 저장 후 배차 확정 가능합니다' })
-      return
-    }
-    if (!window.confirm('배차 확정 시 fmi_rentals 신규 row 가 생성됩니다. 진행할까요?')) return
-    setBusy(true)
-    try {
-      const headers = { ...(await getAuthHeader()), 'Content-Type': 'application/json' }
-      const res = await fetch(`/api/operations/dispatch-orders/${existing.id}/confirm`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          customer_name: row.driver_name,
-          customer_phone: row.driver_phone,
-          customer_car_number: row.customer_car_number,
-          insurance_company: row.insurance_company,
-          insurance_claim_no: row.insurance_claim_no || row.accidentNo,
-          dispatch_date: expDispatch || new Date().toISOString().slice(0, 10),
-          expected_return_date: expReturn || null,
-        }),
-      })
-      const json = await res.json()
-      if (json.error) throw new Error(json.error)
-      onResult({ type: 'ok', text: `배차 확정 완료 — fmi_rental ${json.mode === 'create' ? '신설' : '갱신'}` })
-      onClose()
-    } catch (e: any) {
-      onResult({ type: 'err', text: e.message || '배차 확정 실패' })
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  return (
-    <div
-      onClick={onClose}
-      style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'rgba(15,36,64,0.4)',
-        backdropFilter: 'blur(8px)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 1000,
-        padding: 20,
-      }}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          ...GLASS.L4,
-          borderRadius: 18,
-          padding: 24,
-          maxWidth: 720,
-          width: '100%',
-          maxHeight: '90vh',
-          overflowY: 'auto',
-          boxShadow: '0 25px 60px rgba(15,36,64,0.25)',
-        }}
-      >
-        {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
-          <div>
-            <h2 style={{ fontSize: 18, fontWeight: 900, color: '#0f2440', margin: 0 }}>
-              🚗 {row.customer_car_number || row.driver_name || row.accidentNo}
-            </h2>
-            <p style={{ fontSize: 12, color: '#64748b', marginTop: 4 }}>
-              사고일 {row.accident_date} · 접수번호 {row.accidentNo} · {row.insurance_company || '-'}
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 20, color: '#64748b' }}
-          >
-            ×
-          </button>
-        </div>
-
-        {/* 사고 정보 read-only */}
-        <div
-          style={{
-            background: 'rgba(248,250,252,0.8)',
-            border: '1px solid rgba(0,0,0,0.05)',
-            borderRadius: 12,
-            padding: 14,
-            marginBottom: 16,
-            fontSize: 12,
-            color: '#475569',
-          }}
-        >
-          <Field label="고객" value={`${row.driver_name || '-'} · ${row.driver_phone || ''}`} />
-          <Field label="사고 위치" value={row.accident_location || '-'} />
-          <Field label="청구번호" value={row.insurance_claim_no || row.accidentNo} />
-          {row.rental_car_number && (
-            <Field label="기존 배차 (cafe24)" value={`${row.rental_car_number} ${row.rental_car_model || ''}`} />
-          )}
-          {row.notes && <Field label="메모" value={row.notes} />}
-        </div>
-
-        {/* dispatch_order 폼 */}
-        <h3 style={{ fontSize: 13, fontWeight: 800, color: '#0f2440', marginBottom: 10 }}>
-          📝 상담 / 일정 입력
-        </h3>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
-          <Input
-            label="상담 내용"
-            value={consultation}
-            onChange={setConsultation}
-            placeholder="고객 통화 내용 / 진행 상황"
-            multiline
-            cols={2}
-          />
-          <Input
-            label="고객 요청사항"
-            value={customerReq}
-            onChange={setCustomerReq}
-            placeholder="요청 차종 / 특이사항"
-            multiline
-            cols={2}
-          />
-          <Input label="예상 배차일" value={expDispatch} onChange={setExpDispatch} type="date" />
-          <Input label="예상 반납일" value={expReturn} onChange={setExpReturn} type="date" />
-          <div style={{ gridColumn: 'span 2' }}>
-            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#475569', marginBottom: 4 }}>
-              상태
-            </label>
-            <select
-              value={status}
-              onChange={(e) => setStatus(e.target.value as DispatchOrder['status'])}
-              style={{
-                width: '100%',
-                padding: '8px 12px',
-                borderRadius: 10,
-                fontSize: 13,
-                color: '#1e293b',
-                ...GLASS.L1,
-              }}
-            >
-              <option value="new">🆕 신규</option>
-              <option value="consulting">📞 상담중</option>
-              <option value="scheduled">📅 배차예정</option>
-              <option value="done">✅ 종결</option>
-              <option value="cancelled">✗ 취소</option>
-            </select>
-          </div>
-        </div>
-
-        {/* Actions */}
-        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 18 }}>
-          <button
-            onClick={onClose}
-            disabled={busy}
-            style={{
-              padding: '10px 18px',
-              background: 'transparent',
-              border: '1px solid rgba(0,0,0,0.1)',
-              borderRadius: 10,
-              cursor: busy ? 'not-allowed' : 'pointer',
-              color: '#475569',
-              fontWeight: 700,
-              fontSize: 13,
-            }}
-          >
-            취소
-          </button>
-          <button
-            onClick={save}
-            disabled={busy}
-            style={{
-              padding: '10px 18px',
-              background: busy ? '#94a3b8' : 'linear-gradient(135deg, #3b82f6, #2563eb)',
-              color: '#fff',
-              border: 'none',
-              borderRadius: 10,
-              cursor: busy ? 'not-allowed' : 'pointer',
-              fontWeight: 700,
-              fontSize: 13,
-            }}
-          >
-            💾 저장
-          </button>
-          {existing && existing.status !== 'dispatched' && existing.status !== 'done' && (
-            <button
-              onClick={confirmDispatch}
-              disabled={busy}
-              style={{
-                padding: '10px 18px',
-                background: busy ? '#94a3b8' : 'linear-gradient(135deg, #10b981, #059669)',
-                color: '#fff',
-                border: 'none',
-                borderRadius: 10,
-                cursor: busy ? 'not-allowed' : 'pointer',
-                fontWeight: 800,
-                fontSize: 13,
-              }}
-            >
-              🚀 배차 확정
-            </button>
-          )}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ═══ Small UI helpers ═══════════════════════════════════════════
-function Field({ label, value }: { label: string; value: string }) {
-  return (
-    <div style={{ display: 'flex', gap: 10, marginBottom: 6, alignItems: 'baseline' }}>
-      <span style={{ minWidth: 100, color: '#94a3b8', fontWeight: 700 }}>{label}</span>
-      <span style={{ color: '#1e293b', fontWeight: 600 }}>{value}</span>
-    </div>
-  )
-}
-
-function Input({
-  label,
-  value,
-  onChange,
-  type = 'text',
-  placeholder,
-  multiline,
-  cols = 1,
-}: {
-  label: string
-  value: string
-  onChange: (v: string) => void
-  type?: 'text' | 'date'
-  placeholder?: string
-  multiline?: boolean
-  cols?: number
-}) {
-  const baseStyle: React.CSSProperties = {
-    width: '100%',
-    padding: '8px 12px',
-    borderRadius: 10,
-    fontSize: 13,
-    color: '#1e293b',
-    ...GLASS.L1,
-  }
-  return (
-    <div style={{ gridColumn: cols > 1 ? `span ${cols}` : undefined }}>
-      <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#475569', marginBottom: 4 }}>
-        {label}
-      </label>
-      {multiline ? (
-        <textarea
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder}
-          rows={2}
-          style={{ ...baseStyle, resize: 'vertical', minHeight: 56 }}
-        />
-      ) : (
-        <input
-          type={type}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder}
-          style={baseStyle}
-        />
-      )}
-    </div>
-  )
-}
