@@ -7,24 +7,22 @@
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
 
-const TABS: Array<{ href: string; label: string; matchTab?: string }> = [
+// N-14 — 운영 vs 설정 분류 (사용자 의도)
+//   운영 (자주 보는 영역, 상위): 대시보드 / 직원 요청
+//   설정 (모든 셋팅, ⚙ 안): 시간 / 그룹 / 워커 / 공휴일 / 휴가
+const TABS: Array<{ href: string; label: string; matchSettings?: boolean }> = [
   { href: '/CallScheduler',                          label: '📊 대시보드' },
   { href: '/CallScheduler/requests',                 label: '📋 직원 요청' },
-  { href: '/CallScheduler/settings?tab=shifts',      label: '🕐 시프트',    matchTab: 'shifts' },
-  { href: '/CallScheduler/settings?tab=groups',      label: '🚧 그룹',      matchTab: 'groups' },
-  { href: '/CallScheduler/settings?tab=workers',     label: '👥 워커',      matchTab: 'workers' },
-  { href: '/CallScheduler/settings?tab=holidays',    label: '🎌 공휴일',    matchTab: 'holidays' },
-  { href: '/CallScheduler/settings?tab=leaves',      label: '💼 휴가',      matchTab: 'leaves' },
+  { href: '/CallScheduler/settings?tab=shifts',      label: '⚙ 설정',       matchSettings: true },
 ]
 
 export default function SubNav() {
   const pathname = usePathname()
-  const sp = useSearchParams()
-  const currentTab = sp?.get('tab')
 
   const isActive = (tab: typeof TABS[number]): boolean => {
-    if (tab.matchTab) {
-      return pathname === '/CallScheduler/settings' && currentTab === tab.matchTab
+    if (tab.matchSettings) {
+      // ⚙ 설정 — settings 페이지의 어떤 탭이든 활성
+      return pathname === '/CallScheduler/settings'
     }
     if (tab.href === '/CallScheduler') {
       return pathname === '/CallScheduler' || (pathname?.startsWith('/CallScheduler/') && !pathname.startsWith('/CallScheduler/settings') && !pathname.startsWith('/CallScheduler/requests'))
