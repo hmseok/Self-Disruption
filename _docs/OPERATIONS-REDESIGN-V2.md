@@ -270,6 +270,89 @@ Phase 2/3 동일 절차.
 
 ---
 
+## 9.5 Phase 1.4 설계 (사용자 명시 — 상담원 기록 스타일)
+
+> **사용자 명시 비즈니스 흐름** (2026-05-11):
+> 「접수내역에 사고접수 상세 내용이 나와야 하고 그내역과 콜센터 상담내역을 보고
+>  여기서 이관받아 상담 눌러서 여기의 추가 상담을 디비저장하는 구성의 페이지가
+>  나와야하는데 상담원 상담기록 스타일로」
+
+### 9.5.1 데이터 모델 — operations_consultations 신설
+
+```sql
+CREATE TABLE operations_consultations (
+  id                 CHAR(36) PRIMARY KEY,
+  dispatch_order_id  CHAR(36) NOT NULL,
+  note               TEXT NOT NULL,
+  category           ENUM('intake','followup','status_change','other') DEFAULT 'followup',
+  created_at         TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  created_by         VARCHAR(64),
+  INDEX idx_dispatch_order (dispatch_order_id),
+  INDEX idx_created_at (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+```
+
+**원칙**: 단일 dispatch_order 에 여러 상담 row 누적 — 시간순 히스토리. 기존 `dispatch_orders.consultation_note` 는 「최초 인테이크 노트」 로 의미 변경.
+
+### 9.5.2 API 명세
+
+| Endpoint | Method | 용도 |
+|----------|--------|------|
+| `/api/operations/consultations?dispatch_order_id=` | GET | 시간순 list (DESC) |
+| `/api/operations/consultations` | POST | 신규 상담 row INSERT |
+| `/api/operations/consultations/[id]` | DELETE | (옵션) 수정/삭제는 Phase 2 |
+
+### 9.5.3 모달 새 구성 — 상담원 기록 스타일
+
+```
+┌─ 사고 정보 (cafe24 detail fetch — /api/cafe24/accidents/detail) ─┐
+│  사고일/시간/위치 / 차량번호 / 차종 / 요청자 / 사고 메모        │
+└────────────────────────────────────────────────────────────────────┘
+
+┌─ 콜센터 메모 (cafe24 read-only) ─────────────────────────────────┐
+│  esosrstx (사고 텍스트) / esosmemo (상담 메모) / esosinft (정보) │
+│  외부 시스템에 등록된 메모, 우리는 변경 X                       │
+└────────────────────────────────────────────────────────────────────┘
+
+┌─ 💬 상담 히스토리 (operations_consultations 시간순 누적) ────────┐
+│  📞 2026-05-11 14:30 hjpark                                      │
+│     고객 통화 — 견인 차량 도착 확인                              │
+│  📞 2026-05-11 15:10 hjpark                                      │
+│     EV6 대차 가능 협의                                           │
+│  ...                                                             │
+└────────────────────────────────────────────────────────────────────┘
+
+┌─ 새 상담 입력 ──────────────────────────────────────────────────┐
+│  [textarea — 상담 내용]                                         │
+│  [category dropdown: 인테이크/팔로업/상태변경/기타]              │
+│  [💬 상담 추가] → POST → 위 히스토리에 새 row 표시               │
+└────────────────────────────────────────────────────────────────────┘
+
+┌─ dispatch_order 기본 필드 (기존 유지) ───────────────────────────┐
+│  status / expected_dispatch_date / expected_return_date          │
+│  [💾 저장] [🚀 배차 확정]                                         │
+└────────────────────────────────────────────────────────────────────┘
+```
+
+### 9.5.4 cafe24 detail 응답 활용
+
+`/api/cafe24/accidents/detail?idno=&mddt=&srno=` 호출 시 30+ 필드:
+- 위치: `esosaddr`, `esosadnm`, `esosadtl`
+- 요청자: `esosusnm` (이름), `esosustl` (전화), `esosusvp` (차량 정보), `esosusvd` (차종)
+- 메모: `esosrstx`, `esosmemo`, `esosinft`
+- 등록: `esosgndt`, `esosgntm`, `esosgnus`
+
+list 응답에서 `esosmddt + esossrno` 도 받아두기 (detail 호출 키). 현재 매핑에 없으므로 보강 필요.
+
+### 9.5.5 Phase 1.4 작업 분할
+
+| 단계 | 내용 |
+|------|------|
+| **P1.4a** | 마이그 `operations_consultations` + API `/api/operations/consultations` GET/POST |
+| **P1.4b** | 모달 리뉴얼 — detail fetch + 콜센터 메모 + 상담 히스토리 + 새 상담 입력 |
+
+---
+
 ## 10. 다음 단계 (사용자 결정 대기)
 
 설계서 v2 검토 후 다음 키워드 중 하나 응답:
@@ -291,6 +374,10 @@ Phase 2/3 동일 절차.
 | 2026-05-11 | 설계 | bfb9386 | 설계서 v2 + operations 메인 세션 재배정 |
 | 2026-05-11 | Phase 1.1 | c01656e | 마이그레이션 SQL + GET/POST API 신설 (사용자 SQL 적용 ✅) |
 | 2026-05-11 | Phase 1.2 | 3481012 | PATCH/confirm API |
-| 2026-05-11 | Phase 1.3 | (TBD) | /operations/intake UI 리뉴얼 — 791줄 → ~570줄 |
+| 2026-05-11 | Phase 1.3 | 7449315 | /operations/intake UI 리뉴얼 — 791줄 → ~570줄 |
+| 2026-05-11 | hotfix #1 | 4b02421 | cafe24 fetch Authorization 헤더 + 365일 |
+| 2026-05-11 | hotfix #2 | 9a2af66 | cafe24 응답 필드명 매핑 (esos* 정정) |
+| TBD | Phase 1.4a | TBD | operations_consultations 마이그 + API |
+| TBD | Phase 1.4b | TBD | 모달 리뉴얼 — 상담원 기록 스타일 |
 | TBD | Phase 2 | TBD | 차량 일정 리뉴얼 + 정비 sub-tab |
 | TBD | Phase 3 | TBD | 보험 청구 통합 + 입금% 표출 |
