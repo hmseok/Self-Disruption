@@ -24,8 +24,9 @@
 | `app/(employees)/RideVehicleRegistry*/*` | Ride* 세션 | ✅ |
 | `app/(employees)/RideCustomerData*/*` | Ride* 세션 | ✅ |
 | `app/api/ride-*/*` | Ride* 세션 | ✅ |
-| `app/operations/*` | **operations 세션 (신설 2026-05-11)** | ✅ |
-| `app/api/operations/*` | **operations 세션 (신설 2026-05-11)** | ✅ |
+| `app/operations/*` | **sweet-amazing-galileo (메인) — 2026-05-11 재배정** | ✅ |
+| `app/api/operations/*` | **sweet-amazing-galileo (메인) — 2026-05-11 재배정** | ✅ |
+| `app/maintenance/*` (신설) | **sweet-amazing-galileo (메인)** | ✅ |
 | `app/loans*/*` | 본 도메인 세션 (자율) | ✅ |
 | `app/insurance*/*` | 본 도메인 세션 (자율) | ✅ |
 
