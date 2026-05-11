@@ -116,6 +116,9 @@
 | 2026-05-09 | fmi_vehicles 신설 (UUID FK 대상) | INT id 와 분리 |
 | 2026-05-10 | hotfix: 매처 fmi_vehicles 전환 | 잘못된 cars 참조 정정 |
 | 2026-05-11 | PR-UX14 cars→fmi_vehicles 동기화 도구 | 0건 상태 해결 |
+| 2026-05-11 | Phase 1.1 operations_dispatch_orders 신설 (c01656e) | 사고 → 대차 상담/일정 |
+| 2026-05-11 | Phase 1.1 fmi_rentals.billed_at / billed_by 컬럼 추가 (c01656e) | 청구 입력 추적 |
+| TBD | Phase 1.4a operations_consultations 신설 | 단일 dispatch_order 에 상담 누적 (상담원 기록 스타일) |
 | TBD | fmi_rentals 일괄 매핑 재실행 | vehicle_id NULL 해결 |
 
 ---
