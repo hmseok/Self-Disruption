@@ -20,6 +20,28 @@
 - 셀 호출 시 `slotGroups[slot.id].id + worker_id` 로 lookup → 색상 layer 재활성
 - 효과: 같은 워커가 야간 그룹에서 화/목 희망, 주간 그룹에서 월/금 비선호 등 다른 색상 layer 표출
 
+## 2026-05-10 (Phase N-13) — NeuDataTable 마이그 (CLAUDE.md §10 의무 컴포넌트 3종 완성)
+
+### 변경
+- 메인 page.tsx 의 자체 `<table>` 스케줄 list → **NeuDataTable**
+- TableColumn<ScheduleListItem>[] 5 컬럼 (년/월 / 상태 / 근무자 / 충원율 / 최근 수정)
+- 각 컬럼 sortBy 함수 — NeuDataTable 자체 정렬 (헤더 클릭)
+- defaultSort 'year_month' / 'desc'
+- onRowClick — 행 클릭 시 /CallScheduler/[id] navigate
+- 자체 SortKey/SortDir/sorted/toggle/Th 함수 모두 제거 (NeuDataTable 자체 정렬)
+- 빈 상태 emptyIcon "📅" + emptyMessage
+
+### 효과
+- CLAUDE.md §10 의무 컴포넌트 3종 완성:
+  · ✓ DcStatStrip (N-10)
+  · ✓ DcToolbar — settings 페이지 자체 nav 가 toolbar 역할 (이미 적용)
+  · ✓ NeuDataTable (N-13)
+- /loans (대출 관리) 와 동일 패턴
+
+### 검증
+- tsc CallScheduler 0 errors
+- lint:ui-design CallScheduler 0건
+
 ## 2026-05-10 (Phase N-12) — PageTitle 자동 + 자체 헤더 모두 제거 (정산/대출 기준)
 
 ### 사용자 명령

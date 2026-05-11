@@ -10,6 +10,7 @@ import { COLORS, GLASS, BTN, pillStyle } from '@/app/utils/ui-tokens'
 import { TONE_BG, TONE_TEXT } from './utils/palette'
 import { getAuthHeader } from '@/app/utils/auth-client'
 import DcStatStrip, { StatItem, ActionButton } from '@/app/components/DcStatStrip'
+import NeuDataTable, { TableColumn } from '@/app/components/NeuDataTable'
 import { useRouter } from 'next/navigation'
 
 export const dynamic = 'force-dynamic'
@@ -30,16 +31,11 @@ interface ScheduleListItem {
   updated_at: string
 }
 
-type SortKey = 'year_month' | 'status' | 'workers' | 'fill' | 'updated'
-type SortDir = 'asc' | 'desc'
-
 export default function CallSchedulerListPage() {
   const router = useRouter()
   const [items, setItems] = useState<ScheduleListItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [sortKey, setSortKey] = useState<SortKey>('year_month')
-  const [sortDir, setSortDir] = useState<SortDir>('desc')
   const [pendingCount, setPendingCount] = useState(0)
   const [opsCounts, setOpsCounts] = useState<{
     slots: number; groups: number; workers: number; quotaWorkers: number
@@ -133,25 +129,6 @@ export default function CallSchedulerListPage() {
     return () => { abort = true }
   }, [])
 
-  const sorted = useMemo(() => {
-    const arr = [...items]
-    arr.sort((a, b) => {
-      let av: any, bv: any
-      switch (sortKey) {
-        case 'year_month': av = a.year * 100 + a.month; bv = b.year * 100 + b.month; break
-        case 'status':     av = a.status; bv = b.status; break
-        case 'workers':    av = a.worker_count; bv = b.worker_count; break
-        case 'fill':       av = a.fill_rate; bv = b.fill_rate; break
-        case 'updated':    av = new Date(a.updated_at).getTime(); bv = new Date(b.updated_at).getTime(); break
-      }
-      const cmp = typeof av === 'string'
-        ? av.localeCompare(bv as string)
-        : (av as number) - (bv as number)
-      return sortDir === 'asc' ? cmp : -cmp
-    })
-    return arr
-  }, [items, sortKey, sortDir])
-
   const aggregate = useMemo(() => {
     if (items.length === 0) return null
     const draft = items.filter(i => i.status === 'draft').length
@@ -161,10 +138,60 @@ export default function CallSchedulerListPage() {
     return { draft, published, totalWorkers, avgFill }
   }, [items])
 
-  const toggle = (k: SortKey) => {
-    if (sortKey === k) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
-    else { setSortKey(k); setSortDir('desc') }
-  }
+  // N-13 — NeuDataTable columns (CLAUDE.md §10 의무 컴포넌트)
+  const scheduleColumns: TableColumn<ScheduleListItem>[] = useMemo(() => [
+    {
+      key: 'year_month', label: '년/월',
+      sortBy: (s) => s.year * 100 + s.month,
+      render: (s) => (
+        <span>
+          <span style={{ color: COLORS.primary, fontWeight: 700 }}>
+            {s.year}년 {s.month}월
+          </span>
+          {s.title && (
+            <span style={{ marginLeft: 8, fontSize: 11, color: COLORS.textMuted }}>
+              {s.title}
+            </span>
+          )}
+        </span>
+      ),
+    },
+    {
+      key: 'status', label: '상태',
+      sortBy: (s) => s.status,
+      render: (s) => {
+        const tone = s.status === 'published' ? 'success' : s.status === 'draft' ? 'info' : 'neutral'
+        const label = s.status === 'published' ? '공지됨' : s.status === 'draft' ? '초안' : '보관'
+        return <span style={pillStyle(tone)}>{label}</span>
+      },
+    },
+    {
+      key: 'workers', label: '근무자', align: 'right',
+      sortBy: (s) => s.worker_count,
+      render: (s) => <span style={{ color: COLORS.textPrimary }}>{s.worker_count}명</span>,
+    },
+    {
+      key: 'fill', label: '충원율', align: 'right',
+      sortBy: (s) => s.fill_rate,
+      render: (s) => {
+        const pct = Math.round(s.fill_rate * 1000) / 10
+        const tone = s.fill_rate >= 0.9 ? 'success' : s.fill_rate >= 0.7 ? 'warning' : 'danger'
+        return <span style={pillStyle(tone)}>{pct}%</span>
+      },
+    },
+    {
+      key: 'updated', label: '최근 수정', align: 'right',
+      sortBy: (s) => new Date(s.updated_at).getTime(),
+      render: (s) => (
+        <span style={{ color: COLORS.textMuted, fontSize: 11 }}>
+          {new Date(s.updated_at).toLocaleString('ko-KR', {
+            year: '2-digit', month: '2-digit', day: '2-digit',
+            hour: '2-digit', minute: '2-digit',
+          })}
+        </span>
+      ),
+    },
+  ], [])
 
   // N-10 — DcStatStrip 용 5 stat (정산 관리 기준)
   const statItems: StatItem[] = useMemo(() => {
@@ -240,120 +267,26 @@ export default function CallSchedulerListPage() {
         </div>
       )}
 
-      <div style={{ ...GLASS.L4, borderRadius: 12, padding: 12, overflow: 'auto' }}>
-        {loading && (
-          <div style={{ padding: 40, textAlign: 'center', color: COLORS.textMuted }}>로딩 중...</div>
-        )}
-        {error && (
-          <div style={{
-            padding: 12, background: COLORS.bgRed, border: `1px solid ${COLORS.borderRed}`,
-            borderRadius: 8, color: COLORS.danger, fontSize: 13,
-          }}>
-            ❌ {error}
-          </div>
-        )}
-        {!loading && !error && items.length === 0 && (
-          <div style={{ padding: 60, textAlign: 'center' }}>
-            <div style={{ fontSize: 14, color: COLORS.textSecondary, marginBottom: 12 }}>
-              아직 작성된 스케줄이 없습니다.
-            </div>
-            <Link href="/CallScheduler/new" style={{
-              ...BTN.md, background: COLORS.primary, color: '#fff',
-              textDecoration: 'none', display: 'inline-block',
-            }}>
-              첫 스케줄 만들기
-            </Link>
-          </div>
-        )}
-        {!loading && !error && items.length > 0 && (
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-            <thead>
-              <tr style={{ borderBottom: `1px solid ${COLORS.borderFaint}` }}>
-                <Th sortKey="year_month" current={sortKey} dir={sortDir} onClick={toggle}>년/월</Th>
-                <Th sortKey="status" current={sortKey} dir={sortDir} onClick={toggle}>상태</Th>
-                <Th sortKey="workers" current={sortKey} dir={sortDir} onClick={toggle} align="right">근무자</Th>
-                <Th sortKey="fill" current={sortKey} dir={sortDir} onClick={toggle} align="right">충원율</Th>
-                <Th sortKey="updated" current={sortKey} dir={sortDir} onClick={toggle} align="right">최근 수정</Th>
-                <th style={{ padding: '8px 10px', textAlign: 'right' }}></th>
-              </tr>
-            </thead>
-            <tbody>
-              {sorted.map(s => {
-                const fillPct = Math.round(s.fill_rate * 1000) / 10
-                const fillTone = s.fill_rate >= 0.9 ? 'success' : s.fill_rate >= 0.7 ? 'warning' : 'danger'
-                const statusTone = s.status === 'published' ? 'success' : s.status === 'draft' ? 'info' : 'neutral'
-                const statusLabel = s.status === 'published' ? '공지됨' : s.status === 'draft' ? '초안' : '보관'
-                return (
-                  <tr key={s.id} style={{ borderBottom: `1px solid ${COLORS.borderFaint}` }}>
-                    <td style={{ padding: '10px', whiteSpace: 'nowrap' }}>
-                      <Link href={`/CallScheduler/${s.id}`} style={{
-                        color: COLORS.primary, fontWeight: 700, textDecoration: 'none',
-                      }}>
-                        {s.year}년 {s.month}월
-                      </Link>
-                      {s.title && (
-                        <span style={{ marginLeft: 8, fontSize: 11, color: COLORS.textMuted }}>
-                          {s.title}
-                        </span>
-                      )}
-                    </td>
-                    <td style={{ padding: '10px' }}>
-                      <span style={pillStyle(statusTone)}>{statusLabel}</span>
-                    </td>
-                    <td style={{ padding: '10px', textAlign: 'right', color: COLORS.textPrimary }}>
-                      {s.worker_count}명
-                    </td>
-                    <td style={{ padding: '10px', textAlign: 'right' }}>
-                      <span style={pillStyle(fillTone)}>{fillPct}%</span>
-                    </td>
-                    <td style={{
-                      padding: '10px', textAlign: 'right',
-                      color: COLORS.textMuted, fontSize: 11,
-                    }}>
-                      {new Date(s.updated_at).toLocaleString('ko-KR', {
-                        year: '2-digit', month: '2-digit', day: '2-digit',
-                        hour: '2-digit', minute: '2-digit',
-                      })}
-                    </td>
-                    <td style={{ padding: '10px', textAlign: 'right' }}>
-                      <Link href={`/CallScheduler/${s.id}`} style={{
-                        ...BTN.sm, background: COLORS.bgBlue, color: COLORS.info,
-                        border: `1px solid ${COLORS.borderBlue}`,
-                        textDecoration: 'none', display: 'inline-block',
-                      }}>
-                        열기
-                      </Link>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        )}
-      </div>
+      {/* N-13 — NeuDataTable (CLAUDE.md §10 의무 컴포넌트) */}
+      {error && (
+        <div style={{
+          padding: 12, background: COLORS.bgRed, border: `1px solid ${COLORS.borderRed}`,
+          borderRadius: 8, color: COLORS.danger, fontSize: 13, marginBottom: 12,
+        }}>
+          ❌ {error}
+        </div>
+      )}
+      <NeuDataTable<ScheduleListItem>
+        data={items}
+        loading={loading}
+        rowKey={(s) => s.id}
+        emptyIcon="📅"
+        emptyMessage="아직 작성된 스케줄이 없습니다."
+        defaultSort={{ key: 'year_month', dir: 'desc' }}
+        onRowClick={(s) => router.push(`/CallScheduler/${s.id}`)}
+        columns={scheduleColumns}
+      />
     </div>
-  )
-}
-
-function Th({ children, sortKey, current, dir, onClick, align = 'left' }: {
-  children: React.ReactNode
-  sortKey: SortKey
-  current: SortKey
-  dir: SortDir
-  onClick: (k: SortKey) => void
-  align?: 'left' | 'right'
-}) {
-  return (
-    <th
-      onClick={() => onClick(sortKey)}
-      style={{
-        padding: '8px 10px', textAlign: align,
-        color: COLORS.textSecondary, fontWeight: 700,
-        cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap',
-      }}
-    >
-      {children}{current === sortKey ? (dir === 'asc' ? ' ▲' : ' ▼') : ''}
-    </th>
   )
 }
 
