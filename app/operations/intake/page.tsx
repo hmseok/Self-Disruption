@@ -99,37 +99,51 @@ export default function OperationsIntakePage() {
   const [resultMsg, setResultMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
 
   // ── Fetch ────────────────────────────────────────────────────────
+  // cafe24 응답 (PR-OPS-REDESIGN P1.3 hotfix):
+  //   { success: true, data: AccidentRow[] }
+  //   AccidentRow: { esosidno, esosmddt, esossrno, esosacdt, esosactm,
+  //                  esosrgst, esosrslt, esosrstx, esostypp, esosgnus,
+  //                  cars_no, cars_model }
+  //   detail endpoint (/api/cafe24/accidents/detail) 에서 위치/요청자 등 30+ 필드 가능
   const fetchCafe24 = useCallback(async () => {
     try {
-      const params = new URLSearchParams({ days: '365', limit: '500' })
+      // limit 최대 200, from/to 는 YYYYMMDD
+      const today = new Date()
+      const oneYearAgo = new Date(today.getTime() - 365 * 24 * 3600 * 1000)
+      const fmtYMD = (d: Date) => `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`
+      const params = new URLSearchParams({
+        from: fmtYMD(oneYearAgo),
+        to: fmtYMD(today),
+        limit: '200',
+      })
       const headers = await getAuthHeader()
       const res = await fetch(`/api/cafe24/accidents?${params}`, { headers })
       if (!res.ok) { setCafe24Accidents([]); return }
-      const data = await res.json()
-      const records = Array.isArray(data) ? data : (data.records || data.data || [])
+      const json = await res.json()
+      const records = json?.data || []
+      const fmtDate = (s: string) => s && s.length === 8 ? `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}` : (s || '')
+      const fmtTime = (s: string) => s && s.length >= 4 ? `${s.slice(0, 2)}:${s.slice(2, 4)}` : ''
       const mapped: Cafe24Accident[] = records.map((r: any, idx: number) => {
-        const fmtDate = (s: string) => s && s.length === 8 ? `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}` : (s || '')
-        const accNo = String(r.accidentNo || `pseudo-${idx}`)
-        // ride_accident_id 매핑용 INT 추출 — accidentNo 의 숫자만
-        const accNoInt = parseInt(accNo.replace(/[^0-9]/g, '').slice(0, 9) || '0', 10) || (idx + 1)
+        const idno = String(r.esosidno || '')
+        const idnoInt = parseInt(idno.replace(/[^0-9]/g, '').slice(0, 9) || '0', 10) || (idx + 1)
         return {
-          id: accNoInt,
-          accidentNo: accNo,
-          accident_date: fmtDate(r.accidentDate || ''),
-          accident_time: r.accidentTime ? `${r.accidentTime.slice(0, 2)}:${r.accidentTime.slice(2, 4)}` : '',
-          accident_location: r.accidentLocation || '',
-          driver_name: r.counterpartName || '',
-          driver_phone: r.counterpartPhone || '',
-          customer_car_number: r.counterpartVehicle || '',
-          rental_car_number: r.rentalCarNo || '',
-          rental_car_model: r.rentalCarModel || '',
-          insurance_company: r.counterpartInsurance || '',
-          insurance_claim_no: r.accidentNo || '',
-          repair_shop_name: r.repairShopName || '',
-          rental_from_date: fmtDate(r.rentalFromDate || ''),
-          rental_to_date: fmtDate(r.rentalToDate || ''),
-          workflow_stage: r.status || '',
-          notes: r.accidentMemo || '',
+          id: idnoInt,
+          accidentNo: idno || `pseudo-${idx}`,
+          accident_date: fmtDate(r.esosacdt || r.esosmddt || ''),
+          accident_time: fmtTime(r.esosactm || ''),
+          accident_location: '',  // detail 호출 시 채움
+          driver_name: '',  // detail 호출 시 채움
+          driver_phone: '',
+          customer_car_number: r.cars_no || '',
+          rental_car_number: r.cars_no || '',
+          rental_car_model: r.cars_model || '',
+          insurance_company: '',  // cafe24 미보유 — dispatch_order 폼에서 매뉴얼
+          insurance_claim_no: idno,
+          repair_shop_name: '',
+          rental_from_date: '',
+          rental_to_date: '',
+          workflow_stage: r.esosrgst || r.esosrslt || '',
+          notes: r.esosrstx || '',
         }
       })
       setCafe24Accidents(mapped)
