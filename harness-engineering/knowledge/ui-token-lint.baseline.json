@@ -56,19 +56,19 @@
     },
     {
       "file": "app/(employees)/CallScheduler/page.tsx",
-      "line": 486,
+      "line": 419,
       "label": "glass-bg-hardcode",
       "snippet": "background: 'rgba(255,255,255,0.7)', color: COLORS.textPrimary,"
     },
     {
       "file": "app/(employees)/CallScheduler/page.tsx",
-      "line": 516,
+      "line": 449,
       "label": "glass-bg-hardcode",
       "snippet": "background: TONE_BG[tone] !== 'transparent' ? TONE_BG[tone] : 'rgba(255,255,255,0.7)',"
     },
     {
       "file": "app/(employees)/CallScheduler/page.tsx",
-      "line": 562,
+      "line": 495,
       "label": "glass-bg-hardcode",
       "snippet": "background: TONE_BG[tone] !== 'transparent' ? TONE_BG[tone] : 'rgba(255,255,255,0.7)',"
     },
@@ -3349,6 +3349,6 @@
       "snippet": "boxShadow: '6px 6px 18px rgba(140,170,210,0.14), -6px -6px 18px rgba(255,255,255,0.47)',"
     }
   ],
-  "generatedAt": "2026-05-10T05:34:11.428Z",
+  "generatedAt": "2026-05-11T00:41:26.470Z",
   "note": "UI 토큰 hardcode (inline rgba). 기존 위반 동결, 새 위반만 차단."
 }
