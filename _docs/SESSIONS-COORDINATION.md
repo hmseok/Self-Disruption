@@ -24,6 +24,8 @@
 | `app/(employees)/RideVehicleRegistry*/*` | Ride* 세션 | ✅ |
 | `app/(employees)/RideCustomerData*/*` | Ride* 세션 | ✅ |
 | `app/api/ride-*/*` | Ride* 세션 | ✅ |
+| `app/operations/*` | **operations 세션 (신설 2026-05-11)** | ✅ |
+| `app/api/operations/*` | **operations 세션 (신설 2026-05-11)** | ✅ |
 | `app/loans*/*` | 본 도메인 세션 (자율) | ✅ |
 | `app/insurance*/*` | 본 도메인 세션 (자율) | ✅ |
 
@@ -143,3 +145,41 @@ CLAUDE.md 정독 후:
 ---
 
 본 문서는 운영 중 발생 패턴에 따라 갱신.
+
+---
+
+## 6. operations 세션 시작 가이드 (2026-05-11 신설)
+
+신설 operations 세션이 첫 commit 전 다음 절차 의무:
+
+1. `git pull origin main && npm run cowork:init`
+2. `CLAUDE.md` 정독 (Rule 21 협업 / Rule 22 _docs / Rule 26 페르소나)
+3. **`_docs/OPERATIONS-PERSONAS.md` 정독** — 배차담당자 페르소나 + 시나리오 (사용자 명시 주 페르소나)
+4. **`_docs/OPERATIONS-DATA-MODEL.md` 정독** — cars / fmi_vehicles / fmi_rentals 관계
+5. `_docs/UI-DESIGN-STANDARD.md` 정독 — 디자인 표준
+6. 기준 페이지 (`/loans`, `/finance/settlement`) 실제 동작 확인
+7. 신규 PR 시작 시 Rule 27 GATE 체크리스트 의무
+
+### 6.1 책임 모듈
+- `app/operations/*` (페이지 4개 + OperationsMain / CalendarView / FleetBoard / DispatchModal / TransportRequestModal)
+- `app/api/operations/*` (신설 예정)
+
+### 6.2 연계 데이터 (READ ONLY, 변경 시 메인 세션 합의)
+- `fmi_rentals` (메인 세션 finance 매처가 사용)
+- `fmi_vehicles` (메인 세션 PR-UX14 동기화 도구 사용)
+- `cars` (레거시 — 운영 데이터 다수)
+
+### 6.3 전제 조건 (operations 세션 시작 전 메인 세션이 완료)
+- [ ] PR-UX14 cars→fmi_vehicles 동기화 실 INSERT 완료
+- [ ] fmi-rentals-fix 재실행 (vehicle_id 일괄 매핑)
+- [ ] 1-Click 자동 매칭 + 정산 검증
+- [x] _docs/OPERATIONS-PERSONAS.md 작성 (2026-05-11)
+- [x] _docs/OPERATIONS-DATA-MODEL.md 작성 (2026-05-11)
+- [x] _docs/SESSIONS-COORDINATION.md 갱신 (본 갱신)
+
+### 6.4 권장 1차 작업 (operations 세션)
+- Phase 2.1: `/operations` 메인 — 배차담당자 대시보드 (정산 관리 디자인 기준)
+- Phase 2.2: `/operations/dispatch` 신설 — Step 2/3 차량 선정 + 모달
+- Phase 2.3: `/operations/rentals` 리뉴얼 — 진행 모니터 + 검색/필터 강화
+
+자세한 시나리오는 `_docs/OPERATIONS-PERSONAS.md` § 7 참고.
