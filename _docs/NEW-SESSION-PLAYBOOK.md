@@ -48,14 +48,42 @@
 
 ---
 
-## 2. 새 세션 시작 — 사용자 첫 프롬프트 템플릿
+## 2. 새 세션 시작 — 사용자 메시지 템플릿 2종
 
-새 세션 만든 직후 **이 템플릿을 카피** 해서 첫 메시지로 보내세요. 세션이 곧바로 자기 위치/책임/절차를 파악합니다.
+새 세션 만들기 전후로 **두 군데에 메시지 카피** 합니다:
+- **[A]** 메인 세션 (sweet-amazing-galileo) — 사전 준비 요청
+- **[B]** 신규 세션 (방금 만든 새 채팅창) — 첫 메시지
 
-### 2.1 표준 템플릿 (카피해서 사용)
+### 2.1 [A] 메인 세션에 보낼 메시지 — 사전 준비 요청
+
+> **언제 사용?** 새 세션 만들기 **전에** 메인 세션에서 페르소나/데이터모델/모듈등록 받을 때.
 
 ```
-[새 세션 시작 — <세션명> ]
+[새 세션 신설 사전 준비 요청]
+
+세션명: <예: operations / payroll / inventory>
+책임 모듈:
+  - app/<module>/*
+  - app/api/<module>/*
+주 페르소나: <예: 배차담당자 / 정산담당자>
+첫 작업 (대략): <예: /operations 메인 페이지 리뉴얼>
+
+요청:
+1. _docs/<MODULE>-PERSONAS.md 초안 작성 (Rule 26 의무)
+   - 인터뷰 질문 답변할 테니 물어주세요 (운영 시간 / 부서 차이 / 권한 등)
+2. _docs/<MODULE>-DATA-MODEL.md 작성 (Rule 22 의무)
+   - 관련 테이블 / 컬럼 / FK 도식
+3. _docs/SESSIONS-COORDINATION.md 에 모듈 등록
+4. 전제 조건 점검 (마이그 / 데이터 동기화 등 메인 책임 영역)
+5. push 완료되면 신규 세션 시작합니다
+```
+
+### 2.2 [B] 신규 세션 첫 메시지 — 표준 템플릿
+
+> **언제 사용?** 메인 준비 끝나고 **새 세션 열어서 첫 채팅창에 입력**.
+
+```
+[새 세션 시작 — <세션명>]
 
 세션명: <예: operations / payroll / inventory>
 책임 모듈:
@@ -65,21 +93,39 @@
 
 5분 셋업 절차:
 1. git pull origin main && npm run cowork:init
-2. 정독 순서:
+2. 정독 순서 (반드시 이 순서):
    - CLAUDE.md (전체 규칙)
+   - _docs/NEW-SESSION-PLAYBOOK.md (세션 운영 표준)
    - _docs/SESSIONS-COORDINATION.md (모듈 매핑 + 합의 프로토콜)
    - _docs/<MODULE>-PERSONAS.md (페르소나/시나리오)
    - _docs/<MODULE>-DATA-MODEL.md (데이터 구조)
-   - _docs/UI-DESIGN-STANDARD.md (디자인 표준)
-   - _docs/NEW-SESSION-PLAYBOOK.md (본 문서)
+   - _docs/UI-DESIGN-STANDARD.md (디자인 표준 — 의무)
 3. 기준 페이지 동작 확인: /loans, /finance/settlement
-4. git status 로 자기 영역 외 modified 없는지 확인
-5. 본 세션이 맡을 첫 작업 명시 후 GO 키워드 대기
+4. git status 자기 영역 외 modified 잔재 없는지 확인
+5. 본 세션이 맡을 첫 작업 인지 후 설계서 v2 작성
 
-첫 작업: <예: /operations 메인 페이지 리뉴얼 — 배차담당자 대시보드>
+첫 작업: <예: /operations 메인 리뉴얼 — 배차담당자 대시보드>
+범위: <예: 1주 / 3개 PR / Phase 2.1>
+
+⚠️ 규칙 (반드시 준수):
+- Rule 1 풀 파이프라인 트리거 작업이면 설계서 v2 → GO 키워드 대기
+- Rule 21 자기 모듈만 자율 commit, 공통 파일 변경 시 사용자 GO 대기
+- Rule 22 _docs 갱신 의무 (CHANGELOG / DATA-MODEL / UI-SPEC)
+- Rule 27 GATE 체크리스트 commit 메시지 명시
+- git commit --no-verify 절대 금지
+
+설계서 받기 전 코드 작성 X.
 ```
 
-### 2.2 operations 세션 예시 (이미 준비됨)
+### 2.3 실제 사례 — operations 세션 (2026-05-11 신설 대기)
+
+**[A] 메인 세션 작업** — 이미 완료:
+- ✅ `_docs/OPERATIONS-PERSONAS.md` (배차담당자 페르소나 + 8-Step 시나리오)
+- ✅ `_docs/OPERATIONS-DATA-MODEL.md` (cars/fmi_vehicles/fmi_rentals 도식)
+- ✅ `_docs/SESSIONS-COORDINATION.md` § 6 operations 세션 가이드
+- ⏳ 전제 조건: PR-UX14 cars→fmi_vehicles 동기화 (사용자 콘솔 액션 대기)
+
+**[B] operations 세션 첫 메시지** — 카피 가능:
 
 ```
 [새 세션 시작 — operations]
@@ -92,17 +138,24 @@
 
 5분 셋업:
 1. git pull origin main && npm run cowork:init
-2. 정독:
+2. 정독 (이 순서):
    - CLAUDE.md
+   - _docs/NEW-SESSION-PLAYBOOK.md
    - _docs/SESSIONS-COORDINATION.md (§ 6 operations 세션 가이드)
    - _docs/OPERATIONS-PERSONAS.md
    - _docs/OPERATIONS-DATA-MODEL.md
    - _docs/UI-DESIGN-STANDARD.md
-3. 기준 페이지 확인: /loans, /finance/settlement
-4. 메인 세션이 cars→fmi_vehicles 동기화 완료했는지 확인 (전제 조건)
-5. 첫 PR: /operations 메인 리뉴얼 (정산 관리 디자인 기준)
+3. 기준 페이지: /loans, /finance/settlement
+4. 메인 세션 PR-UX14 (cars→fmi_vehicles) + fmi-rentals-fix 완료 확인
+5. 첫 PR — /operations 메인 페이지 리뉴얼 (배차담당자 대시보드)
 
-설계서 v2 만들고 사용자 GO 받기 전까지 코드 작성 X.
+첫 작업: /operations 메인 페이지 리뉴얼 (Phase 2.1 — 정산 관리 디자인 기준)
+범위: 1차 PR — 페이지 헤더 정리 + DcStatStrip 신설 + 가용 차량 카드
+
+⚠️ 규칙:
+- Rule 1/21/22/27 준수
+- 설계서 v2 → 사용자 GO 키워드 대기 후 코드 진입
+- 공통 파일 (app/components/*, lib/*, prisma/) 변경 시 사용자 사전 보고
 ```
 
 ---
