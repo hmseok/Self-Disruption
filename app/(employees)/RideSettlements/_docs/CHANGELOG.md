@@ -4,6 +4,41 @@
 
 ---
 
+## 2026-05-11 | PR-6.11.d | 정산서 → 카페24 enrichment → 차량 자동 등록
+
+### 사용자 요청
+> "정산서 기준으로 카페24데이터를 연동하여 최종 고객사등록차량에 적용이되어야함"
+
+### 의도
+정산서 = 운영 진실의 source. settlement_items 에 있는 차량 중 ride_contracts 미등록인
+차량을 자동 식별 → 카페24 pmccarsm 데이터로 enrichment → 위탁사(customer_id) 기준으로
+ride_contracts 일괄 INSERT.
+
+### 변경
+- **NEW** `app/api/ride-settlements/[id]/extract-vehicles/route.ts`
+  - **GET**: settlement_items (car_number) → ride_contracts WHERE IN 으로 중복 체크 →
+    미등록 후보 + 카페24 pmccarsm enrichment (carsidno/carsodnm/carsusnm)
+  - **POST**: 선택한 item_ids 일괄 INSERT IGNORE 로 ride_contracts 등록
+    (customer_id = settlement.customer_id, status = exec_status 기반 자동 판정)
+- **수정** `app/(employees)/RideSettlements/page.tsx` SettlementDetailDrawer
+  - 새 패널 "📋 정산서 → 차량 등록" — [📋 미등록 분석] 버튼 → 체크박스 리스트 →
+    [✓ N건 등록] 버튼
+  - 카페24 매칭 표시 (✓ 인디케이터)
+  - 등록 완료 후 자동 재분석 (남은 미등록 목록 갱신)
+
+### Soft Ice Glass 토큰 준수
+기존 `'rgba(255,255,255,0.5)'` 하드코드 7곳 → `GLASS.L2.background` 토큰 적용
+(ui-token-lint new violations 0)
+
+### 영향 받는 테이블
+- `ride_contracts` — INSERT (UNIQUE: exec_no) — settlement.customer_id 으로 위탁사 자동 매핑
+
+### Verification
+- tsc --noEmit: 본 PR 무관 (quotes/pricing pre-existing only)
+- lint:harness: 새 critical 위반 0건
+
+---
+
 ## 2026-05-08 | PR-6.11.a | 정산서 등록 + 검수 + 양식 4종 자동 감지 + multi-sheet split
 
 ### 사용자 요청

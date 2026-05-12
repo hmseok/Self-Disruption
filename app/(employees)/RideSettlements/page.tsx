@@ -620,7 +620,7 @@ function UploadModal({
                   </div>
 
                   {f.detected && (
-                    <div style={{ fontSize: 10, color: COLORS.textSecondary, padding: 6, background: 'rgba(255,255,255,0.5)', borderRadius: 4 }}>
+                    <div style={{ fontSize: 10, color: COLORS.textSecondary, padding: 6, background: GLASS.L2.background, borderRadius: 4 }}>
                       감지: <b>{f.detected.layout}</b> · {f.detected.period_label || '?'} · {f.detected.customer_name || '미지정'} · {f.detected.sheet_count} 시트 / 총 <b>{f.detected.total_items}</b>건
                     </div>
                   )}
@@ -687,6 +687,50 @@ function SettlementDetailDrawer({
   const [reviewing, setReviewing] = useState(false)
   const [disputeReason, setDisputeReason] = useState('')
 
+  // PR-6.11.d 차량 등록
+  const [extracted, setExtracted] = useState<{
+    total_items: number
+    unique_cars: number
+    already_registered: number
+    candidates_count: number
+    cafe24_enriched: number
+    candidates: Array<{
+      item_id: string
+      car_number: string
+      exec_no: string | null
+      car_model: string | null
+      cust_name: string | null
+      product_name: string | null
+      cafe24_carsidno: string | null
+      cafe24_owner: string | null
+    }>
+  } | null>(null)
+  const [extractLoading, setExtractLoading] = useState(false)
+  const [extractSelected, setExtractSelected] = useState<Set<string>>(new Set())
+  const [promoting, setPromoting] = useState(false)
+  const [promoteResult, setPromoteResult] = useState<{ requested: number; inserted: number; skipped: number; errors: number } | null>(null)
+
+  // PR-6.11.c 검수 강화
+  const [audit, setAudit] = useState<{
+    total_items: number
+    active: number
+    closed: number
+    sum_mismatch: number
+    unmatched_count: number
+    unmatched_large: number
+    total_amount: number
+    issues: Array<{
+      item_id: string
+      car_number: string | null
+      exec_no: string | null
+      cust_name: string | null
+      issue_type: 'sum-mismatch' | 'unmatched-large' | 'status-conflict'
+      detail: string
+      amount: number
+    }>
+  } | null>(null)
+  const [auditLoading, setAuditLoading] = useState(false)
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()
@@ -728,6 +772,71 @@ function SettlementDetailDrawer({
       cancelled = true
     }
   }, [settlement.id])
+
+  const runExtract = async () => {
+    setExtractLoading(true)
+    setPromoteResult(null)
+    try {
+      const token = getStoredToken()
+      const res = await fetch(`/api/ride-settlements/${settlement.id}/extract-vehicles`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        cache: 'no-store',
+      })
+      const json = await res.json()
+      if (json.success) {
+        setExtracted(json.data)
+        setExtractSelected(new Set(json.data.candidates.map((c: { item_id: string }) => c.item_id)))
+      }
+    } catch (e) {
+      console.error('[extract]', e)
+    } finally {
+      setExtractLoading(false)
+    }
+  }
+
+  const runPromote = async () => {
+    if (extractSelected.size === 0) return
+    setPromoting(true)
+    setPromoteResult(null)
+    try {
+      const token = getStoredToken()
+      const res = await fetch(`/api/ride-settlements/${settlement.id}/extract-vehicles`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ item_ids: Array.from(extractSelected) }),
+      })
+      const json = await res.json()
+      if (json.success) {
+        setPromoteResult(json.result)
+        setExtractSelected(new Set())
+        runExtract()  // 다시 분석
+      }
+    } catch (e) {
+      console.error('[promote]', e)
+    } finally {
+      setPromoting(false)
+    }
+  }
+
+  const runAudit = async () => {
+    setAuditLoading(true)
+    try {
+      const token = getStoredToken()
+      const res = await fetch(`/api/ride-settlements/${settlement.id}/audit`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        cache: 'no-store',
+      })
+      const json = await res.json()
+      if (json.success) setAudit(json.data)
+    } catch (e) {
+      console.error('[audit]', e)
+    } finally {
+      setAuditLoading(false)
+    }
+  }
 
   const updateStatus = async (newStatus: string, reason?: string) => {
     setReviewing(true)
@@ -804,7 +913,7 @@ function SettlementDetailDrawer({
             </div>
           </div>
           <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-            <span style={{ color: cur.color, fontSize: 12, fontWeight: 700, padding: '4px 10px', background: 'rgba(255,255,255,0.5)', borderRadius: 6 }}>
+            <span style={{ color: cur.color, fontSize: 12, fontWeight: 700, padding: '4px 10px', background: GLASS.L2.background, borderRadius: 6 }}>
               {cur.label}
             </span>
             <button style={{ ...BTN.sm, background: 'transparent', color: COLORS.textMuted }} onClick={onClose}>
@@ -851,13 +960,194 @@ function SettlementDetailDrawer({
           </div>
         )}
 
+        {/* PR-6.11.d — 정산서 → 카페24 enrichment → 차량 자동 등록 */}
+        {settlement.layout_type !== 'parent' && (
+          <div style={{ ...GLASS.L3, padding: 12, borderRadius: 8, marginBottom: 12, border: `1px solid ${COLORS.borderViolet}` }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+              <span style={{ fontSize: 12, fontWeight: 700 }}>📋 정산서 → 차량 등록</span>
+              <span style={{ fontSize: 10, color: COLORS.textMuted }}>
+                미등록 차량 → ride_contracts 자동 INSERT
+              </span>
+              <button
+                style={{ ...BTN.sm, background: '#7c3aed', color: '#fff', marginLeft: 'auto' }}
+                onClick={runExtract}
+                disabled={extractLoading}
+              >
+                {extractLoading ? '분석 중…' : '📋 미등록 분석'}
+              </button>
+            </div>
+            {extracted && (
+              <div style={{ fontSize: 11, color: COLORS.textSecondary }}>
+                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', padding: 6, background: GLASS.L2.background, borderRadius: 4 }}>
+                  <span>차량 unique <b>{extracted.unique_cars}</b></span>
+                  <span style={{ color: COLORS.success }}>이미 등록 <b>{extracted.already_registered}</b></span>
+                  <span style={{ color: COLORS.warning }}>미등록 <b>{extracted.candidates_count}</b></span>
+                  <span style={{ color: COLORS.primary }}>카페24 enrich <b>{extracted.cafe24_enriched}</b></span>
+                </div>
+                {extracted.candidates.length > 0 && (
+                  <>
+                    <div style={{ marginTop: 8, display: 'flex', gap: 6, alignItems: 'center' }}>
+                      <span style={{ fontWeight: 700 }}>선택 {extractSelected.size}/{extracted.candidates.length}</span>
+                      <button
+                        style={{ ...BTN.sm, background: COLORS.bgBlue, color: COLORS.primary }}
+                        onClick={() =>
+                          setExtractSelected(
+                            extractSelected.size === extracted.candidates.length
+                              ? new Set()
+                              : new Set(extracted.candidates.map(c => c.item_id))
+                          )
+                        }
+                      >
+                        {extractSelected.size === extracted.candidates.length ? '전체 해제' : '전체 선택'}
+                      </button>
+                      <button
+                        style={{ ...BTN.sm, background: COLORS.success, color: '#fff', marginLeft: 'auto' }}
+                        onClick={runPromote}
+                        disabled={promoting || extractSelected.size === 0}
+                      >
+                        {promoting ? '등록 중…' : `✓ ${extractSelected.size}건 등록`}
+                      </button>
+                    </div>
+                    <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 2, maxHeight: 220, overflow: 'auto' }}>
+                      {extracted.candidates.map(c => (
+                        <label
+                          key={c.item_id}
+                          style={{
+                            fontSize: 10,
+                            padding: '4px 6px',
+                            background: extractSelected.has(c.item_id) ? COLORS.bgBlue : GLASS.L2.background,
+                            borderRadius: 4,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 6,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={extractSelected.has(c.item_id)}
+                            onChange={() => {
+                              const next = new Set(extractSelected)
+                              if (next.has(c.item_id)) next.delete(c.item_id)
+                              else next.add(c.item_id)
+                              setExtractSelected(next)
+                            }}
+                          />
+                          <b style={{ minWidth: 80 }}>{c.car_number}</b>
+                          <span style={{ color: COLORS.textMuted, minWidth: 100 }}>{c.exec_no || '-'}</span>
+                          <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {c.cust_name || '-'} · {c.car_model || '-'}
+                          </span>
+                          {c.cafe24_carsidno && (
+                            <span style={{ fontSize: 9, color: COLORS.primary }}>cafe24✓</span>
+                          )}
+                          {c.product_name && (
+                            <span style={{ fontSize: 9, color: COLORS.textMuted }}>{c.product_name.substring(0, 12)}</span>
+                          )}
+                        </label>
+                      ))}
+                    </div>
+                  </>
+                )}
+                {promoteResult && (
+                  <div style={{ marginTop: 8, padding: 6, background: COLORS.bgGreen, borderRadius: 4, color: COLORS.success }}>
+                    ✅ 등록 완료 — 신규 <b>{promoteResult.inserted}</b> / 중복 skip {promoteResult.skipped}
+                    {promoteResult.errors > 0 && <span style={{ color: COLORS.danger }}> / 에러 {promoteResult.errors}</span>}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* PR-6.11.c — 검수 강화 패널 (합계 검증 + 활성/종료) */}
+        {settlement.layout_type !== 'parent' && (
+          <div style={{ ...GLASS.L3, padding: 12, borderRadius: 8, marginBottom: 12, border: `1px solid ${COLORS.borderAmber}` }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+              <span style={{ fontSize: 12, fontWeight: 700 }}>🔍 검수 진단</span>
+              <span style={{ fontSize: 10, color: COLORS.textMuted }}>
+                합계 mismatch + 활성/종료 + 미매칭 큰 금액
+              </span>
+              <button
+                style={{ ...BTN.sm, background: COLORS.warning, color: '#fff', marginLeft: 'auto' }}
+                onClick={runAudit}
+                disabled={auditLoading}
+              >
+                {auditLoading ? '진단 중…' : '🔍 진단 실행'}
+              </button>
+            </div>
+            {audit && (
+              <div style={{ fontSize: 11, color: COLORS.textSecondary }}>
+                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', padding: 6, background: GLASS.L2.background, borderRadius: 4 }}>
+                  <span>총 <b>{audit.total_items}</b>건</span>
+                  <span style={{ color: COLORS.success }}>활성 <b>{audit.active}</b></span>
+                  <span style={{ color: COLORS.danger }}>종료 <b>{audit.closed}</b></span>
+                  <span style={{ color: COLORS.warning }}>합계 mismatch <b>{audit.sum_mismatch}</b></span>
+                  <span style={{ color: COLORS.textMuted }}>
+                    미매칭 <b>{audit.unmatched_count}</b> (큰금액 <b>{audit.unmatched_large}</b>)
+                  </span>
+                </div>
+                {audit.issues.length > 0 && (
+                  <div style={{ marginTop: 8 }}>
+                    <div style={{ fontWeight: 700, marginBottom: 4 }}>⚠ 의심 row {audit.issues.length}개</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 200, overflow: 'auto' }}>
+                      {audit.issues.map(iss => (
+                        <div
+                          key={iss.item_id + iss.issue_type}
+                          style={{
+                            fontSize: 10,
+                            padding: '4px 6px',
+                            background:
+                              iss.issue_type === 'sum-mismatch'
+                                ? COLORS.bgRed
+                                : iss.issue_type === 'status-conflict'
+                                ? COLORS.bgAmber
+                                : GLASS.L2.background,
+                            borderRadius: 4,
+                          }}
+                        >
+                          <span
+                            style={{
+                              fontSize: 9,
+                              fontWeight: 700,
+                              padding: '1px 4px',
+                              borderRadius: 3,
+                              marginRight: 4,
+                              background:
+                                iss.issue_type === 'sum-mismatch'
+                                  ? COLORS.danger
+                                  : iss.issue_type === 'status-conflict'
+                                  ? COLORS.warning
+                                  : COLORS.neutral,
+                              color: '#fff',
+                            }}
+                          >
+                            {iss.issue_type === 'sum-mismatch'
+                              ? '합계'
+                              : iss.issue_type === 'status-conflict'
+                              ? '상태'
+                              : '미매칭'}
+                          </span>
+                          <b style={{ marginRight: 4 }}>{iss.car_number || iss.exec_no || '-'}</b>
+                          {iss.cust_name && <span style={{ color: COLORS.textMuted, marginRight: 4 }}>{iss.cust_name}</span>}
+                          <span>{iss.detail}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* 자녀 settlements (parent 인 경우) */}
         {children.length > 0 && (
           <div style={{ ...GLASS.L3, padding: 12, borderRadius: 8, marginBottom: 12, border: `1px solid ${COLORS.borderViolet}` }}>
             <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6 }}>🔀 자녀 정산서 ({children.length})</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 200, overflow: 'auto' }}>
               {children.map(c => (
-                <div key={c.id} style={{ fontSize: 11, padding: '4px 8px', background: 'rgba(255,255,255,0.5)', borderRadius: 4, display: 'flex', gap: 8 }}>
+                <div key={c.id} style={{ fontSize: 11, padding: '4px 8px', background: GLASS.L2.background, borderRadius: 4, display: 'flex', gap: 8 }}>
                   <span style={{ flex: 1 }}>
                     📄 <b>{c.sheet_name}</b> · {c.customer_name_snap || '-'} · {c.category}
                   </span>
