@@ -66,6 +66,81 @@ export default function RequestsPage() {
     onConfirm: (note: string | null) => void
   } | null>(null)
   const [rejectNote, setRejectNote] = useState('')
+  // N-15 — 매니저 직접 등록 (회피일)
+  const [workers, setWorkers] = useState<Array<{ id: string; name: string; color_tone: ColorTone }>>([])
+  const [groups, setGroups] = useState<Array<{ id: string; name: string; member_ids: string[] }>>([])
+  const [regWorkerId, setRegWorkerId] = useState<string>('')
+  const [regGroupId, setRegGroupId] = useState<string>('')
+  const [regStart, setRegStart] = useState<string>('')
+  const [regEnd, setRegEnd] = useState<string>('')
+  const [regReason, setRegReason] = useState<string>('')
+  const [regBusy, setRegBusy] = useState(false)
+
+  // N-15 — 워커/그룹 fetch (회피일 직접 등록용)
+  useEffect(() => {
+    let abort = false
+    ;(async () => {
+      try {
+        const auth = await getAuthHeader()
+        const [wR, gR] = await Promise.all([
+          fetch('/api/call-scheduler/workers', { headers: auth }),
+          fetch('/api/call-scheduler/shift-groups', { headers: auth }),
+        ])
+        if (abort) return
+        const wJ = wR.ok ? await wR.json() : { data: [] }
+        const gJ = gR.ok ? await gR.json() : { data: [] }
+        setWorkers((wJ.data || []).map((w: any) => ({
+          id: w.id, name: w.name, color_tone: w.color_tone || 'none',
+        })))
+        setGroups((gJ.data || []).filter((g: any) => g.is_active !== false).map((g: any) => ({
+          id: g.id, name: g.name,
+          member_ids: Array.isArray(g.members) ? g.members.map((m: any) => m.id) : [],
+        })))
+      } catch { /* graceful */ }
+    })()
+    return () => { abort = true }
+  }, [])
+
+  // N-15 — 워커 선택 시 그 워커가 속한 그룹만 자동 chip
+  const regWorkerGroups = workers.length > 0 && regWorkerId
+    ? groups.filter(g => g.member_ids.includes(regWorkerId))
+    : []
+
+  // N-15 — 매니저 직접 등록 (status=approved 즉시)
+  const registerSkip = async () => {
+    if (!regWorkerId || !regGroupId || !regStart || !regEnd) {
+      setMsg({ ok: false, text: '워커 / 그룹 / 시작일 / 종료일 모두 필수' })
+      return
+    }
+    if (regStart > regEnd) {
+      setMsg({ ok: false, text: '시작일이 종료일보다 이후입니다' })
+      return
+    }
+    setRegBusy(true); setMsg(null)
+    try {
+      const auth = await getAuthHeader()
+      const res = await fetch(`/api/call-scheduler/shift-groups/${regGroupId}/skip-dates`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...auth },
+        body: JSON.stringify({
+          worker_id: regWorkerId,
+          start_date: regStart,
+          end_date: regEnd,
+          reason: regReason.trim() || null,
+          status: 'approved',
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json?.error || '등록 실패')
+      const wName = workers.find(w => w.id === regWorkerId)?.name || ''
+      setMsg({ ok: true, text: `${wName} 회피일 등록 — ${regStart}${regStart !== regEnd ? ` ~ ${regEnd}` : ''}` })
+      // 폼 리셋 (워커/그룹은 유지 — 연속 입력 편의)
+      setRegStart(''); setRegEnd(''); setRegReason('')
+      load()
+    } catch (e: any) {
+      setMsg({ ok: false, text: e?.message || '오류' })
+    } finally { setRegBusy(false) }
+  }
 
   const load = async () => {
     setLoading(true); setError(null)
@@ -165,7 +240,7 @@ export default function RequestsPage() {
             <button key={s} type="button" onClick={() => setStatusFilter(s)}
                     style={{
                       padding: '6px 12px', borderRadius: 99, fontSize: 12, fontWeight: 700,
-                      background: statusFilter === s ? COLORS.primary : 'rgba(255,255,255,0.6)',
+                      background: statusFilter === s ? COLORS.primary : COLORS.bgGray,
                       color: statusFilter === s ? '#fff' : COLORS.textSecondary,
                       border: `1px solid ${statusFilter === s ? COLORS.primary : COLORS.borderFaint}`,
                       cursor: 'pointer',
@@ -197,7 +272,7 @@ export default function RequestsPage() {
             {t.count > 0 && (
               <span style={{
                 marginLeft: 6, fontSize: 10, padding: '1px 6px', borderRadius: 99, fontWeight: 800,
-                background: tab === t.v ? 'rgba(255,255,255,0.25)' : COLORS.bgAmber,
+                background: tab === t.v ? COLORS.bgGray : COLORS.bgAmber,
                 color: tab === t.v ? '#fff' : COLORS.warning,
               }}>{t.count}</span>
             )}
@@ -234,14 +309,139 @@ export default function RequestsPage() {
         </div>
       ) : (
         <>
-          {/* 🛌 회피일 */}
+          {/* 🛌 회피일 — 직원 신청 검토 + 매니저 직접 등록 (N-15 통합) */}
           {tab === 'skip' && (
-            skips.length === 0
-              ? <EmptyHint text="회피일 신청이 없습니다." />
-              : <SkipList rows={skips} busy={busy}
-                  onApprove={(s) => updateSkip(s, 'approved')}
-                  onReject={(s) => openRejectModal('skip', s.worker_name || '워커',
-                    (note) => updateSkip(s, 'rejected', note))} />
+            <>
+              {/* 매니저 직접 등록 패널 */}
+              <div style={{ ...GLASS.L4, borderRadius: 12, padding: 14, marginBottom: 14 }}>
+                <div style={{ fontSize: 13, fontWeight: 800, color: '#0f2440', marginBottom: 10 }}>
+                  📝 매니저 직접 등록
+                  <span style={{ fontSize: 11, fontWeight: 500, color: COLORS.textMuted, marginLeft: 6 }}>
+                    워커 선택 → 그룹 → 일자 → [+ 등록] (즉시 승인)
+                  </span>
+                </div>
+                {/* 워커 chip 선택 */}
+                <div style={{ marginBottom: 8 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSecondary, marginBottom: 4 }}>
+                    워커
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                    {workers.map(w => {
+                      const active = regWorkerId === w.id
+                      const tone = w.color_tone as keyof typeof TONE_BG
+                      return (
+                        <button key={w.id} type="button"
+                                onClick={() => {
+                                  setRegWorkerId(active ? '' : w.id)
+                                  setRegGroupId('')  // 워커 바뀌면 그룹 reset
+                                }}
+                                style={{
+                                  padding: '5px 11px', borderRadius: 6, fontSize: 12, fontWeight: 700,
+                                  background: active
+                                    ? '#0f2440'
+                                    : (TONE_BG[tone] !== 'transparent' ? TONE_BG[tone] : COLORS.bgGray),
+                                  color: active ? '#fff' : (TONE_TEXT[tone] || COLORS.textPrimary),
+                                  border: `1px solid ${active ? '#0f2440' : COLORS.borderFaint}`,
+                                  cursor: 'pointer',
+                                }}>
+                          {w.name}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+                {/* 그룹 chip (워커 선택 시만) */}
+                {regWorkerId && (
+                  <div style={{ marginBottom: 8 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSecondary, marginBottom: 4 }}>
+                      그룹 {regWorkerGroups.length === 0 && (
+                        <span style={{ fontWeight: 500, color: COLORS.danger }}>
+                          (이 워커가 속한 활성 그룹 없음 — 그룹 셋팅 먼저)
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                      {regWorkerGroups.map(g => {
+                        const active = regGroupId === g.id
+                        return (
+                          <button key={g.id} type="button"
+                                  onClick={() => setRegGroupId(active ? '' : g.id)}
+                                  style={{
+                                    padding: '5px 11px', borderRadius: 6, fontSize: 12, fontWeight: 700,
+                                    background: active ? '#0f2440' : COLORS.bgGray,
+                                    color: active ? '#fff' : '#64748b',
+                                    border: `1px solid ${active ? '#0f2440' : COLORS.borderFaint}`,
+                                    cursor: 'pointer',
+                                  }}>
+                            🚧 {g.name}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+                {/* 일자 + 사유 + 등록 */}
+                <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end', flexWrap: 'wrap', marginTop: 8 }}>
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSecondary, marginBottom: 4 }}>
+                      시작일
+                    </div>
+                    <input type="date" value={regStart}
+                           onChange={(e) => {
+                             setRegStart(e.target.value)
+                             if (!regEnd || regEnd < e.target.value) setRegEnd(e.target.value)
+                           }}
+                           style={{
+                             padding: '6px 10px', fontSize: 12, fontWeight: 600,
+                             border: `1px solid ${COLORS.borderFaint}`, borderRadius: 6,
+                             background: 'rgba(255,255,255,1)',
+                           }} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSecondary, marginBottom: 4 }}>
+                      종료일
+                    </div>
+                    <input type="date" value={regEnd}
+                           onChange={(e) => setRegEnd(e.target.value)}
+                           style={{
+                             padding: '6px 10px', fontSize: 12, fontWeight: 600,
+                             border: `1px solid ${COLORS.borderFaint}`, borderRadius: 6,
+                             background: 'rgba(255,255,255,1)',
+                           }} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 200 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSecondary, marginBottom: 4 }}>
+                      사유 (선택)
+                    </div>
+                    <input type="text" value={regReason}
+                           onChange={(e) => setRegReason(e.target.value)}
+                           placeholder="예: 개인 사정 / 가족 행사 / ..."
+                           style={{
+                             width: '100%', padding: '6px 10px', fontSize: 12, fontWeight: 500,
+                             border: `1px solid ${COLORS.borderFaint}`, borderRadius: 6,
+                             background: 'rgba(255,255,255,1)',
+                           }} />
+                  </div>
+                  <button type="button" onClick={registerSkip} disabled={regBusy}
+                          style={{
+                            padding: '8px 18px', borderRadius: 8, fontSize: 13, fontWeight: 800,
+                            background: '#0f2440', color: '#fff', border: 'none',
+                            cursor: regBusy ? 'not-allowed' : 'pointer',
+                            opacity: regBusy ? 0.6 : 1,
+                          }}>
+                    {regBusy ? '...' : '+ 등록'}
+                  </button>
+                </div>
+              </div>
+
+              {/* 직원 신청 검토 + 등록된 회피일 list */}
+              {skips.length === 0
+                ? <EmptyHint text="회피일 신청 / 등록 없음." />
+                : <SkipList rows={skips} busy={busy}
+                    onApprove={(s) => updateSkip(s, 'approved')}
+                    onReject={(s) => openRejectModal('skip', s.worker_name || '워커',
+                      (note) => updateSkip(s, 'rejected', note))} />}
+            </>
           )}
 
           {/* 🙋 휴가 */}
