@@ -275,11 +275,62 @@ GET 단건 (`?id=...`) 은 `WHERE id = ? AND deleted_at IS NULL` 로 보호 → 
 
 ---
 
-## 10. 변경 이력
+## 10. V2 컬럼 — `meetings.body` (PR-MTG-V2-A, 2026-05-13)
+
+**마이그**: `migrations/2026-05-13_meetings_v2.sql` (멱등 @col_exists 패턴)
+
+| 컬럼 | 타입 | NULL | DEFAULT | 설명 |
+|------|------|------|---------|------|
+| body | JSON | YES | NULL | TipTap JSON 본문 (ProseMirror 형식) — V2 자유 본문 |
+| body_version | INT | NO | 1 | 낙관적 락 — PATCH 시 `WHERE body_version = ?` 일치 시만 update |
+| body_updated_at | DATETIME | YES | NULL | 본문 마지막 변경 시각 — sidebar 최근 작업 정렬 (PR-V2-B 활용) |
+| body_updated_by | CHAR(36) | YES | NULL | 본문 마지막 변경자 (profiles.id 논리 FK) |
+
+**인덱스**: `idx_m_body_updated (body_updated_at)`
+
+### 10.1 V1 ↔ V2 데이터 공존 정책
+
+| 상태 | 의미 | UI |
+|------|------|----|
+| `body = NULL` | V2 본문 미작성 (V1 회의 또는 신규 비어있음) | V2 라우트에서 빈 에디터 + 「📎 V1 섹션」 탭 표시 (minutes 존재 시) |
+| `body = { type: 'doc', content: [...] }` | V2 본문 작성됨 | TipTap 에디터 + V1 섹션은 read-only 참조 |
+
+→ V1 데이터(`meeting_minutes`)는 영구 보존. V2 본문에 옮긴 후 사용자가 직접 정리 (또는 PR-V2-F 자동 변환 도구).
+
+### 10.2 낙관적 락 동작
+
+```sql
+-- 클라이언트가 보낸 body_version 과 DB 상태 비교
+UPDATE meetings
+   SET body = ?,
+       body_version = body_version + 1,
+       body_updated_at = NOW(),
+       body_updated_by = ?,
+       updated_at = NOW()
+ WHERE id = ?
+   AND body_version = ?
+   AND deleted_at IS NULL;
+
+-- affected = 0 → 다른 세션 변경 (409 conflict + server 본문 반환)
+-- affected = 1 → 성공 + new version 반환
+```
+
+### 10.3 Rule 23 graceful fallback (마이그 미적용 시)
+
+`GET /api/meetings/[id]/body` 및 `PATCH` 가 ER_BAD_FIELD_ERROR (MySQL 1054 — Unknown column) 캐치:
+- GET: `{ data: { body: null, body_version: 1, ... }, _migration_pending: true }` 반환 (status 200)
+- PATCH: `{ error: 'migration_pending', _migration_pending: true }` 반환 (status 503)
+
+UI 는 `_migration_pending: true` 받으면 「⚠ DB 마이그 미적용」 배너 표시 + 본문 read-only.
+
+---
+
+## 11. 변경 이력
 
 | 날짜 | 변경 | 작성자 |
 |------|------|--------|
 | 2026-04-30 | 4 테이블 마이그 적용 | (메인 세션) |
 | 2026-05-13 | 본 문서 1차 초안 — ERD + 컬럼 + 권한 + 잠재 회귀 7건 | meetings 세션 |
+| 2026-05-13 | PR-MTG-V2-A — `meetings.body / body_version / body_updated_at / body_updated_by` 4 컬럼 + 인덱스 추가 (§ 10) | meetings 세션 |
 
 본 문서는 마이그 / 컬럼 변경 / 운영 정책 결정 시 갱신.

@@ -6,6 +6,83 @@
 
 ## 2026-05-13
 
+### PR-MTG-V2-A — 노션형 풀페이지 에디터 기반 (Split view + TipTap)
+
+**사용자 명령**: 「회의록처럼 화면이 열리고 본문을 넓게 작성하는 페이지 — 노션의 업그레이드 버전을 만들고 싶다」.
+
+**범위**:
+- 새 라우트 신설 — `app/meetings/new/page.tsx` + `app/meetings/[id]/page.tsx`
+- 공용 컴포넌트 7개 — `app/meetings/_components/{MeetingsLayoutV2, MeetingSidebar, MeetingHeaderBar, TiptapEditor, AutoSaveIndicator, AttendeeManager, ActionItemList}.tsx`
+- API body endpoint — `app/api/meetings/[id]/body/route.ts` (GET / PATCH 낙관적 락 + Rule 23 graceful fallback)
+- 마이그 — `migrations/2026-05-13_meetings_v2.sql` (공통 — 사용자 직접 실행)
+- 공통 — `package.json` + `package-lock.json` (TipTap deps 7종) / `app/components/PageTitle.tsx` (`/meetings/new` 등록)
+- 목록 페이지 — 모달 제거 + 라우트 이동 (「+ 회의 등록」 → `/meetings/new`, 행 클릭/「열기」 → `/meetings/[id]`)
+- 설계서 — `_docs/MEETINGS-EDITOR-DESIGN.md` 신설
+
+**핵심 변경**:
+
+1. **R2. Split view 레이아웃** — 좌측 sidebar(접기 가능, width 320 / collapsed 48) + 우측 본문 풀스크린 (max-width 1080)
+2. **TipTap 에디터** — StarterKit + Placeholder + TaskList + TaskItem + Link. SSR 안전 (`immediatelyRender: false`). 단축키 안내 footer. 슬래시/멘션/임베드는 후속 PR.
+3. **자동 저장** — body debounce 1.5s / meta blur 즉시 / attendees·actions debounce 1s. 낙관적 락 (`body_version` WHERE 조건).
+4. **AutoSaveIndicator** — idle/pending/saving/saved/error/conflict/migration 7 상태. 「✓ 저장됨 · N초 전」 자동 갱신.
+5. **권한 conditional** — `canEdit = admin/master/organizer/created_by`. 비편집자는 read-only 모드 + 🔒 안내 패널.
+6. **Tabs** — 본문 / 참석자 N / 액션 M / V1 섹션 (legacy, body=NULL 회의 메뉴 표시).
+7. **「+ 회의 등록」 Notion 방식** — `/meetings/new` 진입 즉시 POST `{title: '제목 없는 회의', status: 'draft'}` → `router.replace(/meetings/[id])`. 빈 form 회피.
+8. **삭제** — 헤더바 「삭제」 버튼 (편집 권한자만) → soft delete + `/meetings` 이동.
+9. **목록 페이지 통합** — 모달 제거. NeuDataTable의 「열기」 버튼이 V2 라우트로 이동.
+
+**데이터 모델 변경** (C. Hybrid — 기존 4 테이블 그대로 유지):
+- `meetings.body JSON NULL` — TipTap JSON 본문 (ProseMirror)
+- `meetings.body_version INT DEFAULT 1` — 낙관적 락
+- `meetings.body_updated_at DATETIME NULL` — 본문 마지막 변경 시각
+- `meetings.body_updated_by CHAR(36) NULL` — 변경자 (profiles.id 논리 FK)
+- `INDEX idx_m_body_updated (body_updated_at)` — sidebar 최근 작업 정렬 (PR-V2-B 활용)
+- 기존 `meeting_minutes` / `meeting_attendees` / `meeting_action_items` 모두 유지 — V1 데이터 read-only 보존
+
+**Rule 8 End-to-End 시뮬레이션**:
+- 사용자 「+ 회의 등록」 → POST blank → `/meetings/[id]` 이동 → 본문 타이핑 → debounce 1.5s → PATCH `/api/meetings/[id]/body` `{body, body_version}` → UPDATE meetings SET body=?, body_version+1 WHERE id=? AND body_version=? → AutoSaveIndicator 「✓ 저장됨」
+- 마이그 미적용 시: GET `_migration_pending: true` → 배너 표시 + 본문 read-only / PATCH 503 → AutoSaveIndicator 'migration'
+- 버전 충돌 시: 409 conflict → server 본문 reset + 'conflict' 상태
+
+**Rule 11 SQL 컬럼 사전 검증**:
+- `meetings.body / body_version / body_updated_at / body_updated_by` — 본 PR 마이그에서 신설 ✓
+- JSON 컬럼 타입 — Cloud SQL MySQL 8.x 지원 ✓ (CLAUDE.md Rule 13 화이트리스트 외 — 단순 ALTER ADD COLUMN JSON 으로 안전)
+
+**Rule 14 동형 패턴**: type 4종 (regular/specific/one_on_one/department) sidebar / 헤더 / 자동 채우기 모두 동형.
+
+**Rule 18 sortBy**: 목록 페이지 NeuDataTable 그대로 유지. Sidebar 카드는 정렬 미지원 (목록 페이지 정렬과 분리 — PR-V2-B 에서 「최근 작업」 정렬 옵션 추가).
+
+**Rule 19 줄바꿈 최소화**: 모든 sidebar 카드 / 헤더 메타 / 액션 row `whiteSpace: 'nowrap'`.
+
+**Rule 20 결과 메시지**: 삭제는 confirm + 토스트 / 저장 실패는 AutoSaveIndicator 'error' 톤 / 마이그 미적용은 배너.
+
+**Rule 21 공통 파일 분리 commit**:
+1. `app/components/PageTitle.tsx` — `/meetings/new` 등록 (단독 commit)
+2. `migrations/2026-05-13_meetings_v2.sql` — 단독 commit + 사용자 직접 실행
+3. `package.json` + `package-lock.json` — TipTap deps install (단독 commit)
+4. 자기 모듈 (`app/meetings/*` + `app/api/meetings/*`) — 묶음 commit (cross-module 회피 위해 api 와 분리 가능)
+
+**Rule 22 _docs 갱신**: 본 CHANGELOG + DATA-MODEL.md V2 컬럼 섹션 추가 + EDITOR-DESIGN.md (신설).
+
+**Rule 23 graceful fallback**: body endpoint 의 GET / PATCH 가 ER_BAD_FIELD_ERROR (1054) 캐치 시 `_migration_pending: true` 반환. UI 배너 + read-only.
+
+**Rule 27 GATE 체크리스트**:
+- G3 설계서 (MEETINGS-EDITOR-DESIGN.md) + 사용자 GO ✓
+- G4 마이그 안전 — ALTER ADD COLUMN (NULL 허용 + 인덱스) — 멱등 @col_exists 패턴
+- G5 tsc PASS (본 세션 영역)
+- G6 lint:harness 새 위반 0건
+- G7 Designer — 사용자 스크린샷 검수 (split view + TipTap 동작)
+- Rule 8 / 11 / 14 / 18 / 19 / 20 / 21 / 22 / 23 모두 준수
+
+**1차 V2-A 제외 (후속 PR)**:
+- V2-B 슬래시 명령 + 블록 확장 (체크리스트/표/이미지 — 부분만 A에 포함, 슬래시 메뉴는 B)
+- V2-C @멘션 (직원/회의/계약)
+- V2-D ERP 데이터 인라인 임베드
+- V2-E 협업 (yjs + WebSocket — 별도 인프라 합의)
+- V2-F V1 → V2 본문 마이그 도구 (meeting_minutes → body 자동 변환)
+
+---
+
 ### PR-MTG-1 — 디자인 표준 1차 리뉴얼
 
 **범위**: `app/meetings/page.tsx` + `app/api/meetings/route.ts` (m.created_by 한 컬럼 추가) + `app/components/PageTitle.tsx` (공통, 분리 commit) + `_docs/MEETINGS-PERSONAS.md` (신설) + `_docs/MEETINGS-DATA-MODEL.md` (신설).
