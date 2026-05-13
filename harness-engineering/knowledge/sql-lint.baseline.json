@@ -229,6 +229,12 @@
       "column": "card_company"
     },
     {
+      "file": "app/api/finance/transactions/processing-status/route.ts",
+      "ref": "source (unprefixed)",
+      "table": "transactions",
+      "column": "source"
+    },
+    {
       "file": "app/api/lib/assignment-engine.ts",
       "ref": "p.employee_name",
       "table": "profiles",
@@ -325,6 +331,6 @@
       "column": "purchase_price"
     }
   ],
-  "generatedAt": "2026-05-05T09:22:09.405Z",
+  "generatedAt": "2026-05-12T02:26:02.124Z",
   "note": "기존 SQL 컬럼 위반 — known issue 로 처리. 새 위반만 lint fail."
 }

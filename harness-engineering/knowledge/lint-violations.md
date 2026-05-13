@@ -1413,3 +1413,797 @@
 - sql-fn-lint: total=0
 - api-trace: broken=29, newBroken=0
 - ui-coverage: warnings=33
+
+## 2026-05-09 03:00:15
+- sql-lint: total=55, new=1, known=54
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=33
+  - **새 SQL 컬럼 위반**:
+    - `app/api/finance/transactions/processing-status/route.ts:39` source (unprefixed) (table `transactions` 에 `source` 없음)
+
+## 2026-05-09 03:08:34
+- sql-lint: total=55, new=1, known=54
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=33
+  - **새 SQL 컬럼 위반**:
+    - `app/api/finance/transactions/processing-status/route.ts:39` source (unprefixed) (table `transactions` 에 `source` 없음)
+
+## 2026-05-09 03:09:00
+- sql-lint: total=55, new=1, known=54
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=33
+  - **새 SQL 컬럼 위반**:
+    - `app/api/finance/transactions/processing-status/route.ts:39` source (unprefixed) (table `transactions` 에 `source` 없음)
+
+## 2026-05-09 03:09:42
+- sql-lint: total=55, new=1, known=54
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=33
+  - **새 SQL 컬럼 위반**:
+    - `app/api/finance/transactions/processing-status/route.ts:39` source (unprefixed) (table `transactions` 에 `source` 없음)
+
+## 2026-05-09 03:10:17
+- sql-lint: total=55, new=1, known=54
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=33
+  - **새 SQL 컬럼 위반**:
+    - `app/api/finance/transactions/processing-status/route.ts:39` source (unprefixed) (table `transactions` 에 `source` 없음)
+
+## 2026-05-09 03:12:19
+- sql-lint: total=55, new=1, known=54
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=33
+  - **새 SQL 컬럼 위반**:
+    - `app/api/finance/transactions/processing-status/route.ts:39` source (unprefixed) (table `transactions` 에 `source` 없음)
+
+## 2026-05-09 07:41:32
+- sql-lint: total=55, new=1, known=54
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=33
+  - **새 SQL 컬럼 위반**:
+    - `app/api/finance/transactions/processing-status/route.ts:39` source (unprefixed) (table `transactions` 에 `source` 없음)
+
+## 2026-05-09 07:53:22
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=33
+
+## 2026-05-09 07:58:51
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=33
+
+## 2026-05-09 07:59:41
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=33
+
+## 2026-05-09 08:05:03
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=33
+
+## 2026-05-09 08:05:10
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=33
+
+## 2026-05-09 08:09:34
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=35
+
+## 2026-05-09 08:10:56
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=35
+
+## 2026-05-09 08:12:57
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=35
+
+## 2026-05-09 08:13:43
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=35
+
+## 2026-05-09 08:14:28
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=35
+
+## 2026-05-09 08:30:42
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=35
+
+## 2026-05-09 08:35:16
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=35
+
+## 2026-05-09 08:39:41
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=35
+
+## 2026-05-09 08:41:55
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=35
+
+## 2026-05-09 08:45:29
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=35
+
+## 2026-05-09 08:46:52
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=35
+
+## 2026-05-09 08:50:40
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=35
+
+## 2026-05-09 08:51:03
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=36
+
+## 2026-05-09 08:51:34
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=36
+
+## 2026-05-09 08:51:34
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=36
+
+## 2026-05-09 08:51:57
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=36
+
+## 2026-05-09 09:03:56
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=35
+
+## 2026-05-09 09:05:32
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=35
+
+## 2026-05-09 09:05:50
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=35
+
+## 2026-05-09 09:05:56
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=35
+
+## 2026-05-09 09:06:21
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=35
+
+## 2026-05-09 09:06:25
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=35
+
+## 2026-05-09 09:06:44
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=35
+
+## 2026-05-09 09:09:33
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=35
+
+## 2026-05-09 09:15:07
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=35
+
+## 2026-05-09 09:23:06
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=35
+
+## 2026-05-09 09:24:43
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=35
+
+## 2026-05-09 09:31:39
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=35
+
+## 2026-05-09 09:33:36
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=35
+
+## 2026-05-09 09:33:59
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=35
+
+## 2026-05-09 09:34:47
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=35
+
+## 2026-05-09 09:35:20
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=35
+
+## 2026-05-09 09:36:01
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=35
+
+## 2026-05-09 09:37:45
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=36
+
+## 2026-05-09 09:44:05
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=36
+
+## 2026-05-09 09:44:13
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=36
+
+## 2026-05-09 09:46:38
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=36
+
+## 2026-05-09 09:57:56
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=36
+
+## 2026-05-09 10:02:38
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=36
+
+## 2026-05-09 10:04:04
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=36
+
+## 2026-05-09 10:04:11
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=36
+
+## 2026-05-09 10:04:33
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=36
+
+## 2026-05-09 23:45:45
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=36
+
+## 2026-05-09 23:57:43
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=36
+
+## 2026-05-10 00:16:34
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=36
+
+## 2026-05-10 00:17:19
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=36
+
+## 2026-05-10 00:29:15
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=36
+
+## 2026-05-10 00:43:22
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=36
+
+## 2026-05-10 00:44:54
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=36
+
+## 2026-05-10 00:46:07
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=36
+
+## 2026-05-10 00:46:48
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=36
+
+## 2026-05-10 04:20:42
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=36
+
+## 2026-05-10 04:35:24
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=36
+
+## 2026-05-10 04:45:59
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=36
+
+## 2026-05-10 04:47:46
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=36
+
+## 2026-05-10 04:48:40
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=36
+
+## 2026-05-10 04:49:17
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=36
+
+## 2026-05-10 04:57:01
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=36
+
+## 2026-05-10 04:57:16
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=36
+
+## 2026-05-10 04:58:26
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=36
+
+## 2026-05-10 05:25:29
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=36
+
+## 2026-05-10 05:25:52
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=36
+
+## 2026-05-10 05:26:14
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=36
+
+## 2026-05-10 05:26:38
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=36
+
+## 2026-05-10 05:32:42
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=36
+
+## 2026-05-10 05:34:26
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=36
+
+## 2026-05-10 05:39:19
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=36
+
+## 2026-05-10 05:52:00
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=36
+
+## 2026-05-10 05:52:26
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=36
+
+## 2026-05-10 05:52:49
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=36
+
+## 2026-05-11 00:42:06
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=36
+
+## 2026-05-11 00:43:03
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=36
+
+## 2026-05-11 00:50:45
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=36
+
+## 2026-05-11 01:12:52
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=36
+
+## 2026-05-11 03:53:51
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=36
+
+## 2026-05-11 04:28:01
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=36
+
+## 2026-05-11 04:49:01
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=36
+
+## 2026-05-11 05:08:08
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=36
+
+## 2026-05-11 10:50:29
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=36
+
+## 2026-05-11 10:51:45
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=36
+
+## 2026-05-11 11:22:42
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=36
+
+## 2026-05-11 11:36:17
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=36
+
+## 2026-05-11 12:08:43
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=36
+
+## 2026-05-11 12:15:40
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=36
+
+## 2026-05-11 12:16:23
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=36
+
+## 2026-05-11 12:18:28
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=36
+
+## 2026-05-11 12:19:20
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=36
+
+## 2026-05-11 13:42:41
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=36
+
+## 2026-05-11 13:45:29
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=36
+
+## 2026-05-11 13:54:22
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=36
+
+## 2026-05-11 13:57:59
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=38
+
+## 2026-05-11 13:58:22
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=38
+
+## 2026-05-11 13:59:06
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=38
+
+## 2026-05-11 13:59:59
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=38
+
+## 2026-05-11 14:00:27
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=38
+
+## 2026-05-11 14:01:52
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=38
+
+## 2026-05-11 14:05:11
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=38
+
+## 2026-05-11 14:06:11
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=38
+
+## 2026-05-12 02:01:31
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=38
+
+## 2026-05-12 02:01:57
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=38
+
+## 2026-05-12 02:02:05
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=38
+
+## 2026-05-12 02:04:13
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=38
+
+## 2026-05-12 02:26:02
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=38
+
+## 2026-05-12 02:27:06
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=38
+
+## 2026-05-12 02:28:48
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=38
+
+## 2026-05-13 00:36:57
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=38
+
+## 2026-05-13 00:37:28
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=38
+
+## 2026-05-13 07:13:07
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=38
+
+## 2026-05-13 07:13:37
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=38
+
+## 2026-05-13 08:26:48
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=38
+
+## 2026-05-13 08:27:09
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=38
+
+## 2026-05-13 08:27:53
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=38
+
+## 2026-05-13 08:27:55
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=38
+
+## 2026-05-13 08:28:31
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=38
+
+## 2026-05-13 08:29:42
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=38
+
+## 2026-05-13 08:31:11
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=38
+
+## 2026-05-13 08:33:05
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=38
+
+## 2026-05-13 09:06:47
+- sql-lint: total=55, new=0, known=55
+- sql-fn-lint: total=0
+- api-trace: broken=29, newBroken=0
+- ui-coverage: warnings=38

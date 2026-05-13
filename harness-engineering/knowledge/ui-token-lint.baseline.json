@@ -73,18 +73,6 @@
       "snippet": "background: TONE_BG[tone] !== 'transparent' ? TONE_BG[tone] : 'rgba(255,255,255,0.7)',"
     },
     {
-      "file": "app/(employees)/CallScheduler/requests/page.tsx",
-      "line": 168,
-      "label": "glass-bg-hardcode",
-      "snippet": "background: statusFilter === s ? COLORS.primary : 'rgba(255,255,255,0.6)',"
-    },
-    {
-      "file": "app/(employees)/CallScheduler/requests/page.tsx",
-      "line": 200,
-      "label": "glass-bg-hardcode",
-      "snippet": "background: tab === t.v ? 'rgba(255,255,255,0.25)' : COLORS.bgAmber,"
-    },
-    {
       "file": "app/(employees)/CallScheduler/settings/GroupEditor.tsx",
       "line": 581,
       "label": "glass-bg-hardcode",
@@ -329,24 +317,6 @@
       "line": 524,
       "label": "primary-hardcode",
       "snippet": "background: hover ? 'rgba(59,110,181,0.08)' : 'rgba(255,255,255,0.40)',"
-    },
-    {
-      "file": "app/(employees)/RideSettlements/page.tsx",
-      "line": 623,
-      "label": "glass-bg-hardcode",
-      "snippet": "<div style={{ fontSize: 10, color: COLORS.textSecondary, padding: 6, background: 'rgba(255,255,255,0.5)', borderRadius: "
-    },
-    {
-      "file": "app/(employees)/RideSettlements/page.tsx",
-      "line": 807,
-      "label": "glass-bg-hardcode",
-      "snippet": "<span style={{ color: cur.color, fontSize: 12, fontWeight: 700, padding: '4px 10px', background: 'rgba(255,255,255,0.5)'"
-    },
-    {
-      "file": "app/(employees)/RideSettlements/page.tsx",
-      "line": 860,
-      "label": "glass-bg-hardcode",
-      "snippet": "<div key={c.id} style={{ fontSize: 11, padding: '4px 8px', background: 'rgba(255,255,255,0.5)', borderRadius: 4, display"
     },
     {
       "file": "app/(employees)/RideVehicleRegistry/page.tsx",
@@ -941,12 +911,6 @@
       "line": 91,
       "label": "glass-bg-hardcode",
       "snippet": ": '4px 4px 12px rgba(140,170,210,0.14), -4px -4px 12px rgba(255,255,255,0.47)',"
-    },
-    {
-      "file": "app/components/PageTitle.tsx",
-      "line": 144,
-      "label": "glass-bg-hardcode",
-      "snippet": "background: 'rgba(255,255,255,0.75)',"
     },
     {
       "file": "app/components/QuickTxModal.tsx",
@@ -2395,18 +2359,6 @@
       "snippet": "background: 'rgba(255,255,255,0.7)', color: COLORS.textPrimary,"
     },
     {
-      "file": "app/operations/intake/page.tsx",
-      "line": 451,
-      "label": "glass-bg-hardcode",
-      "snippet": "<span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 10, border: `1px solid ${stage?.color || 'rgba(255,255,25"
-    },
-    {
-      "file": "app/operations/intake/page.tsx",
-      "line": 485,
-      "label": "glass-bg-hardcode",
-      "snippet": "style={{ fontSize: 12, padding: '4px 8px', borderRadius: 6, border: `1.5px solid ${stage?.color || 'rgba(255,255,255,0.1"
-    },
-    {
       "file": "app/quotes/QuoteListMain.tsx",
       "line": 259,
       "label": "glass-bg-hardcode",
@@ -3349,6 +3301,6 @@
       "snippet": "boxShadow: '6px 6px 18px rgba(140,170,210,0.14), -6px -6px 18px rgba(255,255,255,0.47)',"
     }
   ],
-  "generatedAt": "2026-05-11T00:41:26.470Z",
+  "generatedAt": "2026-05-12T02:25:47.634Z",
   "note": "UI 토큰 hardcode (inline rgba). 기존 위반 동결, 새 위반만 차단."
 }
