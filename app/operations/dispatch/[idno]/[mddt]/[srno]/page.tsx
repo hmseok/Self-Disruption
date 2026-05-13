@@ -676,13 +676,14 @@ function Lbl({ children }: { children: React.ReactNode }) {
   return <span style={{ color: '#94a3b8', fontWeight: 700, whiteSpace: 'nowrap' }}>{children}</span>
 }
 
-function Val({ children, span, preWrap }: { children: React.ReactNode; span?: number; preWrap?: boolean }) {
+function Val({ children, span, preWrap, style }: { children: React.ReactNode; span?: number; preWrap?: boolean; style?: React.CSSProperties }) {
   return (
     <span style={{
       color: '#1e293b',
       fontWeight: 600,
       gridColumn: span ? `span ${span}` : undefined,
       whiteSpace: preWrap ? 'pre-wrap' : undefined,
+      ...style,
     }}>{children}</span>
   )
 }
