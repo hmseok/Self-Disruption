@@ -75,10 +75,15 @@ export default function OperationsIntakePage() {
     return { from: fmt(oneYearAgo), to: fmt(today) }
   }, [])
 
+  // 탭별 fetch 완료 플래그 (무한 루프 회피)
+  const [accidentsFetched, setAccidentsFetched] = useState(false)
+  const [dispatchesFetched, setDispatchesFetched] = useState(false)
+
   // ── Fetch — 사고접수 ──
   const fetchAccidents = useCallback(async () => {
     setAccidentsLoading(true)
     setAccidentsErr(null)
+    setAccidentsFetched(true)   // 무한 루프 회피
     try {
       const headers = await getAuthHeader()
       const params = new URLSearchParams({
@@ -106,6 +111,7 @@ export default function OperationsIntakePage() {
   const fetchDispatches = useCallback(async () => {
     setDispatchesLoading(true)
     setDispatchesErr(null)
+    setDispatchesFetched(true)
     try {
       const headers = await getAuthHeader()
       const params = new URLSearchParams({
@@ -129,14 +135,14 @@ export default function OperationsIntakePage() {
     }
   }, [dateRange])
 
-  // 탭별 lazy fetch
+  // 탭별 lazy fetch — fetched flag 로 무한 루프 회피
   useEffect(() => {
-    if (subTab === 'accidents' && accidents.length === 0 && !accidentsLoading && !accidentsErr) {
+    if (subTab === 'accidents' && !accidentsFetched) {
       fetchAccidents()
-    } else if (subTab === 'dispatch' && dispatches.length === 0 && !dispatchesLoading && !dispatchesErr) {
+    } else if (subTab === 'dispatch' && !dispatchesFetched) {
       fetchDispatches()
     }
-  }, [subTab, accidents.length, dispatches.length, accidentsLoading, dispatchesLoading, accidentsErr, dispatchesErr, fetchAccidents, fetchDispatches])
+  }, [subTab, accidentsFetched, dispatchesFetched, fetchAccidents, fetchDispatches])
 
   // ── Filtered ──
   const filteredAccidents = useMemo(() => {
@@ -184,10 +190,20 @@ export default function OperationsIntakePage() {
     { label: '🔍 검색결과', value: filteredDispatches.length, unit: '건', tint: 'violet' },
   ]) as StatItem[]
 
+  const refreshActive = useCallback(() => {
+    if (subTab === 'accidents') {
+      setAccidentsFetched(false)
+      fetchAccidents()
+    } else {
+      setDispatchesFetched(false)
+      fetchDispatches()
+    }
+  }, [subTab, fetchAccidents, fetchDispatches])
+
   const statActions: ActionButton[] = [
     {
       label: '새로고침',
-      onClick: subTab === 'accidents' ? fetchAccidents : fetchDispatches,
+      onClick: refreshActive,
       variant: 'secondary',
       icon: '🔄',
     },
@@ -549,7 +565,7 @@ export default function OperationsIntakePage() {
           <DispatchRequestFullscreen
             row={selectedDispatch}
             onClose={() => setSelectedDispatch(null)}
-            onResult={(msg) => { setResultMsg(msg); fetchDispatches() }}
+            onResult={(msg) => { setResultMsg(msg); setDispatchesFetched(false); fetchDispatches() }}
           />
         )}
       </div>
