@@ -5,15 +5,22 @@ import Placeholder from '@tiptap/extension-placeholder'
 import TaskList from '@tiptap/extension-task-list'
 import TaskItem from '@tiptap/extension-task-item'
 import Link from '@tiptap/extension-link'
+import Image from '@tiptap/extension-image'
+import { Table } from '@tiptap/extension-table'
+import TableRow from '@tiptap/extension-table-row'
+import TableHeader from '@tiptap/extension-table-header'
+import TableCell from '@tiptap/extension-table-cell'
+import SlashCommand from './extensions/SlashCommand'
 import { useEffect, useRef } from 'react'
 import { COLORS, GLASS } from '@/app/utils/ui-tokens'
 
 // ═══════════════════════════════════════════════════════════════
-// TiptapEditor — PR-MTG-V2-A 기본 통합
+// TiptapEditor — PR-MTG-V2-A 기본 + V2-B 슬래시/이미지/표
 //   · StarterKit + Placeholder + TaskList + Link
+//   · V2-B 추가: Image / Table / SlashCommand (슬래시 명령)
 //   · 풀페이지 본문용 — onChange debounce 는 부모(MeetingsLayoutV2)가 책임
 //   · SSR 안전 (immediatelyRender: false)
-//   · 슬래시 명령 / 멘션 / ERP 임베드 는 PR-V2-B / V2-C / V2-D 에서 확장
+//   · @멘션 / ERP 임베드 는 PR-V2-C / V2-D 에서 확장
 // ═══════════════════════════════════════════════════════════════
 
 export interface TiptapEditorProps {
@@ -38,7 +45,7 @@ export default function TiptapEditor({
   value,
   onChange,
   editable = true,
-  placeholder = '회의 본문을 자유롭게 작성하세요. (PR-V2-B 에서 슬래시 명령 추가 예정)',
+  placeholder = '회의 본문을 자유롭게 작성하세요. / 입력으로 블록 메뉴 (제목/체크/표/이미지/...)',
   reloadKey,
 }: TiptapEditorProps) {
   const editor = useEditor({
@@ -59,6 +66,20 @@ export default function TiptapEditor({
         openOnClick: true,
         HTMLAttributes: { rel: 'noopener noreferrer', target: '_blank' },
       }),
+      // PR-V2-B 추가 ────────────────────────────────────────────
+      Image.configure({
+        inline: false,
+        allowBase64: false,
+        HTMLAttributes: { class: 'tiptap-image' },
+      }),
+      Table.configure({
+        resizable: true,
+        HTMLAttributes: { class: 'tiptap-table' },
+      }),
+      TableRow,
+      TableHeader,
+      TableCell,
+      SlashCommand,
     ],
     content: value ?? EMPTY_DOC,
     editable,
@@ -126,7 +147,7 @@ export default function TiptapEditor({
         .tiptap-meetings .ProseMirror ul[data-type="taskList"] li { display: flex; gap: 8px; align-items: flex-start; }
         .tiptap-meetings .ProseMirror ul[data-type="taskList"] li > label { margin-top: 4px; flex-shrink: 0; }
         .tiptap-meetings .ProseMirror ul[data-type="taskList"] li > div { flex: 1; }
-        .tiptap-meetings .ProseMirror blockquote { border-left: 3px solid ${COLORS.primary}; padding: 4px 14px; margin: 10px 0; color: ${COLORS.textSecondary}; font-style: italic; background: rgba(59,110,181,0.04); border-radius: 0 6px 6px 0; }
+        .tiptap-meetings .ProseMirror blockquote { border-left: 3px solid ${COLORS.primary}; padding: 4px 14px; margin: 10px 0; color: ${COLORS.textSecondary}; font-style: italic; background: ${COLORS.primary}0A; border-radius: 0 6px 6px 0; }
         .tiptap-meetings .ProseMirror code { background: rgba(0,0,0,0.06); padding: 2px 6px; border-radius: 4px; font-family: 'SF Mono', Menlo, Consolas, monospace; font-size: 0.9em; }
         .tiptap-meetings .ProseMirror pre { background: rgba(0,0,0,0.85); color: #fff; padding: 14px 18px; border-radius: 8px; overflow-x: auto; margin: 12px 0; }
         .tiptap-meetings .ProseMirror pre code { background: none; padding: 0; color: inherit; }
@@ -135,6 +156,59 @@ export default function TiptapEditor({
         .tiptap-meetings .ProseMirror strong { font-weight: 700; }
         .tiptap-meetings .ProseMirror em { font-style: italic; }
         .tiptap-meetings .ProseMirror s { text-decoration: line-through; opacity: 0.7; }
+
+        /* V2-B Image */
+        .tiptap-meetings .ProseMirror img.tiptap-image {
+          max-width: 100%;
+          height: auto;
+          display: block;
+          margin: 12px auto;
+          border-radius: 8px;
+          box-shadow: 0 4px 14px rgba(0,0,0,0.08);
+        }
+        .tiptap-meetings .ProseMirror img.ProseMirror-selectednode {
+          outline: 2px solid ${COLORS.primary};
+        }
+
+        /* V2-B Table */
+        .tiptap-meetings .ProseMirror table.tiptap-table {
+          border-collapse: collapse;
+          margin: 12px 0;
+          overflow: hidden;
+          table-layout: fixed;
+          width: 100%;
+        }
+        .tiptap-meetings .ProseMirror table.tiptap-table td,
+        .tiptap-meetings .ProseMirror table.tiptap-table th {
+          border: 1px solid rgba(0,0,0,0.12);
+          padding: 8px 10px;
+          vertical-align: top;
+          position: relative;
+          min-width: 60px;
+          font-size: 14px;
+        }
+        .tiptap-meetings .ProseMirror table.tiptap-table th {
+          background: ${COLORS.primary}10;
+          font-weight: 700;
+          text-align: left;
+        }
+        .tiptap-meetings .ProseMirror table.tiptap-table .selectedCell:after {
+          z-index: 2; position: absolute; content: "";
+          left: 0; right: 0; top: 0; bottom: 0;
+          background: ${COLORS.primary}1F; pointer-events: none;
+        }
+        .tiptap-meetings .ProseMirror table.tiptap-table .column-resize-handle {
+          position: absolute; right: -2px; top: 0; bottom: -2px; width: 4px;
+          background: ${COLORS.primary}; pointer-events: none;
+        }
+
+        /* Tippy popper (슬래시 명령) — 본 페이지 한정 */
+        .tippy-box[data-theme~='light-border'] {
+          background: transparent; box-shadow: none;
+        }
+        .tippy-box[data-theme~='light-border'] > .tippy-content {
+          padding: 0;
+        }
       `}</style>
       <EditorContent editor={editor} className="tiptap-meetings" />
       {!editor && (
@@ -147,13 +221,13 @@ export default function TiptapEditor({
           display: 'flex', gap: 6, flexWrap: 'wrap',
           fontSize: 11, color: COLORS.textMuted, whiteSpace: 'nowrap',
         }}>
-          <span>💡 단축키:</span>
+          <span>💡 빠른 입력:</span>
+          <kbd style={kbdStyle}>/</kbd> 블록 메뉴 (제목 / 체크 / 표 / 이미지 / 인용 / ...)
           <kbd style={kbdStyle}>Ctrl+B</kbd> 굵게
           <kbd style={kbdStyle}>Ctrl+I</kbd> 기울임
           <kbd style={kbdStyle}>Ctrl+Alt+1~3</kbd> 제목
           <kbd style={kbdStyle}>Ctrl+Shift+8/7</kbd> 목록
-          <kbd style={kbdStyle}>Ctrl+Shift+9</kbd> 인용
-          <span style={{ marginLeft: 6, color: COLORS.primary }}>· PR-V2-B 에서 `/` 슬래시 명령 추가</span>
+          <span style={{ marginLeft: 6, color: COLORS.primary }}>· @멘션 (V2-C) · ERP 임베드 (V2-D)</span>
         </div>
       )}
     </div>
@@ -164,7 +238,7 @@ const kbdStyle: React.CSSProperties = {
   padding: '1px 5px',
   border: '1px solid rgba(0,0,0,0.12)',
   borderRadius: 4,
-  background: 'rgba(255,255,255,0.5)',
+  background: GLASS.L1.background,
   fontFamily: 'SF Mono, Menlo, Consolas, monospace',
   fontSize: 10,
 }

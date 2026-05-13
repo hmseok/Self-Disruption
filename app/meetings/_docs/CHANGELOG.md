@@ -6,6 +6,63 @@
 
 ## 2026-05-13
 
+### PR-MTG-V2-B — 슬래시 명령 + 블록 확장 (이미지/표)
+
+**사용자 명령**: V2-A 완료 후 「ㄱㄱㄱ」 / 「PR-V2-B 슬래시 명령 + 블록 확장 (Recommended)」 선택.
+
+**범위**:
+- 신규 컴포넌트 — `app/meetings/_components/SlashCommandMenu.tsx` (forwardRef + 키보드 ↑↓Enter)
+- 신규 extension — `app/meetings/_components/extensions/SlashCommand.ts` (TipTap Extension + Suggestion)
+- 기존 `TiptapEditor.tsx` 수정 — Image / Table / SlashCommand extensions 추가 + 표/이미지 CSS
+- 공통 — `package.json` + `package-lock.json` (deps 7종 추가: @tiptap/suggestion, extension-image, extension-table (+row/header/cell), tippy.js)
+
+**핵심 변경**:
+
+1. **슬래시 명령 `/`** — 본문에서 `/` 입력 시 tippy.js popper 메뉴 표시. 카테고리: 기본 / 미디어. 키보드 ↑↓ 이동, Enter 선택, Esc 닫기. 마우스 hover 도 선택 동기화. 빈 검색 결과 시 안내 화면.
+2. **블록 메뉴** (총 12 항목):
+   - 기본 (10): 제목1/2/3, 단락, 불릿 목록, 번호 목록, 체크리스트, 인용, 코드 블록, 구분선
+   - 미디어 (2): 이미지 (window.prompt로 URL 입력), 표 (3×3 with header)
+3. **이미지** — `@tiptap/extension-image` (inline:false, allowBase64:false). max-width 100% + border-radius 8 + shadow + selected 시 outline.
+4. **표** — `@tiptap/extension-table` resizable + TableRow / TableHeader / TableCell. 헤더 행 강조 (primary alpha 6%) + selectedCell 오버레이 (primary alpha 12%) + 컬럼 리사이즈 핸들.
+5. **tippy.js CSS 자동 임포트** — `tippy.css` + `themes/light-border.css` 를 SlashCommand.ts 에서 side-effect import. 다른 페이지 영향 X (CSS scope는 popper 한정).
+6. **ui-token-lint 통과** — 모든 색상 `${COLORS.primary}XX` (8자리 hex alpha) 형식 토큰화 / 배경은 `GLASS.L1.background` / `GLASS.L5.background` 사용.
+7. **푸터 안내 갱신** — `/` 블록 메뉴를 첫 자리에 명시 + V2-C 멘션 / V2-D 임베드 예고.
+
+**Rule 8 End-to-End 시뮬레이션**:
+- 사용자 `/` 입력 → TipTap Suggestion plugin → tippy popper 표시
+- 화살표/마우스 선택 → Enter/Click → `editor.chain().focus().deleteRange(range).{command}().run()`
+- onUpdate 트리거 → debounce 1.5s → PATCH `/api/meetings/[id]/body`
+- AutoSaveIndicator 「✓ 저장됨」
+- 다른 페이지 영향 X (TipTap 내부 확장 + 모듈 한정 CSS)
+
+**Rule 11 SQL 검증**: SQL 변경 없음 ✓
+
+**Rule 13 라이브러리 호환성**:
+- `@tiptap/suggestion` / `extension-image` / `extension-table` 등 — TipTap 3.23.2 (V2-A 동일 버전)
+- `tippy.js` 6.3.7 — popper.js 기반, peer 충돌 없음
+
+**Rule 14 동형 패턴**: 슬래시 카테고리에 (V2-C 멘션) + (V2-D ERP 임베드) 자리 예고. 후속 PR 에서 추가.
+
+**Rule 21 공통 파일 분리 commit**:
+1. `package.json` + `package-lock.json` (단독 commit)
+2. 자기 모듈 `app/meetings/_components/*` (단독 commit)
+
+**Rule 22 _docs 갱신**: 본 CHANGELOG (이 섹션) ✓
+
+**GATE 진행 상태**:
+- G3 설계서 (MEETINGS-EDITOR-DESIGN.md § 6 PR-V2-B 범위) + 사용자 GO (「Recommended」 선택) ✓
+- G5 tsc PASS (Table named export 수정 후 0 에러)
+- G6 lint:harness 새 위반 0건 (ui-token-lint 6건 토큰화 정리 후)
+- G7 Designer — 사용자 스크린샷 검수 (슬래시 메뉴 / 표 / 이미지 동작)
+- Rule 8 / 11 / 13 / 14 / 21 / 22 모두 준수
+
+**알려진 이슈 (후속 PR 대상)**:
+- 이미지 업로드 미구현 — 현재 URL 입력만 (Cloud Storage 업로드는 별도 PR)
+- 표 / 이미지 우클릭 메뉴 미구현 — TipTap BubbleMenu / FloatingMenu 도입은 별도 PR
+- 슬래시 메뉴 한글 입력 시 자모 분리 동작 — IME composition 처리는 별도 검증 필요
+
+---
+
 ### PR-MTG-V2-A — 노션형 풀페이지 에디터 기반 (Split view + TipTap)
 
 **사용자 명령**: 「회의록처럼 화면이 열리고 본문을 넓게 작성하는 페이지 — 노션의 업그레이드 버전을 만들고 싶다」.
