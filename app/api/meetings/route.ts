@@ -84,7 +84,7 @@ export async function GET(request: NextRequest) {
 
     const list = await prisma.$queryRawUnsafe<any[]>(
       `SELECT m.id, m.title, m.type, m.meeting_date, m.duration_min, m.location,
-              m.organizer_id, m.department, m.status, m.created_at,
+              m.organizer_id, m.department, m.status, m.created_by, m.created_at,
               p.name AS organizer_name,
               (SELECT COUNT(*) FROM meeting_attendees WHERE meeting_id = m.id) AS attendee_count,
               (SELECT COUNT(*) FROM meeting_action_items WHERE meeting_id = m.id) AS action_count,
