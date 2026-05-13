@@ -27,6 +27,10 @@
 | `app/operations/*` | **sweet-amazing-galileo (메인) — 2026-05-11 재배정** | ✅ |
 | `app/api/operations/*` | **sweet-amazing-galileo (메인) — 2026-05-11 재배정** | ✅ |
 | `app/maintenance/*` (신설) | **sweet-amazing-galileo (메인)** | ✅ |
+| `app/meetings/*` | **meetings 세션 (신설 2026-05-11)** | ✅ |
+| `app/api/meetings/*` | **meetings 세션 (신설 2026-05-11)** | ✅ |
+| `app/RideMTOps/*` | MT팀 세션 (위탁: 메뉴 등록 메인 세션) | ✅ |
+| `app/api/cafe24/maintenance-tours,legal-inspections,chargers/*` | MT팀 세션 | ✅ |
 | `app/loans*/*` | 본 도메인 세션 (자율) | ✅ |
 | `app/insurance*/*` | 본 도메인 세션 (자율) | ✅ |
 
