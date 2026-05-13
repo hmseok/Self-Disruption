@@ -12,7 +12,9 @@ const PATH_TO_GROUP: Record<string, string> = {
   // ── 차량관리 (차량 + 운영 + 사고 통합) ──
   '/cars': 'vehicle', '/insurance': 'vehicle', '/registration': 'vehicle',
   '/fleet/vehicle-lookup': 'vehicle',
-  '/operations': 'vehicle', '/operations/intake': 'vehicle', '/maintenance': 'vehicle',
+  '/operations': 'vehicle', '/operations/intake': 'vehicle',
+  '/operations/accident': 'vehicle', '/operations/dispatch': 'vehicle',
+  '/maintenance': 'vehicle',
   '/fleet/factory-mgmt': 'vehicle',
   '/claims/accident-mgmt': 'vehicle', '/claims/billing-mgmt': 'vehicle',
   // ── 영업/계약 (견적→계약→수금→정산 파이프라인) ──
@@ -71,6 +73,8 @@ const PAGE_NAMES: Record<string, string> = {
   '/fleet/vehicle-lookup': '거래처 차량조회',
   '/operations': '차량운영',
   '/operations/intake': '접수/오더',
+  '/operations/accident': '사고접수 상세',
+  '/operations/dispatch': '대차접수 상세',
   '/maintenance': '정비/유지보수',
   '/fleet/factory-mgmt': '공장/협력업체',
   '/claims/accident-mgmt': '사고관리',
