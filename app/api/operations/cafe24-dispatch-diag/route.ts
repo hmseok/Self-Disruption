@@ -148,6 +148,71 @@ export async function GET(request: Request) {
       [from, to]
     )
 
+    // 10. acrrentm 진단 (hotfix #3 후 0건 → 추가 분석)
+    const acrrentmTotal = await cafe24Db.query<RowDataPacket & { c: number }>(
+      'SELECT COUNT(*) AS c FROM acrrentm'
+    )
+    const acrrentmInRange = await cafe24Db.query<RowDataPacket & { c: number }>(
+      `SELECT COUNT(*) AS c FROM acrrentm
+        WHERE CHAR_LENGTH(rentmddt) = 8
+          AND rentmddt BETWEEN ? AND ?`,
+      [from, to]
+    )
+    // 11. acrrentm sample 5건 (idno/mddt/srno/seqn/stat 확인)
+    const acrrentmSample = await cafe24Db.query<RowDataPacket>(
+      `SELECT rentidno, rentmddt, rentsrno, rentseqn, rentstat,
+              rentrsdt, rentfrdt, rentuser, rentnums, rentfacd
+         FROM acrrentm
+        WHERE CHAR_LENGTH(rentmddt) = 8
+          AND rentmddt BETWEEN ? AND ?
+        ORDER BY rentmddt DESC, rentseqn DESC
+        LIMIT 10`,
+      [from, to]
+    )
+    // 12. 가설 D JOIN (idno+mddt) — aceesosh ↔ acrrentm LEFT JOIN
+    const hypD = await cafe24Db.query<RowDataPacket & { c: number }>(
+      `SELECT COUNT(*) AS c FROM aceesosh a
+        INNER JOIN acrrentm r
+          ON r.rentidno = a.esosidno
+         AND r.rentmddt = a.esosmddt
+        WHERE CHAR_LENGTH(a.esosmddt) = 8
+          AND a.esosmddt BETWEEN ? AND ?`,
+      [from, to]
+    )
+    // 13. 가설 E: idno 만 (mddt 제외)
+    const hypE = await cafe24Db.query<RowDataPacket & { c: number }>(
+      `SELECT COUNT(*) AS c FROM aceesosh a
+        INNER JOIN acrrentm r
+          ON r.rentidno = a.esosidno
+        WHERE CHAR_LENGTH(a.esosmddt) = 8
+          AND a.esosmddt BETWEEN ? AND ?`,
+      [from, to]
+    )
+    // 14. 가설 F: rentidno = esosidno + rentfrdt 가까운 (rentmddt 무시, rentfrdt 사용)
+    const hypF = await cafe24Db.query<RowDataPacket & { c: number }>(
+      `SELECT COUNT(*) AS c FROM aceesosh a
+        INNER JOIN acrrentm r
+          ON r.rentidno = a.esosidno
+         AND r.rentfrdt = a.esosmddt
+        WHERE CHAR_LENGTH(a.esosmddt) = 8
+          AND a.esosmddt BETWEEN ? AND ?`,
+      [from, to]
+    )
+    // 15. 사용자 sample 차량 (127호5097 / 232호9659) 의 acrrentm 검색
+    //     실제 데이터 있는지 직접 확인
+    const userSample = await cafe24Db.query<RowDataPacket>(
+      `SELECT r.rentidno, r.rentmddt, r.rentsrno, r.rentseqn, r.rentstat,
+              r.rentrsdt, r.rentuser, r.rentnums, r.rentfacd,
+              c.carsnums, c.carsodnm
+         FROM acrrentm r
+         LEFT JOIN pmccarsm c
+           ON c.carsidno = r.rentidno
+          AND r.rentmddt BETWEEN c.carsfrdt AND c.carstodt
+        WHERE c.carsnums IN ('127호5097', '232호9659')
+        ORDER BY r.rentmddt DESC
+        LIMIT 5`
+    )
+
     return NextResponse.json({
       success: true,
       diagnostics: {
@@ -161,6 +226,13 @@ export async function GET(request: Request) {
         '7_acrotpth_sample_5': acrotpthSample,
         '8_aceesosh_sample_5': aceesoshSample,
         '9_srno_compare (left join, see if ace_srno == otpt_srno)': srnoCompare,
+        '10_acrrentm_total': acrrentmTotal[0]?.c,
+        '11_acrrentm_in_range': acrrentmInRange[0]?.c,
+        '12_hypothesis_D_join (idno+mddt)': hypD[0]?.c,
+        '13_hypothesis_E_join (idno only)': hypE[0]?.c,
+        '14_hypothesis_F_join (idno+rentfrdt=esosmddt)': hypF[0]?.c,
+        '15_acrrentm_sample_10': acrrentmSample,
+        '16_user_sample_lookup (127호5097, 232호9659)': userSample,
       },
       meta: {
         fetched_at: new Date().toISOString(),
@@ -172,6 +244,10 @@ export async function GET(request: Request) {
           if_5_zero_6_nonzero: '가설 B 사용 — srno 별도 일련번호',
           if_5_lt_6: 'acrotpth 가 사고와 1:N (출동마다 별 row, srno 다름) — 가설 C: MAX(srno) 또는 latest',
           if_9_shows_srno_diff: '9 결과의 ace_srno vs otpt_srno 다르면 → 가설 B 채택 + b.otptdcyn 만 별도 필터',
+          if_12_zero_13_nonzero: '가설 E (idno only) — rentmddt 가 esosmddt 와 다른 의미 (rentmddt=등록일자?)',
+          if_12_zero_14_nonzero: '가설 F (rentfrdt) — rentmddt 가 등록일자 / rentfrdt 가 사고일',
+          if_10_zero: 'acrrentm 전체 비어있음 — 다른 테이블 (rentbody?)',
+          if_16_nonempty: '15 결과로 사용자 sample 차량의 실제 rent* 컬럼 값 확인 → JOIN 키 직접 도출',
         },
       },
     })
