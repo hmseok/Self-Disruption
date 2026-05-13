@@ -180,15 +180,18 @@ export default function OperationsIntakePage() {
   }, [dispatches, dispatchesSearch])
 
   // ── Stat items (활성 탭 기준) ──
-  const statItems: StatItem[] = (subTab === 'accidents' ? [
+  // DcStatStrip Tint = 'blue' | 'green' | 'red' | 'amber' | 'purple' | 'slate'
+  const accidentStats: StatItem[] = [
     { label: '📋 사고접수 (1년)', value: accidents.length, unit: '건', tint: 'blue' },
     { label: '🚗 대차접수 (대조)', value: dispatches.length, unit: '건', tint: 'amber' },
-    { label: '🔍 검색결과', value: filteredAccidents.length, unit: '건', tint: 'violet' },
-  ] : [
+    { label: '🔍 검색결과', value: filteredAccidents.length, unit: '건', tint: 'purple' },
+  ]
+  const dispatchStats: StatItem[] = [
     { label: '🚗 대차접수 (1년)', value: dispatches.length, unit: '건', tint: 'red' },
     { label: '📋 사고접수 (대조)', value: accidents.length, unit: '건', tint: 'blue' },
-    { label: '🔍 검색결과', value: filteredDispatches.length, unit: '건', tint: 'violet' },
-  ]) as StatItem[]
+    { label: '🔍 검색결과', value: filteredDispatches.length, unit: '건', tint: 'purple' },
+  ]
+  const statItems: StatItem[] = subTab === 'accidents' ? accidentStats : dispatchStats
 
   const refreshActive = useCallback(() => {
     if (subTab === 'accidents') {
