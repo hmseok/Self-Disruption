@@ -14,9 +14,16 @@
  *   증거 2: acr0101a.php:139 「대차없음」 디폴트 'N'
  *   증거 3: jandi_move.php:144 잔디 메시지 발송 트리거 = otptdcyn='Y'
  *
+ * JOIN 키 (PR-OPS-1.5a hotfix #2, 진단 결과 확정):
+ *   가설 A (idno+mddt+srno) JOIN: 0건 — srno 매칭 실패
+ *   진단 (acrotpth 69,450 / 시간 범위 26,356 / otptdcyn=Y 2,161)
+ *   → acrotpth.otptsrno 가 사고 esossrno 와 다른 일련번호 (사고 1건당 N 출동 패턴)
+ *   → 가설 B 채택: idno+mddt 만 매칭 + LATEST otptdcyn='Y' srno 선택 (서브쿼리)
+ *
  * JOIN 구조:
  *   aceesosh a   사고 본체
- *   acrotpth b   대차/출동 (otptdcyn='Y' 필터, INNER JOIN)
+ *   latest       acrotpth 의 (idno, mddt, MAX(srno) WHERE otptdcyn='Y') 서브쿼리
+ *   acrotpth b   LATEST row (사고 1건 ↔ 최신 대차요청 1 row 보장)
  *   pmccarsm c   차량 마스터 (carsnums/carsodnm/carsuser/carscust)
  *   pmccustm cu  캐피탈사 마스터 (custname)
  *   picuserm u   등록자 마스터 (username)
@@ -122,9 +129,8 @@ export async function GET(request: Request) {
   // 비정상 mddt 필터 (PR-6.7.c 패턴)
   where.push('CHAR_LENGTH(a.esosmddt) = 8')
   where.push("a.esosmddt BETWEEN '20100101' AND '20991231'")
-  // 등록 활성 + 대차요청 = Y (핵심)
+  // 등록 활성 (대차요청 필터는 LATEST 서브쿼리 안에서 처리)
   where.push("a.esosrgst = 'R'")
-  where.push("b.otptdcyn = 'Y'")
 
   if (from && /^\d{8}$/.test(from)) {
     where.push('a.esosmddt >= ?')
@@ -144,9 +150,9 @@ export async function GET(request: Request) {
   const whereSql = `WHERE ${where.join(' AND ')}`
 
   try {
-    // 5-table JOIN (acrrentm 제외 — JOIN 키 가설 검증 후 hotfix 추가)
-    // JOIN 키 가설 A: otptidno+mddt+srno = esosidno+mddt+srno (acr0101a.php INSERT 패턴)
-    // 1차 호출 시 응답 row 수 + 사용자 sample 메시지 매칭으로 검증.
+    // 5-table JOIN (가설 B + LATEST 서브쿼리 — hotfix #2)
+    // 진단 결과: acrotpth.otptsrno ≠ aceesosh.esossrno (사고 1:N 출동)
+    // LATEST 서브쿼리로 사고당 1개의 최신 대차요청 row 만 선택.
     const sql = `
       SELECT a.esosidno, a.esosmddt, a.esossrno,
              a.esosacdt, a.esosactm, a.esosrgst,
@@ -154,6 +160,7 @@ export async function GET(request: Request) {
              a.esosrstx,
              a.esosaddr, a.esosadnm, a.esosadtl,
              a.esosusnm, a.esosustl,
+             b.otptsrno AS otpt_srno,
              b.otptdcyn, b.otptacbn,
              b.otptcanm, b.otptcahp,
              b.otptdsnm, b.otptdshp,
@@ -170,10 +177,18 @@ export async function GET(request: Request) {
              cu.custname AS capital_co_name,
              u.username  AS gnus_name
         FROM aceesosh a
+        INNER JOIN (
+          SELECT otptidno, otptmddt, MAX(otptsrno) AS otptsrno
+            FROM acrotpth
+           WHERE otptdcyn = 'Y'
+           GROUP BY otptidno, otptmddt
+        ) latest
+          ON latest.otptidno = a.esosidno
+         AND latest.otptmddt = a.esosmddt
         INNER JOIN acrotpth b
-          ON b.otptidno = a.esosidno
-         AND b.otptmddt = a.esosmddt
-         AND b.otptsrno = a.esossrno
+          ON b.otptidno = latest.otptidno
+         AND b.otptmddt = latest.otptmddt
+         AND b.otptsrno = latest.otptsrno
         LEFT JOIN pmccarsm c
           ON c.carsidno = a.esosidno
          AND a.esosmddt BETWEEN c.carsfrdt AND c.carstodt
@@ -199,7 +214,8 @@ export async function GET(request: Request) {
         filters: { from, to, q },
         join_diagnostics: {
           row_count: rows.length,
-          join_key_hypothesis: 'A (otptidno+mddt+srno = esos*)',
+          join_key_hypothesis: 'B + LATEST (idno+mddt only, MAX otptsrno WHERE otptdcyn=Y)',
+          hypothesis_a_result: 'rejected — 가설 A srno 매칭 결과 0건 (진단 endpoint 결과)',
           rental_vendor_join: 'pending (acrrentm 키 미확정 — 1차 응답 검토 후 결정)',
         },
       },
