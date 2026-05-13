@@ -29,6 +29,7 @@ const PATH_TO_GROUP: Record<string, string> = {
   '/work-essentials/my-info': 'work',
   '/work-essentials/receipts': 'work',
   '/meetings': 'work',
+  '/meetings/new': 'work',
   // ── 관리자 운영 (admin-ops) ── (PR-6.13.c)
   '/RideVehicleRegistry':       'admin-ops',
   '/RideCustomerData':          'admin-ops',
@@ -98,6 +99,7 @@ const PAGE_NAMES: Record<string, string> = {
   '/work-essentials/my-info': '내 정보',
   '/work-essentials/receipts': '영수증제출',
   '/meetings': '회의록',
+  '/meetings/new': '회의록 · 새로 만들기',
   // 설정
   '/admin/employees': '조직/권한 관리',
   '/admin/contract-terms': '계약 약관 관리',
