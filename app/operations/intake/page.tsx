@@ -1,13 +1,12 @@
 'use client'
 
 import { useEffect, useState, useCallback, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
 import { useApp } from '../../context/AppContext'
 import DcStatStrip, { StatItem, ActionButton } from '../../components/DcStatStrip'
 import DcToolbar, { FilterItem } from '../../components/DcToolbar'
 import NeuDataTable, { TableColumn, MobileCardConfig } from '../../components/NeuDataTable'
 import { GLASS } from '../../utils/ui-tokens'
-import AccidentDetailFullscreen from './AccidentDetailFullscreen'
-import DispatchRequestFullscreen from './DispatchRequestFullscreen'
 import type {
   RichAccidentRow,
   DispatchRequestRow,
@@ -48,6 +47,7 @@ const SUBTAB_LABEL: Record<SubTab, string> = {
 // ═══ Page ══════════════════════════════════════════════════════════
 export default function OperationsIntakePage() {
   const { company, role } = useApp()
+  const router = useRouter()
   const [subTab, setSubTab] = useState<SubTab>('dispatch')   // 본업 대차접수 default
 
   // ── 사고접수 탭 state ──
@@ -55,14 +55,12 @@ export default function OperationsIntakePage() {
   const [accidentsLoading, setAccidentsLoading] = useState(false)
   const [accidentsErr, setAccidentsErr] = useState<string | null>(null)
   const [accidentsSearch, setAccidentsSearch] = useState('')
-  const [selectedAccident, setSelectedAccident] = useState<RichAccidentRow | null>(null)
 
   // ── 대차접수 탭 state ──
   const [dispatches, setDispatches] = useState<DispatchRequestRow[]>([])
   const [dispatchesLoading, setDispatchesLoading] = useState(false)
   const [dispatchesErr, setDispatchesErr] = useState<string | null>(null)
   const [dispatchesSearch, setDispatchesSearch] = useState('')
-  const [selectedDispatch, setSelectedDispatch] = useState<DispatchRequestRow | null>(null)
 
   // ── 공통 결과 메시지 ──
   const [resultMsg, setResultMsg] = useState<ResultMsg | null>(null)
@@ -528,13 +526,13 @@ export default function OperationsIntakePage() {
           </div>
         )}
 
-        {/* 활성 탭 데이터 테이블 */}
+        {/* 활성 탭 데이터 테이블 — 행 클릭 시 상세페이지로 이동 (P1.5c) */}
         {subTab === 'accidents' ? (
           <NeuDataTable
             columns={accidentColumns}
             data={filteredAccidents}
             rowKey={(r) => `${r.esosidno}-${r.esossrno}`}
-            onRowClick={(r) => setSelectedAccident(r)}
+            onRowClick={(r) => router.push(`/operations/accident/${r.esosidno}/${r.esosmddt}/${r.esossrno}`)}
             loading={activeLoading}
             emptyIcon="📋"
             emptyMessage="조건에 맞는 사고접수가 없습니다"
@@ -546,29 +544,12 @@ export default function OperationsIntakePage() {
             columns={dispatchColumns}
             data={filteredDispatches}
             rowKey={(r) => `${r.otptidno}-${r.otptmddt}-${r.otptsrno}`}
-            onRowClick={(r) => setSelectedDispatch(r)}
+            onRowClick={(r) => router.push(`/operations/dispatch/${r.otptidno}/${r.otptmddt}/${r.otptsrno}`)}
             loading={activeLoading}
             emptyIcon="🚗"
             emptyMessage="조건에 맞는 대차접수가 없습니다"
             mobileCard={dispatchMobileCard}
             defaultSort={{ key: 'date', dir: 'desc' }}
-          />
-        )}
-
-        {/* 풀스크린 모달 — 사고접수 */}
-        {selectedAccident && (
-          <AccidentDetailFullscreen
-            row={selectedAccident}
-            onClose={() => setSelectedAccident(null)}
-          />
-        )}
-
-        {/* 풀스크린 모달 — 대차접수 */}
-        {selectedDispatch && (
-          <DispatchRequestFullscreen
-            row={selectedDispatch}
-            onClose={() => setSelectedDispatch(null)}
-            onResult={(msg) => { setResultMsg(msg); setDispatchesFetched(false); fetchDispatches() }}
           />
         )}
       </div>

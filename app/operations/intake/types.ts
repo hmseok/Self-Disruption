@@ -70,6 +70,12 @@ export type Cafe24Detail = {
   esosidno: string
   esosmddt: string
   esossrno: number
+  // 접수일시 (detail/route.ts 응답에 포함)
+  esosacdt: string | null
+  esosactm: string | null
+  esosrgst: string | null
+  esosrslt: string | null
+  esostypp: string | null
   // 위치
   esosaddr: string | null
   esosadnm: string | null
