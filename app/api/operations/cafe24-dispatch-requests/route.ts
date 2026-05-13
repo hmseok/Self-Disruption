@@ -155,6 +155,10 @@ export async function GET(request: Request) {
   const from = url.searchParams.get('from')
   const to = url.searchParams.get('to')
   const q = url.searchParams.get('q')
+  // P1.5e — otptdcyn 필터 옵션화: 'Y' / 'N' / 'all' (사용자 명시 — 대차사용/미사용 모두)
+  const dcyn = url.searchParams.get('dcyn') || 'Y'
+  // rgst: 'R' (활성) / 'C' (취소) / 'all' (모두)
+  const rgst = url.searchParams.get('rgst') || 'R'
 
   const where: string[] = []
   const params: unknown[] = []
@@ -162,9 +166,15 @@ export async function GET(request: Request) {
   // 비정상 mddt 필터
   where.push('CHAR_LENGTH(b.otptmddt) = 8')
   where.push("b.otptmddt BETWEEN '20100101' AND '20991231'")
-  // 활성 + 대차요청 = Y (가설 J — acrotpth 메인)
-  where.push("b.otptrgst = 'R'")
-  where.push("b.otptdcyn = 'Y'")
+
+  if (rgst !== 'all' && /^[A-Z]$/.test(rgst)) {
+    where.push('b.otptrgst = ?')
+    params.push(rgst)
+  }
+  if (dcyn !== 'all' && /^[YN]$/.test(dcyn)) {
+    where.push('b.otptdcyn = ?')
+    params.push(dcyn)
+  }
 
   if (from && /^\d{8}$/.test(from)) {
     where.push('b.otptmddt >= ?')
@@ -250,7 +260,7 @@ export async function GET(request: Request) {
         cache: 30,
         limit,
         offset,
-        filters: { from, to, q },
+        filters: { from, to, q, dcyn, rgst },
         join_strategy: 'J (acrotpth main + acrrentm idno+mddt+srno 1:1)',
         diagnostics: {
           row_count: rows.length,
