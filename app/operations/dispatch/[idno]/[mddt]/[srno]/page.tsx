@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef, use, useMemo } from 'react'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { GLASS } from '@/app/utils/ui-tokens'
 import type {
@@ -356,9 +355,7 @@ export default function DispatchDetailPage({
           <div style={{ display: 'flex', gap: 8 }}>
             <button onClick={() => router.back()} style={ghostBtn}>← 목록</button>
             <button onClick={() => { fetchRow(); fetchMemos(); fetchOrder(); fetchConsultations() }} disabled={rowLoading} style={subtleBtn}>↻ 새로고침</button>
-            <Link href={`/operations/accident/${idno}/${mddt}/${srno}`} style={{ ...secondaryBtn, textDecoration: 'none' }}>
-              📋 사고접수 보기
-            </Link>
+            {/* 사고접수 link 제거 — esos*srno vs otpt*srno 스킴 다름 */}
           </div>
         </div>
 
@@ -388,54 +385,81 @@ export default function DispatchDetailPage({
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 16 }}>
             {/* MAIN COLUMN */}
             <div>
-              {/* A. 대차요청 정보 (잔디 메시지 형식) */}
-              <Section icon="📋" title="대차요청 정보 (잔디 메시지 형식)">
-                <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr 140px 1fr', gap: '8px 16px', fontSize: 12 }}>
-                  <Lbl>*대차업체</Lbl>
-                  <Val>{row.rental_vendor || '-'}{row.rental_hp ? ` (${row.rental_hp})` : ''}</Val>
-                  <Lbl>*캐피탈사</Lbl>
-                  <Val>{row.capital_co_name || row.capital_co_code || '-'}</Val>
-                  <Lbl>*차량번호,차종</Lbl>
-                  <Val span={3}>
-                    <span style={{ fontWeight: 800 }}>{row.cars_no || '-'}</span>
-                    {row.cars_model && <span style={{ marginLeft: 6, color: '#475569' }}>{row.cars_model}</span>}
-                  </Val>
-                  <Lbl>*접수일시</Lbl>
-                  <Val>{fmtCafe24DateTime(row.otptacdt, row.otptactm) || '-'}</Val>
-                  <Lbl>*고객명</Lbl>
+              {/* 차량 정보 (메인 상단으로 이동 — 사용자 명시) */}
+              <Section icon="🚗" title="차량 정보">
+                <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr 140px 1fr', gap: '8px 16px', fontSize: 13 }}>
+                  <Lbl>차량번호</Lbl>
+                  <Val><span style={{ fontWeight: 800, fontSize: 14 }}>{row.cars_no || '-'}</span></Val>
+                  <Lbl>차종</Lbl>
+                  <Val>{row.cars_model || '-'}</Val>
+                  <Lbl>고객</Lbl>
                   <Val>{row.cars_user || '-'}</Val>
-                  <Lbl>*통보자</Lbl>
-                  <Val>{row.otptcanm || '-'}{row.otptcahp ? ` / ${row.otptcahp}` : ''}</Val>
-                  <Lbl>*운전자</Lbl>
-                  <Val>{row.otptdsnm || '-'}{row.otptdshp ? ` / ${row.otptdshp}` : ''}</Val>
-                  <Lbl>*사고종류</Lbl>
+                  <Lbl>캐피탈사</Lbl>
+                  <Val>{row.capital_co_name || row.capital_co_code || '-'}</Val>
+                </div>
+              </Section>
+
+              {/* 사고 정보 — 자체 구성 */}
+              <Section icon="🚨" title="사고 정보">
+                <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr 140px 1fr', gap: '8px 16px', fontSize: 12 }}>
+                  <Lbl>접수일시</Lbl>
+                  <Val>{fmtCafe24DateTime(row.otptacdt, row.otptactm) || '-'}</Val>
+                  <Lbl>접수자</Lbl>
+                  <Val>{row.gnus_name || row.otptgnus || '-'}</Val>
+                  <Lbl>사고 종류</Lbl>
                   <Val span={3}>
                     {accidentTypes.length > 0
                       ? accidentTypes.map((t: string) => (
-                          <span key={t} style={{ display: 'inline-block', marginRight: 6, padding: '2px 8px', background: 'rgba(99,102,241,0.12)', color: '#4338ca', borderRadius: 6, fontSize: 11, fontWeight: 700 }}>{t}</span>
+                          <span key={t} style={{ display: 'inline-block', marginRight: 6, padding: '3px 10px', background: 'rgba(99,102,241,0.12)', color: '#4338ca', borderRadius: 8, fontSize: 11, fontWeight: 700 }}>{t}</span>
                         ))
                       : '-'}
                   </Val>
-                  <Lbl>*사고내용</Lbl>
+                  <Lbl>사고 내용</Lbl>
                   <Val span={3} preWrap>{row.otptacmo || '-'}</Val>
-                  <Lbl>*사고위치</Lbl>
+                  <Lbl>사고 위치</Lbl>
                   <Val span={3} preWrap>{row.otptacad || '-'}</Val>
-                  <Lbl>*상대 보험사</Lbl>
-                  <Val>{insuranceCompanyOther}</Val>
-                  <Lbl>*상대 접수번호</Lbl>
-                  <Val>{insuranceClaimOther}</Val>
-                  {(row.otpttonm || row.otpttohp || row.otpttonu) && (
-                    <>
-                      <Lbl>*상대차량 운전자</Lbl>
+                </div>
+              </Section>
+
+              {/* 통보자 / 운전자 */}
+              <Section icon="👥" title="통보자 / 운전자">
+                <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr 140px 1fr', gap: '8px 16px', fontSize: 12 }}>
+                  <Lbl>통보자</Lbl>
+                  <Val>{row.otptcanm || '-'}{row.otptcahp ? ` / ${row.otptcahp}` : ''}</Val>
+                  <Lbl>운전자</Lbl>
+                  <Val>{row.otptdsnm || '-'}{row.otptdshp ? ` / ${row.otptdshp}` : ''}</Val>
+                </div>
+              </Section>
+
+              {/* 상대 차량 / 보험 (있을 때만) */}
+              {(row.otpttobm || row.otpttonm || row.otpttohp) && (
+                <Section icon="🚙" title="상대 차량 / 보험">
+                  <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr 140px 1fr', gap: '8px 16px', fontSize: 12 }}>
+                    <Lbl>상대 보험사</Lbl>
+                    <Val>{insuranceCompanyOther}</Val>
+                    <Lbl>상대 접수번호</Lbl>
+                    <Val>{insuranceClaimOther}</Val>
+                    {(row.otpttonm || row.otpttohp) && (<>
+                      <Lbl>상대 운전자</Lbl>
                       <Val>{row.otpttonm || '-'}{row.otpttohp ? ` / ${row.otpttohp}` : ''}</Val>
-                      <Lbl>*상대차량 번호</Lbl>
+                      <Lbl>상대 차량번호</Lbl>
                       <Val>{row.otpttonu || '-'}{row.otpttomd ? ` (${row.otpttomd})` : ''}</Val>
-                    </>
-                  )}
-                  <Lbl>*대차요청날짜</Lbl>
+                    </>)}
+                  </div>
+                </Section>
+              )}
+
+              {/* 대차 요청 */}
+              <Section icon="🏢" title="대차 요청">
+                <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr 140px 1fr', gap: '8px 16px', fontSize: 12 }}>
+                  <Lbl>대차업체</Lbl>
+                  <Val>{row.rental_vendor || '-'}</Val>
+                  <Lbl>대차업체 전화</Lbl>
+                  <Val>{row.rental_hp || '-'}</Val>
+                  <Lbl>대차요청날짜</Lbl>
                   <Val>{row.rent_rsdt || '협의필요'}</Val>
-                  <Lbl>*접수자</Lbl>
-                  <Val>{row.gnus_name || row.otptgnus || '-'}</Val>
+                  <Lbl>업체 코드</Lbl>
+                  <Val>{row.rent_facd || '-'}</Val>
                 </div>
               </Section>
 
@@ -614,44 +638,12 @@ export default function DispatchDetailPage({
                 </div>
               </Section>
 
-              {/* 사이드 정보 — 차량 마스터 */}
-              <Section icon="🚗" title="차량 마스터">
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12 }}>
-                  <Row><Lbl>차량번호</Lbl><Val>{row.cars_no || '-'}</Val></Row>
-                  <Row><Lbl>차종</Lbl><Val>{row.cars_model || '-'}</Val></Row>
-                  <Row><Lbl>고객</Lbl><Val>{row.cars_user || '-'}</Val></Row>
-                  <Row><Lbl>캐피탈사</Lbl><Val>{row.capital_co_name || row.capital_co_code || '-'}</Val></Row>
-                </div>
-              </Section>
-
-              {/* 사이드 정보 — 대차업체 */}
-              <Section icon="🏢" title="대차업체">
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12 }}>
-                  <Row><Lbl>업체명</Lbl><Val>{row.rental_vendor || '-'}</Val></Row>
-                  <Row><Lbl>전화</Lbl><Val>{row.rental_hp || '-'}</Val></Row>
-                  <Row><Lbl>코드</Lbl><Val>{row.rent_facd || '-'}</Val></Row>
-                </div>
-              </Section>
-
-              {/* 사이드 정보 — 상대차량 */}
-              {(row.otpttonm || row.otpttohp || row.otpttobm) && (
-                <Section icon="🚙" title="상대차량">
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12 }}>
-                    {row.otpttonm && <Row><Lbl>운전자</Lbl><Val>{row.otpttonm}</Val></Row>}
-                    {row.otpttohp && <Row><Lbl>전화</Lbl><Val>{row.otpttohp}</Val></Row>}
-                    {row.otpttonu && <Row><Lbl>차량번호</Lbl><Val>{row.otpttonu}</Val></Row>}
-                    {row.otpttomd && <Row><Lbl>차종</Lbl><Val>{row.otpttomd}</Val></Row>}
-                    {row.otpttobm && <Row><Lbl>보험사</Lbl><Val>{row.otpttobm}</Val></Row>}
-                    {row.otpttobn && <Row><Lbl>접수번호</Lbl><Val>{row.otpttobn}</Val></Row>}
-                  </div>
-                </Section>
-              )}
-
-              {/* 사이드 정보 — 등록자 */}
-              <Section icon="👤" title="등록자">
+              {/* 사이드 정보 — 접수 정보 */}
+              <Section icon="📌" title="접수 정보">
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12 }}>
                   <Row><Lbl>접수자</Lbl><Val>{row.gnus_name || row.otptgnus || '-'}</Val></Row>
-                  <Row><Lbl>접수번호</Lbl><Val>{row.otptidno}/{row.otptmddt}/{row.otptsrno}</Val></Row>
+                  <Row><Lbl>접수번호</Lbl><Val style={{ fontFamily: 'monospace', fontSize: 11 }}>{row.otptidno}/{row.otptmddt}/{row.otptsrno}</Val></Row>
+                  <Row><Lbl>등록상태</Lbl><Val>{row.otptrgst === 'R' ? '활성' : row.otptrgst === 'C' ? '취소' : row.otptrgst || '-'}</Val></Row>
                 </div>
               </Section>
             </div>

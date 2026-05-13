@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useCallback, use } from 'react'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { GLASS } from '@/app/utils/ui-tokens'
 import type { Cafe24Detail, Cafe24Memo, DispatchOrder } from '@/app/operations/intake/types'
@@ -63,6 +62,55 @@ export default function AccidentDetailPage({
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [dispatchOrder, setDispatchOrder] = useState<DispatchOrder | null>(null)
+  const [proceedBusy, setProceedBusy] = useState(false)
+  const [toast, setToast] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
+
+  // ── 우리 시스템에서 대차로 진행 (사용자 명시 — 카페24 외 자체 dispatch_order 생성) ──
+  const proceedToDispatch = useCallback(async () => {
+    if (proceedBusy) return
+    if (!window.confirm('우리 시스템에 대차요청을 등록합니다. 진행할까요?')) return
+    setProceedBusy(true)
+    try {
+      const headers = { ...(await getAuthHeader()), 'Content-Type': 'application/json' }
+      const res = await fetch('/api/operations/dispatch-orders', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          ride_accident_id: rideAccidentIdFromIdno(idno),
+          status: 'consulting',
+        }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (json.error) throw new Error(json.error)
+      // 새 dispatch_order 정보로 state 갱신
+      setDispatchOrder({
+        id: json.id,
+        ride_accident_id: json.ride_accident_id,
+        consultation_note: null,
+        customer_request: null,
+        expected_dispatch_date: null,
+        expected_return_date: null,
+        status: json.status || 'consulting',
+        assigned_to: null,
+        fmi_rental_id: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      setToast({ type: 'ok', text: '우리 시스템에 대차요청 등록됨' })
+      setTimeout(() => setToast(null), 5000)
+    } catch (e: any) {
+      const msg = e?.message || '대차 진행 실패'
+      // 이미 active dispatch_order 있는 경우 409 fallback
+      if (msg.includes('이미 진행 중')) {
+        setToast({ type: 'ok', text: '이미 대차 진행 중 — 새로고침 권장' })
+      } else {
+        setToast({ type: 'err', text: msg })
+      }
+      setTimeout(() => setToast(null), 5000)
+    } finally {
+      setProceedBusy(false)
+    }
+  }, [idno, proceedBusy])
 
   // ── Fetch detail + memos + dispatch_order (병렬) ──
   const fetchAll = useCallback(async () => {
@@ -128,19 +176,33 @@ export default function AccidentDetailPage({
           <div style={{ display: 'flex', gap: 8 }}>
             <button onClick={() => router.back()} style={ghostBtn}>← 목록</button>
             <button onClick={fetchAll} disabled={loading} style={subtleBtn}>↻ 새로고침</button>
-            {dispatchOrder ? (
-              <Link
-                href={`/operations/dispatch/${idno}/${mddt}/${srno}`}
-                style={{ ...primaryBtn, textDecoration: 'none' }}
-              >🚗 대차접수 화면으로</Link>
-            ) : (
-              <Link
-                href={`/operations/dispatch/${idno}/${mddt}/${srno}`}
-                style={{ ...secondaryBtn, textDecoration: 'none' }}
-              >🚗 대차로 진행</Link>
+            {!dispatchOrder && (
+              <button
+                onClick={proceedToDispatch}
+                disabled={proceedBusy}
+                style={{ ...secondaryBtn, opacity: proceedBusy ? 0.5 : 1, cursor: proceedBusy ? 'wait' : 'pointer' }}
+              >{proceedBusy ? '⏳ 처리 중…' : '🚗 대차로 진행'}</button>
             )}
           </div>
         </div>
+
+        {/* Toast */}
+        {toast && (
+          <div
+            style={{
+              marginBottom: 16,
+              padding: 14,
+              background: toast.type === 'ok' ? 'rgba(16,185,129,0.08)' : 'rgba(239,68,68,0.08)',
+              border: `1px solid ${toast.type === 'ok' ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)'}`,
+              borderRadius: 12,
+              fontSize: 13,
+              fontWeight: 700,
+              color: toast.type === 'ok' ? '#065f46' : '#991b1b',
+            }}
+          >
+            {toast.type === 'ok' ? '✅' : '⚠️'} {toast.text}
+          </div>
+        )}
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 16 }}>
           {/* MAIN COLUMN */}
@@ -235,9 +297,23 @@ export default function AccidentDetailPage({
               </div>
             </Section>
 
+            {dispatchOrder && (
+              <Section icon="🚗" title="우리 대차 진행">
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12 }}>
+                  <Row><Lbl>상태</Lbl><Val>{dispatchOrder.status}</Val></Row>
+                  <Row><Lbl>등록</Lbl><Val>{new Date(dispatchOrder.created_at).toLocaleString('ko-KR', { dateStyle: 'short', timeStyle: 'short' })}</Val></Row>
+                  {dispatchOrder.expected_dispatch_date && <Row><Lbl>예상 배차일</Lbl><Val>{dispatchOrder.expected_dispatch_date}</Val></Row>}
+                  {dispatchOrder.expected_return_date && <Row><Lbl>예상 반납일</Lbl><Val>{dispatchOrder.expected_return_date}</Val></Row>}
+                </div>
+                <div style={{ marginTop: 10, padding: 10, background: 'rgba(99,102,241,0.08)', borderRadius: 8, fontSize: 11, color: '#4338ca', lineHeight: 1.5 }}>
+                  📋 상담 / 일정 / 배차 확정은 본 화면 하단 (P1.5d-2 추가 예정) 또는 「대차접수」 탭에서 관리.
+                </div>
+              </Section>
+            )}
+
             <div style={{ marginTop: 12, padding: 10, background: 'rgba(241,245,249,0.6)', borderRadius: 8, fontSize: 11, color: '#64748b', lineHeight: 1.5 }}>
-              ℹ️ 사고접수 단계 — read-only.<br />
-              대차 진행은 「🚗 대차접수」 화면에서 상담 / 일정 / 배차 확정 관리.
+              ℹ️ 사고접수 단계 — cafe24 데이터 read-only.<br />
+              {!dispatchOrder && '우리 시스템에서 대차로 진행하려면 상단 [🚗 대차로 진행] 버튼.'}
             </div>
           </div>
         </div>
