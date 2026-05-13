@@ -356,6 +356,9 @@ interface FileItem {
   customerId: string
   periodLabel: string
   layout: 'auto' | 'meritz' | 'im' | 'mg' | 'ride-integrated'
+  password: string  // PR-6.11.e — 비밀번호 보호 정산서
+  passwordNeeded: boolean  // 서버에서 비밀번호 요구 시 true
+  passwordInvalid: boolean  // 비밀번호 불일치 시 true
   busy: boolean
   result: { parent_settlement_id: string | null; total_inserted: number; children: { sheet: string; settlement_id: string; inserted: number }[] } | null
   detected: { layout?: string; period_label?: string; customer_name?: string; sheet_count?: number; total_items?: number } | null
@@ -384,6 +387,9 @@ function UploadModal({
       customerId: defaultCustomerId,
       periodLabel: '',
       layout: 'auto',
+      password: '',  // PR-6.11.e
+      passwordNeeded: false,
+      passwordInvalid: false,
       busy: false,
       result: null,
       detected: null,
@@ -403,7 +409,7 @@ function UploadModal({
   const submitOne = async (id: string, mode: 'preview' | 'apply') => {
     const item = files.find(f => f.id === id)
     if (!item) return
-    updateField(id, { busy: true, error: null })
+    updateField(id, { busy: true, error: null, passwordNeeded: false, passwordInvalid: false })
     try {
       const token = getStoredToken()
       const fd = new FormData()
@@ -412,13 +418,22 @@ function UploadModal({
       if (item.periodLabel) fd.append('period_label', item.periodLabel)
       fd.append('layout', item.layout)
       fd.append('mode', mode)
+      if (item.password) fd.append('password', item.password)  // PR-6.11.e
       const res = await fetch('/api/ride-settlements/upload', {
         method: 'POST',
         headers: token ? { Authorization: `Bearer ${token}` } : {},
         body: fd,
       })
       const text = await res.text()
-      let json: { success?: boolean; error?: string; detected?: { layout?: string; period_label?: string; customer_name?: string; sheet_count?: number; total_items?: number }; result?: { parent_settlement_id: string | null; total_inserted: number; children: { sheet: string; settlement_id: string; inserted: number }[] } }
+      let json: {
+        success?: boolean
+        error?: string
+        message?: string
+        _password_needed?: boolean
+        _password_invalid?: boolean
+        detected?: { layout?: string; period_label?: string; customer_name?: string; sheet_count?: number; total_items?: number }
+        result?: { parent_settlement_id: string | null; total_inserted: number; children: { sheet: string; settlement_id: string; inserted: number }[] }
+      }
       try {
         json = JSON.parse(text)
       } catch {
@@ -426,6 +441,24 @@ function UploadModal({
         return
       }
       if (!res.ok || !json.success) {
+        // PR-6.11.e — password 보호 응답 처리
+        if (json._password_needed) {
+          updateField(id, {
+            busy: false,
+            passwordNeeded: true,
+            error: json.message || '비밀번호 보호 파일 — 비밀번호 입력 필요',
+          })
+          return
+        }
+        if (json._password_invalid) {
+          updateField(id, {
+            busy: false,
+            passwordNeeded: true,
+            passwordInvalid: true,
+            error: json.message || '비밀번호 불일치',
+          })
+          return
+        }
         updateField(id, { busy: false, error: json.error || `HTTP ${res.status}` })
         return
       }
@@ -521,7 +554,7 @@ function UploadModal({
               padding: '20px 16px',
               textAlign: 'center',
               cursor: 'pointer',
-              background: hover ? 'rgba(59,110,181,0.08)' : 'rgba(255,255,255,0.40)',
+              background: hover ? COLORS.bgBlue : GLASS.L1.background,
             }}
           >
             <input
@@ -602,6 +635,24 @@ function UploadModal({
                       value={f.periodLabel}
                       onChange={e => updateField(f.id, { periodLabel: e.target.value })}
                       style={{ fontSize: 11, padding: '4px 8px', borderRadius: 6, border: '1px solid rgba(0,0,0,0.10)', width: 110 }}
+                    />
+                    <input
+                      type="password"
+                      placeholder="🔑 비밀번호 (선택)"
+                      value={f.password}
+                      onChange={e => updateField(f.id, { password: e.target.value, passwordInvalid: false })}
+                      style={{
+                        fontSize: 11,
+                        padding: '4px 8px',
+                        borderRadius: 6,
+                        border: f.passwordInvalid
+                          ? `2px solid ${COLORS.danger}`
+                          : f.passwordNeeded
+                            ? `2px solid ${COLORS.warning}`
+                            : '1px solid rgba(0,0,0,0.10)',
+                        width: 140,
+                      }}
+                      autoFocus={f.passwordNeeded}
                     />
                     <button
                       style={{ ...BTN.sm, background: COLORS.bgBlue, color: COLORS.primary, marginLeft: 'auto' }}

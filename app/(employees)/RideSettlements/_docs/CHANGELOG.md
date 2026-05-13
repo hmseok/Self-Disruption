@@ -4,6 +4,53 @@
 
 ---
 
+## 2026-05-13 | PR-6.11.e | 비밀번호 보호 정산서 자동 복호화
+
+### 사용자 요청
+> "xlsx parse 실패: File is password-protected … 아무래도 더많아질수있죠 개인정보니까"
+
+### 의도
+위탁사가 개인정보 보호 차원에서 password-protected xlsx 정산서를 보내는 빈도 증가 예상.
+ERP 업로드 UI 에 비밀번호 입력란 추가 + server 측 자동 복호화 → 기존 SheetJS parse 흐름 유지.
+
+### 라이브러리 (Rule 13 검증)
+- `officecrypto-tool@0.0.19` — npm, MIT, deps=3
+- `isEncrypted(buf)` + `decrypt(buf, { password })` API
+- ECMA-376 Agile/Standard encryption 지원 (xls/xlsx 모두 OK)
+
+### 변경
+- **`package.json`** — officecrypto-tool 의존성 추가
+- **`app/api/ride-settlements/upload/route.ts`**
+  - FormData `password` 파라미터 수신
+  - 파일 buffer → `officeCrypto.isEncrypted()` 체크
+  - 암호화 + 비밀번호 미입력 → `_password_needed: true` 응답 (HTTP 400)
+  - 비밀번호 불일치 → `_password_invalid: true` 응답 (HTTP 400)
+  - 복호화 성공 → buffer 교체 후 기존 SheetJS parse 계속
+- **`app/(employees)/RideSettlements/page.tsx` — UploadModal**
+  - `FileItem` 인터페이스에 `password / passwordNeeded / passwordInvalid` 추가
+  - 파일 카드 컨트롤 행에 `🔑 비밀번호 (선택)` input 추가 (type="password")
+  - 비밀번호 필요 시 border 노란색 강조 + autoFocus
+  - 비밀번호 불일치 시 border 빨간색 강조
+  - submitOne 에서 password FormData 에 추가 + 응답에서 password_needed/invalid 처리
+
+### 보안 (Rule 13)
+- 비밀번호 평문 저장 절대 X (DB / 로그 / localStorage 모두 금지)
+- React state 메모리만 사용 → 모달 닫으면 사라짐
+- HTTPS 전제 (배포 OK)
+
+### 토큰화 (UI 표준)
+업로드 modal dropzone 의 hover/idle 배경 하드코드 → `COLORS.bgBlue / GLASS.L1.background` 토큰 적용
+
+### Verification
+- tsc --noEmit: 본 PR 무관 (pre-existing only)
+- lint:harness: 새 critical 위반 0건
+
+### 향후 옵션 (별도 PR-6.11.f)
+위탁사별 default password 도입 가능성 — `ride_customer_companies.default_settlement_password_enc`
+(서버 마스터키로 암호화 후 저장 → 자동 시도 → 실패 시 사용자 입력 fallback)
+
+---
+
 ## 2026-05-11 | PR-6.11.d | 정산서 → 카페24 enrichment → 차량 자동 등록
 
 ### 사용자 요청

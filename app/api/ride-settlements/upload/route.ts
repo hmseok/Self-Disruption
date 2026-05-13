@@ -24,6 +24,12 @@ import { prisma } from '@/lib/prisma'
 import { randomUUID } from 'crypto'
 import * as XLSX from 'xlsx'
 import { logAuditAction } from '@/lib/audit-log'
+// PR-6.11.e — 비밀번호 보호 정산서 자동 복호화
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const officeCrypto = require('officecrypto-tool') as {
+  isEncrypted: (buf: Buffer) => boolean
+  decrypt: (buf: Buffer, opts: { password: string }) => Promise<Buffer>
+}
 
 type Cell = string | number | null | undefined
 type Layout = 'meritz' | 'im' | 'mg' | 'ride-integrated' | 'unknown'
@@ -330,6 +336,8 @@ export async function POST(request: Request) {
   const periodLabelInput = (formData.get('period_label') as string) || ''
   const layoutForce = (formData.get('layout') as string) || 'auto'
   const mode = ((formData.get('mode') as string) || 'preview') === 'apply' ? 'apply' : 'preview'
+  // PR-6.11.e — 비밀번호 (개인정보 보호 정산서)
+  const passwordInput = (formData.get('password') as string) || ''
 
   if (!file)
     return NextResponse.json({ success: false, error: 'file 필요' }, { status: 400 })
@@ -339,6 +347,40 @@ export async function POST(request: Request) {
     buffer = Buffer.from(await file.arrayBuffer())
   } catch {
     return NextResponse.json({ success: false, error: '파일 읽기 실패' }, { status: 400 })
+  }
+
+  // PR-6.11.e — 비밀번호 보호 파일 자동 복호화
+  let isEncryptedFile = false
+  try {
+    isEncryptedFile = officeCrypto.isEncrypted(buffer)
+  } catch {
+    isEncryptedFile = false
+  }
+  if (isEncryptedFile) {
+    if (!passwordInput) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'password-needed',
+          message: '비밀번호 보호 파일 — 비밀번호 입력 필요',
+          _password_needed: true,
+        },
+        { status: 400 }
+      )
+    }
+    try {
+      buffer = await officeCrypto.decrypt(buffer, { password: passwordInput })
+    } catch (e) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'password-invalid',
+          message: `비밀번호 불일치 또는 미지원 암호화: ${(e as Error).message}`,
+          _password_invalid: true,
+        },
+        { status: 400 }
+      )
+    }
   }
 
   let wb: XLSX.WorkBook
