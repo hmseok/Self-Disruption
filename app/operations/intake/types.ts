@@ -87,6 +87,15 @@ export type Cafe24Detail = {
   esosgndt: string | null
   esosgntm: string | null
   esosgnus: string | null
+  // 점검 (Y/N — accident/detail/route.ts 의 응답 필드)
+  esosbate: string | null
+  esostire: string | null
+  esosoils: string | null
+  esoslock: string | null
+  esosmove: string | null
+  esoshelp: string | null
+  // 주행거리
+  esoskilo: string | null
   // 차량 마스터 (조인)
   cars_no: string | null
   cars_model: string | null
@@ -104,6 +113,130 @@ export type Cafe24Memo = {
   memognus: string | null
   memogndt: string | null
   memogntm: string | null
+}
+
+// ─── PR-OPS-1.5b 풍성화 ───────────────────────────────────────────
+
+// /api/operations/cafe24-accidents 응답 (사고접수 탭 — 풍성화)
+export type RichAccidentRow = {
+  esosidno: string
+  esosmddt: string
+  esossrno: number
+  esosacdt: string | null
+  esosactm: string | null
+  esosrgst: string | null
+  esosrslt: string | null
+  esosrstx: string | null
+  esostypp: string | null
+  esosgnus: string | null
+  esosaddr: string | null
+  esosadnm: string | null
+  esosadtl: string | null
+  esosusnm: string | null
+  esosustl: string | null
+  esoskilo: string | null
+  cars_no: string | null
+  cars_model: string | null
+  cars_user: string | null
+  capital_co_code: string | null
+  capital_co_name: string | null
+  gnus_name: string | null
+}
+
+// /api/operations/cafe24-dispatch-requests 응답 (대차접수 탭)
+// 가설 J — acrotpth main + acrrentm 1:1 + pmccarsm + pmcfactm + pmccustm + picuserm
+export type DispatchRequestRow = {
+  // 사고차 출동 본체 (acrotpth)
+  otptidno: string
+  otptmddt: string
+  otptsrno: number
+  otptacdt: string | null
+  otptactm: string | null
+  otptacbn: string | null
+  otptrgst: string | null
+  otptrgtp: string | null
+  otptgnus: string | null
+  otptdcyn: string | null
+  otptcanm: string | null
+  otptcahp: string | null
+  otptdsnm: string | null
+  otptdshp: string | null
+  otptacdi: string | null
+  otptacdm: string | null
+  otptacjc: string | null
+  otptacjs: string | null
+  otptacmb: string | null
+  otptacno: string | null
+  otptacph: string | null
+  otptdsrp: string | null
+  otptftyn: string | null
+  otpttonm: string | null
+  otpttohp: string | null
+  otpttonu: string | null
+  otpttomd: string | null
+  otpttobm: string | null
+  otpttobn: string | null
+  otpttobu: string | null
+  otptacad: string | null
+  otptacmo: string | null
+  otptacet: string | null
+  // 대차요청 sub (acrrentm)
+  rent_srno: number | string | null
+  rent_seqn: number | null
+  rent_stat: string | null
+  rent_rsdt: string | null
+  rent_frdt: string | null
+  rent_frtm: string | null
+  rent_todt: string | null
+  rent_totm: string | null
+  rent_user: string | null
+  rent_ushp: string | null
+  rent_nums: string | null
+  rent_modl: string | null
+  rent_facd: string | null
+  rent_memo: string | null
+  // 대차업체 (pmcfactm)
+  rental_vendor: string | null
+  rental_hp: string | null
+  rental_bdno: string | null
+  // 차량 마스터 (pmccarsm)
+  cars_no: string | null
+  cars_model: string | null
+  cars_user: string | null
+  capital_co_code: string | null
+  capital_co_name: string | null
+  // 등록자 (picuserm)
+  gnus_name: string | null
+}
+
+// acrotpth Y/N flag → 사고 종류 라벨 매핑
+// jandi_move.php:99-132 패턴 그대로
+export function describeAccidentTypes(r: DispatchRequestRow): string[] {
+  const types: string[] = []
+  if (r.otptacdi === 'Y') types.push('대인')
+  if (r.otptacdm === 'Y') types.push('대물')
+  if (r.otptacjc === 'Y') types.push('자차')
+  if (r.otptacjs === 'Y') types.push('자손')
+  if (r.otptacmb === 'Y') types.push('무보험')
+  if (r.otptacno === 'Y') types.push('현장출동')
+  if (r.otptacph === 'Y') types.push('긴급견인')
+  if (r.otptdsrp === 'Y') types.push('수리')
+  return types
+}
+
+// YYYYMMDD + HHMM → 표시용 (페이지 + 모달 공유)
+export function fmtCafe24DateTime(d: string | null, t: string | null): string {
+  if (!d || d.length !== 8) return ''
+  const date = `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}`
+  if (!t || t.length < 4) return date
+  return `${date} ${t.slice(0, 2)}:${t.slice(2, 4)}`
+}
+
+// dispatch_order 가 가지는 대차접수 row 매핑용 키 — (idno, mddt, srno)
+export type DispatchRequestKey = {
+  idno: string
+  mddt: string
+  srno: number
 }
 
 // 카테고리 색상 + 라벨 (D/C 섹션 공유)

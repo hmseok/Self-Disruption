@@ -6,22 +6,27 @@ import DcStatStrip, { StatItem, ActionButton } from '../../components/DcStatStri
 import DcToolbar, { FilterItem } from '../../components/DcToolbar'
 import NeuDataTable, { TableColumn, MobileCardConfig } from '../../components/NeuDataTable'
 import { GLASS } from '../../utils/ui-tokens'
-import IntakeModalV2 from './IntakeModalV2'
-import type { Cafe24Accident, DispatchOrder, MergedRow, ResultMsg } from './types'
+import AccidentDetailFullscreen from './AccidentDetailFullscreen'
+import DispatchRequestFullscreen from './DispatchRequestFullscreen'
+import type {
+  RichAccidentRow,
+  DispatchRequestRow,
+  ResultMsg,
+} from './types'
+import { fmtCafe24DateTime } from './types'
 
 // ═══════════════════════════════════════════════════════════════════
-// /operations/intake — 접수/오더 (PR-OPS-REDESIGN Phase 1.3)
+// /operations/intake — 접수/오더 (PR-OPS-1.5b)
 //
-// 외부 카페24 사고 데이터 + 우리 operations_dispatch_orders 통합.
-// 배차담당자 워크플로우:
-//   1. 신규 대차요청 (cafe24 사고 stage='replacement_requested' / 'accident_reported')
-//   2. 상담 진행 (dispatch_order.status='new'|'consulting')
-//   3. 배차 예정 (dispatch_order.status='scheduled')
-//   4. 배차 확정 (dispatch_order.status='dispatched', fmi_rentals 연결)
-//   5. 종결 (done / cancelled / cafe24 closed)
+// Sub-tab 2개:
+//   📋 사고접수 = /api/operations/cafe24-accidents (cafe24 어드민 전체 사고)
+//   🚗 대차접수 = /api/operations/cafe24-dispatch-requests (otptdcyn='Y' 대차요청)
+//
+// 행 클릭:
+//   사고접수 → AccidentDetailFullscreen (cafe24 어드민 스타일 read-only)
+//   대차접수 → DispatchRequestFullscreen (sample 메시지 형식 + dispatch_order)
 //
 // 디자인 표준: PageTitle 자동 / DcStatStrip / DcToolbar / NeuDataTable
-// Rule 17 모듈 책임 / Rule 18 sortBy 의무 / Rule 19 줄바꿈 최소화 / Rule 20 결과 글래스 패널
 // ═══════════════════════════════════════════════════════════════════
 
 async function getAuthHeader(): Promise<Record<string, string>> {
@@ -33,330 +38,426 @@ async function getAuthHeader(): Promise<Record<string, string>> {
   }
 }
 
-// ── Types ─── ./types.ts 에서 공유 ───────────────────────────────
+type SubTab = 'accidents' | 'dispatch'
 
-const STAGE_LABEL: Record<string, string> = {
-  new: '🆕 신규',
-  consulting: '📞 상담중',
-  scheduled: '📅 배차예정',
-  dispatched: '🚐 배차완료',
-  done: '✅ 종결',
-}
-
-const STAGE_TINT: Record<string, string> = {
-  new: '#ef4444',
-  consulting: '#f97316',
-  scheduled: '#eab308',
-  dispatched: '#3b82f6',
-  done: '#10b981',
+const SUBTAB_LABEL: Record<SubTab, string> = {
+  accidents: '📋 사고접수',
+  dispatch: '🚗 대차접수',
 }
 
 // ═══ Page ══════════════════════════════════════════════════════════
 export default function OperationsIntakePage() {
   const { company, role } = useApp()
-  const [cafe24Accidents, setCafe24Accidents] = useState<Cafe24Accident[]>([])
-  const [dispatchOrders, setDispatchOrders] = useState<DispatchOrder[]>([])
-  const [loading, setLoading] = useState(true)
-  const [stageFilter, setStageFilter] = useState<string>('all')
-  const [search, setSearch] = useState('')
-  const [selectedRow, setSelectedRow] = useState<MergedRow | null>(null)
+  const [subTab, setSubTab] = useState<SubTab>('dispatch')   // 본업 대차접수 default
+
+  // ── 사고접수 탭 state ──
+  const [accidents, setAccidents] = useState<RichAccidentRow[]>([])
+  const [accidentsLoading, setAccidentsLoading] = useState(false)
+  const [accidentsErr, setAccidentsErr] = useState<string | null>(null)
+  const [accidentsSearch, setAccidentsSearch] = useState('')
+  const [selectedAccident, setSelectedAccident] = useState<RichAccidentRow | null>(null)
+
+  // ── 대차접수 탭 state ──
+  const [dispatches, setDispatches] = useState<DispatchRequestRow[]>([])
+  const [dispatchesLoading, setDispatchesLoading] = useState(false)
+  const [dispatchesErr, setDispatchesErr] = useState<string | null>(null)
+  const [dispatchesSearch, setDispatchesSearch] = useState('')
+  const [selectedDispatch, setSelectedDispatch] = useState<DispatchRequestRow | null>(null)
+
+  // ── 공통 결과 메시지 ──
   const [resultMsg, setResultMsg] = useState<ResultMsg | null>(null)
 
-  // ── Fetch ────────────────────────────────────────────────────────
-  // cafe24 응답 (PR-OPS-REDESIGN P1.3 hotfix):
-  //   { success: true, data: AccidentRow[] }
-  //   AccidentRow: { esosidno, esosmddt, esossrno, esosacdt, esosactm,
-  //                  esosrgst, esosrslt, esosrstx, esostypp, esosgnus,
-  //                  cars_no, cars_model }
-  //   detail endpoint (/api/cafe24/accidents/detail) 에서 위치/요청자 등 30+ 필드 가능
-  const fetchCafe24 = useCallback(async () => {
+  // ── Date range — 1년 ──
+  const dateRange = useMemo(() => {
+    const today = new Date()
+    const oneYearAgo = new Date(today.getTime() - 365 * 24 * 3600 * 1000)
+    const fmt = (d: Date) => `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`
+    return { from: fmt(oneYearAgo), to: fmt(today) }
+  }, [])
+
+  // ── Fetch — 사고접수 ──
+  const fetchAccidents = useCallback(async () => {
+    setAccidentsLoading(true)
+    setAccidentsErr(null)
     try {
-      // limit 최대 200, from/to 는 YYYYMMDD
-      const today = new Date()
-      const oneYearAgo = new Date(today.getTime() - 365 * 24 * 3600 * 1000)
-      const fmtYMD = (d: Date) => `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`
+      const headers = await getAuthHeader()
       const params = new URLSearchParams({
-        from: fmtYMD(oneYearAgo),
-        to: fmtYMD(today),
+        from: dateRange.from,
+        to: dateRange.to,
         limit: '200',
       })
-      const headers = await getAuthHeader()
-      const res = await fetch(`/api/cafe24/accidents?${params}`, { headers })
-      if (!res.ok) { setCafe24Accidents([]); return }
-      const json = await res.json()
-      const records = json?.data || []
-      const fmtDate = (s: string) => s && s.length === 8 ? `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}` : (s || '')
-      const fmtTime = (s: string) => s && s.length >= 4 ? `${s.slice(0, 2)}:${s.slice(2, 4)}` : ''
-      const mapped: Cafe24Accident[] = records.map((r: any, idx: number) => {
-        const idno = String(r.esosidno || '')
-        const idnoInt = parseInt(idno.replace(/[^0-9]/g, '').slice(0, 9) || '0', 10) || (idx + 1)
-        // PR-OPS-1.4b — detail/memos 호출 키 보존
-        const mddt = String(r.esosmddt || '')
-        const srno = Number(r.esossrno || 0)
-        return {
-          id: idnoInt,
-          esosidno: idno,
-          esosmddt: mddt,
-          esossrno: srno,
-          accidentNo: idno || `pseudo-${idx}`,
-          accident_date: fmtDate(r.esosacdt || r.esosmddt || ''),
-          accident_time: fmtTime(r.esosactm || ''),
-          accident_location: '',  // detail 호출 시 채움
-          driver_name: '',  // detail 호출 시 채움
-          driver_phone: '',
-          customer_car_number: r.cars_no || '',
-          rental_car_number: r.cars_no || '',
-          rental_car_model: r.cars_model || '',
-          insurance_company: '',  // cafe24 미보유 — dispatch_order 폼에서 매뉴얼
-          insurance_claim_no: idno,
-          repair_shop_name: '',
-          rental_from_date: '',
-          rental_to_date: '',
-          workflow_stage: r.esosrgst || r.esosrslt || '',
-          notes: r.esosrstx || '',
-        }
-      })
-      setCafe24Accidents(mapped)
-    } catch (e) {
-      console.error('[intake fetchCafe24]', e)
-      setCafe24Accidents([])
+      const res = await fetch(`/api/operations/cafe24-accidents?${params}`, { headers })
+      const json = await res.json().catch(() => ({}))
+      if (json?.success && Array.isArray(json.data)) {
+        setAccidents(json.data as RichAccidentRow[])
+      } else {
+        setAccidents([])
+        setAccidentsErr(json?.error || 'cafe24 미연결')
+      }
+    } catch (e: any) {
+      setAccidents([])
+      setAccidentsErr(e?.message || 'fetch 실패')
+    } finally {
+      setAccidentsLoading(false)
     }
-  }, [])
+  }, [dateRange])
 
-  const fetchDispatchOrders = useCallback(async () => {
+  // ── Fetch — 대차접수 ──
+  const fetchDispatches = useCallback(async () => {
+    setDispatchesLoading(true)
+    setDispatchesErr(null)
     try {
       const headers = await getAuthHeader()
-      const res = await fetch('/api/operations/dispatch-orders', { headers })
-      const json = await res.json()
-      setDispatchOrders(json.data || [])
-    } catch (e) {
-      console.error('[intake fetchDispatchOrders]', e)
-      setDispatchOrders([])
-    }
-  }, [])
-
-  const refresh = useCallback(async () => {
-    setLoading(true)
-    await Promise.all([fetchCafe24(), fetchDispatchOrders()])
-    setLoading(false)
-  }, [fetchCafe24, fetchDispatchOrders])
-
-  useEffect(() => { refresh() }, [refresh])
-
-  // ── Merged data ──────────────────────────────────────────────────
-  const merged: MergedRow[] = useMemo(() => {
-    const dispatchByAcc = new Map<number, DispatchOrder>()
-    dispatchOrders.forEach(d => dispatchByAcc.set(d.ride_accident_id, d))
-
-    return cafe24Accidents.map(acc => {
-      const dispatch = dispatchByAcc.get(acc.id)
-      let unified_stage: MergedRow['unified_stage'] = 'new'
-      if (dispatch) {
-        if (dispatch.status === 'consulting') unified_stage = 'consulting'
-        else if (dispatch.status === 'scheduled') unified_stage = 'scheduled'
-        else if (dispatch.status === 'dispatched') unified_stage = 'dispatched'
-        else if (dispatch.status === 'done' || dispatch.status === 'cancelled') unified_stage = 'done'
-        else unified_stage = 'consulting'  // 'new' status = 상담 시작
-      } else if (acc.workflow_stage === 'closed' || acc.workflow_stage === '90') {
-        unified_stage = 'done'
+      const params = new URLSearchParams({
+        from: dateRange.from,
+        to: dateRange.to,
+        limit: '200',
+      })
+      const res = await fetch(`/api/operations/cafe24-dispatch-requests?${params}`, { headers })
+      const json = await res.json().catch(() => ({}))
+      if (json?.success && Array.isArray(json.data)) {
+        setDispatches(json.data as DispatchRequestRow[])
+      } else {
+        setDispatches([])
+        setDispatchesErr(json?.error || 'cafe24 미연결')
       }
-      return { ...acc, dispatch_order: dispatch, unified_stage }
-    })
-  }, [cafe24Accidents, dispatchOrders])
+    } catch (e: any) {
+      setDispatches([])
+      setDispatchesErr(e?.message || 'fetch 실패')
+    } finally {
+      setDispatchesLoading(false)
+    }
+  }, [dateRange])
 
-  // ── Stats ────────────────────────────────────────────────────────
-  const stats = useMemo(() => {
-    const counts: Record<string, number> = { new: 0, consulting: 0, scheduled: 0, dispatched: 0, done: 0 }
-    merged.forEach(r => { counts[r.unified_stage] = (counts[r.unified_stage] || 0) + 1 })
-    return counts
-  }, [merged])
+  // 탭별 lazy fetch
+  useEffect(() => {
+    if (subTab === 'accidents' && accidents.length === 0 && !accidentsLoading && !accidentsErr) {
+      fetchAccidents()
+    } else if (subTab === 'dispatch' && dispatches.length === 0 && !dispatchesLoading && !dispatchesErr) {
+      fetchDispatches()
+    }
+  }, [subTab, accidents.length, dispatches.length, accidentsLoading, dispatchesLoading, accidentsErr, dispatchesErr, fetchAccidents, fetchDispatches])
 
-  // ── Filtered ─────────────────────────────────────────────────────
-  const filtered = useMemo(() => {
-    let list = merged
-    if (stageFilter !== 'all') list = list.filter(r => r.unified_stage === stageFilter)
-    if (search.trim()) {
-      const q = search.toLowerCase()
+  // ── Filtered ──
+  const filteredAccidents = useMemo(() => {
+    let list = accidents
+    if (accidentsSearch.trim()) {
+      const q = accidentsSearch.toLowerCase()
       list = list.filter(r =>
-        (r.driver_name || '').toLowerCase().includes(q) ||
-        (r.insurance_company || '').toLowerCase().includes(q) ||
-        (r.customer_car_number || '').toLowerCase().includes(q) ||
-        (r.accidentNo || '').toLowerCase().includes(q) ||
-        (r.rental_car_number || '').toLowerCase().includes(q)
+        (r.cars_no || '').toLowerCase().includes(q) ||
+        (r.esosusnm || '').toLowerCase().includes(q) ||
+        (r.cars_user || '').toLowerCase().includes(q) ||
+        (r.capital_co_name || '').toLowerCase().includes(q) ||
+        (r.esosidno || '').toLowerCase().includes(q) ||
+        (r.esosrstx || '').toLowerCase().includes(q)
       )
     }
     return list
-  }, [merged, stageFilter, search])
+  }, [accidents, accidentsSearch])
 
-  // ── Stat items + Actions ────────────────────────────────────────
-  const statItems: StatItem[] = [
-    { label: '🆕 신규 대차요청', value: stats.new || 0, unit: '건', tint: 'red' },
-    { label: '📞 상담 진행', value: stats.consulting || 0, unit: '건', tint: 'amber' },
-    { label: '📅 배차 예정', value: stats.scheduled || 0, unit: '건', tint: 'amber' },
-    { label: '🚐 배차 완료', value: stats.dispatched || 0, unit: '건', tint: 'blue' },
-    { label: '✅ 종결', value: stats.done || 0, unit: '건', tint: 'green' },
-  ]
+  const filteredDispatches = useMemo(() => {
+    let list = dispatches
+    if (dispatchesSearch.trim()) {
+      const q = dispatchesSearch.toLowerCase()
+      list = list.filter(r =>
+        (r.cars_no || '').toLowerCase().includes(q) ||
+        (r.otptcanm || '').toLowerCase().includes(q) ||
+        (r.otptdsnm || '').toLowerCase().includes(q) ||
+        (r.cars_user || '').toLowerCase().includes(q) ||
+        (r.rental_vendor || '').toLowerCase().includes(q) ||
+        (r.capital_co_name || '').toLowerCase().includes(q) ||
+        (r.otptidno || '').toLowerCase().includes(q) ||
+        (r.otptacmo || '').toLowerCase().includes(q)
+      )
+    }
+    return list
+  }, [dispatches, dispatchesSearch])
+
+  // ── Stat items (활성 탭 기준) ──
+  const statItems: StatItem[] = (subTab === 'accidents' ? [
+    { label: '📋 사고접수 (1년)', value: accidents.length, unit: '건', tint: 'blue' },
+    { label: '🚗 대차접수 (대조)', value: dispatches.length, unit: '건', tint: 'amber' },
+    { label: '🔍 검색결과', value: filteredAccidents.length, unit: '건', tint: 'violet' },
+  ] : [
+    { label: '🚗 대차접수 (1년)', value: dispatches.length, unit: '건', tint: 'red' },
+    { label: '📋 사고접수 (대조)', value: accidents.length, unit: '건', tint: 'blue' },
+    { label: '🔍 검색결과', value: filteredDispatches.length, unit: '건', tint: 'violet' },
+  ]) as StatItem[]
 
   const statActions: ActionButton[] = [
-    { label: '새로고침', onClick: refresh, variant: 'secondary', icon: '🔄' },
-  ]
-
-  // ── Toolbar filters ─────────────────────────────────────────────
-  const filterItems: FilterItem[] = [
-    { key: 'all', label: '전체', count: merged.length },
-    { key: 'new', label: '🆕 신규', count: stats.new || 0 },
-    { key: 'consulting', label: '📞 상담중', count: stats.consulting || 0 },
-    { key: 'scheduled', label: '📅 배차예정', count: stats.scheduled || 0 },
-    { key: 'dispatched', label: '🚐 배차완료', count: stats.dispatched || 0 },
-    { key: 'done', label: '✅ 종결', count: stats.done || 0 },
-  ]
-
-  // ── Table columns ───────────────────────────────────────────────
-  const columns: TableColumn<MergedRow>[] = [
     {
-      key: 'accident_date',
-      label: '사고일',
-      width: 110,
-      sortBy: (r) => r.accident_date || '',
-      render: (r) => (
-        <div style={{ whiteSpace: 'nowrap' }}>
-          <span style={{ fontWeight: 700, fontSize: 13, color: '#1e293b' }}>{r.accident_date || '-'}</span>
-          {r.accident_time && (
-            <span style={{ marginLeft: 6, fontSize: 11, color: '#64748b' }}>{r.accident_time}</span>
-          )}
-        </div>
-      ),
+      label: '새로고침',
+      onClick: subTab === 'accidents' ? fetchAccidents : fetchDispatches,
+      variant: 'secondary',
+      icon: '🔄',
     },
+  ]
+
+  const filterItems: FilterItem[] = [
+    { key: 'accidents', label: SUBTAB_LABEL.accidents, count: accidents.length },
+    { key: 'dispatch', label: SUBTAB_LABEL.dispatch, count: dispatches.length },
+  ]
+
+  // ── 사고접수 컬럼 (12 컬럼, Rule 18 sortBy 의무) ──
+  const accidentColumns: TableColumn<RichAccidentRow>[] = [
     {
-      key: 'accidentNo',
-      label: '접수번호',
+      key: 'date',
+      label: '사고일시',
       width: 130,
-      sortBy: (r) => r.accidentNo || '',
+      sortBy: (r) => `${r.esosacdt || ''}${r.esosactm || ''}`,
       render: (r) => (
-        <span style={{ fontFamily: 'monospace', fontSize: 12, color: '#0f2440', whiteSpace: 'nowrap' }}>
-          {r.accidentNo || '-'}
+        <span style={{ whiteSpace: 'nowrap', fontWeight: 700, color: '#1e293b', fontSize: 12 }}>
+          {fmtCafe24DateTime(r.esosacdt, r.esosactm) || '-'}
         </span>
       ),
     },
     {
-      key: 'driver',
+      key: 'esosidno',
+      label: '접수번호',
+      width: 100,
+      sortBy: (r) => r.esosidno || '',
+      render: (r) => (
+        <span style={{ fontFamily: 'monospace', fontSize: 11, color: '#0f2440', whiteSpace: 'nowrap' }}>
+          {r.esosidno || '-'}
+        </span>
+      ),
+    },
+    {
+      key: 'cars_no',
+      label: '차량번호',
+      width: 100,
+      sortBy: (r) => r.cars_no || '',
+      render: (r) => (
+        <span style={{ fontWeight: 700, color: '#0f2440', whiteSpace: 'nowrap' }}>
+          🚗 {r.cars_no || '-'}
+        </span>
+      ),
+    },
+    {
+      key: 'cars_model',
+      label: '차종',
+      width: 180,
+      sortBy: (r) => r.cars_model || '',
+      render: (r) => (
+        <span style={{ fontSize: 12, color: '#475569', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: 180 }}>
+          {r.cars_model || '-'}
+        </span>
+      ),
+    },
+    {
+      key: 'capital_co_name',
+      label: '캐피탈사',
+      width: 120,
+      sortBy: (r) => r.capital_co_name || '',
+      render: (r) => (
+        <span style={{ fontSize: 12, color: '#475569', whiteSpace: 'nowrap' }}>
+          {r.capital_co_name || '-'}
+        </span>
+      ),
+    },
+    {
+      key: 'cars_user',
       label: '고객',
       width: 160,
-      sortBy: (r) => r.driver_name || '',
+      sortBy: (r) => r.cars_user || '',
       render: (r) => (
-        <div style={{ whiteSpace: 'nowrap' }}>
-          <span style={{ fontWeight: 700, color: '#1e293b' }}>{r.driver_name || '-'}</span>
-          {r.driver_phone && (
-            <span style={{ marginLeft: 6, fontSize: 11, color: '#64748b' }}>{r.driver_phone}</span>
-          )}
-        </div>
-      ),
-    },
-    {
-      key: 'customer_car_number',
-      label: '사고차량',
-      width: 110,
-      sortBy: (r) => r.customer_car_number || '',
-      render: (r) => (
-        <span style={{ fontWeight: 600, color: '#0f2440', whiteSpace: 'nowrap' }}>
-          🚗 {r.customer_car_number || '-'}
+        <span style={{ fontWeight: 600, color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: 160 }}>
+          {r.cars_user || '-'}
         </span>
       ),
     },
     {
-      key: 'insurance',
-      label: '보험사',
-      width: 120,
-      sortBy: (r) => r.insurance_company || '',
+      key: 'esosusnm',
+      label: '요청자',
+      width: 130,
+      sortBy: (r) => r.esosusnm || '',
       render: (r) => (
-        <span style={{ fontSize: 12, color: '#475569', whiteSpace: 'nowrap' }}>
-          🛡 {r.insurance_company || '-'}
+        <span style={{ whiteSpace: 'nowrap', fontSize: 12 }}>
+          {r.esosusnm || '-'}
+          {r.esosustl && <span style={{ marginLeft: 4, fontSize: 11, color: '#64748b' }}>{r.esosustl}</span>}
         </span>
       ),
     },
     {
-      key: 'stage',
-      label: '처리 상태',
-      width: 120,
-      align: 'center',
-      sortBy: (r) => r.unified_stage,
+      key: 'esosrstx',
+      label: '사고메모',
+      width: 200,
+      sortBy: (r) => r.esosrstx || '',
       render: (r) => (
-        <span
-          style={{
-            display: 'inline-block',
-            padding: '4px 10px',
-            borderRadius: 8,
-            background: STAGE_TINT[r.unified_stage] + '22',
-            color: STAGE_TINT[r.unified_stage],
-            fontWeight: 700,
-            fontSize: 12,
-            whiteSpace: 'nowrap',
-          }}
-        >
-          {STAGE_LABEL[r.unified_stage]}
+        <span style={{ fontSize: 11, color: '#475569', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: 200 }}>
+          {r.esosrstx || '-'}
         </span>
       ),
     },
     {
-      key: 'expected_dispatch',
-      label: '예상 배차일',
-      width: 110,
-      sortBy: (r) => r.dispatch_order?.expected_dispatch_date || '',
-      render: (r) => (
-        <span style={{ fontSize: 12, color: '#475569', whiteSpace: 'nowrap' }}>
-          {r.dispatch_order?.expected_dispatch_date || '—'}
-        </span>
-      ),
-    },
-    {
-      key: 'actions',
-      label: '액션',
+      key: 'esosrslt',
+      label: '단계',
       width: 80,
       align: 'center',
+      sortBy: (r) => r.esosrslt || '',
+      render: (r) => {
+        const label: Record<string, string> = { '1': '🆕 접수', '3': '✅ 종결' }
+        return (
+          <span style={{ fontSize: 11, color: '#0f2440', whiteSpace: 'nowrap', fontWeight: 700 }}>
+            {label[r.esosrslt || ''] || r.esosrslt || '-'}
+          </span>
+        )
+      },
+    },
+    {
+      key: 'gnus_name',
+      label: '등록자',
+      width: 100,
+      sortBy: (r) => r.gnus_name || '',
       render: (r) => (
-        <button
-          onClick={(e) => { e.stopPropagation(); setSelectedRow(r) }}
-          style={{
-            padding: '4px 10px',
-            background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
-            color: '#fff',
-            border: 'none',
-            borderRadius: 8,
-            cursor: 'pointer',
-            fontWeight: 700,
-            fontSize: 11,
-            whiteSpace: 'nowrap',
-          }}
-        >
-          처리
-        </button>
+        <span style={{ fontSize: 11, color: '#64748b', whiteSpace: 'nowrap' }}>
+          {r.gnus_name || r.esosgnus || '-'}
+        </span>
       ),
     },
   ]
 
-  // ── Mobile Card ─────────────────────────────────────────────────
-  const mobileCard: MobileCardConfig<MergedRow> = {
-    title: (r) => (
-      <span style={{ whiteSpace: 'nowrap' }}>
-        🚗 {r.customer_car_number || r.driver_name || r.accidentNo}
-      </span>
-    ),
-    subtitle: (r) => `${r.accident_date} · ${r.insurance_company || '-'}`,
-    trailing: (r) => (
-      <span style={{ color: STAGE_TINT[r.unified_stage], fontWeight: 800, fontSize: 12, whiteSpace: 'nowrap' }}>
-        {STAGE_LABEL[r.unified_stage]}
-      </span>
-    ),
+  // ── 대차접수 컬럼 (Rule 18 sortBy 의무) ──
+  const dispatchColumns: TableColumn<DispatchRequestRow>[] = [
+    {
+      key: 'date',
+      label: '접수일시',
+      width: 130,
+      sortBy: (r) => `${r.otptacdt || ''}${r.otptactm || ''}`,
+      render: (r) => (
+        <span style={{ whiteSpace: 'nowrap', fontWeight: 700, color: '#1e293b', fontSize: 12 }}>
+          {fmtCafe24DateTime(r.otptacdt, r.otptactm) || '-'}
+        </span>
+      ),
+    },
+    {
+      key: 'otptidno',
+      label: '접수번호',
+      width: 100,
+      sortBy: (r) => `${r.otptidno || ''}-${r.otptsrno}`,
+      render: (r) => (
+        <span style={{ fontFamily: 'monospace', fontSize: 11, color: '#0f2440', whiteSpace: 'nowrap' }}>
+          {r.otptidno || '-'}/{r.otptsrno}
+        </span>
+      ),
+    },
+    {
+      key: 'cars_no',
+      label: '차량번호',
+      width: 100,
+      sortBy: (r) => r.cars_no || '',
+      render: (r) => (
+        <span style={{ fontWeight: 700, color: '#0f2440', whiteSpace: 'nowrap' }}>
+          🚗 {r.cars_no || '-'}
+        </span>
+      ),
+    },
+    {
+      key: 'cars_model',
+      label: '차종',
+      width: 180,
+      sortBy: (r) => r.cars_model || '',
+      render: (r) => (
+        <span style={{ fontSize: 12, color: '#475569', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: 180 }}>
+          {r.cars_model || '-'}
+        </span>
+      ),
+    },
+    {
+      key: 'capital_co_name',
+      label: '캐피탈사',
+      width: 120,
+      sortBy: (r) => r.capital_co_name || '',
+      render: (r) => (
+        <span style={{ fontSize: 12, color: '#475569', whiteSpace: 'nowrap' }}>
+          {r.capital_co_name || '-'}
+        </span>
+      ),
+    },
+    {
+      key: 'cars_user',
+      label: '고객',
+      width: 160,
+      sortBy: (r) => r.cars_user || '',
+      render: (r) => (
+        <span style={{ fontWeight: 600, color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: 160 }}>
+          {r.cars_user || '-'}
+        </span>
+      ),
+    },
+    {
+      key: 'otptcanm',
+      label: '통보자',
+      width: 130,
+      sortBy: (r) => r.otptcanm || '',
+      render: (r) => (
+        <span style={{ whiteSpace: 'nowrap', fontSize: 12 }}>
+          {r.otptcanm || '-'}
+          {r.otptcahp && <span style={{ marginLeft: 4, fontSize: 11, color: '#64748b' }}>{r.otptcahp}</span>}
+        </span>
+      ),
+    },
+    {
+      key: 'rental_vendor',
+      label: '대차업체',
+      width: 140,
+      sortBy: (r) => r.rental_vendor || '',
+      render: (r) => (
+        <span style={{ fontSize: 12, color: '#0f2440', fontWeight: 700, whiteSpace: 'nowrap' }}>
+          🏢 {r.rental_vendor || '-'}
+        </span>
+      ),
+    },
+    {
+      key: 'otptacmo',
+      label: '사고내용',
+      width: 220,
+      sortBy: (r) => r.otptacmo || '',
+      render: (r) => (
+        <span style={{ fontSize: 11, color: '#475569', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: 220 }}>
+          {r.otptacmo || '-'}
+        </span>
+      ),
+    },
+    {
+      key: 'gnus_name',
+      label: '접수자',
+      width: 100,
+      sortBy: (r) => r.gnus_name || '',
+      render: (r) => (
+        <span style={{ fontSize: 11, color: '#64748b', whiteSpace: 'nowrap' }}>
+          {r.gnus_name || r.otptgnus || '-'}
+        </span>
+      ),
+    },
+  ]
+
+  // ── Mobile Card ──
+  const accidentMobileCard: MobileCardConfig<RichAccidentRow> = {
+    title: (r) => <span style={{ whiteSpace: 'nowrap' }}>🚗 {r.cars_no || r.esosusnm || r.esosidno}</span>,
+    subtitle: (r) => `${fmtCafe24DateTime(r.esosacdt, r.esosactm)} · ${r.capital_co_name || '-'}`,
   }
 
-  // ── Render ──────────────────────────────────────────────────────
+  const dispatchMobileCard: MobileCardConfig<DispatchRequestRow> = {
+    title: (r) => <span style={{ whiteSpace: 'nowrap' }}>🚗 {r.cars_no || r.otptcanm || r.otptidno}</span>,
+    subtitle: (r) => `${fmtCafe24DateTime(r.otptacdt, r.otptactm)} · ${r.rental_vendor || '-'}`,
+  }
+
+  const activeLoading = subTab === 'accidents' ? accidentsLoading : dispatchesLoading
+  const activeErr = subTab === 'accidents' ? accidentsErr : dispatchesErr
+  const activeSearch = subTab === 'accidents' ? accidentsSearch : dispatchesSearch
+  const setActiveSearch = subTab === 'accidents' ? setAccidentsSearch : setDispatchesSearch
+  const placeholder = subTab === 'accidents'
+    ? '차량번호 / 고객 / 요청자 / 캐피탈사 / 사고메모 검색…'
+    : '차량번호 / 통보자 / 운전자 / 고객 / 대차업체 / 사고내용 검색…'
+
   return (
     <div className="page-bg">
       <div className="max-w-[1400px] mx-auto py-4 px-4 md:py-5 md:px-6">
         {/* DcStatStrip */}
         <DcStatStrip stats={statItems} actions={statActions} />
 
-        {/* 결과 메시지 — Rule 20 글래스 패널 */}
+        {/* Result Msg — Rule 20 글래스 패널 */}
         {resultMsg && (
           <div
             style={{
@@ -377,45 +478,81 @@ export default function OperationsIntakePage() {
             <button
               onClick={() => setResultMsg(null)}
               style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 16, color: '#64748b' }}
-            >
-              ×
-            </button>
+            >×</button>
           </div>
         )}
 
-        {/* DcToolbar */}
+        {/* Sub-tab via DcToolbar filters (검색 + 탭 통합) */}
         <DcToolbar
-          search={search}
-          onSearchChange={setSearch}
-          placeholder="고객명 / 차량번호 / 접수번호 / 보험사 검색..."
+          search={activeSearch}
+          onSearchChange={setActiveSearch}
+          placeholder={placeholder}
           filters={filterItems}
-          activeFilter={stageFilter}
-          onFilterChange={setStageFilter}
+          activeFilter={subTab}
+          onFilterChange={(k) => setSubTab(k as SubTab)}
         />
 
-        {/* NeuDataTable */}
-        <NeuDataTable
-          columns={columns}
-          data={filtered}
-          rowKey={(r) => r.accidentNo}
-          onRowClick={(r) => setSelectedRow(r)}
-          loading={loading}
-          emptyIcon="📋"
-          emptyMessage="조건에 맞는 대차요청이 없습니다"
-          mobileCard={mobileCard}
-          defaultSort={{ key: 'accident_date', dir: 'desc' }}
-        />
+        {/* 활성 탭 에러 */}
+        {activeErr && (
+          <div
+            style={{
+              ...GLASS.L3,
+              marginBottom: 12,
+              padding: 12,
+              borderRadius: 10,
+              border: '1px solid rgba(239,68,68,0.3)',
+              fontSize: 12,
+              color: '#991b1b',
+            }}
+          >
+            ⚠ cafe24 미연결: {activeErr}
+          </div>
+        )}
 
-        {/* 모달 v2 — A 사고상세 / B 콜센터메모 / C 상담히스토리 / D 새상담 / E dispatch_order */}
-        {selectedRow && (
-          <IntakeModalV2
-            row={selectedRow}
-            onClose={() => setSelectedRow(null)}
-            onResult={(msg) => { setResultMsg(msg); refresh() }}
+        {/* 활성 탭 데이터 테이블 */}
+        {subTab === 'accidents' ? (
+          <NeuDataTable
+            columns={accidentColumns}
+            data={filteredAccidents}
+            rowKey={(r) => `${r.esosidno}-${r.esossrno}`}
+            onRowClick={(r) => setSelectedAccident(r)}
+            loading={activeLoading}
+            emptyIcon="📋"
+            emptyMessage="조건에 맞는 사고접수가 없습니다"
+            mobileCard={accidentMobileCard}
+            defaultSort={{ key: 'date', dir: 'desc' }}
+          />
+        ) : (
+          <NeuDataTable
+            columns={dispatchColumns}
+            data={filteredDispatches}
+            rowKey={(r) => `${r.otptidno}-${r.otptmddt}-${r.otptsrno}`}
+            onRowClick={(r) => setSelectedDispatch(r)}
+            loading={activeLoading}
+            emptyIcon="🚗"
+            emptyMessage="조건에 맞는 대차접수가 없습니다"
+            mobileCard={dispatchMobileCard}
+            defaultSort={{ key: 'date', dir: 'desc' }}
+          />
+        )}
+
+        {/* 풀스크린 모달 — 사고접수 */}
+        {selectedAccident && (
+          <AccidentDetailFullscreen
+            row={selectedAccident}
+            onClose={() => setSelectedAccident(null)}
+          />
+        )}
+
+        {/* 풀스크린 모달 — 대차접수 */}
+        {selectedDispatch && (
+          <DispatchRequestFullscreen
+            row={selectedDispatch}
+            onClose={() => setSelectedDispatch(null)}
+            onResult={(msg) => { setResultMsg(msg); fetchDispatches() }}
           />
         )}
       </div>
     </div>
   )
 }
-
