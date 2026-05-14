@@ -245,6 +245,45 @@ export type DispatchRequestKey = {
   srno: number
 }
 
+// ─── PR-OPS-1.5f — ACR 측 추가 데이터 ──────────────────────────
+
+// /api/operations/cafe24-acr-memos 응답 (ACR 사고처리관리 상담내역)
+export type AcrMemoRow = {
+  memoidno: string
+  memomddt: string
+  memosrno: number
+  memonums: number
+  memosort: number
+  memotitl: string | null
+  memotext: string | null
+  memognus: string | null
+  memogndt: string | null
+  memogntm: string | null
+  memoflag: string | null
+  user_name: string | null
+}
+
+// /api/operations/cafe24-factory-assignment 응답 (공장배정)
+export type FactoryAssignmentRow = {
+  oderidno: string
+  odermddt: string
+  odersrno: number
+  oderseqn: number | null
+  oderfact: string | null
+  odermscs: string | null
+  odermetp: string | null
+  oderstat: string | null
+  odergnus: string | null
+  odergndt: string | null
+  odergntm: string | null
+  factname: string | null
+  factbdno: string | null
+  facthpno: string | null
+  facttelo: string | null
+  factaddr: string | null
+  user_name: string | null
+}
+
 // 카테고리 색상 + 라벨 (D/C 섹션 공유)
 export const CATEGORY_META: Record<ConsultationCategory, { label: string; tint: string; emoji: string }> = {
   intake:        { label: '인테이크',  tint: '#ef4444', emoji: '🆕' },

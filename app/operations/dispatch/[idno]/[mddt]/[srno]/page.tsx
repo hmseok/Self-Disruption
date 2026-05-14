@@ -10,6 +10,8 @@ import type {
   Cafe24Memo,
   ResultMsg,
   DispatchOrder,
+  AcrMemoRow,
+  FactoryAssignmentRow,
 } from '@/app/operations/intake/types'
 import { CATEGORY_META, describeAccidentTypes, fmtCafe24DateTime } from '@/app/operations/intake/types'
 
@@ -87,6 +89,14 @@ export default function DispatchDetailPage({
   const [memos, setMemos] = useState<Cafe24Memo[]>([])
   const [memosLoading, setMemosLoading] = useState(true)
 
+  // ── ACR 사고처리관리 상담내역 (acrmemoh — P1.5f) ──
+  const [acrMemos, setAcrMemos] = useState<AcrMemoRow[]>([])
+  const [acrMemosLoading, setAcrMemosLoading] = useState(true)
+
+  // ── 공장배정 (ajaoderh — P1.5f) ──
+  const [factories, setFactories] = useState<FactoryAssignmentRow[]>([])
+  const [factoriesLoading, setFactoriesLoading] = useState(true)
+
   // ── dispatch_order ──
   const [dispatchOrder, setDispatchOrder] = useState<DispatchOrder | null>(null)
   const [orderLoading, setOrderLoading] = useState(true)
@@ -158,6 +168,38 @@ export default function DispatchDetailPage({
     }
   }, [idno, mddt, srno])
 
+  // P1.5f — ACR 사고처리관리 상담내역 (acrmemoh)
+  const fetchAcrMemos = useCallback(async () => {
+    setAcrMemosLoading(true)
+    try {
+      const params = new URLSearchParams({ idno, mddt, srno })
+      const headers = await getAuthHeader()
+      const res = await fetch(`/api/operations/cafe24-acr-memos?${params}`, { headers })
+      const json = await res.json().catch(() => ({}))
+      setAcrMemos((json?.success && Array.isArray(json.data)) ? json.data : [])
+    } catch {
+      setAcrMemos([])
+    } finally {
+      setAcrMemosLoading(false)
+    }
+  }, [idno, mddt, srno])
+
+  // P1.5f — 공장배정 (ajaoderh + pmcfactm)
+  const fetchFactories = useCallback(async () => {
+    setFactoriesLoading(true)
+    try {
+      const params = new URLSearchParams({ idno, mddt, srno })
+      const headers = await getAuthHeader()
+      const res = await fetch(`/api/operations/cafe24-factory-assignment?${params}`, { headers })
+      const json = await res.json().catch(() => ({}))
+      setFactories((json?.success && Array.isArray(json.data)) ? json.data : [])
+    } catch {
+      setFactories([])
+    } finally {
+      setFactoriesLoading(false)
+    }
+  }, [idno, mddt, srno])
+
   const fetchOrder = useCallback(async () => {
     setOrderLoading(true)
     try {
@@ -206,7 +248,10 @@ export default function DispatchDetailPage({
     }
   }, [dispatchOrder?.id])
 
-  useEffect(() => { fetchRow(); fetchMemos(); fetchOrder() }, [fetchRow, fetchMemos, fetchOrder])
+  useEffect(() => {
+    fetchRow(); fetchMemos(); fetchOrder()
+    fetchAcrMemos(); fetchFactories()
+  }, [fetchRow, fetchMemos, fetchOrder, fetchAcrMemos, fetchFactories])
   useEffect(() => { fetchConsultations() }, [fetchConsultations])
   useEffect(() => {
     if (dispatchOrder?.id) setTimeout(() => noteRef.current?.focus(), 150)
@@ -463,10 +508,84 @@ export default function DispatchDetailPage({
                 </div>
               </Section>
 
-              {/* B. 콜센터 메모 */}
-              <Section icon="📞" title={`콜센터 메모 (${memos.length})`}>
+              {/* 공장배정 (ajaoderh + pmcfactm) — P1.5f */}
+              {(factoriesLoading || factories.length > 0) && (
+                <Section icon="🔧" title={`공장배정 (${factories.length})`}>
+                  {factoriesLoading ? <Place>공장배정 조회 중…</Place>
+                    : factories.length === 0 ? <Place>공장배정 없음</Place>
+                    : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        {factories.map((f) => (
+                          <div
+                            key={`${f.oderseqn}-${f.odermddt}`}
+                            style={{ ...GLASS.L3, padding: '10px 12px', borderRadius: 8, border: '1px solid rgba(0,0,0,0.04)', fontSize: 12 }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
+                              <span style={{ fontWeight: 800, color: '#0f2440', fontSize: 13 }}>🏢 {f.factname || f.oderfact || '-'}</span>
+                              {f.oderstat && (
+                                <span style={{ padding: '2px 8px', background: 'rgba(34,197,94,0.12)', color: '#15803d', borderRadius: 6, fontSize: 11, fontWeight: 700 }}>
+                                  진행중 ({f.oderstat})
+                                </span>
+                              )}
+                              <div style={{ flex: 1 }} />
+                              <span style={{ fontSize: 11, color: '#94a3b8', whiteSpace: 'nowrap' }}>seq#{f.oderseqn}</span>
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '90px 1fr 90px 1fr', gap: '4px 12px', fontSize: 11 }}>
+                              {f.facttelo && (<><Lbl>전화</Lbl><Val>{f.facttelo}</Val></>)}
+                              {f.facthpno && (<><Lbl>휴대폰</Lbl><Val>{f.facthpno}</Val></>)}
+                              {f.factbdno && (<><Lbl>사업자번호</Lbl><Val>{f.factbdno}</Val></>)}
+                              {f.factaddr && (<><Lbl>주소</Lbl><Val span={3}>{f.factaddr}</Val></>)}
+                              <Lbl>등록</Lbl>
+                              <Val span={3}>
+                                {fmtCafe24DateTime(f.odergndt, f.odergntm) || '-'}
+                                {f.user_name && <span style={{ marginLeft: 6, color: '#94a3b8' }}>· {f.user_name}</span>}
+                              </Val>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                </Section>
+              )}
+
+              {/* 카페24 ACR 사고처리관리 상담내역 (acrmemoh) — P1.5f */}
+              <Section icon="📒" title={`카페24 상담내역 (${acrMemos.length})`}>
+                {acrMemosLoading ? <Place>cafe24 상담내역 조회 중…</Place>
+                  : acrMemos.length === 0 ? <Place>카페24 측 상담내역 없음</Place>
+                  : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 400, overflowY: 'auto', paddingRight: 4 }}>
+                      {acrMemos.map((m) => (
+                        <div
+                          key={`${m.memosort}-${m.memonums}`}
+                          style={{
+                            padding: '10px 12px',
+                            background: 'rgba(245,158,11,0.06)',
+                            borderLeft: '4px solid #f59e0b',
+                            borderRadius: 6,
+                            fontSize: 12,
+                          }}
+                        >
+                          <div style={{ display: 'flex', gap: 8, marginBottom: 4, fontSize: 11, alignItems: 'center', whiteSpace: 'nowrap', flexWrap: 'wrap' }}>
+                            <span style={{ color: '#b45309', fontWeight: 800, padding: '2px 8px', background: '#fff', borderRadius: 6 }}>
+                              📒 #{m.memosort}-{m.memonums}
+                            </span>
+                            <span style={{ color: '#64748b' }}>{fmtCafe24DateTime(m.memogndt, m.memogntm)}</span>
+                            {(m.user_name || m.memognus) && (
+                              <span style={{ color: '#94a3b8' }}>· 👤 {m.user_name || m.memognus}</span>
+                            )}
+                          </div>
+                          {m.memotitl && <div style={{ fontWeight: 700, color: '#0f2440', marginBottom: 2 }}>{m.memotitl}</div>}
+                          {m.memotext && <div style={{ color: '#1e293b', whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>{m.memotext}</div>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+              </Section>
+
+              {/* B. 긴급출동 메모 (acememoh — ACE 모듈, 보조) */}
+              <Section icon="📞" title={`긴급출동 메모 (${memos.length})`}>
                 {memosLoading ? <Place>cafe24 메모 조회 중…</Place>
-                  : memos.length === 0 ? <Place>콜센터 메모 없음</Place>
+                  : memos.length === 0 ? <Place>긴급출동 메모 없음</Place>
                   : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                       {memos.map((m) => (
