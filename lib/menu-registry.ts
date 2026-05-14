@@ -73,9 +73,10 @@ export const MENUS: MenuEntry[] = [
   { id: 'mod-insurance', name: '보험', displayName: '🛡 보험',  path: '/insurance', iconKey: 'Money', group: 'asset', sortOrder: 3 },
 
   // ── 운영 (operation) ── 차량을 어떻게 굴리는가
-  { id: 'mod-maint',  name: '정비',      displayName: '🔧 정비',       path: '/maintenance',       iconKey: 'WrenchScrewdriver', group: 'operation', sortOrder: 10 },
-  { id: 'mod-ops',    name: '차량 일정',  displayName: '📅 차량 일정',   path: '/operations',        iconKey: 'Wrench',            group: 'operation', sortOrder: 11 },
-  { id: 'mod-intake', name: '접수/오더',  displayName: '📋 접수/오더',   path: '/operations/intake', iconKey: 'Clipboard',         group: 'operation', sortOrder: 12 },
+  // P2.2 (2026-05-13) — operations 통합 페이지로 정리.
+  // /operations 안 5 sub-tab: 사고접수 / 대차접수 / 배차스케줄 / 청구관리 / 대기차량
+  // /maintenance, /operations/intake 메뉴는 hide (페이지는 그대로 — backward compat)
+  { id: 'mod-ops',    name: '차량 운영',  displayName: '🚗 차량 운영',   path: '/operations',        iconKey: 'Wrench',            group: 'operation', sortOrder: 10 },
 
   // ── 재무 (finance) ── 통장 진입점 + 손익/정산/투자
   { id: 'mod-bank-card',     name: '통장/카드',  displayName: '💳 통장/카드',  path: '/finance/bank-card',     iconKey: 'Money', group: 'finance', sortOrder: 20 },
@@ -151,6 +152,11 @@ export const HIDDEN_PATHS = new Set<string>([
   '/fleet/factory-mgmt', '/fleet/vehicle-lookup',
   '/db/depreciation', '/db/maintenance', '/db/models',
   // ── 중복/통합 완료 ──
+  // P2.2 (2026-05-13) — operations 통합 페이지로 흡수
+  '/maintenance',           // → /operations 안 「대기차량」 sub-tab
+  '/operations/intake',     // → /operations 안 「사고접수」 sub-tab
+  '/operations/rentals',    // → /operations 안 「배차스케줄」 sub-tab (예정)
+  '/operations/intake-bulk',// → /operations 안 작업 (또는 별도 admin)
   '/e-contract',
   '/quotes/pricing', '/quotes/short-term',
   '/customers',
