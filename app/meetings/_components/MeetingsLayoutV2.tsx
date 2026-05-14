@@ -317,6 +317,20 @@ export default function MeetingsLayoutV2({ meetingId, initialTab = 'body' }: Pro
           </div>
         )}
 
+        {/* 「← 목록으로」 버튼 (hotfix #1) */}
+        <div style={{ marginBottom: 8 }}>
+          <button onClick={() => router.push('/meetings')}
+            title="회의록 목록으로 (Esc 비슷)"
+            style={{
+              padding: '4px 10px', fontSize: 11, fontWeight: 600, borderRadius: 6,
+              background: 'transparent', color: COLORS.textSecondary,
+              border: `1px solid ${COLORS.borderSubtle}`, cursor: 'pointer', whiteSpace: 'nowrap',
+              display: 'inline-flex', alignItems: 'center', gap: 4,
+            }}>
+            ← 회의록 목록
+          </button>
+        </div>
+
         {/* 헤더 */}
         <MeetingHeaderBar
           meta={meta}
@@ -431,7 +445,7 @@ function TabBtn({ label, active, onClick }: { label: string; active: boolean; on
     <button onClick={onClick} style={{
       padding: '7px 14px', borderRadius: 8, border: 'none',
       fontSize: 12, fontWeight: 700,
-      background: active ? '#0f2440' : 'rgba(255,255,255,0.5)',
+      background: active ? '#0f2440' : GLASS.L1.background,
       color: active ? '#fff' : COLORS.textSecondary,
       cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit',
       transition: 'all 0.15s',

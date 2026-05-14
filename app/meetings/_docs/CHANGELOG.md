@@ -6,6 +6,24 @@
 
 ## 2026-05-13
 
+### hotfix #1 — 「← 회의록 목록」 버튼 + 토큰화 누락 정리
+
+**사용자 보고**: "목록으로 가는 버튼은 없어보여요" (2026-05-13 V2-B 검수).
+
+**변경**:
+1. `MeetingsLayoutV2.tsx` 헤더 상단에 「← 회의록 목록」 버튼 추가 (사이드바 외 명시적 이동 경로 — 사용자가 사이드바 접었거나 사이드바에 회의 없을 때 대비)
+2. `TabBtn` 의 `background: 'rgba(255,255,255,0.5)'` → `GLASS.L1.background` 토큰화 (PR-V2-A 누락분 — ui-token-lint 새 위반 1건 정리)
+
+**별도 진단 — IME 한글 자모 분리** (스크린샷에서 본문 발견):
+- 체크리스트 안에 `ㅁㄴ어라ㅣㅓㄴㅁ어라...` 자모 분리 표시
+- 「안녕하세요~」 일반 단락은 정상 → 슬래시 메뉴 후 / TaskItem 안 한글 입력 시점 의심
+- 원인 후보:
+  · TipTap `@tiptap/suggestion` 이 IME composition 중 키 입력 가로채기 (ueberdosis/tiptap#3284 / #3454)
+  · TaskItem extension IME composition 호환성
+- **hotfix 미포함** — 추가 진단 + 사용자 시나리오 확인 후 별도 PR 처리
+
+---
+
 ### PR-MTG-V2-B — 슬래시 명령 + 블록 확장 (이미지/표)
 
 **사용자 명령**: V2-A 완료 후 「ㄱㄱㄱ」 / 「PR-V2-B 슬래시 명령 + 블록 확장 (Recommended)」 선택.
