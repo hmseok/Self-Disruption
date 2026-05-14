@@ -6,6 +6,69 @@
 
 ## 2026-05-13
 
+### PR-MTG-V2-C-1 — @직원 멘션 (패턴 확립)
+
+**사용자 명령**: 「멘션 진행 ㄱㄱ」 (V2-B 검수 후).
+
+**범위**: `@` + 이름/부서/직책 입력 → 자동완성 → 클릭 시 인라인 멘션 노드 삽입. 패턴 확립 후속 PR (#회의 / >ERP) 동일 구조로 진행.
+
+**변경**:
+
+1. **공통 deps** — `@tiptap/extension-mention@3.23.2` (peer dependency 충돌 회피 위해 minor 명시)
+2. **신규 API** — `app/api/meetings/mentions/profiles/route.ts`:
+   - GET `?q=&limit=10`
+   - 활성 직원 (`is_active IS NULL OR is_active = 1`) 만
+   - 빈 쿼리 → 이름 ASC top 10
+   - 쿼리 있음 → 이름 prefix 우선 (`CASE WHEN name LIKE ? THEN 0 ELSE 1 END AS match_prio`) + 부분 매칭 (이름/부서/직책)
+   - `rank` 예약어 회피 → `match_prio` (sql-reserved-alias-lint 통과)
+3. **신규 컴포넌트** — `app/meetings/_components/MentionList.tsx`:
+   - forwardRef + useImperativeHandle 로 onKeyDown 노출
+   - ↑↓ 이동 / Enter 선택 / Esc 닫기 / mouse hover 동기화
+   - 공용 — `MentionItem` 형식 (id / label / subtitle / icon) — 향후 #회의 / >ERP 도 재사용
+4. **신규 extension** — `app/meetings/_components/extensions/MentionEmployee.ts`:
+   - `Mention.extend({ name: 'mentionEmployee' }).configure({...})` — 동일 노드 종류로 다른 char 트리거 등록 가능 (향후 #회의 / >ERP)
+   - `HTMLAttributes`: `class: 'mention mention-employee'` + `data-mention-type: 'employee'`
+   - `renderText`: `@{label}`
+   - `suggestion.items` — debounce 180ms (빈 쿼리는 즉시) + AbortController 로 race 회피
+   - `render` — ReactRenderer + tippy.js light-border theme
+5. **TiptapEditor 통합** — extensions 배열에 `MentionEmployee` 추가 + CSS 멘션 노드 스타일 (`background: ${COLORS.primary}1F` + hover `33`) + footer 안내 `@` 직원 멘션 명시
+
+**Rule 8 End-to-End 시뮬레이션**:
+- STEP 0: 본문에 `@박` 입력
+- STEP 1: TipTap Suggestion → debounce 180ms → fetch `/api/meetings/mentions/profiles?q=박`
+- STEP 2: API → SQL `WHERE is_active IS NULL OR is_active = 1 AND (name LIKE '박%' OR ...)` ORDER BY match_prio, name LIMIT 10
+- STEP 3: MentionList 표시 (이름 prefix 우선 정렬) → 사용자 선택
+- STEP 4: command 호출 → 인라인 mention 노드 삽입 → onUpdate → debounce 1.5s → PATCH body
+- STEP 5: 다른 페이지 영향 X (mention 노드는 본문 안 inline)
+
+**Rule 11 SQL 컬럼 사전 검증**:
+- `profiles.id / name / department / position / is_active` — V1 module 부터 사용 중 ✓
+- `sql-reserved-alias-lint`: 초기 `AS rank` → MySQL 예약어 (window function RANK()) — `AS match_prio` 로 변경 ✓
+
+**Rule 13 호환성**:
+- `@tiptap/extension-mention@3.23.2` — 다른 TipTap 패키지 (3.23.2) 와 minor 일치 (latest 3.23.4 는 peer dependency conflict)
+- ProseMirror peer 충돌 없음
+
+**Rule 14 동형 패턴 (후속 PR 위한 자리 예고)**:
+- 본 PR 의 `MentionEmployee` + `MentionList` + `/api/meetings/mentions/profiles` 패턴 → PR-V2-C-2 `#회의` (`MentionMeeting` + `/api/meetings/mentions/meetings`), PR-V2-C-3 `>ERP` (`MentionEntity` + `/api/meetings/mentions/entities`) 동일 구조
+
+**Rule 21**: 공통 `package.json` + `package-lock.json` 단독 commit / 자기 모듈 별도 commit
+
+**Rule 22**: 본 CHANGELOG ✓
+
+**GATE 진행 상태**:
+- G3 설계서 § 4.3 + 사용자 GO 「ㄱㄱ」 ✓
+- G5 tsc PASS (renderHTML 타입 충돌 → HTMLAttributes configure 로 회피)
+- G6 lint:harness 새 위반 0건 (`rank` 예약어 → `match_prio` 치환 후)
+- G7 Designer — 사용자 스크린샷 검수 (`@` 입력 → 메뉴 / 클릭 → 멘션 삽입)
+
+**1차 PR (V2-C-1) 제외 (후속)**:
+- PR-V2-C-2: `#` 회의 멘션 — `MentionMeeting` + `/api/meetings/mentions/meetings`
+- PR-V2-C-3: `>` ERP 엔티티 멘션 — `MentionEntity` + `/api/meetings/mentions/entities` (contracts / cars / customers)
+- 멘션 클릭 시 hover 카드 / 페이지 이동 — 별도 PR (V2-C-4)
+
+---
+
 ### PR-MTG-V2-F — V1 → V2 본문 마이그 도구
 
 **사용자 명령**: 「본문 마이그 진행 ㄱㄱ」 (V2-B 검수 후).

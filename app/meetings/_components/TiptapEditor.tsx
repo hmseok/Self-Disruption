@@ -11,6 +11,7 @@ import TableRow from '@tiptap/extension-table-row'
 import TableHeader from '@tiptap/extension-table-header'
 import TableCell from '@tiptap/extension-table-cell'
 import SlashCommand from './extensions/SlashCommand'
+import MentionEmployee from './extensions/MentionEmployee'
 import { useEffect, useRef } from 'react'
 import { COLORS, GLASS } from '@/app/utils/ui-tokens'
 
@@ -80,6 +81,7 @@ export default function TiptapEditor({
       TableHeader,
       TableCell,
       SlashCommand,
+      MentionEmployee,
     ],
     content: value ?? EMPTY_DOC,
     editable,
@@ -209,6 +211,24 @@ export default function TiptapEditor({
         .tippy-box[data-theme~='light-border'] > .tippy-content {
           padding: 0;
         }
+
+        /* V2-C 멘션 노드 */
+        .tiptap-meetings .ProseMirror .mention {
+          display: inline-block;
+          padding: 1px 6px;
+          margin: 0 1px;
+          border-radius: 4px;
+          background: ${COLORS.primary}1F;
+          color: ${COLORS.primary};
+          font-weight: 600;
+          font-size: 0.95em;
+          line-height: 1.4;
+          cursor: pointer;
+          user-select: none;
+        }
+        .tiptap-meetings .ProseMirror .mention:hover {
+          background: ${COLORS.primary}33;
+        }
       `}</style>
       <EditorContent editor={editor} className="tiptap-meetings" />
       {!editor && (
@@ -222,12 +242,13 @@ export default function TiptapEditor({
           fontSize: 11, color: COLORS.textMuted, whiteSpace: 'nowrap',
         }}>
           <span>💡 빠른 입력:</span>
-          <kbd style={kbdStyle}>/</kbd> 블록 메뉴 (제목 / 체크 / 표 / 이미지 / 인용 / ...)
+          <kbd style={kbdStyle}>/</kbd> 블록 메뉴
+          <kbd style={kbdStyle}>@</kbd> 직원 멘션
           <kbd style={kbdStyle}>Ctrl+B</kbd> 굵게
           <kbd style={kbdStyle}>Ctrl+I</kbd> 기울임
           <kbd style={kbdStyle}>Ctrl+Alt+1~3</kbd> 제목
           <kbd style={kbdStyle}>Ctrl+Shift+8/7</kbd> 목록
-          <span style={{ marginLeft: 6, color: COLORS.primary }}>· @멘션 (V2-C) · ERP 임베드 (V2-D)</span>
+          <span style={{ marginLeft: 6, color: COLORS.primary }}>· #회의 / &gt;ERP 임베드 (후속)</span>
         </div>
       )}
     </div>
