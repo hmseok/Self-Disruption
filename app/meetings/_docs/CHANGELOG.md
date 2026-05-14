@@ -6,6 +6,65 @@
 
 ## 2026-05-13
 
+### PR-MTG-V2-F — V1 → V2 본문 마이그 도구
+
+**사용자 명령**: 「본문 마이그 진행 ㄱㄱ」 (V2-B 검수 후).
+
+**범위**: V2 페이지 「📎 V1 섹션」 탭에 「✨ V2 본문으로 옮기기」 버튼 신설. 클릭 시 `meeting_minutes` 의 안건/결정/메모/첨부 섹션을 TipTap JSON 으로 자동 변환 → body 에 적용 → 자동 저장.
+
+**변경**:
+
+1. **신규 helper** — `app/meetings/_components/v1ToV2Body.ts`:
+   - `v1ToV2Body(minutes)` — TipTap doc 생성
+   - `appendV1ToBody(existing, minutes)` — 기존 body 끝에 구분선 + V1 변환 결과 append
+2. **MeetingsLayoutV2.tsx** — V1 탭에:
+   - 우상단 「✨ V2 본문으로 옮기기」 버튼 (편집 권한 + 마이그 적용 시만 노출)
+   - 안내 패널 — 변환 결과 설명
+   - 변환 후 본문 탭 자동 이동
+   - body 비어있으면 즉시 적용 / 있으면 「본문 끝에 추가? / 취소?」 confirm
+
+**변환 규칙** (Rule 14 동형 — 4 section type):
+
+| V1 section_type | V2 변환 |
+|----------------|---------|
+| `agenda` | H2 「📋 안건」 + 각 row 의 title H3 + content 단락 (\\n 분리) |
+| `decision` | H2 「✓ 결정 사항」 + 각 row 의 title H3 + content 단락 |
+| `note` | H2 「📝 메모」 + 각 row 의 title H3 + content 단락 |
+| `attachment` | H2 「📎 첨부」 + 각 row 의 title H3 + attachment_url 링크 단락 |
+
+섹션 순서: agenda → decision → note → attachment (`SECTION_ORDER`)
+각 섹션 안에서는 `order_no` 정렬
+
+**Rule 8 End-to-End 시뮬레이션**:
+- STEP 0: V1 회의 (예: minutes 3 row — agenda 1 + decision 1 + note 1) 진입
+- STEP 1: V1 탭 클릭 → 「✨ V2 본문으로 옮기기」 표시
+- STEP 2: 클릭 → body 비어있음 → 즉시 v1ToV2Body(minutes) 호출 → TipTap doc 생성
+- STEP 3: setBody(doc) + pendingBodyRef.current 설정 → debounce 300ms (V1 변환은 빠른 저장)
+- STEP 4: flushBody → PATCH /api/meetings/[id]/body → body_version 증가
+- STEP 5: AutoSaveIndicator 「✓ 저장됨」 + 본문 탭 자동 이동 / V1 데이터는 그대로 (read-only)
+
+**Rule 11 SQL 검증**: 변경 없음 — V1 데이터 read-only / V2 body 만 update (기존 endpoint 재사용) ✓
+
+**Rule 13 호환성**: 새 라이브러리 없음 — TipTap JSON 직접 구성 ✓
+
+**Rule 14 동형 패턴**: 4 section type (agenda/decision/note/attachment) 모두 동일 알고리즘 변환 ✓
+
+**Rule 21**: 자기 모듈 (`app/meetings/_components/*`) 만 ✓
+
+**Rule 22**: 본 CHANGELOG (본 섹션) ✓
+
+**Rule 23 graceful fallback**: 마이그 미적용 시 버튼 비표시 + alert 안내 — 「먼저 migrations/2026-05-13_meetings_v2.sql 적용 요청」
+
+**GATE 진행 상태**:
+- G3 사용자 GO + 설계서 § 6 PR-V2-F ✓
+- G5 tsc PASS / G6 lint:harness 새 위반 0건 (boxShadow primary alpha 토큰화 후)
+- G7 Designer — 사용자 스크린샷 검수 (V1 회의 진입 → 변환 → 본문 확인)
+
+**알려진 이슈**:
+- 본 PR 진단으로 발견된 IME 한글 자모 분리 (V2-B 시 발견) — 별도 hotfix 예정
+
+---
+
 ### hotfix #1 — 「← 회의록 목록」 버튼 + 토큰화 누락 정리
 
 **사용자 보고**: "목록으로 가는 버튼은 없어보여요" (2026-05-13 V2-B 검수).

@@ -10,6 +10,7 @@ import TiptapEditor from './TiptapEditor'
 import AutoSaveIndicator, { type SaveStatus } from './AutoSaveIndicator'
 import AttendeeManager from './AttendeeManager'
 import ActionItemList from './ActionItemList'
+import { v1ToV2Body, appendV1ToBody } from './v1ToV2Body'
 
 // ═══════════════════════════════════════════════════════════════
 // MeetingsLayoutV2 — V2 Split view 컨테이너 (PR-V2-A)
@@ -243,6 +244,42 @@ export default function MeetingsLayoutV2({ meetingId, initialTab = 'body' }: Pro
     childTimerRef.current = setTimeout(() => { void saveChildren(attendees, next) }, 1000)
   }, [attendees, saveChildren])
 
+  // ── V1 → V2 본문 변환 (PR-MTG-V2-F) ─────────────────────────
+  const [convertingV1, setConvertingV1] = useState(false)
+  const onConvertV1 = useCallback(async () => {
+    if (!canEdit) return
+    if (!minutes || minutes.length === 0) return
+    if (bodyMigrationPending) {
+      alert('DB 마이그 미적용 상태 — 본문 저장 불가 (먼저 migrations/2026-05-13_meetings_v2.sql 적용 요청)')
+      return
+    }
+    const hasExistingBody = !!body && Array.isArray(body.content) && body.content.some(
+      (n: any) => n.type !== 'paragraph' || (n.content && n.content.length > 0)
+    )
+    let nextBody
+    if (hasExistingBody) {
+      const choice = confirm(
+        `현재 본문이 비어있지 않습니다.\n\n[확인] V1 섹션을 본문 끝에 추가\n[취소] 작업 취소\n\n` +
+        `※ 새 본문으로 교체하려면 본문 탭에서 직접 비운 후 다시 시도하세요.`
+      )
+      if (!choice) return
+      nextBody = appendV1ToBody(body, minutes)
+    } else {
+      nextBody = v1ToV2Body(minutes)
+    }
+    setConvertingV1(true)
+    setBody(nextBody)
+    // onBodyChange 와 같은 흐름 — debounce 우회하여 즉시 PATCH 가능하지만,
+    // 통일성 위해 같은 debounce 경로 사용 (사용자가 「✓ 저장됨」 명시적 확인)
+    pendingBodyRef.current = nextBody
+    setBodySaveStatus('pending')
+    if (bodyTimerRef.current) clearTimeout(bodyTimerRef.current)
+    bodyTimerRef.current = setTimeout(() => { void flushBody() }, 300)  // 빠르게 저장
+    // 본문 탭으로 자동 이동
+    setActiveTab('body')
+    setConvertingV1(false)
+  }, [canEdit, minutes, body, bodyMigrationPending, flushBody])
+
   // ── 삭제 ─────────────────────────────────────────────────────
   const onDelete = useCallback(async () => {
     if (!confirm(`「${meta.title || '제목 없음'}」 회의를 삭제할까요?`)) return
@@ -397,9 +434,31 @@ export default function MeetingsLayoutV2({ meetingId, initialTab = 'body' }: Pro
 
         {activeTab === 'legacy' && hasLegacy && (
           <div style={{ ...GLASS.L3, padding: 14, borderRadius: 12 }}>
-            <h3 style={{ fontSize: 13, fontWeight: 700, color: COLORS.textPrimary, marginTop: 0, marginBottom: 10 }}>
-              📎 V1 섹션 (read-only — V2 본문으로 옮긴 후 정리 권장)
-            </h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+              <h3 style={{ fontSize: 13, fontWeight: 700, color: COLORS.textPrimary, margin: 0, whiteSpace: 'nowrap' }}>
+                📎 V1 섹션 (read-only — 변환 후 정리 권장)
+              </h3>
+              {canEdit && !bodyMigrationPending && (
+                <button onClick={onConvertV1} disabled={convertingV1}
+                  title="V1 섹션 (안건/결정/메모/첨부) 을 V2 본문으로 변환 — body 비어있으면 자동 / 있으면 append 확인"
+                  style={{
+                    padding: '5px 12px', fontSize: 11, fontWeight: 700, borderRadius: 6,
+                    background: `linear-gradient(135deg, ${COLORS.primary}, #5a8fd4)`,
+                    color: '#fff', border: 'none', cursor: convertingV1 ? 'wait' : 'pointer',
+                    whiteSpace: 'nowrap', boxShadow: `0 2px 6px ${COLORS.primary}4D`,
+                  }}>
+                  {convertingV1 ? '변환 중...' : '✨ V2 본문으로 옮기기'}
+                </button>
+              )}
+            </div>
+            <div style={{
+              padding: '8px 12px', borderRadius: 8, marginBottom: 10,
+              background: `${COLORS.primary}0A`,
+              color: COLORS.textSecondary, fontSize: 11,
+            }}>
+              💡 「V2 본문으로 옮기기」 → 안건/결정/메모/첨부 섹션이 본문 탭에 H2/H3/단락 블록으로 추가됩니다.
+              V1 데이터는 그대로 보존되며, 본문 탭에서 추가 편집 가능합니다.
+            </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {minutes.map((m, i) => (
                 <div key={m.id || i} style={{ ...GLASS.L4, padding: 10, borderRadius: 8 }}>
