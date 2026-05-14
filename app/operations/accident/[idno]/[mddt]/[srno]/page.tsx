@@ -78,6 +78,10 @@ export default function AccidentDetailPage({
         body: JSON.stringify({
           ride_accident_id: rideAccidentIdFromIdno(idno),
           status: 'consulting',
+          // P2.1c-1: cafe24 키 같이 보냄 — DispatchIntakeTab 에서 정확 link
+          cafe24_otpt_idno: idno,
+          cafe24_otpt_mddt: mddt,
+          cafe24_otpt_srno: parseInt(srno, 10),
         }),
       })
       const json = await res.json().catch(() => ({}))

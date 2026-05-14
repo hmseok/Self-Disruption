@@ -38,6 +38,21 @@ export type DispatchOrder = {
   fmi_rental_id: string | null
   created_at: string
   updated_at: string
+  // P2.1c-1 — cafe24 acrotpth 키 (dispatch 상세 link 용)
+  cafe24_otpt_idno?: string | null
+  cafe24_otpt_mddt?: string | null
+  cafe24_otpt_srno?: number | null
+  // ride_accidents JOIN 결과 (있으면)
+  acc_id?: number | null
+  acc_date?: string | null
+  acc_location?: string | null
+  acc_driver_name?: string | null
+  acc_driver_phone?: string | null
+  acc_insurance_company?: string | null
+  acc_claim_no?: string | null
+  acc_stage?: string | null
+  acc_car_id?: string | null
+  acc_created_at?: string | null
 }
 
 export type MergedRow = Cafe24Accident & {

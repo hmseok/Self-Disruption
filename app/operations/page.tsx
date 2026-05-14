@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import AccidentIntakeTab from './_tabs/AccidentIntakeTab'
+import DispatchIntakeTab from './_tabs/DispatchIntakeTab'
 import PlaceholderTab from './_tabs/PlaceholderTab'
 
 // ═══════════════════════════════════════════════════════════════════
@@ -69,19 +70,7 @@ export default function OperationsPage() {
         {/* Tab content */}
         {tab === 'accident' && <AccidentIntakeTab />}
 
-        {tab === 'dispatch' && (
-          <PlaceholderTab
-            icon="🚗"
-            title="대차접수"
-            description="우리 시스템에서 대차로 진행한 사고 — 고객 상담 + 스케줄 입력"
-            upcoming={[
-              '큰 영역 고객 상담 (operations_consultations)',
-              '스케줄 입력 — 예상 배차일 / 예상 반납일',
-              '배차 확정 액션 → 「배차스케줄」 탭 이동',
-              '사고접수 탭의 「대차로 진행」 누른 사고 자동 노출',
-            ]}
-          />
-        )}
+        {tab === 'dispatch' && <DispatchIntakeTab />}
 
         {tab === 'schedule' && (
           <PlaceholderTab

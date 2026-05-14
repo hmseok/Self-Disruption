@@ -324,6 +324,10 @@ export default function DispatchDetailPage({
             expected_dispatch_date: expDispatch || null,
             expected_return_date: expReturn || null,
             status,
+            // P2.1c-1: cafe24 키 같이 send
+            cafe24_otpt_idno: idno,
+            cafe24_otpt_mddt: mddt,
+            cafe24_otpt_srno: parseInt(srno, 10),
           }),
         })
         const json = await res.json()
