@@ -69,13 +69,21 @@ export default function OperationsIntakePage() {
   const [search, setSearch] = useState('')
   const [resultMsg, setResultMsg] = useState<ResultMsg | null>(null)
 
-  // ── Date range — 1년 ──
-  const dateRange = useMemo(() => {
-    const today = new Date()
-    const oneYearAgo = new Date(today.getTime() - 365 * 24 * 3600 * 1000)
-    const fmt = (d: Date) => `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`
-    return { from: fmt(oneYearAgo), to: fmt(today) }
+  // ── Date range — 사용자 입력 가능 (default 30일) ──
+  const todayYmd = useMemo(() => {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
   }, [])
+  const monthAgoYmd = useMemo(() => {
+    const d = new Date(Date.now() - 30 * 24 * 3600 * 1000)
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  }, [])
+  const [fromDate, setFromDate] = useState<string>(monthAgoYmd)  // 'YYYY-MM-DD'
+  const [toDate, setToDate] = useState<string>(todayYmd)
+  const dateRange = useMemo(() => {
+    const fmt = (s: string) => s.replace(/-/g, '')
+    return { from: fmt(fromDate), to: fmt(toDate) }
+  }, [fromDate, toDate])
 
   // ── Fetch (filter 별) ──
   const fetchFilter = useCallback(async (key: FilterKey) => {
@@ -107,16 +115,27 @@ export default function OperationsIntakePage() {
     }
   }, [dateRange])
 
-  // 활성 filter 의 데이터 없으면 자동 fetch
+  // 모든 filter prefetch (mount 시 한 번에) — 카운트 즉시 갱신
   useEffect(() => {
-    if (cache[filter] === null && !loadingMap[filter] && !errMap[filter]) {
-      fetchFilter(filter)
-    }
-  }, [filter, cache, loadingMap, errMap, fetchFilter])
+    (Object.keys(FILTER_QUERY) as FilterKey[]).forEach((k) => {
+      if (cache[k] === null && !loadingMap[k] && !errMap[k]) {
+        fetchFilter(k)
+      }
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dateRange])  // 날짜 범위 변경 시 모두 재 fetch
 
   const refresh = useCallback(() => {
-    setCache((c) => ({ ...c, [filter]: null }))
-  }, [filter])
+    // 모든 filter cache 비움 → 모두 재 fetch
+    setCache({ all: null, dcyn_y: null, dcyn_n: null, closed: null })
+  }, [])
+
+  // 날짜 변경 시 cache 초기화 + 모두 prefetch
+  const applyDate = useCallback((from: string, to: string) => {
+    setFromDate(from)
+    setToDate(to)
+    setCache({ all: null, dcyn_y: null, dcyn_n: null, closed: null })
+  }, [])
 
   const activeData = cache[filter] || []
   const activeLoading = loadingMap[filter]
@@ -329,6 +348,36 @@ export default function OperationsIntakePage() {
           filters={filterItems}
           activeFilter={filter}
           onFilterChange={(k) => setFilter(k as FilterKey)}
+          trailing={
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 12, color: '#475569' }}>
+              <span style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>📅</span>
+              <input
+                type="date"
+                value={fromDate}
+                onChange={(e) => applyDate(e.target.value, toDate)}
+                style={{ ...GLASS.L1, padding: '6px 8px', borderRadius: 8, fontSize: 12, color: '#1e293b' }}
+              />
+              <span style={{ color: '#94a3b8' }}>~</span>
+              <input
+                type="date"
+                value={toDate}
+                onChange={(e) => applyDate(fromDate, e.target.value)}
+                style={{ ...GLASS.L1, padding: '6px 8px', borderRadius: 8, fontSize: 12, color: '#1e293b' }}
+              />
+              <button
+                onClick={() => applyDate(monthAgoYmd, todayYmd)}
+                style={{ padding: '6px 10px', background: 'transparent', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, cursor: 'pointer', color: '#64748b', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap' }}
+              >최근 30일</button>
+              <button
+                onClick={() => {
+                  const d = new Date(Date.now() - 365 * 24 * 3600 * 1000)
+                  const y = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+                  applyDate(y, todayYmd)
+                }}
+                style={{ padding: '6px 10px', background: 'transparent', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, cursor: 'pointer', color: '#64748b', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap' }}
+              >1년</button>
+            </div>
+          }
         />
 
         {activeErr && (
