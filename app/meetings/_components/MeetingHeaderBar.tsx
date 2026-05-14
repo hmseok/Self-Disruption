@@ -109,22 +109,28 @@ export default function MeetingHeaderBar({ meta, onMetaChange, trailing, editabl
           <span style={inlineTag}>📆 {meta.meeting_date || '미정'}</span>
         )}
 
-        {/* 시간 */}
+        {/* 시간 (분 단위) */}
         {editable ? (
-          <input type="number" value={meta.duration_min || ''}
-            onChange={(e) => onMetaChange({ duration_min: Number(e.target.value) || null })}
-            placeholder="분"
-            style={{ ...inlineSelect, width: 80, padding: '4px 8px' }} />
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
+            <span style={{ fontSize: 11, color: COLORS.textMuted }}>⏱</span>
+            <input type="number" value={meta.duration_min || ''}
+              onChange={(e) => onMetaChange({ duration_min: Number(e.target.value) || null })}
+              placeholder="60"
+              title="회의 진행 시간 (분)"
+              style={{ ...inlineSelect, width: 64, padding: '4px 8px', textAlign: 'right' }} />
+            <span style={{ fontSize: 12, color: COLORS.textSecondary, fontWeight: 600 }}>분</span>
+          </span>
         ) : (
           meta.duration_min && <span style={inlineTag}>⏱ {meta.duration_min}분</span>
         )}
 
-        {/* 장소 */}
+        {/* 장소 (오프라인 주소 또는 화상 링크) */}
         {editable ? (
           <input value={meta.location || ''}
             onChange={(e) => onMetaChange({ location: e.target.value })}
-            placeholder="📍 장소"
-            style={{ ...inlineSelect, padding: '4px 8px', minWidth: 140 }} />
+            placeholder="📍 회의 장소 또는 화상 링크 (예: 본사 회의실 / Zoom URL)"
+            title="회의 장소 — 자유 입력 (주소 검색은 별도 PR)"
+            style={{ ...inlineSelect, padding: '4px 8px', minWidth: 240 }} />
         ) : (
           meta.location && <span style={inlineTag}>📍 {meta.location}</span>
         )}
@@ -165,6 +171,6 @@ const inlineTag: React.CSSProperties = {
   fontSize: 12,
   borderRadius: 6,
   border: `1px solid ${COLORS.borderSubtle}`,
-  background: 'rgba(255,255,255,0.6)',
+  background: GLASS.L1.background,
   whiteSpace: 'nowrap',
 }

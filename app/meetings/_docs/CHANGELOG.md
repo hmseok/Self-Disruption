@@ -6,6 +6,55 @@
 
 ## 2026-05-13
 
+### hotfix #2 — 단위 라벨 + 「← 목록」 버튼 강조 + 장소 placeholder + ride_employees graceful
+
+**사용자 피드백** (V2-Ride-2 push 후 스크린샷 검수):
+> 「저 60 숫자가 뭔지 모르겠고 / 장소는 뭐 주소검색이라도 되게 해주는게 좋고 / 참석자는 추가 누르면 라이드 직원구성이 제대로 안나오는것같은데 / 회의 작성중 목록으로 가는 기능이나 버튼이 없는것같고 / 좌측 목록에는 뭔가 트리구조로 만들던가 폴더구조로 관리할수있는게 필요하지않을까요?」
+
+**hotfix 처리 (5건 중 4건)**:
+
+1. **`duration_min` 단위 라벨** (`MeetingHeaderBar.tsx`):
+   - 60 input 옆에 「분」 텍스트 + ⏱ 아이콘 prefix 추가
+   - placeholder「60」 + title 툴팁「회의 진행 시간 (분)」
+   - input width 80 → 64 (compact)
+2. **「← 회의록 목록」 버튼 강조** (`MeetingsLayoutV2.tsx`):
+   - 11px small → 13px medium, fontWeight 600 → 700
+   - 색상: `transparent` → `GLASS.L4.background` + `${COLORS.primary}40` border
+   - text: 「← 회의록 목록」 → 「← 회의록 목록으로」 (명확)
+   - hover 시 background + shadow 강조
+3. **장소 placeholder 명확화** (`MeetingHeaderBar.tsx`):
+   - 「📍 장소」 → 「📍 회의 장소 또는 화상 링크 (예: 본사 회의실 / Zoom URL)」
+   - minWidth 140 → 240 (더 길게)
+   - title 툴팁 추가 — 「주소 검색은 별도 PR」
+   - ※ 카카오 주소 API 통합은 별도 PR (V2-Address)
+4. **ride_employees 비어있을 때 graceful** (`MeetingsLayoutV2.tsx`):
+   - `loadEmployees` 결과 0건 → `employeesEmpty: true`
+   - amber 배너 표시 — 「인사마스터 직원 데이터 없음 — 참석자/담당자 선택 불가」
+   - 마이그 안내 + `/hr/people` 등록 요청 명시 (Rule 23)
+
+**별도 PR (큰 작업, 본 hotfix 미포함)**:
+- **V2-Tree** — 좌측 sidebar 트리/폴더 구조 (부서/유형/주관자 그룹 collapse + 커스텀 폴더)
+- **V2-Address** — 장소 카카오/네이버 주소 API 통합
+
+**Rule 8 시뮬레이션**:
+- 사용자 회의 페이지 진입 → MeetingsLayoutV2 mount
+- `loadEmployees` 호출 → ride_employees 마이그 미적용 시 빈 응답 → `employeesEmpty=true`
+- UI 에 amber 배너 표시 (참석자 추가 시도 시 사용자가 원인 파악 가능)
+- duration 「분」 단위 표시 → 「60 분」 명확
+- 「← 회의록 목록으로」 더 잘 보임 (medium 크기 + primary border + hover)
+
+**Rule 11**: DB 변경 X ✓
+**Rule 21**: 자기 모듈 (MeetingHeaderBar / MeetingsLayoutV2 / CHANGELOG)
+**Rule 22**: CHANGELOG 갱신
+
+**GATE**:
+- G3 사용자 피드백 ✓
+- G5 tsc PASS
+- G6 lint:harness — `'rgba(255,255,255,0.6)'` → `GLASS.L1.background` 토큰화 후 0건
+- G7 Designer — 사용자 스크린샷 검수 (push 후)
+
+---
+
 ### PR-MTG-V2-Ride-2 — AttendeeManager + ActionItemList ride_employees 전환
 
 **사용자 명령**: 「V2-Ride-2 ㄱㄱ」 (V2-C-Ride 검수 후).

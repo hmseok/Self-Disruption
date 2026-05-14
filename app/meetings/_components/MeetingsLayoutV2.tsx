@@ -127,11 +127,20 @@ export default function MeetingsLayoutV2({ meetingId, initialTab = 'body' }: Pro
     }
   }, [meetingId])
 
+  const [employeesEmpty, setEmployeesEmpty] = useState(false)
   const loadEmployees = useCallback(async () => {
     // PR-V2-Ride-2: profiles → ride_employees (인사 마스터)
     // 응답: [{ id, name, department, position, employment_type, color_tone, group_label, profile_id }]
-    const { json } = await fetchWithAuth('/api/meetings/mentions/employees?limit=200')
-    if (json?.data) setEmployees(json.data)
+    try {
+      const { json } = await fetchWithAuth('/api/meetings/mentions/employees?limit=200')
+      const data = Array.isArray(json?.data) ? json.data : []
+      setEmployees(data)
+      setEmployeesEmpty(data.length === 0)
+    } catch (e) {
+      console.warn('[loadEmployees]', e)
+      setEmployees([])
+      setEmployeesEmpty(true)
+    }
   }, [])
 
   useEffect(() => { load() }, [load])
@@ -356,17 +365,42 @@ export default function MeetingsLayoutV2({ meetingId, initialTab = 'body' }: Pro
           </div>
         )}
 
-        {/* 「← 목록으로」 버튼 (hotfix #1) */}
-        <div style={{ marginBottom: 8 }}>
+        {/* ride_employees 비어있을 때 배너 (hotfix #2 — Rule 23 graceful) */}
+        {employeesEmpty && (
+          <div style={{
+            ...GLASS.L3, border: '1px solid rgba(245,158,11,0.40)',
+            borderRadius: 10, padding: '10px 14px', marginBottom: 14,
+            color: '#b45309', fontSize: 12, fontWeight: 600,
+          }}>
+            ⚠ 인사마스터 직원 데이터 없음 — 참석자/담당자 선택 불가.
+            <br />
+            관리자에게 <code style={{ background: 'rgba(0,0,0,0.06)', padding: '1px 6px', borderRadius: 4 }}>migrations/2026-05-03_ride_employees_init.sql</code> 적용 + <code style={{ background: 'rgba(0,0,0,0.06)', padding: '1px 6px', borderRadius: 4 }}>/hr/people</code> 에서 직원 등록 요청.
+          </div>
+        )}
+
+        {/* 「← 목록으로」 버튼 (hotfix #1 → hotfix #2 강조) */}
+        <div style={{ marginBottom: 12 }}>
           <button onClick={() => router.push('/meetings')}
-            title="회의록 목록으로 (Esc 비슷)"
+            title="회의록 목록으로 돌아가기 (sidebar 외 명시 경로)"
             style={{
-              padding: '4px 10px', fontSize: 11, fontWeight: 600, borderRadius: 6,
-              background: 'transparent', color: COLORS.textSecondary,
-              border: `1px solid ${COLORS.borderSubtle}`, cursor: 'pointer', whiteSpace: 'nowrap',
-              display: 'inline-flex', alignItems: 'center', gap: 4,
+              padding: '6px 14px', fontSize: 13, fontWeight: 700, borderRadius: 8,
+              background: GLASS.L4.background,
+              color: COLORS.primary,
+              border: `1px solid ${COLORS.primary}40`,
+              cursor: 'pointer', whiteSpace: 'nowrap',
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              boxShadow: `0 1px 3px ${COLORS.primary}20`,
+              transition: 'all 0.15s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = `${COLORS.primary}1A`
+              e.currentTarget.style.boxShadow = `0 2px 6px ${COLORS.primary}40`
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = GLASS.L4.background
+              e.currentTarget.style.boxShadow = `0 1px 3px ${COLORS.primary}20`
             }}>
-            ← 회의록 목록
+            ← 회의록 목록으로
           </button>
         </div>
 
