@@ -409,6 +409,7 @@ export default function MeetingsLayoutV2({ meetingId, initialTab = 'body' }: Pro
           meta={meta}
           onMetaChange={onMetaChange}
           editable={canEdit}
+          employees={employees}
           trailing={
             <>
               <AutoSaveIndicator

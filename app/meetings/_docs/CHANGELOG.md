@@ -6,6 +6,88 @@
 
 ## 2026-05-13
 
+### PR-MTG-V2-Tree-1 + V2-Address + organizer select hotfix (3 PR 묶음)
+
+**사용자 명령**: 「v2-d 만 미루고 나머지 ㄱㄱ」 (V2-D 보류, 나머지 3건 일괄).
+
+---
+
+#### ① organizer select hotfix (MeetingHeaderBar)
+
+V2-A 신설 시 organizer 변경 UI 누락 → 회의 생성자가 곧 organizer 로 고정되던 이슈 해결.
+
+**변경**:
+- `MeetingHeaderBar.Props` 에 `employees?: EmployeeOption[]` 추가
+- 주관자 select inline — `ride_employees` 기반 + `profile_id` 있는 직원만 선택 가능
+- value 형식: ride_employees.id (정상) 또는 `pid:<profileId>` (인사마스터에 없지만 DB 에 organizer_id 있는 경우)
+- DB 저장: 항상 `meta.organizer_id` (profiles.id) — 외부 직원은 organizer 불가
+- read-only 모드: profile_id 매칭으로 이름 표시
+- `MeetingsLayoutV2` 에서 `employees={employees}` prop 전달
+
+**Rule 8**: 사용자가 organizer 변경 → onMetaChange → blur 즉시 PATCH /api/meetings → DB organizer_id 갱신
+**Rule 11**: `meetings.organizer_id` (profiles.id) — schema 그대로 ✓
+
+---
+
+#### ② PR-V2-Address — Daum 우편번호 popup
+
+**라이브러리**: `react-daum-postcode` (무료, API 키 X)
+
+**신규 컴포넌트** — `_components/AddressSearchModal.tsx`:
+- dynamic import — SSR 안전
+- onComplete: 도로명 우선 / 지번 fallback + 우편번호 + 건물명 자동 조합
+- 결과 형식: `[12345] 서울특별시 강남구 ... (FMI빌딩)`
+
+**MeetingHeaderBar 통합**:
+- 장소 input 우측에 「🔍 주소」 버튼
+- 클릭 → AddressSearchModal open → 선택 → location 자동 채움
+- 자유 입력 (회의실 / Zoom URL) 도 그대로 가능
+
+**Rule 13 호환성**: react-daum-postcode peer dependency 충돌 없음 ✓
+**Rule 21**: 공통 `package.json` + `package-lock.json` 단독 commit
+
+---
+
+#### ③ PR-V2-Tree-1 — 사이드바 그룹화 + collapse
+
+**범위**: 좌측 sidebar 회의 목록을 그룹별로 묶고 접기 가능. DB 변경 X (client-side grouping).
+
+**Meeting 인터페이스 확장**: `department: string | null` 추가
+**API SELECT**: `m.department` 는 V1 모듈부터 SELECT 됨 → 변경 X ✓
+
+**그룹화 방식** (GroupBy):
+- `none` — 전체 평면 (기본)
+- `type` — 유형별 (📅 정기 / 📋 특정 / 👥 1:1 / 🏢 부서별) 정해진 순
+- `department` — 부서별 (alphabetic)
+- `organizer` — 주관자별 (alphabetic)
+- `month` — 월별 (`YYYY-MM` desc)
+
+**기능**:
+- 그룹 select (sidebar 상단, 검색바와 type pill 사이)
+- 그룹 헤더 클릭 → 접기 (▼ ↔ ▶)
+- 그룹 항목 개수 우측 표시
+- **localStorage 보존** — `meetings.sidebar.groupBy` + `meetings.sidebar.collapsedGroups` — 새로고침 / 라우트 이동 후에도 상태 유지
+
+**Rule 8**: 사용자가 그룹 select 변경 → setGroupBy → localStorage 저장 + 회의 그룹화 + collapse 토글 가능
+
+**별도 PR (큰 작업, 본 PR 미포함)**:
+- **V2-Tree-2** — 커스텀 폴더 (사용자가 직접 만들기, drag&drop) — 신규 테이블 `meeting_folders` + `meeting.folder_id` 마이그 필요
+
+---
+
+**3 PR 공통 GATE**:
+- G3 사용자 GO 「ㄱㄱ」 ✓
+- G5 tsc PASS (본 세션 영역 0 에러)
+- G6 lint:harness 새 위반 0건
+- G7 Designer — 사용자 검수 (organizer select / 주소 검색 popup / sidebar 그룹 collapse)
+- Rule 8/11/13/14/21/22 모두 준수
+
+**별도 PR 보류**:
+- V2-D ERP 임베드 (사용자 명시 보류)
+- V2-Tree-2 커스텀 폴더 (마이그 영향 — 별도 결정)
+
+---
+
 ### hotfix #2 — 단위 라벨 + 「← 목록」 버튼 강조 + 장소 placeholder + ride_employees graceful
 
 **사용자 피드백** (V2-Ride-2 push 후 스크린샷 검수):

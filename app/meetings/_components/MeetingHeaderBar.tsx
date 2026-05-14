@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { COLORS, GLASS } from '@/app/utils/ui-tokens'
+import AddressSearchModal from './AddressSearchModal'
 
 // ═══════════════════════════════════════════════════════════════
 // MeetingHeaderBar — V2 본문 영역 상단 (PR-V2-A)
@@ -32,6 +33,17 @@ export interface MeetingMeta {
   status: string                        // draft | published | archived
 }
 
+interface EmployeeOption {
+  /** ride_employees.id */
+  id: string
+  /** profiles.id 옵션 FK */
+  profile_id?: string | null
+  name: string
+  department?: string | null
+  position?: string | null
+  group_label?: string | null
+}
+
 interface Props {
   meta: MeetingMeta
   onMetaChange: (patch: Partial<MeetingMeta>) => void
@@ -39,10 +51,13 @@ interface Props {
   trailing?: React.ReactNode
   /** 편집 가능 */
   editable?: boolean
+  /** organizer 선택용 직원 목록 (ride_employees) */
+  employees?: EmployeeOption[]
 }
 
-export default function MeetingHeaderBar({ meta, onMetaChange, trailing, editable = true }: Props) {
+export default function MeetingHeaderBar({ meta, onMetaChange, trailing, editable = true, employees = [] }: Props) {
   const [title, setTitle] = useState(meta.title)
+  const [addressOpen, setAddressOpen] = useState(false)
   useEffect(() => { setTitle(meta.title) }, [meta.title])
 
   const commitTitle = () => {
@@ -124,16 +139,67 @@ export default function MeetingHeaderBar({ meta, onMetaChange, trailing, editabl
           meta.duration_min && <span style={inlineTag}>⏱ {meta.duration_min}분</span>
         )}
 
-        {/* 장소 (오프라인 주소 또는 화상 링크) */}
+        {/* 장소 (오프라인 주소 또는 화상 링크) + 주소 검색 버튼 */}
         {editable ? (
-          <input value={meta.location || ''}
-            onChange={(e) => onMetaChange({ location: e.target.value })}
-            placeholder="📍 회의 장소 또는 화상 링크 (예: 본사 회의실 / Zoom URL)"
-            title="회의 장소 — 자유 입력 (주소 검색은 별도 PR)"
-            style={{ ...inlineSelect, padding: '4px 8px', minWidth: 240 }} />
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+            <input value={meta.location || ''}
+              onChange={(e) => onMetaChange({ location: e.target.value })}
+              placeholder="📍 회의 장소 또는 화상 링크 (예: 본사 회의실 / Zoom URL)"
+              title="자유 입력 가능 — 또는 우측 「🔍 주소」 버튼으로 주소 검색"
+              style={{ ...inlineSelect, padding: '4px 8px', minWidth: 240 }} />
+            <button onClick={() => setAddressOpen(true)}
+              title="Daum 우편번호로 정식 주소 검색"
+              style={{
+                padding: '4px 8px', fontSize: 11, fontWeight: 600, borderRadius: 6,
+                background: `${COLORS.primary}1A`, color: COLORS.primary,
+                border: `1px solid ${COLORS.primary}40`, cursor: 'pointer', whiteSpace: 'nowrap',
+              }}>🔍 주소</button>
+          </span>
         ) : (
           meta.location && <span style={inlineTag}>📍 {meta.location}</span>
         )}
+
+        {/* 주관자 (organizer) — ride_employees 기반 */}
+        {editable && employees.length > 0 ? (
+          <select
+            value={
+              meta.organizer_id
+                ? (employees.find(e => e.profile_id === meta.organizer_id)?.id || `pid:${meta.organizer_id}`)
+                : ''
+            }
+            onChange={(e) => {
+              const v = e.target.value
+              if (!v) { onMetaChange({ organizer_id: null }); return }
+              if (v.startsWith('pid:')) {
+                onMetaChange({ organizer_id: v.slice(4) })
+                return
+              }
+              const emp = employees.find(x => x.id === v)
+              if (emp?.profile_id) onMetaChange({ organizer_id: emp.profile_id })
+              else onMetaChange({ organizer_id: null })  // 외부 직원은 organizer 불가 (profile_id 필수)
+            }}
+            title="회의 주관자 — 인증 계정 있는 직원만 선택 가능"
+            style={{ ...inlineSelect, minWidth: 180 }}>
+            <option value="">👤 주관자 미정</option>
+            {employees.filter(e => e.profile_id).map(e => {
+              const meta = [e.department, e.position || e.group_label].filter(Boolean).join(' · ')
+              return (
+                <option key={e.id} value={e.id}>
+                  👤 {e.name}{meta ? ` (${meta})` : ''}
+                </option>
+              )
+            })}
+            {meta.organizer_id && !employees.find(e => e.profile_id === meta.organizer_id) && (
+              <option value={`pid:${meta.organizer_id}`}>
+                ⚠ 주관자 (인사마스터에 없음 — ID: {meta.organizer_id.slice(0, 8)})
+              </option>
+            )}
+          </select>
+        ) : meta.organizer_id ? (
+          <span style={inlineTag}>
+            👤 {employees.find(e => e.profile_id === meta.organizer_id)?.name || '주관자'}
+          </span>
+        ) : null}
 
         {/* 상태 */}
         {editable ? (
@@ -149,6 +215,13 @@ export default function MeetingHeaderBar({ meta, onMetaChange, trailing, editabl
           }}>{status.label}</span>
         )}
       </div>
+
+      {/* 주소 검색 모달 (V2-Address) */}
+      <AddressSearchModal
+        open={addressOpen}
+        onClose={() => setAddressOpen(false)}
+        onSelect={(addr) => onMetaChange({ location: addr })}
+      />
     </div>
   )
 }
