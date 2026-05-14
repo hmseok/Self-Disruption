@@ -15,23 +15,28 @@ import MentionList, { type MentionItem, type MentionListRef } from '../MentionLi
 let debounceTimer: NodeJS.Timeout | null = null
 let abortController: AbortController | null = null
 
-async function fetchProfiles(q: string): Promise<MentionItem[]> {
+async function fetchEmployees(q: string): Promise<MentionItem[]> {
   if (abortController) abortController.abort()
   abortController = new AbortController()
   try {
     // 인증 헤더 — localStorage 의 fmi_token
     const token = typeof window !== 'undefined' ? window.localStorage.getItem('fmi_token') : null
     const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {}
-    const res = await fetch(`/api/meetings/mentions/profiles?q=${encodeURIComponent(q)}&limit=10`, {
+    const res = await fetch(`/api/meetings/mentions/employees?q=${encodeURIComponent(q)}&limit=10`, {
       headers, signal: abortController.signal,
     })
     if (!res.ok) return []
     const json = await res.json()
     const rows = Array.isArray(json?.data) ? json.data : []
-    return rows.map((p: any) => ({
-      id: String(p.id),
-      label: String(p.name || ''),
-      subtitle: [p.department, p.position].filter(Boolean).join(' · ') || undefined,
+    return rows.map((e: any) => ({
+      id: String(e.id),
+      label: String(e.name || ''),
+      // 부서 · 직급/그룹 · 고용형태 — 사용자 「그룹별 기준」 표출
+      subtitle: [
+        e.department,
+        e.position || e.group_label,
+        e.employment_type,
+      ].filter(Boolean).join(' · ') || undefined,
       icon: '👤',
     }))
   } catch (e: any) {
@@ -63,7 +68,7 @@ export const MentionEmployee = Mention.extend({
         if (debounceTimer) clearTimeout(debounceTimer)
         const delay = query.length === 0 ? 0 : 180
         debounceTimer = setTimeout(async () => {
-          const items = await fetchProfiles(query)
+          const items = await fetchEmployees(query)
           resolve(items)
         }, delay)
       })
@@ -78,7 +83,7 @@ export const MentionEmployee = Mention.extend({
             props: {
               items: props.items,
               command: (item: MentionItem) => props.command({ id: item.id, label: item.label }),
-              emptyHint: '🔍 일치 직원 없음 — 이름 / 부서 / 직책 검색',
+              emptyHint: '🔍 일치 직원 없음 — 이름 / 부서 / 직책 / 그룹 검색',
             },
             editor: props.editor,
           })
@@ -101,7 +106,7 @@ export const MentionEmployee = Mention.extend({
           component?.updateProps({
             items: props.items,
             command: (item: MentionItem) => props.command({ id: item.id, label: item.label }),
-            emptyHint: '🔍 일치 직원 없음 — 이름 / 부서 / 직책 검색',
+            emptyHint: '🔍 일치 직원 없음 — 이름 / 부서 / 직책 / 그룹 검색',
           })
           if (!props.clientRect) return
           popup?.[0]?.setProps({ getReferenceClientRect: props.clientRect as any })

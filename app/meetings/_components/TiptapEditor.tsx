@@ -95,8 +95,9 @@ export default function TiptapEditor({
         if (type === 'mentionEmployee') {
           const id = node.attrs?.id
           if (id && typeof window !== 'undefined') {
-            // 직원 상세 페이지 없음 → /admin/employees 목록으로 (?id= 강조는 별도 PR)
-            window.open(`/admin/employees?focus=${encodeURIComponent(String(id))}`, '_blank', 'noopener')
+            // PR-V2-C-Ride: ride_employees 인사 마스터 페이지 (/hr/people) 로 이동
+            // focus 강조는 /hr/people 페이지가 별도로 처리 (별도 PR — 메인 세션 위임)
+            window.open(`/hr/people?focus=${encodeURIComponent(String(id))}`, '_blank', 'noopener')
           }
           return true
         }

@@ -6,6 +6,62 @@
 
 ## 2026-05-13
 
+### PR-MTG-V2-C-Ride — @멘션을 ride_employees (인사마스터) 기반으로 변경
+
+**사용자 명령**:
+> 「라이드 니까 라이드 등록 직원기준으로 진행」
+> 「우리 인사마스터쪽에 직원 관리가 있어요」
+> 「회사별 그룹별 기준으로 어차피 회의록작성시 권한이 부여되니 문제없을듯합니다」
+
+**문제 인식**:
+- 기존 `/api/meetings/mentions/profiles` 는 `profiles` 테이블 (인증 계정) 기반
+- 실제 직원 데이터는 `ride_employees` (Ride Inc. 인사 마스터, 2026-05-03 도입) → `/hr/people` 페이지에서 관리
+- `profiles` 는 외부 사용자 / 미직원 계정도 포함 가능 → @멘션 결과 부정확
+
+**변경**:
+
+1. **신규 API** — `app/api/meetings/mentions/employees/route.ts`:
+   - `SELECT id, name, department, position, employment_type, color_tone, group_label, profile_id FROM ride_employees WHERE is_active = 1`
+   - 검색 컬럼 확장: `name / department / position / group_label` (사용자 「그룹별 기준」 반영)
+   - 이름 prefix 우선 + `match_prio CASE`
+2. **기존 API 제거** — `app/api/meetings/mentions/profiles/route.ts` 삭제 (deprecated 표시 X — 데이터 부정확이라 즉시 폐기)
+3. **MentionEmployee.ts 수정**:
+   - fetch URL → `/api/meetings/mentions/employees`
+   - 함수명 `fetchProfiles` → `fetchEmployees`
+   - subtitle 확장: `[부서, 직급 또는 그룹, 고용형태].join(' · ')` (예: `콜센터 · 매니저 · 정규`, `콜센터 · 주간 · 파트`)
+   - emptyHint: "이름 / 부서 / 직책 / 그룹 검색"
+4. **TiptapEditor handleClickOn** — 직원 멘션 클릭 시:
+   - `/admin/employees?focus=<id>` → `/hr/people?focus=<id>` (Ride 인사 마스터 페이지로 이동)
+   - focus 강조는 `/hr/people` 별도 PR (메인 세션 위임)
+
+**Rule 11 SQL 컬럼 사전 검증**:
+- `migrations/2026-05-03_ride_employees_init.sql` 직접 확인:
+  - `id (CHAR 36), name, profile_id, department, position, employment_type, hire_date, resign_date, phone, email, color_tone, group_label, memo, is_active, created_at, updated_at`
+  - INDEX: `(is_active, department)`, `(profile_id)`, `(name)` ✓
+
+**Rule 14 동형 패턴 — 후속 검토 영역 (본 PR 미포함)**:
+- `AttendeeManager` 의 참석자 추가 select — 현재 `profiles` 사용 (page.tsx `loadEmployees` 가 `/api/finance-upload?table=profiles`)
+- `ActionItemList` 의 담당자 select — 같음
+- 두 영역도 ride_employees 로 변경 권장 — but DB 컬럼 `meeting_attendees.profile_id` 와 `meeting_action_items.assignee_id` 가 profiles.id 가리키는 의미 — 마이그 영향
+- **별도 PR (V2-Ride-2)** 필요 — 사용자 GO 받고 진행
+- ⚠️ 현재 사용자 명시 "회의록 작성시 권한 부여" — 작성/편집 권한은 profiles (인증) 기반 유지. ride_employees 는 멘션 노출 용도 한정.
+
+**Rule 21 분리 commit**: API 단독 + UI 단독
+
+**Rule 22 _docs**: 본 CHANGELOG (본 섹션) ✓
+
+**GATE 진행 상태**:
+- G3 사용자 GO ✓
+- G5 tsc PASS / G6 lint:harness 새 위반 0건
+- G7 Designer — 사용자 검수 (`@` 입력 시 ride 직원 16명 표시 / 클릭 → /hr/people)
+- Rule 8 시뮬레이션 ✓ (단순 SQL 소스 교체 + URL 변경)
+
+**후속 (별도 PR 필요)**:
+- V2-Ride-2: AttendeeManager / ActionItemList 도 ride_employees 로 전환 (사용자 GO 후)
+- V2-Ride-3: `/hr/people` 페이지 ?focus=<id> 강조 (메인 세션 위임 — `/hr` 모듈 외부 영역)
+
+---
+
 ### PR-MTG-V2-C-2/3/4 — #회의 + >ERP 멘션 + 클릭 페이지 이동 (통합)
 
 **사용자 명령**: 「1, 3번 다해야죠」 (V2-C-1 검수 후) — V2-C-2 + V2-C-3 + V2-C-4 한 PR 묶음 진행.
