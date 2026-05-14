@@ -3,15 +3,21 @@ import { useMemo } from 'react'
 import { COLORS, GLASS } from '@/app/utils/ui-tokens'
 
 // ═══════════════════════════════════════════════════════════════
-// AttendeeManager — V2 참석자 관리 (PR-V2-A)
-//   · 기존 모달 안 로직 분리 — 풀페이지 / 모달 양쪽 재사용
+// AttendeeManager — V2 참석자 관리 (PR-V2-A → PR-V2-Ride-2)
+//   · 데이터 소스: ride_employees (인사 마스터)
 //   · controlled component (state는 부모)
+//
+// 변경 이력:
+//   · 2026-05-13 V2-A: profiles 기반 시작
+//   · 2026-05-13 V2-Ride-2: ride_employees 기반 + profile_id 옵션 + external_name fallback
 // ═══════════════════════════════════════════════════════════════
 
 interface Attendee {
+  /** profiles.id — ride_employees.profile_id 가 있을 때만 채워짐 */
   profile_id: string | null
   profile_name?: string | null
   profile_department?: string | null
+  /** profile_id 가 null 일 때 ride_employees.name 또는 외부인 이름 */
   external_name?: string | null
   role?: string
   attendance?: string
@@ -19,9 +25,16 @@ interface Attendee {
 }
 
 interface Employee {
+  /** ride_employees.id (UUID) — UI 선택 key 용 */
   id: string
+  /** profiles.id 옵션 FK — 인증 계정 있는 직원만 */
+  profile_id?: string | null
   name: string
   department?: string | null
+  position?: string | null
+  employment_type?: string | null
+  color_tone?: string | null
+  group_label?: string | null
   is_active?: boolean | null
 }
 
@@ -35,33 +48,47 @@ interface Props {
   editable?: boolean
 }
 
+/** ride_employees row → 새 Attendee (profile_id 있으면 그걸, 없으면 external_name) */
+function rideToAttendee(e: Employee, role = 'attendee', attendance = 'present'): Attendee {
+  const pid = e.profile_id || null
+  return {
+    profile_id: pid,
+    profile_name: pid ? e.name : undefined,
+    external_name: pid ? undefined : e.name,
+    profile_department: e.department,
+    role, attendance,
+  }
+}
+
+/** 이미 참석자에 들어있는지 — profile_id 있으면 그걸로 / 없으면 external_name 으로 */
+function isAlreadyAttending(e: Employee, attendees: Attendee[]): boolean {
+  if (e.profile_id) return attendees.some(a => a.profile_id === e.profile_id)
+  return attendees.some(a => !a.profile_id && a.external_name === e.name)
+}
+
 export default function AttendeeManager({
   attendees, onChange, employees, department, showAutoFill, editable = true,
 }: Props) {
   const remainingEmployees = useMemo(
-    () => employees.filter(e => !attendees.find(a => a.profile_id === e.id)),
+    () => employees.filter(e => !isAlreadyAttending(e, attendees)),
     [employees, attendees]
   )
 
-  const add = (id: string) => {
-    if (!id) return
-    if (attendees.find(a => a.profile_id === id)) return
-    const e = employees.find(x => x.id === id)
-    onChange([...attendees, {
-      profile_id: id, profile_name: e?.name, profile_department: e?.department,
-      role: 'attendee', attendance: 'present',
-    }])
+  const add = (rideId: string) => {
+    if (!rideId) return
+    const e = employees.find(x => x.id === rideId)
+    if (!e) return
+    if (isAlreadyAttending(e, attendees)) return
+    onChange([...attendees, rideToAttendee(e)])
   }
   const remove = (i: number) => onChange(attendees.filter((_, idx) => idx !== i))
   const update = (i: number, patch: Partial<Attendee>) =>
     onChange(attendees.map((a, idx) => idx === i ? { ...a, ...patch } : a))
+
   const autoFillDept = () => {
     if (!department) return
     const members = employees.filter(e => e.department === department)
-    onChange(members.map(e => ({
-      profile_id: e.id, profile_name: e.name, profile_department: e.department,
-      role: 'attendee', attendance: 'present',
-    })))
+    onChange(members.map(e => rideToAttendee(e)))
   }
 
   return (
@@ -74,7 +101,7 @@ export default function AttendeeManager({
           <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
             {showAutoFill && department && (
               <button onClick={autoFillDept}
-                title={`부서 「${department}」 전원 자동 추가`}
+                title={`부서 「${department}」 전원 자동 추가 (ride_employees)`}
                 style={{
                   padding: '4px 10px', fontSize: 11, fontWeight: 600, borderRadius: 6,
                   background: 'rgba(245,158,11,0.10)', color: '#b45309',
@@ -87,12 +114,18 @@ export default function AttendeeManager({
               style={{
                 padding: '4px 10px', fontSize: 12, borderRadius: 6,
                 border: `1px solid ${COLORS.borderSubtle}`, background: GLASS.L1.background,
-                color: COLORS.textPrimary, cursor: 'pointer', minWidth: 200,
+                color: COLORS.textPrimary, cursor: 'pointer', minWidth: 220,
               }}>
-              <option value="">+ 직원 추가</option>
-              {remainingEmployees.map(e => (
-                <option key={e.id} value={e.id}>{e.name} {e.department ? `(${e.department})` : ''}</option>
-              ))}
+              <option value="">+ 직원 추가 (인사마스터)</option>
+              {remainingEmployees.map(e => {
+                const meta = [e.department, e.position || e.group_label, e.employment_type].filter(Boolean).join(' · ')
+                const noProfile = !e.profile_id
+                return (
+                  <option key={e.id} value={e.id}>
+                    {e.name}{meta ? ` (${meta})` : ''}{noProfile ? ' — 외부' : ''}
+                  </option>
+                )
+              })}
             </select>
           </div>
         )}
@@ -100,7 +133,7 @@ export default function AttendeeManager({
 
       {attendees.length === 0 && (
         <div style={{ padding: 16, textAlign: 'center', color: COLORS.textMuted, fontSize: 12 }}>
-          참석자 없음 — 우측 「+ 직원 추가」 에서 선택
+          참석자 없음 — 우측 「+ 직원 추가 (인사마스터)」 에서 선택
         </div>
       )}
 
@@ -117,6 +150,11 @@ export default function AttendeeManager({
               {a.profile_department && (
                 <span style={{ fontWeight: 400, color: COLORS.textMuted, marginLeft: 6 }}>
                   ({a.profile_department})
+                </span>
+              )}
+              {!a.profile_id && a.external_name && (
+                <span style={{ fontWeight: 400, color: COLORS.textMuted, marginLeft: 4, fontSize: 10 }}>
+                  · 외부/인증無
                 </span>
               )}
             </span>

@@ -6,6 +6,75 @@
 
 ## 2026-05-13
 
+### PR-MTG-V2-Ride-2 — AttendeeManager + ActionItemList ride_employees 전환
+
+**사용자 명령**: 「V2-Ride-2 ㄱㄱ」 (V2-C-Ride 검수 후).
+
+**범위**: 회의록 모달의 직원 select 두 곳(참석자 추가 / 액션 담당자) 도 `ride_employees` 기반으로 일관성 확보.
+
+**전략 — Option C (DB 마이그 없이)**:
+- DB 컬럼 (`meeting_attendees.profile_id` / `meeting_action_items.assignee_id`) 의미 그대로 (profiles.id 가리킴)
+- UI 데이터 소스만 `ride_employees` 로 변경 (loadEmployees URL)
+- 선택 시 `ride_employees.profile_id` 가 있으면 → `profile_id` 에 저장 (정상 인증 직원)
+- `profile_id` 없으면 → `external_name` / `external_assignee` 로 fallback (인증 계정 없는 직원)
+- **마이그 SQL 불필요** ✓
+
+**변경**:
+
+1. **MeetingsLayoutV2.tsx `loadEmployees`** — URL 변경:
+   - `/api/finance-upload?table=profiles` → `/api/meetings/mentions/employees?limit=200`
+   - 응답: ride_employees row `[{ id, name, department, position, employment_type, color_tone, group_label, profile_id }]`
+
+2. **AttendeeManager.tsx**:
+   - Employee 타입 확장 — `profile_id` / `position` / `employment_type` / `color_tone` / `group_label`
+   - `rideToAttendee(e)` 헬퍼 — `profile_id` 있으면 정상 attendee / 없으면 external_name fallback
+   - `isAlreadyAttending(e, attendees)` — profile_id 또는 external_name 으로 dedup
+   - `add(rideId)` — `e.id` 가 ride_employees.id. profile_id/external_name 분기 후 추가
+   - `autoFillDept` — 부서원 자동 채우기. 같은 분기 적용
+   - select option label 확장: `이름 (부서 · 직급/그룹 · 고용형태) — 외부` (profile 없는 직원 표시)
+   - 참석자 행에 외부/인증無 라벨 노출
+
+3. **ActionItemList.tsx**:
+   - Employee 타입 확장 — 같음
+   - select value 형식 변경 — `pid:<profileId>` 또는 `ext:<name>` 으로 두 케이스 분기 처리
+   - onChange — kind 분기 후 `assignee_id` (profiles.id) 또는 `external_assignee` (이름) 채움
+   - read-only 표시 — `employees.find(e => e.profile_id === ai.assignee_id)` 매칭 또는 external_assignee
+   - option label — `이름 (외부)` 표시
+
+**Rule 8 End-to-End 시뮬레이션**:
+- STEP 0: MeetingsLayoutV2 mount → loadEmployees → /api/meetings/mentions/employees → ride_employees 16명+ 가져옴
+- STEP 1: 참석자 탭에서 「+ 직원 추가 (인사마스터)」 → ride 직원 선택
+- STEP 2: 직원 e.profile_id 있음 → meeting_attendees.profile_id = e.profile_id 저장
+- STEP 2': 직원 e.profile_id 없음 → external_name = e.name 저장 (profile_id = null)
+- STEP 3: 액션 탭에서 담당자 select → 같은 분기 (assignee_id 또는 external_assignee)
+- STEP 4: PATCH /api/meetings?id=... → DB 저장 (기존 의미 그대로)
+- STEP 5: 다른 페이지 영향 X (loadEmployees URL 변경만)
+
+**Rule 11**: DB 컬럼 변경 X — schema 검증 불필요 ✓
+**Rule 13**: 새 라이브러리 없음 ✓
+**Rule 14 동형 패턴**:
+- MentionEmployee (V2-C-Ride) + AttendeeManager (V2-Ride-2) + ActionItemList (V2-Ride-2) 모두 ride_employees 일관성
+- 부서 자동 채우기, 외부 직원 fallback 모두 동일 패턴
+
+**Rule 21**: 자기 모듈 (app/meetings/_components/* 만)
+
+**Rule 22**: 본 CHANGELOG (본 섹션) ✓
+
+**GATE 진행 상태**:
+- G3 사용자 GO 「V2-Ride-2 ㄱㄱ」 ✓
+- G5 tsc PASS (본 세션 영역 0 에러)
+- G6 lint:harness 새 위반 0건
+- G7 Designer — 사용자 검수 (참석자 추가 / 액션 담당자 select 에 ride 직원 16명)
+- Rule 8/11/13/14/21/22 모두 준수
+
+**알려진 한계 / 후속**:
+- ride 직원 중 `profile_id` 없는 사람은 external_name/external_assignee 로 저장 — DB 의미는 「외부 사람」 으로 처리됨 (인사 마스터에는 등록되어 있지만 인증 계정 없는 직원)
+- 조회 / 정렬 / 통계 (예: action_count, attendee_count) 는 그대로 동작
+- 후속 PR-V2-Ride-3: `/hr/people` 페이지에서 `?focus=<id>` 강조 (메인 세션 위임 — /hr 모듈 외부 영역)
+- 후속 PR (조직 동기화): `ride_employees` 가 추가될 때 profiles 인증 계정 자동 매핑 정책 — 별도 결정
+
+---
+
 ### PR-MTG-V2-C-Ride — @멘션을 ride_employees (인사마스터) 기반으로 변경
 
 **사용자 명령**:

@@ -128,8 +128,10 @@ export default function MeetingsLayoutV2({ meetingId, initialTab = 'body' }: Pro
   }, [meetingId])
 
   const loadEmployees = useCallback(async () => {
-    const { json } = await fetchWithAuth('/api/finance-upload?table=profiles')
-    if (json?.data) setEmployees(json.data.filter((p: any) => p.is_active !== false))
+    // PR-V2-Ride-2: profiles → ride_employees (인사 마스터)
+    // 응답: [{ id, name, department, position, employment_type, color_tone, group_label, profile_id }]
+    const { json } = await fetchWithAuth('/api/meetings/mentions/employees?limit=200')
+    if (json?.data) setEmployees(json.data)
   }, [])
 
   useEffect(() => { load() }, [load])

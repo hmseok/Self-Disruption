@@ -2,10 +2,15 @@
 import { COLORS, GLASS } from '@/app/utils/ui-tokens'
 
 // ═══════════════════════════════════════════════════════════════
-// ActionItemList — V2 액션 아이템 인라인 편집 (PR-V2-A)
+// ActionItemList — V2 액션 아이템 인라인 편집 (PR-V2-A → PR-V2-Ride-2)
+//   · 담당자 데이터 소스: ride_employees (인사 마스터)
 //   · controlled component (state는 부모)
 //   · 인라인 체크: status open ↔ done
 //   · content / assignee / due_date 인라인 편집
+//
+// 변경 이력:
+//   · 2026-05-13 V2-A: profiles 기반 시작
+//   · 2026-05-13 V2-Ride-2: ride_employees 기반 + profile_id 옵션 + external_assignee fallback
 // ═══════════════════════════════════════════════════════════════
 
 interface ActionItem {
@@ -20,9 +25,15 @@ interface ActionItem {
 }
 
 interface Employee {
+  /** ride_employees.id — UI select key */
   id: string
+  /** profiles.id 옵션 FK */
+  profile_id?: string | null
   name: string
   department?: string | null
+  position?: string | null
+  employment_type?: string | null
+  group_label?: string | null
 }
 
 interface Props {
@@ -118,17 +129,44 @@ export default function ActionItemList({ items, onChange, employees, editable = 
                 }}>{ai.content}</span>
               )}
 
-              {/* 담당자 */}
+              {/* 담당자 — ride_employees 기반 */}
               {editable ? (
-                <select value={ai.assignee_id || ''}
-                  onChange={(e) => update(i, { assignee_id: e.target.value || null })}
+                <select
+                  value={
+                    ai.assignee_id
+                      ? `pid:${ai.assignee_id}`
+                      : ai.external_assignee
+                        ? `ext:${ai.external_assignee}`
+                        : ''
+                  }
+                  onChange={(e) => {
+                    const v = e.target.value
+                    if (!v) {
+                      update(i, { assignee_id: null, external_assignee: null })
+                      return
+                    }
+                    const [kind, ...rest] = v.split(':')
+                    const value = rest.join(':')
+                    if (kind === 'pid') {
+                      update(i, { assignee_id: value, external_assignee: null })
+                    } else if (kind === 'ext') {
+                      update(i, { assignee_id: null, external_assignee: value })
+                    }
+                  }}
                   style={cellInput}>
                   <option value="">담당자</option>
-                  {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+                  {employees.map(e => {
+                    const noProfile = !e.profile_id
+                    const optKey = e.profile_id ? `pid:${e.profile_id}` : `ext:${e.name}`
+                    const label = `${e.name}${noProfile ? ' (외부)' : ''}`
+                    return <option key={e.id} value={optKey}>{label}</option>
+                  })}
                 </select>
               ) : (
                 <span style={cellReadonly}>
-                  {employees.find(e => e.id === ai.assignee_id)?.name || ai.external_assignee || '미정'}
+                  {employees.find(e => e.profile_id && e.profile_id === ai.assignee_id)?.name
+                    || ai.external_assignee
+                    || '미정'}
                 </span>
               )}
 
