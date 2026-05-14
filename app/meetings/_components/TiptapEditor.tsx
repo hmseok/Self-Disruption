@@ -12,6 +12,8 @@ import TableHeader from '@tiptap/extension-table-header'
 import TableCell from '@tiptap/extension-table-cell'
 import SlashCommand from './extensions/SlashCommand'
 import MentionEmployee from './extensions/MentionEmployee'
+import MentionMeeting from './extensions/MentionMeeting'
+import MentionEntity from './extensions/MentionEntity'
 import { useEffect, useRef } from 'react'
 import { COLORS, GLASS } from '@/app/utils/ui-tokens'
 
@@ -82,7 +84,48 @@ export default function TiptapEditor({
       TableCell,
       SlashCommand,
       MentionEmployee,
+      MentionMeeting,
+      MentionEntity,
     ],
+    editorProps: {
+      // PR-V2-C-4 — 멘션 클릭 시 페이지 이동
+      handleClickOn(view, pos, node, _nodePos, _event, direct) {
+        if (!direct) return false
+        const type = node.type.name
+        if (type === 'mentionEmployee') {
+          const id = node.attrs?.id
+          if (id && typeof window !== 'undefined') {
+            // 직원 상세 페이지 없음 → /admin/employees 목록으로 (?id= 강조는 별도 PR)
+            window.open(`/admin/employees?focus=${encodeURIComponent(String(id))}`, '_blank', 'noopener')
+          }
+          return true
+        }
+        if (type === 'mentionMeeting') {
+          const id = node.attrs?.id
+          if (id && typeof window !== 'undefined') {
+            window.location.href = `/meetings/${encodeURIComponent(String(id))}`
+          }
+          return true
+        }
+        if (type === 'mentionEntity') {
+          const id = node.attrs?.id
+          const entityType = node.attrs?.entityType
+          if (id && entityType && typeof window !== 'undefined') {
+            const pathMap: Record<string, string> = {
+              contract: '/contracts',
+              car: '/cars',
+              customer: '/customers',
+            }
+            const base = pathMap[entityType]
+            if (base) {
+              window.open(`${base}?focus=${encodeURIComponent(String(id))}`, '_blank', 'noopener')
+            }
+          }
+          return true
+        }
+        return false
+      },
+    },
     content: value ?? EMPTY_DOC,
     editable,
     // Next.js SSR 회피 — client 마운트 후 렌더
@@ -212,22 +255,42 @@ export default function TiptapEditor({
           padding: 0;
         }
 
-        /* V2-C 멘션 노드 */
+        /* V2-C 멘션 노드 — 공통 */
         .tiptap-meetings .ProseMirror .mention {
           display: inline-block;
           padding: 1px 6px;
           margin: 0 1px;
           border-radius: 4px;
-          background: ${COLORS.primary}1F;
-          color: ${COLORS.primary};
           font-weight: 600;
           font-size: 0.95em;
           line-height: 1.4;
           cursor: pointer;
           user-select: none;
+          transition: background 0.12s;
         }
-        .tiptap-meetings .ProseMirror .mention:hover {
+        /* 직원 멘션 — primary (blue) */
+        .tiptap-meetings .ProseMirror .mention-employee {
+          background: ${COLORS.primary}1F;
+          color: ${COLORS.primary};
+        }
+        .tiptap-meetings .ProseMirror .mention-employee:hover {
           background: ${COLORS.primary}33;
+        }
+        /* 회의 멘션 — success (green) */
+        .tiptap-meetings .ProseMirror .mention-meeting {
+          background: rgba(16,185,129,0.15);
+          color: #047857;
+        }
+        .tiptap-meetings .ProseMirror .mention-meeting:hover {
+          background: rgba(16,185,129,0.30);
+        }
+        /* ERP 멘션 — warning (amber) */
+        .tiptap-meetings .ProseMirror .mention-entity {
+          background: rgba(245,158,11,0.15);
+          color: #b45309;
+        }
+        .tiptap-meetings .ProseMirror .mention-entity:hover {
+          background: rgba(245,158,11,0.30);
         }
       `}</style>
       <EditorContent editor={editor} className="tiptap-meetings" />
@@ -242,13 +305,13 @@ export default function TiptapEditor({
           fontSize: 11, color: COLORS.textMuted, whiteSpace: 'nowrap',
         }}>
           <span>💡 빠른 입력:</span>
-          <kbd style={kbdStyle}>/</kbd> 블록 메뉴
-          <kbd style={kbdStyle}>@</kbd> 직원 멘션
-          <kbd style={kbdStyle}>Ctrl+B</kbd> 굵게
-          <kbd style={kbdStyle}>Ctrl+I</kbd> 기울임
+          <kbd style={kbdStyle}>/</kbd> 블록
+          <kbd style={kbdStyle}>@</kbd> 직원
+          <kbd style={kbdStyle}>#</kbd> 회의
+          <kbd style={kbdStyle}>&gt;</kbd> 계약/차량/고객
+          <kbd style={kbdStyle}>Ctrl+B/I</kbd> 굵게/기울임
           <kbd style={kbdStyle}>Ctrl+Alt+1~3</kbd> 제목
-          <kbd style={kbdStyle}>Ctrl+Shift+8/7</kbd> 목록
-          <span style={{ marginLeft: 6, color: COLORS.primary }}>· #회의 / &gt;ERP 임베드 (후속)</span>
+          <span style={{ marginLeft: 6, color: COLORS.primary }}>· 멘션 클릭 → 페이지 이동</span>
         </div>
       )}
     </div>

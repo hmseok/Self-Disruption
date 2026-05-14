@@ -6,6 +6,89 @@
 
 ## 2026-05-13
 
+### PR-MTG-V2-C-2/3/4 — #회의 + >ERP 멘션 + 클릭 페이지 이동 (통합)
+
+**사용자 명령**: 「1, 3번 다해야죠」 (V2-C-1 검수 후) — V2-C-2 + V2-C-3 + V2-C-4 한 PR 묶음 진행.
+
+**범위**:
+
+1. **#회의 멘션 (V2-C-2)** — `MentionMeeting` extension + `/api/meetings/mentions/meetings` API
+2. **>ERP 멘션 (V2-C-3)** — `MentionEntity` extension + `/api/meetings/mentions/entities` API (계약/차량/고객 mixed)
+3. **클릭 페이지 이동 (V2-C-4)** — TiptapEditor `editorProps.handleClickOn` 으로 모든 멘션 클릭 처리
+
+**신규 API**:
+
+| 경로 | 검색 컬럼 | 정렬 |
+|------|----------|------|
+| `GET /api/meetings/mentions/meetings?q=&limit=` | `m.title` (prefix 우선) / `m.agenda` / `m.summary` | `match_prio ASC, meeting_date DESC` |
+| `GET /api/meetings/mentions/entities?q=&limit=` | (계약) customer_name / (차량) number·brand·model / (고객) name·phone·email | type 순 (계약 → 차량 → 고객), 각 perType 분할 |
+
+**Rule 11 SQL 사전 검증**:
+- `meetings.title / agenda / summary / meeting_date / deleted_at` — V1 모듈부터 사용 중 ✓
+- `contracts.customer_name` — `app/api/contracts/*` grep 확인 ✓
+- `cars.number / brand / model / created_at` — `app/api/cars/*` + `card-match-diag` grep 확인 ✓
+- `customers.name / phone / email / created_at` — `app/api/customers/*` grep 확인 ✓
+- `sql-reserved-alias-lint`: `match_prio` 사용 (rank 예약어 회피) ✓
+
+**신규 컴포넌트**:
+
+- `app/meetings/_components/extensions/MentionMeeting.ts`
+  - char='#' / suggestion debounce 180ms + AbortController
+  - HTMLAttributes: `class: 'mention mention-meeting'` + `data-mention-type: 'meeting'`
+  - icon: type 별 (📅정기 / 📋특정 / 👥1:1 / 🏢부서)
+
+- `app/meetings/_components/extensions/MentionEntity.ts`
+  - char='>' / suggestion debounce 180ms
+  - `addAttributes` — `entityType` attr 추가 (contract/car/customer 구분)
+  - HTMLAttributes: `class: 'mention mention-entity'` + `data-mention-type: 'entity'` + `data-entity-type`
+  - icon: type 별 (📑계약 / 🚗차량 / 👤고객)
+
+**클릭 핸들러 (V2-C-4)** — TiptapEditor `editorProps.handleClickOn`:
+
+```ts
+mentionEmployee → window.open(`/admin/employees?focus=<id>`, '_blank', 'noopener')
+mentionMeeting  → window.location.href = `/meetings/<id>`
+mentionEntity   → type 별 base path (/contracts | /cars | /customers) + `?focus=<id>` + 새 탭
+```
+
+**Rule 8 End-to-End 시뮬레이션** (대표 — `#매출`):
+- STEP 0: 본문에 `#매출` 입력
+- STEP 1: Suggestion → debounce 180ms → fetch `/api/meetings/mentions/meetings?q=매출`
+- STEP 2: SQL `WHERE m.deleted_at IS NULL AND (title LIKE '매출%' OR agenda LIKE ... OR summary LIKE ...) ORDER BY match_prio ASC, ...`
+- STEP 3: MentionList 표시 → 선택 → mention 노드 inline 삽입
+- STEP 4: onUpdate → PATCH body
+- STEP 5: 클릭 → `window.location.href = '/meetings/<id>'` 같은 탭 이동 (회의록은 그대로 이동, 다른 도메인은 새 탭)
+
+**Rule 13 호환성**:
+- `@tiptap/extension-mention@3.23.2` — V2-C-1 에서 이미 install (재사용)
+- 3 extension 같은 패키지 base — peer 충돌 없음 ✓
+
+**Rule 14 동형 패턴** — 멘션 3 종류 (직원 / 회의 / ERP) 동일 구조:
+- API: `/api/meetings/mentions/{type}?q=&limit=`
+- Extension: `Mention.extend({ name: 'mention{Type}' }).configure({ char, suggestion: { items, render } })`
+- UI: `MentionList` 공용
+- 클릭: `handleClickOn` 의 type 분기
+
+후속 PR-V2-C-4 추가 강화 (현재 PR 외):
+- hover 카드 (상세 정보 미리보기) — 별도 PR
+- focus 강조 (?focus=<id> 쿼리 받아 list 페이지에서 해당 행 highlight) — 각 도메인 모듈 별도 PR
+
+**Rule 21 분리 commit**: API 2개 단독 + UI 통합 + CHANGELOG
+
+**Rule 22 _docs**: 본 CHANGELOG (이 섹션) ✓
+
+**GATE 진행 상태**:
+- G3 설계서 § 4.3 / § 5.2 + 사용자 GO 「1,3번 다해야죠」 ✓
+- G5 tsc PASS (본 세션 영역 0 에러)
+- G6 lint:harness 새 위반 0건
+- G7 Designer — 사용자 스크린샷 검수 (push 후 # / > 동작 + 클릭 이동)
+
+**알려진 한계 (후속 PR)**:
+- ERP entities API 가 graceful — 한 테이블 (예: contracts) 컬럼 누락 시에도 다른 type 결과 반환 (별도 PR-V2-C-5 에서 schema 정확도 강화 검토)
+- focus= 쿼리 강조는 각 list 페이지 (cars/contracts/customers/admin/employees) 가 별도 수신 처리 필요 — 본 PR 미포함
+
+---
+
 ### PR-MTG-V2-C-1 — @직원 멘션 (패턴 확립)
 
 **사용자 명령**: 「멘션 진행 ㄱㄱ」 (V2-B 검수 후).
