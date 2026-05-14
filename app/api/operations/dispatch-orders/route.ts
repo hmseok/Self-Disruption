@@ -34,7 +34,27 @@ export async function GET(request: NextRequest) {
 
     // ride_accidents 가 INT id, operations_dispatch_orders.ride_accident_id INT
     // graceful fallback: 테이블 미적용 시 빈 배열
-    const baseSql = `SELECT
+    // P2.1c-1: cafe24_otpt_* 컬럼이 있을 수도, 없을 수도 (마이그 미적용 케이스)
+    // Try with new columns; if fail, fallback.
+    const baseSqlWithCafe24 = `SELECT
+         o.id, o.ride_accident_id, o.consultation_note, o.customer_request,
+         o.expected_dispatch_date, o.expected_return_date,
+         o.status, o.assigned_to, o.fmi_rental_id,
+         o.created_at, o.updated_at, o.created_by, o.updated_by,
+         o.cafe24_otpt_idno, o.cafe24_otpt_mddt, o.cafe24_otpt_srno,
+         a.id              AS acc_id,
+         a.accident_date   AS acc_date,
+         a.accident_location AS acc_location,
+         a.driver_name     AS acc_driver_name,
+         a.driver_phone    AS acc_driver_phone,
+         a.insurance_company AS acc_insurance_company,
+         a.insurance_claim_no AS acc_claim_no,
+         a.workflow_stage  AS acc_stage,
+         a.car_id          AS acc_car_id,
+         a.created_at      AS acc_created_at
+       FROM operations_dispatch_orders o
+       LEFT JOIN ride_accidents a ON a.id = o.ride_accident_id`
+    const baseSqlLegacy = `SELECT
          o.id, o.ride_accident_id, o.consultation_note, o.customer_request,
          o.expected_dispatch_date, o.expected_return_date,
          o.status, o.assigned_to, o.fmi_rental_id,
@@ -51,11 +71,19 @@ export async function GET(request: NextRequest) {
          a.created_at      AS acc_created_at
        FROM operations_dispatch_orders o
        LEFT JOIN ride_accidents a ON a.id = o.ride_accident_id`
+    const baseSql = baseSqlWithCafe24
     const sql = stage
       ? `${baseSql} WHERE o.status = ? ORDER BY o.created_at DESC LIMIT ${limit}`
       : `${baseSql} ORDER BY o.created_at DESC LIMIT ${limit}`
     const params = stage ? [stage] : []
-    const rows = await prisma.$queryRawUnsafe<Array<any>>(sql, ...params).catch((e: any) => {
+    const rows = await prisma.$queryRawUnsafe<Array<any>>(sql, ...params).catch(async (e: any) => {
+      // P2.1c-1: cafe24_otpt_* 미적용 시 fallback
+      if (e?.message?.includes("Unknown column 'o.cafe24_otpt_")) {
+        const fallbackSql = stage
+          ? `${baseSqlLegacy} WHERE o.status = ? ORDER BY o.created_at DESC LIMIT ${limit}`
+          : `${baseSqlLegacy} ORDER BY o.created_at DESC LIMIT ${limit}`
+        return await prisma.$queryRawUnsafe<Array<any>>(fallbackSql, ...params).catch(() => [])
+      }
       console.warn('[dispatch-orders GET] table not yet migrated:', e?.message?.slice(0, 200))
       return []
     })
@@ -85,6 +113,10 @@ export async function POST(request: NextRequest) {
       expected_return_date,
       assigned_to,
       status: statusInput,
+      // P2.1c-1: cafe24 키 (사고접수 상세에서 「대차로 진행」 시 같이 send)
+      cafe24_otpt_idno,
+      cafe24_otpt_mddt,
+      cafe24_otpt_srno,
     } = body || {}
 
     const rideAccId = Number(ride_accident_id)
@@ -112,23 +144,53 @@ export async function POST(request: NextRequest) {
     const status = ['new', 'consulting', 'scheduled', 'dispatched', 'done', 'cancelled']
       .includes(statusInput) ? statusInput : 'new'
 
-    await prisma.$executeRawUnsafe(
-      `INSERT INTO operations_dispatch_orders
-         (id, ride_accident_id, consultation_note, customer_request,
-          expected_dispatch_date, expected_return_date,
-          status, assigned_to, created_by, updated_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      newId,
-      rideAccId,
-      consultation_note || null,
-      customer_request || null,
-      expected_dispatch_date || null,
-      expected_return_date || null,
-      status,
-      assigned_to || null,
-      user.id || null,
-      user.id || null,
-    )
+    // P2.1c-1: cafe24_otpt_* 컬럼 (마이그 미적용 시 graceful — try/catch)
+    try {
+      await prisma.$executeRawUnsafe(
+        `INSERT INTO operations_dispatch_orders
+           (id, ride_accident_id, consultation_note, customer_request,
+            expected_dispatch_date, expected_return_date,
+            status, assigned_to, created_by, updated_by,
+            cafe24_otpt_idno, cafe24_otpt_mddt, cafe24_otpt_srno)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        newId,
+        rideAccId,
+        consultation_note || null,
+        customer_request || null,
+        expected_dispatch_date || null,
+        expected_return_date || null,
+        status,
+        assigned_to || null,
+        user.id || null,
+        user.id || null,
+        cafe24_otpt_idno || null,
+        cafe24_otpt_mddt || null,
+        cafe24_otpt_srno || null,
+      )
+    } catch (e: any) {
+      // 마이그 미적용 (cafe24_otpt_* 컬럼 없음) — fallback to old INSERT
+      if (e?.message?.includes("Unknown column 'cafe24_otpt_")) {
+        await prisma.$executeRawUnsafe(
+          `INSERT INTO operations_dispatch_orders
+             (id, ride_accident_id, consultation_note, customer_request,
+              expected_dispatch_date, expected_return_date,
+              status, assigned_to, created_by, updated_by)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          newId,
+          rideAccId,
+          consultation_note || null,
+          customer_request || null,
+          expected_dispatch_date || null,
+          expected_return_date || null,
+          status,
+          assigned_to || null,
+          user.id || null,
+          user.id || null,
+        )
+      } else {
+        throw e
+      }
+    }
 
     return NextResponse.json({
       ok: true,
