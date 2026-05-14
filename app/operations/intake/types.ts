@@ -186,6 +186,20 @@ export type DispatchRequestRow = {
   otptacad: string | null
   otptacmo: string | null
   otptacet: string | null
+  // P2.1b 추가
+  otptdsli: string | null    // 운전자면허
+  otptdsbh: string | null    // 생년월일
+  otptdsbn: string | null    // 보험접수번호 (당사)
+  otptdsus: string | null    // 대물담당자
+  otptdstl: string | null    // 대물담당자 HP
+  otptpart: string | null    // 파손부위
+  otptdsre: string | null    // 계약자와의관계
+  otptcare: string | null    // 운전자관계
+  otptbdnm: string | null    // 사고장소 (정식)
+  otptpknm: string | null    // 수리희망지
+  otptacrn: string | null    // 운행가능여부 Y/N
+  otptitem: string | null    // 사고상세구분
+  otptadfg: string | null    // 공장입고여부 Y/N
   // 대차요청 sub (acrrentm)
   rent_srno: number | string | null
   rent_seqn: number | null

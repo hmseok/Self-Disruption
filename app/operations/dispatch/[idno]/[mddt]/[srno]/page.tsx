@@ -444,7 +444,7 @@ export default function DispatchDetailPage({
                 </div>
               </Section>
 
-              {/* 사고 정보 — 자체 구성 */}
+              {/* 사고 정보 — 자체 구성 + P2.1b 풍성화 */}
               <Section icon="🚨" title="사고 정보">
                 <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr 140px 1fr', gap: '8px 16px', fontSize: 12 }}>
                   <Lbl>접수일시</Lbl>
@@ -459,20 +459,37 @@ export default function DispatchDetailPage({
                         ))
                       : '-'}
                   </Val>
+                  {row.otptitem && (<><Lbl>사고상세구분</Lbl><Val span={3}>{row.otptitem}</Val></>)}
                   <Lbl>사고 내용</Lbl>
                   <Val span={3} preWrap>{row.otptacmo || '-'}</Val>
                   <Lbl>사고 위치</Lbl>
-                  <Val span={3} preWrap>{row.otptacad || '-'}</Val>
+                  <Val span={3} preWrap>{row.otptbdnm || row.otptacad || '-'}</Val>
+                  {row.otptpknm && (<><Lbl>수리희망지</Lbl><Val span={3} preWrap>{row.otptpknm}</Val></>)}
+                  <Lbl>운행가능</Lbl>
+                  <Val>
+                    <span style={{ padding: '2px 8px', background: row.otptacrn === 'Y' ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)', color: row.otptacrn === 'Y' ? '#15803d' : '#991b1b', borderRadius: 6, fontSize: 11, fontWeight: 700 }}>
+                      {row.otptacrn === 'Y' ? '✅ 가능' : '❌ 불가'}
+                    </span>
+                  </Val>
+                  <Lbl>공장입고</Lbl>
+                  <Val>{row.otptadfg === 'Y' ? '✅ 입고됨' : '⏳ 미입고'}</Val>
+                  {row.otptpart && (<><Lbl>파손부위</Lbl><Val span={3} preWrap>{row.otptpart}</Val></>)}
                 </div>
               </Section>
 
-              {/* 통보자 / 운전자 */}
-              <Section icon="👥" title="통보자 / 운전자">
+              {/* 통보자 / 운전자 — P2.1b 풍성화 */}
+              <Section icon="👥" title="당사 차량 (통보자/운전자)">
                 <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr 140px 1fr', gap: '8px 16px', fontSize: 12 }}>
                   <Lbl>통보자</Lbl>
                   <Val>{row.otptcanm || '-'}{row.otptcahp ? ` / ${row.otptcahp}` : ''}</Val>
+                  {row.otptcare && (<><Lbl>운전자관계</Lbl><Val>{row.otptcare}</Val></>)}
                   <Lbl>운전자</Lbl>
                   <Val>{row.otptdsnm || '-'}{row.otptdshp ? ` / ${row.otptdshp}` : ''}</Val>
+                  {row.otptdsre && (<><Lbl>계약자와의관계</Lbl><Val>{row.otptdsre}</Val></>)}
+                  {row.otptdsli && (<><Lbl>운전자면허</Lbl><Val>{row.otptdsli}</Val></>)}
+                  {row.otptdsbh && (<><Lbl>생년월일</Lbl><Val>{row.otptdsbh}</Val></>)}
+                  {row.otptdsbn && (<><Lbl>보험접수번호 (당사)</Lbl><Val span={3}>{row.otptdsbn}</Val></>)}
+                  {(row.otptdsus || row.otptdstl) && (<><Lbl>대물담당자</Lbl><Val span={3}>{row.otptdsus || '-'}{row.otptdstl ? ` / ${row.otptdstl}` : ''}</Val></>)}
                 </div>
               </Section>
 
