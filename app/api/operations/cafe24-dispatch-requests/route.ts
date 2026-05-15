@@ -99,19 +99,14 @@ export interface DispatchRequestRow extends RowDataPacket {
   otptacad: string | null
   otptacmo: string | null
   otptacet: string | null
-  // P2.1b 추가 — mgcap/accident.view.php 의 한글 라벨 매핑 발견
+  // P2.1b 추가 — acr0101a.php INSERT 패턴 검증 후 안전 컬럼만 유지
+  // hotfix (2026-05-15): mgcap/accident.view.php 의 HTML id 6개는 acrotpth 미존재 (제거)
   otptdsli: string | null    // 운전자면허
   otptdsbh: string | null    // 생년월일
   otptdsbn: string | null    // 보험접수번호 (당사)
-  otptdsus: string | null    // 대물담당자
-  otptdstl: string | null    // 대물담당자 HP
-  otptpart: string | null    // 파손부위
   otptdsre: string | null    // 계약자와의관계
   otptcare: string | null    // 운전자관계
-  otptbdnm: string | null    // 사고장소 (정식 — 검색 결과)
-  otptpknm: string | null    // 수리희망지
   otptacrn: string | null    // 운행가능여부 Y/N
-  otptitem: string | null    // 사고상세구분
   otptadfg: string | null    // 공장입고여부 Y/N
   // 대차요청 sub (acrrentm)
   rent_srno: number | null
@@ -223,10 +218,8 @@ export async function GET(request: Request) {
              b.otpttobm, b.otpttobn, b.otpttobu,
              b.otptacad, b.otptacmo, b.otptacet,
              b.otptdsli, b.otptdsbh, b.otptdsbn,
-             b.otptdsus, b.otptdstl,
-             b.otptpart, b.otptdsre, b.otptcare,
-             b.otptbdnm, b.otptpknm,
-             b.otptacrn, b.otptitem, b.otptadfg,
+             b.otptdsre, b.otptcare,
+             b.otptacrn, b.otptadfg,
              r.rentsrno AS rent_srno,
              r.rentseqn AS rent_seqn,
              r.rentstat AS rent_stat,
