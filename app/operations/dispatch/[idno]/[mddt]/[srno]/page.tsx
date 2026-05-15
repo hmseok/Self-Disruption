@@ -466,7 +466,11 @@ export default function DispatchDetailPage({
                   <Lbl>사고 내용</Lbl>
                   <Val span={3} preWrap>{row.otptacmo || '-'}</Val>
                   <Lbl>사고 위치</Lbl>
-                  <Val span={3} preWrap>{row.otptacad || '-'}</Val>
+                  <Val span={3} preWrap>
+                    {row.otptbdnm || row.otptacad || '-'}
+                    {row.otptbdnm && row.otptacad && ` / ${row.otptacad}`}
+                  </Val>
+                  {row.otptpknm && (<><Lbl>수리희망지</Lbl><Val span={3} preWrap>{row.otptpknm}</Val></>)}
                   <Lbl>운행가능</Lbl>
                   <Val>
                     <span style={{ padding: '2px 8px', background: row.otptacrn === 'Y' ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)', color: row.otptacrn === 'Y' ? '#15803d' : '#991b1b', borderRadius: 6, fontSize: 11, fontWeight: 700 }}>
@@ -475,6 +479,7 @@ export default function DispatchDetailPage({
                   </Val>
                   <Lbl>공장입고</Lbl>
                   <Val>{row.otptadfg === 'Y' ? '✅ 입고됨' : '⏳ 미입고'}</Val>
+                  {row.otptpart && (<><Lbl>파손부위</Lbl><Val span={3} preWrap>{row.otptpart}</Val></>)}
                 </div>
               </Section>
 
@@ -490,6 +495,7 @@ export default function DispatchDetailPage({
                   {row.otptdsli && (<><Lbl>운전자면허</Lbl><Val>{row.otptdsli}</Val></>)}
                   {row.otptdsbh && (<><Lbl>생년월일</Lbl><Val>{row.otptdsbh}</Val></>)}
                   {row.otptdsbn && (<><Lbl>보험접수번호 (당사)</Lbl><Val span={3}>{row.otptdsbn}</Val></>)}
+                  {(row.otptdsus || row.otptdstl) && (<><Lbl>대물담당자</Lbl><Val span={3}>{row.otptdsus || '-'}{row.otptdstl ? ` / ${row.otptdstl}` : ''}</Val></>)}
                 </div>
               </Section>
 

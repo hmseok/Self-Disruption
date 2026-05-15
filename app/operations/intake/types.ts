@@ -201,14 +201,19 @@ export type DispatchRequestRow = {
   otptacad: string | null
   otptacmo: string | null
   otptacet: string | null
-  // P2.1b 추가 (hotfix 2026-05-15: acrotpth 미존재 컬럼 6개 제거)
-  otptdsli: string | null    // 운전자면허
+  // P2.1b 풍성화 (mgcap/api_accident.php SQL 검증 후 12 컬럼)
+  otptdsli: string | null    // 운전자면허 (코드)
   otptdsbh: string | null    // 생년월일
   otptdsbn: string | null    // 보험접수번호 (당사)
   otptdsre: string | null    // 계약자와의관계
   otptcare: string | null    // 운전자관계
   otptacrn: string | null    // 운행가능여부 Y/N
   otptadfg: string | null    // 공장입고여부 Y/N
+  otptbdnm: string | null    // 사고장소 (정식)
+  otptpknm: string | null    // 수리희망지
+  otptdsus: string | null    // 대물담당자
+  otptdstl: string | null    // 대물담당자 HP
+  otptpart: string | null    // 파손부위 (acrparth + comcbsdm subquery)
   // 대차요청 sub (acrrentm)
   rent_srno: number | string | null
   rent_seqn: number | null
