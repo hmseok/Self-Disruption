@@ -99,15 +99,20 @@ export interface DispatchRequestRow extends RowDataPacket {
   otptacad: string | null
   otptacmo: string | null
   otptacet: string | null
-  // P2.1b 추가 — acr0101a.php INSERT 패턴 검증 후 안전 컬럼만 유지
-  // hotfix (2026-05-15): mgcap/accident.view.php 의 HTML id 6개는 acrotpth 미존재 (제거)
-  otptdsli: string | null    // 운전자면허
+  // P2.1b 풍성화 — mgcap/api_accident.php SQL 검증 후 12 컬럼 (otptitem 만 derived)
+  otptdsli: string | null    // 운전자면허 (코드 — get_cbsddesc('OTPTDSLI', ...) 변환)
   otptdsbh: string | null    // 생년월일
   otptdsbn: string | null    // 보험접수번호 (당사)
   otptdsre: string | null    // 계약자와의관계
   otptcare: string | null    // 운전자관계
   otptacrn: string | null    // 운행가능여부 Y/N
   otptadfg: string | null    // 공장입고여부 Y/N
+  otptbdnm: string | null    // 사고장소 (정식)
+  otptpknm: string | null    // 수리희망지
+  otptdsus: string | null    // 대물담당자
+  otptdstl: string | null    // 대물담당자 HP
+  // otptpart (파손부위) — acrparth + comcbsdm subquery 별도 (다음 step)
+  otptpart: string | null
   // 대차요청 sub (acrrentm)
   rent_srno: number | null
   rent_seqn: number | null
@@ -220,6 +225,18 @@ export async function GET(request: Request) {
              b.otptdsli, b.otptdsbh, b.otptdsbn,
              b.otptdsre, b.otptcare,
              b.otptacrn, b.otptadfg,
+             b.otptbdnm, b.otptpknm,
+             b.otptdsus, b.otptdstl,
+             (SELECT GROUP_CONCAT(DISTINCT cb.cbsddesc SEPARATOR ', ')
+                FROM acrparth p
+                JOIN comcbsdm cb ON p.partcode = cb.cbsdcode
+               WHERE cb.cbsdjobb = 'OTPT'
+                 AND cb.cbsdgubn = 'OTPTPART'
+                 AND p.partflag = 'O'
+                 AND p.partidno = b.otptidno
+                 AND p.partmddt = b.otptmddt
+                 AND p.partsrno = b.otptsrno
+             ) AS otptpart,
              r.rentsrno AS rent_srno,
              r.rentseqn AS rent_seqn,
              r.rentstat AS rent_stat,
