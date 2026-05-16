@@ -12,6 +12,7 @@ import type {
   DispatchOrder,
   AcrMemoRow,
   FactoryAssignmentRow,
+  Cafe24SmsRow,
 } from '@/app/operations/intake/types'
 import { CATEGORY_META, describeAccidentTypes, fmtCafe24DateTime, fmtCafe24DateOnly } from '@/app/operations/intake/types'
 
@@ -109,6 +110,10 @@ export default function DispatchDetailPage({
   // ── 공장배정 (ajaoderh — P1.5f) ──
   const [factories, setFactories] = useState<FactoryAssignmentRow[]>([])
   const [factoriesLoading, setFactoriesLoading] = useState(true)
+
+  // ── 문자 발송 이력 (crmsendh + crmsmsgh — PR-B3) ──
+  const [sms, setSms] = useState<Cafe24SmsRow[]>([])
+  const [smsLoading, setSmsLoading] = useState(true)
 
   // ── dispatch_order ──
   const [dispatchOrder, setDispatchOrder] = useState<DispatchOrder | null>(null)
@@ -216,6 +221,22 @@ export default function DispatchDetailPage({
     }
   }, [idno, mddt, srno])
 
+  // PR-B3 — 문자 발송 이력 + 발송문구 (crmsendh + crmsmsgh)
+  const fetchSms = useCallback(async () => {
+    setSmsLoading(true)
+    try {
+      const params = new URLSearchParams({ idno, mddt, srno })
+      const headers = await getAuthHeader()
+      const res = await fetch(`/api/operations/cafe24-sms-history?${params}`, { headers })
+      const json = await res.json().catch(() => ({}))
+      setSms((json?.success && Array.isArray(json.data)) ? json.data : [])
+    } catch {
+      setSms([])
+    } finally {
+      setSmsLoading(false)
+    }
+  }, [idno, mddt, srno])
+
   const fetchOrder = useCallback(async () => {
     setOrderLoading(true)
     try {
@@ -266,8 +287,8 @@ export default function DispatchDetailPage({
 
   useEffect(() => {
     fetchRow(); fetchMemos(); fetchOrder()
-    fetchAcrMemos(); fetchFactories()
-  }, [fetchRow, fetchMemos, fetchOrder, fetchAcrMemos, fetchFactories])
+    fetchAcrMemos(); fetchFactories(); fetchSms()
+  }, [fetchRow, fetchMemos, fetchOrder, fetchAcrMemos, fetchFactories, fetchSms])
   useEffect(() => { fetchConsultations() }, [fetchConsultations])
   useEffect(() => {
     if (dispatchOrder?.id) setTimeout(() => noteRef.current?.focus(), 150)
@@ -405,7 +426,7 @@ export default function DispatchDetailPage({
         {/* Header — 사용자 명시 (2026-05-16): 「목록 새로고침은 좌측이 편한데」 */}
         <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
           <button onClick={() => router.back()} style={ghostBtn}>← 목록</button>
-          <button onClick={() => { fetchRow(); fetchMemos(); fetchOrder(); fetchConsultations() }} disabled={rowLoading} style={subtleBtn}>↻ 새로고침</button>
+          <button onClick={() => { fetchRow(); fetchMemos(); fetchOrder(); fetchConsultations(); fetchAcrMemos(); fetchFactories(); fetchSms() }} disabled={rowLoading} style={subtleBtn}>↻ 새로고침</button>
         </div>
         <div style={{ marginBottom: 16 }}>
           <h1 style={{ fontSize: 22, fontWeight: 900, color: '#0f2440', margin: 0, whiteSpace: 'nowrap' }}>
@@ -590,6 +611,69 @@ export default function DispatchDetailPage({
                         ))}
                       </div>
                     )}
+              </Section>
+
+              {/* PR-B3 — 카페24 문자 발송 이력 + 발송문구 (crmsendh + crmsmsgh)
+                  사용자 명시 (2026-05-16): 「문자 발송이력과 발송문구 내용도 카페24 접수에 있긴한데」 */}
+              <Section icon="📨" title={`문자 발송 이력 (${sms.length})`}>
+                {smsLoading ? <Place>cafe24 문자 발송 이력 조회 중…</Place>
+                  : sms.length === 0 ? <Place>발송된 문자가 없습니다</Place>
+                  : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 480, overflowY: 'auto', paddingRight: 4 }}>
+                      {sms.map((m) => {
+                        // 예약/즉시 분기 — 예약 Y 면 sendhpdt/hptm, 즉시 N 이면 sendsndt/sntm
+                        const dt = m.sendresv === 'Y' ? m.sendhpdt : m.sendsndt
+                        const tm = m.sendresv === 'Y' ? m.sendhptm : m.sendsntm
+                        // 상태 색상: Y=성공(녹), N=대기(노), F=실패(빨), X=취소(회)
+                        const statColor = m.sendstat === 'Y' ? { bg: 'rgba(34,197,94,0.12)', fg: '#15803d', txt: '✓ 발송완료' }
+                          : m.sendstat === 'N' ? { bg: 'rgba(245,158,11,0.12)', fg: '#b45309', txt: '⏳ 대기' }
+                          : m.sendstat === 'F' ? { bg: 'rgba(239,68,68,0.12)', fg: '#991b1b', txt: '✗ 실패' }
+                          : m.sendstat === 'X' ? { bg: 'rgba(148,163,184,0.15)', fg: '#475569', txt: '× 취소' }
+                          : { bg: 'rgba(148,163,184,0.15)', fg: '#475569', txt: m.sendstat || '-' }
+                        // 발송 채널 배지: KAKAO 노랑 / SMS LMS MMS 파랑
+                        const typeBadge = m.sendtype === 'KAKAO' ? { bg: '#FEE500', fg: '#3C1E1E' }
+                          : { bg: 'rgba(14,165,233,0.12)', fg: '#0369a1' }
+                        return (
+                          <div
+                            key={m.sendseqn}
+                            style={{ ...GLASS.L3, padding: '10px 12px', borderRadius: 8, border: '1px solid rgba(0,0,0,0.04)', fontSize: 12 }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6, flexWrap: 'wrap', fontSize: 11 }}>
+                              <span style={{ padding: '2px 8px', borderRadius: 6, background: typeBadge.bg, color: typeBadge.fg, fontWeight: 800 }}>
+                                {m.sendtype || 'SMS'}
+                              </span>
+                              <span style={{ padding: '2px 8px', borderRadius: 6, background: statColor.bg, color: statColor.fg, fontWeight: 700 }}>
+                                {statColor.txt}
+                              </span>
+                              {m.sendresv === 'Y' && (
+                                <span style={{ padding: '2px 8px', borderRadius: 6, background: 'rgba(99,102,241,0.12)', color: '#4338ca', fontWeight: 700 }}>
+                                  📅 예약
+                                </span>
+                              )}
+                              <span style={{ color: '#64748b' }}>{fmtCafe24DateTime(dt, tm) || '-'}</span>
+                              {m.sendmobl && <span style={{ color: '#475569', fontWeight: 700 }}>📱 {m.sendmobl}</span>}
+                              {(m.user_name || m.sendgnus) && <span style={{ color: '#94a3b8' }}>· {m.user_name || m.sendgnus}</span>}
+                            </div>
+                            {(m.sendsbjt || m.smsgdesc) && (
+                              <div style={{ fontWeight: 700, color: '#0f2440', marginBottom: 4, fontSize: 12 }}>
+                                {m.sendsbjt || m.smsgdesc}
+                              </div>
+                            )}
+                            {m.sendmesg && (
+                              <div style={{ color: '#1e293b', whiteSpace: 'pre-wrap', lineHeight: 1.5, padding: '8px 10px', background: 'rgba(248,250,252,0.8)', borderRadius: 6, fontSize: 12 }}>
+                                {m.sendmesg}
+                              </div>
+                            )}
+                            {m.sendrslt && m.sendstat !== 'Y' && (
+                              <div style={{ marginTop: 4, fontSize: 11, color: '#991b1b' }}>
+                                결과: {m.sendrslt}
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
               </Section>
 
               {/* 카페24 ACR 사고처리관리 상담내역 (acrmemoh) — P1.5f */}

@@ -334,6 +334,32 @@ export type FactoryAssignmentRow = {
   user_name: string | null
 }
 
+// /api/operations/cafe24-sms-history 응답 (문자 발송 이력 + 발송문구) — PR-B3 (2026-05-16)
+// crmsendh (본체) + crmsmsgh (템플릿) + picuserm (발송자)
+export type Cafe24SmsRow = {
+  sendseqn: number
+  sendidno: string
+  sendmddt: string
+  sendsrno: number
+  sendsndt: string | null     // 발송일자 (YYYYMMDD)
+  sendsntm: string | null     // 발송시간 (HHMMSS)
+  sendhpdt: string | null     // 예약 발송일자
+  sendhptm: string | null     // 예약 발송시간
+  sendresv: string | null     // 예약 Y/N
+  sendmobl: string | null     // 수신자 번호
+  sendmesg: string | null     // 발송 본문
+  sendsbjt: string | null     // 제목
+  sendstat: string | null     // Y(완료) / N(대기) / F(실패) / X(취소)
+  sendrslt: string | null     // 결과 메시지
+  sendtype: string | null     // SMS / LMS / MMS / KAKAO
+  sendcust: string | null
+  sendgubn: string | null
+  sendcode: string | null
+  sendgnus: string | null
+  user_name: string | null    // picuserm.username
+  smsgdesc: string | null     // 템플릿 설명 (crmsmsgh)
+}
+
 // 카테고리 색상 + 라벨 (D/C 섹션 공유)
 export const CATEGORY_META: Record<ConsultationCategory, { label: string; tint: string; emoji: string }> = {
   intake:        { label: '인테이크',  tint: '#ef4444', emoji: '🆕' },
