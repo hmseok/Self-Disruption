@@ -3,6 +3,57 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-16 (Phase N-22) — 대체공휴일 자동 채우기 (공공데이터 API)
+
+### 사용자 의도
+> "우리는 대체휴무일도 다 지정하는데 그럼 외부에서 확인해서 대체휴무일 체크하는것도 추가해야할것같아 사용자가 다 체크하긴 어렵자나"
+
+### 데이터 source
+- **공공데이터 OPEN API** (data.go.kr) — 한국천문연구원_특일 정보
+- Endpoint: `https://apis.data.go.kr/B090041/openapi/service/SpcdeInfoService/getRestDeInfo`
+- 응답: XML (response/header/resultCode + body/items/item[])
+- 2026년 22개 row 확인 — 공휴일 + 대체공휴일 (삼일절/부처님오신날/광복절/개천절 대체 4개) 모두 포함
+
+### 신설 파일
+- `lib/korea-holiday-api.ts` — XML regex 파서 + `getKoreaHolidays(year)` wrapper
+  · 외부 라이브러리 X (xml2js 등 install 불필요)
+  · isHoliday=Y row 만 필터 + locdate YYYYMMDD → YYYY-MM-DD 변환
+  · date+name dedupe (seq=2 같이 중복 row 처리)
+  · KOREA_HOLIDAY_API_KEY 환경변수 누락 시 명확한 에러
+- `app/api/call-scheduler/holidays/sync/route.ts` — `POST /holidays/sync?year=YYYY`
+  · 멱등 INSERT IGNORE (UNIQUE KEY uq_cs_holiday_date_name 활용)
+  · 응답: `{ inserted, skipped, total, year }`
+  · type='national', exclude_auto=1, is_paid=1, color_tone='red' 디폴트
+  · memo='공공데이터 API 자동 동기화' 라벨
+
+### UI (`HolidaysTab.tsx`)
+- 「📥 자동 채우기」 버튼 신설 — 「+ 휴일 추가」 옆
+- 클릭 시 confirm 후 fetch — 진행 중 「⏳ 가져오는 중...」 표시
+- 결과 메시지 패널 (글래스 디자인 — 규칙 20) — 신규/중복/총 API 카운트
+- 자동 동기화 후 자동 reload
+
+### 환경변수
+- `KOREA_HOLIDAY_API_KEY` — data.go.kr 발급 일반 인증키
+- 로컬: `.env.local`
+- 배포: GCP Cloud Run > 변수 및 보안 비밀
+
+### 효과
+- 매년 사용자가 일일이 22개 (또는 더) 휴일 + 대체공휴일 입력 필요 없음
+- 정부 정책 변경 (대체공휴일 추가 등) 즉시 반영
+- 멱등 — 여러 번 클릭해도 안전 (이미 있는 항목 skip)
+
+### 검증
+- API key 동기화 후 dry-run 통과 (Rule 13 — 외부 시스템 호환성)
+- 2026년 22 row 응답 확인 (대체공휴일 4건 포함)
+- tsc PASS / lint:harness 0건
+
+### 사용법
+1. 설정 → 휴일 탭 → 연도 선택 (2026)
+2. 「📥 자동 채우기」 클릭 → confirm
+3. 결과 메시지 확인 (예: "신규 22개 추가 / 중복 0개 skip")
+4. 자동 추가된 휴일은 type='national', exclude_auto=1 (24/365 운영이라 그룹별 skip_on_holidays 로 제어)
+5. 필요 시 수동 편집 가능
+
 ## 2026-05-16 (Phase N-21-a) — 그룹 설정 버전 timeline (Step 1: 데이터 모델 + UI 기본)
 
 ### 사용자 의도

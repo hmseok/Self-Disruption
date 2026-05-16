@@ -66,6 +66,9 @@ export default function HolidaysTab() {
   const [year, setYear] = useState(new Date().getFullYear())
   const [editing, setEditing] = useState<FormState | null>(null)
   const [saving, setSaving] = useState(false)
+  // N-22 — 공공데이터 API 자동 채우기
+  const [syncing, setSyncing] = useState(false)
+  const [syncMessage, setSyncMessage] = useState<{ ok: boolean; msg: string } | null>(null)
 
   const load = async () => {
     setLoading(true); setError(null)
@@ -108,6 +111,31 @@ export default function HolidaysTab() {
       setEditing(null); await load()
     } catch (e: any) { setError(e?.message || '오류') }
     finally { setSaving(false) }
+  }
+
+  // N-22 — 공공데이터 API 로 해당 연도 공휴일 + 대체공휴일 자동 채우기
+  const autoFill = async () => {
+    if (syncing) return
+    if (!confirm(`${year}년 공휴일 + 대체공휴일을 공공데이터 API 에서 가져와 자동 추가합니다.\n이미 있는 항목은 skip 됩니다 (멱등). 계속할까요?`)) return
+    setSyncing(true); setSyncMessage(null); setError(null)
+    try {
+      const auth = await getAuthHeader()
+      const res = await fetch(`/api/call-scheduler/holidays/sync?year=${year}`, {
+        method: 'POST', headers: auth,
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json?.error || '자동 채우기 실패')
+      const { inserted, skipped, total } = json.data
+      setSyncMessage({
+        ok: true,
+        msg: `✅ ${year}년 — 신규 ${inserted}개 추가 / 중복 ${skipped}개 skip / 총 API ${total}개`,
+      })
+      await load()
+    } catch (e: any) {
+      setSyncMessage({ ok: false, msg: `❌ ${e?.message || '오류'}` })
+    } finally {
+      setSyncing(false)
+    }
   }
 
   const remove = async (h: Holiday) => {
@@ -166,15 +194,47 @@ export default function HolidaysTab() {
             <span>· 기타 {stats.byType.get('custom') || 0}</span>
           </div>
         </div>
-        <button type="button"
-                onClick={() => setEditing({ ...EMPTY, holiday_date: `${year}-01-01` })}
-                style={{
-                  ...BTN.md, background: COLORS.primary, color: '#fff',
-                  border: 'none', cursor: 'pointer',
-                }}>
-          + 휴일 추가
-        </button>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          {/* N-22 — 공공데이터 API 자동 채우기 */}
+          <button type="button"
+                  onClick={autoFill} disabled={syncing}
+                  style={{
+                    ...BTN.md, background: '#fff', color: COLORS.info,
+                    border: `1px solid ${COLORS.borderBlue}`,
+                    cursor: syncing ? 'not-allowed' : 'pointer',
+                    opacity: syncing ? 0.6 : 1, fontWeight: 700,
+                  }}
+                  title={`${year}년 공휴일 + 대체공휴일을 공공데이터 API 에서 자동 추가`}>
+            {syncing ? '⏳ 가져오는 중...' : '📥 자동 채우기'}
+          </button>
+          <button type="button"
+                  onClick={() => setEditing({ ...EMPTY, holiday_date: `${year}-01-01` })}
+                  style={{
+                    ...BTN.md, background: COLORS.primary, color: '#fff',
+                    border: 'none', cursor: 'pointer',
+                  }}>
+            + 휴일 추가
+          </button>
+        </div>
       </div>
+
+      {/* N-22 — 자동 채우기 결과 메시지 */}
+      {syncMessage && (
+        <div style={{
+          padding: '8px 12px', borderRadius: 8, marginBottom: 10, fontSize: 12,
+          background: syncMessage.ok ? COLORS.bgGreen : COLORS.bgRed,
+          border: `1px solid ${syncMessage.ok ? COLORS.borderGreen : COLORS.borderRed}`,
+          color: syncMessage.ok ? COLORS.success : COLORS.danger,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        }}>
+          <span>{syncMessage.msg}</span>
+          <button onClick={() => setSyncMessage(null)} style={{
+            fontSize: 11, padding: '2px 8px', borderRadius: 4,
+            background: 'transparent', border: 'none', cursor: 'pointer',
+            color: 'inherit', opacity: 0.7,
+          }}>× 닫기</button>
+        </div>
+      )}
 
       {/* 편집 폼 */}
       {editing && (
