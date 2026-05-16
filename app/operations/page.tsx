@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import AccidentIntakeTab from './_tabs/AccidentIntakeTab'
+import ScheduleTab from './_tabs/ScheduleTab'
 import PlaceholderTab from './_tabs/PlaceholderTab'
 
 // ═══════════════════════════════════════════════════════════════════
@@ -72,19 +73,7 @@ export default function OperationsPage() {
         {/* Tab content */}
         {tab === 'accident' && <AccidentIntakeTab />}
 
-        {tab === 'schedule' && (
-          <PlaceholderTab
-            icon="📅"
-            title="배차스케줄"
-            description="배차 확정된 차량 진행 모니터 — 출고예상일 / 특이사항"
-            upcoming={[
-              'fmi_rentals 진행 중 list (status=dispatched)',
-              '출고예상일 + 특이사항 메모',
-              '회차 확정 → 「청구관리」 탭 이동',
-              '캘린더 뷰 (옵션)',
-            ]}
-          />
-        )}
+        {tab === 'schedule' && <ScheduleTab />}
 
         {tab === 'claims' && (
           <PlaceholderTab
