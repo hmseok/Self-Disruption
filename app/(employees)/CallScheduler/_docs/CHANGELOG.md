@@ -42,7 +42,16 @@
 
 ### 검증
 - tsc PASS (GroupEditor + auto-generate 0 errors)
-- 멤버 추가 순서만으로 자동 분산 — 사용자가 추가 셋업 X
+- 멤버 추가 순서만으로 자동 분산 — 사용자 추가 셋업 X
+- ✅ 미리보기 동작 확인: 워커별 4일씩 균등 분포 (자동 분산 정상)
+
+### 🐛 Bug fix 추가 — `Cannot read properties of undefined (reading 'slot_start')`
+- 원인: rotation 그룹은 워커마다 다른 shift_slot_id 가 plan 에 들어가는데,
+  `targetGroups.find(g => g.shift_slot_id === p.shift_slot_id)` 는 그룹.shift_slot_id (= sequence[0]) 만 매칭 → L02/L03/L05/L07 slot 은 find = undefined → `slot.slot_start` 에러
+- Fix: 모든 cs_shift_slots 직접 fetch → `slotByIdMap` 으로 lookup
+  · `lookupSlot(slotId)` helper — Map 우선, fallback to targetGroups.find
+  · graceful — slot 못 찾으면 plan row skip
+- 영향: rotation 그룹의 모든 시프트 (sequence 전체) 가 cs_assignments INSERT 가능
 
 ## 2026-05-16 (Phase N-21-c) — Cron 자동 다음 달 스케줄 생성 (Step 3 — C 안)
 

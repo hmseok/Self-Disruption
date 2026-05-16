@@ -1399,6 +1399,61 @@ export async function POST(
       await prisma.$queryRaw<any[]>`SELECT day_hours FROM cs_assignments LIMIT 1`
     } catch { hasAsnBreakdown = false }
 
+    // N-23 fix — rotation 그룹은 워커별 다른 shift_slot_id 가 plan 에 들어감.
+    // targetGroups 는 그룹 row 라 g.shift_slot_id (단일) 만 매칭 → undefined 에러.
+    // 모든 cs_shift_slots 직접 fetch 후 slotByIdMap 으로 lookup.
+    type SlotById = {
+      slot_start: string; slot_end: string; slot_overnight: number | boolean
+      slot_night_period_start: string | null; slot_night_period_end: string | null
+      slot_night_premium_rate: number
+    }
+    const slotByIdMap = new Map<string, SlotById>()
+    try {
+      const rows: any[] = (hasSlotBreakdown
+        ? await prisma.$queryRaw<any[]>`
+            SELECT id,
+                   TIME_FORMAT(start_time, '%H:%i:%s') AS slot_start,
+                   TIME_FORMAT(end_time, '%H:%i:%s')   AS slot_end,
+                   is_overnight,
+                   TIME_FORMAT(night_period_start, '%H:%i:%s') AS slot_night_period_start,
+                   TIME_FORMAT(night_period_end,   '%H:%i:%s') AS slot_night_period_end,
+                   night_premium_rate
+            FROM cs_shift_slots
+          `
+        : await prisma.$queryRaw<any[]>`
+            SELECT id,
+                   TIME_FORMAT(start_time, '%H:%i:%s') AS slot_start,
+                   TIME_FORMAT(end_time, '%H:%i:%s')   AS slot_end,
+                   is_overnight
+            FROM cs_shift_slots
+          `) as any[]
+      for (const r of rows) {
+        slotByIdMap.set(String(r.id), {
+          slot_start: r.slot_start,
+          slot_end: r.slot_end,
+          slot_overnight: r.is_overnight,
+          slot_night_period_start: r.slot_night_period_start || null,
+          slot_night_period_end: r.slot_night_period_end || null,
+          slot_night_premium_rate: Number(r.night_premium_rate || 0),
+        })
+      }
+    } catch { /* graceful — slotByIdMap 빈 채로 — fallback to targetGroups.find */ }
+    // slot lookup helper — slotByIdMap 우선, fallback to targetGroups
+    const lookupSlot = (slotId: string): SlotById | null => {
+      const s = slotByIdMap.get(slotId)
+      if (s) return s
+      const g = targetGroups.find(g => g.shift_slot_id === slotId)
+      if (!g) return null
+      return {
+        slot_start: g.slot_start,
+        slot_end: g.slot_end,
+        slot_overnight: g.slot_overnight,
+        slot_night_period_start: g.slot_night_period_start || null,
+        slot_night_period_end: g.slot_night_period_end || null,
+        slot_night_premium_rate: Number(g.slot_night_premium_rate || 0),
+      }
+    }
+
     if (clearFirst) {
       // PR-2QQ-b: manual_lock=1 셀은 보존
       if (hasLockCol) {
@@ -1412,7 +1467,9 @@ export async function POST(
       // 클리어 후엔 모두 insert
       for (const p of plan) {
         if (p.action === 'skip-holiday' || p.action === 'skip-no-member') continue
-        const slot = targetGroups.find(g => g.shift_slot_id === p.shift_slot_id)!
+        // N-23 fix — slotByIdMap 우선 lookup (rotation 그룹의 sequence 시프트 포함)
+        const slot = lookupSlot(p.shift_slot_id)
+        if (!slot) continue  // 안전 fallback — slot 못 찾으면 skip
         const hours = computeHours(slot.slot_start, slot.slot_end, !!slot.slot_overnight, p.special_code)
         const newId = crypto.randomUUID()
         // PR-2SS-e — 시간 분해
@@ -1446,7 +1503,9 @@ export async function POST(
       // 일반 적용 — insert / update 만
       for (const p of plan) {
         if (p.action !== 'insert' && p.action !== 'update') continue
-        const slot = targetGroups.find(g => g.shift_slot_id === p.shift_slot_id)!
+        // N-23 fix — slotByIdMap 우선 lookup
+        const slot = lookupSlot(p.shift_slot_id)
+        if (!slot) continue
         const hours = computeHours(slot.slot_start, slot.slot_end, !!slot.slot_overnight, p.special_code)
         // PR-2SS-e — 시간 분해
         const bd = computeBreakdown(
