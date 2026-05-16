@@ -27,12 +27,17 @@ export default function ScheduleGrid({ detail, onChanged, myWorkerId }: Props) {
     [schedule.year, schedule.month],
   )
 
-  // (date, slot_id) → assignment[] 매핑 (PR-2OO: 1셀 N워커)
-  // N-25 — 워커 priority 순으로 sort (매일 같은 순서 보장)
+  // (date, slot_id, group_id) → assignment[] 매핑
+  // N-25 Step B — group_id 포함 키 (같은 시프트가 여러 그룹에 있어도 분리)
+  // N-25 Step A — 워커 name 사전순 sort (매일 같은 순서)
+  // group_id 없는 옛 데이터는 (date, slot_id) 키로 backward compat
   const cellMap = useMemo(() => {
     const m = new Map<string, Assignment[]>()
     for (const a of assignments) {
-      const k = `${a.work_date}_${a.shift_slot_id}`
+      // group_id 있으면 (date, slot, group) 키 / 없으면 (date, slot) 키
+      const k = a.group_id
+        ? `${a.work_date}_${a.shift_slot_id}_${a.group_id}`
+        : `${a.work_date}_${a.shift_slot_id}`
       const arr = m.get(k) || []
       arr.push(a)
       m.set(k, arr)
@@ -71,7 +76,12 @@ export default function ScheduleGrid({ detail, onChanged, myWorkerId }: Props) {
   // PR-2SS-Phase-J — 슬롯 → 그룹 매핑 (시간대 + 그룹 같이 표출)
   const [slotGroups, setSlotGroups] = useState<Record<string, { id: string; name: string; category: string; tone?: string; member_ids: string[] }>>({})
   // PR-2SS-Phase-J-3 — 그룹 멤버 매핑 (그룹별 회피/cycle 행 분리용)
-  const [allGroups, setAllGroups] = useState<Array<{ id: string; name: string; category: string; shift_slot_id: string; member_ids: string[] }>>([])
+  // N-25 — rotation_enabled + rotation_shifts 추가 (sequence 펼침용)
+  const [allGroups, setAllGroups] = useState<Array<{
+    id: string; name: string; category: string; shift_slot_id: string; member_ids: string[]
+    rotation_enabled: boolean
+    rotation_shifts: Array<{ shift_slot_id: string; sort_order: number }>
+  }>>([])
   // K-3 — 그룹 × 워커 멤버 cfg (priority_level, dow prefer/avoid) — 색상 layer + 툴팁용
   const [memberCfgMap, setMemberCfgMap] = useState<Map<string, { priority_level: number; preferred_dow_prefer: string | null; preferred_dow_avoid: string | null }>>(new Map())
   useEffect(() => {
@@ -84,17 +94,29 @@ export default function ScheduleGrid({ detail, onChanged, myWorkerId }: Props) {
         if (abort) return
         if (res.ok && Array.isArray(json.data)) {
           const map: Record<string, { id: string; name: string; category: string; tone?: string; member_ids: string[] }> = {}
-          const groupList: Array<{ id: string; name: string; category: string; shift_slot_id: string; member_ids: string[] }> = []
+          const groupList: Array<{
+            id: string; name: string; category: string; shift_slot_id: string; member_ids: string[]
+            rotation_enabled: boolean
+            rotation_shifts: Array<{ shift_slot_id: string; sort_order: number }>
+          }> = []
           const cfgMap = new Map<string, { priority_level: number; preferred_dow_prefer: string | null; preferred_dow_avoid: string | null }>()
           for (const g of json.data) {
             if (!g.is_active) continue
             const memberIds = Array.isArray(g.members) ? g.members.map((m: any) => m.id) : []
+            const rotationShifts = Array.isArray(g.rotation_shifts)
+              ? g.rotation_shifts.map((rs: any) => ({
+                  shift_slot_id: String(rs.shift_slot_id),
+                  sort_order: Number(rs.sort_order || 0),
+                }))
+              : []
             groupList.push({
               id: g.id,
               name: g.name,
               category: g.category || 'general',
               shift_slot_id: g.shift_slot_id,
               member_ids: memberIds,
+              rotation_enabled: Boolean(g.rotation_enabled),
+              rotation_shifts: rotationShifts,
             })
             if (!map[g.shift_slot_id]) {
               map[g.shift_slot_id] = {
@@ -282,6 +304,46 @@ export default function ScheduleGrid({ detail, onChanged, myWorkerId }: Props) {
 
     return m
   }, [assignments, slotById])
+
+  // N-25 Step B — slots → (group, slot) 단위 row 산출
+  // rotation_enabled 그룹은 rotation_shifts 의 모든 시프트를 sub-row 로 펼침
+  // 일반 그룹은 g.shift_slot_id 단일 row
+  // 그룹 없는 slot 은 groupInfo=null
+  type GroupInfo = { id: string; name: string; category: string; member_ids: string[] }
+  const slotsByGroup = useMemo(() => {
+    const rows: Array<{ slot: ShiftSlot; groupInfo: GroupInfo | null; rotationOrder: number }> = []
+    const usedSlotIds = new Set<string>()
+    // 1) 활성 그룹별 row 생성 (rotation 은 sequence 펼침)
+    for (const g of allGroups) {
+      const groupInfo: GroupInfo = {
+        id: g.id, name: g.name, category: g.category, member_ids: g.member_ids,
+      }
+      if (g.rotation_enabled && g.rotation_shifts.length > 0) {
+        // rotation sequence 모두 row
+        const sorted = [...g.rotation_shifts].sort((a, b) => a.sort_order - b.sort_order)
+        for (let i = 0; i < sorted.length; i++) {
+          const slot = slots.find(s => s.id === sorted[i].shift_slot_id)
+          if (slot) {
+            rows.push({ slot, groupInfo, rotationOrder: i + 1 })
+            usedSlotIds.add(slot.id)
+          }
+        }
+      } else {
+        const slot = slots.find(s => s.id === g.shift_slot_id)
+        if (slot) {
+          rows.push({ slot, groupInfo, rotationOrder: 0 })
+          usedSlotIds.add(slot.id)
+        }
+      }
+    }
+    // 2) 그룹 없는 slot (옛 데이터 등) — 그대로 표시
+    for (const s of slots) {
+      if (!usedSlotIds.has(s.id)) {
+        rows.push({ slot: s, groupInfo: null, rotationOrder: 0 })
+      }
+    }
+    return rows
+  }, [allGroups, slots])
 
   const [pickerSlot, setPickerSlot] = useState<ShiftSlot | null>(null)
   const [pickerDate, setPickerDate] = useState<string>('')
@@ -734,10 +796,13 @@ export default function ScheduleGrid({ detail, onChanged, myWorkerId }: Props) {
             })
           })()}
           {/* 슬롯 행 (그룹 헤더 사이에 끼움 — index 비교로 그룹 변경 시 헤더 추가) */}
-          {slots.map((slot, slotIdx) => {
+          {/* N-25 Step B — slotsByGroup 으로 변경 (rotation 그룹은 sequence 펼침) */}
+          {slotsByGroup.map(({ slot, groupInfo, rotationOrder }, slotIdx) => {
             // PR-2SS-Phase-J-3 — 그룹 변경 시 헤더 + 그룹 멤버 cycle/회피 행 inline
-            const curGrp = slotGroups[slot.id]
-            const prevGrp = slotIdx > 0 ? slotGroups[slots[slotIdx-1].id] : null
+            // N-25 Step B — groupInfo 우선 (없으면 slotGroups[slot.id] fallback)
+            const curGrp = groupInfo || slotGroups[slot.id] || null
+            const prevRow = slotIdx > 0 ? slotsByGroup[slotIdx-1] : null
+            const prevGrp = prevRow ? (prevRow.groupInfo || slotGroups[prevRow.slot.id] || null) : null
             const isNewGroupSection = !prevGrp || (curGrp?.id || '') !== (prevGrp?.id || '')
             // J-2C — 매니저 토글 OFF 면 그룹 섹션 안 외부/회피 행 모두 빈 배열 (다른 직원 시야 차단)
             const sectionExt = (showPrivate && isNewGroupSection && curGrp)
@@ -778,7 +843,8 @@ export default function ScheduleGrid({ detail, onChanged, myWorkerId }: Props) {
                             : grp?.category === '특수' ? COLORS.borderRed
                             : COLORS.borderFaint
             return (
-            <tr key={slot.id}>
+            // N-25 Step B — key 에 group_id 포함 (같은 slot 이 여러 그룹 row 에)
+            <tr key={`${curGrp?.id || 'nogrp'}_${slot.id}`}>
               <td style={{
                 padding: '4px 6px', position: 'sticky', left: 0,
                 background: 'rgba(255,255,255,0.95)',
@@ -848,7 +914,19 @@ export default function ScheduleGrid({ detail, onChanged, myWorkerId }: Props) {
               </td>
               {days.map(d => {
                 // PR-2OO: 1셀에 N워커 가능 — 모든 row 표시
-                const arr = cellMap.get(`${d}_${slot.id}`) || []
+                // N-25 Step B — group_id 포함 키 우선, fallback 으로 옛 키 + 그룹 멤버 필터
+                const arrWithGroup = curGrp?.id
+                  ? cellMap.get(`${d}_${slot.id}_${curGrp.id}`) || []
+                  : []
+                const arrLegacy = cellMap.get(`${d}_${slot.id}`) || []
+                // 그룹 row 인데 group_id 채워진 데이터가 있으면 그것만 사용
+                // 그룹 row + group_id 없는 옛 데이터면 그룹 멤버로 필터
+                // 그룹 없는 row 면 그대로 모든 worker
+                const arr = curGrp
+                  ? (arrWithGroup.length > 0
+                      ? arrWithGroup
+                      : arrLegacy.filter(a => !a.worker_id || curGrp.member_ids.includes(a.worker_id)))
+                  : arrLegacy
                 const isEmpty = arr.length === 0
                   || arr.every(a => !a.worker_id && a.special_code !== 'off')
                 // J-2B — 셀 td 너비 56 → 48 (화면 너비 축소)

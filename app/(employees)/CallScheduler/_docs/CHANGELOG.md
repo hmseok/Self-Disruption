@@ -3,6 +3,48 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-16 (Phase N-25 Step B) — ScheduleGrid 그룹별 row 분리 + rotation sequence 펼침
+
+### 사용자 보고
+> "로테이션인데 시프트가 하나만 표출 / 워커에 매칭된 시프트도 제대로 보여줘야지요"
+
+### 변경
+
+#### Assignment 타입
+- `app/(employees)/CallScheduler/utils/types.ts` — `group_id?: string | null` 추가
+
+#### API (`/schedules/[id]/route.ts`)
+- `hasAsnGroupId` graceful 감지
+- SELECT 4 분기 (hasLockCol × hasAsnGroupId) — group_id 포함
+- 응답 `assignments[i].group_id` 채움
+
+#### ScheduleGrid 핵심 변경
+- `allGroups` 타입 확장: `rotation_enabled` + `rotation_shifts[]` 추가
+- `slotsByGroup` 신설 — (slot, groupInfo) 단위 row list
+  · rotation 그룹: `rotation_shifts` 모두 펼침 (sequence 전체 시프트 sub-row)
+  · 일반 그룹: `shift_slot_id` 단일 row
+  · 그룹 없는 slot: `groupInfo=null` 로 그대로 표시
+- `slots.map` → `slotsByGroup.map` 으로 변경
+- `<tr key>` 에 `${curGrp?.id}_${slot.id}` (같은 slot 이 여러 그룹 row 에)
+- `cellMap` 키 변경: `${date}_${slot}_${group}` (group_id 있으면) + `${date}_${slot}` (legacy)
+- 셀 lookup 우선순위:
+  1. `cellMap.get("${d}_${slot}_${group}")` — 그룹별 워커 (group_id 채워진 데이터)
+  2. fallback: 같은 slot legacy 데이터 → 그룹 멤버 필터 (member_ids.includes)
+  3. 그룹 없는 row: 그대로 모든 worker
+
+### 효과
+- 「로테이션」 그룹 row 가 sequence 5 시프트 (L01/L02/L03/L05/L07) 모두 sub-row 로 표시
+- 「주4 general · 멤버 1명」 row 에 「로테이션」 그룹 워커 안 섞임 (group_id 필터)
+- 박혜정 (다른 그룹 멤버) 이 「로테이션」 row 의 L01 에 끼어 보이는 문제 해결
+
+### 백워드 호환
+- cs_assignments.group_id NULL 인 옛 데이터 → 같은 slot 의 모든 그룹 row 에 표시 + 멤버 필터로 정리
+- 그룹 없는 slot → 기존 동작 그대로
+
+### 검증
+- tsc PASS
+- lint:harness ui-token 2건 시프트 (실제 새 hardcode X — 줄 번호 변경) → baseline 갱신 필요
+
 ## 2026-05-16 (Phase N-25 Step A) — 매트릭스 sort 고정 + group_id 인프라
 
 ### 사용자 보고

@@ -120,6 +120,8 @@ export interface Assignment {
   special_code: SpecialCode
   computed_hours: number
   note: string | null
+  // N-25 — 그룹 필터용 (cs_assignments.group_id)
+  group_id?: string | null
   // PR-2QQ-b — 수동 lock (외부 직원 일정 등 자동 생성이 보존)
   manual_lock?: boolean
   // PR-2SS-e — 시간 분해 (KPI 보조)

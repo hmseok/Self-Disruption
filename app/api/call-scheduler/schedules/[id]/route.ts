@@ -102,15 +102,38 @@ export async function GET(
     try {
       await prisma.$queryRaw<any[]>`SELECT manual_lock FROM cs_assignments LIMIT 1`
     } catch { hasLockCol = false }
+    // N-25 — group_id 컬럼 graceful
+    let hasAsnGroupId = true
+    try {
+      await prisma.$queryRaw<any[]>`SELECT group_id FROM cs_assignments LIMIT 1`
+    } catch { hasAsnGroupId = false }
 
     // 4) 배정 (그리드)
-    const assignRows = hasLockCol
+    const assignRows = (hasLockCol && hasAsnGroupId)
+      ? await prisma.$queryRaw<any[]>`
+          SELECT id, schedule_id,
+                 DATE_FORMAT(work_date, '%Y-%m-%d') AS work_date,
+                 shift_slot_id, group_id, worker_id, special_code,
+                 CAST(computed_hours AS DECIMAL(4,2)) AS computed_hours,
+                 note, manual_lock
+          FROM cs_assignments WHERE schedule_id = ${id}
+        `
+      : hasLockCol
       ? await prisma.$queryRaw<any[]>`
           SELECT id, schedule_id,
                  DATE_FORMAT(work_date, '%Y-%m-%d') AS work_date,
                  shift_slot_id, worker_id, special_code,
                  CAST(computed_hours AS DECIMAL(4,2)) AS computed_hours,
                  note, manual_lock
+          FROM cs_assignments WHERE schedule_id = ${id}
+        `
+      : hasAsnGroupId
+      ? await prisma.$queryRaw<any[]>`
+          SELECT id, schedule_id,
+                 DATE_FORMAT(work_date, '%Y-%m-%d') AS work_date,
+                 shift_slot_id, group_id, worker_id, special_code,
+                 CAST(computed_hours AS DECIMAL(4,2)) AS computed_hours,
+                 note
           FROM cs_assignments WHERE schedule_id = ${id}
         `
       : await prisma.$queryRaw<any[]>`
@@ -125,6 +148,7 @@ export async function GET(
       ...r,
       computed_hours: Number(r.computed_hours || 0),
       manual_lock: hasLockCol ? Boolean(r.manual_lock) : false,
+      group_id: hasAsnGroupId ? (r.group_id ?? null) : null,
     }))
 
     // 5) 배포 이력
