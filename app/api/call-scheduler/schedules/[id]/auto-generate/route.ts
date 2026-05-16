@@ -888,7 +888,10 @@ export async function POST(
               byGroup[g.id].skipped++
               continue
             }
-            for (const m of verMembers) {
+            // N-23 정정 — priority (멤버 순서) 기반 자동 분산
+            // verMembers 는 priority ASC 순서 (cs_group_member_versions.priority)
+            for (let memberIdx = 0; memberIdx < verMembers.length; memberIdx++) {
+              const m = verMembers[memberIdx]
               const wId = m.worker_id
               // 휴가 풀-오프 제외
               const lm = workerLeaveMap.get(wId)
@@ -908,7 +911,8 @@ export async function POST(
               // 멤버별 시작일 / 종료일 (버전 멤버 데이터 우선)
               const startDate = m.rotation_start_date || activeVersion.valid_from
               const endDate = m.rotation_end_date || activeVersion.valid_to
-              const startIndex = Math.max(0, m.rotation_start_index || 0)
+              // N-23 — start_index 가 명시적으로 양수면 그것, 아니면 priority (memberIdx) 자동
+              const baseIdx = (m.rotation_start_index > 0) ? m.rotation_start_index : memberIdx
               if (startDate && isoDate < startDate) continue
               if (endDate && isoDate > endDate) continue
               // elapsed_periods 계산 (버전의 period_kind / custom_days 사용)
@@ -924,7 +928,7 @@ export async function POST(
                 }
                 if (elapsed < 0) elapsed = 0
               }
-              const shiftIndex = ((startIndex + elapsed) % verShifts.length + verShifts.length) % verShifts.length
+              const shiftIndex = ((baseIdx + elapsed) % verShifts.length + verShifts.length) % verShifts.length
               const targetSlotId = verShifts[shiftIndex].shift_slot_id
               const specialCode: 'none' | 'am_half' | 'pm_half' = sp ?? 'none'
               plan.push({
@@ -949,7 +953,10 @@ export async function POST(
         const rotCfg = groupRotMap.get(g.id)
         const rotShifts = groupShiftsMap.get(g.id) || []
         if (rotCfg?.enabled && rotShifts.length > 0) {
-          for (const wId of gMembers) {
+          // N-23 정정 — priority (멤버 순서) 기반 자동 분산
+          // gMembers 는 priority ASC 순서 (cs_group_members.priority)
+          for (let memberIdx = 0; memberIdx < gMembers.length; memberIdx++) {
+            const wId = gMembers[memberIdx]
             // 휴가 풀-오프 제외
             const lm = workerLeaveMap.get(wId)
             const sp = lm?.get(isoDate)
@@ -967,11 +974,12 @@ export async function POST(
               continue
             }
 
-            // 멤버별 시작일 / 종료일
+            // 멤버별 시작일 / 종료일 (start_index 는 priority 기반 자동 — 사용자 명시 override 가능)
             const mrot = memberRotMap.get(`${g.id}_${wId}`)
             const startDate = mrot?.start_date || null
             const endDate = mrot?.end_date || null
-            const startIndex = Math.max(0, mrot?.start_index || 0)
+            // N-23 — start_index 가 명시적으로 0 보다 크면 그것 사용, 아니면 priority (memberIdx) 자동
+            const baseIdx = (mrot && mrot.start_index > 0) ? mrot.start_index : memberIdx
             if (startDate && isoDate < startDate) continue  // 시작 전 → skip
             if (endDate && isoDate > endDate) continue      // 종료 후 → skip
 
@@ -989,7 +997,7 @@ export async function POST(
               }
               if (elapsed < 0) elapsed = 0
             }
-            const shiftIndex = ((startIndex + elapsed) % rotShifts.length + rotShifts.length) % rotShifts.length
+            const shiftIndex = ((baseIdx + elapsed) % rotShifts.length + rotShifts.length) % rotShifts.length
             const targetSlot = rotShifts[shiftIndex]
             const targetSlotId = targetSlot.shift_slot_id
 

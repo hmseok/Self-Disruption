@@ -90,25 +90,8 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
   const updateMemberRotCfg = (wId: string, patch: Partial<RotCfg>) => {
     setMemberRotCfgs(prev => ({ ...prev, [wId]: { ...(prev[wId] || defaultRotCfg()), ...patch } }))
   }
-  // N-23 — 자동 분산: 모든 멤버 startIndex 를 (priority % shifts.length) 로 자동 배치 + 시작일 통일
-  const autoDistributeStartIndex = (commonStartDate?: string) => {
-    if (rotationShifts.length === 0) return
-    const today = commonStartDate || (() => {
-      const d = new Date()
-      return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`
-    })()
-    setMemberRotCfgs(prev => {
-      const next: Record<string, RotCfg> = { ...prev }
-      memberIds.forEach((wId, idx) => {
-        next[wId] = {
-          start_date: today,
-          start_index: idx % rotationShifts.length,
-          end_date: next[wId]?.end_date || '',
-        }
-      })
-      return next
-    })
-  }
+  // N-23 정정 — 자동 분산 함수 제거. 알고리즘에서 priority 기반 자동 계산.
+  // rotation_start_index 컬럼은 사용자 명시 override 용 (기본은 priority 자동).
   // N-23 — rotation ON 시 slotId 자동 동기화 (sequence[0])
   useEffect(() => {
     if (rotationEnabled && rotationShifts.length > 0) {
@@ -397,20 +380,8 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
       if (prev[wId]) { const next = { ...prev }; delete next[wId]; return next }
       return { ...prev, [wId]: defaultMemberCfg() }
     })
-    // N-23 — rotation ON 시 새 멤버 추가하면 자동 startIndex 분산
-    if (isAdding && rotationEnabled && rotationShifts.length > 0) {
-      const newIdx = memberIds.length  // 추가 직전의 길이 = 새 멤버의 priority
-      const today = new Date()
-      const startDate = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-01`
-      setMemberRotCfgs(prev => ({
-        ...prev,
-        [wId]: {
-          start_date: prev[wId]?.start_date || startDate,
-          start_index: newIdx % rotationShifts.length,
-          end_date: prev[wId]?.end_date || '',
-        },
-      }))
-    } else if (!isAdding) {
+    // N-23 정정 — 새 멤버 추가 시 자동 startIndex 설정 X (priority 기반 알고리즘 자동 분산)
+    if (!isAdding) {
       // 제거 시 rot cfg 정리
       setMemberRotCfgs(prev => {
         const next = { ...prev }
@@ -641,43 +612,67 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
             </div>
           </Field>
 
-          <Field label="시프트 (시간대)" required>
-            <div style={{
-              display: 'flex', flexWrap: 'wrap', gap: 4,
-              maxHeight: 120, overflowY: 'auto',
-              padding: 4, borderRadius: 8,
-              border: `1px solid ${COLORS.borderFaint}`,
-            }}>
-              {slots.map(s => {
-                const active = slotId === s.id
-                return (
-                  <button
-                    key={s.id}
-                    type="button"
-                    onClick={() => setSlotId(s.id)}
-                    style={{
-                      padding: '4px 8px', borderRadius: 6,
-                      fontSize: 11, fontWeight: 600,
-                      background: active ? COLORS.bgBlue : 'transparent',
-                      color: active ? COLORS.info : COLORS.textSecondary,
-                      border: `1px solid ${active ? COLORS.borderBlue : COLORS.borderFaint}`,
-                      cursor: 'pointer', whiteSpace: 'nowrap',
-                    }}
-                  >
-                    <span style={{ color: COLORS.textMuted, marginRight: 4, fontFamily: 'monospace' }}>
-                      {s.code}
-                    </span>
-                    {s.label}
-                  </button>
-                )
-              })}
-              {slots.length === 0 && (
-                <div style={{ padding: 12, fontSize: 11, color: COLORS.textMuted }}>
-                  시프트가 없습니다 — [시프트] 탭에서 먼저 추가하세요.
-                </div>
-              )}
-            </div>
-          </Field>
+          {/* N-23 — rotation ON 시 단일 시프트 영역 hide + 안내 / OFF 시 단일 시프트 선택 표시 */}
+          {!rotationEnabled ? (
+            <Field label="시프트 (시간대)" required
+                   sub="그룹이 어느 시간대에 배정되는지 — 1개 선택 (여러 시간대 순환은 아래 「시프트 로테이션」 ON)">
+              <div style={{
+                display: 'flex', flexWrap: 'wrap', gap: 4,
+                maxHeight: 120, overflowY: 'auto',
+                padding: 4, borderRadius: 8,
+                border: `1px solid ${COLORS.borderFaint}`,
+              }}>
+                {slots.map(s => {
+                  const active = slotId === s.id
+                  return (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => setSlotId(s.id)}
+                      style={{
+                        padding: '4px 8px', borderRadius: 6,
+                        fontSize: 11, fontWeight: 600,
+                        background: active ? COLORS.bgBlue : 'transparent',
+                        color: active ? COLORS.info : COLORS.textSecondary,
+                        border: `1px solid ${active ? COLORS.borderBlue : COLORS.borderFaint}`,
+                        cursor: 'pointer', whiteSpace: 'nowrap',
+                      }}
+                    >
+                      <span style={{ color: COLORS.textMuted, marginRight: 4, fontFamily: 'monospace' }}>
+                        {s.code}
+                      </span>
+                      {s.label}
+                    </button>
+                  )
+                })}
+                {slots.length === 0 && (
+                  <div style={{ padding: 12, fontSize: 11, color: COLORS.textMuted }}>
+                    시프트가 없습니다 — [시프트] 탭에서 먼저 추가하세요.
+                  </div>
+                )}
+              </div>
+            </Field>
+          ) : (
+            <Field label="시프트 (시간대)"
+                   sub="🔄 시프트 로테이션 ON — 아래 「시프트 sequence」 사용 (단일 시프트 선택 X)">
+              <div style={{
+                padding: '10px 12px', borderRadius: 8,
+                background: COLORS.bgBlue, border: `1px solid ${COLORS.borderBlue}`,
+                fontSize: 12, color: COLORS.info,
+                display: 'flex', alignItems: 'center', gap: 8,
+              }}>
+                <span style={{ fontWeight: 800 }}>🔄</span>
+                <span>
+                  로테이션 모드 — 워커마다 매월(또는 N일) 자동 순환합니다.
+                  대표 시프트는 sequence 의 첫 번째 (
+                  <code style={{ background: '#fff', padding: '1px 6px', borderRadius: 4 }}>
+                    {slots.find(s => s.id === slotId)?.code || '?'}
+                  </code>
+                  ) 로 자동 지정됩니다.
+                </span>
+              </div>
+            </Field>
+          )}
 
           <Field label="배정 패턴">
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 6 }}>
@@ -954,36 +949,18 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
                 </div>
               </Field>
 
-              {/* N-23 — 자동 분산 */}
-              <Field label="⚖️ 워커 startIndex 자동 분산"
-                     sub="멤버 순서대로 시프트 sequence 에 분산 — 1순위 워커=L01부터 / 2순위=L02부터 / ...">
-                <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-                  <button type="button"
-                          onClick={() => autoDistributeStartIndex()}
-                          disabled={memberIds.length === 0 || rotationShifts.length === 0}
-                          style={{
-                            fontSize: 12, fontWeight: 700,
-                            padding: '8px 14px', borderRadius: 8,
-                            background: COLORS.primary, color: '#fff',
-                            border: 'none', cursor: 'pointer',
-                            opacity: (memberIds.length === 0 || rotationShifts.length === 0) ? 0.5 : 1,
-                          }}>
-                    ⚖️ 자동 분산 적용
-                  </button>
-                  <span style={{ fontSize: 11, color: COLORS.textMuted }}>
-                    {memberIds.length === 0 ? '먼저 멤버 추가 필요'
-                     : rotationShifts.length === 0 ? '먼저 시프트 sequence 필요'
-                     : `${memberIds.length}명 → ${rotationShifts.length}개 sequence 에 분산 (시작일=이번 달 1일)`}
-                  </span>
-                </div>
-                <div style={{
-                  marginTop: 6, padding: 8, fontSize: 11,
-                  background: COLORS.bgAmber, border: `1px solid ${COLORS.borderAmber}`,
-                  borderRadius: 6, color: COLORS.warning,
-                }}>
-                  💡 모든 워커가 같은 시프트에 배정되는 문제를 해결합니다. 워커마다 다른 시프트로 자동 분산.
-                </div>
-              </Field>
+              {/* N-23 정정 — 자동 분산 버튼 제거: 알고리즘이 priority 기반 자동 분산 */}
+              <div style={{
+                padding: '8px 12px', borderRadius: 8,
+                background: COLORS.bgGreen, border: `1px solid ${COLORS.borderGreen}`,
+                fontSize: 11, color: COLORS.success,
+              }}>
+                ✅ 자동 분산 — 워커는 추가 순서대로 sequence 에 자동 매핑됩니다
+                (1순위→{rotationShifts[0] ? slots.find(s => s.id === rotationShifts[0])?.code : '?'} /
+                 2순위→{rotationShifts[1] ? slots.find(s => s.id === rotationShifts[1])?.code : '?'} /
+                 3순위→{rotationShifts[2] ? slots.find(s => s.id === rotationShifts[2])?.code : '?'} ...)
+                매월 한 칸씩 자동 순환.
+              </div>
             </>
           )}
 
@@ -1517,36 +1494,17 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
                                   🔄 시프트 로테이션 시작 (멤버별)
                                 </div>
                                 <div style={{
-                                  display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8,
+                                  display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8,
                                 }}>
                                   <div>
                                     <div style={{ fontSize: 11, color: COLORS.textMuted, marginBottom: 4 }}>
-                                      시작일
+                                      시작일 <span style={{ color: COLORS.textMuted, fontWeight: 400 }}>(빈 칸 = 그룹 활성 시작)</span>
                                     </div>
                                     <input type="date" value={rcfg.start_date}
                                            onChange={(e) => updateMemberRotCfg(w.id, { start_date: e.target.value })}
                                            style={{
                                              ...inputStyle, width: '100%', fontSize: 12,
                                            }} />
-                                  </div>
-                                  <div>
-                                    <div style={{ fontSize: 11, color: COLORS.textMuted, marginBottom: 4 }}>
-                                      시작 시프트
-                                    </div>
-                                    <select value={rcfg.start_index}
-                                            onChange={(e) => updateMemberRotCfg(w.id, { start_index: Number(e.target.value) })}
-                                            style={{
-                                              ...inputStyle, width: '100%', fontSize: 12,
-                                            }}>
-                                      {rotationShifts.map((slotId, i) => {
-                                        const slot = slots.find(s => s.id === slotId)
-                                        return (
-                                          <option key={slotId + '_' + i} value={i}>
-                                            {i + 1}. {slot?.code} {slot?.start_time}~{slot?.end_time}
-                                          </option>
-                                        )
-                                      })}
-                                    </select>
                                   </div>
                                   <div>
                                     <div style={{ fontSize: 11, color: COLORS.textMuted, marginBottom: 4 }}>
@@ -1562,7 +1520,8 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
                                 <div style={{
                                   marginTop: 8, fontSize: 11, color: COLORS.textMuted,
                                 }}>
-                                  💡 자동 생성 시 시작일부터 주기마다 다음 시프트로 이동 (N-19-b 알고리즘 적용 예정)
+                                  💡 멤버 순서가 시프트 매핑 결정: 1순위→{slots.find(s => s.id === rotationShifts[0])?.code || '?'} / 2순위→{slots.find(s => s.id === rotationShifts[1])?.code || '?'} / ... (priority 자동 분산)
+                                  · 시작일부터 매월(또는 N일) 한 칸씩 자동 순환
                                 </div>
                               </div>
                             )

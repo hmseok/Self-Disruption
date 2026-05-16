@@ -3,7 +3,48 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
-## 2026-05-16 (Phase N-23) — Rotation 운영 fix (자동 분산 + UI 정리 + 단일 시프트 동기화)
+## 2026-05-16 (Phase N-23) — Rotation 운영 fix (priority 기반 자동 분산으로 구조 재설계)
+
+### 사용자 지적
+> "시프트 로테이션은 당연히 다른 시프트에 배정되는 설정인데 자동 분산 적용이 왜 필요한가?
+>  구조적으로 문제를 만들고 거기에 임시조치 기능을 넣은건가?"
+
+→ **인정.** rotation_start_index 컬럼을 사용자에게 노출 + 「자동 분산」 버튼은 임시조치.
+정상 흐름은 sequence + 멤버만 정의하면 알고리즘이 자동 분산해야 함.
+
+### 변경 (구조 재설계)
+
+#### 1. 알고리즘 (`auto-generate/route.ts`)
+- **rotation path** (N-19-b) + **버전 path** (N-21-b) 둘 다:
+  - 기존: `shift_index = (start_index + elapsed) % shifts.length`
+  - 변경: `shift_index = (baseIdx + elapsed) % shifts.length`
+  - `baseIdx = (mrot.start_index > 0) ? mrot.start_index : memberIdx`
+  - memberIdx = 멤버 priority 순서 (gMembers / verMembers 의 인덱스)
+  - 명시적 override (start_index > 0) 한 경우만 그 값 사용 — backward compat
+- 결과: 워커 추가 순서만으로 자동 분산 — 1순위→L01 / 2순위→L02 / ...
+
+#### 2. UI (`GroupEditor.tsx`)
+- 「⚖️ 자동 분산 적용」 버튼 **제거**
+- 새 멤버 추가 시 자동 startIndex 셋팅 **제거**
+- 멤버 cfg 펼침 — 「시작 시프트 (1번/2번/...)」 select **제거**, 시작일/종료일만 유지
+- 시프트 로테이션 ON 시 안내 박스 변경: "워커는 추가 순서대로 sequence 에 자동 매핑됩니다 (1순위→L01 / 2순위→L02 / ...)"
+- 멤버 cfg 안내: "💡 멤버 순서가 시프트 매핑 결정 — priority 자동 분산"
+- rotation ON 시 단일 시프트 영역 hide + 안내 박스 (이전 N-23 변경 유지)
+
+### 효과
+- 사용자가 rotation ON + sequence + 멤버 추가만 하면 자동 분산
+- 별도 「자동 분산」 버튼 클릭 또는 startIndex 입력 필요 X
+- rotation_start_index 컬럼은 데이터 모델에 유지 (DB 호환) 단, UI 노출 X — 명시 override 용 reserved
+
+### 회고
+- ⚠ Rule 14 (동형 패턴) — 자동 분산을 사용자에게 떠넘긴 임시조치 1회. 사용자 지적으로 즉시 구조 변경.
+- 향후 강화: 데이터 모델 컬럼 추가 시 "사용자가 항상 manual 입력 필요한가? 알고리즘 자동 계산 가능한가?" 사전 검토 의무.
+
+### 검증
+- tsc PASS (GroupEditor + auto-generate 0 errors)
+- 멤버 추가 순서만으로 자동 분산 — 사용자가 추가 셋업 X
+
+## 2026-05-16 (Phase N-21-c) — Cron 자동 다음 달 스케줄 생성 (Step 3 — C 안)
 
 ### 사용자 보고
 > "현재 로테이션 매월 반복으로 근무자를 셋팅하고 해당 시프트도 적용했는데
@@ -47,9 +88,10 @@
 - tsc PASS (GroupEditor 0 errors)
 - lint:harness ui-token 13건 시프트 (실제 새 hardcode X — 줄 번호 변경) → baseline 갱신 필요
 
-### 미해결 (별도 PR)
-- 근무표 매트릭스 표출 — N-19-b 알고리즘이 매일 7명 배정한 경우 그리드 표시 확인 필요 (사용자 매트릭스 스크린샷 분석 후)
-- generation_strategy='rotation' + rotation_enabled 동시 ON 충돌 — 명확화 필요
+### 미해결 (별도 PR — N-24)
+- 버전 timeline 위치 — 그룹 편집 최상단으로 이동 (사용자 요청)
+- 스케줄 목록 — 카드 → 리스트 상세화 (사용자 요청)
+- 근무표 매트릭스 표출 — 실제 동작 확인 후 fix
 
 ## 2026-05-16 (Phase N-21-c) — Cron 자동 다음 달 스케줄 생성 (Step 3 — C 안)
 
