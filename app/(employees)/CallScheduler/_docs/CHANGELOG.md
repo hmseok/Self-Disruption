@@ -3,6 +3,67 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-16 (Phase N-17) — 대시보드 운영 풀세트 + KPI 통합
+
+### 사용자 의도
+> "이렇게 표출만 되는게 맞나요? 정보들이 별로 도움이 안되는데 대시보드에서"
+> "KPI도 같이 넣을 예정이긴한데 직원 근무 분석이나 채용율 그리고 업무강도나 이런것들"
+> "우리 시스템이 카페24 연동하고있으니 사고접수량, 긴출 및 기타 접수량, 상담등록량 추가"
+
+### 변경 (제거)
+- 운영 셋팅 펼침 카드 4종 (시프트/그룹/워커/quota) + 펼침 영역 통째로 제거
+- 단순 카운트 (`opsCounts.slots/groups/workers/quotaWorkers`) 제거 — 대시보드 의미 없음
+
+### 변경 (신설)
+- **새 API**: `GET /api/call-scheduler/dashboard?date=YYYY-MM-DD` — 한 번 round-trip 에 9 KPI + 6 영역 묶음
+- **새 컴포넌트** `_components/dashboard/` 7종:
+  · `KpiStrip.tsx` — 운영 5 + 카페24 5 (2줄)
+  · `NowWorkingStrip.tsx` — 현재 시각 active workers (24/365 가시화)
+  · `TodayTomorrowGrid.tsx` — 오늘/내일 시프트별 워커
+  · `PendingReviewsCard.tsx` — 검토 대기 (skip/leave/swap)
+  · `EmptySlotsAlert.tsx` — 이번 주 min_coverage 미달 일자
+  · `NextActionCard.tsx` — 월말 다음 달 생성 CTA
+  · `UpcomingHolidaysCard.tsx` — 다음 14일 휴일 + 영향 그룹
+- **page.tsx 재작성** — 8 영역 순차 표출, fetch 한 번으로 통합
+
+### KPI 묶음 (9개)
+**운영 인력 (5)**
+- 인당 근무일 평균 + 최대/최소 워커
+- 활성 워커 vs 필요 인원 (min_coverage 합)
+- 야간 근무 비율 (is_overnight)
+- 부하 편차 σ (워커간 근무일수 표준편차 — 균형 깨진 정도)
+- 충원율 (filled / total)
+
+**외부 부하 (5 — 카페24 + 자체)**
+- 사고접수 (`aceesosh` esosmddt — graceful)
+- 긴급출동 (`acrotpth` otptdcyn='Y' — graceful)
+- 기타 접수 (`operations_dispatch_orders` created_at)
+- 상담등록 (`operations_consultations` created_at)
+- 카페24 총합
+
+### 데이터 source
+- cs_assignments / cs_workers / cs_shift_slots / cs_shift_groups / cs_group_min_coverage
+- cs_holidays / cs_group_member_skip_dates / cs_leaves / cs_swap_requests
+- cafe24Db (외부) — aceesosh / acrotpth
+- operations_dispatch_orders / operations_consultations (자체)
+
+### Graceful 처리
+- 카페24 외부 DB 연결 실패 시 `null` → KPI 타일 "—" + "카페24 연결 안 됨" 라벨
+- 모든 SQL try/catch — 마이그 미적용 / collation 이슈 안전
+- skip_on_holidays 컬럼 없으면 affected_groups 빈 배열 (N-16 graceful)
+
+### 효과
+- 진입 즉시 24/365 운영 상태 파악 (지금 누가 / 오늘/내일 누가 / 빈자리 / 휴일)
+- 검토 대기는 클릭으로 /requests 이동
+- 월말 자동 생성 시기 자동 안내
+- 외부 부하 (카페24 사고/긴급/상담) 실시간 가시화
+
+### 검증
+- tsc PASS (CallScheduler 0 errors)
+- lint:harness 새 위반 0건
+- lint:ui-design CallScheduler 0건
+
+
 ## 2026-05-15 (Phase N-16) — 그룹별 휴일 자동 제외 옵션 (skip_on_holidays)
 
 ### 사용자 의도
