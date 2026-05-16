@@ -3,6 +3,28 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-16 (Phase N-24-a) — 탭 블루 pill + 컨텐츠 전체 width
+
+### 사용자 지적
+> "근데 왜 탭 커서 색이 왜 블랙이 되었고 그리고 보니 탭 아래 페이지들은 왜 가운데 정렬이야?"
+
+### 결정사항 (사용자 옵션 선택)
+- 탭 색: **블루 pill** (settlement 검정 → 블루 — 일반적인 액센트 컬러)
+- 컨텐츠 정렬: **전체 width** (maxWidth 제거 — 사이드바 옆부터 우측 끝까지)
+
+### 변경
+- `_components/SubNav.tsx`:
+  · 활성 탭 background: `#0f2440` → `COLORS.primary` (블루 #2563eb)
+  · borderRadius: 8 → 99 (완전 둥근 pill)
+  · 비활성 보더: transparent → `COLORS.borderFaint` (얇은 윤곽)
+  · 활성 box-shadow: `0 2px 8px rgba(37,99,235,0.25)` (블루 글로우)
+- `page.tsx` + `skips/page.tsx`: `maxWidth: 1400 / 1200 + margin: 0 auto` 제거 → 전체 width
+- `[id]/page.tsx` 와 `new/page.tsx` 는 maxWidth 600/720 (form 형 페이지) — 유지
+
+### 검증
+- tsc PASS
+- lint:harness 0건
+
 ## 2026-05-16 (Phase N-23) — Rotation 운영 fix (priority 기반 자동 분산으로 구조 재설계)
 
 ### 사용자 지적

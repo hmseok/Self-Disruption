@@ -1,11 +1,12 @@
 'use client'
 // ───────────────────────────────────────────────────────────────
-// SubNav — CallScheduler 모듈 공통 탭 (정산 관리 §4 검정 pill 패턴)
-//   활성: 검정 배경 #0f2440 + 흰 글씨
-//   비활성: 투명 + 회색 #64748b
+// SubNav — CallScheduler 모듈 공통 탭 (N-24-a: 블루 pill — 사용자 선택)
+//   활성: 블루 배경 #2563eb + 흰 글씨
+//   비활성: 투명 + 회색 #64748b + 호버 시 보더
 // ───────────────────────────────────────────────────────────────
 import Link from 'next/link'
-import { usePathname, useSearchParams } from 'next/navigation'
+import { usePathname } from 'next/navigation'
+import { COLORS } from '@/app/utils/ui-tokens'
 
 // N-14 — 운영 vs 설정 분류 (사용자 의도)
 //   운영 (자주 보는 영역, 상위): 대시보드 / 직원 요청
@@ -39,14 +40,15 @@ export default function SubNav() {
             key={tab.href}
             href={tab.href}
             style={{
-              padding: '8px 16px', borderRadius: 8,
+              padding: '8px 16px', borderRadius: 99,
               fontSize: 13, fontWeight: 700,
               textDecoration: 'none',
-              background: active ? '#0f2440' : 'transparent',
-              color: active ? '#fff' : '#64748b',
-              border: active ? 'none' : '1px solid transparent',
+              background: active ? COLORS.primary : 'transparent',
+              color: active ? '#fff' : COLORS.textSecondary,
+              border: active ? `1px solid ${COLORS.primary}` : `1px solid ${COLORS.borderFaint}`,
               transition: 'all 0.15s',
               whiteSpace: 'nowrap',
+              boxShadow: active ? '0 2px 8px rgba(37,99,235,0.25)' : 'none',
             }}
           >
             {tab.label}

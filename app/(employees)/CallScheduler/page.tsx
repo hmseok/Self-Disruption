@@ -168,7 +168,8 @@ export default function CallSchedulerListPage() {
   ], [])
 
   return (
-    <div style={{ padding: '20px 24px', maxWidth: 1400, margin: '0 auto' }}>
+    // N-24-a — 전체 width (maxWidth 제거)
+    <div style={{ padding: '20px 24px' }}>
       {/* PageTitle 자동 — 자체 헤더 X */}
 
       {/* 에러 표시 */}
