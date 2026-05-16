@@ -58,6 +58,19 @@ function fmtIsoFull(iso: string): string {
   } catch { return iso.slice(0, 16) }
 }
 
+// 사용자 명시 (2026-05-16): 「공장 사업자번호는 이상한데」
+// 한국 사업자등록번호 = 10자리 (xxx-xx-xxxxx). cafe24 에 10자리 초과 raw 가 들어있을 수 있어
+// 숫자만 추출 후 10자리면 표준 포맷, 아니면 raw 표시.
+function formatBizNo(raw: string | null | undefined): string {
+  if (!raw) return '-'
+  const digits = String(raw).replace(/[^0-9]/g, '')
+  if (digits.length === 10) {
+    return `${digits.slice(0, 3)}-${digits.slice(3, 5)}-${digits.slice(5)}`
+  }
+  // 비정상 길이 (사업자번호 외 데이터일 수도) — raw 표시
+  return raw
+}
+
 function rideAccidentIdFromIdno(idno: string): number {
   return parseInt(String(idno).replace(/[^0-9]/g, '').slice(0, 9) || '0', 10)
 }
@@ -389,26 +402,23 @@ export default function DispatchDetailPage({
   return (
     <div className="page-bg">
       <div className="max-w-[1400px] mx-auto py-4 px-4 md:py-5 md:px-6">
-        {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, gap: 12, flexWrap: 'wrap' }}>
-          <div>
-            <h1 style={{ fontSize: 22, fontWeight: 900, color: '#0f2440', margin: 0, whiteSpace: 'nowrap' }}>
-              🚗 {row?.cars_no || row?.otptcanm || idno}
-              <span style={{ fontSize: 13, fontWeight: 600, color: '#64748b', marginLeft: 8 }}>
-                {row?.cars_model || ''}
-              </span>
-            </h1>
-            <p style={{ fontSize: 12, color: '#64748b', marginTop: 4, whiteSpace: 'nowrap' }}>
-              {row?.otptdcyn === 'Y' ? '🚗 대차접수' : '📋 사고접수'} · 접수 {fmtCafe24DateTime(row?.otptacdt || null, row?.otptactm || null)} ·
-              {row?.rental_vendor && <span style={{ marginLeft: 6, color: '#0f2440', fontWeight: 700 }}>🏢 {row.rental_vendor}</span>}
-              <span style={{ marginLeft: 6, color: '#94a3b8' }}>{idno}/{mddt}/{srno}</span>
-            </p>
-          </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={() => router.back()} style={ghostBtn}>← 목록</button>
-            <button onClick={() => { fetchRow(); fetchMemos(); fetchOrder(); fetchConsultations() }} disabled={rowLoading} style={subtleBtn}>↻ 새로고침</button>
-            {/* 사고접수 link 제거 — esos*srno vs otpt*srno 스킴 다름 */}
-          </div>
+        {/* Header — 사용자 명시 (2026-05-16): 「목록 새로고침은 좌측이 편한데」 */}
+        <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+          <button onClick={() => router.back()} style={ghostBtn}>← 목록</button>
+          <button onClick={() => { fetchRow(); fetchMemos(); fetchOrder(); fetchConsultations() }} disabled={rowLoading} style={subtleBtn}>↻ 새로고침</button>
+        </div>
+        <div style={{ marginBottom: 16 }}>
+          <h1 style={{ fontSize: 22, fontWeight: 900, color: '#0f2440', margin: 0, whiteSpace: 'nowrap' }}>
+            🚗 {row?.cars_no || row?.otptcanm || idno}
+            <span style={{ fontSize: 13, fontWeight: 600, color: '#64748b', marginLeft: 8 }}>
+              {row?.cars_model || ''}
+            </span>
+          </h1>
+          <p style={{ fontSize: 12, color: '#64748b', marginTop: 4, whiteSpace: 'nowrap' }}>
+            {row?.otptdcyn === 'Y' ? '🚗 대차접수' : '📋 사고접수'} · 접수 {fmtCafe24DateTime(row?.otptacdt || null, row?.otptactm || null)} ·
+            {row?.rental_vendor && <span style={{ marginLeft: 6, color: '#0f2440', fontWeight: 700 }}>🏢 {row.rental_vendor}</span>}
+            <span style={{ marginLeft: 6, color: '#94a3b8' }}>{idno}/{mddt}/{srno}</span>
+          </p>
         </div>
 
         {/* Toast */}
@@ -520,7 +530,9 @@ export default function DispatchDetailPage({
                 </Section>
               )}
 
-              {/* 대차 요청 */}
+              {/* 대차 요청
+                  사용자 명시 (2026-05-16): 「업체 코드 라벨 숨김」— raw 코드 노이즈 제거
+                  사업자번호는 포맷 적용 */}
               <Section icon="🏢" title="대차 요청">
                 <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr 140px 1fr', gap: '8px 16px', fontSize: 12 }}>
                   <Lbl>대차업체</Lbl>
@@ -529,17 +541,17 @@ export default function DispatchDetailPage({
                   <Val>{row.rental_hp || '-'}</Val>
                   <Lbl>대차요청날짜</Lbl>
                   <Val>{row.rent_rsdt || '협의필요'}</Val>
-                  <Lbl>업체 코드</Lbl>
-                  <Val>{row.rent_facd || '-'}</Val>
+                  {row.rental_bdno && (<><Lbl>사업자번호</Lbl><Val>{formatBizNo(row.rental_bdno)}</Val></>)}
                 </div>
               </Section>
 
-              {/* 공장배정 (ajaoderh + pmcfactm) — P1.5f */}
-              {(factoriesLoading || factories.length > 0) && (
-                <Section icon="🔧" title={`공장배정 (${factories.length})`}>
-                  {factoriesLoading ? <Place>공장배정 조회 중…</Place>
-                    : factories.length === 0 ? <Place>공장배정 없음</Place>
-                    : (
+              {/* 공장배정 (ajaoderh + pmcfactm) — P1.5f
+                  사용자 명시 (2026-05-16): 「배정공장 관련 내용이 안나오고」
+                  → 데이터 없어도 섹션 항상 노출 (placeholder) */}
+              <Section icon="🔧" title={`공장배정 (${factories.length})`}>
+                {factoriesLoading ? <Place>공장배정 조회 중…</Place>
+                  : factories.length === 0 ? <Place>아직 배정된 공장이 없습니다</Place>
+                  : (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                         {factories.map((f) => (
                           <div
@@ -555,7 +567,7 @@ export default function DispatchDetailPage({
                             <div style={{ display: 'grid', gridTemplateColumns: '90px 1fr 90px 1fr', gap: '4px 12px', fontSize: 11 }}>
                               {f.facttelo && (<><Lbl>전화</Lbl><Val>{f.facttelo}</Val></>)}
                               {f.facthpno && (<><Lbl>휴대폰</Lbl><Val>{f.facthpno}</Val></>)}
-                              {f.factbdno && (<><Lbl>사업자번호</Lbl><Val>{f.factbdno}</Val></>)}
+                              {f.factbdno && (<><Lbl>사업자번호</Lbl><Val>{formatBizNo(f.factbdno)}</Val></>)}
                               {f.factaddr && (<><Lbl>주소</Lbl><Val span={3}>{f.factaddr}</Val></>)}
                               <Lbl>등록</Lbl>
                               <Val span={3}>
@@ -567,8 +579,7 @@ export default function DispatchDetailPage({
                         ))}
                       </div>
                     )}
-                </Section>
-              )}
+              </Section>
 
               {/* 카페24 ACR 사고처리관리 상담내역 (acrmemoh) — P1.5f */}
               <Section icon="📒" title={`카페24 상담내역 (${acrMemos.length})`}>
@@ -602,29 +613,33 @@ export default function DispatchDetailPage({
                   )}
               </Section>
 
-              {/* B. 긴급출동 메모 (acememoh — ACE 모듈, 보조) */}
-              <Section icon="📞" title={`긴급출동 메모 (${memos.length})`}>
-                {memosLoading ? <Place>cafe24 메모 조회 중…</Place>
-                  : memos.length === 0 ? <Place>긴급출동 메모 없음</Place>
-                  : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                      {memos.map((m) => (
-                        <div
-                          key={`${m.memosort}-${m.memonums}`}
-                          style={{ ...GLASS.L3, padding: '10px 12px', borderRadius: 8, border: '1px solid rgba(0,0,0,0.04)', fontSize: 12 }}
-                        >
-                          <div style={{ display: 'flex', gap: 8, marginBottom: 4, color: '#64748b', fontSize: 11, whiteSpace: 'nowrap' }}>
-                            <span style={{ fontWeight: 700 }}>#{m.memosort}-{m.memonums}</span>
-                            <span>{fmtCafe24DateTime(m.memogndt, m.memogntm)}</span>
-                            {m.memognus && <span>· {m.memognus}</span>}
+              {/* B. 긴급출동 메모 (acememoh — ACE 모듈, 보조)
+                  사용자 명시 (2026-05-16): 「사고 이니 긴급출동메모는 사고엔 없는게 맞고」
+                  → 데이터 있을 때만 (또는 긴급출동/현장출동 Y 일 때만) 표출 */}
+              {(memosLoading || memos.length > 0 || row.otptacph === 'Y' || row.otptacno === 'Y') && (
+                <Section icon="📞" title={`긴급출동 메모 (${memos.length})`}>
+                  {memosLoading ? <Place>cafe24 메모 조회 중…</Place>
+                    : memos.length === 0 ? <Place>긴급출동 메모 없음</Place>
+                    : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        {memos.map((m) => (
+                          <div
+                            key={`${m.memosort}-${m.memonums}`}
+                            style={{ ...GLASS.L3, padding: '10px 12px', borderRadius: 8, border: '1px solid rgba(0,0,0,0.04)', fontSize: 12 }}
+                          >
+                            <div style={{ display: 'flex', gap: 8, marginBottom: 4, color: '#64748b', fontSize: 11, whiteSpace: 'nowrap' }}>
+                              <span style={{ fontWeight: 700 }}>#{m.memosort}-{m.memonums}</span>
+                              <span>{fmtCafe24DateTime(m.memogndt, m.memogntm)}</span>
+                              {m.memognus && <span>· {m.memognus}</span>}
+                            </div>
+                            {m.memotitl && <div style={{ fontWeight: 700, color: '#0f2440', marginBottom: 2 }}>{m.memotitl}</div>}
+                            {m.memotext && <div style={{ color: '#1e293b', whiteSpace: 'pre-wrap' }}>{m.memotext}</div>}
                           </div>
-                          {m.memotitl && <div style={{ fontWeight: 700, color: '#0f2440', marginBottom: 2 }}>{m.memotitl}</div>}
-                          {m.memotext && <div style={{ color: '#1e293b', whiteSpace: 'pre-wrap' }}>{m.memotext}</div>}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-              </Section>
+                        ))}
+                      </div>
+                    )}
+                </Section>
+              )}
 
               {/* C+D. 상담 (히스토리 + 새 입력) — 큰 영역 */}
               <Section icon="💬" title={`상담 히스토리 (${consultations.length})`}>
