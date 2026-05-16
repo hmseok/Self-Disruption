@@ -3,6 +3,47 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-16 (Phase N-25 Step A) — 매트릭스 sort 고정 + group_id 인프라
+
+### 사용자 보고
+> "로테이션인데 시프트가 하나만 표출되니 누가 몇시근무인지를 모르고 제대로 로테이션 되는지도 확인이 안되네 순서가 계속바뀌는것 보니 매일 바뀌는것처럼 보이기도 하고"
+> "워커에 매칭된 시프트도 제대로 보여줘야지요 로테이션시프트중에 한가지를 보여주고 묶어서 직원들을 다배치하는게아니라"
+
+### 진단 (SQL 확인)
+- 알고리즘 정상: 6/1~6/5 매일 동일한 김현정·박혜정·정지은이 L01 (매월 1회 순환 OK)
+- 매트릭스 표시 버그:
+  1. 같은 시프트의 다른 그룹 워커가 같은 row 에 섞임 (cs_assignments 에 group_id 없음)
+  2. 셀 내 worker chip 이 매일 다른 순서로 표시 (sort 안 됨)
+  3. rotation 그룹의 시프트 sequence 가 한 row 만 보임 (L02~L07 안 보임 — 다른 row 에 섞임)
+
+### 변경 (Step A — 인프라 + sort 고정)
+
+#### 마이그 (`migrations/2026-05-16_cs_assignments_group_id.sql`)
+- `cs_assignments.group_id CHAR(36) NULL` 컬럼 추가 (멱등)
+- 인덱스 `idx_cs_asn_group_date (group_id, work_date)`
+- FK `fk_cs_asn_group → cs_shift_groups(id) ON DELETE SET NULL`
+
+#### auto-generate (`route.ts`)
+- `hasAsnGroupId` graceful 감지
+- INSERT 분기 4종 (clearFirst × hasAsnBreakdown × hasAsnGroupId) — 모든 경우 group_id 같이 INSERT
+- 기존 plan 의 `group_id` 가 그대로 cs_assignments 에 들어감
+
+#### ScheduleGrid sort 고정
+- `cellMap` 구축 후 worker name 사전순 sort (한국어 localeCompare)
+- 셀 내 worker chip 이 매일 같은 순서로 표시됨
+
+### Step B (다음 PR)
+- ScheduleGrid 의 row 구조 변경: slot 단위 → (group_id, slot_id) 단위
+- 같은 시프트가 여러 그룹에 속하면 row 가 그룹별로 분리됨
+- rotation 그룹의 sequence 시프트 (L01/L02/L03/L05/L07) 가 각각 sub-row 로 표시
+- 그룹 row 의 worker 는 그 그룹 멤버만 (cs_assignments.group_id 필터)
+- 작업 분량 ~300줄 — 큰 reshuffling 이라 별도 PR
+
+### 검증
+- tsc PASS
+- 마이그 적용 후 자동 생성 재실행 → cs_assignments.group_id 채움
+- 매트릭스 sort 즉시 효과 (날짜별 순서 흔들림 사라짐)
+
 ## 2026-05-16 (Phase N-24-a) — 탭 블루 pill + 컨텐츠 전체 width
 
 ### 사용자 지적

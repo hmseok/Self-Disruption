@@ -1398,6 +1398,11 @@ export async function POST(
     try {
       await prisma.$queryRaw<any[]>`SELECT day_hours FROM cs_assignments LIMIT 1`
     } catch { hasAsnBreakdown = false }
+    // N-25 — cs_assignments.group_id 컬럼 graceful
+    let hasAsnGroupId = true
+    try {
+      await prisma.$queryRaw<any[]>`SELECT group_id FROM cs_assignments LIMIT 1`
+    } catch { hasAsnGroupId = false }
 
     // N-23 fix — rotation 그룹은 워커별 다른 shift_slot_id 가 plan 에 들어감.
     // targetGroups 는 그룹 row 라 g.shift_slot_id (단일) 만 매칭 → undefined 에러.
@@ -1479,7 +1484,19 @@ export async function POST(
           Number(slot.slot_night_premium_rate || 0),
           p.special_code,
         )
-        if (hasAsnBreakdown) {
+        // N-25 — group_id 같이 INSERT (graceful)
+        if (hasAsnBreakdown && hasAsnGroupId) {
+          await prisma.$executeRaw`
+            INSERT INTO cs_assignments
+              (id, schedule_id, work_date, shift_slot_id, group_id, worker_id, special_code,
+               computed_hours, day_hours, night_hours, premium_hours,
+               created_at, updated_at)
+            VALUES
+              (${newId}, ${scheduleId}, ${p.work_date}, ${p.shift_slot_id}, ${p.group_id}, ${p.worker_id}, ${p.special_code},
+               ${hours}, ${bd.day}, ${bd.night}, ${bd.premium},
+               NOW(), NOW())
+          `
+        } else if (hasAsnBreakdown) {
           await prisma.$executeRaw`
             INSERT INTO cs_assignments
               (id, schedule_id, work_date, shift_slot_id, worker_id, special_code,
@@ -1489,6 +1506,13 @@ export async function POST(
               (${newId}, ${scheduleId}, ${p.work_date}, ${p.shift_slot_id}, ${p.worker_id}, ${p.special_code},
                ${hours}, ${bd.day}, ${bd.night}, ${bd.premium},
                NOW(), NOW())
+          `
+        } else if (hasAsnGroupId) {
+          await prisma.$executeRaw`
+            INSERT INTO cs_assignments
+              (id, schedule_id, work_date, shift_slot_id, group_id, worker_id, special_code, computed_hours, created_at, updated_at)
+            VALUES
+              (${newId}, ${scheduleId}, ${p.work_date}, ${p.shift_slot_id}, ${p.group_id}, ${p.worker_id}, ${p.special_code}, ${hours}, NOW(), NOW())
           `
         } else {
           await prisma.$executeRaw`
@@ -1517,7 +1541,19 @@ export async function POST(
 
         if (p.action === 'insert') {
           const newId = crypto.randomUUID()
-          if (hasAsnBreakdown) {
+          // N-25 — group_id 같이 INSERT (graceful)
+          if (hasAsnBreakdown && hasAsnGroupId) {
+            await prisma.$executeRaw`
+              INSERT INTO cs_assignments
+                (id, schedule_id, work_date, shift_slot_id, group_id, worker_id, special_code,
+                 computed_hours, day_hours, night_hours, premium_hours,
+                 created_at, updated_at)
+              VALUES
+                (${newId}, ${scheduleId}, ${p.work_date}, ${p.shift_slot_id}, ${p.group_id}, ${p.worker_id}, ${p.special_code},
+                 ${hours}, ${bd.day}, ${bd.night}, ${bd.premium},
+                 NOW(), NOW())
+            `
+          } else if (hasAsnBreakdown) {
             await prisma.$executeRaw`
               INSERT INTO cs_assignments
                 (id, schedule_id, work_date, shift_slot_id, worker_id, special_code,
@@ -1527,6 +1563,13 @@ export async function POST(
                 (${newId}, ${scheduleId}, ${p.work_date}, ${p.shift_slot_id}, ${p.worker_id}, ${p.special_code},
                  ${hours}, ${bd.day}, ${bd.night}, ${bd.premium},
                  NOW(), NOW())
+            `
+          } else if (hasAsnGroupId) {
+            await prisma.$executeRaw`
+              INSERT INTO cs_assignments
+                (id, schedule_id, work_date, shift_slot_id, group_id, worker_id, special_code, computed_hours, created_at, updated_at)
+              VALUES
+                (${newId}, ${scheduleId}, ${p.work_date}, ${p.shift_slot_id}, ${p.group_id}, ${p.worker_id}, ${p.special_code}, ${hours}, NOW(), NOW())
             `
           } else {
             await prisma.$executeRaw`

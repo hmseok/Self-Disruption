@@ -28,6 +28,7 @@ export default function ScheduleGrid({ detail, onChanged, myWorkerId }: Props) {
   )
 
   // (date, slot_id) → assignment[] 매핑 (PR-2OO: 1셀 N워커)
+  // N-25 — 워커 priority 순으로 sort (매일 같은 순서 보장)
   const cellMap = useMemo(() => {
     const m = new Map<string, Assignment[]>()
     for (const a of assignments) {
@@ -36,8 +37,22 @@ export default function ScheduleGrid({ detail, onChanged, myWorkerId }: Props) {
       arr.push(a)
       m.set(k, arr)
     }
+    // 셀 내 worker chip sort — worker_id 의 그룹 priority 기준
+    // workers 배열은 priority 정보 직접 없음 — name 사전순 sort 로 fallback (안정적)
+    for (const [, arr] of m) {
+      arr.sort((x, y) => {
+        // 1) null worker (빈 셀) 는 뒤로
+        if (!x.worker_id && y.worker_id) return 1
+        if (x.worker_id && !y.worker_id) return -1
+        if (!x.worker_id && !y.worker_id) return 0
+        // 2) worker name 사전순 (안정 정렬 — 매일 같은 순서)
+        const xName = workers.find(w => w.id === x.worker_id)?.name || ''
+        const yName = workers.find(w => w.id === y.worker_id)?.name || ''
+        return xName.localeCompare(yName, 'ko')
+      })
+    }
     return m
-  }, [assignments])
+  }, [assignments, workers])
 
   const workerMap = useMemo(() => {
     const m = new Map<string, Worker>()
