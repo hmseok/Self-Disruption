@@ -95,6 +95,21 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
   const [coverageMissing, setCoverageMissing] = useState(false)   // 마이그 미적용 시
   // N-5 — 최소 인원 collapsible
   const [coverageExpanded, setCoverageExpanded] = useState(false)
+  // N-21-a — 버전 timeline (그룹 설정의 기간별 버전)
+  interface VersionRow {
+    id: string; group_id: string
+    valid_from: string; valid_to: string | null
+    rotation_enabled: boolean; rotation_period_kind: string
+    pattern_type: string; note: string | null
+    shift_count: number; member_count: number
+    created_at: string
+  }
+  const [versions, setVersions] = useState<VersionRow[]>([])
+  const [versionsMissing, setVersionsMissing] = useState(false)  // 마이그 미적용
+  const [versionsExpanded, setVersionsExpanded] = useState(false)
+  const [newVersionForm, setNewVersionForm] = useState<{
+    valid_from: string; valid_to: string; note: string; saving: boolean; error: string | null
+  }>({ valid_from: '', valid_to: '', note: '', saving: false, error: null })
   // PR-2SS-h-1 → fix — 그룹 회피일 (인라인 펼침)
   const [skipDates, setSkipDates] = useState<GroupMemberSkipDate[]>([])
   const [skipMissing, setSkipMissing] = useState(false)
@@ -200,6 +215,17 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
             setSkipMissing(true)
           }
         } catch { setSkipMissing(true) }
+        // N-21-a — 버전 timeline 로드 (graceful)
+        try {
+          const vRes = await fetch(`/api/call-scheduler/shift-groups/${groupId}/versions`, { headers: auth })
+          const vJson = await vRes.json()
+          if (vRes.ok && Array.isArray(vJson.data)) {
+            setVersions(vJson.data)
+            if (vJson._migration_pending) setVersionsMissing(true)
+          } else if (vJson?._migration_pending) {
+            setVersionsMissing(true)
+          }
+        } catch { setVersionsMissing(true) }
       } catch (e: any) { setError(e?.message || '오류') }
       finally { if (!abort) setLoading(false) }
     })()
@@ -215,6 +241,59 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
       const sJson = await sRes.json()
       if (sRes.ok && Array.isArray(sJson.data)) setSkipDates(sJson.data)
     } catch { /* graceful */ }
+  }
+
+  // N-21-a — 버전 timeline reload + 새 버전 생성
+  const reloadVersions = async () => {
+    if (isNew || !groupId) return
+    try {
+      const auth = await getAuthHeader()
+      const vRes = await fetch(`/api/call-scheduler/shift-groups/${groupId}/versions`, { headers: auth })
+      const vJson = await vRes.json()
+      if (vRes.ok && Array.isArray(vJson.data)) setVersions(vJson.data)
+    } catch { /* graceful */ }
+  }
+  const createNewVersion = async () => {
+    if (isNew || !groupId) return
+    setNewVersionForm(p => ({ ...p, error: null }))
+    if (!newVersionForm.valid_from) {
+      setNewVersionForm(p => ({ ...p, error: '시작일 필수' })); return
+    }
+    if (newVersionForm.valid_to && newVersionForm.valid_to < newVersionForm.valid_from) {
+      setNewVersionForm(p => ({ ...p, error: '종료일이 시작일보다 빠를 수 없음' })); return
+    }
+    setNewVersionForm(p => ({ ...p, saving: true }))
+    try {
+      const auth = await getAuthHeader()
+      const res = await fetch(`/api/call-scheduler/shift-groups/${groupId}/versions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...auth },
+        body: JSON.stringify({
+          valid_from: newVersionForm.valid_from,
+          valid_to: newVersionForm.valid_to || null,
+          note: newVersionForm.note.trim() || null,
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json?.error || '버전 생성 실패')
+      setNewVersionForm({ valid_from: '', valid_to: '', note: '', saving: false, error: null })
+      reloadVersions()
+    } catch (e: any) {
+      setNewVersionForm(p => ({ ...p, saving: false, error: e?.message || '오류' }))
+    }
+  }
+  const deleteVersion = async (versionId: string) => {
+    if (isNew || !groupId) return
+    if (!confirm('이 버전을 삭제합니다. 시프트 sequence + 멤버 cfg 도 같이 삭제됩니다. 계속할까요?')) return
+    try {
+      const auth = await getAuthHeader()
+      const res = await fetch(`/api/call-scheduler/shift-groups/${groupId}/versions/${versionId}`, {
+        method: 'DELETE', headers: auth,
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json?.error || '삭제 실패')
+      reloadVersions()
+    } catch (e: any) { setError(e?.message || '오류') }
   }
 
   // PR-2SS-h-1-fix — 인라인 빠른 입력 (매니저 즉시 승인)
@@ -823,6 +902,137 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
                 </div>
               </Field>
             </>
+          )}
+
+          {/* N-21-a — 버전 timeline (그룹 설정의 기간별 버전) */}
+          {!isNew && (
+            <div>
+              <button type="button"
+                      onClick={() => setVersionsExpanded(p => !p)}
+                      style={{
+                        width: '100%', textAlign: 'left',
+                        padding: '8px 12px', borderRadius: 8,
+                        background: versionsExpanded ? COLORS.bgBlue : 'rgba(0,0,0,0.03)',
+                        border: `1px solid ${versionsExpanded ? COLORS.borderBlue : COLORS.borderFaint}`,
+                        cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        fontSize: 12, fontWeight: 700,
+                        color: versionsExpanded ? COLORS.info : COLORS.textPrimary,
+                      }}>
+                <span>📅 버전 timeline <span style={{ fontSize: 11, fontWeight: 500, color: COLORS.textMuted }}>
+                  (기간별 그룹 설정 — 분기/시즌별 다른 sequence)
+                </span></span>
+                <span style={{ fontSize: 11, fontWeight: 500, color: COLORS.textMuted }}>
+                  {versions.length}개 버전 {versionsExpanded ? '▼' : '▶'}
+                </span>
+              </button>
+              {versionsExpanded && (
+                <div style={{
+                  marginTop: 8, padding: 12, borderRadius: 10,
+                  ...GLASS.L1, border: `1px solid ${COLORS.borderFaint}`,
+                }}>
+                  {versionsMissing && (
+                    <div style={{
+                      padding: 10, borderRadius: 8,
+                      background: COLORS.bgAmber, border: `1px solid ${COLORS.borderAmber}`,
+                      fontSize: 12, color: COLORS.warning, marginBottom: 10,
+                    }}>
+                      ⚠ 마이그레이션 미적용 — <code>migrations/2026-05-16_cs_shift_group_versions.sql</code> 적용 필요
+                    </div>
+                  )}
+                  {/* 기존 버전 list */}
+                  {versions.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
+                      {versions.map(v => (
+                        <div key={v.id} style={{
+                          display: 'flex', alignItems: 'center', gap: 8,
+                          padding: '8px 12px', borderRadius: 8,
+                          background: COLORS.bgBlue, border: `1px solid ${COLORS.borderBlue}`,
+                          fontSize: 12,
+                        }}>
+                          <span style={{ fontWeight: 700, color: COLORS.info, minWidth: 180 }}>
+                            📅 {v.valid_from} ~ {v.valid_to || '무한'}
+                          </span>
+                          {v.rotation_enabled && (
+                            <span style={{
+                              fontSize: 10, padding: '2px 6px', borderRadius: 4,
+                              background: '#fff', color: COLORS.info, fontWeight: 700,
+                              border: `1px solid ${COLORS.borderBlue}`,
+                            }}>🔄 {v.rotation_period_kind}</span>
+                          )}
+                          <span style={{ color: COLORS.textMuted }}>
+                            시프트 {v.shift_count} · 멤버 {v.member_count}
+                          </span>
+                          {v.note && (
+                            <span style={{ color: COLORS.textSecondary, fontStyle: 'italic' }}>
+                              · {v.note}
+                            </span>
+                          )}
+                          <div style={{ flex: 1 }} />
+                          <button type="button" onClick={() => deleteVersion(v.id)}
+                                  style={{
+                                    fontSize: 11, padding: '3px 8px', borderRadius: 6,
+                                    background: 'transparent', color: COLORS.danger,
+                                    border: `1px solid ${COLORS.borderRed}`,
+                                    cursor: 'pointer',
+                                  }}>× 삭제</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {/* 새 버전 생성 폼 */}
+                  {!versionsMissing && (
+                    <div style={{
+                      padding: 10, borderRadius: 8,
+                      background: 'rgba(0,0,0,0.02)',
+                      border: `1px dashed ${COLORS.borderFaint}`,
+                    }}>
+                      <div style={{
+                        fontSize: 11, fontWeight: 700, color: COLORS.textSecondary, marginBottom: 8,
+                      }}>
+                        ➕ 새 버전 만들기 <span style={{ fontWeight: 500, color: COLORS.textMuted }}>
+                          (현재 설정 복제 — 그 후 편집 가능)
+                        </span>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 2fr auto', gap: 6 }}>
+                        <input type="date" value={newVersionForm.valid_from}
+                               onChange={(e) => setNewVersionForm(p => ({ ...p, valid_from: e.target.value }))}
+                               placeholder="시작일"
+                               style={{ ...inputStyle, fontSize: 12 }} />
+                        <input type="date" value={newVersionForm.valid_to}
+                               onChange={(e) => setNewVersionForm(p => ({ ...p, valid_to: e.target.value }))}
+                               placeholder="종료일 (빈 칸 = 무한)"
+                               style={{ ...inputStyle, fontSize: 12 }} />
+                        <input type="text" value={newVersionForm.note}
+                               onChange={(e) => setNewVersionForm(p => ({ ...p, note: e.target.value }))}
+                               placeholder="설명 (예: 6~8월 여름 패턴)"
+                               style={{ ...inputStyle, fontSize: 12 }} />
+                        <button type="button" onClick={createNewVersion}
+                                disabled={newVersionForm.saving}
+                                style={{
+                                  fontSize: 12, padding: '6px 12px', borderRadius: 6,
+                                  background: COLORS.primary, color: '#fff',
+                                  border: 'none', cursor: 'pointer', fontWeight: 700,
+                                  opacity: newVersionForm.saving ? 0.6 : 1,
+                                }}>
+                          {newVersionForm.saving ? '...' : '+ 추가'}
+                        </button>
+                      </div>
+                      {newVersionForm.error && (
+                        <div style={{
+                          marginTop: 6, fontSize: 11, color: COLORS.danger,
+                        }}>❌ {newVersionForm.error}</div>
+                      )}
+                    </div>
+                  )}
+                  <div style={{
+                    marginTop: 8, fontSize: 11, color: COLORS.textMuted,
+                  }}>
+                    💡 버전은 그룹 설정의 시간 단면. 자동 생성 시 work_date 가 어느 버전 기간에 속하는지 보고 적용 (N-21-b 알고리즘 적용 예정).
+                  </div>
+                </div>
+              )}
+            </div>
           )}
 
           {/* N-5 — 최소 인원 collapsible (자주 안 만지는 셋팅 접기) */}

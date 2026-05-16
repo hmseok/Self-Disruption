@@ -3,6 +3,48 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-16 (Phase N-21-a) — 그룹 설정 버전 timeline (Step 1: 데이터 모델 + UI 기본)
+
+### 사용자 의도
+> "로테이션이나 이런 그룹설정 주기를 스케줄링 해놓을순없을까?"
+> 4 안 (timeline / 예약변경 / cron / 오버라이드) 모두 진행, 단계 분할 — Step 1 부터 순차 진행 (추천)
+
+### 마이그레이션 (`migrations/2026-05-16_cs_shift_group_versions.sql`)
+- **신설** `cs_shift_group_versions` — 그룹 ↔ 기간별 설정 (valid_from / valid_to / rotation_* / pattern_* / note)
+- **신설** `cs_group_shift_versions` — 각 버전의 시프트 sequence (1:N)
+- **신설** `cs_group_member_versions` — 각 버전의 멤버 + 8 cfg + rotation_start_*
+- FK 모두 ON DELETE CASCADE — 버전 삭제 시 시프트/멤버 함께 삭제
+
+### API 신설
+- `GET  /api/call-scheduler/shift-groups/[id]/versions` — 버전 list (shift_count / member_count 집계 포함)
+- `POST /api/call-scheduler/shift-groups/[id]/versions` — 새 버전 생성 (현재 설정 복제 + valid_from)
+  · body: `{ valid_from, valid_to, note, copy_from_version_id? }`
+  · copy_from_version_id 없으면 그룹 현재 cs_shift_groups + cs_group_shifts + cs_group_members 복제
+- `GET    /api/call-scheduler/shift-groups/[id]/versions/[versionId]` — 단일 버전 상세 (settings + shifts + members)
+- `PATCH  /api/call-scheduler/shift-groups/[id]/versions/[versionId]` — settings / shifts / members 부분 업데이트
+- `DELETE /api/call-scheduler/shift-groups/[id]/versions/[versionId]` — 버전 삭제 (cascade)
+
+### UI 변경 (`GroupEditor.tsx`)
+- 「📅 버전 timeline」 collapsible 영역 추가
+- 기존 버전 list — valid_from~valid_to / 시프트 수 / 멤버 수 / note + 삭제 버튼
+- 새 버전 만들기 폼 — 시작일 / 종료일 / 설명 + 추가 버튼
+- 마이그 미적용 시 graceful 안내 (배너 표시)
+
+### 백워드 호환
+- 버전 0개 그룹 → 기존 cs_shift_groups + cs_group_shifts + cs_group_members 그대로 동작
+- 자동 생성 알고리즘 영향 X (N-21-b 에서 변경 예정)
+- 마이그 미적용 시 graceful — 버전 영역만 안내 배너, 다른 기능 정상 동작
+
+### Step 분할 (4 안 진행 계획)
+- **Step 1 (지금)**: 데이터 모델 + UI 기본 (이번 PR)
+- Step 2: A 알고리즘 적용 + B 예약 변경 (현재 설정 복제 wrapper)
+- Step 3: C cron 자동 생성 + D 임시 오버라이드 (cs_assignment_overrides)
+
+### 검증
+- tsc PASS (GroupEditor + 새 API 라우트 0 errors)
+- lint:harness ui-token 13건 시프트 (실제 새 hardcode X — line 번호 변경) → baseline 갱신 필요
+- 마이그 적용 후 검증 SQL 주석 포함
+
 ## 2026-05-16 (N-19-a-fix) — GroupEditor 다시 열 때 rotation 데이터 누락 fix
 
 ### 사용자 보고
