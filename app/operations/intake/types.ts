@@ -291,24 +291,38 @@ export function fmtCafe24DateOnly(raw: string | null | undefined): string {
 // P2.1a-pivot-B3.1 — cafe24 SMS 본문 sanitize (사용자 명시 2026-05-16):
 //   「특수문자로 줄바꿈 한것같은데 문자 폼모양으로 보여주고
 //    개발시 들어간 특수문자나 이런것들은 안보여주면 좋겠는데」
+//   추가 (사용자 스크린샷 2026-05-16):
+//     실제 cafe24/아리고 본문에 @^* (필드 구분자) + @^ (줄바꿈 marker) 가
+//     그대로 포함됨. 단순 HTML/엔티티 처리만으론 부족.
 //
-// cafe24 / 아리고 API / 카카오 알림톡 raw 본문에 자주 포함되는 마크업:
-//   <br>, <br/>, <br />     → 줄바꿈
-//   \r\n, \r                 → \n 으로 정규화
-//   &nbsp; &amp; &lt; &gt;   → 일반 문자로 환원
-//   기타 HTML 태그            → strip (단, [#XX#] 같은 미치환 변수는 보존 — 디버깅용)
-//   다중 개행 3개+            → 2개로 축소 (가독성)
+// 처리 대상 마커:
+//   @^*                      → \n  (필드 구분 — cafe24 템플릿 변수 구분자)
+//   @^                       → \n  (줄바꿈 marker)
+//   <br>, <br/>, <br />      → \n
+//   \r\n, \r                 → \n  정규화
+//   &nbsp; &amp; &lt; &gt;   → 일반 문자 환원
+//   기타 HTML 태그            → strip
+//   다중 개행 3개+            → 2개로 축소
 //   앞뒤 공백/개행 trim
+//   각 줄 trailing 공백 제거
+//
+// 보존:
+//   [#XX#] 같은 미치환 변수 (디버깅용)
+//   ■ 같은 강조 marker (제목 표시)
 export function sanitizeSmsBody(raw: string | null | undefined): string {
   if (!raw) return ''
   let s = String(raw)
-  // 1. <br> 변형 모두 → \n
+  // 1. cafe24/아리고 특수 마커 (3글자 @^* 먼저 → 2글자 @^ 나중)
+  //    순서 중요: @^* 를 먼저 매칭해야 @^ 로 잘리지 않음
+  s = s.replace(/@\^\*/g, '\n')
+  s = s.replace(/@\^/g, '\n')
+  // 2. <br> 변형 모두 → \n
   s = s.replace(/<br\s*\/?>/gi, '\n')
-  // 2. 개행 정규화 (\r\n / \r → \n)
+  // 3. 개행 정규화 (\r\n / \r → \n)
   s = s.replace(/\r\n?/g, '\n')
-  // 3. 나머지 HTML 태그 제거 (raw 그대로 두면 어색)
+  // 4. 나머지 HTML 태그 제거
   s = s.replace(/<\/?[a-zA-Z][^>]*>/g, '')
-  // 4. HTML 엔티티 환원 (자주 쓰이는 것만)
+  // 5. HTML 엔티티 환원 (자주 쓰이는 것만)
   s = s
     .replace(/&nbsp;/g, ' ')
     .replace(/&amp;/g, '&')
@@ -316,11 +330,11 @@ export function sanitizeSmsBody(raw: string | null | undefined): string {
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
-  // 5. 다중 개행 3개+ → 2개로 (가독성, 의도된 단락 구분 유지)
+  // 6. 각 줄 trailing 공백 제거 + leading 공백도 (필드 구분 후 자주 발생)
+  s = s.split('\n').map((line) => line.replace(/[ \t]+$/, '').replace(/^[ \t]+/, '')).join('\n')
+  // 7. 다중 개행 3개+ → 2개로 (가독성, 의도된 단락 구분 유지)
   s = s.replace(/\n{3,}/g, '\n\n')
-  // 6. 각 줄 trailing 공백 제거
-  s = s.split('\n').map((line) => line.replace(/[ \t]+$/, '')).join('\n')
-  // 7. 앞뒤 trim
+  // 8. 앞뒤 trim
   return s.trim()
 }
 
