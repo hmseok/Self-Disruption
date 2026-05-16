@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import AccidentIntakeTab from './_tabs/AccidentIntakeTab'
-import DispatchIntakeTab from './_tabs/DispatchIntakeTab'
 import PlaceholderTab from './_tabs/PlaceholderTab'
 
 // ═══════════════════════════════════════════════════════════════════
@@ -18,19 +17,21 @@ import PlaceholderTab from './_tabs/PlaceholderTab'
 // 기존 OperationsMain (1247줄, Calendar+FleetBoard+DispatchModal) 폐기.
 // ═══════════════════════════════════════════════════════════════════
 
-type SubTab = 'waiting' | 'dispatch' | 'schedule' | 'claims' | 'accident'
+type SubTab = 'waiting' | 'accident' | 'schedule' | 'claims'
 
-// 사용자 명시 (2026-05-16): 대기차량 제일 앞 / 사고접수 제일 뒤
+// 사용자 명시 (2026-05-16):
+//   「사고접수를 살리고 그안에 대차쪽에 일부를 갖다붙히고 대차접수를 없애는게」
+//   → 대차접수 탭 폐기, 사고접수 탭이 대차요청 처리까지 통합 담당
+//   탭 순서: 대기차량(앞) → 사고접수(default) → 배차스케줄 → 청구관리
 const TAB_LIST: Array<{ key: SubTab; label: string; icon: string }> = [
   { key: 'waiting',  label: '대기차량',    icon: '🛠' },
-  { key: 'dispatch', label: '대차접수',    icon: '🚗' },
+  { key: 'accident', label: '사고접수',    icon: '📋' },
   { key: 'schedule', label: '배차스케줄',  icon: '📅' },
   { key: 'claims',   label: '청구관리',    icon: '💰' },
-  { key: 'accident', label: '사고접수',    icon: '📋' },
 ]
 
 export default function OperationsPage() {
-  const [tab, setTab] = useState<SubTab>('dispatch')  // default: 대차접수 (배차담당자 주 페르소나)
+  const [tab, setTab] = useState<SubTab>('accident')  // default: 사고접수 (대차요청 진행처리 통합)
 
   return (
     <div className="page-bg">
@@ -70,8 +71,6 @@ export default function OperationsPage() {
 
         {/* Tab content */}
         {tab === 'accident' && <AccidentIntakeTab />}
-
-        {tab === 'dispatch' && <DispatchIntakeTab />}
 
         {tab === 'schedule' && (
           <PlaceholderTab
