@@ -6,6 +6,77 @@
 
 ## 2026-05-13
 
+### PR-MTG-V2-Dept — 부서 표현 일관성 + UX 강화
+
+**사용자 명령**:
+> 「회의록 부서별 구성이라던가 그런것들이 제대로 표현나 구성이 안되어있는것같은데 인사마스터쪽으로 조금 더 정리해야하나」
+> 「완성도 측면에서 ㄱㄱ」
+
+**문제 진단**:
+- `meetings.department` (VARCHAR 64) + `ride_employees.department` (VARCHAR 32) — 둘 다 자유 입력 → 동기 불가
+- 부서별 회의 type 선택 시 부서 입력 검증 없음 → 「부서원 자동」 매칭 실패 가능
+- 「부서원 자동」 버튼이 type=`department` 한정 → 다른 type 회의는 부서 입력해도 자동 채우기 불가
+- 부서 매칭이 정확 일치 (`=`) → 공백/대소문자 차이 시 매칭 실패
+
+**변경 (본 PR 본 세션 책임)**:
+
+1. **MeetingHeaderBar 「🏢 부서」 inline input + datalist**:
+   - `ride_employees` 의 unique department 자동 추출 → `<datalist id="dept-options">` 옵션
+   - 자유 입력 + 자동완성 동시 (브라우저 native datalist)
+   - placeholder 분기: type=department 시 「(필수)」 / 그 외 「(선택)」
+   - **type=department 인데 부서 비어있으면 빨간 border + 「⚠ 필수」 라벨**
+   - read-only 모드: `🏢 부서명` 태그
+
+2. **AttendeeManager 부서원 자동 매칭 강화**:
+   - 기존: `e.department === department` (대소문자 + 공백 민감)
+   - 신규: `e.department.trim().toLowerCase() === department.trim().toLowerCase()` (PR-V2-Dept)
+   - 「부서원 자동」 동작 변경: **기존 attendees 삭제 X → 부서원만 추가** (dedup 적용, 이미 있는 사람 skip)
+   - 버튼 라벨: `🏢 {부서} 자동 (N)` — 매칭 직원 수 미리 표시
+   - 매칭 0명 시: 버튼 disabled + tooltip 「인사마스터에 부서 없음 → /hr/people 등록 안내」
+
+3. **AttendeeManager 노출 조건 변경**:
+   - 기존: `showAutoFill={meta.type === 'department'}` (부서별 회의 한정)
+   - 신규: `showAutoFill={!!meta.department?.trim()}` (PR-V2-Dept — 부서 입력되어 있으면 항상 노출)
+   - → 「정기 회의」나 「특정 회의」 도 부서 지정 시 부서원 자동 추가 가능
+
+4. **헤더 메타 라인 순서 정리**:
+   - 유형 → 일시 → 시간(분) → 장소 (+ 주소 검색) → **부서** → 주관자 → 상태
+   - 부서가 주관자 옆이라 부서별 회의 시 두 영역 함께 입력 자연스러움
+
+**Rule 8 End-to-End 시뮬레이션**:
+- 사용자 type=「부서별 회의」 선택 → 부서 input 빨간 border + 「⚠ 필수」 표시
+- 사용자 「콜센터」 입력 시 datalist 자동완성 → 클릭/선택 → onMetaChange → PATCH meetings
+- 「부서원 자동 (N)」 버튼 클릭 → autoFillDept → trim+lowercase 매칭 → 신규 부서원만 추가 (기존 보존)
+- DB: meeting_attendees INSERT (각 row 의 profile_id 또는 external_name 채움 — V2-Ride-2 로직)
+
+**Rule 11 SQL**:
+- `meetings.department` 컬럼 그대로 — schema 변경 X ✓
+- `ride_employees.department` 그대로 ✓
+
+**Rule 14 동형 패턴** — 부서 표현 일관성:
+- MeetingHeaderBar 부서 input → ride_employees.department 자동완성
+- AttendeeManager 부서원 자동 → 같은 source
+- 사이드바 V2-Tree-1 「부서별」 그룹 → `m.department` 사용 (이미 통합)
+- MentionEmployee subtitle → `e.department` 표시 (이미 통합)
+- 모든 곳이 ride_employees.department + meetings.department 두 source 사용
+
+**Rule 21**: 자기 모듈 (app/meetings/_components/* + CHANGELOG) ✓
+**Rule 22**: 본 CHANGELOG (본 섹션) ✓
+
+**별도 PR (HR/메인 세션 위임 — 본 PR 범위 외)**:
+- **부서 마스터 테이블 (`ride_departments`)** 신설 — 부서 표준화, 부서장 지정, 부서 트리 등
+- `ride_employees.department_id` FK 마이그
+- `meetings.department_id` FK 마이그 (본 세션 협업 가능 — 후속 PR-V2-Dept-FK)
+
+**GATE 진행 상태**:
+- G3 사용자 GO 「ㄱㄱ」 + 「완성도 측면에서」 ✓
+- G5 tsc PASS (본 세션 영역 0 에러)
+- G6 lint:harness 새 위반 0건
+- G7 Designer — 사용자 검수 (부서 input + datalist + 「자동 (N)」 버튼)
+- Rule 8/11/14/21/22 모두 준수
+
+---
+
 ### PR-MTG-V2-Tree-1 + V2-Address + organizer select hotfix (3 PR 묶음)
 
 **사용자 명령**: 「v2-d 만 미루고 나머지 ㄱㄱ」 (V2-D 보류, 나머지 3건 일괄).

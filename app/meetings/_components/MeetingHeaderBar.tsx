@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { COLORS, GLASS } from '@/app/utils/ui-tokens'
 import AddressSearchModal from './AddressSearchModal'
 
@@ -59,6 +59,18 @@ export default function MeetingHeaderBar({ meta, onMetaChange, trailing, editabl
   const [title, setTitle] = useState(meta.title)
   const [addressOpen, setAddressOpen] = useState(false)
   useEffect(() => { setTitle(meta.title) }, [meta.title])
+
+  // PR-V2-Dept — ride_employees 의 unique 부서 목록 (자동완성용)
+  const departmentOptions = useMemo(() => {
+    const set = new Set<string>()
+    for (const e of employees) {
+      if (e.department && e.department.trim()) set.add(e.department.trim())
+    }
+    return Array.from(set).sort()
+  }, [employees])
+
+  const isDeptMeeting = meta.type === 'department'
+  const deptMissing = isDeptMeeting && !meta.department?.trim()
 
   const commitTitle = () => {
     const t = title.trim()
@@ -158,6 +170,38 @@ export default function MeetingHeaderBar({ meta, onMetaChange, trailing, editabl
         ) : (
           meta.location && <span style={inlineTag}>📍 {meta.location}</span>
         )}
+
+        {/* 부서 (PR-V2-Dept — datalist 자동완성 + 부서별 회의 시 의무) */}
+        {editable ? (
+          <span style={{
+            display: 'inline-flex', alignItems: 'center', gap: 4,
+            padding: deptMissing ? '0' : undefined,
+            border: deptMissing ? '1px solid rgba(239,68,68,0.5)' : 'none',
+            borderRadius: deptMissing ? 8 : 0,
+            background: deptMissing ? 'rgba(239,68,68,0.06)' : 'transparent',
+          }}>
+            <input list="dept-options"
+              value={meta.department || ''}
+              onChange={(e) => onMetaChange({ department: e.target.value || null })}
+              placeholder={isDeptMeeting ? '🏢 부서 (필수 — 부서별 회의)' : '🏢 부서 (선택)'}
+              title={
+                isDeptMeeting
+                  ? '부서별 회의 — 부서 입력 시 「부서원 자동」 가능'
+                  : '회의 부서 — 인사마스터 부서 자동완성 (자유 입력 가능)'
+              }
+              style={{ ...inlineSelect, padding: '4px 8px', minWidth: 180 }} />
+            <datalist id="dept-options">
+              {departmentOptions.map(d => <option key={d} value={d} />)}
+            </datalist>
+            {deptMissing && (
+              <span style={{ fontSize: 10, color: '#b91c1c', fontWeight: 700, padding: '0 6px', whiteSpace: 'nowrap' }}>
+                ⚠ 필수
+              </span>
+            )}
+          </span>
+        ) : meta.department ? (
+          <span style={inlineTag}>🏢 {meta.department}</span>
+        ) : null}
 
         {/* 주관자 (organizer) — ride_employees 기반 */}
         {editable && employees.length > 0 ? (

@@ -42,8 +42,9 @@ interface Props {
   attendees: Attendee[]
   onChange: (next: Attendee[]) => void
   employees: Employee[]
-  /** 부서별 회의 자동 채우기 — department 선택 시 활성 */
+  /** 부서 — 자동 채우기 매칭 키 (case-insensitive + trim) */
   department?: string | null
+  /** PR-V2-Dept — type=department 외에도 부서 있으면 노출 */
   showAutoFill?: boolean
   editable?: boolean
 }
@@ -87,8 +88,19 @@ export default function AttendeeManager({
 
   const autoFillDept = () => {
     if (!department) return
-    const members = employees.filter(e => e.department === department)
-    onChange(members.map(e => rideToAttendee(e)))
+    // PR-V2-Dept — 매칭 강화: trim + case-insensitive
+    const target = department.trim().toLowerCase()
+    const members = employees.filter(e => (e.department || '').trim().toLowerCase() === target)
+    if (members.length === 0) return
+    // 기존 attendees 보존 + 새 멤버 중 dedup 한 사람만 추가
+    const existing = new Set(attendees.map(a => a.profile_id || `ext:${a.external_name || ''}`))
+    const additions = members
+      .filter(e => {
+        const k = e.profile_id || `ext:${e.name}`
+        return !existing.has(k)
+      })
+      .map(e => rideToAttendee(e))
+    if (additions.length > 0) onChange([...attendees, ...additions])
   }
 
   return (
@@ -99,17 +111,29 @@ export default function AttendeeManager({
         </h3>
         {editable && (
           <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
-            {showAutoFill && department && (
-              <button onClick={autoFillDept}
-                title={`부서 「${department}」 전원 자동 추가 (ride_employees)`}
-                style={{
-                  padding: '4px 10px', fontSize: 11, fontWeight: 600, borderRadius: 6,
-                  background: 'rgba(245,158,11,0.10)', color: '#b45309',
-                  border: '1px solid rgba(245,158,11,0.35)', cursor: 'pointer', whiteSpace: 'nowrap',
-                }}>
-                🏢 {department} 자동
-              </button>
-            )}
+            {showAutoFill && department && (() => {
+              // 매칭되는 직원 수 미리 계산 (case-insensitive + trim)
+              const target = department.trim().toLowerCase()
+              const matchCount = employees.filter(e => (e.department || '').trim().toLowerCase() === target).length
+              return (
+                <button onClick={autoFillDept}
+                  disabled={matchCount === 0}
+                  title={
+                    matchCount === 0
+                      ? `「${department}」 부서 직원 없음 — 인사마스터 (/hr/people) 등록 후 시도`
+                      : `「${department}」 직원 ${matchCount}명 추가 (이미 있는 사람은 skip)`
+                  }
+                  style={{
+                    padding: '4px 10px', fontSize: 11, fontWeight: 600, borderRadius: 6,
+                    background: matchCount > 0 ? 'rgba(245,158,11,0.10)' : 'rgba(0,0,0,0.04)',
+                    color: matchCount > 0 ? '#b45309' : COLORS.textMuted,
+                    border: matchCount > 0 ? '1px solid rgba(245,158,11,0.35)' : `1px solid ${COLORS.borderSubtle}`,
+                    cursor: matchCount > 0 ? 'pointer' : 'not-allowed', whiteSpace: 'nowrap',
+                  }}>
+                  🏢 {department} 자동 ({matchCount})
+                </button>
+              )
+            })()}
             <select onChange={(e) => { if (e.target.value) { add(e.target.value); e.target.value = '' } }}
               style={{
                 padding: '4px 10px', fontSize: 12, borderRadius: 6,

@@ -455,7 +455,7 @@ export default function MeetingsLayoutV2({ meetingId, initialTab = 'body' }: Pro
             onChange={onAttendeesChange}
             employees={employees}
             department={meta.department}
-            showAutoFill={meta.type === 'department'}
+            showAutoFill={!!meta.department?.trim()}  /* PR-V2-Dept — type 무관, 부서 있으면 노출 */
             editable={canEdit}
           />
         )}
