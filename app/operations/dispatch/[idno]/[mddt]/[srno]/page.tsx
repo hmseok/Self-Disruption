@@ -461,7 +461,15 @@ export default function DispatchDetailPage({
             </span>
           </h1>
           <p style={{ fontSize: 12, color: '#64748b', marginTop: 4, whiteSpace: 'nowrap' }}>
-            {row?.otptdcyn === 'Y' ? '🚗 대차접수' : '📋 사고접수'} · 접수 {fmtCafe24DateTime(row?.otptacdt || null, row?.otptactm || null)} ·
+            {row?.otptdcyn === 'Y' ? '🚗 대차접수' : '📋 사고접수'} · 접수 {fmtCafe24DateTime(row?.otptacdt || null, row?.otptactm || null)}
+            {(row?.gnus_name || row?.otptgnus) && <span style={{ marginLeft: 6 }}>· 접수자 <span style={{ color: '#0f2440', fontWeight: 700 }}>{row?.gnus_name || row?.otptgnus}</span></span>}
+            {row?.otptrgst && (
+              <span style={{ marginLeft: 6, padding: '1px 8px', borderRadius: 6, fontSize: 11, fontWeight: 700,
+                background: row.otptrgst === 'R' ? 'rgba(34,197,94,0.12)' : 'rgba(148,163,184,0.15)',
+                color: row.otptrgst === 'R' ? '#15803d' : '#475569' }}>
+                {row.otptrgst === 'R' ? '활성' : row.otptrgst === 'C' ? '취소' : row.otptrgst}
+              </span>
+            )}
             {row?.rental_vendor && <span style={{ marginLeft: 6, color: '#0f2440', fontWeight: 700 }}>🏢 {row.rental_vendor}</span>}
             <span style={{ marginLeft: 6, color: '#94a3b8' }}>{idno}/{mddt}/{srno}</span>
           </p>
@@ -490,8 +498,10 @@ export default function DispatchDetailPage({
         ) : rowError || !row ? (
           <Place warn>⚠ {rowError || '데이터 없음'}</Place>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 16 }}>
-            {/* MAIN COLUMN */}
+          <div>
+            {/* MAIN COLUMN — PR-B4 (2026-05-16): 사용자 명시
+               「사고상세 이쪽엔 우측 배차일정/상태는 없어야할것같고」
+               → SIDE COLUMN 제거, 단일 컬럼. 배차 일정/상태 입력은 배차스케줄 탭으로 이전 */}
             <div>
               {/* 차량 정보 — P2.1a-pivot-B2 (사용자 명시 2026-05-16):
                   「계약기간 차량등록일 등 차량 계약관련 내용도 추가되어 들어오면 좋겠어요」
@@ -694,6 +704,19 @@ export default function DispatchDetailPage({
                         // 예약/즉시 분기 — 예약 Y 면 sendhpdt/hptm, 즉시 N 이면 sendsndt/sntm
                         const dt = m.sendresv === 'Y' ? m.sendhpdt : m.sendsndt
                         const tm = m.sendresv === 'Y' ? m.sendhptm : m.sendsntm
+                        // PR-B4 (2026-05-16): 사용자 명시 「수신자이름과 수신자번호가 제대로 표출되어야할것같고」
+                        //   sendmobl 의 raw 숫자를 사고 본체의 사람들 (통보자/운전자/계약자/대물담당자)
+                        //   휴대폰과 매칭 시도. 매칭되면 그 이름 표시.
+                        const normHp = (h: string | null | undefined) => (h || '').replace(/[^0-9]/g, '')
+                        const rxHp = normHp(m.sendmobl)
+                        const matched =
+                          rxHp && row && (
+                            (normHp(row.otptcahp) === rxHp && row.otptcanm ? `${row.otptcanm} (통보자)` : '') ||
+                            (normHp(row.otptdshp) === rxHp && row.otptdsnm ? `${row.otptdsnm} (운전자)` : '') ||
+                            (normHp(row.cars_user_hp) === rxHp && row.cars_user ? `${row.cars_user} (계약자)` : '') ||
+                            (normHp(row.otptdstl) === rxHp && row.otptdsus ? `${row.otptdsus} (대물담당)` : '') ||
+                            (normHp(row.rent_ushp) === rxHp && row.rent_user ? `${row.rent_user} (대차 사용자)` : '')
+                          ) || ''
                         // 상태 색상: Y=성공(녹), N=대기(노), F=실패(빨), X=취소(회)
                         const statColor = m.sendstat === 'Y' ? { bg: 'rgba(34,197,94,0.12)', fg: '#15803d', txt: '✓ 발송완료' }
                           : m.sendstat === 'N' ? { bg: 'rgba(245,158,11,0.12)', fg: '#b45309', txt: '⏳ 대기' }
@@ -721,8 +744,12 @@ export default function DispatchDetailPage({
                                 </span>
                               )}
                               <span style={{ color: '#64748b' }}>{fmtCafe24DateTime(dt, tm) || '-'}</span>
-                              {m.sendmobl && <span style={{ color: '#475569', fontWeight: 700 }}>📱 {m.sendmobl}</span>}
-                              {(m.user_name || m.sendgnus) && <span style={{ color: '#94a3b8' }}>· {m.user_name || m.sendgnus}</span>}
+                              {m.sendmobl && (
+                                <span style={{ color: '#475569', fontWeight: 700 }}>
+                                  📱 {matched ? <><span style={{ color: '#0f2440' }}>{matched.split(' (')[0]}</span><span style={{ color: '#94a3b8', fontWeight: 500, marginLeft: 4 }}>{matched.includes(' (') ? `(${matched.split(' (')[1]}` : ''}</span> <span style={{ color: '#64748b', fontWeight: 500 }}>{m.sendmobl}</span></> : m.sendmobl}
+                                </span>
+                              )}
+                              {(m.user_name || m.sendgnus) && <span style={{ color: '#94a3b8' }}>· 발송자 {m.user_name || m.sendgnus}</span>}
                             </div>
                             {(m.sendsbjt || m.smsgdesc) && (
                               <div style={{ fontWeight: 700, color: '#0f2440', marginBottom: 6, fontSize: 12 }}>
@@ -935,51 +962,6 @@ export default function DispatchDetailPage({
                       </div>
                     </>
                   )}
-              </Section>
-            </div>
-
-            {/* SIDE COLUMN */}
-            <div>
-              {/* E. dispatch_order */}
-              <Section icon="📅" title="배차 일정 / 상태">
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  <SmallField label="상태">
-                    <select
-                      value={status}
-                      onChange={(e) => setStatus(e.target.value as DispatchOrder['status'])}
-                      style={inputStyle}
-                    >
-                      {(Object.keys(DISPATCH_STATUS_LABEL) as DispatchOrder['status'][]).map((k) => (
-                        <option key={k} value={k}>{DISPATCH_STATUS_LABEL[k]}</option>
-                      ))}
-                    </select>
-                  </SmallField>
-                  <SmallField label="예상 배차일">
-                    <input type="date" value={expDispatch} onChange={(e) => setExpDispatch(e.target.value)} style={inputStyle} />
-                  </SmallField>
-                  <SmallField label="예상 반납일">
-                    <input type="date" value={expReturn} onChange={(e) => setExpReturn(e.target.value)} style={inputStyle} />
-                  </SmallField>
-                  <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
-                    <button onClick={saveOrder} disabled={busy} style={{ ...primaryBtnFull, opacity: busy ? 0.5 : 1 }}>
-                      💾 {dispatchOrder ? '수정' : '저장'}
-                    </button>
-                    {dispatchOrder && dispatchOrder.status !== 'dispatched' && dispatchOrder.status !== 'done' && (
-                      <button onClick={confirmDispatch} disabled={busy} style={{ ...successBtnFull, opacity: busy ? 0.5 : 1 }}>
-                        🚀 배차 확정
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </Section>
-
-              {/* 사이드 정보 — 접수 정보 */}
-              <Section icon="📌" title="접수 정보">
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12 }}>
-                  <Row><Lbl>접수자</Lbl><Val>{row.gnus_name || row.otptgnus || '-'}</Val></Row>
-                  <Row><Lbl>접수번호</Lbl><Val style={{ fontFamily: 'monospace', fontSize: 11 }}>{row.otptidno}/{row.otptmddt}/{row.otptsrno}</Val></Row>
-                  <Row><Lbl>등록상태</Lbl><Val>{row.otptrgst === 'R' ? '활성' : row.otptrgst === 'C' ? '취소' : row.otptrgst || '-'}</Val></Row>
-                </div>
               </Section>
             </div>
           </div>
