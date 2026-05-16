@@ -300,6 +300,7 @@ export async function POST(
     let hasGroupRotation = true        // N-19-b — cs_shift_groups.rotation_enabled
     let hasGroupShifts = true          // N-19-b — cs_group_shifts 테이블
     let hasMemberRotation = true       // N-19-b — cs_group_members.rotation_start_date
+    let hasGroupVersions = true        // N-21-b — cs_shift_group_versions 테이블
     try {
       await prisma.$queryRaw<any[]>`SELECT next_day_blocking_hours FROM cs_shift_slots LIMIT 1`
     } catch { hasSlotSafety = false }
@@ -318,6 +319,9 @@ export async function POST(
     try {
       await prisma.$queryRaw<any[]>`SELECT rotation_start_date FROM cs_group_members LIMIT 1`
     } catch { hasMemberRotation = false }
+    try {
+      await prisma.$queryRaw<any[]>`SELECT 1 FROM cs_shift_group_versions LIMIT 1`
+    } catch { hasGroupVersions = false }
     const groups: GroupRow[] = (hasSlotSafety && hasSlotBreakdown)
       ? (await prisma.$queryRaw<any[]>`
           SELECT g.id, g.name, g.shift_slot_id, g.pattern_type, g.custom_days,
@@ -450,6 +454,102 @@ export async function POST(
             start_index: Number(r.rotation_start_index || 0),
             end_date: r.end_date || null,
           })
+        }
+      } catch { /* graceful */ }
+    }
+
+    // ── N-21-b — 버전 timeline 일괄 fetch (graceful — 테이블 미적용 시 빈 Map) ──
+    type VersionRow = {
+      id: string; group_id: string
+      valid_from: string; valid_to: string | null
+      rotation_enabled: boolean; rotation_period_kind: string; rotation_custom_days: number
+      pattern_type: string; custom_days: string | null
+      skip_on_holidays: boolean
+    }
+    const groupVersionsMap = new Map<string, VersionRow[]>()  // group_id → 버전 list (시작일 ASC)
+    const versionShiftsMap = new Map<string, Array<{ shift_slot_id: string; sort_order: number }>>()
+    const versionMembersMap = new Map<string, Array<{
+      worker_id: string; priority: number
+      rotation_start_date: string | null; rotation_start_index: number; rotation_end_date: string | null
+    }>>()
+    if (hasGroupVersions && targetGroups.length > 0) {
+      try {
+        const placeholders = targetGroups.map(() => '?').join(',')
+        const ids = targetGroups.map(g => g.id)
+        // 버전 헤더
+        const vRows: any[] = await prisma.$queryRawUnsafe<any[]>(
+          `SELECT id, group_id,
+                  DATE_FORMAT(valid_from, '%Y-%m-%d') AS valid_from,
+                  DATE_FORMAT(valid_to,   '%Y-%m-%d') AS valid_to,
+                  rotation_enabled, rotation_period_kind, rotation_custom_days,
+                  pattern_type, custom_days, skip_on_holidays
+           FROM cs_shift_group_versions
+           WHERE group_id IN (${placeholders})
+           ORDER BY group_id, valid_from ASC`,
+          ...ids,
+        ) as any[]
+        for (const r of vRows) {
+          const arr = groupVersionsMap.get(r.group_id) || []
+          arr.push({
+            id: String(r.id),
+            group_id: String(r.group_id),
+            valid_from: String(r.valid_from),
+            valid_to: r.valid_to || null,
+            rotation_enabled: Boolean(r.rotation_enabled),
+            rotation_period_kind: String(r.rotation_period_kind || 'monthly'),
+            rotation_custom_days: Math.max(1, Number(r.rotation_custom_days || 30)),
+            pattern_type: String(r.pattern_type || 'all_weekdays'),
+            custom_days: r.custom_days || null,
+            skip_on_holidays: Boolean(r.skip_on_holidays),
+          })
+          groupVersionsMap.set(r.group_id, arr)
+        }
+        // 모든 versionId 추출 후 shifts / members 한 번에 fetch
+        const versionIds = vRows.map(v => v.id)
+        if (versionIds.length > 0) {
+          const vPlaceholders = versionIds.map(() => '?').join(',')
+          // 시프트 sequence
+          try {
+            const gsvRows: any[] = await prisma.$queryRawUnsafe<any[]>(
+              `SELECT version_id, shift_slot_id, sort_order
+               FROM cs_group_shift_versions
+               WHERE version_id IN (${vPlaceholders})
+               ORDER BY version_id, sort_order ASC`,
+              ...versionIds,
+            ) as any[]
+            for (const r of gsvRows) {
+              const arr = versionShiftsMap.get(r.version_id) || []
+              arr.push({
+                shift_slot_id: String(r.shift_slot_id),
+                sort_order: Number(r.sort_order || 0),
+              })
+              versionShiftsMap.set(r.version_id, arr)
+            }
+          } catch { /* graceful */ }
+          // 멤버
+          try {
+            const mvRows: any[] = await prisma.$queryRawUnsafe<any[]>(
+              `SELECT version_id, worker_id, priority,
+                      DATE_FORMAT(rotation_start_date, '%Y-%m-%d') AS rotation_start_date,
+                      rotation_start_index,
+                      DATE_FORMAT(rotation_end_date, '%Y-%m-%d')   AS rotation_end_date
+               FROM cs_group_member_versions
+               WHERE version_id IN (${vPlaceholders})
+               ORDER BY version_id, priority ASC`,
+              ...versionIds,
+            ) as any[]
+            for (const r of mvRows) {
+              const arr = versionMembersMap.get(r.version_id) || []
+              arr.push({
+                worker_id: String(r.worker_id),
+                priority: Number(r.priority || 0),
+                rotation_start_date: r.rotation_start_date || null,
+                rotation_start_index: Number(r.rotation_start_index || 0),
+                rotation_end_date: r.rotation_end_date || null,
+              })
+              versionMembersMap.set(r.version_id, arr)
+            }
+          } catch { /* graceful */ }
         }
       } catch { /* graceful */ }
     }
@@ -767,7 +867,83 @@ export async function POST(
           continue
         }
 
-        // ── N-19-b — 그룹 시프트 로테이션 (rotation_enabled) ──
+        // ── N-21-b — 버전 timeline 우선 lookup ──
+        // 해당 work_date 에 활성 버전이 있고 rotation_enabled 면 버전 데이터로 처리
+        // 활성 버전 = valid_from <= isoDate <= valid_to (valid_to NULL = 무한)
+        const versions = groupVersionsMap.get(g.id) || []
+        const activeVersion = versions.find(v =>
+          v.valid_from <= isoDate && (v.valid_to == null || v.valid_to >= isoDate)
+        )
+        if (activeVersion && activeVersion.rotation_enabled) {
+          const verShifts = versionShiftsMap.get(activeVersion.id) || []
+          const verMembers = versionMembersMap.get(activeVersion.id) || []
+          if (verShifts.length > 0 && verMembers.length > 0) {
+            // 버전의 skip_on_holidays 우선 적용
+            if (skipHolidays && activeVersion.skip_on_holidays && holidayDates.has(isoDate)) {
+              plan.push({
+                work_date: isoDate, shift_slot_id: g.shift_slot_id, worker_id: null,
+                special_code: 'none', action: 'skip-holiday',
+                group_id: g.id, group_name: g.name,
+              })
+              byGroup[g.id].skipped++
+              continue
+            }
+            for (const m of verMembers) {
+              const wId = m.worker_id
+              // 휴가 풀-오프 제외
+              const lm = workerLeaveMap.get(wId)
+              const sp = lm?.get(isoDate)
+              if (sp === 'off') continue
+              // 그룹 회피일 (PR-2SS-h-1 — 그룹 단위, 버전 무관)
+              const gSkips = groupSkipMap.get(g.id) || []
+              const skipMatch = gSkips.find(s =>
+                s.worker_id === wId && isoDate >= s.start_date && isoDate <= s.end_date
+              )
+              if (skipMatch) {
+                warnings.push({
+                  type: 'group_skip', worker_id: wId, group_id: g.id, date: isoDate, reason: skipMatch.reason || null,
+                })
+                continue
+              }
+              // 멤버별 시작일 / 종료일 (버전 멤버 데이터 우선)
+              const startDate = m.rotation_start_date || activeVersion.valid_from
+              const endDate = m.rotation_end_date || activeVersion.valid_to
+              const startIndex = Math.max(0, m.rotation_start_index || 0)
+              if (startDate && isoDate < startDate) continue
+              if (endDate && isoDate > endDate) continue
+              // elapsed_periods 계산 (버전의 period_kind / custom_days 사용)
+              let elapsed = 0
+              if (startDate) {
+                const start = new Date(startDate + 'T00:00:00')
+                const cur = new Date(isoDate + 'T00:00:00')
+                if (activeVersion.rotation_period_kind === 'days') {
+                  const diffMs = cur.getTime() - start.getTime()
+                  elapsed = Math.floor(diffMs / (1000 * 60 * 60 * 24) / activeVersion.rotation_custom_days)
+                } else {
+                  elapsed = (cur.getFullYear() - start.getFullYear()) * 12 + (cur.getMonth() - start.getMonth())
+                }
+                if (elapsed < 0) elapsed = 0
+              }
+              const shiftIndex = ((startIndex + elapsed) % verShifts.length + verShifts.length) % verShifts.length
+              const targetSlotId = verShifts[shiftIndex].shift_slot_id
+              const specialCode: 'none' | 'am_half' | 'pm_half' = sp ?? 'none'
+              plan.push({
+                work_date: isoDate,
+                shift_slot_id: targetSlotId,
+                worker_id: wId,
+                special_code: specialCode,
+                action: 'insert',
+                group_id: g.id, group_name: g.name,
+              })
+              byGroup[g.id].generated++
+              workedToday.add(wId)
+            }
+            continue  // 버전 path 종료
+          }
+          // 버전은 있지만 shifts 또는 members 비어있음 → 기존 N-19-b path 로 fall-through
+        }
+
+        // ── N-19-b — 그룹 시프트 로테이션 (rotation_enabled — 버전 없는 경우) ──
         // rotation_enabled 이면 워커마다 elapsed_periods 기반 shift_slot_id 동적 결정
         // (휴가 / 회피일 / 휴일 가드만 적용 — 슬롯거부 / 연속한도 등은 후속 작업)
         const rotCfg = groupRotMap.get(g.id)

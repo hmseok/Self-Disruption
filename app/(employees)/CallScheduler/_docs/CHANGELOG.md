@@ -3,6 +3,58 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-16 (Phase N-21-b) — 자동 생성 알고리즘: 버전 timeline 적용 (Step 2)
+
+### 사용자 의도
+> "다음 진행하시죠" — N-21-a 버전 timeline 데이터/UI 완료 후 알고리즘 적용
+
+### 변경 (`app/api/call-scheduler/schedules/[id]/auto-generate/route.ts`)
+- Graceful 감지: `hasGroupVersions` (cs_shift_group_versions 테이블 존재 여부)
+- 버전 일괄 fetch (3 Map):
+  · `groupVersionsMap<group_id, VersionRow[]>` — 그룹별 버전 list (valid_from ASC)
+  · `versionShiftsMap<version_id, shifts[]>` — 각 버전의 시프트 sequence
+  · `versionMembersMap<version_id, members[]>` — 각 버전의 멤버 + rotation_start_*
+- 메인 loop 휴일 체크 직후 **버전 우선 lookup 분기** 추가:
+  · 활성 버전 = `valid_from <= isoDate AND (valid_to IS NULL OR valid_to >= isoDate)`
+  · 활성 버전 + rotation_enabled + shifts + members 있으면 버전 데이터로 처리
+  · skip_on_holidays / pattern_type / rotation_period_kind / rotation_custom_days 모두 버전 우선
+  · 멤버 rotation_start_date 가 NULL 이면 version.valid_from 으로 fallback
+  · 가드: 휴가 풀-오프 / 그룹 회피일 / 멤버 시작일·종료일
+- 활성 버전 없거나 rotation_disabled 면 → 기존 N-19-b rotation path
+- N-19-b rotation 도 없으면 → 기존 단일 shift path (백워드 호환)
+
+### 우선순위 (work_date 처리 순서)
+```
+1. 휴일 체크 (전역 + 그룹별 skip_on_holidays)
+2. 활성 버전 (rotation_enabled) → 버전 데이터 사용  ★ N-21-b 추가
+3. 그룹 rotation_enabled (cs_shift_groups) → 기존 cs_group_shifts 사용 (N-19-b)
+4. 일반 그룹 → 단일 g.shift_slot_id (기존)
+```
+
+### 예약 변경 (B 안) — N-21-a 에서 이미 구현됨
+- 「+ 새 버전」 버튼이 곧 예약 변경 (미래 시점 새 버전 추가 = 그 시점부터 다른 설정 적용)
+- N-21-b 의 알고리즘이 자동으로 활성 버전을 보고 적용
+
+### 효과
+- 「로테이션」 그룹에 v1 (6~8월 sequence [L01,L02,L03]) / v2 (9~12월 sequence [L02,L03,L04]) 등록 시
+- 자동 생성 → 6~8월은 v1 / 9~12월은 v2 자동 적용
+- 워커별 시작 시점도 버전별로 독립 — 인원 변경 / 패턴 변경 등 분기/시즌별 운영 가능
+
+### 백워드 호환
+- 버전 없는 그룹 → 기존 N-19-b / 단일 path 그대로
+- rotation_enabled = false 버전 → 기존 path 로 fall-through
+- 마이그 미적용 (cs_shift_group_versions 없음) → graceful — 영향 X
+
+### 검증
+- tsc PASS (auto-generate 0 errors)
+- lint:harness 새 위반 0건
+- 백워드 호환 확인 — 기존 단일 그룹 자동 생성 그대로 동작
+
+### Step 분할 진행 상황
+- ✅ Step 1 (N-21-a): 데이터 모델 + UI 기본
+- ✅ Step 2 (N-21-b): 자동 생성 알고리즘 적용 + B 예약 변경 (UI 는 이미 N-21-a)
+- ⏸ Step 3 (예정): C cron 자동 생성 + D 임시 오버라이드
+
 ## 2026-05-16 (Phase N-22) — 대체공휴일 자동 채우기 (공공데이터 API)
 
 ### 사용자 의도
