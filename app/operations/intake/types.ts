@@ -216,6 +216,15 @@ export type DispatchRequestRow = {
   otptpart: string | null    // 파손부위 (acrparth + comcbsdm subquery)
   // 배정공장 (ajaoderh + pmcfactm subquery — 활성 oderstat<>'X' 만, ','로 join)
   factory_names: string | null
+  // P2.1a-pivot-B2 — 차량 계약 정보 (pmccarsm) + 코드→한글 매핑 (comcbsdm)
+  cars_vin: string | null          // 차대번호 (VIN)
+  cars_contract_no: string | null  // 계약번호
+  cars_start_date: string | null   // 계약시작일 (raw YYYYMMDD[HHMI])
+  cars_use_from: string | null     // 계약 사용 시작
+  cars_use_to: string | null       // 계약 사용 종료
+  cars_user_hp: string | null      // 계약자 휴대폰
+  otptdsli_label: string | null    // 운전자면허 한글 (1B → 1종 보통)
+  otptacbn_label: string | null    // 사고구분 한글
   // 대차요청 sub (acrrentm)
   rent_srno: number | string | null
   rent_seqn: number | null
@@ -266,6 +275,17 @@ export function fmtCafe24DateTime(d: string | null, t: string | null): string {
   const date = `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}`
   if (!t || t.length < 4) return date
   return `${date} ${t.slice(0, 2)}:${t.slice(2, 4)}`
+}
+
+// P2.1a-pivot-B2 — cafe24 raw 날짜 (YYYYMMDD 8자리 또는 YYYYMMDDHHMI 12자리) → YYYY-MM-DD
+// pmccarsm 의 carsstdt/carscofr/carscoto 등 계약 관련 컬럼 표시용
+export function fmtCafe24DateOnly(raw: string | null | undefined): string {
+  if (!raw) return '-'
+  const digits = String(raw).replace(/[^0-9]/g, '')
+  if (digits.length >= 8) {
+    return `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6, 8)}`
+  }
+  return raw  // 비정상 길이 raw 보존
 }
 
 // dispatch_order 가 가지는 대차접수 row 매핑용 키 — (idno, mddt, srno)

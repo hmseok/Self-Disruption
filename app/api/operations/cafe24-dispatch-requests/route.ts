@@ -140,6 +140,16 @@ export interface DispatchRequestRow extends RowDataPacket {
   cars_user: string | null
   capital_co_code: string | null
   capital_co_name: string | null
+  // P2.1a-pivot-B2 — 차량 계약 정보 (사용자 시각 검수 결과 추가, 2026-05-16)
+  cars_vin: string | null          // c.carscode 차대번호 (VIN)
+  cars_contract_no: string | null  // c.carscono 계약번호
+  cars_start_date: string | null   // c.carsstdt 계약시작일 (raw YYYYMMDD[HHMI])
+  cars_use_from: string | null     // c.carscofr 계약 사용 시작
+  cars_use_to: string | null       // c.carscoto 계약 사용 종료
+  cars_user_hp: string | null      // c.carsushp 계약자 휴대폰
+  // P2.1a-pivot-B2 — 코드→한글 매핑 (comcbsdm subquery)
+  otptdsli_label: string | null    // 운전자면허 한글 (1B → 1종 보통)
+  otptacbn_label: string | null    // 사고구분 한글
   // 등록자 (picuserm)
   gnus_name: string | null
 }
@@ -249,6 +259,15 @@ export async function GET(request: Request) {
                  AND aa.odersrno = b.otptsrno
                  AND aa.oderstat <> 'X'
              ) AS factory_names,
+             -- P2.1a-pivot-B2: 코드→한글 매핑 (mgcap get_cbsddesc 동등)
+             (SELECT cbsddesc FROM comcbsdm
+               WHERE cbsdjobb='OTPT' AND cbsdgubn='OTPTDSLI'
+                 AND cbsdcode = b.otptdsli LIMIT 1
+             ) AS otptdsli_label,
+             (SELECT cbsddesc FROM comcbsdm
+               WHERE cbsdjobb='OTPT' AND cbsdgubn='OTPTACBN'
+                 AND cbsdcode = b.otptacbn LIMIT 1
+             ) AS otptacbn_label,
              r.rentsrno AS rent_srno,
              r.rentseqn AS rent_seqn,
              r.rentstat AS rent_stat,
@@ -271,6 +290,13 @@ export async function GET(request: Request) {
              c.carsuser  AS cars_user,
              c.carscust  AS capital_co_code,
              cu.custname AS capital_co_name,
+             -- P2.1a-pivot-B2: 차량 계약 정보 (raw 그대로 — client side 포맷)
+             c.carscode  AS cars_vin,
+             c.carscono  AS cars_contract_no,
+             c.carsstdt  AS cars_start_date,
+             c.carscofr  AS cars_use_from,
+             c.carscoto  AS cars_use_to,
+             c.carsushp  AS cars_user_hp,
              u.username  AS gnus_name
         FROM acrotpth b
         LEFT JOIN acrrentm r

@@ -13,7 +13,7 @@ import type {
   AcrMemoRow,
   FactoryAssignmentRow,
 } from '@/app/operations/intake/types'
-import { CATEGORY_META, describeAccidentTypes, fmtCafe24DateTime } from '@/app/operations/intake/types'
+import { CATEGORY_META, describeAccidentTypes, fmtCafe24DateTime, fmtCafe24DateOnly } from '@/app/operations/intake/types'
 
 // ═══════════════════════════════════════════════════════════════════
 // /operations/dispatch/[idno]/[mddt]/[srno] — PR-OPS-1.5c
@@ -447,7 +447,9 @@ export default function DispatchDetailPage({
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 16 }}>
             {/* MAIN COLUMN */}
             <div>
-              {/* 차량 정보 (메인 상단으로 이동 — 사용자 명시) */}
+              {/* 차량 정보 — P2.1a-pivot-B2 (사용자 명시 2026-05-16):
+                  「계약기간 차량등록일 등 차량 계약관련 내용도 추가되어 들어오면 좋겠어요」
+                  → cafe24 pmccarsm 의 차대번호/계약번호/계약시작일/사용기간 추가 표출 */}
               <Section icon="🚗" title="차량 정보">
                 <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr 140px 1fr', gap: '8px 16px', fontSize: 13 }}>
                   <Lbl>차량번호</Lbl>
@@ -455,9 +457,18 @@ export default function DispatchDetailPage({
                   <Lbl>차종</Lbl>
                   <Val>{row.cars_model || '-'}</Val>
                   <Lbl>고객</Lbl>
-                  <Val>{row.cars_user || '-'}</Val>
+                  <Val>{row.cars_user || '-'}{row.cars_user_hp && row.cars_user_hp !== '-' ? ` / ${row.cars_user_hp}` : ''}</Val>
                   <Lbl>캐피탈사</Lbl>
                   <Val>{row.capital_co_name || row.capital_co_code || '-'}</Val>
+                  {row.cars_vin && (<><Lbl>차대번호</Lbl><Val span={3}><span style={{ fontFamily: 'ui-monospace, monospace', fontSize: 12 }}>{row.cars_vin}</span></Val></>)}
+                  {row.cars_contract_no && (<><Lbl>계약번호</Lbl><Val>{row.cars_contract_no}</Val></>)}
+                  {row.cars_start_date && (<><Lbl>계약시작일</Lbl><Val>{fmtCafe24DateOnly(row.cars_start_date)}</Val></>)}
+                  {(row.cars_use_from || row.cars_use_to) && (<>
+                    <Lbl>계약기간</Lbl>
+                    <Val span={3}>
+                      {fmtCafe24DateOnly(row.cars_use_from)} ~ {fmtCafe24DateOnly(row.cars_use_to)}
+                    </Val>
+                  </>)}
                 </div>
               </Section>
 
@@ -505,7 +516,7 @@ export default function DispatchDetailPage({
                   <Lbl>운전자</Lbl>
                   <Val>{row.otptdsnm || '-'}{row.otptdshp ? ` / ${row.otptdshp}` : ''}</Val>
                   {row.otptdsre && (<><Lbl>계약자와의관계</Lbl><Val>{row.otptdsre}</Val></>)}
-                  {row.otptdsli && (<><Lbl>운전자면허</Lbl><Val>{row.otptdsli}</Val></>)}
+                  {row.otptdsli && (<><Lbl>운전자면허</Lbl><Val>{row.otptdsli_label || row.otptdsli}</Val></>)}
                   {row.otptdsbh && (<><Lbl>생년월일</Lbl><Val>{row.otptdsbh}</Val></>)}
                   {row.otptdsbn && (<><Lbl>보험접수번호 (당사)</Lbl><Val span={3}>{row.otptdsbn}</Val></>)}
                   {(row.otptdsus || row.otptdstl) && (<><Lbl>대물담당자</Lbl><Val span={3}>{row.otptdsus || '-'}{row.otptdstl ? ` / ${row.otptdstl}` : ''}</Val></>)}
