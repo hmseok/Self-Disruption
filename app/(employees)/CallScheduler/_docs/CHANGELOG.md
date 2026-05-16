@@ -3,6 +3,44 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-16 (Phase N-20) — KPI 카드 드릴다운 확장 (5/5 카드 모두 클릭 가능)
+
+### 사용자 의도
+> "순서대로 가시죠" (N-18 균형도만 → 나머지 4 카드도 드릴다운 통일)
+
+### 변경 (`app/(employees)/CallScheduler/components/KpiStrip.tsx`)
+- DrillKey type 확장: 'fill' | 'avg' | 'half' | 'unfilled' | 'balance'
+- 각 카드 clickable 조건 정의:
+  · 충원율 — slots.length > 0
+  · 평균시간 — activeWorkers.length > 0
+  · 반차·F — half + free > 0
+  · 미배정 — unfilled_slots > 0
+  · 균형도 — alertCount > 0
+- 한 번에 1 카드만 펼침 (다른 카드 클릭 시 자동 전환)
+- 드릴다운 컴포넌트 4종 신설:
+  · `FillDrilldown` — 슬롯별 충원율 (낮은 순)
+  · `AvgDrilldown` — 워커별 시간 막대 + 평균 세로선 + 편차 %
+  · `HalfDrilldown` — 워커별 반차/F 카운트
+  · `UnfilledDrilldown` — 슬롯별 미배정 셀 카운트 + 비중 %
+- 기존 `BalanceColumn` (N-18) 재사용
+
+### UI 일관성
+- 모든 드릴다운: 글래스 L1 + 타이틀 + × 닫기 + 정렬된 list
+- 워커 칩: tone bg + 이름 + 보조 정보 + 우측 정렬된 수치
+- 슬롯 항목: 코드 + 라벨 + 충원/미배정 카운트
+- 색상 의미: 빨강=경고 / 앰버=주의 / 초록=양호
+
+### 효과
+- 사용자가 KPI 숫자 클릭 → 어떤 워커/슬롯에 문제 있는지 즉시 확인
+- "균형도 12" 처럼 추상 수치가 구체 워커 list 로 분해됨
+- 운영 결정 (멤버 추가 / 일수 조정 / 슬롯 정리) 의 근거가 명확해짐
+
+### 검증
+- tsc PASS (KpiStrip 0 errors)
+- lint:harness 새 위반 0건
+- 기존 N-18 균형도 드릴다운 동작 유지
+
+
 ## 2026-05-16 (Phase N-19-b) — 자동 생성 알고리즘: 그룹 rotation_enabled 시 워커별 시프트 순환
 
 ### 사용자 의도
