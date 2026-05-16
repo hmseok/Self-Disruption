@@ -3,6 +3,46 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-16 (Phase N-21-c) — Cron 자동 다음 달 스케줄 생성 (Step 3 — C 안)
+
+### 사용자 의도
+> "들어가요 검증하고있을테니" — N-21-c (C cron + D 오버라이드) 시작
+> 분할: C 먼저 (가벼움), D 다음 PR
+
+### 신설
+- `app/api/call-scheduler/cron/auto-generate-monthly/route.ts` — Cloud Scheduler 트리거 endpoint
+  · POST + GET 모두 지원 (테스트 편의)
+  · 인증: `?secret=<CRON_SECRET>` 또는 `Authorization: Bearer ...` 또는 `X-CloudScheduler-Jobname` 헤더
+  · 동작: 다음 달 (또는 ?target=YYYY-MM 강제) cs_schedules draft 자동 생성
+  · 멱등 — 이미 있으면 `action: 'skip-already-exists'`
+  · source='cron' / note='Cron 자동 생성 — <timestamp>'
+
+### 설계 결정
+- **자동 생성 알고리즘 (auto-generate) 호출 X** — draft 만 만들고 매니저가 검토 후 수동 실행
+  · 안전성 우선 (운영 데이터 자동 publish 위험 방지)
+  · 매니저가 출근 후 「📅 월별 스케줄」 에서 새 draft 발견 → 클릭 → 자동 생성 → 검토 → publish
+- 미래 확장 (TBD): 자동 생성 알고리즘도 cron 에서 실행 + 이메일/Slack 알림
+
+### 운영 셋업 가이드
+- `_docs/CRON-SETUP.md` 신설
+  · Cloud Run `CRON_SECRET` 환경변수 등록 단계
+  · Cloud Scheduler 작업 생성 가이드 (cron: `0 6 1 * *` — 매월 1일 06:00 KST)
+  · 호출 예시 + 트러블슈팅 표
+
+### Step 분할 진행 상황
+- ✅ Step 1 (N-21-a): 데이터 모델 + UI
+- ✅ Step 2 (N-21-b): 자동 생성 알고리즘 적용 + B 예약 변경
+- ✅ Step 3-C (N-21-c): Cron 자동 다음 달 생성 (이번 commit)
+- ⏸ Step 3-D (다음 PR): 임시 오버라이드 (cs_assignment_overrides 마이그 + 알고리즘 + UI)
+
+### 환경변수
+- `CRON_SECRET` (Cloud Run 등록 필요) — `openssl rand -hex 32` 같은 충분히 긴 random 문자열
+
+### 검증
+- tsc PASS (cron route 0 errors)
+- lint:harness 0건
+- 멱등 — 여러 번 호출해도 안전 (이미 있는 월 skip)
+
 ## 2026-05-16 (Phase N-21-b) — 자동 생성 알고리즘: 버전 timeline 적용 (Step 2)
 
 ### 사용자 의도
