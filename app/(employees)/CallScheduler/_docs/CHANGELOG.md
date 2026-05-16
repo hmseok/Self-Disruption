@@ -3,6 +3,32 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-16 (N-19-a-fix) — GroupEditor 다시 열 때 rotation 데이터 누락 fix
+
+### 사용자 보고
+> "그룹 설정에서 저장이 안되는것같은데"
+
+### 진단
+- DB 확인 — cs_shift_groups.rotation_enabled=1, cs_group_shifts 5 row 모두 정상 저장됨
+- 문제: `GET /api/call-scheduler/shift-groups/[id]` (단일 그룹 상세) 가 rotation_* 컬럼 + rotation_shifts list + 멤버 rotation_start_* 안 반환
+- 결과: GroupEditor 다시 열면 토글 OFF / sequence 빈 칸으로 보임 (= "저장 안 됨" 으로 보임)
+- 원인: N-19-a 에서 list GET / PATCH 만 확장하고 [id] 단일 GET 누락
+
+### 변경 (`app/api/call-scheduler/shift-groups/[id]/route.ts`)
+- graceful 컬럼 감지 추가 (hasCategory / hasSkipOnHolidays / hasRotation / hasGroupShifts / hasMemberRotation)
+- 별도 SELECT 로 category / skip_on_holidays / rotation_* 조회 후 응답 group 객체에 merge
+- `rotation_shifts` — cs_group_shifts JOIN cs_shift_slots 으로 sequence 반환
+- 멤버 query 에 `rotation_start_date / rotation_start_index / rotation_end_date` 추가 (조건부)
+- 응답 정규화 (blocked_slot_ids JSON parse 등)
+
+### 효과
+- 그룹 편집 화면을 닫았다 다시 열어도 로테이션 토글 + 시프트 sequence + 멤버 시작 시점 모두 그대로 표시
+- DB 에는 정상 저장됐던 데이터가 UI 에 가시화됨
+
+### 회고
+- ⚠ N-19-a 때 GET list + PATCH 만 검증하고 [id] 단일 GET 미검증 — 동형 패턴 검사 부족
+- Rule 14 (동형 패턴 자동 확장) 적용 사례 추가 — 새 컬럼 추가 시 list + 단일 + POST/PATCH 4개 모두 검증 의무
+
 ## 2026-05-16 (Phase N-20) — KPI 카드 드릴다운 확장 (5/5 카드 모두 클릭 가능)
 
 ### 사용자 의도

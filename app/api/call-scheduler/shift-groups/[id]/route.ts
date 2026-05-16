@@ -37,6 +37,27 @@ export async function GET(
   if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
   try {
     const { id } = await context.params
+
+    // graceful 컬럼 감지 — N-16 / N-19-a
+    let hasCategory = true
+    try { await prisma.$queryRaw<any[]>`SELECT category FROM cs_shift_groups LIMIT 1` }
+    catch { hasCategory = false }
+    let hasSkipOnHolidays = true
+    try { await prisma.$queryRaw<any[]>`SELECT skip_on_holidays FROM cs_shift_groups LIMIT 1` }
+    catch { hasSkipOnHolidays = false }
+    let hasRotation = true
+    try { await prisma.$queryRaw<any[]>`SELECT rotation_enabled FROM cs_shift_groups LIMIT 1` }
+    catch { hasRotation = false }
+    let hasGroupShifts = true
+    try { await prisma.$queryRaw<any[]>`SELECT 1 FROM cs_group_shifts LIMIT 1` }
+    catch { hasGroupShifts = false }
+    let hasMemberSettings = true
+    try { await prisma.$queryRaw<any[]>`SELECT priority_level FROM cs_group_members LIMIT 1` }
+    catch { hasMemberSettings = false }
+    let hasMemberRotation = true
+    try { await prisma.$queryRaw<any[]>`SELECT rotation_start_date FROM cs_group_members LIMIT 1` }
+    catch { hasMemberRotation = false }
+
     const grpRows = await prisma.$queryRaw<any[]>`
       SELECT g.id, g.name, g.shift_slot_id, g.pattern_type, g.custom_days,
              g.generation_strategy, g.rotation_size, g.rotation_period_days,
@@ -53,24 +74,135 @@ export async function GET(
     if (grpRows.length === 0) {
       return NextResponse.json({ error: '그룹을 찾을 수 없습니다.' }, { status: 404 })
     }
-    const memberRows = await prisma.$queryRaw<any[]>`
-      SELECT m.id, m.worker_id, m.priority,
-             w.name AS worker_name, w.color_tone AS worker_tone, w.group_label
-      FROM cs_group_members m
-      JOIN cs_workers w ON w.id = m.worker_id
-      WHERE m.group_id = ${id}
-      ORDER BY m.priority ASC, w.name ASC
-    `
+
+    // N-16/N-19-a — 별도 컬럼 조회 (graceful)
+    let category = 'general'
+    let skipOnHolidays = false
+    let rotationEnabled = false
+    let rotationPeriodKind = 'monthly'
+    let rotationCustomDays = 30
+    if (hasCategory) {
+      try {
+        const r = await prisma.$queryRaw<any[]>`SELECT category FROM cs_shift_groups WHERE id = ${id} LIMIT 1`
+        category = r[0]?.category || 'general'
+      } catch { /* graceful */ }
+    }
+    if (hasSkipOnHolidays) {
+      try {
+        const r = await prisma.$queryRaw<any[]>`SELECT skip_on_holidays FROM cs_shift_groups WHERE id = ${id} LIMIT 1`
+        skipOnHolidays = Boolean(r[0]?.skip_on_holidays)
+      } catch { /* graceful */ }
+    }
+    if (hasRotation) {
+      try {
+        const r = await prisma.$queryRaw<any[]>`
+          SELECT rotation_enabled, rotation_period_kind, rotation_custom_days
+          FROM cs_shift_groups WHERE id = ${id} LIMIT 1
+        `
+        rotationEnabled = Boolean(r[0]?.rotation_enabled)
+        rotationPeriodKind = String(r[0]?.rotation_period_kind || 'monthly')
+        rotationCustomDays = Number(r[0]?.rotation_custom_days || 30)
+      } catch { /* graceful */ }
+    }
+
+    // N-19-a — cs_group_shifts sequence
+    let rotationShifts: any[] = []
+    if (hasGroupShifts) {
+      try {
+        rotationShifts = await prisma.$queryRaw<any[]>`
+          SELECT gs.shift_slot_id, gs.sort_order,
+                 s.code AS slot_code, s.label AS slot_label,
+                 TIME_FORMAT(s.start_time, '%H:%i') AS start_time,
+                 TIME_FORMAT(s.end_time, '%H:%i') AS end_time,
+                 s.is_overnight
+          FROM cs_group_shifts gs
+          JOIN cs_shift_slots s ON s.id = gs.shift_slot_id
+          WHERE gs.group_id = ${id}
+          ORDER BY gs.sort_order ASC
+        `
+      } catch { /* graceful */ }
+    }
+
+    // 멤버 — Phase K (priority_level 등) + N-19-a (rotation_start_*)
+    const memberRows: any[] = (hasMemberSettings && hasMemberRotation)
+      ? await prisma.$queryRaw<any[]>`
+          SELECT m.id, m.worker_id, m.priority,
+                 m.priority_level, m.preferred_dow_prefer, m.preferred_dow_avoid,
+                 m.max_consecutive_work_days, m.required_days_per_month, m.max_days_per_month,
+                 m.blocked_slot_ids, m.work_pattern_text,
+                 DATE_FORMAT(m.rotation_start_date, '%Y-%m-%d') AS rotation_start_date,
+                 m.rotation_start_index,
+                 DATE_FORMAT(m.rotation_end_date, '%Y-%m-%d') AS rotation_end_date,
+                 w.name AS worker_name, w.color_tone AS worker_tone, w.group_label
+          FROM cs_group_members m
+          JOIN cs_workers w ON w.id = m.worker_id
+          WHERE m.group_id = ${id}
+          ORDER BY m.priority ASC, w.name ASC
+        `
+      : hasMemberSettings
+      ? await prisma.$queryRaw<any[]>`
+          SELECT m.id, m.worker_id, m.priority,
+                 m.priority_level, m.preferred_dow_prefer, m.preferred_dow_avoid,
+                 m.max_consecutive_work_days, m.required_days_per_month, m.max_days_per_month,
+                 m.blocked_slot_ids, m.work_pattern_text,
+                 w.name AS worker_name, w.color_tone AS worker_tone, w.group_label
+          FROM cs_group_members m
+          JOIN cs_workers w ON w.id = m.worker_id
+          WHERE m.group_id = ${id}
+          ORDER BY m.priority ASC, w.name ASC
+        `
+      : await prisma.$queryRaw<any[]>`
+          SELECT m.id, m.worker_id, m.priority,
+                 w.name AS worker_name, w.color_tone AS worker_tone, w.group_label
+          FROM cs_group_members m
+          JOIN cs_workers w ON w.id = m.worker_id
+          WHERE m.group_id = ${id}
+          ORDER BY m.priority ASC, w.name ASC
+        `
+
+    // 멤버 응답 정규화 (parse blocked_slot_ids JSON)
+    const members = memberRows.map(r => ({
+      ...r,
+      priority_level: hasMemberSettings ? Number(r.priority_level || 2) : 2,
+      max_consecutive_work_days: hasMemberSettings && r.max_consecutive_work_days != null
+        ? Number(r.max_consecutive_work_days) : null,
+      required_days_per_month: hasMemberSettings && r.required_days_per_month != null
+        ? Number(r.required_days_per_month) : null,
+      max_days_per_month: hasMemberSettings && r.max_days_per_month != null
+        ? Number(r.max_days_per_month) : null,
+      blocked_slot_ids: hasMemberSettings && r.blocked_slot_ids != null
+        ? (typeof r.blocked_slot_ids === 'string'
+           ? (() => { try { return JSON.parse(r.blocked_slot_ids) } catch { return [] } })()
+           : (Array.isArray(r.blocked_slot_ids) ? r.blocked_slot_ids : []))
+        : null,
+      rotation_start_date: hasMemberRotation ? (r.rotation_start_date ?? null) : null,
+      rotation_start_index: hasMemberRotation ? Number(r.rotation_start_index || 0) : 0,
+      rotation_end_date: hasMemberRotation ? (r.rotation_end_date ?? null) : null,
+    }))
 
     const group = {
       ...grpRows[0],
+      category,
+      skip_on_holidays: skipOnHolidays,
+      rotation_enabled: rotationEnabled,
+      rotation_period_kind: rotationPeriodKind,
+      rotation_custom_days: rotationCustomDays,
+      rotation_shifts: rotationShifts.map(s => ({
+        shift_slot_id: s.shift_slot_id,
+        sort_order: Number(s.sort_order || 0),
+        slot_code: s.slot_code,
+        slot_label: s.slot_label,
+        start_time: s.start_time,
+        end_time: s.end_time,
+        is_overnight: Boolean(s.is_overnight),
+      })),
       is_active: Boolean(grpRows[0].is_active),
       is_overnight: Boolean(grpRows[0].is_overnight),
       rotation_size: grpRows[0].rotation_size != null ? Number(grpRows[0].rotation_size) : null,
       rotation_period_days: Number(grpRows[0].rotation_period_days || 1),
     }
     return NextResponse.json({
-      data: serialize({ group, members: memberRows }),
+      data: serialize({ group, members }),
       error: null,
     })
   } catch (e: any) {
