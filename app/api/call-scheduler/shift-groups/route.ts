@@ -37,6 +37,19 @@ export async function GET(request: NextRequest) {
     try {
       await prisma.$queryRaw<any[]>`SELECT skip_on_holidays FROM cs_shift_groups LIMIT 1`
     } catch { hasSkipOnHolidays = false }
+    // N-19-a — rotation 컬럼 + cs_group_shifts 테이블 graceful
+    let hasRotation = true
+    try {
+      await prisma.$queryRaw<any[]>`SELECT rotation_enabled FROM cs_shift_groups LIMIT 1`
+    } catch { hasRotation = false }
+    let hasGroupShifts = true
+    try {
+      await prisma.$queryRaw<any[]>`SELECT 1 FROM cs_group_shifts LIMIT 1`
+    } catch { hasGroupShifts = false }
+    let hasMemberRotation = true
+    try {
+      await prisma.$queryRaw<any[]>`SELECT rotation_start_date FROM cs_group_members LIMIT 1`
+    } catch { hasMemberRotation = false }
 
     const rows = await prisma.$queryRaw<any[]>`
       SELECT g.id, g.name, g.shift_slot_id, g.pattern_type, g.custom_days,
@@ -70,6 +83,58 @@ export async function GET(request: NextRequest) {
       `
       for (const r of shRows) skipHolidaysMap.set(r.id, Boolean(r.skip_on_holidays))
     }
+    // N-19-a — rotation 설정 별도 조회 (graceful)
+    const rotationMap = new Map<string, {
+      enabled: boolean; period_kind: string; period_days: number
+    }>()
+    if (hasRotation && rows.length > 0) {
+      try {
+        const rRows = await prisma.$queryRaw<any[]>`
+          SELECT id, rotation_enabled, rotation_period_kind, rotation_custom_days
+          FROM cs_shift_groups WHERE is_active = 1
+        `
+        for (const r of rRows) {
+          rotationMap.set(r.id, {
+            enabled: Boolean(r.rotation_enabled),
+            period_kind: String(r.rotation_period_kind || 'monthly'),
+            period_days: Number(r.rotation_custom_days || 30),
+          })
+        }
+      } catch { /* graceful */ }
+    }
+    // N-19-a — cs_group_shifts (그룹 ↔ 시프트 1:N) 일괄 조회
+    const groupShiftsMap = new Map<string, Array<{
+      shift_slot_id: string; sort_order: number
+      slot_code: string; slot_label: string
+      start_time: string; end_time: string; is_overnight: boolean
+    }>>()
+    if (hasGroupShifts && rows.length > 0) {
+      try {
+        const gsRows = await prisma.$queryRaw<any[]>`
+          SELECT gs.group_id, gs.shift_slot_id, gs.sort_order,
+                 s.code AS slot_code, s.label AS slot_label,
+                 TIME_FORMAT(s.start_time, '%H:%i') AS start_time,
+                 TIME_FORMAT(s.end_time, '%H:%i') AS end_time,
+                 s.is_overnight
+          FROM cs_group_shifts gs
+          JOIN cs_shift_slots s ON s.id = gs.shift_slot_id
+          ORDER BY gs.group_id, gs.sort_order ASC
+        `
+        for (const r of gsRows) {
+          const arr = groupShiftsMap.get(r.group_id) || []
+          arr.push({
+            shift_slot_id: r.shift_slot_id,
+            sort_order: Number(r.sort_order || 0),
+            slot_code: String(r.slot_code),
+            slot_label: String(r.slot_label || r.slot_code),
+            start_time: r.start_time,
+            end_time: r.end_time,
+            is_overnight: Boolean(r.is_overnight),
+          })
+          groupShiftsMap.set(r.group_id, arr)
+        }
+      } catch { /* graceful */ }
+    }
 
     // Phase K — cs_group_members 새 8 컬럼 존재 확인 (graceful)
     let hasMemberSettings = true
@@ -77,7 +142,7 @@ export async function GET(request: NextRequest) {
       await prisma.$queryRaw<any[]>`SELECT priority_level FROM cs_group_members LIMIT 1`
     } catch { hasMemberSettings = false }
 
-    // 멤버 chip 일괄 조회 (그룹별 워커 이름 + color_tone + 8 멤버 설정)
+    // 멤버 chip 일괄 조회 (그룹별 워커 이름 + color_tone + 8 멤버 설정 + N-19-a 로테이션 3)
     type MemberRow = {
       id: string; name: string; color_tone: string; priority: number;
       priority_level: number;
@@ -85,10 +150,27 @@ export async function GET(request: NextRequest) {
       max_consecutive_work_days: number | null;
       required_days_per_month: number | null; max_days_per_month: number | null;
       blocked_slot_ids: string[] | null; work_pattern_text: string | null;
+      rotation_start_date: string | null; rotation_start_index: number;
+      rotation_end_date: string | null;
     }
     const memberMap = new Map<string, MemberRow[]>()
     if (rows.length > 0) {
-      const memRows = hasMemberSettings
+      const memRows = (hasMemberSettings && hasMemberRotation)
+        ? await prisma.$queryRaw<any[]>`
+            SELECT m.group_id, w.id AS worker_id, w.name, w.color_tone,
+                   m.priority,
+                   m.priority_level, m.preferred_dow_prefer, m.preferred_dow_avoid,
+                   m.max_consecutive_work_days, m.required_days_per_month, m.max_days_per_month,
+                   m.blocked_slot_ids, m.work_pattern_text,
+                   DATE_FORMAT(m.rotation_start_date, '%Y-%m-%d') AS rotation_start_date,
+                   m.rotation_start_index,
+                   DATE_FORMAT(m.rotation_end_date, '%Y-%m-%d') AS rotation_end_date
+            FROM cs_group_members m
+            JOIN cs_workers w ON w.id = m.worker_id
+            WHERE w.is_active = 1
+            ORDER BY m.group_id, m.priority ASC
+          `
+        : hasMemberSettings
         ? await prisma.$queryRaw<any[]>`
             SELECT m.group_id, w.id AS worker_id, w.name, w.color_tone,
                    m.priority,
@@ -129,23 +211,34 @@ export async function GET(request: NextRequest) {
                : (Array.isArray(r.blocked_slot_ids) ? r.blocked_slot_ids : []))
             : null,
           work_pattern_text: hasMemberSettings ? (r.work_pattern_text ?? null) : null,
+          rotation_start_date: hasMemberRotation ? (r.rotation_start_date ?? null) : null,
+          rotation_start_index: hasMemberRotation ? Number(r.rotation_start_index || 0) : 0,
+          rotation_end_date: hasMemberRotation ? (r.rotation_end_date ?? null) : null,
         }
         arr.push(row)
         memberMap.set(r.group_id, arr)
       }
     }
 
-    const data = rows.map(r => ({
-      ...r,
-      category: catMap.get(r.id) || CATEGORIES_FALLBACK,
-      skip_on_holidays: skipHolidaysMap.get(r.id) || false,  // N-16
-      is_active: Boolean(r.is_active),
-      is_overnight: Boolean(r.is_overnight),
-      rotation_size: r.rotation_size != null ? Number(r.rotation_size) : null,
-      rotation_period_days: Number(r.rotation_period_days || 1),
-      member_count: Number(r.member_count || 0),
-      members: memberMap.get(r.id) || [],
-    }))
+    const data = rows.map(r => {
+      const rot = rotationMap.get(r.id)
+      return {
+        ...r,
+        category: catMap.get(r.id) || CATEGORIES_FALLBACK,
+        skip_on_holidays: skipHolidaysMap.get(r.id) || false,  // N-16
+        is_active: Boolean(r.is_active),
+        is_overnight: Boolean(r.is_overnight),
+        rotation_size: r.rotation_size != null ? Number(r.rotation_size) : null,
+        rotation_period_days: Number(r.rotation_period_days || 1),
+        member_count: Number(r.member_count || 0),
+        members: memberMap.get(r.id) || [],
+        // N-19-a — 시프트 로테이션
+        rotation_enabled: rot?.enabled || false,
+        rotation_period_kind: rot?.period_kind || 'monthly',
+        rotation_custom_days: rot?.period_days || 30,
+        rotation_shifts: groupShiftsMap.get(r.id) || [],
+      }
+    })
     return NextResponse.json({ data: serialize(data), error: null })
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || 'DB error' }, { status: 500 })

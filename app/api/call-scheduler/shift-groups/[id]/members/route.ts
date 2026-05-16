@@ -31,6 +31,10 @@ interface MemberInput {
   max_days_per_month?: number | null
   blocked_slot_ids?: string[] | null
   work_pattern_text?: string | null
+  // N-19-a — 시프트 로테이션
+  rotation_start_date?: string | null
+  rotation_start_index?: number
+  rotation_end_date?: string | null
 }
 
 function clampPriorityLevel(v: any): number {
@@ -71,10 +75,16 @@ export async function PUT(
       return NextResponse.json({ error: '그룹을 찾을 수 없습니다.' }, { status: 404 })
     }
 
+    // N-19-a — rotation 컬럼 graceful 감지
+    let hasMemberRotation = true
+    try {
+      await prisma.$queryRaw<any[]>`SELECT rotation_start_date FROM cs_group_members LIMIT 1`
+    } catch { hasMemberRotation = false }
+
     // 기존 멤버 모두 삭제
     await prisma.$executeRaw`DELETE FROM cs_group_members WHERE group_id = ${id}`
 
-    // 새 멤버 INSERT (priority = 배열 인덱스, 8 컬럼 멤버 단위 설정)
+    // 새 멤버 INSERT (priority = 배열 인덱스, 8 컬럼 + N-19-a rotation 3 컬럼)
     for (let i = 0; i < members.length; i++) {
       const m = members[i]
       const memberId = crypto.randomUUID()
@@ -87,18 +97,40 @@ export async function PUT(
       const blocked = Array.isArray(m.blocked_slot_ids) && m.blocked_slot_ids.length > 0
         ? JSON.stringify(m.blocked_slot_ids.map(String)) : null
       const pattern = nullableStr(m.work_pattern_text)
-      await prisma.$executeRaw`
-        INSERT INTO cs_group_members
-          (id, group_id, worker_id, priority,
-           priority_level, preferred_dow_prefer, preferred_dow_avoid,
-           max_consecutive_work_days, required_days_per_month, max_days_per_month,
-           blocked_slot_ids, work_pattern_text, created_at)
-        VALUES
-          (${memberId}, ${id}, ${m.worker_id}, ${i},
-           ${priority_level}, ${dow_prefer}, ${dow_avoid},
-           ${max_consec}, ${req_days}, ${max_days},
-           ${blocked}, ${pattern}, NOW())
-      `
+      const rot_start = nullableStr(m.rotation_start_date)
+      const rot_index = Math.max(0, Math.min(255, Number(m.rotation_start_index) || 0))
+      const rot_end = nullableStr(m.rotation_end_date)
+      if (hasMemberRotation) {
+        await prisma.$executeRaw`
+          INSERT INTO cs_group_members
+            (id, group_id, worker_id, priority,
+             priority_level, preferred_dow_prefer, preferred_dow_avoid,
+             max_consecutive_work_days, required_days_per_month, max_days_per_month,
+             blocked_slot_ids, work_pattern_text,
+             rotation_start_date, rotation_start_index, rotation_end_date,
+             created_at)
+          VALUES
+            (${memberId}, ${id}, ${m.worker_id}, ${i},
+             ${priority_level}, ${dow_prefer}, ${dow_avoid},
+             ${max_consec}, ${req_days}, ${max_days},
+             ${blocked}, ${pattern},
+             ${rot_start}, ${rot_index}, ${rot_end},
+             NOW())
+        `
+      } else {
+        await prisma.$executeRaw`
+          INSERT INTO cs_group_members
+            (id, group_id, worker_id, priority,
+             priority_level, preferred_dow_prefer, preferred_dow_avoid,
+             max_consecutive_work_days, required_days_per_month, max_days_per_month,
+             blocked_slot_ids, work_pattern_text, created_at)
+          VALUES
+            (${memberId}, ${id}, ${m.worker_id}, ${i},
+             ${priority_level}, ${dow_prefer}, ${dow_avoid},
+             ${max_consec}, ${req_days}, ${max_days},
+             ${blocked}, ${pattern}, NOW())
+        `
+      }
     }
 
     // 새 멤버 목록 반환 (8 컬럼 포함)

@@ -76,6 +76,18 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
   const [category, setCategory] = useState('general')
   // N-16 — 휴일(cs_holidays) 자동 제외 (주중 그룹은 true, 야간/24-365 그룹은 false)
   const [skipOnHolidays, setSkipOnHolidays] = useState(false)
+  // N-19-a — 시프트 로테이션 (그룹 1개에 시프트 여러 개 sequence + 워커별 시작 시점)
+  const [rotationEnabled, setRotationEnabled] = useState(false)
+  const [rotationPeriodKind, setRotationPeriodKind] = useState<'monthly' | 'days'>('monthly')
+  const [rotationCustomDays, setRotationCustomDays] = useState<string>('30')
+  const [rotationShifts, setRotationShifts] = useState<string[]>([])  // 시프트 slot_id sequence
+  // 워커별 로테이션 시작 시점 — Record<workerId, { start_date, start_index, end_date }>
+  interface RotCfg { start_date: string; start_index: number; end_date: string }
+  const defaultRotCfg = (): RotCfg => ({ start_date: '', start_index: 0, end_date: '' })
+  const [memberRotCfgs, setMemberRotCfgs] = useState<Record<string, RotCfg>>({})
+  const updateMemberRotCfg = (wId: string, patch: Partial<RotCfg>) => {
+    setMemberRotCfgs(prev => ({ ...prev, [wId]: { ...(prev[wId] || defaultRotCfg()), ...patch } }))
+  }
   // PR-2QQ-d-2: 최소 인원 (디폴트 + 요일별 예외)
   const [defaultMin, setDefaultMin] = useState<string>('')        // 매일 디폴트 (빈 문자열 = 미설정)
   const [dowMin, setDowMin] = useState<Record<number, string>>({}) // 요일별 예외 (0~6)
@@ -125,6 +137,23 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
         setDescription(group.description || '')
         setCategory(group.category || 'general')
         setSkipOnHolidays(Boolean(group.skip_on_holidays))  // N-16
+        // N-19-a — 로테이션 설정 + 시프트 sequence 로드
+        setRotationEnabled(Boolean(group.rotation_enabled))
+        setRotationPeriodKind((group.rotation_period_kind || 'monthly') as 'monthly' | 'days')
+        setRotationCustomDays(String(group.rotation_custom_days || 30))
+        if (Array.isArray(group.rotation_shifts)) {
+          setRotationShifts(group.rotation_shifts.map((s: any) => String(s.shift_slot_id)))
+        }
+        // 멤버별 로테이션 시작 시점 — members 응답에 같이 들어있음
+        const rotCfgs: Record<string, RotCfg> = {}
+        for (const m of members) {
+          rotCfgs[m.worker_id] = {
+            start_date: m.rotation_start_date || '',
+            start_index: Number(m.rotation_start_index || 0),
+            end_date: m.rotation_end_date || '',
+          }
+        }
+        setMemberRotCfgs(rotCfgs)
         setMemberIds(members.map((m: any) => m.worker_id))
         // K-2 — 멤버 cfg 파싱
         const cfgs: Record<string, MemberCfg> = {}
@@ -293,6 +322,13 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
         color_tone: colorTone,
         description: description.trim() || null,
         skip_on_holidays: skipOnHolidays ? 1 : 0,  // N-16
+        // N-19-a — 시프트 로테이션
+        rotation_enabled: rotationEnabled ? 1 : 0,
+        rotation_period_kind: rotationPeriodKind,
+        rotation_custom_days: Math.max(1, Number(rotationCustomDays) || 30),
+        rotation_shifts: rotationEnabled
+          ? rotationShifts.map(slotId => ({ shift_slot_id: slotId }))
+          : [],
       }
       // K-2 — 멤버 PUT body (8 컬럼 포함)
       const buildMembersPayload = () => memberIds.map(wId => {
@@ -307,6 +343,10 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
           max_days_per_month: cfg.max_days_per_month === '' ? null : Number(cfg.max_days_per_month),
           blocked_slot_ids: Array.from(cfg.blocked_slot_ids),
           work_pattern_text: cfg.work_pattern_text.trim() || null,
+          // N-19-a — 시프트 로테이션 시작 시점
+          rotation_start_date: (memberRotCfgs[wId]?.start_date || '').trim() || null,
+          rotation_start_index: Number(memberRotCfgs[wId]?.start_index || 0),
+          rotation_end_date: (memberRotCfgs[wId]?.end_date || '').trim() || null,
         }
       })
       let id = groupId
@@ -626,6 +666,164 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
               </span>
             </label>
           </Field>
+
+          {/* N-19-a — 시프트 로테이션 (그룹 1개 안에 시프트 여러 개 sequence) */}
+          <Field label="🔄 시프트 로테이션"
+                 sub="그룹 안에 시프트 여러 개 (예: 07-16 / 08-17 / 09-18) 를 넣고 워커마다 매월 자동 순환">
+            <label style={{
+              display: 'flex', alignItems: 'center', gap: 10,
+              padding: '10px 12px', borderRadius: 10,
+              background: rotationEnabled ? COLORS.bgBlue : 'rgba(0,0,0,0.03)',
+              border: `1px solid ${rotationEnabled ? COLORS.borderBlue : COLORS.borderFaint}`,
+              cursor: 'pointer',
+            }}>
+              <input type="checkbox"
+                     checked={rotationEnabled}
+                     onChange={(e) => setRotationEnabled(e.target.checked)}
+                     style={{ width: 16, height: 16, cursor: 'pointer' }} />
+              <span style={{ fontSize: 12, fontWeight: 600,
+                             color: rotationEnabled ? COLORS.info : COLORS.textPrimary }}>
+                시프트 로테이션 사용
+              </span>
+              <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 'auto' }}>
+                {rotationEnabled ? `${rotationShifts.length}개 시프트 sequence` : 'OFF — 단일 시프트'}
+              </span>
+            </label>
+          </Field>
+
+          {rotationEnabled && (
+            <>
+              {/* 시프트 sequence 선택 + 순서 */}
+              <Field label="시프트 sequence"
+                     sub="배정 순서대로 추가. 워커마다 매월 한 칸씩 이동합니다.">
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {rotationShifts.length === 0 && (
+                    <div style={{
+                      padding: 10, borderRadius: 8,
+                      background: 'rgba(0,0,0,0.03)',
+                      border: `1px dashed ${COLORS.borderFaint}`,
+                      fontSize: 11, color: COLORS.textMuted, textAlign: 'center',
+                    }}>
+                      아래에서 시프트를 추가하세요.
+                    </div>
+                  )}
+                  {rotationShifts.map((slotId, i) => {
+                    const slot = slots.find(s => s.id === slotId)
+                    return (
+                      <div key={slotId + '_' + i} style={{
+                        display: 'flex', alignItems: 'center', gap: 8,
+                        padding: '8px 12px', borderRadius: 8,
+                        background: COLORS.bgBlue,
+                        border: `1px solid ${COLORS.borderBlue}`,
+                      }}>
+                        <span style={{
+                          fontSize: 11, fontWeight: 800, color: COLORS.info,
+                          minWidth: 22, textAlign: 'center',
+                        }}>{i + 1}.</span>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: COLORS.textPrimary }}>
+                          {slot?.code} {slot?.label}
+                        </span>
+                        <span style={{ fontSize: 11, color: COLORS.textMuted }}>
+                          {slot?.start_time}~{slot?.end_time}
+                        </span>
+                        <div style={{ flex: 1 }} />
+                        <button type="button"
+                                disabled={i === 0}
+                                onClick={() => setRotationShifts(arr => {
+                                  if (i === 0) return arr
+                                  const next = [...arr]; const [m] = next.splice(i, 1); next.splice(i - 1, 0, m); return next
+                                })}
+                                style={{
+                                  fontSize: 11, padding: '3px 8px', borderRadius: 6,
+                                  background: 'transparent',
+                                  border: `1px solid ${COLORS.borderFaint}`,
+                                  cursor: i === 0 ? 'not-allowed' : 'pointer',
+                                  opacity: i === 0 ? 0.4 : 1,
+                                }}>↑</button>
+                        <button type="button"
+                                disabled={i === rotationShifts.length - 1}
+                                onClick={() => setRotationShifts(arr => {
+                                  if (i === arr.length - 1) return arr
+                                  const next = [...arr]; const [m] = next.splice(i, 1); next.splice(i + 1, 0, m); return next
+                                })}
+                                style={{
+                                  fontSize: 11, padding: '3px 8px', borderRadius: 6,
+                                  background: 'transparent',
+                                  border: `1px solid ${COLORS.borderFaint}`,
+                                  cursor: i === rotationShifts.length - 1 ? 'not-allowed' : 'pointer',
+                                  opacity: i === rotationShifts.length - 1 ? 0.4 : 1,
+                                }}>↓</button>
+                        <button type="button"
+                                onClick={() => setRotationShifts(arr => arr.filter((_, idx) => idx !== i))}
+                                style={{
+                                  fontSize: 11, padding: '3px 8px', borderRadius: 6,
+                                  background: 'transparent', color: COLORS.danger,
+                                  border: `1px solid ${COLORS.borderRed}`,
+                                  cursor: 'pointer',
+                                }}>×</button>
+                      </div>
+                    )
+                  })}
+                  {/* 추가 selector */}
+                  <div style={{
+                    display: 'flex', flexWrap: 'wrap', gap: 4,
+                    padding: 8, borderRadius: 8,
+                    background: 'rgba(0,0,0,0.02)',
+                    border: `1px dashed ${COLORS.borderFaint}`,
+                  }}>
+                    {slots.filter(s => !rotationShifts.includes(s.id)).map(s => (
+                      <button key={s.id} type="button"
+                              onClick={() => setRotationShifts(arr => [...arr, s.id])}
+                              style={{
+                                fontSize: 11, fontWeight: 700,
+                                padding: '4px 10px', borderRadius: 99,
+                                background: 'transparent',
+                                border: `1px solid ${COLORS.borderFaint}`,
+                                color: COLORS.textSecondary,
+                                cursor: 'pointer', whiteSpace: 'nowrap',
+                              }}>
+                        + {s.code} {s.start_time}~{s.end_time}
+                      </button>
+                    ))}
+                    {slots.length === rotationShifts.length && (
+                      <span style={{ fontSize: 11, color: COLORS.textMuted, padding: '4px 8px' }}>
+                        모든 시프트가 sequence 에 추가됨
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </Field>
+
+              {/* 주기 선택 */}
+              <Field label="로테이션 주기">
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button type="button"
+                          onClick={() => setRotationPeriodKind('monthly')}
+                          style={modeBtnStyle(rotationPeriodKind === 'monthly')}>
+                    매월
+                  </button>
+                  <button type="button"
+                          onClick={() => setRotationPeriodKind('days')}
+                          style={modeBtnStyle(rotationPeriodKind === 'days')}>
+                    N일
+                  </button>
+                  {rotationPeriodKind === 'days' && (
+                    <input type="number" min={1} value={rotationCustomDays}
+                           onChange={(e) => setRotationCustomDays(e.target.value)}
+                           style={{
+                             ...inputStyle, width: 80, marginLeft: 6,
+                           }}
+                           placeholder="30" />
+                  )}
+                  {rotationPeriodKind === 'days' && (
+                    <span style={{ fontSize: 11, color: COLORS.textMuted, alignSelf: 'center' }}>
+                      일마다 다음 시프트로
+                    </span>
+                  )}
+                </div>
+              </Field>
+            </>
+          )}
 
           {/* N-5 — 최소 인원 collapsible (자주 안 만지는 셋팅 접기) */}
           <div>
@@ -1004,11 +1202,79 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
                       )}
                       {/* K-2 — 멤버 cfg 펼침 카드 */}
                       {expandedCfgWorkerId === w.id && (
-                        <MemberCfgPanel
-                          cfg={memberCfgs[w.id] || defaultMemberCfg()}
-                          onChange={(patch) => updateMemberCfg(w.id, patch)}
-                          slots={slots}
-                        />
+                        <>
+                          <MemberCfgPanel
+                            cfg={memberCfgs[w.id] || defaultMemberCfg()}
+                            onChange={(patch) => updateMemberCfg(w.id, patch)}
+                            slots={slots}
+                          />
+                          {/* N-19-a — 시프트 로테이션 시작 시점 (rotation_enabled 일 때만) */}
+                          {rotationEnabled && rotationShifts.length > 0 && (() => {
+                            const rcfg = memberRotCfgs[w.id] || defaultRotCfg()
+                            return (
+                              <div style={{
+                                ...GLASS.L1, borderRadius: 10, padding: 12, marginTop: 8,
+                                border: `1px solid ${COLORS.borderBlue}`,
+                                background: COLORS.bgBlue,
+                              }}>
+                                <div style={{
+                                  display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8,
+                                  fontSize: 12, fontWeight: 800, color: COLORS.info,
+                                }}>
+                                  🔄 시프트 로테이션 시작 (멤버별)
+                                </div>
+                                <div style={{
+                                  display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8,
+                                }}>
+                                  <div>
+                                    <div style={{ fontSize: 11, color: COLORS.textMuted, marginBottom: 4 }}>
+                                      시작일
+                                    </div>
+                                    <input type="date" value={rcfg.start_date}
+                                           onChange={(e) => updateMemberRotCfg(w.id, { start_date: e.target.value })}
+                                           style={{
+                                             ...inputStyle, width: '100%', fontSize: 12,
+                                           }} />
+                                  </div>
+                                  <div>
+                                    <div style={{ fontSize: 11, color: COLORS.textMuted, marginBottom: 4 }}>
+                                      시작 시프트
+                                    </div>
+                                    <select value={rcfg.start_index}
+                                            onChange={(e) => updateMemberRotCfg(w.id, { start_index: Number(e.target.value) })}
+                                            style={{
+                                              ...inputStyle, width: '100%', fontSize: 12,
+                                            }}>
+                                      {rotationShifts.map((slotId, i) => {
+                                        const slot = slots.find(s => s.id === slotId)
+                                        return (
+                                          <option key={slotId + '_' + i} value={i}>
+                                            {i + 1}. {slot?.code} {slot?.start_time}~{slot?.end_time}
+                                          </option>
+                                        )
+                                      })}
+                                    </select>
+                                  </div>
+                                  <div>
+                                    <div style={{ fontSize: 11, color: COLORS.textMuted, marginBottom: 4 }}>
+                                      종료일 <span style={{ color: COLORS.textMuted, fontWeight: 400 }}>(빈 칸 = 무한)</span>
+                                    </div>
+                                    <input type="date" value={rcfg.end_date}
+                                           onChange={(e) => updateMemberRotCfg(w.id, { end_date: e.target.value })}
+                                           style={{
+                                             ...inputStyle, width: '100%', fontSize: 12,
+                                           }} />
+                                  </div>
+                                </div>
+                                <div style={{
+                                  marginTop: 8, fontSize: 11, color: COLORS.textMuted,
+                                }}>
+                                  💡 자동 생성 시 시작일부터 주기마다 다음 시프트로 이동 (N-19-b 알고리즘 적용 예정)
+                                </div>
+                              </div>
+                            )
+                          })()}
+                        </>
                       )}
                     </div>
                   )

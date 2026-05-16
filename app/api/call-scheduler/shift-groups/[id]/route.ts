@@ -17,7 +17,10 @@ const ALLOWED_COLS = new Set([
   'name', 'category', 'shift_slot_id', 'pattern_type', 'custom_days',
   'generation_strategy', 'rotation_size', 'rotation_period_days',
   'color_tone', 'description', 'sort_order', 'is_active',
-  'skip_on_holidays',  // N-16
+  'skip_on_holidays',         // N-16
+  'rotation_enabled',         // N-19-a
+  'rotation_period_kind',     // N-19-a — monthly | days
+  'rotation_custom_days',     // N-19-a
 ])
 const PATTERNS = new Set(['all_days', 'all_weekdays', 'weekends_only', 'custom'])
 const STRATEGIES = new Set(['all_members', 'rotation'])
@@ -97,28 +100,59 @@ export async function PATCH(
     try {
       await prisma.$queryRaw<any[]>`SELECT skip_on_holidays FROM cs_shift_groups LIMIT 1`
     } catch { hasSkipOnHolidays = false }
+    // N-19-a — rotation 컬럼 존재 확인 (graceful)
+    let hasRotation = true
+    try {
+      await prisma.$queryRaw<any[]>`SELECT rotation_enabled FROM cs_shift_groups LIMIT 1`
+    } catch { hasRotation = false }
+    let hasGroupShifts = true
+    try {
+      await prisma.$queryRaw<any[]>`SELECT 1 FROM cs_group_shifts LIMIT 1`
+    } catch { hasGroupShifts = false }
 
     const sets: string[] = []
     const params: any[] = []
+    const rotationCols = new Set(['rotation_enabled', 'rotation_period_kind', 'rotation_custom_days'])
     for (const [k, v] of Object.entries(body || {})) {
       if (!ALLOWED_COLS.has(k)) continue
       if (k === 'category' && !hasCategory) continue  // 마이그레이션 미적용 시 skip
       if (k === 'skip_on_holidays' && !hasSkipOnHolidays) continue  // N-16 — graceful
+      if (rotationCols.has(k) && !hasRotation) continue  // N-19-a — graceful
       if (k === 'pattern_type' && !PATTERNS.has(String(v))) continue
       if (k === 'generation_strategy' && !STRATEGIES.has(String(v))) continue
       if (k === 'color_tone' && !COLOR_TONES.has(String(v))) continue
-      if (k === 'is_active' || k === 'skip_on_holidays') {
+      if (k === 'is_active' || k === 'skip_on_holidays' || k === 'rotation_enabled') {
         sets.push(`${k} = ?`); params.push(v ? 1 : 0); continue
+      }
+      if (k === 'rotation_custom_days') {
+        sets.push(`${k} = ?`); params.push(Math.max(1, Number(v) || 30)); continue
       }
       sets.push(`${k} = ?`); params.push(v ?? null)
     }
-    if (sets.length === 0) {
+    if (sets.length === 0 && !Array.isArray(body?.rotation_shifts)) {
       return NextResponse.json({ error: '변경할 항목 없음' }, { status: 400 })
     }
-    sets.push('updated_at = NOW()')
-    const sql = `UPDATE cs_shift_groups SET ${sets.join(', ')} WHERE id = ?`
-    params.push(id)
-    await prisma.$executeRawUnsafe(sql, ...params)
+    if (sets.length > 0) {
+      sets.push('updated_at = NOW()')
+      const sql = `UPDATE cs_shift_groups SET ${sets.join(', ')} WHERE id = ?`
+      params.push(id)
+      await prisma.$executeRawUnsafe(sql, ...params)
+    }
+
+    // N-19-a — rotation_shifts list 동기화 (DELETE + INSERT)
+    if (Array.isArray(body?.rotation_shifts) && hasGroupShifts) {
+      const shifts: Array<{ shift_slot_id: string }> = body.rotation_shifts
+      await prisma.$executeRaw`DELETE FROM cs_group_shifts WHERE group_id = ${id}`
+      const crypto = await import('crypto')
+      for (let i = 0; i < shifts.length; i++) {
+        const slotId = shifts[i]?.shift_slot_id
+        if (!slotId) continue
+        await prisma.$executeRaw`
+          INSERT INTO cs_group_shifts (id, group_id, shift_slot_id, sort_order, created_at, updated_at)
+          VALUES (${crypto.randomUUID()}, ${id}, ${slotId}, ${i}, NOW(), NOW())
+        `
+      }
+    }
 
     const rows = await prisma.$queryRaw<any[]>`
       SELECT id, name, shift_slot_id, pattern_type, custom_days,
