@@ -115,6 +115,31 @@ export default function DispatchDetailPage({
   const [sms, setSms] = useState<Cafe24SmsRow[]>([])
   const [smsLoading, setSmsLoading] = useState(true)
 
+  // PR-B3.3 — 발송 이력 요약 통계 (채널별 / 상태별 / 최근 시각)
+  // 사용자 명시 (2026-05-16): 「길어지니까 상단에 전체 내역을 카운드해주고
+  //                              볼수있게 정보좀 주면 보기 편할것같은데요」
+  const smsStats = useMemo(() => {
+    const types: Record<string, number> = {}
+    const stats: Record<string, number> = {}
+    let latestDt = ''
+    let latestTm = ''
+    for (const m of sms) {
+      const t = m.sendtype || 'SMS'
+      types[t] = (types[t] || 0) + 1
+      const st = m.sendstat || '-'
+      stats[st] = (stats[st] || 0) + 1
+      const dt = (m.sendresv === 'Y' ? m.sendhpdt : m.sendsndt) || ''
+      const tm = (m.sendresv === 'Y' ? m.sendhptm : m.sendsntm) || ''
+      const key = `${dt}${tm}`
+      const cur = `${latestDt}${latestTm}`
+      if (key > cur) {
+        latestDt = dt
+        latestTm = tm
+      }
+    }
+    return { types, stats, latestDt, latestTm }
+  }, [sms])
+
   // ── dispatch_order ──
   const [dispatchOrder, setDispatchOrder] = useState<DispatchOrder | null>(null)
   const [orderLoading, setOrderLoading] = useState(true)
@@ -614,11 +639,56 @@ export default function DispatchDetailPage({
               </Section>
 
               {/* PR-B3 — 카페24 문자 발송 이력 + 발송문구 (crmsendh + crmsmsgh)
-                  사용자 명시 (2026-05-16): 「문자 발송이력과 발송문구 내용도 카페24 접수에 있긴한데」 */}
+                  사용자 명시 (2026-05-16): 「문자 발송이력과 발송문구 내용도 카페24 접수에 있긴한데」
+                  PR-B3.3 — 상단 요약 strip (사용자 명시): 「길어지니까 상단에 전체 내역을 카운드해주고 볼수있게」 */}
               <Section icon="📨" title={`문자 발송 이력 (${sms.length})`}>
                 {smsLoading ? <Place>cafe24 문자 발송 이력 조회 중…</Place>
                   : sms.length === 0 ? <Place>발송된 문자가 없습니다</Place>
                   : (
+                    <>
+                      {/* 요약 strip — 채널별 / 상태별 / 최근 발송 시각 */}
+                      <div style={{
+                        display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center',
+                        marginBottom: 12, padding: '8px 10px',
+                        background: 'rgba(248,250,252,0.7)',
+                        borderRadius: 8,
+                        border: '1px solid rgba(0,0,0,0.04)',
+                        fontSize: 11,
+                      }}>
+                        <span style={{ color: '#64748b', fontWeight: 700 }}>채널</span>
+                        {Object.entries(smsStats.types).map(([t, c]) => {
+                          const badge = t === 'KAKAO' ? { bg: '#FEE500', fg: '#3C1E1E' }
+                            : { bg: 'rgba(14,165,233,0.12)', fg: '#0369a1' }
+                          return (
+                            <span key={t} style={{ padding: '2px 8px', borderRadius: 6, background: badge.bg, color: badge.fg, fontWeight: 700, whiteSpace: 'nowrap' }}>
+                              {t} {c}
+                            </span>
+                          )
+                        })}
+                        <span style={{ width: 1, height: 14, background: 'rgba(0,0,0,0.08)', margin: '0 4px' }} />
+                        <span style={{ color: '#64748b', fontWeight: 700 }}>상태</span>
+                        {Object.entries(smsStats.stats).map(([s, c]) => {
+                          const meta = s === 'Y' ? { bg: 'rgba(34,197,94,0.12)', fg: '#15803d', label: '✓완료' }
+                            : s === 'N' ? { bg: 'rgba(245,158,11,0.12)', fg: '#b45309', label: '⏳대기' }
+                            : s === 'F' ? { bg: 'rgba(239,68,68,0.12)', fg: '#991b1b', label: '✗실패' }
+                            : s === 'X' ? { bg: 'rgba(148,163,184,0.15)', fg: '#475569', label: '×취소' }
+                            : { bg: 'rgba(148,163,184,0.15)', fg: '#475569', label: s }
+                          return (
+                            <span key={s} style={{ padding: '2px 8px', borderRadius: 6, background: meta.bg, color: meta.fg, fontWeight: 700, whiteSpace: 'nowrap' }}>
+                              {meta.label} {c}
+                            </span>
+                          )
+                        })}
+                        {smsStats.latestDt && (
+                          <>
+                            <span style={{ width: 1, height: 14, background: 'rgba(0,0,0,0.08)', margin: '0 4px' }} />
+                            <span style={{ color: '#64748b', fontWeight: 700 }}>최근</span>
+                            <span style={{ color: '#0f2440', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                              {fmtCafe24DateTime(smsStats.latestDt, smsStats.latestTm) || '-'}
+                            </span>
+                          </>
+                        )}
+                      </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 480, overflowY: 'auto', paddingRight: 4 }}>
                       {sms.map((m) => {
                         // 예약/즉시 분기 — 예약 Y 면 sendhpdt/hptm, 즉시 N 이면 sendsndt/sntm
@@ -688,6 +758,7 @@ export default function DispatchDetailPage({
                         )
                       })}
                     </div>
+                    </>
                   )}
               </Section>
 
