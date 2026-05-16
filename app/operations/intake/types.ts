@@ -214,6 +214,8 @@ export type DispatchRequestRow = {
   otptdsus: string | null    // 대물담당자
   otptdstl: string | null    // 대물담당자 HP
   otptpart: string | null    // 파손부위 (acrparth + comcbsdm subquery)
+  // 배정공장 (ajaoderh + pmcfactm subquery — 활성 oderstat<>'X' 만, ','로 join)
+  factory_names: string | null
   // 대차요청 sub (acrrentm)
   rent_srno: number | string | null
   rent_seqn: number | null

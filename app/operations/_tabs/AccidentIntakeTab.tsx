@@ -119,6 +119,7 @@ export default function AccidentIntakeTab() {
       (r.otptdsnm || '').toLowerCase().includes(q) ||
       (r.cars_user || '').toLowerCase().includes(q) ||
       (r.rental_vendor || '').toLowerCase().includes(q) ||
+      (r.factory_names || '').toLowerCase().includes(q) ||
       (r.capital_co_name || '').toLowerCase().includes(q) ||
       (r.otptidno || '').toLowerCase().includes(q) ||
       (r.otptacmo || '').toLowerCase().includes(q),
@@ -200,6 +201,13 @@ export default function AccidentIntakeTab() {
       render: (r) => <span style={{ fontSize: 12, color: '#0f2440', whiteSpace: 'nowrap' }}>{r.rental_vendor || '-'}</span>,
     },
     {
+      key: 'factory_names', label: '배정공장', width: 160,
+      sortBy: (r) => r.factory_names || '',
+      render: (r) => r.factory_names
+        ? <span style={{ fontSize: 12, color: '#0f2440', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: 160 }}>🔧 {r.factory_names}</span>
+        : <span style={{ fontSize: 11, color: '#cbd5e1', whiteSpace: 'nowrap' }}>—</span>,
+    },
+    {
       key: 'otptacmo', label: '사고내용', width: 320,
       sortBy: (r) => r.otptacmo || '',
       render: (r) => <span style={{ fontSize: 11, color: '#475569', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: 320 }}>{r.otptacmo || '-'}</span>,
@@ -222,7 +230,7 @@ export default function AccidentIntakeTab() {
       <DcToolbar
         search={search}
         onSearchChange={setSearch}
-        placeholder="차량번호 / 통보자 / 운전자 / 고객 / 대차업체 / 사고내용 검색…"
+        placeholder="차량번호 / 통보자 / 운전자 / 고객 / 대차업체 / 배정공장 / 사고내용 검색…"
         filters={filterItems}
         activeFilter={filter}
         onFilterChange={(k) => setFilter(k as FilterKey)}

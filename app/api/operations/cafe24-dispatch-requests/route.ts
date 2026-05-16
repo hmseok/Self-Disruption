@@ -113,6 +113,8 @@ export interface DispatchRequestRow extends RowDataPacket {
   otptdstl: string | null    // 대물담당자 HP
   // otptpart (파손부위) — acrparth + comcbsdm subquery 별도 (다음 step)
   otptpart: string | null
+  // P2.1a-pivot — 배정공장 (ajaoderh + pmcfactm subquery, 활성 oderstat<>'X' 만)
+  factory_names: string | null
   // 대차요청 sub (acrrentm)
   rent_srno: number | null
   rent_seqn: number | null
@@ -237,6 +239,14 @@ export async function GET(request: Request) {
                  AND p.partmddt = b.otptmddt
                  AND p.partsrno = b.otptsrno
              ) AS otptpart,
+             (SELECT GROUP_CONCAT(DISTINCT pf.factname SEPARATOR ', ')
+                FROM ajaoderh aa
+                LEFT JOIN pmcfactm pf ON pf.factcode = aa.oderfact
+               WHERE aa.oderidno = b.otptidno
+                 AND aa.odermddt = b.otptmddt
+                 AND aa.odersrno = b.otptsrno
+                 AND aa.oderstat <> 'X'
+             ) AS factory_names,
              r.rentsrno AS rent_srno,
              r.rentseqn AS rent_seqn,
              r.rentstat AS rent_stat,
