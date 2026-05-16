@@ -74,6 +74,8 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
   }
   // PR-2QQ-a: 카테고리
   const [category, setCategory] = useState('general')
+  // N-16 — 휴일(cs_holidays) 자동 제외 (주중 그룹은 true, 야간/24-365 그룹은 false)
+  const [skipOnHolidays, setSkipOnHolidays] = useState(false)
   // PR-2QQ-d-2: 최소 인원 (디폴트 + 요일별 예외)
   const [defaultMin, setDefaultMin] = useState<string>('')        // 매일 디폴트 (빈 문자열 = 미설정)
   const [dowMin, setDowMin] = useState<Record<number, string>>({}) // 요일별 예외 (0~6)
@@ -122,6 +124,7 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
         setColorTone(group.color_tone)
         setDescription(group.description || '')
         setCategory(group.category || 'general')
+        setSkipOnHolidays(Boolean(group.skip_on_holidays))  // N-16
         setMemberIds(members.map((m: any) => m.worker_id))
         // K-2 — 멤버 cfg 파싱
         const cfgs: Record<string, MemberCfg> = {}
@@ -289,6 +292,7 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
         rotation_period_days: rotationPeriod,
         color_tone: colorTone,
         description: description.trim() || null,
+        skip_on_holidays: skipOnHolidays ? 1 : 0,  // N-16
       }
       // K-2 — 멤버 PUT body (8 컬럼 포함)
       const buildMembersPayload = () => memberIds.map(wId => {
@@ -597,6 +601,30 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
           <Field label="설명">
             <input type="text" value={description} onChange={(e) => setDescription(e.target.value)}
                    style={inputStyle} placeholder="자유 메모" />
+          </Field>
+
+          {/* N-16 — 휴일 자동 제외 (주중 그룹은 ON, 야간/24-365 그룹은 OFF) */}
+          <Field label="휴일 처리"
+                 sub="공휴일/임시휴일(휴일 설정 탭)에 자동 배정에서 제외할지 — 주중 근무 그룹은 ON, 24/365 운영 그룹은 OFF">
+            <label style={{
+              display: 'flex', alignItems: 'center', gap: 10,
+              padding: '10px 12px', borderRadius: 10,
+              background: skipOnHolidays ? COLORS.bgBlue : 'rgba(0,0,0,0.03)',
+              border: `1px solid ${skipOnHolidays ? COLORS.borderBlue : COLORS.borderFaint}`,
+              cursor: 'pointer',
+            }}>
+              <input type="checkbox"
+                     checked={skipOnHolidays}
+                     onChange={(e) => setSkipOnHolidays(e.target.checked)}
+                     style={{ width: 16, height: 16, cursor: 'pointer' }} />
+              <span style={{ fontSize: 12, fontWeight: 600,
+                             color: skipOnHolidays ? COLORS.info : COLORS.textPrimary }}>
+                🎌 휴일에는 자동 배정 제외
+              </span>
+              <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 'auto' }}>
+                {skipOnHolidays ? '주중 근무 그룹' : '휴일에도 정상 배정 (24/365)'}
+              </span>
+            </label>
           </Field>
 
           {/* N-5 — 최소 인원 collapsible (자주 안 만지는 셋팅 접기) */}

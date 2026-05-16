@@ -3,6 +3,35 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-15 (Phase N-16) — 그룹별 휴일 자동 제외 옵션 (skip_on_holidays)
+
+### 사용자 의도
+> "그룹설정에서 주중근무자들이 휴일은 빠져야 되는데 설정이 없는것같아 휴일설정에서 휴일로 들어간것에는 빠지도록 설정추가해줘 그부분은 또 다른근무그룹이 할수있게도 셋팅도 해야겠지?"
+
+### 변경
+- **마이그레이션**: `migrations/2026-05-10_cs_shift_groups_skip_on_holidays.sql`
+  · `cs_shift_groups.skip_on_holidays TINYINT(1) NOT NULL DEFAULT 0` 추가 (멱등)
+- **API GET `/api/call-scheduler/shift-groups`**: `hasSkipOnHolidays` 감지 + 별도 조회로 graceful 응답에 `skip_on_holidays` 포함
+- **API POST `/api/call-scheduler/shift-groups`**: body `skip_on_holidays` 수용, INSERT 분기 (hasCategory && hasSkipOnHolidays / hasCategory only / legacy)
+- **API PATCH `/api/call-scheduler/shift-groups/[id]`**: `ALLOWED_COLS` 에 `skip_on_holidays` 추가, graceful 컬럼 감지, boolean → 0/1 변환
+- **UI `GroupEditor.tsx`**: 그룹 정의 섹션에 「🎌 휴일에는 자동 배정 제외」 체크박스 (설명 아래, 최소인원 위)
+  · ON: 주중 근무 그룹 (휴일 자동 배정 제외)
+  · OFF: 24/365 운영 그룹 (휴일에도 정상 배정)
+- **알고리즘 `auto-generate/route.ts`**:
+  · `GroupRow` 에 `skip_on_holidays` 추가
+  · 그룹별 skip flag 별도 조회 → targetGroups 에 주입
+  · 메인 루프 휴일 분기: `g.skip_on_holidays` 우선, 컬럼 미적용 시 legacy 전역 `skipHolidays` 사용
+  · 전역 `skipHolidays` 는 master kill switch (전역 false 면 모든 그룹 휴일 정상 배정)
+
+### 효과
+- 주중 근무 그룹 (09:00~18:00 주4): `skip_on_holidays=1` → 자동 생성 시 cs_holidays 일자 후보 제외
+- 야간/특수 그룹: `skip_on_holidays=0` → 휴일에도 정상 배정 (24/365 콜센터 유지)
+
+### 검증
+- tsc PASS (CallScheduler 모듈 0 errors)
+- 마이그레이션 사용자 적용 완료 (skip_on_holidays / tinyint / default 0)
+
+
 ## 2026-05-09 (Phase K-3) — 자동 생성 알고리즘 그룹별 정교화 + AssignmentCell dow 색상 재활성
 
 ### 자동 생성 알고리즘

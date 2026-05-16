@@ -17,6 +17,7 @@ const ALLOWED_COLS = new Set([
   'name', 'category', 'shift_slot_id', 'pattern_type', 'custom_days',
   'generation_strategy', 'rotation_size', 'rotation_period_days',
   'color_tone', 'description', 'sort_order', 'is_active',
+  'skip_on_holidays',  // N-16
 ])
 const PATTERNS = new Set(['all_days', 'all_weekdays', 'weekends_only', 'custom'])
 const STRATEGIES = new Set(['all_members', 'rotation'])
@@ -91,16 +92,22 @@ export async function PATCH(
     } catch {
       hasCategory = false
     }
+    // N-16 — skip_on_holidays 컬럼 존재 확인 (graceful)
+    let hasSkipOnHolidays = true
+    try {
+      await prisma.$queryRaw<any[]>`SELECT skip_on_holidays FROM cs_shift_groups LIMIT 1`
+    } catch { hasSkipOnHolidays = false }
 
     const sets: string[] = []
     const params: any[] = []
     for (const [k, v] of Object.entries(body || {})) {
       if (!ALLOWED_COLS.has(k)) continue
       if (k === 'category' && !hasCategory) continue  // 마이그레이션 미적용 시 skip
+      if (k === 'skip_on_holidays' && !hasSkipOnHolidays) continue  // N-16 — graceful
       if (k === 'pattern_type' && !PATTERNS.has(String(v))) continue
       if (k === 'generation_strategy' && !STRATEGIES.has(String(v))) continue
       if (k === 'color_tone' && !COLOR_TONES.has(String(v))) continue
-      if (k === 'is_active') {
+      if (k === 'is_active' || k === 'skip_on_holidays') {
         sets.push(`${k} = ?`); params.push(v ? 1 : 0); continue
       }
       sets.push(`${k} = ?`); params.push(v ?? null)

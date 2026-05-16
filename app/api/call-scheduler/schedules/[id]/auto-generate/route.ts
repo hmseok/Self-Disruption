@@ -56,6 +56,8 @@ interface GroupRow {
   slot_night_period_start?: string | null
   slot_night_period_end?: string | null
   slot_night_premium_rate?: number
+  // N-16 — 그룹별 휴일 자동 제외 (graceful)
+  skip_on_holidays?: number | boolean
 }
 interface MemberRow {
   group_id: string
@@ -294,12 +296,16 @@ export async function POST(
     // 2) 그룹 + 슬롯 join — PR-2SS-b/e: 안전 가드 + 시간 분해 컬럼 graceful (d revert 후 seniority 제거)
     let hasSlotSafety = true
     let hasSlotBreakdown = true
+    let hasGroupSkipOnHolidays = true  // N-16
     try {
       await prisma.$queryRaw<any[]>`SELECT next_day_blocking_hours FROM cs_shift_slots LIMIT 1`
     } catch { hasSlotSafety = false }
     try {
       await prisma.$queryRaw<any[]>`SELECT night_period_start FROM cs_shift_slots LIMIT 1`
     } catch { hasSlotBreakdown = false }
+    try {
+      await prisma.$queryRaw<any[]>`SELECT skip_on_holidays FROM cs_shift_groups LIMIT 1`
+    } catch { hasGroupSkipOnHolidays = false }
     const groups: GroupRow[] = (hasSlotSafety && hasSlotBreakdown)
       ? (await prisma.$queryRaw<any[]>`
           SELECT g.id, g.name, g.shift_slot_id, g.pattern_type, g.custom_days,
@@ -347,6 +353,21 @@ export async function POST(
       : groups
     if (targetGroups.length === 0) {
       return NextResponse.json({ error: '활성 그룹이 없습니다. 먼저 설정 → 그룹 탭에서 그룹을 만드세요.' }, { status: 400 })
+    }
+
+    // N-16 — 그룹별 skip_on_holidays 별도 조회 (graceful — 컬럼 없으면 false)
+    const groupSkipHolidaysMap = new Map<string, boolean>()
+    if (hasGroupSkipOnHolidays && targetGroups.length > 0) {
+      try {
+        const shRows = await prisma.$queryRaw<any[]>`
+          SELECT id, skip_on_holidays FROM cs_shift_groups WHERE is_active = 1
+        `
+        for (const r of shRows) groupSkipHolidaysMap.set(r.id, Boolean(r.skip_on_holidays))
+      } catch { /* graceful */ }
+    }
+    // 각 그룹 row 에 skip_on_holidays 주입
+    for (const g of targetGroups) {
+      g.skip_on_holidays = groupSkipHolidaysMap.get(g.id) ? 1 : 0
     }
 
     // 3) 그룹 멤버
@@ -648,8 +669,11 @@ export async function POST(
         const dowSet = patternDays(g.pattern_type, g.custom_days)
         if (!dowSet.has(dow)) continue
 
-        // 휴일 제외
-        if (skipHolidays && holidayDates.has(isoDate)) {
+        // 휴일 제외 — N-16: 그룹별 skip_on_holidays 우선 (legacy 전역 skipHolidays 는 master kill switch)
+        const groupSkipsHoliday = hasGroupSkipOnHolidays
+          ? Boolean(g.skip_on_holidays)
+          : skipHolidays  // 컬럼 미적용 시 legacy 전역 옵션 사용
+        if (skipHolidays && groupSkipsHoliday && holidayDates.has(isoDate)) {
           plan.push({
             work_date: isoDate, shift_slot_id: g.shift_slot_id, worker_id: null,
             special_code: 'none', action: 'skip-holiday',
