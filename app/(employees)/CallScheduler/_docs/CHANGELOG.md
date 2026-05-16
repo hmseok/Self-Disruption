@@ -3,6 +3,54 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-16 (Phase N-23) — Rotation 운영 fix (자동 분산 + UI 정리 + 단일 시프트 동기화)
+
+### 사용자 보고
+> "현재 로테이션 매월 반복으로 근무자를 셋팅하고 해당 시프트도 적용했는데
+>  실제로 표출은 다른시프트는 공백이 되고 모두 같은 시프트 시간에
+>  매일변경되는 로테이션 출근으로 표출되고있습니다."
+
+### 진단
+- DB 확인: 7명 멤버 모두 `rotation_start_index=0` / `rotation_start_date=''` (default)
+- N-19-b 알고리즘: `shift_index = (start_index + elapsed) % shifts.length`
+  - 모든 워커 start_index=0 + start_date=null → elapsed=0 → 모두 sequence[0] (L01)
+- 결과: L01 에만 7명 매일 배정 / L02~L07 모두 빈 셀
+
+### 변경 (`GroupEditor.tsx`)
+1. **자동 분산 함수** `autoDistributeStartIndex(commonStartDate?)`:
+   - 멤버 순서대로 `start_index = priority % shifts.length` 자동 설정
+   - 시작일 통일 (이번 달 1일)
+2. **「⚖️ 워커 startIndex 자동 분산」 Field 추가** (시프트 sequence + 주기 아래):
+   - 「자동 분산 적용」 버튼 — 클릭 시 모든 멤버 startIndex 재배치
+   - 안내 메시지 — "모든 워커가 같은 시프트에 배정되는 문제 해결"
+3. **새 멤버 추가 시 자동 startIndex 분산** (`toggleMember`):
+   - rotation_enabled ON 일 때 새 워커 추가하면 자동으로 `priority % shifts.length` startIndex + 시작일 셋팅
+   - 멤버 제거 시 rot cfg 정리
+4. **rotation ON 시 단일 slotId 자동 동기화** (useEffect):
+   - rotation_enabled && rotationShifts.length > 0 → `slotId = rotationShifts[0]` 자동
+   - 사용자가 단일 시프트 선택 영역을 따로 만질 필요 X
+
+### 운영 흐름
+**Before** (이슈):
+1. 그룹 만들기 + rotation ON + sequence 5개 + 워커 7명 추가
+2. 워커 cfg 안 만지고 저장
+3. 자동 생성 → 모두 L01 / L02~L07 빈 셀
+
+**After** (N-23):
+1. 그룹 만들기 + rotation ON + sequence 5개 + 워커 7명 추가
+   → 새 워커 추가 시 자동 startIndex (0/1/2/3/4/0/1) 자동 셋팅
+2. 또는 기존 그룹에 「⚖️ 자동 분산 적용」 클릭 → 모든 멤버 재배치
+3. 저장 + 자동 생성 → 워커별 다른 시프트 배정 (L01: 1순위·6순위 / L02: 2순위·7순위 / L03: 3순위 / L05: 4순위 / L07: 5순위)
+4. 매월 자동 순환 (N-19-b 알고리즘)
+
+### 검증
+- tsc PASS (GroupEditor 0 errors)
+- lint:harness ui-token 13건 시프트 (실제 새 hardcode X — 줄 번호 변경) → baseline 갱신 필요
+
+### 미해결 (별도 PR)
+- 근무표 매트릭스 표출 — N-19-b 알고리즘이 매일 7명 배정한 경우 그리드 표시 확인 필요 (사용자 매트릭스 스크린샷 분석 후)
+- generation_strategy='rotation' + rotation_enabled 동시 ON 충돌 — 명확화 필요
+
 ## 2026-05-16 (Phase N-21-c) — Cron 자동 다음 달 스케줄 생성 (Step 3 — C 안)
 
 ### 사용자 의도

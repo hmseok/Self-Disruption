@@ -78,6 +78,8 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
   const [skipOnHolidays, setSkipOnHolidays] = useState(false)
   // N-19-a — 시프트 로테이션 (그룹 1개에 시프트 여러 개 sequence + 워커별 시작 시점)
   const [rotationEnabled, setRotationEnabled] = useState(false)
+  // N-23 — rotation ON 시 단일 slotId 를 sequence[0] 로 자동 동기화
+  // useEffect 가 아래에서 처리 (rotationEnabled / rotationShifts 변경 시)
   const [rotationPeriodKind, setRotationPeriodKind] = useState<'monthly' | 'days'>('monthly')
   const [rotationCustomDays, setRotationCustomDays] = useState<string>('30')
   const [rotationShifts, setRotationShifts] = useState<string[]>([])  // 시프트 slot_id sequence
@@ -88,6 +90,34 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
   const updateMemberRotCfg = (wId: string, patch: Partial<RotCfg>) => {
     setMemberRotCfgs(prev => ({ ...prev, [wId]: { ...(prev[wId] || defaultRotCfg()), ...patch } }))
   }
+  // N-23 — 자동 분산: 모든 멤버 startIndex 를 (priority % shifts.length) 로 자동 배치 + 시작일 통일
+  const autoDistributeStartIndex = (commonStartDate?: string) => {
+    if (rotationShifts.length === 0) return
+    const today = commonStartDate || (() => {
+      const d = new Date()
+      return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`
+    })()
+    setMemberRotCfgs(prev => {
+      const next: Record<string, RotCfg> = { ...prev }
+      memberIds.forEach((wId, idx) => {
+        next[wId] = {
+          start_date: today,
+          start_index: idx % rotationShifts.length,
+          end_date: next[wId]?.end_date || '',
+        }
+      })
+      return next
+    })
+  }
+  // N-23 — rotation ON 시 slotId 자동 동기화 (sequence[0])
+  useEffect(() => {
+    if (rotationEnabled && rotationShifts.length > 0) {
+      const firstSlot = rotationShifts[0]
+      if (firstSlot && firstSlot !== slotId) {
+        setSlotId(firstSlot)
+      }
+    }
+  }, [rotationEnabled, rotationShifts, slotId])
   // PR-2QQ-d-2: 최소 인원 (디폴트 + 요일별 예외)
   const [defaultMin, setDefaultMin] = useState<string>('')        // 매일 디폴트 (빈 문자열 = 미설정)
   const [dowMin, setDowMin] = useState<Record<number, string>>({}) // 요일별 예외 (0~6)
@@ -360,12 +390,34 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
   }
 
   const toggleMember = (wId: string) => {
+    const isAdding = !memberIds.includes(wId)
     setMemberIds(prev => prev.includes(wId) ? prev.filter(x => x !== wId) : [...prev, wId])
     // K-2 — 새 멤버 default cfg, 제외 시 cfg 정리
     setMemberCfgs(prev => {
       if (prev[wId]) { const next = { ...prev }; delete next[wId]; return next }
       return { ...prev, [wId]: defaultMemberCfg() }
     })
+    // N-23 — rotation ON 시 새 멤버 추가하면 자동 startIndex 분산
+    if (isAdding && rotationEnabled && rotationShifts.length > 0) {
+      const newIdx = memberIds.length  // 추가 직전의 길이 = 새 멤버의 priority
+      const today = new Date()
+      const startDate = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-01`
+      setMemberRotCfgs(prev => ({
+        ...prev,
+        [wId]: {
+          start_date: prev[wId]?.start_date || startDate,
+          start_index: newIdx % rotationShifts.length,
+          end_date: prev[wId]?.end_date || '',
+        },
+      }))
+    } else if (!isAdding) {
+      // 제거 시 rot cfg 정리
+      setMemberRotCfgs(prev => {
+        const next = { ...prev }
+        delete next[wId]
+        return next
+      })
+    }
     // 새 멤버 추가 시 자동 펼침 (그 자리에서 cfg 입력)
     setExpandedCfgWorkerId(prev => prev === wId ? null : wId)
   }
@@ -899,6 +951,37 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
                       일마다 다음 시프트로
                     </span>
                   )}
+                </div>
+              </Field>
+
+              {/* N-23 — 자동 분산 */}
+              <Field label="⚖️ 워커 startIndex 자동 분산"
+                     sub="멤버 순서대로 시프트 sequence 에 분산 — 1순위 워커=L01부터 / 2순위=L02부터 / ...">
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <button type="button"
+                          onClick={() => autoDistributeStartIndex()}
+                          disabled={memberIds.length === 0 || rotationShifts.length === 0}
+                          style={{
+                            fontSize: 12, fontWeight: 700,
+                            padding: '8px 14px', borderRadius: 8,
+                            background: COLORS.primary, color: '#fff',
+                            border: 'none', cursor: 'pointer',
+                            opacity: (memberIds.length === 0 || rotationShifts.length === 0) ? 0.5 : 1,
+                          }}>
+                    ⚖️ 자동 분산 적용
+                  </button>
+                  <span style={{ fontSize: 11, color: COLORS.textMuted }}>
+                    {memberIds.length === 0 ? '먼저 멤버 추가 필요'
+                     : rotationShifts.length === 0 ? '먼저 시프트 sequence 필요'
+                     : `${memberIds.length}명 → ${rotationShifts.length}개 sequence 에 분산 (시작일=이번 달 1일)`}
+                  </span>
+                </div>
+                <div style={{
+                  marginTop: 6, padding: 8, fontSize: 11,
+                  background: COLORS.bgAmber, border: `1px solid ${COLORS.borderAmber}`,
+                  borderRadius: 6, color: COLORS.warning,
+                }}>
+                  💡 모든 워커가 같은 시프트에 배정되는 문제를 해결합니다. 워커마다 다른 시프트로 자동 분산.
                 </div>
               </Field>
             </>
