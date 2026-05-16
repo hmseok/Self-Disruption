@@ -50,11 +50,15 @@ export default function AccidentIntakeTab() {
     const d = new Date()
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
   }, [])
+  const weekAgoYmd = useMemo(() => {
+    const d = new Date(Date.now() - 7 * 24 * 3600 * 1000)
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  }, [])
   const monthAgoYmd = useMemo(() => {
     const d = new Date(Date.now() - 30 * 24 * 3600 * 1000)
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
   }, [])
-  const [fromDate, setFromDate] = useState<string>(monthAgoYmd)
+  const [fromDate, setFromDate] = useState<string>(weekAgoYmd)  // 사용자 명시: 기본 7일
   const [toDate, setToDate] = useState<string>(todayYmd)
   const dateRange = useMemo(() => {
     const fmt = (s: string) => s.replace(/-/g, '')
@@ -68,7 +72,7 @@ export default function AccidentIntakeTab() {
       const headers = await getAuthHeader()
       const q = FILTER_QUERY[key]
       const params = new URLSearchParams({
-        from: dateRange.from, to: dateRange.to, limit: '200',
+        from: dateRange.from, to: dateRange.to, limit: '1000',
         dcyn: q.dcyn, rgst: q.rgst,
       })
       const res = await fetch(`/api/operations/cafe24-dispatch-requests?${params}`, { headers })
@@ -157,9 +161,9 @@ export default function AccidentIntakeTab() {
       render: (r) => <span style={{ fontWeight: 700, color: '#0f2440', whiteSpace: 'nowrap' }}>🚗 {r.cars_no || '-'}</span>,
     },
     {
-      key: 'cars_model', label: '차종', width: 200,
+      key: 'cars_model', label: '차종', width: 240,
       sortBy: (r) => r.cars_model || '',
-      render: (r) => <span style={{ fontSize: 12, color: '#475569', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: 200 }}>{r.cars_model || '-'}</span>,
+      render: (r) => <span style={{ fontSize: 12, color: '#475569', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: 240 }}>{r.cars_model || '-'}</span>,
     },
     {
       key: 'capital_co_name', label: '캐피탈사', width: 120,
@@ -196,9 +200,9 @@ export default function AccidentIntakeTab() {
       render: (r) => <span style={{ fontSize: 12, color: '#0f2440', whiteSpace: 'nowrap' }}>{r.rental_vendor || '-'}</span>,
     },
     {
-      key: 'otptacmo', label: '사고내용', width: 240,
+      key: 'otptacmo', label: '사고내용', width: 320,
       sortBy: (r) => r.otptacmo || '',
-      render: (r) => <span style={{ fontSize: 11, color: '#475569', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: 240 }}>{r.otptacmo || '-'}</span>,
+      render: (r) => <span style={{ fontSize: 11, color: '#475569', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: 320 }}>{r.otptacmo || '-'}</span>,
     },
     {
       key: 'gnus_name', label: '접수자', width: 100,
@@ -230,9 +234,12 @@ export default function AccidentIntakeTab() {
             <span style={{ color: '#94a3b8' }}>~</span>
             <input type="date" value={toDate} onChange={(e) => applyDate(fromDate, e.target.value)}
               style={{ ...GLASS.L1, padding: '6px 8px', borderRadius: 8, fontSize: 12, color: '#1e293b' }} />
+            <button onClick={() => applyDate(weekAgoYmd, todayYmd)}
+              style={{ padding: '6px 10px', background: 'transparent', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, cursor: 'pointer', color: '#64748b', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap' }}
+            >7일</button>
             <button onClick={() => applyDate(monthAgoYmd, todayYmd)}
               style={{ padding: '6px 10px', background: 'transparent', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, cursor: 'pointer', color: '#64748b', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap' }}
-            >최근 30일</button>
+            >30일</button>
             <button onClick={() => {
                 const d = new Date(Date.now() - 365 * 24 * 3600 * 1000)
                 const y = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`

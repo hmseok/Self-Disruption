@@ -548,13 +548,9 @@ export default function DispatchDetailPage({
                           >
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
                               <span style={{ fontWeight: 800, color: '#0f2440', fontSize: 13 }}>🏢 {f.factname || f.oderfact || '-'}</span>
-                              {f.oderstat && (
-                                <span style={{ padding: '2px 8px', background: 'rgba(34,197,94,0.12)', color: '#15803d', borderRadius: 6, fontSize: 11, fontWeight: 700 }}>
-                                  진행중 ({f.oderstat})
-                                </span>
-                              )}
-                              <div style={{ flex: 1 }} />
-                              <span style={{ fontSize: 11, color: '#94a3b8', whiteSpace: 'nowrap' }}>seq#{f.oderseqn}</span>
+                              <span style={{ padding: '2px 8px', background: 'rgba(34,197,94,0.12)', color: '#15803d', borderRadius: 6, fontSize: 11, fontWeight: 700 }}>
+                                진행중
+                              </span>
                             </div>
                             <div style={{ display: 'grid', gridTemplateColumns: '90px 1fr 90px 1fr', gap: '4px 12px', fontSize: 11 }}>
                               {f.facttelo && (<><Lbl>전화</Lbl><Val>{f.facttelo}</Val></>)}
@@ -592,12 +588,10 @@ export default function DispatchDetailPage({
                           }}
                         >
                           <div style={{ display: 'flex', gap: 8, marginBottom: 4, fontSize: 11, alignItems: 'center', whiteSpace: 'nowrap', flexWrap: 'wrap' }}>
-                            <span style={{ color: '#b45309', fontWeight: 800, padding: '2px 8px', background: '#fff', borderRadius: 6 }}>
-                              📒 #{m.memosort}-{m.memonums}
-                            </span>
+                            <span style={{ color: '#b45309', fontWeight: 700 }}>📒 카페24</span>
                             <span style={{ color: '#64748b' }}>{fmtCafe24DateTime(m.memogndt, m.memogntm)}</span>
                             {(m.user_name || m.memognus) && (
-                              <span style={{ color: '#94a3b8' }}>· 👤 {m.user_name || m.memognus}</span>
+                              <span style={{ color: '#475569', fontWeight: 700 }}>👤 {m.user_name || m.memognus}</span>
                             )}
                           </div>
                           {m.memotitl && <div style={{ fontWeight: 700, color: '#0f2440', marginBottom: 2 }}>{m.memotitl}</div>}

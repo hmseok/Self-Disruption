@@ -18,22 +18,23 @@ import PlaceholderTab from './_tabs/PlaceholderTab'
 // 기존 OperationsMain (1247줄, Calendar+FleetBoard+DispatchModal) 폐기.
 // ═══════════════════════════════════════════════════════════════════
 
-type SubTab = 'accident' | 'dispatch' | 'schedule' | 'claims' | 'waiting'
+type SubTab = 'waiting' | 'dispatch' | 'schedule' | 'claims' | 'accident'
 
+// 사용자 명시 (2026-05-16): 대기차량 제일 앞 / 사고접수 제일 뒤
 const TAB_LIST: Array<{ key: SubTab; label: string; icon: string }> = [
-  { key: 'accident', label: '사고접수',    icon: '📋' },
+  { key: 'waiting',  label: '대기차량',    icon: '🛠' },
   { key: 'dispatch', label: '대차접수',    icon: '🚗' },
   { key: 'schedule', label: '배차스케줄',  icon: '📅' },
   { key: 'claims',   label: '청구관리',    icon: '💰' },
-  { key: 'waiting',  label: '대기차량',    icon: '🛠' },
+  { key: 'accident', label: '사고접수',    icon: '📋' },
 ]
 
 export default function OperationsPage() {
-  const [tab, setTab] = useState<SubTab>('accident')
+  const [tab, setTab] = useState<SubTab>('dispatch')  // default: 대차접수 (배차담당자 주 페르소나)
 
   return (
     <div className="page-bg">
-      <div className="max-w-[1400px] mx-auto py-4 px-4 md:py-5 md:px-6">
+      <div className="max-w-[1800px] mx-auto py-4 px-4 md:py-5 md:px-6">
         {/* Sub-tab nav */}
         <div style={{
           display: 'flex',
