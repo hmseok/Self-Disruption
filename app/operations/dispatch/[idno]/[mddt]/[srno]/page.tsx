@@ -462,7 +462,7 @@ export default function DispatchDetailPage({
                   <Val>{row.capital_co_name || row.capital_co_code || '-'}</Val>
                   {row.cars_vin && (<><Lbl>차대번호</Lbl><Val span={3}><span style={{ fontFamily: 'ui-monospace, monospace', fontSize: 12 }}>{row.cars_vin}</span></Val></>)}
                   {row.cars_contract_no && (<><Lbl>계약번호</Lbl><Val>{row.cars_contract_no}</Val></>)}
-                  {row.cars_start_date && (<><Lbl>계약시작일</Lbl><Val>{fmtCafe24DateOnly(row.cars_start_date)}</Val></>)}
+                  {row.cars_start_date && (<><Lbl>차량등록일</Lbl><Val>{fmtCafe24DateOnly(row.cars_start_date)}</Val></>)}
                   {(row.cars_use_from || row.cars_use_to) && (<>
                     <Lbl>계약기간</Lbl>
                     <Val span={3}>

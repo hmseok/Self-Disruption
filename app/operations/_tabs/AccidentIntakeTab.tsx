@@ -24,30 +24,25 @@ async function getAuthHeader(): Promise<Record<string, string>> {
 
 type FilterKey = 'all' | 'dcyn_y' | 'dcyn_n' | 'closed'
 
-const FILTER_QUERY: Record<FilterKey, { dcyn: string; rgst: string }> = {
-  all:    { dcyn: 'all', rgst: 'R' },
-  dcyn_y: { dcyn: 'Y',   rgst: 'R' },
-  dcyn_n: { dcyn: 'N',   rgst: 'R' },
-  closed: { dcyn: 'all', rgst: 'C' },
-}
-
+// 사용자 명시 (2026-05-16): 「리스트 조회 로딩이 좀 있네」 「사고전체 리스트가 좀 더디네」
+// 원인: 4 fetch (all=R / Y=R / N=R / all=C) × 7일 = 무거움
+// 개선: 단일 fetch (dcyn=all, rgst=all) + client side filter
+//        디폴트 기간 7일 → 3일 (당일 + 어제 + 그저께)
 export default function AccidentIntakeTab() {
   const router = useRouter()
   const [filter, setFilter] = useState<FilterKey>('all')
 
-  const [cache, setCache] = useState<Record<FilterKey, DispatchRequestRow[] | null>>({
-    all: null, dcyn_y: null, dcyn_n: null, closed: null,
-  })
-  const [loadingMap, setLoadingMap] = useState<Record<FilterKey, boolean>>({
-    all: false, dcyn_y: false, dcyn_n: false, closed: false,
-  })
-  const [errMap, setErrMap] = useState<Record<FilterKey, string | null>>({
-    all: null, dcyn_y: null, dcyn_n: null, closed: null,
-  })
+  const [allRows, setAllRows] = useState<DispatchRequestRow[] | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
   const [search, setSearch] = useState('')
 
   const todayYmd = useMemo(() => {
     const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  }, [])
+  const threeDaysAgoYmd = useMemo(() => {
+    const d = new Date(Date.now() - 3 * 24 * 3600 * 1000)
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
   }, [])
   const weekAgoYmd = useMemo(() => {
@@ -58,57 +53,66 @@ export default function AccidentIntakeTab() {
     const d = new Date(Date.now() - 30 * 24 * 3600 * 1000)
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
   }, [])
-  const [fromDate, setFromDate] = useState<string>(weekAgoYmd)  // 사용자 명시: 기본 7일
+  const [fromDate, setFromDate] = useState<string>(threeDaysAgoYmd)  // 사용자 명시: 기본 3일 (성능 우선)
   const [toDate, setToDate] = useState<string>(todayYmd)
   const dateRange = useMemo(() => {
     const fmt = (s: string) => s.replace(/-/g, '')
     return { from: fmt(fromDate), to: fmt(toDate) }
   }, [fromDate, toDate])
 
-  const fetchFilter = useCallback(async (key: FilterKey) => {
-    setLoadingMap((m) => ({ ...m, [key]: true }))
-    setErrMap((m) => ({ ...m, [key]: null }))
+  const fetchAll = useCallback(async () => {
+    setLoading(true)
+    setErr(null)
     try {
       const headers = await getAuthHeader()
-      const q = FILTER_QUERY[key]
       const params = new URLSearchParams({
-        from: dateRange.from, to: dateRange.to, limit: '1000',
-        dcyn: q.dcyn, rgst: q.rgst,
+        from: dateRange.from, to: dateRange.to, limit: '2000',
+        dcyn: 'all', rgst: 'all',
       })
       const res = await fetch(`/api/operations/cafe24-dispatch-requests?${params}`, { headers })
       const json = await res.json().catch(() => ({}))
       if (json?.success && Array.isArray(json.data)) {
-        setCache((c) => ({ ...c, [key]: json.data as DispatchRequestRow[] }))
+        setAllRows(json.data as DispatchRequestRow[])
       } else {
-        setCache((c) => ({ ...c, [key]: [] }))
-        setErrMap((m) => ({ ...m, [key]: json?.error || 'cafe24 미연결' }))
+        setAllRows([])
+        setErr(json?.error || 'cafe24 미연결')
       }
     } catch (e: any) {
-      setCache((c) => ({ ...c, [key]: [] }))
-      setErrMap((m) => ({ ...m, [key]: e?.message || 'fetch 실패' }))
+      setAllRows([])
+      setErr(e?.message || 'fetch 실패')
     } finally {
-      setLoadingMap((m) => ({ ...m, [key]: false }))
+      setLoading(false)
     }
   }, [dateRange])
 
   useEffect(() => {
-    (Object.keys(FILTER_QUERY) as FilterKey[]).forEach((k) => {
-      if (cache[k] === null && !loadingMap[k] && !errMap[k]) fetchFilter(k)
-    })
+    if (allRows === null && !loading && !err) fetchAll()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dateRange])
 
   const refresh = useCallback(() => {
-    setCache({ all: null, dcyn_y: null, dcyn_n: null, closed: null })
+    setAllRows(null)
   }, [])
   const applyDate = useCallback((from: string, to: string) => {
     setFromDate(from); setToDate(to)
-    setCache({ all: null, dcyn_y: null, dcyn_n: null, closed: null })
+    setAllRows(null)
   }, [])
 
-  const activeData = cache[filter] || []
-  const activeLoading = loadingMap[filter]
-  const activeErr = errMap[filter]
+  // client-side 4-way filter (사용자 명시: 4 fetch → 1 fetch + memo filter)
+  const data = useMemo(() => {
+    if (!allRows) return { all: [], dcyn_y: [], dcyn_n: [], closed: [] }
+    const active = allRows.filter((r) => r.otptrgst === 'R')
+    return {
+      all: active,
+      dcyn_y: active.filter((r) => r.otptdcyn === 'Y'),
+      dcyn_n: active.filter((r) => r.otptdcyn === 'N'),
+      closed: allRows.filter((r) => r.otptrgst === 'C'),
+    }
+  }, [allRows])
+
+  const activeData = data[filter]
+  const activeLoading = loading
+  const activeErr = err
 
   const filtered = useMemo(() => {
     if (!search.trim()) return activeData
@@ -127,10 +131,10 @@ export default function AccidentIntakeTab() {
   }, [activeData, search])
 
   const counts = {
-    all: cache.all?.length ?? 0,
-    dcyn_y: cache.dcyn_y?.length ?? 0,
-    dcyn_n: cache.dcyn_n?.length ?? 0,
-    closed: cache.closed?.length ?? 0,
+    all: data.all.length,
+    dcyn_y: data.dcyn_y.length,
+    dcyn_n: data.dcyn_n.length,
+    closed: data.closed.length,
   }
 
   const statItems: StatItem[] = [
@@ -242,6 +246,9 @@ export default function AccidentIntakeTab() {
             <span style={{ color: '#94a3b8' }}>~</span>
             <input type="date" value={toDate} onChange={(e) => applyDate(fromDate, e.target.value)}
               style={{ ...GLASS.L1, padding: '6px 8px', borderRadius: 8, fontSize: 12, color: '#1e293b' }} />
+            <button onClick={() => applyDate(threeDaysAgoYmd, todayYmd)}
+              style={{ padding: '6px 10px', background: 'transparent', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, cursor: 'pointer', color: '#64748b', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap' }}
+            >3일</button>
             <button onClick={() => applyDate(weekAgoYmd, todayYmd)}
               style={{ padding: '6px 10px', background: 'transparent', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, cursor: 'pointer', color: '#64748b', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap' }}
             >7일</button>

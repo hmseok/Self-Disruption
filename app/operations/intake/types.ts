@@ -219,7 +219,7 @@ export type DispatchRequestRow = {
   // P2.1a-pivot-B2 — 차량 계약 정보 (pmccarsm) + 코드→한글 매핑 (comcbsdm)
   cars_vin: string | null          // 차대번호 (VIN)
   cars_contract_no: string | null  // 계약번호
-  cars_start_date: string | null   // 계약시작일 (raw YYYYMMDD[HHMI])
+  cars_start_date: string | null   // 차량등록일 (raw YYYYMMDD[HHMI] — 사용자 확정 2026-05-16)
   cars_use_from: string | null     // 계약 사용 시작
   cars_use_to: string | null       // 계약 사용 종료
   cars_user_hp: string | null      // 계약자 휴대폰

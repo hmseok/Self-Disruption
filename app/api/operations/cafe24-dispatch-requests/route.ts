@@ -143,7 +143,7 @@ export interface DispatchRequestRow extends RowDataPacket {
   // P2.1a-pivot-B2 — 차량 계약 정보 (사용자 시각 검수 결과 추가, 2026-05-16)
   cars_vin: string | null          // c.carscode 차대번호 (VIN)
   cars_contract_no: string | null  // c.carscono 계약번호
-  cars_start_date: string | null   // c.carsstdt 계약시작일 (raw YYYYMMDD[HHMI])
+  cars_start_date: string | null   // c.carsstdt 차량등록일 (mgcap 라벨 "계약시작일" 이나 실데이터 의미 = 차량/계약 시스템 등록일, 사용자 확정 2026-05-16)
   cars_use_from: string | null     // c.carscofr 계약 사용 시작
   cars_use_to: string | null       // c.carscoto 계약 사용 종료
   cars_user_hp: string | null      // c.carsushp 계약자 휴대폰
