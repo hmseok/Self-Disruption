@@ -3,6 +3,53 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-16 (Phase N-18 + N-19-a) — 균형도 드릴다운 + 그룹 multi-shift 로테이션
+
+### N-18 — 균형도 KPI 카드 드릴다운
+- KpiStrip.tsx — 균형도 카드 클릭 시 펼침 패널
+- 과로 워커 list (빨강 +N%) / 부족 워커 list (앰버 -N%)
+- 워커 칩 (tone bg) + 시간 + 평균 대비 편차 %
+- alertCount > 0 일 때만 클릭 가능 (양호 시 단순 표시)
+
+### N-19-a — 그룹 1개 안 시프트 sequence + 워커별 시작 시점 (마이그 + UI)
+
+#### 사용자 의도
+> "주중 통합 그룹 하나에 7-18 / 8-17 / 9-18 시프트 다 넣고, 워커마다 매월(또는 N일) 자동 순환"
+
+#### 마이그레이션 (`migrations/2026-05-16_cs_group_shift_rotation.sql`, 멱등)
+- **신설** `cs_group_shifts (id, group_id, shift_slot_id, sort_order)` — 그룹 ↔ 시프트 1:N + 순서 보존
+- **ALTER** `cs_shift_groups` + `rotation_enabled` + `rotation_period_kind` ('monthly'|'days') + `rotation_custom_days`
+- **ALTER** `cs_group_members` + `rotation_start_date` + `rotation_start_index` + `rotation_end_date`
+
+#### API (graceful 컬럼 감지)
+- `GET /shift-groups` — `rotation_enabled / period_kind / custom_days / rotation_shifts list` 응답
+- `PATCH /shift-groups/[id]` — rotation 컬럼 + `rotation_shifts` body (DELETE + INSERT 동기화)
+- `PUT /shift-groups/[id]/members` — 멤버별 rotation_start_date / index / end_date 추가
+
+#### UI (`GroupEditor.tsx`)
+- 「🔄 시프트 로테이션」 토글
+- ON 시: 시프트 sequence (↑↓× 순서 조작) + 후보 칩에서 추가 + 주기 (매월 / N일 커스텀)
+- 멤버 cfg 펼침에 추가: 시작일 / 시작 시프트 (1번 / 2번 / ...) / 종료일
+
+#### 알고리즘 (auto-generate)
+- **변경 없음** — rotation_enabled OFF default 라 기존 단일 shift_slot_id 동작 유지
+- N-19-b 에서 알고리즘 변경 + 한 그룹 테스트 후 적용 예정
+
+### 효과
+- 그룹 13개 → 통합 1개 (예: 「주중 통합」) 운영 가능 (사용자 의도)
+- 메뉴 복잡도 감소 + 워커별 자동 순환 가시화
+- 균형도 알람 클릭으로 어떤 워커가 과로 / 부족인지 즉시 확인
+
+### 검증
+- tsc PASS (CallScheduler 0 errors)
+- lint:harness 새 위반 0건 (ui-token baseline 갱신 — 543 위반 동결)
+- 마이그 적용 후 검증 SQL 주석 포함
+
+### 회고
+- ⚠ Rule 22 위반 — 처음 commit 시 CHANGELOG 누락 (lock 정리 + cross-module 처리로 정신 팔림)
+- 별도 hotfix commit 으로 추가 — 향후 staged 직전 CHANGELOG 체크 의무화 (자가 강화)
+
+
 ## 2026-05-16 (Phase N-17) — 대시보드 운영 풀세트 + KPI 통합
 
 ### 사용자 의도
