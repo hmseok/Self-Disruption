@@ -3,6 +3,71 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-16 (Phase N-19-b) — 자동 생성 알고리즘: 그룹 rotation_enabled 시 워커별 시프트 순환
+
+### 사용자 의도
+> "주중 통합 그룹 1개 안에 7-18 / 8-17 / 9-18 시프트 다 넣고, 워커마다 매월(또는 N일) 자동 순환"
+> (N-19-a 에서 데이터 + UI 완료, N-19-b 에서 자동 생성 적용)
+
+### 변경 (`app/api/call-scheduler/schedules/[id]/auto-generate/route.ts`)
+- Graceful 컬럼/테이블 감지 추가:
+  · `hasGroupRotation` — cs_shift_groups.rotation_enabled
+  · `hasGroupShifts` — cs_group_shifts 테이블
+  · `hasMemberRotation` — cs_group_members.rotation_start_date
+- 그룹 rotation 설정 별도 조회 — `groupRotMap<group_id, {enabled, period_kind, period_days}>`
+- 그룹 ↔ 시프트 sequence 일괄 조회 — `groupShiftsMap<group_id, GroupShiftRow[]>`
+- 멤버 rotation 시작 시점 일괄 조회 — `memberRotMap<group_id+'_'+worker_id, {start_date, start_index, end_date}>`
+- 메인 loop 안 휴일 체크 직후 **rotation 분기** 추가:
+  - rotation_enabled && shifts.length > 0 이면 새 path
+  - 워커별 elapsed_periods 계산 (monthly = 자연 월 차이 / days = days / period_days)
+  - `shift_index = (start_index + elapsed) % shifts.length`
+  - `targetSlotId = shifts[shift_index].shift_slot_id`
+  - 가드 적용: 휴가 풀-오프 / 그룹 회피일 (approved) / 멤버 시작일·종료일
+  - plan.push (action='insert', special_code=am_half/pm_half/none)
+  - continue (기존 path skip)
+- rotation_enabled=false 그룹 → 기존 동작 그대로 유지 (백워드 호환)
+
+### 알고리즘 (의사코드)
+```
+for each work_date in month:
+  for each group g:
+    if g.skip_on_holidays && isHoliday: skip
+    if g.rotation_enabled && shifts.length > 0:
+      for each member m:
+        if leave==off || group_skip || isoDate<start_date || isoDate>end_date: skip
+        elapsed = monthDiff(m.start_date, isoDate)  // or daysDiff / period_days
+        shift_index = (m.start_index + elapsed) % shifts.length
+        plan.push(isoDate, shifts[shift_index].slot_id, m.worker_id)
+    else:
+      기존 path (g.shift_slot_id 단일)
+```
+
+### 제한사항 (N-19-c 다음 단계)
+- 슬롯 거부 (blocked_slot_ids) 미적용 — rotation 그룹의 시프트는 sequence 가 결정하므로 슬롯 거부와 충돌 시 경고만
+- 연속 한도 (max_consecutive_work_days) 미적용 — rotation 은 전체 멤버 매일 출근 가정
+- 익일 휴식 (next_day_blocking_hours) 미적용 — 같은 그룹 안에서 큰 시간 차 없으면 안전
+- workerLastEnd / counter 갱신 단순화 — 다음 PR 에서 통합
+
+### 효과
+- 그룹 13개 → 통합 1개 운영 가능 (사용자 의도)
+- 한 그룹 안에 시프트 sequence 정의 + 워커별 시작 시점 → 매월 자동 순환
+- 자동 생성 시 워커 A는 1월 L01, 2월 L02, 3월 L03 → 4월 L01 로 자동 cycling
+
+### 검증
+- tsc PASS (auto-generate 0 errors)
+- lint:harness 새 위반 0건
+- 기존 단일 시프트 그룹은 rotation_enabled=0 default 라 영향 없음 (백워드 호환)
+
+### 테스트 시나리오 (사용자 확인 권장)
+1. 「주중 통합」 그룹 신규 + 시프트 sequence [L01, L02, L03]
+2. 워커 A: start_date=2026-06-01, start_index=0 (6월 L01 시작)
+3. 워커 B: start_date=2026-06-01, start_index=1 (6월 L02 시작)
+4. 워커 C: start_date=2026-06-01, start_index=2 (6월 L03 시작)
+5. 6월 자동 생성 → A=L01, B=L02, C=L03 (매일)
+6. 7월 자동 생성 → A=L02, B=L03, C=L01 (1칸씩 이동)
+7. 8월 자동 생성 → A=L03, B=L01, C=L02
+
+
 ## 2026-05-16 (Phase N-18 + N-19-a) — 균형도 드릴다운 + 그룹 multi-shift 로테이션
 
 ### N-18 — 균형도 KPI 카드 드릴다운

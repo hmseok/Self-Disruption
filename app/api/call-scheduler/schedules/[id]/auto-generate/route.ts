@@ -297,6 +297,9 @@ export async function POST(
     let hasSlotSafety = true
     let hasSlotBreakdown = true
     let hasGroupSkipOnHolidays = true  // N-16
+    let hasGroupRotation = true        // N-19-b — cs_shift_groups.rotation_enabled
+    let hasGroupShifts = true          // N-19-b — cs_group_shifts 테이블
+    let hasMemberRotation = true       // N-19-b — cs_group_members.rotation_start_date
     try {
       await prisma.$queryRaw<any[]>`SELECT next_day_blocking_hours FROM cs_shift_slots LIMIT 1`
     } catch { hasSlotSafety = false }
@@ -306,6 +309,15 @@ export async function POST(
     try {
       await prisma.$queryRaw<any[]>`SELECT skip_on_holidays FROM cs_shift_groups LIMIT 1`
     } catch { hasGroupSkipOnHolidays = false }
+    try {
+      await prisma.$queryRaw<any[]>`SELECT rotation_enabled FROM cs_shift_groups LIMIT 1`
+    } catch { hasGroupRotation = false }
+    try {
+      await prisma.$queryRaw<any[]>`SELECT 1 FROM cs_group_shifts LIMIT 1`
+    } catch { hasGroupShifts = false }
+    try {
+      await prisma.$queryRaw<any[]>`SELECT rotation_start_date FROM cs_group_members LIMIT 1`
+    } catch { hasMemberRotation = false }
     const groups: GroupRow[] = (hasSlotSafety && hasSlotBreakdown)
       ? (await prisma.$queryRaw<any[]>`
           SELECT g.id, g.name, g.shift_slot_id, g.pattern_type, g.custom_days,
@@ -368,6 +380,78 @@ export async function POST(
     // 각 그룹 row 에 skip_on_holidays 주입
     for (const g of targetGroups) {
       g.skip_on_holidays = groupSkipHolidaysMap.get(g.id) ? 1 : 0
+    }
+
+    // N-19-b — 그룹 rotation 설정 별도 조회 (graceful)
+    type GroupRotationCfg = { enabled: boolean; period_kind: string; period_days: number }
+    const groupRotMap = new Map<string, GroupRotationCfg>()
+    if (hasGroupRotation && targetGroups.length > 0) {
+      try {
+        const rRows = await prisma.$queryRaw<any[]>`
+          SELECT id, rotation_enabled, rotation_period_kind, rotation_custom_days
+          FROM cs_shift_groups WHERE is_active = 1
+        `
+        for (const r of rRows) {
+          groupRotMap.set(r.id, {
+            enabled: Boolean(r.rotation_enabled),
+            period_kind: String(r.rotation_period_kind || 'monthly'),
+            period_days: Math.max(1, Number(r.rotation_custom_days || 30)),
+          })
+        }
+      } catch { /* graceful */ }
+    }
+
+    // N-19-b — 그룹 ↔ 시프트 sequence (cs_group_shifts)
+    type GroupShiftRow = { shift_slot_id: string; sort_order: number; slot_start: string; slot_end: string; is_overnight: number }
+    const groupShiftsMap = new Map<string, GroupShiftRow[]>()
+    if (hasGroupShifts && targetGroups.length > 0) {
+      try {
+        const gsRows = await prisma.$queryRaw<any[]>`
+          SELECT gs.group_id, gs.shift_slot_id, gs.sort_order,
+                 TIME_FORMAT(s.start_time, '%H:%i:%s') AS slot_start,
+                 TIME_FORMAT(s.end_time, '%H:%i:%s')   AS slot_end,
+                 s.is_overnight
+          FROM cs_group_shifts gs
+          JOIN cs_shift_slots s ON s.id = gs.shift_slot_id
+          ORDER BY gs.group_id, gs.sort_order ASC
+        `
+        for (const r of gsRows) {
+          const arr = groupShiftsMap.get(r.group_id) || []
+          arr.push({
+            shift_slot_id: String(r.shift_slot_id),
+            sort_order: Number(r.sort_order || 0),
+            slot_start: r.slot_start,
+            slot_end: r.slot_end,
+            is_overnight: Number(r.is_overnight || 0),
+          })
+          groupShiftsMap.set(r.group_id, arr)
+        }
+      } catch { /* graceful */ }
+    }
+
+    // N-19-b — 멤버별 rotation 시작 시점 (graceful)
+    type MemberRotCfg = { start_date: string | null; start_index: number; end_date: string | null }
+    const memberRotMap = new Map<string, MemberRotCfg>()  // key: group_id + '_' + worker_id
+    if (hasMemberRotation && targetGroups.length > 0) {
+      try {
+        const placeholders = targetGroups.map(() => '?').join(',')
+        const sql = `
+          SELECT group_id, worker_id,
+                 DATE_FORMAT(rotation_start_date, '%Y-%m-%d') AS start_date,
+                 rotation_start_index,
+                 DATE_FORMAT(rotation_end_date, '%Y-%m-%d')   AS end_date
+          FROM cs_group_members WHERE group_id IN (${placeholders})
+        `
+        const ids = targetGroups.map(g => g.id)
+        const mRows = await prisma.$queryRawUnsafe<any[]>(sql, ...ids) as any[]
+        for (const r of mRows) {
+          memberRotMap.set(`${r.group_id}_${r.worker_id}`, {
+            start_date: r.start_date || null,
+            start_index: Number(r.rotation_start_index || 0),
+            end_date: r.end_date || null,
+          })
+        }
+      } catch { /* graceful */ }
     }
 
     // 3) 그룹 멤버
@@ -681,6 +765,74 @@ export async function POST(
           })
           byGroup[g.id].skipped++
           continue
+        }
+
+        // ── N-19-b — 그룹 시프트 로테이션 (rotation_enabled) ──
+        // rotation_enabled 이면 워커마다 elapsed_periods 기반 shift_slot_id 동적 결정
+        // (휴가 / 회피일 / 휴일 가드만 적용 — 슬롯거부 / 연속한도 등은 후속 작업)
+        const rotCfg = groupRotMap.get(g.id)
+        const rotShifts = groupShiftsMap.get(g.id) || []
+        if (rotCfg?.enabled && rotShifts.length > 0) {
+          for (const wId of gMembers) {
+            // 휴가 풀-오프 제외
+            const lm = workerLeaveMap.get(wId)
+            const sp = lm?.get(isoDate)
+            if (sp === 'off') continue
+
+            // 그룹 회피일 (PR-2SS-h-1) — approved 상태 매치 시 후보 제외
+            const gSkips = groupSkipMap.get(g.id) || []
+            const skipMatch = gSkips.find(s =>
+              s.worker_id === wId && isoDate >= s.start_date && isoDate <= s.end_date
+            )
+            if (skipMatch) {
+              warnings.push({
+                type: 'group_skip', worker_id: wId, group_id: g.id, date: isoDate, reason: skipMatch.reason || null,
+              })
+              continue
+            }
+
+            // 멤버별 시작일 / 종료일
+            const mrot = memberRotMap.get(`${g.id}_${wId}`)
+            const startDate = mrot?.start_date || null
+            const endDate = mrot?.end_date || null
+            const startIndex = Math.max(0, mrot?.start_index || 0)
+            if (startDate && isoDate < startDate) continue  // 시작 전 → skip
+            if (endDate && isoDate > endDate) continue      // 종료 후 → skip
+
+            // elapsed_periods 계산
+            let elapsed = 0
+            if (startDate) {
+              const start = new Date(startDate + 'T00:00:00')
+              const cur = new Date(isoDate + 'T00:00:00')
+              if (rotCfg.period_kind === 'days') {
+                const diffMs = cur.getTime() - start.getTime()
+                elapsed = Math.floor(diffMs / (1000 * 60 * 60 * 24) / rotCfg.period_days)
+              } else {
+                // monthly — 자연 월 차이
+                elapsed = (cur.getFullYear() - start.getFullYear()) * 12 + (cur.getMonth() - start.getMonth())
+              }
+              if (elapsed < 0) elapsed = 0
+            }
+            const shiftIndex = ((startIndex + elapsed) % rotShifts.length + rotShifts.length) % rotShifts.length
+            const targetSlot = rotShifts[shiftIndex]
+            const targetSlotId = targetSlot.shift_slot_id
+
+            // 휴가 반차/F (am_half / pm_half) — off 는 위에서 이미 skip 됨
+            const specialCode: 'none' | 'am_half' | 'pm_half' = sp ?? 'none'
+
+            plan.push({
+              work_date: isoDate,
+              shift_slot_id: targetSlotId,
+              worker_id: wId,
+              special_code: specialCode,
+              action: 'insert',  // rotation 도 insert (기존 action type 호환)
+              group_id: g.id, group_name: g.name,
+            })
+            byGroup[g.id].generated++
+            workedToday.add(wId)
+            // workerLastEnd / counter 갱신은 단순화 — 가드 통합은 N-19-c 에서
+          }
+          continue  // 기존 path skip
         }
 
         // (1) min 결정
