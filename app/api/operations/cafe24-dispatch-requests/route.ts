@@ -163,9 +163,11 @@ export async function GET(request: Request) {
 
   // ── Query 파싱 ──
   const url = new URL(request.url)
+  // P2.1a-pivot-A2 (2026-05-16): 사용자 신고 「200건밖에 안나옴」
+  // 7일치 활성 사고가 200 초과 가능 — cap 200 → 2000
   const limit = Math.min(
     Math.max(parseInt(url.searchParams.get('limit') || '50', 10) || 50, 1),
-    200
+    2000
   )
   const offset = Math.max(parseInt(url.searchParams.get('offset') || '0', 10) || 0, 0)
   const from = url.searchParams.get('from')
