@@ -14,7 +14,7 @@ import type {
   FactoryAssignmentRow,
   Cafe24SmsRow,
 } from '@/app/operations/intake/types'
-import { CATEGORY_META, describeAccidentTypes, fmtCafe24DateTime, fmtCafe24DateOnly } from '@/app/operations/intake/types'
+import { CATEGORY_META, describeAccidentTypes, fmtCafe24DateTime, fmtCafe24DateOnly, sanitizeSmsBody } from '@/app/operations/intake/types'
 
 // ═══════════════════════════════════════════════════════════════════
 // /operations/dispatch/[idno]/[mddt]/[srno] — PR-OPS-1.5c
@@ -655,17 +655,32 @@ export default function DispatchDetailPage({
                               {(m.user_name || m.sendgnus) && <span style={{ color: '#94a3b8' }}>· {m.user_name || m.sendgnus}</span>}
                             </div>
                             {(m.sendsbjt || m.smsgdesc) && (
-                              <div style={{ fontWeight: 700, color: '#0f2440', marginBottom: 4, fontSize: 12 }}>
+                              <div style={{ fontWeight: 700, color: '#0f2440', marginBottom: 6, fontSize: 12 }}>
                                 {m.sendsbjt || m.smsgdesc}
                               </div>
                             )}
                             {m.sendmesg && (
-                              <div style={{ color: '#1e293b', whiteSpace: 'pre-wrap', lineHeight: 1.5, padding: '8px 10px', background: 'rgba(248,250,252,0.8)', borderRadius: 6, fontSize: 12 }}>
-                                {m.sendmesg}
+                              // P2.1a-pivot-B3.1 — 문자 폼 (말풍선) 스타일
+                              // sanitizeSmsBody 로 <br>/\r\n/HTML 엔티티/태그 정리
+                              <div style={{
+                                color: '#0f2440',
+                                whiteSpace: 'pre-wrap',
+                                wordBreak: 'break-word',
+                                lineHeight: 1.55,
+                                padding: '12px 14px',
+                                background: m.sendtype === 'KAKAO' ? '#FFEB3B22' : 'rgba(14,165,233,0.08)',
+                                border: m.sendtype === 'KAKAO' ? '1px solid #FFEB3B66' : '1px solid rgba(14,165,233,0.18)',
+                                borderRadius: 12,
+                                borderTopLeftRadius: 4,  // 말풍선 꼬리 위치
+                                fontSize: 13,
+                                fontFamily: '-apple-system, "Apple SD Gothic Neo", system-ui, "Segoe UI", Roboto, sans-serif',
+                                maxWidth: '100%',
+                              }}>
+                                {sanitizeSmsBody(m.sendmesg)}
                               </div>
                             )}
                             {m.sendrslt && m.sendstat !== 'Y' && (
-                              <div style={{ marginTop: 4, fontSize: 11, color: '#991b1b' }}>
+                              <div style={{ marginTop: 6, fontSize: 11, color: '#991b1b' }}>
                                 결과: {m.sendrslt}
                               </div>
                             )}

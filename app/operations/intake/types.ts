@@ -288,6 +288,42 @@ export function fmtCafe24DateOnly(raw: string | null | undefined): string {
   return raw  // 비정상 길이 raw 보존
 }
 
+// P2.1a-pivot-B3.1 — cafe24 SMS 본문 sanitize (사용자 명시 2026-05-16):
+//   「특수문자로 줄바꿈 한것같은데 문자 폼모양으로 보여주고
+//    개발시 들어간 특수문자나 이런것들은 안보여주면 좋겠는데」
+//
+// cafe24 / 아리고 API / 카카오 알림톡 raw 본문에 자주 포함되는 마크업:
+//   <br>, <br/>, <br />     → 줄바꿈
+//   \r\n, \r                 → \n 으로 정규화
+//   &nbsp; &amp; &lt; &gt;   → 일반 문자로 환원
+//   기타 HTML 태그            → strip (단, [#XX#] 같은 미치환 변수는 보존 — 디버깅용)
+//   다중 개행 3개+            → 2개로 축소 (가독성)
+//   앞뒤 공백/개행 trim
+export function sanitizeSmsBody(raw: string | null | undefined): string {
+  if (!raw) return ''
+  let s = String(raw)
+  // 1. <br> 변형 모두 → \n
+  s = s.replace(/<br\s*\/?>/gi, '\n')
+  // 2. 개행 정규화 (\r\n / \r → \n)
+  s = s.replace(/\r\n?/g, '\n')
+  // 3. 나머지 HTML 태그 제거 (raw 그대로 두면 어색)
+  s = s.replace(/<\/?[a-zA-Z][^>]*>/g, '')
+  // 4. HTML 엔티티 환원 (자주 쓰이는 것만)
+  s = s
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+  // 5. 다중 개행 3개+ → 2개로 (가독성, 의도된 단락 구분 유지)
+  s = s.replace(/\n{3,}/g, '\n\n')
+  // 6. 각 줄 trailing 공백 제거
+  s = s.split('\n').map((line) => line.replace(/[ \t]+$/, '')).join('\n')
+  // 7. 앞뒤 trim
+  return s.trim()
+}
+
 // dispatch_order 가 가지는 대차접수 row 매핑용 키 — (idno, mddt, srno)
 export type DispatchRequestKey = {
   idno: string
