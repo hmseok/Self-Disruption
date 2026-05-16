@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef, use, useMemo } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { GLASS } from '@/app/utils/ui-tokens'
 import type {
   DispatchRequestRow,
@@ -92,7 +92,13 @@ export default function DispatchDetailPage({
 }) {
   const { idno, mddt, srno } = use(params)
   const router = useRouter()
+  const searchParams = useSearchParams()
   const rideAccidentId = useMemo(() => rideAccidentIdFromIdno(idno), [idno])
+  // PR-C2a (2026-05-16): mode=schedule 진입 시 하단 패널 자동 펼침
+  //   사고접수 list 진입 = 사고 정보 확인 목적 (접힘)
+  //   배차스케줄 list 진입 = 배차 처리 목적 (펼침)
+  const initialPanelOpen = searchParams.get('mode') === 'schedule'
+  const [panelOpen, setPanelOpen] = useState<boolean>(initialPanelOpen)
 
   // ── 대차접수 row ──
   const [row, setRow] = useState<DispatchRequestRow | null>(null)
@@ -447,7 +453,7 @@ export default function DispatchDetailPage({
 
   return (
     <div className="page-bg">
-      <div className="max-w-[1400px] mx-auto py-4 px-4 md:py-5 md:px-6">
+      <div className="max-w-[1400px] mx-auto py-4 px-4 md:py-5 md:px-6" style={{ paddingBottom: panelOpen ? 320 : 80 }}>
         {/* Header — 사용자 명시 (2026-05-16): 「목록 새로고침은 좌측이 편한데」 */}
         <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
           <button onClick={() => router.back()} style={ghostBtn}>← 목록</button>
@@ -967,6 +973,155 @@ export default function DispatchDetailPage({
           </div>
         )}
       </div>
+      {/* PR-C2a (2026-05-16) — 하단 sticky 배차 처리 패널
+         사용자 명시: 「A-1 + 하단 고정해서 작성하면서 위아래 이동」
+         - 위 본문: 사고 정보 / 상담 / SMS / 공장배정 등 — 자유 스크롤
+         - 아래 패널: 배차 처리 폼 — 항상 시야 고정
+         - mode=schedule URL 쿼리 시 자동 펼침 (배차스케줄 list 진입)
+         - 접힘 시 최소 높이 (요약만), 펼침 시 폼 영역 */}
+      {row && !rowLoading && (
+        <div style={{
+          position: 'fixed',
+          left: 0, right: 0, bottom: 0,
+          ...GLASS.L5,
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+          borderTop: '1px solid rgba(0,0,0,0.08)',
+          boxShadow: '0 -8px 24px rgba(0,0,0,0.06)',
+          zIndex: 30,
+          transition: 'all 0.2s',
+        }}>
+          <div style={{ maxWidth: 1400, margin: '0 auto', padding: panelOpen ? '14px 24px 18px' : '8px 24px' }}>
+            {/* Header row — 항상 노출 */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+              <button
+                onClick={() => setPanelOpen((v) => !v)}
+                style={{
+                  padding: '6px 12px',
+                  background: panelOpen ? '#0f2440' : 'transparent',
+                  color: panelOpen ? '#fff' : '#0f2440',
+                  border: panelOpen ? 'none' : '1px solid rgba(15,36,64,0.2)',
+                  borderRadius: 8,
+                  cursor: 'pointer',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {panelOpen ? '▼ 접기' : '▲ 배차 처리'}
+              </button>
+              {dispatchOrder && (
+                <span style={{
+                  padding: '4px 10px', borderRadius: 8, fontSize: 11, fontWeight: 800, whiteSpace: 'nowrap',
+                  background: 'rgba(99,102,241,0.12)', color: '#4338ca',
+                }}>
+                  {DISPATCH_STATUS_LABEL[dispatchOrder.status]}
+                </span>
+              )}
+              {!dispatchOrder && (
+                <span style={{ fontSize: 11, color: '#94a3b8' }}>
+                  ※ 대차요청 dispatch_order 미생성 — 저장 시 새로 생성됩니다
+                </span>
+              )}
+              {/* 요약 — 접혔을 때 한 줄로 보임 */}
+              {!panelOpen && dispatchOrder && (
+                <span style={{ fontSize: 11, color: '#64748b', whiteSpace: 'nowrap' }}>
+                  출고예상 {dispatchOrder.expected_dispatch_date?.slice(0, 10) || '미정'}
+                  {' / '}
+                  반납예상 {dispatchOrder.expected_return_date?.slice(0, 10) || '미정'}
+                </span>
+              )}
+              <div style={{ flex: 1 }} />
+              {/* 액션 버튼 — 펼침 무관 항상 노출 */}
+              <button
+                onClick={saveOrder}
+                disabled={busy}
+                style={{
+                  padding: '8px 16px',
+                  background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: 8,
+                  cursor: busy ? 'not-allowed' : 'pointer',
+                  fontWeight: 800,
+                  fontSize: 12,
+                  whiteSpace: 'nowrap',
+                  opacity: busy ? 0.5 : 1,
+                }}
+              >
+                💾 {dispatchOrder ? '수정' : '저장'}
+              </button>
+              {dispatchOrder && dispatchOrder.status !== 'dispatched' && dispatchOrder.status !== 'done' && (
+                <button
+                  onClick={confirmDispatch}
+                  disabled={busy}
+                  style={{
+                    padding: '8px 16px',
+                    background: 'linear-gradient(135deg, #10b981, #059669)',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: 8,
+                    cursor: busy ? 'not-allowed' : 'pointer',
+                    fontWeight: 800,
+                    fontSize: 12,
+                    whiteSpace: 'nowrap',
+                    opacity: busy ? 0.5 : 1,
+                  }}
+                >
+                  🚀 배차 확정
+                </button>
+              )}
+            </div>
+            {/* 펼침 영역 — 폼 */}
+            {panelOpen && (
+              <div style={{ marginTop: 12, display: 'grid', gridTemplateColumns: '180px 180px 1fr', gap: 12, alignItems: 'start' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#475569', marginBottom: 4, whiteSpace: 'nowrap' }}>상태</label>
+                  <select
+                    value={status}
+                    onChange={(e) => setStatus(e.target.value as DispatchOrder['status'])}
+                    style={{ ...GLASS.L1, width: '100%', padding: '8px 10px', borderRadius: 8, fontSize: 12, color: '#1e293b' }}
+                  >
+                    {(Object.keys(DISPATCH_STATUS_LABEL) as DispatchOrder['status'][]).map((k) => (
+                      <option key={k} value={k}>{DISPATCH_STATUS_LABEL[k]}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#475569', marginBottom: 4, whiteSpace: 'nowrap' }}>예상 배차일</label>
+                  <input type="date" value={expDispatch} onChange={(e) => setExpDispatch(e.target.value)}
+                    style={{ ...GLASS.L1, width: '100%', padding: '8px 10px', borderRadius: 8, fontSize: 12, color: '#1e293b' }} />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#475569', marginBottom: 4, whiteSpace: 'nowrap' }}>예상 반납일</label>
+                  <input type="date" value={expReturn} onChange={(e) => setExpReturn(e.target.value)}
+                    style={{ ...GLASS.L1, width: '100%', padding: '8px 10px', borderRadius: 8, fontSize: 12, color: '#1e293b' }} />
+                </div>
+                {/* 특이사항 메모 — full width */}
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#475569', marginBottom: 4, whiteSpace: 'nowrap' }}>
+                    특이사항 메모
+                    <span style={{ marginLeft: 6, fontSize: 10, color: '#94a3b8', fontWeight: 500 }}>
+                      (탁송/외부오더/주의사항 등 — 본 메모는 상담 히스토리와 별개로 dispatch_order 에 저장)
+                    </span>
+                  </label>
+                  <textarea
+                    value={dispatchOrder?.customer_request || ''}
+                    onChange={() => { /* PR-C2b 에서 활성화 — 현재 readonly */ }}
+                    placeholder="PR-C2b 에서 활성화 예정 — 대기차량 선택 + 탁송/외부오더 통합"
+                    rows={2}
+                    readOnly
+                    style={{
+                      ...GLASS.L1, width: '100%', padding: '8px 10px', borderRadius: 8, fontSize: 12, color: '#1e293b',
+                      resize: 'vertical', fontFamily: 'inherit', opacity: 0.6,
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

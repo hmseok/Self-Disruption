@@ -298,7 +298,8 @@ export default function ScheduleTab() {
           const mddt = r.order.cafe24_otpt_mddt || r.cafe24?.otptmddt
           const srno = r.order.cafe24_otpt_srno || r.cafe24?.otptsrno
           if (idno && mddt && srno) {
-            router.push(`/operations/dispatch/${idno}/${mddt}/${srno}`)
+            // PR-C2a: ?mode=schedule 로 진입 시 하단 sticky 배차 처리 패널 자동 펼침
+            router.push(`/operations/dispatch/${idno}/${mddt}/${srno}?mode=schedule`)
           }
         }}
         loading={loading}
