@@ -131,10 +131,13 @@ export default function DispatchDetailPage({
     try {
       const headers = await getAuthHeader()
       // 시간 범위 좁혀서 1건 매칭 — mddt 같은 범위
+      // dcyn=all + rgst=all — 사고접수/대차접수 모든 row (취소 포함)
       const params = new URLSearchParams({
         from: mddt,
         to: mddt,
         limit: '200',
+        dcyn: 'all',
+        rgst: 'all',
       })
       const res = await fetch(`/api/operations/cafe24-dispatch-requests?${params}`, { headers })
       const json = await res.json().catch(() => ({}))
@@ -396,7 +399,7 @@ export default function DispatchDetailPage({
               </span>
             </h1>
             <p style={{ fontSize: 12, color: '#64748b', marginTop: 4, whiteSpace: 'nowrap' }}>
-              대차접수 · 접수 {fmtCafe24DateTime(row?.otptacdt || null, row?.otptactm || null)} ·
+              {row?.otptdcyn === 'Y' ? '🚗 대차접수' : '📋 사고접수'} · 접수 {fmtCafe24DateTime(row?.otptacdt || null, row?.otptactm || null)} ·
               {row?.rental_vendor && <span style={{ marginLeft: 6, color: '#0f2440', fontWeight: 700 }}>🏢 {row.rental_vendor}</span>}
               <span style={{ marginLeft: 6, color: '#94a3b8' }}>{idno}/{mddt}/{srno}</span>
             </p>
