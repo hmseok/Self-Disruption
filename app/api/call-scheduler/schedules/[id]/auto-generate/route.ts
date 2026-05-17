@@ -675,6 +675,7 @@ export async function POST(
     type WorkerLimits = {
       max_consecutive_work_days: number | null
       max_days_per_month: number | null
+      min_days_per_month: number | null  // N-36 — 글로벌 월 최소 (모든 그룹 합산)
       blocked_slot_ids: Set<string>
       preferred_dow_prefer: number[]
       preferred_dow_avoid: number[]
@@ -684,6 +685,25 @@ export async function POST(
     try {
       await prisma.$queryRaw<any[]>`SELECT max_consecutive_work_days FROM cs_workers LIMIT 1`
     } catch { hasWorkerLimits = false }
+    // N-36 — min_days_per_month 컬럼 graceful
+    let hasWorkerMinDays = true
+    try {
+      await prisma.$queryRaw<any[]>`SELECT min_days_per_month FROM cs_workers LIMIT 1`
+    } catch { hasWorkerMinDays = false }
+    // N-36 — min_days_per_month 별도 조회 (graceful)
+    const workerMinDaysMap = new Map<string, number>()
+    if (hasWorkerMinDays) {
+      try {
+        const minRows = await prisma.$queryRaw<any[]>`
+          SELECT id, min_days_per_month FROM cs_workers WHERE is_active = 1
+        `
+        for (const r of minRows) {
+          if (r.min_days_per_month != null) {
+            workerMinDaysMap.set(String(r.id), Number(r.min_days_per_month))
+          }
+        }
+      } catch { /* graceful */ }
+    }
     if (usePriority) {
       try {
         // 워커 글로벌 cycle 정보 + N-29-d 개인 한계 (graceful)
@@ -725,6 +745,7 @@ export async function POST(
                 ? Number(w.max_consecutive_work_days) : null,
               max_days_per_month: w.max_days_per_month != null
                 ? Number(w.max_days_per_month) : null,
+              min_days_per_month: workerMinDaysMap.get(w.id) ?? null,  // N-36
               blocked_slot_ids: wBlocked,
               preferred_dow_prefer: parseDowList(w.preferred_dow_prefer),
               preferred_dow_avoid: parseDowList(w.preferred_dow_avoid),
@@ -941,6 +962,31 @@ export async function POST(
     const lookupTargetRatio = (gId: string, wId: string): number => {
       const v = targetRatioMap.get(`${gId}_${wId}`)
       return v == null ? 1.0 : v  // 없으면 1.0 (디폴트)
+    }
+
+    // N-36 — (group_id, worker_id) → coverage_priority (graceful)
+    //   NULL = priority_level 따라감 (디폴트)
+    //   1~3 = 휴가 커버 우선순위 명시
+    const coveragePriorityMap = new Map<string, number>()
+    let hasCoveragePriority = true
+    try {
+      await prisma.$queryRaw<any[]>`SELECT coverage_priority FROM cs_group_members LIMIT 1`
+    } catch { hasCoveragePriority = false }
+    if (hasCoveragePriority) {
+      try {
+        const covRows = await prisma.$queryRaw<any[]>`
+          SELECT group_id, worker_id, coverage_priority FROM cs_group_members
+          WHERE coverage_priority IS NOT NULL
+        `
+        for (const r of covRows) {
+          coveragePriorityMap.set(`${r.group_id}_${r.worker_id}`, Number(r.coverage_priority))
+        }
+      } catch { /* graceful */ }
+    }
+    // 효과 우선순위 계산: coverage_priority 명시 시 그것, 없으면 priority_level
+    const lookupCoveragePriority = (gId: string, wId: string, fallback: number): number => {
+      const v = coveragePriorityMap.get(`${gId}_${wId}`)
+      return v == null ? fallback : v
     }
 
     // ── N-33 — counter prefill (직전 30일 cs_assignments 누적) ──────
@@ -1394,12 +1440,30 @@ export async function POST(
           })
           // 가중치 정렬 (K-3: 멤버 단위 priority/dow/필수일수)
           // N-34 — 그룹 분배 비율 (target_ratio) 우선 비교 추가
+          // N-36 — 글로벌 min_days shortfall + coverage_priority 통합
           candidates.sort((a, b) => {
             const wa = lookupMember(g.id, a)
             const wb = lookupMember(g.id, b)
             const pa = wa?.priority_level || 2
             const pb = wb?.priority_level || 2
+            const cnA = ensureCounter(a)
+            const cnB = ensureCounter(b)
+            // N-36 — 글로벌 min_days_per_month shortfall 최우선
+            //   외부인력 같은 「의도된 적은 출근」 보장 — 평소엔 후순위지만 min 까지는 보장
+            const wlA = workerLimits.get(a)
+            const wlB = workerLimits.get(b)
+            const aGlobalShort = wlA?.min_days_per_month != null && cnA.total < wlA.min_days_per_month ? 1 : 0
+            const bGlobalShort = wlB?.min_days_per_month != null && cnB.total < wlB.min_days_per_month ? 1 : 0
+            if (aGlobalShort !== bGlobalShort) return bGlobalShort - aGlobalShort  // shortfall 1 우선
+            // priority_level (평소 순위) — coverage_priority 가 명시되면 fallback 으로만 사용
+            // 부족분 채우기 단계(아래 단순 rotation 분기) 가 아닌 평소 정렬에서는 priority_level 사용
             if (pa !== pb) return pa - pb
+            // N-36 — coverage_priority 보조 (priority_level 동등 시점에 적용)
+            //   정동민 priority_level=3 + coverage_priority=1 →
+            //   P3 끼리 후보일 때 (P1/P2 가 휴가 등으로 다 빠진 결원 시점) 1순위
+            const aCov = lookupCoveragePriority(g.id, a, pa)
+            const bCov = lookupCoveragePriority(g.id, b, pb)
+            if (aCov !== bCov) return aCov - bCov
             // 희망 요일 매치 우선 (priority 다음)
             const aPrefer = wa?.preferred_dow_prefer.includes(dow) ? 0 : 1
             const bPrefer = wb?.preferred_dow_prefer.includes(dow) ? 0 : 1
@@ -1407,8 +1471,6 @@ export async function POST(
             const aAvoid = wa?.preferred_dow_avoid.includes(dow) ? 1 : 0
             const bAvoid = wb?.preferred_dow_avoid.includes(dow) ? 1 : 0
             if (aAvoid !== bAvoid) return aAvoid - bAvoid
-            const cnA = ensureCounter(a)
-            const cnB = ensureCounter(b)
             const aShort = wa?.required_days_per_month && cnA.total < wa.required_days_per_month ? 1 : 0
             const bShort = wb?.required_days_per_month && cnB.total < wb.required_days_per_month ? 1 : 0
             if (aShort !== bShort) return bShort - aShort  // shortfall 1 우선

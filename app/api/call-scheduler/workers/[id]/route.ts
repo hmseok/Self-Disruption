@@ -16,6 +16,8 @@ const ALLOWED = new Set([
   // N-29-a — 개인 한계 (그룹 무관 — 워커 단위)
   'max_consecutive_work_days', 'max_days_per_month',
   'blocked_slot_ids', 'preferred_dow_prefer', 'preferred_dow_avoid',
+  // N-36 — 글로벌 월 최소 근무일수
+  'min_days_per_month',
 ])
 const COLOR_TONES = new Set([
   'blue', 'gray', 'green', 'amber', 'violet', 'red', 'none',

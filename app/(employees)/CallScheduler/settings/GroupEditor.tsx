@@ -58,6 +58,7 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
     blocked_slot_ids: Set<string>
     work_pattern_text: string
     target_ratio: string  // N-34 — 그룹 분배 비율 (디폴트 '1.0', 0 = hard exclude)
+    coverage_priority: string  // N-36 — 휴가 커버 우선순위 ('' = priority_level 따라감, '1'/'2'/'3')
   }
   const defaultMemberCfg = (): MemberCfg => ({
     priority_level: 2,
@@ -69,6 +70,7 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
     blocked_slot_ids: new Set(),
     work_pattern_text: '',
     target_ratio: '1.0',
+    coverage_priority: '',
   })
   const [memberCfgs, setMemberCfgs] = useState<Record<string, MemberCfg>>({})
   const [expandedCfgWorkerId, setExpandedCfgWorkerId] = useState<string | null>(null)
@@ -216,6 +218,7 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
             blocked_slot_ids: new Set(Array.isArray(m.blocked_slot_ids) ? m.blocked_slot_ids : []),
             work_pattern_text: m.work_pattern_text || '',
             target_ratio: m.target_ratio != null ? String(m.target_ratio) : '1.0',  // N-34
+            coverage_priority: m.coverage_priority != null ? String(m.coverage_priority) : '',  // N-36
           }
         }
         setMemberCfgs(cfgs)
@@ -476,6 +479,8 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
           rotation_end_date: (memberRotCfgs[wId]?.end_date || '').trim() || null,
           // N-34 — 그룹 분배 비율 (0 = hard exclude)
           target_ratio: cfg.target_ratio === '' ? 1.0 : Math.max(0, Number(cfg.target_ratio) || 0),
+          // N-36 — 휴가 커버 우선순위 ('' → null = priority_level 따라감)
+          coverage_priority: cfg.coverage_priority === '' ? null : Math.min(3, Math.max(1, Number(cfg.coverage_priority) || 0)) || null,
         }
       })
       let id = groupId
@@ -1735,6 +1740,7 @@ function MemberCfgPanel({
     blocked_slot_ids: Set<string>
     work_pattern_text: string
     target_ratio: string  // N-34
+    coverage_priority: string  // N-36
   }
   onChange: (patch: Partial<typeof cfg>) => void
   slots: ShiftSlot[]
@@ -1819,6 +1825,47 @@ function MemberCfgPanel({
                     }}>
               {n === 1 ? 'P1 최우선' : n === 2 ? 'P2 일반' : 'P3 백업'}
             </button>
+          ))}
+        </div>
+      </div>
+
+      {/* N-36 — 휴가 커버 우선순위 (priority_level 과 독립) */}
+      <div>
+        <div style={cfgFieldLabel}>
+          🆘 휴가 커버 순위
+          <span style={{ fontSize: 11, fontWeight: 500, color: COLORS.textMuted }}>
+            평소 우선순위와 별개 — 누군가 휴가/결원 발생 시 메우는 순서
+          </span>
+        </div>
+        <div style={{
+          padding: '8px 12px', borderRadius: 8, marginBottom: 8,
+          background: COLORS.bgAmber, border: `1px solid ${COLORS.borderAmber}`,
+          fontSize: 11, color: COLORS.warning, lineHeight: 1.6,
+        }}>
+          💡 예: 외부인력은 평소 P3 (백업, 적게 들어감) + 휴가 커버 C1 (결원 시 1순위)
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {[
+            { v: '', label: '─ priority 따라감', tone: 'gray' },
+            { v: '1', label: 'C1 1순위', tone: 'red' },
+            { v: '2', label: 'C2 2순위', tone: 'blue' },
+            { v: '3', label: 'C3 3순위', tone: 'gray' },
+          ].map(p => (
+            <button key={p.v || 'inherit'} type="button"
+                    onClick={() => onChange({ coverage_priority: p.v })}
+                    style={{
+                      flex: 1, padding: '10px 4px', borderRadius: 10, fontSize: 12, fontWeight: 800,
+                      background: cfg.coverage_priority === p.v
+                        ? (p.tone === 'red' ? COLORS.bgRed : p.tone === 'blue' ? COLORS.bgBlue : COLORS.bgGray)
+                        : 'rgba(255,255,255,0.7)',
+                      color: cfg.coverage_priority === p.v
+                        ? (p.tone === 'red' ? COLORS.danger : p.tone === 'blue' ? COLORS.info : COLORS.textSecondary)
+                        : COLORS.textSecondary,
+                      border: `2px solid ${cfg.coverage_priority === p.v
+                        ? (p.tone === 'red' ? COLORS.borderRed : p.tone === 'blue' ? COLORS.borderBlue : COLORS.borderFaint)
+                        : COLORS.borderFaint}`,
+                      cursor: 'pointer',
+                    }}>{p.label}</button>
           ))}
         </div>
       </div>

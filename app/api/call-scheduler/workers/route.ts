@@ -82,15 +82,29 @@ export async function GET(request: NextRequest) {
       blocked_slot_ids: string[] | null
       preferred_dow_prefer: string | null
       preferred_dow_avoid: string | null
+      min_days_per_month: number | null  // N-36
     }>()
+    // N-36 — min_days_per_month 컬럼 graceful
+    let hasMinDays = true
+    try {
+      await prisma.$queryRaw<any[]>`SELECT min_days_per_month FROM cs_workers LIMIT 1`
+    } catch { hasMinDays = false }
     if (hasPersonalLimits && rows.length > 0) {
       try {
-        const limitRows = await prisma.$queryRaw<any[]>`
-          SELECT id, max_consecutive_work_days, max_days_per_month,
-                 blocked_slot_ids, preferred_dow_prefer, preferred_dow_avoid
-          FROM cs_workers
-          WHERE is_active = 1
-        `
+        const limitRows = hasMinDays
+          ? await prisma.$queryRaw<any[]>`
+              SELECT id, max_consecutive_work_days, max_days_per_month,
+                     blocked_slot_ids, preferred_dow_prefer, preferred_dow_avoid,
+                     min_days_per_month
+              FROM cs_workers
+              WHERE is_active = 1
+            `
+          : await prisma.$queryRaw<any[]>`
+              SELECT id, max_consecutive_work_days, max_days_per_month,
+                     blocked_slot_ids, preferred_dow_prefer, preferred_dow_avoid
+              FROM cs_workers
+              WHERE is_active = 1
+            `
         for (const r of limitRows) {
           limitsMap.set(r.id, {
             max_consecutive_work_days: r.max_consecutive_work_days != null
@@ -104,6 +118,8 @@ export async function GET(request: NextRequest) {
               : null,
             preferred_dow_prefer: r.preferred_dow_prefer ?? null,
             preferred_dow_avoid: r.preferred_dow_avoid ?? null,
+            min_days_per_month: hasMinDays && r.min_days_per_month != null
+              ? Number(r.min_days_per_month) : null,
           })
         }
       } catch { /* graceful */ }
@@ -126,6 +142,8 @@ export async function GET(request: NextRequest) {
         blocked_slot_ids: limits?.blocked_slot_ids ?? null,
         preferred_dow_prefer: limits?.preferred_dow_prefer ?? null,
         preferred_dow_avoid: limits?.preferred_dow_avoid ?? null,
+        // N-36 — 글로벌 월 최소 근무일수
+        min_days_per_month: limits?.min_days_per_month ?? null,
       }
     })
     return NextResponse.json({ data: serialize(data), error: null })

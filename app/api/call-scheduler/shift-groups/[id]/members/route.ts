@@ -37,6 +37,8 @@ interface MemberInput {
   rotation_end_date?: string | null
   // N-34 — 그룹 분배 비율 (디폴트 1.0, 0 = hard exclude)
   target_ratio?: number | null
+  // N-36 — 휴가 커버 우선순위 (1~3, NULL = priority_level 따라감)
+  coverage_priority?: number | null
 }
 
 function clampPriorityLevel(v: any): number {
@@ -87,6 +89,11 @@ export async function PUT(
     try {
       await prisma.$queryRaw<any[]>`SELECT target_ratio FROM cs_group_members LIMIT 1`
     } catch { hasTargetRatio = false }
+    // N-36 — coverage_priority 컬럼 graceful 감지
+    let hasCoveragePriority = true
+    try {
+      await prisma.$queryRaw<any[]>`SELECT coverage_priority FROM cs_group_members LIMIT 1`
+    } catch { hasCoveragePriority = false }
 
     // 기존 멤버 모두 삭제
     await prisma.$executeRaw`DELETE FROM cs_group_members WHERE group_id = ${id}`
@@ -112,6 +119,12 @@ export async function PUT(
       const target_ratio = (target_ratio_raw == null || target_ratio_raw === '' as any)
         ? 1.0
         : Math.max(0, Number(target_ratio_raw) || 0)
+      // N-36 — coverage_priority (1~3 또는 NULL = priority_level 따라감)
+      const cov_raw = m.coverage_priority
+      const coverage_priority: number | null =
+        cov_raw == null || cov_raw === '' as any
+          ? null
+          : Math.min(3, Math.max(1, Number(cov_raw) || 0)) || null
 
       if (hasMemberRotation && hasTargetRatio) {
         await prisma.$executeRaw`
@@ -160,6 +173,16 @@ export async function PUT(
              ${max_consec}, ${req_days}, ${max_days},
              ${blocked}, ${pattern}, NOW())
         `
+      }
+
+      // N-36 — coverage_priority 별도 UPDATE (graceful, 분기 폭증 방지)
+      if (hasCoveragePriority) {
+        try {
+          await prisma.$executeRaw`
+            UPDATE cs_group_members SET coverage_priority = ${coverage_priority}
+            WHERE id = ${memberId}
+          `
+        } catch { /* graceful */ }
       }
     }
 

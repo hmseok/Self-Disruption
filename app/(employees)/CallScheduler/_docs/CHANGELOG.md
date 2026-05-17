@@ -3,6 +3,62 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-17 (Phase N-36) — 워커 글로벌 min_days + 그룹 coverage_priority
+
+### 사용자 보고
+> "정동민은 8일 근무로 보여지는데 6월 스케줄은 외부인력이라 최소근무가 없어서 그런가?
+>  그 기준도 있어야 하나 최소근무 그리고 휴가자 발생 시에 1순위로도 넣으려고 하는데
+>  그 기준도 그럼 그룹에서 휴가 커버 순위도 지정해야 하나"
+> "뭐 이건 외부인력이나 내부인력이나 상관은 없죠"
+
+### 사용자 결정
+- min_days 위치: 워커 마스터 (글로벌, 모든 그룹 합산)
+- 휴가 커버 순위: 새 컬럼 신설 (priority_level 과 독립)
+- is_external 가드는 신설 X — 모든 워커 같은 셋팅 흐름
+
+### 데이터 모델
+- 마이그: `migrations/2026-05-17_cs_workers_min_days_and_coverage.sql`
+- `cs_workers.min_days_per_month` TINYINT UNSIGNED DEFAULT NULL
+- `cs_group_members.coverage_priority` TINYINT UNSIGNED DEFAULT NULL (1~3)
+- `cs_group_member_versions.coverage_priority` 도 (timeline 일관)
+
+### 운영 예시
+- **외부인력 정동민**:
+  - priority_level=3 (P3 백업, 평소 후순위)
+  - min_days_per_month=8 (글로벌 8일 보장)
+  - coverage_priority=1 (휴가 결원 시 1순위)
+  → 평소엔 P1/P2 가 다 채워주고 정동민 8일만 들어감
+  → 휴가자 발생 → P1/P2 부족 → P3 후보 → 정동민이 cov=1 이라 우선 선택
+
+### 변경
+1. **API**
+   - workers GET + PATCH — min_days_per_month graceful
+   - members PUT — coverage_priority 수용 (post-INSERT UPDATE 패턴)
+   - shift-groups [id] GET — coverage_priority 응답에 포함
+2. **WorkersTab.tsx**
+   - PersonalLimitsPanel 에 「📊 월 최소 일수」 input 추가 (3컬럼 grid)
+   - state: editMinDays
+3. **GroupEditor.tsx (MemberCfgPanel)**
+   - MemberCfg interface 에 `coverage_priority: string`
+   - 「🆘 휴가 커버 순위」 영역 — preset 4종 (─ priority 따라감 / C1 / C2 / C3)
+4. **auto-generate/route.ts**
+   - WorkerLimits 에 min_days_per_month 추가 + 별도 graceful 조회
+   - coveragePriorityMap (graceful) + lookupCoveragePriority 헬퍼
+   - 정렬 새 기준 (priority_level 다음 → 동등 시 coverage_priority):
+     · 1순위 min_days shortfall (글로벌 외부인력 최소 보장)
+     · 2순위 priority_level
+     · 2.5순위 coverage_priority (P3 끼리 결원 시 우선)
+     · 이후 dow / required / counter / last_date
+
+### 검증
+- tsc PASS
+- 사용자 시나리오: 정동민 P3 + min=8 + cov=1 → 평소 8일 보장 + 휴가 시 우선
+
+### 자동 휴일 API 진단 (별도)
+- 사용자 보고: "자동 휴일 적용 api 오류납니다"
+- 원인 추정: KOREA_HOLIDAY_API_KEY 환경변수 미설정 가능성
+- 정확한 에러 메시지 확인 후 별도 hotfix 예정
+
 ## 2026-05-17 (Phase N-35) — 그룹 단위 「같은 날 다른 그룹 겹침」 허용 옵션 + target_ratio UI 명확화
 
 ### 사용자 보고

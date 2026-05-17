@@ -204,6 +204,23 @@ export async function GET(
       } catch { /* graceful */ }
     }
 
+    // N-36 — coverage_priority 별도 조회 (graceful)
+    let hasCoveragePriority = true
+    try { await prisma.$queryRaw<any[]>`SELECT coverage_priority FROM cs_group_members LIMIT 1` }
+    catch { hasCoveragePriority = false }
+    const covMap = new Map<string, number | null>()
+    if (hasCoveragePriority) {
+      try {
+        const cRows = await prisma.$queryRaw<any[]>`
+          SELECT worker_id, coverage_priority FROM cs_group_members WHERE group_id = ${id}
+        `
+        for (const r of cRows) {
+          covMap.set(String(r.worker_id),
+            r.coverage_priority != null ? Number(r.coverage_priority) : null)
+        }
+      } catch { /* graceful */ }
+    }
+
     // 멤버 응답 정규화 (parse blocked_slot_ids JSON)
     const members = memberRows.map(r => ({
       ...r,
@@ -223,6 +240,7 @@ export async function GET(
       rotation_start_index: hasMemberRotation ? Number(r.rotation_start_index || 0) : 0,
       rotation_end_date: hasMemberRotation ? (r.rotation_end_date ?? null) : null,
       target_ratio: ratioMap.has(String(r.worker_id)) ? ratioMap.get(String(r.worker_id))! : 1.0,  // N-34
+      coverage_priority: covMap.has(String(r.worker_id)) ? covMap.get(String(r.worker_id)) : null,  // N-36
     }))
 
     const group = {

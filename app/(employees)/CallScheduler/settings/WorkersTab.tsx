@@ -49,6 +49,7 @@ export default function WorkersTab() {
   // N-29-b — 개인 한계 (그룹 무관 — 워커 단위)
   const [editMaxConsec, setEditMaxConsec] = useState<string>('')   // '' = 무제한
   const [editMaxDays, setEditMaxDays] = useState<string>('')       // '' = 무제한
+  const [editMinDays, setEditMinDays] = useState<string>('')       // N-36 — '' = 무제한 (최소 보장 X)
   const [editBlockedSlots, setEditBlockedSlots] = useState<Set<string>>(new Set())
   const [editDowPrefer, setEditDowPrefer] = useState<Set<number>>(new Set())
   const [editDowAvoid, setEditDowAvoid] = useState<Set<number>>(new Set())
@@ -91,6 +92,7 @@ export default function WorkersTab() {
     const wx = w as any
     setEditMaxConsec(wx.max_consecutive_work_days != null ? String(wx.max_consecutive_work_days) : '')
     setEditMaxDays(wx.max_days_per_month != null ? String(wx.max_days_per_month) : '')
+    setEditMinDays(wx.min_days_per_month != null ? String(wx.min_days_per_month) : '')  // N-36
     setEditBlockedSlots(new Set(Array.isArray(wx.blocked_slot_ids) ? wx.blocked_slot_ids : []))
     setEditDowPrefer(new Set(
       typeof wx.preferred_dow_prefer === 'string'
@@ -134,6 +136,8 @@ export default function WorkersTab() {
           // N-29-b — 개인 한계
           max_consecutive_work_days: editMaxConsec ? Number(editMaxConsec) : null,
           max_days_per_month: editMaxDays ? Number(editMaxDays) : null,
+          min_days_per_month: editMinDays ? Number(editMinDays) : null,  // N-36
+
           blocked_slot_ids: Array.from(editBlockedSlots),
           preferred_dow_prefer: editDowPrefer.size > 0
             ? Array.from(editDowPrefer).sort().join(',') : null,
@@ -384,6 +388,7 @@ export default function WorkersTab() {
                           <PersonalLimitsPanel
                             maxConsec={editMaxConsec} setMaxConsec={setEditMaxConsec}
                             maxDays={editMaxDays} setMaxDays={setEditMaxDays}
+                            minDays={editMinDays} setMinDays={setEditMinDays}
                             blockedSlots={editBlockedSlots} setBlockedSlots={setEditBlockedSlots}
                             dowPrefer={editDowPrefer} setDowPrefer={setEditDowPrefer}
                             dowAvoid={editDowAvoid} setDowAvoid={setEditDowAvoid}
@@ -533,12 +538,14 @@ const inputStyle: React.CSSProperties = {
 // N-29-b — 워커 개인 한계 패널 (그룹 무관 — 모든 그룹 합산 적용)
 function PersonalLimitsPanel({
   maxConsec, setMaxConsec, maxDays, setMaxDays,
+  minDays, setMinDays,  // N-36
   blockedSlots, setBlockedSlots,
   dowPrefer, setDowPrefer, dowAvoid, setDowAvoid,
   slots,
 }: {
   maxConsec: string; setMaxConsec: (v: string) => void
   maxDays: string; setMaxDays: (v: string) => void
+  minDays: string; setMinDays: (v: string) => void  // N-36
   blockedSlots: Set<string>; setBlockedSlots: (v: Set<string>) => void
   dowPrefer: Set<number>; setDowPrefer: (v: Set<number>) => void
   dowAvoid: Set<number>; setDowAvoid: (v: Set<number>) => void
@@ -568,7 +575,7 @@ function PersonalLimitsPanel({
         🛡️ 개인 한계 (그룹 무관 — 모든 그룹 합산 적용)
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 10 }}>
         <div>
           <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSecondary, marginBottom: 4 }}>
             📅 연속 근무 한도 (일) <span style={{ color: COLORS.textMuted, fontWeight: 500 }}>빈 칸 = 무제한</span>
@@ -576,6 +583,15 @@ function PersonalLimitsPanel({
           <input type="number" min={1} max={14} value={maxConsec}
                  onChange={(e) => setMaxConsec(e.target.value)}
                  placeholder="예: 5"
+                 style={inputStyle} />
+        </div>
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSecondary, marginBottom: 4 }}>
+            📊 월 최소 일수 <span style={{ color: COLORS.textMuted, fontWeight: 500 }}>모든 그룹 합산, 빈 칸 = 무제한</span>
+          </div>
+          <input type="number" min={0} max={31} value={minDays}
+                 onChange={(e) => setMinDays(e.target.value)}
+                 placeholder="예: 8 (외부인력)"
                  style={inputStyle} />
         </div>
         <div>
