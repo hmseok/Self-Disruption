@@ -102,6 +102,7 @@ export const MENUS: MenuEntry[] = [
   { id: 'mod-my-info',         name: '내 정보',     path: '/work-essentials/my-info',  iconKey: 'Users',     group: 'work-essentials', sortOrder: 50, requirePermission: true },
   { id: 'mod-receipts',        name: '영수증제출',   path: '/work-essentials/receipts', iconKey: 'Clipboard', group: 'work-essentials', sortOrder: 51, requirePermission: true },
   { id: 'mod-meetings',        name: '회의록', displayName: '📋 회의록', path: '/meetings', iconKey: 'Doc', group: 'work-essentials', sortOrder: 52, requirePermission: true },
+  { id: 'mod-meetings-me',     name: '내 TODO', displayName: '✓ 내 TODO', path: '/meetings/me', iconKey: 'Clipboard', group: 'work-essentials', sortOrder: 53, requirePermission: true },
 
   // ── CX팀 (cx-team) ── Employee of Ride Inc. > CX팀 — 권한 부여 대상 (CX팀원만)
   // PR-6.3.c (2026-05-05) — 카페24 ERP (skyautosvc.co.kr) read-only 연동
