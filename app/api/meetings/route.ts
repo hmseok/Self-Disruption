@@ -31,6 +31,36 @@ export async function GET(request: NextRequest) {
       const m = meetings[0]
       if (!m) return NextResponse.json({ data: null })
 
+      // PR-V2-Visibility — 단건 조회 권한 체크
+      const isAdmin = user.role === 'admin' || user.role === 'master'
+      if (!isAdmin) {
+        const visibility = m.visibility || 'attendees'
+        let canRead = false
+        if (visibility === 'public') canRead = true
+        else if (m.organizer_id === user.id || m.created_by === user.id) canRead = true
+        else {
+          // attendees / editors / department 체크
+          const checks = await Promise.all([
+            prisma.$queryRawUnsafe<any[]>(
+              `SELECT 1 FROM meeting_attendees WHERE meeting_id = ? AND profile_id = ? LIMIT 1`,
+              id, user.id
+            ),
+            prisma.$queryRawUnsafe<any[]>(
+              `SELECT 1 FROM meeting_editors WHERE meeting_id = ? AND profile_id = ? LIMIT 1`,
+              id, user.id
+            ),
+            visibility === 'department' && m.department
+              ? prisma.$queryRawUnsafe<any[]>(
+                  `SELECT 1 FROM ride_employees WHERE profile_id = ? AND department = ? AND is_active = 1 LIMIT 1`,
+                  user.id, m.department
+                )
+              : Promise.resolve([]),
+          ])
+          canRead = checks[0].length > 0 || checks[1].length > 0 || checks[2].length > 0
+        }
+        if (!canRead) return NextResponse.json({ error: '조회 권한 없음' }, { status: 403 })
+      }
+
       const [attendees, minutes, actions] = await Promise.all([
         prisma.$queryRawUnsafe<any[]>(
           `SELECT a.*, p.name AS profile_name, p.department AS profile_department, p.position AS profile_position
@@ -82,9 +112,27 @@ export async function GET(request: NextRequest) {
       params.push(user.id, user.id)
     }
 
+    // PR-V2-Visibility — 권한 체크
+    // admin/master 면 모두, 그 외는 visibility 별 필터
+    const isAdmin = user.role === 'admin' || user.role === 'master'
+    if (!isAdmin) {
+      conditions.push(`(
+        m.visibility = 'public'
+        OR m.organizer_id = ?
+        OR m.created_by = ?
+        OR EXISTS (SELECT 1 FROM meeting_attendees ma WHERE ma.meeting_id = m.id AND ma.profile_id = ?)
+        OR EXISTS (SELECT 1 FROM meeting_editors me WHERE me.meeting_id = m.id AND me.profile_id = ?)
+        OR (m.visibility = 'department' AND m.department IS NOT NULL AND m.department IN (
+          SELECT department FROM ride_employees WHERE profile_id = ? AND is_active = 1 LIMIT 1
+        ))
+      )`)
+      params.push(user.id, user.id, user.id, user.id, user.id)
+    }
+
     const list = await prisma.$queryRawUnsafe<any[]>(
       `SELECT m.id, m.title, m.type, m.meeting_date, m.duration_min, m.location,
               m.organizer_id, m.department, m.status, m.created_by, m.created_at,
+              m.visibility,
               p.name AS organizer_name,
               (SELECT COUNT(*) FROM meeting_attendees WHERE meeting_id = m.id) AS attendee_count,
               (SELECT COUNT(*) FROM meeting_action_items WHERE meeting_id = m.id) AS action_count,
@@ -227,17 +275,32 @@ export async function PATCH(request: NextRequest) {
        WHERE user_id = ${user.id} AND page_path = '/meetings' LIMIT 1
     `
     const hasEditPagePerm = !!(editPerm[0]?.can_edit)
+
+    // PR-V2-Visibility — meeting_editors.role='editor' 도 편집 가능
+    let isEditorByList = false
+    try {
+      const editorRow = await prisma.$queryRawUnsafe<any[]>(
+        `SELECT 1 FROM meeting_editors WHERE meeting_id = ? AND profile_id = ? AND role = 'editor' LIMIT 1`,
+        id, user.id
+      )
+      isEditorByList = editorRow.length > 0
+    } catch {
+      // meeting_editors 테이블 미적용 시 무시 (graceful)
+    }
+
     const canEdit = user.role === 'admin'
                   || user.role === 'master'
                   || hasEditPagePerm
                   || existing[0].organizer_id === user.id
                   || existing[0].created_by === user.id
+                  || isEditorByList
     if (!canEdit) return NextResponse.json({ error: '편집 권한 없음' }, { status: 403 })
 
     if (meeting) {
       const ALLOWED = new Set([
         'title', 'type', 'meeting_date', 'duration_min', 'location',
         'organizer_id', 'department', 'status', 'agenda', 'summary',
+        'visibility',                                                  // PR-V2-Visibility
       ])
       const entries = Object.entries(meeting).filter(([k]) => ALLOWED.has(k))
       if (entries.length > 0) {
