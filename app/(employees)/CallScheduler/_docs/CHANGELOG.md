@@ -3,6 +3,31 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-17 (Phase N-37) — 워커 max_days_per_month hard cap (모든 경로 공통)
+
+### 사용자 보고
+> "최소 최대일 설정값에서 정동민씨가 다른 사람 연차 시 먼저 우선순위로 본인 근무가능일에
+>  배정되더라도 최대일을 넘길 순 없습니다. 그래야 근무일을 정확히 가져가죠"
+
+### 진단
+- 기존 max 가드 (auto-generate 라인 1428~) 는 **usePriority=true 안에서만** 적용
+- `lookupMember` 하나만 검사 — 멤버 cfg max 명시되면 워커 글로벌 max 우회 가능
+- 단순 rotation 경로 (usePriority=false) 에는 max 가드 없음
+
+### 변경 (`auto-generate/route.ts`)
+- candidates 필터 단계 (target_ratio hard exclude 직후) 에 **글로벌 hard cap** 추가
+- 워커 cfg max + 멤버 cfg max **둘 다 검사** → 작은 값 자동 적용
+- 모든 경로 공통 (usePriority 분기 무관)
+
+### 효과
+- 정동민 워커 cfg max=8 → coverage_priority=1 일도 8일 초과 절대 X
+- 멤버 cfg 가 더 빡빡한 경우 (예: 6) → 6일 초과 X
+- "최소 8일 보장 + 최대 8일 한도" 정확 적용
+
+### 운영 검증 시나리오
+- 정동민 워커 마스터: min=8, max=8 → 정확히 8일
+- 정동민 워커 마스터: min=8, max=10 → 평소 8일 + 휴가 커버 시 최대 10일까지
+
 ## 2026-05-17 (Phase N-36) — 워커 글로벌 min_days + 그룹 coverage_priority
 
 ### 사용자 보고

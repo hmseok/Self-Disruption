@@ -1408,6 +1408,26 @@ export async function POST(
           return ratio > 0
         })
 
+        // N-37 — 글로벌 max_days_per_month hard cap (모든 경로 공통)
+        //   사용자 보고 (2026-05-17): "정동민씨가 다른 사람 연차 시 먼저 우선순위로
+        //                              본인 근무가능일에 배정되더라도 최대일을 넘길 순 없습니다"
+        //
+        //   기존 가드는 usePriority=true 안에서만 + lookupMember 하나만 검사 →
+        //   멤버 cfg max 명시되면 워커 글로벌 max 우회 가능 (버그)
+        //
+        //   새 가드: 둘 다 검사 (작은 값 자동 적용) + 모든 경로 공통
+        candidates = candidates.filter(wId => {
+          const cn = counter.get(wId)
+          if (!cn) return true  // counter 0 인 사람은 max 0건 비교 → 통과
+          // 워커 글로벌 max (모든 그룹 합산 기준)
+          const workerMax = workerLimits.get(wId)?.max_days_per_month
+          if (workerMax != null && cn.total >= workerMax) return false
+          // 멤버 cfg max (이 그룹 명시 — 더 빡빡할 수 있음)
+          const memberCfg = memberCons.get(`${g.id}_${wId}`)
+          if (memberCfg?.max_days_per_month != null && cn.total >= memberCfg.max_days_per_month) return false
+          return true
+        })
+
         // N-35 — 이 그룹이 「같은 날 다른 그룹 겹침」 허용 X 이면 workedToday hard exclude
         //   디폴트 false (한 사람 하루 1그룹). 24/365 특수 운영만 true.
         //   주의: 이 그룹이 allow=1 이어도 「상대 그룹」 이 allow=0 이면 그 워커는
