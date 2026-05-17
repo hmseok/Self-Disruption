@@ -158,7 +158,7 @@ export async function GET(
       ? await prisma.$queryRaw<any[]>`
           SELECT m.id, m.worker_id, m.priority,
                  m.priority_level, m.preferred_dow_prefer, m.preferred_dow_avoid,
-                 m.max_consecutive_work_days, m.required_days_per_month, m.max_days_per_month,
+                 m.max_consecutive_work_days, m.max_days_per_month,
                  m.blocked_slot_ids, m.work_pattern_text,
                  DATE_FORMAT(m.rotation_start_date, '%Y-%m-%d') AS rotation_start_date,
                  m.rotation_start_index,
@@ -173,7 +173,7 @@ export async function GET(
       ? await prisma.$queryRaw<any[]>`
           SELECT m.id, m.worker_id, m.priority,
                  m.priority_level, m.preferred_dow_prefer, m.preferred_dow_avoid,
-                 m.max_consecutive_work_days, m.required_days_per_month, m.max_days_per_month,
+                 m.max_consecutive_work_days, m.max_days_per_month,
                  m.blocked_slot_ids, m.work_pattern_text,
                  w.name AS worker_name, w.color_tone AS worker_tone, w.group_label
           FROM cs_group_members m
@@ -227,8 +227,6 @@ export async function GET(
       priority_level: hasMemberSettings ? Number(r.priority_level || 2) : 2,
       max_consecutive_work_days: hasMemberSettings && r.max_consecutive_work_days != null
         ? Number(r.max_consecutive_work_days) : null,
-      required_days_per_month: hasMemberSettings && r.required_days_per_month != null
-        ? Number(r.required_days_per_month) : null,
       max_days_per_month: hasMemberSettings && r.max_days_per_month != null
         ? Number(r.max_days_per_month) : null,
       blocked_slot_ids: hasMemberSettings && r.blocked_slot_ids != null

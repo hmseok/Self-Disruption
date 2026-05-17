@@ -197,7 +197,7 @@ export async function GET(request: NextRequest) {
       priority_level: number;
       preferred_dow_prefer: string | null; preferred_dow_avoid: string | null;
       max_consecutive_work_days: number | null;
-      required_days_per_month: number | null; max_days_per_month: number | null;
+      max_days_per_month: number | null;
       blocked_slot_ids: string[] | null; work_pattern_text: string | null;
       rotation_start_date: string | null; rotation_start_index: number;
       rotation_end_date: string | null;
@@ -209,7 +209,7 @@ export async function GET(request: NextRequest) {
             SELECT m.group_id, w.id AS worker_id, w.name, w.color_tone,
                    m.priority,
                    m.priority_level, m.preferred_dow_prefer, m.preferred_dow_avoid,
-                   m.max_consecutive_work_days, m.required_days_per_month, m.max_days_per_month,
+                   m.max_consecutive_work_days, m.max_days_per_month,
                    m.blocked_slot_ids, m.work_pattern_text,
                    DATE_FORMAT(m.rotation_start_date, '%Y-%m-%d') AS rotation_start_date,
                    m.rotation_start_index,
@@ -224,7 +224,7 @@ export async function GET(request: NextRequest) {
             SELECT m.group_id, w.id AS worker_id, w.name, w.color_tone,
                    m.priority,
                    m.priority_level, m.preferred_dow_prefer, m.preferred_dow_avoid,
-                   m.max_consecutive_work_days, m.required_days_per_month, m.max_days_per_month,
+                   m.max_consecutive_work_days, m.max_days_per_month,
                    m.blocked_slot_ids, m.work_pattern_text
             FROM cs_group_members m
             JOIN cs_workers w ON w.id = m.worker_id
@@ -252,8 +252,6 @@ export async function GET(request: NextRequest) {
           preferred_dow_avoid: hasMemberSettings ? (r.preferred_dow_avoid ?? null) : null,
           max_consecutive_work_days: hasMemberSettings && r.max_consecutive_work_days != null
             ? Number(r.max_consecutive_work_days) : null,
-          required_days_per_month: hasMemberSettings && r.required_days_per_month != null
-            ? Number(r.required_days_per_month) : null,
           max_days_per_month: hasMemberSettings && r.max_days_per_month != null
             ? Number(r.max_days_per_month) : null,
           blocked_slot_ids: hasMemberSettings && r.blocked_slot_ids != null

@@ -3,6 +3,56 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-17 (Phase N-48) — required_days_per_month 완전 제거
+
+### 사용자 결정
+> "워커에 최소, 최대 근무일수가 있는데 그룹에 월 필수일수가 필요할까요?"
+> → 완전 제거 (데이터 + UI)
+
+### 변경
+- 마이그: `cs_group_members.required_days_per_month` DROP COLUMN (cs_group_member_versions 도)
+- API: members PUT INSERT, shift-groups GET, versions PATCH 모두 컬럼 제거
+- GroupEditor: MemberCfgPanel 의 「📈 월 필수 일수」 영역 제거 + state 제거
+- auto-generate 알고리즘: required_days_per_month 정렬 기준 제거 (글로벌 min_days_per_month 만 사용)
+- types.ts: 인터페이스 컬럼 제거
+
+### 효과
+- 그룹 멤버 cfg 단순화 (우선순위 + 비율 + 커버 순위 + 메모만)
+- 워커 마스터 min/max 가 글로벌 의무
+- 알고리즘 정렬 단순화 — 글로벌 min shortfall + priority + cov + dow + counter
+
+## 2026-05-17 (Phase N-46 + N-47) — P2 결원 P3 cov 우선 + 카테고리 그룹 정렬
+
+### N-46 — P2 결원 자리는 P3 cov 우선 채움 (균등 보장)
+
+사용자 보고: "정동민이 윤민진/전유하/전정연 휴가 시 커버 → 정동민 max 도달 후
+윤민진 추가 휴가 시 다른 사람 (전유하/전정연) 근무일 늘어남 → 균등 깨짐"
+
+▸ 변경 (auto-generate/route.ts)
+- 매 일자 후보 정렬 직후 「P2 결원 채우기」 로직 추가:
+  - p2Short = 그룹 P2 멤버 수 - candidates 중 P2 수
+  - p2Short > 0 면 P3 cov 우선 P2 결원 수 만큼 selected
+  - 나머지 need 는 기존 정렬된 candidates 에서
+
+▸ 효과
+- 윤민진 휴가 → 그 자리 P3 cov=1 (정동민) 우선 진입
+- 전유하/전정연 max=17 까지 안 채움 (P2 균등 유지)
+- 정동민 cap 도달 → 빈자리 → warnings (운영자 추가 백업 또는 검토)
+
+### N-47 — 카테고리 모드 정렬 강화 (카테고리 → 그룹 → 시간)
+
+사용자 보고: "카테고리그룹별인데 그룹이 두 번씩 나오면서 분리되어 보이는"
+
+▸ 원인: 카테고리 → 시간순 2단계 → 같은 카테고리 안 그룹들의 시프트가 섞임
+
+▸ 변경 (ScheduleGrid.tsx)
+- 정렬: 카테고리 → 그룹 sort_order → 시간 (3단계)
+- rotation sequence 도 한 그룹 안에서 연속 표시
+
+▸ 효과
+- 같은 그룹 시프트들 연속 → 카테고리 헤더 한 번만 표시
+- 그룹 라벨 흩어지지 않음
+
 ## 2026-05-17 (Phase N-43) — 주말 공휴일 가드 자동 제외 + 대체공휴일 페어 UI 시각화
 
 ### 사용자 보고

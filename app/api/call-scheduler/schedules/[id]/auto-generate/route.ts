@@ -96,7 +96,6 @@ interface MemberConstraint {
   priority_level: number
   preferred_dow_avoid: number[]
   preferred_dow_prefer: number[]
-  required_days_per_month: number | null
   max_days_per_month: number | null
   max_consecutive_work_days: number | null
   blocked_slot_ids: Set<string>     // 비어있으면 빈 Set
@@ -784,7 +783,7 @@ export async function POST(
           const memberRows = await prisma.$queryRaw<any[]>`
             SELECT m.group_id, m.worker_id,
                    m.priority_level, m.preferred_dow_avoid, m.preferred_dow_prefer,
-                   m.required_days_per_month, m.max_days_per_month,
+                   m.max_days_per_month,
                    m.max_consecutive_work_days, m.blocked_slot_ids
             FROM cs_group_members m
             JOIN cs_workers w ON w.id = m.worker_id
@@ -814,7 +813,6 @@ export async function POST(
               // N-29-d — 그룹 cfg 우선, NULL/빈 set 이면 워커 cfg fallback
               preferred_dow_avoid: grpDowAvoid.length > 0 ? grpDowAvoid : (wL?.preferred_dow_avoid || []),
               preferred_dow_prefer: grpDowPrefer.length > 0 ? grpDowPrefer : (wL?.preferred_dow_prefer || []),
-              required_days_per_month: r.required_days_per_month != null ? Number(r.required_days_per_month) : null,
               max_days_per_month: grpMaxDays != null ? grpMaxDays : (wL?.max_days_per_month ?? null),
               max_consecutive_work_days: grpMaxConsec != null ? grpMaxConsec : (wL?.max_consecutive_work_days ?? null),
               blocked_slot_ids: blocked.size > 0 ? blocked : (wL?.blocked_slot_ids || new Set()),
@@ -840,7 +838,6 @@ export async function POST(
         priority_level: 2,
         preferred_dow_avoid: wL.preferred_dow_avoid,
         preferred_dow_prefer: wL.preferred_dow_prefer,
-        required_days_per_month: null,
         max_days_per_month: wL.max_days_per_month,
         max_consecutive_work_days: wL.max_consecutive_work_days,
         blocked_slot_ids: wL.blocked_slot_ids,
@@ -1518,9 +1515,7 @@ export async function POST(
             const aAvoid = wa?.preferred_dow_avoid.includes(dow) ? 1 : 0
             const bAvoid = wb?.preferred_dow_avoid.includes(dow) ? 1 : 0
             if (aAvoid !== bAvoid) return aAvoid - bAvoid
-            const aShort = wa?.required_days_per_month && cnA.total < wa.required_days_per_month ? 1 : 0
-            const bShort = wb?.required_days_per_month && cnB.total < wb.required_days_per_month ? 1 : 0
-            if (aShort !== bShort) return bShort - aShort  // shortfall 1 우선
+            // N-48 — required_days_per_month 제거. 워커 글로벌 min_days_per_month 만 사용 (위쪽 aGlobalShort)
             // N-34 — 「그룹에서 이미 채워진 비율」 적은 사람 우선
             //   ratio_score = by_group[g.id].total / target_ratio (작을수록 미충족 → 우선)
             //   target_ratio = 0 은 이미 위에서 filter 됨 (hard exclude)
@@ -1540,7 +1535,52 @@ export async function POST(
               ? Math.floor((new Date(isoDate).getTime() - new Date(cnB.last_date).getTime()) / 86400000) : 999
             return bDist - aDist
           })
-          selected = candidates.slice(0, need)
+
+          // N-46 — P2 결원 자리는 P3 cov 우선 채움 (균등 보장)
+          //   사용자 보고 (2026-05-17): "정동민이 윤민진/전유하/전정연 휴가 시 커버 →
+          //                              정동민 max 도달 후 윤민진 추가 휴가 시
+          //                              다른 사람 (전유하/전정연) 근무일 늘어남 → 균등 깨짐"
+          //
+          //   해결: P2 결원 (휴가/회피일/skip 으로 candidates 에서 빠진 P2 수) 만큼
+          //         P3 cov 우선 selected → 그 다음 P2 자연 분배
+          //
+          //   효과: P2 가 max=17 까지 채우려 시도하기 전에 P3 가 먼저 결원 자리 채움
+          //         → 전유하/전정연 가 윤민진 빠진 자리 안 채움 → 균등 유지
+          const isP2 = (wId: string): boolean => {
+            const mc = lookupMember(g.id, wId)
+            return (mc?.priority_level ?? 2) <= 2
+          }
+          const isP3 = (wId: string): boolean => {
+            const mc = lookupMember(g.id, wId)
+            return (mc?.priority_level ?? 2) >= 3
+          }
+          const p2TotalMembers = gMembers.filter(isP2)
+          const p2AvailableNow = p2TotalMembers.filter(wId => candidates.includes(wId))
+          const p2Short = Math.max(0, p2TotalMembers.length - p2AvailableNow.length)
+
+          let selectedList: string[]
+          if (p2Short > 0 && need > 0) {
+            // P3 cov 후보 정렬 (cov 우선)
+            const p3Pool = candidates
+              .filter(isP3)
+              .sort((a, b) => {
+                const pa = lookupMember(g.id, a)?.priority_level ?? 3
+                const pb = lookupMember(g.id, b)?.priority_level ?? 3
+                const aCov = lookupCoveragePriority(g.id, a, pa)
+                const bCov = lookupCoveragePriority(g.id, b, pb)
+                return aCov - bCov  // cov 작을수록 우선
+              })
+            // P2 결원 수 + need 중 작은 만큼 P3 우선 선택
+            const p3Pick = p3Pool.slice(0, Math.min(p2Short, need))
+            // 나머지 need → 기존 정렬된 candidates 에서 (P3 pick 제외)
+            const usedSet = new Set(p3Pick)
+            const restPool = candidates.filter(wId => !usedSet.has(wId))
+            const restPick = restPool.slice(0, need - p3Pick.length)
+            selectedList = [...p3Pick, ...restPick]
+          } else {
+            selectedList = candidates.slice(0, need)
+          }
+          selected = selectedList
         } else {
           // 단순 rotation (legacy)
           if (g.generation_strategy === 'rotation') {

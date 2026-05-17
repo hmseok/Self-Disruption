@@ -3,7 +3,7 @@
 //
 // Phase K (2026-05-09) — body 확장:
 //   { members: [{ worker_id, priority_level, preferred_dow_prefer, preferred_dow_avoid,
-//                 max_consecutive_work_days, required_days_per_month, max_days_per_month,
+//                 max_consecutive_work_days, max_days_per_month,
 //                 blocked_slot_ids, work_pattern_text }, ...] }
 //
 //   (옛 호환) { worker_ids: [uuid, ...] } 도 받음 — priority 만 인덱스로
@@ -27,7 +27,6 @@ interface MemberInput {
   preferred_dow_prefer?: string | null
   preferred_dow_avoid?: string | null
   max_consecutive_work_days?: number | null
-  required_days_per_month?: number | null
   max_days_per_month?: number | null
   blocked_slot_ids?: string[] | null
   work_pattern_text?: string | null
@@ -106,7 +105,6 @@ export async function PUT(
       const dow_prefer = nullableStr(m.preferred_dow_prefer)
       const dow_avoid = nullableStr(m.preferred_dow_avoid)
       const max_consec = nullableNum(m.max_consecutive_work_days)
-      const req_days = nullableNum(m.required_days_per_month)
       const max_days = nullableNum(m.max_days_per_month)
       const blocked = Array.isArray(m.blocked_slot_ids) && m.blocked_slot_ids.length > 0
         ? JSON.stringify(m.blocked_slot_ids.map(String)) : null
@@ -131,14 +129,14 @@ export async function PUT(
           INSERT INTO cs_group_members
             (id, group_id, worker_id, priority,
              priority_level, preferred_dow_prefer, preferred_dow_avoid,
-             max_consecutive_work_days, required_days_per_month, max_days_per_month,
+             max_consecutive_work_days, max_days_per_month,
              blocked_slot_ids, work_pattern_text,
              rotation_start_date, rotation_start_index, rotation_end_date,
              target_ratio, created_at)
           VALUES
             (${memberId}, ${id}, ${m.worker_id}, ${i},
              ${priority_level}, ${dow_prefer}, ${dow_avoid},
-             ${max_consec}, ${req_days}, ${max_days},
+             ${max_consec}, ${max_days},
              ${blocked}, ${pattern},
              ${rot_start}, ${rot_index}, ${rot_end},
              ${target_ratio}, NOW())
@@ -148,14 +146,14 @@ export async function PUT(
           INSERT INTO cs_group_members
             (id, group_id, worker_id, priority,
              priority_level, preferred_dow_prefer, preferred_dow_avoid,
-             max_consecutive_work_days, required_days_per_month, max_days_per_month,
+             max_consecutive_work_days, max_days_per_month,
              blocked_slot_ids, work_pattern_text,
              rotation_start_date, rotation_start_index, rotation_end_date,
              created_at)
           VALUES
             (${memberId}, ${id}, ${m.worker_id}, ${i},
              ${priority_level}, ${dow_prefer}, ${dow_avoid},
-             ${max_consec}, ${req_days}, ${max_days},
+             ${max_consec}, ${max_days},
              ${blocked}, ${pattern},
              ${rot_start}, ${rot_index}, ${rot_end},
              NOW())
@@ -165,12 +163,12 @@ export async function PUT(
           INSERT INTO cs_group_members
             (id, group_id, worker_id, priority,
              priority_level, preferred_dow_prefer, preferred_dow_avoid,
-             max_consecutive_work_days, required_days_per_month, max_days_per_month,
+             max_consecutive_work_days, max_days_per_month,
              blocked_slot_ids, work_pattern_text, created_at)
           VALUES
             (${memberId}, ${id}, ${m.worker_id}, ${i},
              ${priority_level}, ${dow_prefer}, ${dow_avoid},
-             ${max_consec}, ${req_days}, ${max_days},
+             ${max_consec}, ${max_days},
              ${blocked}, ${pattern}, NOW())
         `
       }
@@ -190,7 +188,7 @@ export async function PUT(
     const out = await prisma.$queryRaw<any[]>`
       SELECT m.id, m.worker_id, m.priority,
              m.priority_level, m.preferred_dow_prefer, m.preferred_dow_avoid,
-             m.max_consecutive_work_days, m.required_days_per_month, m.max_days_per_month,
+             m.max_consecutive_work_days, m.max_days_per_month,
              m.blocked_slot_ids, m.work_pattern_text,
              w.name AS worker_name, w.color_tone AS worker_tone, w.group_label
       FROM cs_group_members m
@@ -202,7 +200,6 @@ export async function PUT(
       ...r,
       priority_level: Number(r.priority_level || 2),
       max_consecutive_work_days: r.max_consecutive_work_days != null ? Number(r.max_consecutive_work_days) : null,
-      required_days_per_month: r.required_days_per_month != null ? Number(r.required_days_per_month) : null,
       max_days_per_month: r.max_days_per_month != null ? Number(r.max_days_per_month) : null,
       blocked_slot_ids: r.blocked_slot_ids
         ? (typeof r.blocked_slot_ids === 'string'

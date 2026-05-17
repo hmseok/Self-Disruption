@@ -62,7 +62,7 @@ export async function GET(
     const members = await prisma.$queryRaw<any[]>`
       SELECT mv.worker_id, mv.priority,
              mv.priority_level, mv.preferred_dow_prefer, mv.preferred_dow_avoid,
-             mv.max_consecutive_work_days, mv.required_days_per_month, mv.max_days_per_month,
+             mv.max_consecutive_work_days, mv.max_days_per_month,
              mv.blocked_slot_ids, mv.work_pattern_text,
              DATE_FORMAT(mv.rotation_start_date, '%Y-%m-%d') AS rotation_start_date,
              mv.rotation_start_index,
@@ -89,7 +89,6 @@ export async function GET(
         ...m,
         priority_level: Number(m.priority_level || 2),
         max_consecutive_work_days: m.max_consecutive_work_days != null ? Number(m.max_consecutive_work_days) : null,
-        required_days_per_month: m.required_days_per_month != null ? Number(m.required_days_per_month) : null,
         max_days_per_month: m.max_days_per_month != null ? Number(m.max_days_per_month) : null,
         rotation_start_index: Number(m.rotation_start_index || 0),
         blocked_slot_ids: m.blocked_slot_ids
@@ -170,7 +169,7 @@ export async function PATCH(
           INSERT INTO cs_group_member_versions
             (id, version_id, worker_id, priority,
              priority_level, preferred_dow_prefer, preferred_dow_avoid,
-             max_consecutive_work_days, required_days_per_month, max_days_per_month,
+             max_consecutive_work_days, max_days_per_month,
              blocked_slot_ids, work_pattern_text,
              rotation_start_date, rotation_start_index, rotation_end_date,
              created_at, updated_at)
@@ -179,7 +178,6 @@ export async function PATCH(
              ${Math.min(3, Math.max(1, Number(m.priority_level) || 2))},
              ${m.preferred_dow_prefer || null}, ${m.preferred_dow_avoid || null},
              ${m.max_consecutive_work_days != null ? Number(m.max_consecutive_work_days) : null},
-             ${m.required_days_per_month != null ? Number(m.required_days_per_month) : null},
              ${m.max_days_per_month != null ? Number(m.max_days_per_month) : null},
              ${blocked}, ${m.work_pattern_text || null},
              ${m.rotation_start_date || null},

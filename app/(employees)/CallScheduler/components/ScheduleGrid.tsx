@@ -376,11 +376,24 @@ export default function ScheduleGrid({ detail, onChanged, myWorkerId }: Props) {
       }
     }
     // N-40 — viewMode='category' 면 카테고리 우선, 'flat' 이면 시간순만
+    // N-47 (사용자 보고): 「카테고리 안 그룹이 두 번씩 분리」 → 카테고리 → 그룹 → 시간 3단계
     rows.sort((a, b) => {
       if (viewMode === 'category') {
         const aCat = CATEGORY_ORDER[a.groupInfo?.category || 'general'] || 99
         const bCat = CATEGORY_ORDER[b.groupInfo?.category || 'general'] || 99
         if (aCat !== bCat) return aCat - bCat
+        // 같은 카테고리 안에서는 그룹 우선 (같은 그룹 시프트 연속)
+        const aGrpId = a.groupInfo?.id || 'zzz_nogrp'
+        const bGrpId = b.groupInfo?.id || 'zzz_nogrp'
+        if (aGrpId !== bGrpId) {
+          // 그룹 sort_order 우선 — 없으면 id 사전순
+          const aGrp = allGroups.find(g => g.id === aGrpId)
+          const bGrp = allGroups.find(g => g.id === bGrpId)
+          const aOrd = aGrp ? (aGrp as any).sort_order || 0 : 9999
+          const bOrd = bGrp ? (bGrp as any).sort_order || 0 : 9999
+          if (aOrd !== bOrd) return aOrd - bOrd
+          return aGrpId.localeCompare(bGrpId)
+        }
       }
       // 시작 시간 ASC (overnight 도 자기 start_time 기준)
       const toMin = (t: string) => {

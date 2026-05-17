@@ -53,7 +53,6 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
     preferred_dow_prefer: Set<number>
     preferred_dow_avoid: Set<number>
     max_consecutive_work_days: string
-    required_days_per_month: string
     max_days_per_month: string
     blocked_slot_ids: Set<string>
     work_pattern_text: string
@@ -65,7 +64,6 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
     preferred_dow_prefer: new Set(),
     preferred_dow_avoid: new Set(),
     max_consecutive_work_days: '',
-    required_days_per_month: '',
     max_days_per_month: '',
     blocked_slot_ids: new Set(),
     work_pattern_text: '',
@@ -214,7 +212,6 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
             preferred_dow_prefer: parseCsv(m.preferred_dow_prefer),
             preferred_dow_avoid: parseCsv(m.preferred_dow_avoid),
             max_consecutive_work_days: m.max_consecutive_work_days != null ? String(m.max_consecutive_work_days) : '',
-            required_days_per_month: m.required_days_per_month != null ? String(m.required_days_per_month) : '',
             max_days_per_month: m.max_days_per_month != null ? String(m.max_days_per_month) : '',
             blocked_slot_ids: new Set(Array.isArray(m.blocked_slot_ids) ? m.blocked_slot_ids : []),
             work_pattern_text: m.work_pattern_text || '',
@@ -490,7 +487,6 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
           preferred_dow_prefer: Array.from(cfg.preferred_dow_prefer).sort().join(',') || null,
           preferred_dow_avoid: Array.from(cfg.preferred_dow_avoid).sort().join(',') || null,
           max_consecutive_work_days: cfg.max_consecutive_work_days === '' ? null : Number(cfg.max_consecutive_work_days),
-          required_days_per_month: cfg.required_days_per_month === '' ? null : Number(cfg.required_days_per_month),
           max_days_per_month: cfg.max_days_per_month === '' ? null : Number(cfg.max_days_per_month),
           blocked_slot_ids: Array.from(cfg.blocked_slot_ids),
           work_pattern_text: cfg.work_pattern_text.trim() || null,
@@ -1779,7 +1775,6 @@ function MemberCfgPanel({
     preferred_dow_prefer: Set<number>
     preferred_dow_avoid: Set<number>
     max_consecutive_work_days: string
-    required_days_per_month: string
     max_days_per_month: string
     blocked_slot_ids: Set<string>
     work_pattern_text: string
@@ -1974,16 +1969,7 @@ function MemberCfgPanel({
         💡 <strong>희망/비선호 요일 · 월 최대 일수 · 연속 근무 한도 · 슬롯 거부</strong> 는 워커 마스터 (설정 → 워커 탭) 에서 셋팅 — 모든 그룹에 동일 적용
       </div>
 
-      {/* 3행 — 그룹별 의무 (월 필수 일수만 유지) */}
-      <div>
-        <div style={cfgFieldLabel}>
-          📈 월 필수 일수 (이 그룹 안)
-          <span style={{ fontSize: 11, fontWeight: 500, color: COLORS.textMuted }}>이 그룹에 최소 N일 보장</span>
-        </div>
-        <input type="number" min={0} value={cfg.required_days_per_month}
-               onChange={(e) => onChange({ required_days_per_month: e.target.value })}
-               placeholder="비움 = 무관" style={cfgInputStyle} />
-      </div>
+      {/* N-48 — 「월 필수 일수」 영역 제거 (워커 글로벌 min_days 만으로 충분) */}
 
       {/* 5행 — 패턴 메모 */}
       <div>

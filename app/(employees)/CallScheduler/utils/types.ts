@@ -88,7 +88,6 @@ export interface GroupMemberSettings {
   preferred_dow_prefer?: string | null // CSV '1,3,5'
   preferred_dow_avoid?: string | null  // CSV '0,6'
   max_consecutive_work_days?: number | null
-  required_days_per_month?: number | null
   max_days_per_month?: number | null
   blocked_slot_ids?: string[] | null   // ['L01','L02']
   work_pattern_text?: string | null    // '2-on-2-off' 자유 메모
