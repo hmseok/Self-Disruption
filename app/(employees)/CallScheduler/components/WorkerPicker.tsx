@@ -64,8 +64,10 @@ export default function WorkerPicker(props: Props) {
         onClick={(e) => e.stopPropagation()}
         style={{
           ...GLASS.L4,
-          width: 420, maxWidth: '92vw', maxHeight: '85vh',
-          borderRadius: 16, padding: 20, overflowY: 'auto',
+          // 사용자 보고 (2026-05-17): "날짜별에서 클릭했을 때 모달도 작아서 화면도 많이 짤려"
+          // → 480 → 560 으로 확대 + maxHeight 90vh 로 확대
+          width: 560, maxWidth: '95vw', maxHeight: '90vh',
+          borderRadius: 16, padding: 24, overflowY: 'auto',
           display: 'flex', flexDirection: 'column', gap: 14,
         }}
       >
@@ -89,7 +91,9 @@ export default function WorkerPicker(props: Props) {
           }}
         />
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 260, overflowY: 'auto' }}>
+        {/* 사용자 보고 (2026-05-17): "전체 근무자 다 표기되었으면 좋겠어"
+            → maxHeight 260 → 480 으로 확대, 워커 16명 정도는 스크롤 없이 표시 */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 480, overflowY: 'auto' }}>
           <button
             type="button"
             onClick={() => setWorkerId(null)}

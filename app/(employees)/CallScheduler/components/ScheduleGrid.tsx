@@ -306,7 +306,30 @@ export default function ScheduleGrid({ detail, onChanged, myWorkerId }: Props) {
   }, [assignments, slotById])
 
   // N-25 Step B — slots → (group, slot) 단위 row 산출
+  // N-40 — 매트릭스 뷰 모드 (카테고리 그룹 / 평면 시간순) 토글
+  //   디폴트 'category' — 24/365 운영에서 주간/야간 분리 검수
+  //   localStorage 로 사용자 선택 유지
+  const [viewMode, setViewMode] = useState<'category' | 'flat'>(() => {
+    if (typeof window === 'undefined') return 'category'
+    const saved = localStorage.getItem('cs-matrix-view-mode')
+    return saved === 'flat' ? 'flat' : 'category'
+  })
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('cs-matrix-view-mode', viewMode)
+    }
+  }, [viewMode])
+  // 카테고리 정렬 순서 (운영 흐름에 맞춰)
+  const CATEGORY_ORDER: Record<string, number> = {
+    '주간': 1, '저녁': 2, '야간': 3, '특수': 4, 'general': 5, '일반': 5,
+  }
+  const CATEGORY_LABEL: Record<string, string> = {
+    '주간': '☀️ 주간', '저녁': '🌆 저녁', '야간': '🌙 야간',
+    '특수': '🎌 특수', 'general': '📁 일반', '일반': '📁 일반',
+  }
+
   // N-26 — row 를 시작 시간 순으로 정렬 (그룹과 무관 — 사용자 의도)
+  // N-40 — viewMode='category' 면 카테고리 우선 → 안에서 시간순
   // rotation_enabled 그룹은 rotation_shifts 의 모든 시프트를 sub-row 로 펼침
   // 일반 그룹은 g.shift_slot_id 단일 row
   // 그룹 없는 slot 은 groupInfo=null
@@ -350,8 +373,14 @@ export default function ScheduleGrid({ detail, onChanged, myWorkerId }: Props) {
         rows.push({ slot: s, groupInfo: null, rotationOrder: 0 })
       }
     }
-    // N-26 — 시작 시간 ASC 정렬 (overnight 도 자기 start_time 기준)
+    // N-40 — viewMode='category' 면 카테고리 우선, 'flat' 이면 시간순만
     rows.sort((a, b) => {
+      if (viewMode === 'category') {
+        const aCat = CATEGORY_ORDER[a.groupInfo?.category || 'general'] || 99
+        const bCat = CATEGORY_ORDER[b.groupInfo?.category || 'general'] || 99
+        if (aCat !== bCat) return aCat - bCat
+      }
+      // 시작 시간 ASC (overnight 도 자기 start_time 기준)
       const toMin = (t: string) => {
         const [h, m] = t.split(':').map(Number)
         return (h || 0) * 60 + (m || 0)
@@ -363,7 +392,7 @@ export default function ScheduleGrid({ detail, onChanged, myWorkerId }: Props) {
       return a.slot.code.localeCompare(b.slot.code)
     })
     return rows
-  }, [allGroups, slots])
+  }, [allGroups, slots, viewMode])
 
   const [pickerSlot, setPickerSlot] = useState<ShiftSlot | null>(null)
   const [pickerDate, setPickerDate] = useState<string>('')
@@ -605,6 +634,19 @@ export default function ScheduleGrid({ detail, onChanged, myWorkerId }: Props) {
                   title="외부 근무 / 회피일 행 보기 (매니저 계획용 — 다른 직원 시야엔 기본 숨김)">
             {showPrivate ? '👁 외부/회피 표시' : '🙈 외부/회피 숨김'}
           </button>
+          {/* N-40 — 매트릭스 정렬 모드 토글 (카테고리 / 평면 시간순) */}
+          <button type="button"
+                  onClick={() => setViewMode(m => m === 'category' ? 'flat' : 'category')}
+                  style={{
+                    padding: '3px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700,
+                    background: viewMode === 'category' ? COLORS.bgBlue : 'transparent',
+                    color: viewMode === 'category' ? COLORS.info : COLORS.textSecondary,
+                    border: `1px solid ${viewMode === 'category' ? COLORS.borderBlue : COLORS.borderFaint}`,
+                    cursor: 'pointer',
+                  }}
+                  title="카테고리(주간/야간/특수) 별로 그룹핑 ↔ 평면 시간순">
+            {viewMode === 'category' ? '🗂 카테고리 그룹' : '⏱ 평면 시간순'}
+          </button>
         </div>
       </div>
       <table style={{
@@ -817,7 +859,14 @@ export default function ScheduleGrid({ detail, onChanged, myWorkerId }: Props) {
           })()}
           {/* 슬롯 행 (그룹 헤더 사이에 끼움 — index 비교로 그룹 변경 시 헤더 추가) */}
           {/* N-25 Step B — slotsByGroup 으로 변경 (rotation 그룹은 sequence 펼침) */}
+          {/* N-40 — viewMode='category' 면 카테고리 변경 시 섹션 헤더 row 삽입 */}
           {slotsByGroup.map(({ slot, groupInfo, rotationOrder }, slotIdx) => {
+            // N-40 — 카테고리 섹션 헤더 row (카테고리 모드 + 카테고리 첫 등장 시)
+            const prevRow = slotIdx > 0 ? slotsByGroup[slotIdx - 1] : null
+            const curCat = groupInfo?.category || 'general'
+            const prevCat = prevRow ? (prevRow.groupInfo?.category || 'general') : null
+            const isNewCategoryHeader = viewMode === 'category' && curCat !== prevCat
+            const catLabel = CATEGORY_LABEL[curCat] || `📁 ${curCat}`
             // PR-2SS-Phase-J-3 — 그룹 변경 시 헤더 + 그룹 멤버 cycle/회피 행 inline
             // N-25 Step B — groupInfo 우선 (없으면 slotGroups[slot.id] fallback)
             // N-26 — 시간순 정렬이라 같은 그룹이 비연속적 — 그룹 헤더 row 비활성 (isNewGroupSection=false)
@@ -1059,6 +1108,35 @@ export default function ScheduleGrid({ detail, onChanged, myWorkerId }: Props) {
             // PR-2SS-Phase-J-3 — 그룹 헤더 + 멤버 cycle/회피 행 + 슬롯 행 묶음
             return (
               <Fragment key={slot.id}>
+                {/* N-40 — 카테고리 섹션 헤더 (viewMode='category' + 카테고리 변경 시) */}
+                {isNewCategoryHeader && (
+                  <tr key={`cathdr-${slotIdx}-${curCat}`}>
+                    <td colSpan={days.length + 1} style={{
+                      padding: '8px 14px', position: 'sticky', left: 0,
+                      background: curCat === '주간' ? COLORS.bgBlue
+                                : curCat === '저녁' ? COLORS.bgAmber
+                                : curCat === '야간' ? COLORS.bgViolet
+                                : curCat === '특수' ? COLORS.bgRed
+                                : COLORS.bgGray,
+                      color: curCat === '주간' ? COLORS.info
+                           : curCat === '저녁' ? COLORS.warning
+                           : curCat === '야간' ? '#7c3aed'
+                           : curCat === '특수' ? COLORS.danger
+                           : COLORS.textSecondary,
+                      fontWeight: 800, fontSize: 13,
+                      borderTop: `4px solid ${
+                        curCat === '주간' ? COLORS.borderBlue
+                        : curCat === '저녁' ? COLORS.borderAmber
+                        : curCat === '야간' ? COLORS.borderViolet
+                        : curCat === '특수' ? COLORS.borderRed
+                        : COLORS.borderFaint}`,
+                      borderBottom: `1px solid ${COLORS.borderFaint}`,
+                      letterSpacing: '0.3px',
+                    }}>
+                      {catLabel}
+                    </td>
+                  </tr>
+                )}
                 {isNewGroupSection && curGrp && (
                   <tr key={`gh-${slot.id}`}>
                     <td colSpan={days.length + 1} style={{
