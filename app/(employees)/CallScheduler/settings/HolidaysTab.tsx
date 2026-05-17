@@ -116,7 +116,7 @@ export default function HolidaysTab() {
   // N-22 — 공공데이터 API 로 해당 연도 공휴일 + 대체공휴일 자동 채우기
   const autoFill = async () => {
     if (syncing) return
-    if (!confirm(`${year}년 공휴일 + 대체공휴일을 공공데이터 API 에서 가져와 자동 추가합니다.\n이미 있는 항목은 skip 됩니다 (멱등). 계속할까요?`)) return
+    if (!confirm(`${year}년 공휴일 + 대체공휴일을 공공데이터 API 에서 가져와 자동 추가합니다.\n같은 날짜의 기존 공휴일(national) row 은 새 데이터로 대체됩니다. 회사휴무/기타는 보존. 계속할까요?`)) return
     setSyncing(true); setSyncMessage(null); setError(null)
     try {
       const auth = await getAuthHeader()
@@ -125,10 +125,12 @@ export default function HolidaysTab() {
       })
       const json = await res.json()
       if (!res.ok) throw new Error(json?.error || '자동 채우기 실패')
-      const { inserted, skipped, total } = json.data
+      const { inserted, skipped, replaced, total } = json.data
+      // N-38 — replaced 카운터 메시지 추가
+      const replacedStr = replaced > 0 ? ` / 기존 대체 ${replaced}개` : ''
       setSyncMessage({
         ok: true,
-        msg: `✅ ${year}년 — 신규 ${inserted}개 추가 / 중복 ${skipped}개 skip / 총 API ${total}개`,
+        msg: `✅ ${year}년 — 신규 ${inserted}개 추가${replacedStr} / 중복 ${skipped}개 skip / 총 API ${total}개`,
       })
       await load()
     } catch (e: any) {

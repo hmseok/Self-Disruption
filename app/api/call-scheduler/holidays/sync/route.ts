@@ -35,12 +35,29 @@ export async function POST(request: NextRequest) {
 
     if (holidays.length === 0) {
       return NextResponse.json({
-        data: { inserted: 0, skipped: 0, total: 0, year },
+        data: { inserted: 0, skipped: 0, replaced: 0, total: 0, year },
         error: null,
       })
     }
 
-    // 멱등 INSERT (UNIQUE KEY uq_cs_holiday_date_name 활용 — INSERT IGNORE)
+    // N-38 — 같은 날짜 + type='national' 기존 row 자동 대체
+    //   사용자 보고: API 동기화 후 같은 날짜에 중복 휴일 row 발생
+    //   ("설날 연휴" 수동 + "설날" API 동기화 둘 다 존재)
+    //   결정: 「공식 공휴일 마스터 = API 데이터」 보장 — 같은 날짜 national 기존 row 삭제
+    //   주의: type='company' (회사휴무) / 'etc' (기타) 는 보존 (운영자 명시 입력 데이터)
+    const apiDates = Array.from(new Set(holidays.map(h => h.date)))
+    let replaced = 0
+    for (const date of apiDates) {
+      try {
+        const delResult = await prisma.$executeRaw`
+          DELETE FROM cs_holidays
+          WHERE holiday_date = ${date} AND type = 'national'
+        `
+        replaced += Number(delResult) || 0
+      } catch { /* graceful */ }
+    }
+
+    // 새 INSERT (이제 같은 날짜에 national row 없으므로 IGNORE 불필요)
     let inserted = 0
     let skipped = 0
     for (const h of holidays) {
@@ -54,7 +71,6 @@ export async function POST(request: NextRequest) {
             (${id}, ${h.date}, ${h.name}, 'national', 1, 1, 'red',
              ${'공공데이터 API 자동 동기화'}, NOW(), NOW())
         `
-        // executeRaw 의 result = affected rows. 1 = INSERT, 0 = IGNORE (이미 있음)
         if (Number(result) > 0) inserted++
         else skipped++
       } catch {
@@ -63,7 +79,7 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({
-      data: { inserted, skipped, total: holidays.length, year },
+      data: { inserted, skipped, replaced, total: holidays.length, year },
       error: null,
     })
   } catch (e: any) {

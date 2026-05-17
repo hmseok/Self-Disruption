@@ -3,6 +3,34 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-17 (Phase N-38) — 휴일 sync 중복 정리 + 임시공휴일 보강
+
+### 사용자 보고 (2건)
+> "근데 지방선거일이 6/3일인데 이 정보는 안 가져오는 이유는? 그런 건 안 뜨나?"
+> (UI 화면) 같은 날짜에 "설날 연휴" (수동) + "설날" (API) 중복 row 발생
+
+### 변경
+1. **`holidays/sync/route.ts`** — 같은 날짜 'national' row 자동 대체
+   - DELETE 기존 national row (해당 날짜) → INSERT API 데이터
+   - type='company' (회사휴무) / 'etc' (기타) 는 보존
+   - 응답에 `replaced` 카운터 추가
+   - 「공식 공휴일 마스터 = API 데이터」 보장
+
+2. **`lib/korea-holiday-api.ts`** — 임시공휴일 보강
+   - `getExtraHolidaysOverride(year)` 함수 신설
+   - 한국천문연구원 API 는 임시공휴일 (지방선거 등) 즉시 미반영
+   - API 응답 후 알려진 임시공휴일 추가 (날짜 dedupe)
+   - 2026: 제8회 전국동시지방선거 (6/3)
+
+3. **`HolidaysTab.tsx`** — UI 메시지 + 안내 텍스트
+   - confirm 메시지: 「기존 national 대체 / 회사휴무 보존」 명시
+   - 결과 메시지에 「기존 대체 N개」 카운터 표시
+
+### 효과
+- 매번 sync 할 때마다 깔끔한 결과 (중복 row 없음)
+- 6/3 지방선거일 자동 포함 — 햇살/석양 그룹 (skip_on_holidays=1) 정상 skip
+- 향후 임시공휴일 (대선/총선/보궐) 도 같은 패턴으로 추가
+
 ## 2026-05-17 (Phase N-37) — 워커 max_days_per_month hard cap (모든 경로 공통)
 
 ### 사용자 보고

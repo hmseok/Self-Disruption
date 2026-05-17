@@ -131,16 +131,52 @@ export async function getKoreaHolidays(year: number): Promise<KoreaHoliday[]> {
   }
   // 날짜 + 이름 dedupe (seq=2 같이 중복 row 처리)
   const seen = new Set<string>()
+  const dateSeen = new Set<string>()  // 날짜만 추적 (임시공휴일 보강 중복 방지)
   const dedupe: KoreaHoliday[] = []
   for (const h of result) {
     const key = `${h.date}_${h.name}`
     if (seen.has(key)) continue
     seen.add(key)
+    dateSeen.add(h.date)
     dedupe.push(h)
   }
+
+  // N-38 — API 응답에 누락된 임시공휴일 보강
+  //   사용자 보고: "지방선거일이 6/3일인데 이 정보는 안 가져오는 이유는?"
+  //   원인: 한국천문연구원 API 가 임시공휴일 (행정안전부 지정) 즉시 반영 안 함
+  //   해결: getExtraHolidaysOverride 에 알려진 임시공휴일 하드코딩 → API 응답에 보강
+  //   날짜 기준 중복 체크 — API 가 이미 가져왔으면 무시
+  const extras = getExtraHolidaysOverride(year)
+  for (const h of extras) {
+    if (dateSeen.has(h.date)) continue
+    dedupe.push(h)
+    dateSeen.add(h.date)
+  }
+
   // 날짜 오름차순
   dedupe.sort((a, b) => a.date.localeCompare(b.date))
   return dedupe
+}
+
+/**
+ * 알려진 임시공휴일 (행정안전부 지정 — 한국천문연구원 API 누락 보강).
+ * 정부 발표 후 매뉴얼 업데이트 필요.
+ */
+function getExtraHolidaysOverride(year: number): KoreaHoliday[] {
+  const extras: Record<number, Array<{ date: string; name: string }>> = {
+    2026: [
+      { date: '2026-06-03', name: '제8회 전국동시지방선거' },
+    ],
+    // 향후: 대선/총선/임시공휴일 등 정부 발표 시 추가
+  }
+  const list = extras[year] || []
+  return list.map(h => ({
+    date: h.date,
+    name: h.name,
+    is_holiday: true,
+    is_substitute: false,
+    date_kind: '99',  // 99 = 임시공휴일 (커스텀 코드)
+  }))
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -197,6 +233,8 @@ function getFallbackHolidays(year: number): KoreaHoliday[] {
       // 부처님오신날 (양력 5/24 일) → 대체공휴일 5/25 (월)
       { date: '2026-05-24', name: '부처님오신날' },
       { date: '2026-05-25', name: '대체공휴일(부처님오신날)', is_substitute: true },
+      // 제8회 전국동시지방선거 — 임시공휴일 (행정안전부 지정)
+      { date: '2026-06-03', name: '제8회 전국동시지방선거' },
       // 추석 연휴 (양력 9/24~9/26) — 추석 9/25 금
       { date: '2026-09-24', name: '추석' },
       { date: '2026-09-25', name: '추석' },
