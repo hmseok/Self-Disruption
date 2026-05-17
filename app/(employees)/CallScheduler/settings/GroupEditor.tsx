@@ -141,9 +141,10 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
   const [skipMissing, setSkipMissing] = useState(false)
   const [expandedSkipWorkerId, setExpandedSkipWorkerId] = useState<string | null>(null)
   // 워커별 빠른 입력 폼 상태 (Map by workerId)
-  const [skipForms, setSkipForms] = useState<Record<string, { start: string; end: string; reason: string; saving: boolean; error: string | null }>>({})
-  const getSkipForm = (wId: string) => skipForms[wId] || { start: '', end: '', reason: '', saving: false, error: null }
-  const setSkipForm = (wId: string, patch: Partial<{ start: string; end: string; reason: string; saving: boolean; error: string | null }>) => {
+  // N-39 — scope: 'global' (전체 그룹 → 연차) | 'group' (이 그룹만 → 회피일). 디폴트 'global'
+  const [skipForms, setSkipForms] = useState<Record<string, { start: string; end: string; reason: string; scope: 'global' | 'group'; saving: boolean; error: string | null }>>({})
+  const getSkipForm = (wId: string) => skipForms[wId] || { start: '', end: '', reason: '', scope: 'global' as 'global' | 'group', saving: false, error: null }
+  const setSkipForm = (wId: string, patch: Partial<{ start: string; end: string; reason: string; scope: 'global' | 'group'; saving: boolean; error: string | null }>) => {
     setSkipForms(prev => ({ ...prev, [wId]: { ...getSkipForm(wId), ...patch } }))
   }
 
@@ -340,19 +341,39 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
     setSkipForm(wId, { saving: true })
     try {
       const auth = await getAuthHeader()
-      const res = await fetch(`/api/call-scheduler/shift-groups/${groupId}/skip-dates`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...auth },
-        body: JSON.stringify({
-          worker_id: wId,
-          start_date: form.start,
-          end_date: form.end,
-          reason: form.reason.trim() || null,
-          status: 'approved',
-        }),
-      })
-      const json = await res.json()
-      if (!res.ok) throw new Error(json?.error || '추가 실패')
+      // N-39 — scope 분기: global → 연차 (cs_leaves), group → 회피일 (skip-dates)
+      if (form.scope === 'global') {
+        // 연차 등록 (워커 전체 그룹 — leave_type='annual', am_pm='full')
+        const res = await fetch(`/api/call-scheduler/leaves`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...auth },
+          body: JSON.stringify({
+            worker_id: wId,
+            leave_type: 'annual',
+            start_date: form.start,
+            end_date: form.end,
+            am_pm: 'full',
+            reason: form.reason.trim() || null,
+          }),
+        })
+        const json = await res.json()
+        if (!res.ok) throw new Error(json?.error || '연차 추가 실패')
+      } else {
+        // 회피일 (이 그룹만)
+        const res = await fetch(`/api/call-scheduler/shift-groups/${groupId}/skip-dates`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...auth },
+          body: JSON.stringify({
+            worker_id: wId,
+            start_date: form.start,
+            end_date: form.end,
+            reason: form.reason.trim() || null,
+            status: 'approved',
+          }),
+        })
+        const json = await res.json()
+        if (!res.ok) throw new Error(json?.error || '회피일 추가 실패')
+      }
       setSkipForm(wId, { start: '', end: '', reason: '', saving: false })
       reloadSkips()
     } catch (e: any) {
@@ -1533,6 +1554,29 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
                               ))}
                             </div>
                           )}
+                          {/* N-39 — scope 토글 (전체 그룹 = 연차 / 이 그룹만 = 회피일) */}
+                          <div style={{ display: 'flex', gap: 4, marginBottom: 4 }}>
+                            {([
+                              { v: 'global', label: '📅 연차 (전체 그룹)', tone: 'blue' },
+                              { v: 'group', label: '⛔ 회피일 (이 그룹만)', tone: 'amber' },
+                            ] as const).map(opt => (
+                              <button key={opt.v} type="button"
+                                      onClick={() => setSkipForm(w.id, { scope: opt.v })}
+                                      style={{
+                                        flex: 1, padding: '4px 8px', fontSize: 11, fontWeight: 700,
+                                        borderRadius: 6, cursor: 'pointer',
+                                        background: form.scope === opt.v
+                                          ? (opt.tone === 'blue' ? COLORS.bgBlue : COLORS.bgAmber)
+                                          : 'transparent',
+                                        color: form.scope === opt.v
+                                          ? (opt.tone === 'blue' ? COLORS.info : COLORS.warning)
+                                          : COLORS.textMuted,
+                                        border: `1px solid ${form.scope === opt.v
+                                          ? (opt.tone === 'blue' ? COLORS.borderBlue : COLORS.borderAmber)
+                                          : COLORS.borderFaint}`,
+                                      }}>{opt.label}</button>
+                            ))}
+                          </div>
                           {/* 빠른 입력 한 줄 */}
                           <div style={{ display: 'flex', gap: 4, alignItems: 'flex-end', flexWrap: 'wrap' }}>
                             <input type="date" value={form.start}
@@ -1548,7 +1592,7 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
                                    style={skipInlineInputStyle} title="종료일" />
                             <input type="text" value={form.reason}
                                    onChange={(e) => setSkipForm(w.id, { reason: e.target.value })}
-                                   placeholder="사유 (선택)"
+                                   placeholder={form.scope === 'global' ? '사유 (연차)' : '사유 (회피일)'}
                                    style={{ ...skipInlineInputStyle, flex: 1, minWidth: 100 }} />
                             <button type="button" onClick={() => addSkipInline(w.id)} disabled={form.saving}
                                     style={{

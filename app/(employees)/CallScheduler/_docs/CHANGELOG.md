@@ -3,6 +3,38 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-17 (Phase N-39) — GroupEditor 안 연차/회피일 통합 등록 + coverage_priority 확인
+
+### 사용자 보고
+> "연차는 매니저가 회피일처럼 등록 못 하나요?"
+> "연차 시 우선순위 직원 설정하는 것은 회피일은 적용 안 되나요?"
+
+### 진단
+1. **연차 vs 회피일 분리**
+   - 연차: 워커 차원 (모든 그룹), 발급량 차감, 종일/반차 — 별도 탭
+   - 회피일: 그룹 차원, 사유, 발급량 무관 — GroupEditor 안 인라인
+2. **coverage_priority 적용 범위**: 둘 다 적용 ✓ (candidates 정렬 단계에서 보조)
+   - 휴가 / 회피일 / 연속한도 / skip_on_holidays 어떤 원인이든 결원 → coverage 작동
+
+### 사용자 결정
+- "회피일에 설정하듯이 똑같이 적용하면 될 것 같고 기본을 전체 필터로 해 주세요"
+
+### 변경 (`GroupEditor.tsx`)
+1. SkipForm 에 `scope: 'global' | 'group'` 필드 추가 (디폴트 `'global'`)
+2. 인라인 폼에 scope 토글 추가:
+   - 📅 **연차 (전체 그룹)** — 디폴트 (블루 톤)
+   - ⛔ **회피일 (이 그룹만)** — 회피일 (앰버 톤)
+3. addSkipInline 분기:
+   - `scope='global'` → POST `/api/call-scheduler/leaves` (leave_type='annual', am_pm='full')
+   - `scope='group'` → 기존 POST `/api/call-scheduler/shift-groups/[id]/skip-dates`
+4. 사유 placeholder 동적 변경 (연차/회피일)
+
+### 효과
+- 매니저가 워커 행 펼치면 한 흐름으로 연차/회피일 모두 등록 가능
+- 디폴트 연차 (전체 그룹) — 일반적 케이스 우선
+- 회피일 토글로 특정 그룹만 적용도 가능
+- coverage_priority 는 둘 다에 작동 — 회피일이든 연차든 결원 발생 시 P3 끼리 cov=1 우선
+
 ## 2026-05-17 (Phase N-38) — 휴일 sync 중복 정리 + 임시공휴일 보강
 
 ### 사용자 보고 (2건)
