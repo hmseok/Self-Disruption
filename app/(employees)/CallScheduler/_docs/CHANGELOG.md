@@ -3,6 +3,42 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-17 (Phase N-31) — 휴일 가드 강화 (skip_on_holidays=1 이면 무조건 skip)
+
+### 사용자 보고
+> "휴일제외로 해놓은 그룹이 왜 근무로 또 들어가고 있는지"
+
+### 진단
+- SQL: 햇살 (skip=1) + 석양 (skip=1) 이 6/3 (지방선거일) 출근 ← 버그
+- 원인: 메인 가드의 첫 조건 `skipHolidays` (다이얼로그 옵션) 이 false 면 모든 그룹 가드 무시
+- 추가: `holidayDates` 자체가 `skipHolidays=true` 일 때만 fetch — OFF 시 빈 Set → 그룹 가드 작동 X
+
+### 변경 (`auto-generate/route.ts`)
+1. **`holidayDates` 항상 fetch** — 다이얼로그 옵션과 무관하게 cs_holidays 조회 (그룹 가드용)
+2. **메인 휴일 가드 강화**:
+```js
+// 새 로직
+const shouldSkipForHoliday = isHoliday && (groupSkipsHoliday || skipHolidays)
+//                                          ^^^^^^^^^^^^^^^   ^^^^^^^^^^^^^^^
+//                                          그룹 셋팅 우선     OR 전역 강제
+```
+
+### 우선순위 (새)
+| 그룹.skip_on_holidays | 다이얼로그 옵션 | 휴일 결과 |
+|----------------------|--------------|----------|
+| **1** (휴일 제외 ON) | 무관 | **무조건 skip** |
+| 0 (휴일 출근) | ON | skip (전역 강제) |
+| 0 (휴일 출근) | OFF | 출근 (24/365 운영) |
+
+### 효과
+- 「햇살」 「석양」 그룹의 skip_on_holidays=1 셋팅이 직관대로 동작 (휴일 출근 X)
+- 부엉이/꿀벌/달빛 (skip=0) 은 휴일 출근 OK
+- 다이얼로그 옵션은 skip=0 그룹에 대한 master kill switch 역할만
+
+### 검증
+- tsc PASS
+- 자동 생성 재실행 후 6/3 매트릭스 확인 — 햇살/석양 row 빈 셀이어야
+
 ## 2026-05-17 (Phase N-30) — 「공휴일만」 패턴 추가 (휴일 전담 그룹)
 
 ### 사용자 보고

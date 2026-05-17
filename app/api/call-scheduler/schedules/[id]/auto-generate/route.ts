@@ -571,23 +571,23 @@ export async function POST(
     }
 
     // 4) 휴일 (exclude_auto=1) — 해당 월
+    // N-31 — 항상 fetch (그룹 skip_on_holidays=1 가드를 위해)
+    //   다이얼로그의 「휴일 자동 제외」 옵션은 그룹 skip=0 에 대한 master kill switch 역할만
     const monthStart = `${year}-${String(month).padStart(2, '0')}-01`
     const monthEnd = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
     let holidayDates = new Set<string>()
     let holidayList: HolidayRow[] = []
-    if (skipHolidays) {
-      try {
-        holidayList = await prisma.$queryRaw<any[]>`
-          SELECT DATE_FORMAT(holiday_date, '%Y-%m-%d') AS holiday_date,
-                 exclude_auto, name
-          FROM cs_holidays
-          WHERE holiday_date BETWEEN ${monthStart} AND ${monthEnd}
-            AND exclude_auto = 1
-        ` as any
-        holidayDates = new Set(holidayList.map(h => h.holiday_date))
-      } catch {
-        // 테이블 미적용 시 무시
-      }
+    try {
+      holidayList = await prisma.$queryRaw<any[]>`
+        SELECT DATE_FORMAT(holiday_date, '%Y-%m-%d') AS holiday_date,
+               exclude_auto, name
+        FROM cs_holidays
+        WHERE holiday_date BETWEEN ${monthStart} AND ${monthEnd}
+          AND exclude_auto = 1
+      ` as any
+      holidayDates = new Set(holidayList.map(h => h.holiday_date))
+    } catch {
+      // 테이블 미적용 시 무시
     }
 
     // 5) 연차 — 해당 월 걸친 것
@@ -924,11 +924,16 @@ export async function POST(
           const dowSet = patternDays(g.pattern_type, g.custom_days)
           if (!dowSet.has(dow)) continue
 
-          // 휴일 제외 — N-16: 그룹별 skip_on_holidays 우선 (legacy 전역 skipHolidays 는 master kill switch)
+          // N-31 — 휴일 가드 강화:
+          //   그룹.skip_on_holidays=1 → 다이얼로그 옵션과 무관하게 무조건 skip (그룹 셋팅 우선)
+          //   그룹.skip_on_holidays=0 + 다이얼로그 ON (skipHolidays=true) → 전역 강제 skip
+          //   그룹.skip_on_holidays=0 + 다이얼로그 OFF → 휴일 출근 (24/365 운영)
           const groupSkipsHoliday = hasGroupSkipOnHolidays
             ? Boolean(g.skip_on_holidays)
-            : skipHolidays  // 컬럼 미적용 시 legacy 전역 옵션 사용
-          if (skipHolidays && groupSkipsHoliday && holidayDates.has(isoDate)) {
+            : false
+          const isHoliday = holidayDates.has(isoDate)
+          const shouldSkipForHoliday = isHoliday && (groupSkipsHoliday || skipHolidays)
+          if (shouldSkipForHoliday) {
             plan.push({
               work_date: isoDate, shift_slot_id: g.shift_slot_id, worker_id: null,
               special_code: 'none', action: 'skip-holiday',
