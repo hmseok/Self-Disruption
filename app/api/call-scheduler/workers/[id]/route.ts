@@ -13,6 +13,9 @@ const ALLOWED = new Set([
   'is_external', 'external_pattern',
   // Phase K — 외부 근무 cycle (워커 글로벌)
   'cycle_days_on', 'cycle_days_off', 'cycle_start_date',
+  // N-29-a — 개인 한계 (그룹 무관 — 워커 단위)
+  'max_consecutive_work_days', 'max_days_per_month',
+  'blocked_slot_ids', 'preferred_dow_prefer', 'preferred_dow_avoid',
 ])
 const COLOR_TONES = new Set([
   'blue', 'gray', 'green', 'amber', 'violet', 'red', 'none',
@@ -29,16 +32,25 @@ export async function PATCH(
     const { id } = await context.params
     const body = await request.json()
 
-    // 컬럼 존재 확인 (graceful — 정체성 컬럼만)
-    let hasExt = true, hasCycle = true
+    // 컬럼 존재 확인 (graceful)
+    let hasExt = true, hasCycle = true, hasLimits = true
     try {
       await prisma.$queryRaw<any[]>`SELECT is_external FROM cs_workers LIMIT 1`
     } catch { hasExt = false }
     try {
       await prisma.$queryRaw<any[]>`SELECT cycle_days_on FROM cs_workers LIMIT 1`
     } catch { hasCycle = false }
+    // N-29-a — 개인 한계 컬럼 graceful
+    try {
+      await prisma.$queryRaw<any[]>`SELECT max_consecutive_work_days FROM cs_workers LIMIT 1`
+    } catch { hasLimits = false }
 
     const CYCLE_COLS = new Set(['cycle_days_on', 'cycle_days_off', 'cycle_start_date'])
+    const LIMIT_COLS = new Set([
+      'max_consecutive_work_days', 'max_days_per_month',
+      'blocked_slot_ids', 'preferred_dow_prefer', 'preferred_dow_avoid',
+    ])
+    const NULLABLE_NUM = new Set(['max_consecutive_work_days', 'max_days_per_month'])
 
     const sets: string[] = []
     const params: any[] = []
@@ -46,12 +58,18 @@ export async function PATCH(
       if (!ALLOWED.has(k)) continue
       if ((k === 'is_external' || k === 'external_pattern') && !hasExt) continue
       if (CYCLE_COLS.has(k) && !hasCycle) continue
+      if (LIMIT_COLS.has(k) && !hasLimits) continue
       if (k === 'color_tone' && !COLOR_TONES.has(String(v))) continue
       if (k === 'is_external') {
         sets.push(`${k} = ?`); params.push(v ? 1 : 0); continue
       }
-      if (k === 'cycle_days_on' || k === 'cycle_days_off') {
+      if (k === 'cycle_days_on' || k === 'cycle_days_off' || NULLABLE_NUM.has(k)) {
         sets.push(`${k} = ?`); params.push(v == null || v === '' ? null : Number(v)); continue
+      }
+      if (k === 'blocked_slot_ids') {
+        // JSON 배열 → string
+        const json = Array.isArray(v) && v.length > 0 ? JSON.stringify(v.map(String)) : null
+        sets.push(`${k} = ?`); params.push(json); continue
       }
       sets.push(`${k} = ?`); params.push(v ?? null)
     }

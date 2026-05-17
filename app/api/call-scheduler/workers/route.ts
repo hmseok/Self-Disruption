@@ -25,24 +25,29 @@ type Tone = typeof COLOR_TONES[number]
 interface FeatureFlags {
   hasExternal: boolean    // is_external + external_pattern
   hasCycle: boolean       // cycle_days_on/off/start
+  hasPersonalLimits: boolean  // N-29-a — max_consecutive, max_days, blocked_slot_ids, preferred_dow_*
 }
 
 async function detectFeatures(): Promise<FeatureFlags> {
-  let hasExternal = true, hasCycle = true
+  let hasExternal = true, hasCycle = true, hasPersonalLimits = true
   try {
     await prisma.$queryRaw<any[]>`SELECT is_external FROM cs_workers LIMIT 1`
   } catch { hasExternal = false }
   try {
     await prisma.$queryRaw<any[]>`SELECT cycle_days_on FROM cs_workers LIMIT 1`
   } catch { hasCycle = false }
-  return { hasExternal, hasCycle }
+  // N-29-a — 개인 한계 컬럼 graceful 감지
+  try {
+    await prisma.$queryRaw<any[]>`SELECT max_consecutive_work_days FROM cs_workers LIMIT 1`
+  } catch { hasPersonalLimits = false }
+  return { hasExternal, hasCycle, hasPersonalLimits }
 }
 
 export async function GET(request: NextRequest) {
   const user = await verifyUser(request)
   if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
   try {
-    const { hasExternal, hasCycle } = await detectFeatures()
+    const { hasExternal, hasCycle, hasPersonalLimits } = await detectFeatures()
     let rows: any[]
     if (hasCycle) {
       rows = await prisma.$queryRaw<any[]>`
@@ -70,16 +75,59 @@ export async function GET(request: NextRequest) {
         ORDER BY group_label DESC, name ASC
       `
     }
-    const data = rows.map(r => ({
-      ...r,
-      is_active: Boolean(r.is_active),
-      is_external: hasExternal ? Boolean(r.is_external) : false,
-      external_pattern: hasExternal ? (r.external_pattern ?? null) : null,
-      // Phase K — 외부 cycle (워커 글로벌 — 모든 그룹 공통 일정)
-      cycle_days_on: hasCycle && r.cycle_days_on != null ? Number(r.cycle_days_on) : null,
-      cycle_days_off: hasCycle && r.cycle_days_off != null ? Number(r.cycle_days_off) : null,
-      cycle_start_date: hasCycle ? (r.cycle_start_date ?? null) : null,
-    }))
+    // N-29-a — 개인 한계 별도 조회 (graceful)
+    const limitsMap = new Map<string, {
+      max_consecutive_work_days: number | null
+      max_days_per_month: number | null
+      blocked_slot_ids: string[] | null
+      preferred_dow_prefer: string | null
+      preferred_dow_avoid: string | null
+    }>()
+    if (hasPersonalLimits && rows.length > 0) {
+      try {
+        const limitRows = await prisma.$queryRaw<any[]>`
+          SELECT id, max_consecutive_work_days, max_days_per_month,
+                 blocked_slot_ids, preferred_dow_prefer, preferred_dow_avoid
+          FROM cs_workers
+          WHERE is_active = 1
+        `
+        for (const r of limitRows) {
+          limitsMap.set(r.id, {
+            max_consecutive_work_days: r.max_consecutive_work_days != null
+              ? Number(r.max_consecutive_work_days) : null,
+            max_days_per_month: r.max_days_per_month != null
+              ? Number(r.max_days_per_month) : null,
+            blocked_slot_ids: r.blocked_slot_ids
+              ? (typeof r.blocked_slot_ids === 'string'
+                 ? (() => { try { return JSON.parse(r.blocked_slot_ids) } catch { return [] } })()
+                 : (Array.isArray(r.blocked_slot_ids) ? r.blocked_slot_ids : []))
+              : null,
+            preferred_dow_prefer: r.preferred_dow_prefer ?? null,
+            preferred_dow_avoid: r.preferred_dow_avoid ?? null,
+          })
+        }
+      } catch { /* graceful */ }
+    }
+
+    const data = rows.map(r => {
+      const limits = limitsMap.get(r.id)
+      return {
+        ...r,
+        is_active: Boolean(r.is_active),
+        is_external: hasExternal ? Boolean(r.is_external) : false,
+        external_pattern: hasExternal ? (r.external_pattern ?? null) : null,
+        // Phase K — 외부 cycle (워커 글로벌 — 모든 그룹 공통 일정)
+        cycle_days_on: hasCycle && r.cycle_days_on != null ? Number(r.cycle_days_on) : null,
+        cycle_days_off: hasCycle && r.cycle_days_off != null ? Number(r.cycle_days_off) : null,
+        cycle_start_date: hasCycle ? (r.cycle_start_date ?? null) : null,
+        // N-29-a — 개인 한계 (그룹 무관 — 워커 단위)
+        max_consecutive_work_days: limits?.max_consecutive_work_days ?? null,
+        max_days_per_month: limits?.max_days_per_month ?? null,
+        blocked_slot_ids: limits?.blocked_slot_ids ?? null,
+        preferred_dow_prefer: limits?.preferred_dow_prefer ?? null,
+        preferred_dow_avoid: limits?.preferred_dow_avoid ?? null,
+      }
+    })
     return NextResponse.json({ data: serialize(data), error: null })
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || 'DB error' }, { status: 500 })

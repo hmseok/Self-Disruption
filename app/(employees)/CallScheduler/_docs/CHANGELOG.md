@@ -3,6 +3,47 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-17 (Phase N-29-a) — 워커 마스터 분리 (Step A — 마이그 + API)
+
+### 사용자 보고
+> "그룹 하위에 워커별 셋팅은 여러 그룹에 소속된 경우 각각 적용되나요? 따로 되나요?
+>  그룹에서 하는게 맞나? 개인 워커 설정에서 하는게 맞나"
+
+### 결정 (B 안 — 워커 마스터로 분리)
+- 「개인 한계」 (연속/월최대/슬롯거부/희망요일) = **워커 단위** (cs_workers)
+- 「그룹 안 역할」 (priority_level / rotation_start_*) = **그룹별** (cs_group_members)
+- 알고리즘: 워커 cfg 우선, 그룹 cfg fallback (backward compat)
+
+### 변경 (Step A — 인프라)
+
+#### 마이그 (`migrations/2026-05-17_cs_workers_personal_limits.sql`)
+- cs_workers 에 5 컬럼 추가 (멱등):
+  · max_consecutive_work_days
+  · max_days_per_month
+  · blocked_slot_ids (TEXT — JSON 배열)
+  · preferred_dow_prefer (VARCHAR 32 CSV)
+  · preferred_dow_avoid (VARCHAR 32 CSV)
+- 백필 SQL 주석 포함 (검토 후 수동 실행 권장)
+
+#### API workers GET (`workers/route.ts`)
+- `hasPersonalLimits` graceful 감지 (`FeatureFlags`)
+- 별도 SELECT 로 5 컬럼 fetch + Map merge
+- 응답에 5 컬럼 포함
+
+#### API workers PATCH (`workers/[id]/route.ts`)
+- ALLOWED 에 5 컬럼 추가
+- `hasLimits` graceful 감지
+- nullable 숫자 / blocked_slot_ids JSON 변환
+
+### Step B/C/D (다음 PR)
+- Step B: 워커 마스터 UI 「개인 한계」 영역
+- Step C: GroupEditor 멤버 cfg 축소 (역할만 — priority_level + rotation_start_*)
+- Step D: auto-generate 알고리즘 워커 cfg 우선
+
+### 검증
+- tsc PASS
+- 마이그 적용 후 워커 GET 응답에 5 컬럼 포함 확인 필요
+
 ## 2026-05-17 (Phase N-28-a) — 자동 생성 사유 가시화 (워커별 제외 사유 통계)
 
 ### 사용자 보고
