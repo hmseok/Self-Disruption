@@ -20,13 +20,13 @@
     },
     {
       "file": "app/(employees)/CallScheduler/components/ScheduleGrid.tsx",
-      "line": 918,
+      "line": 920,
       "label": "glass-bg-hardcode",
       "snippet": "background: 'rgba(255,255,255,0.95)',"
     },
     {
       "file": "app/(employees)/CallScheduler/components/ScheduleGrid.tsx",
-      "line": 981,
+      "line": 983,
       "label": "glass-bg-hardcode",
       "snippet": "borderLeft: `1px dashed rgba(255,255,255,0.7)`,"
     },
@@ -3259,6 +3259,6 @@
       "snippet": "boxShadow: '6px 6px 18px rgba(140,170,210,0.14), -6px -6px 18px rgba(255,255,255,0.47)',"
     }
   ],
-  "generatedAt": "2026-05-17T17:16:27.474Z",
+  "generatedAt": "2026-05-17T17:58:45.874Z",
   "note": "UI 토큰 hardcode (inline rgba). 기존 위반 동결, 새 위반만 차단."
 }

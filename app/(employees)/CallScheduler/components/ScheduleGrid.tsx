@@ -308,12 +308,14 @@ export default function ScheduleGrid({ detail, onChanged, myWorkerId }: Props) {
   // N-25 Step B — slots → (group, slot) 단위 row 산출
   // N-40 — 매트릭스 뷰 모드 (카테고리 그룹 / 평면 시간순) 토글
   //   디폴트 'category' — 24/365 운영에서 주간/야간 분리 검수
-  //   localStorage 로 사용자 선택 유지
-  const [viewMode, setViewMode] = useState<'category' | 'flat'>(() => {
-    if (typeof window === 'undefined') return 'category'
-    const saved = localStorage.getItem('cs-matrix-view-mode')
-    return saved === 'flat' ? 'flat' : 'category'
-  })
+  //   localStorage 로 사용자 선택 유지 (SSR-safe — 첫 mount 후 동기화)
+  const [viewMode, setViewMode] = useState<'category' | 'flat'>('category')
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('cs-matrix-view-mode')
+      if (saved === 'flat' || saved === 'category') setViewMode(saved as 'category' | 'flat')
+    }
+  }, [])
   useEffect(() => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('cs-matrix-view-mode', viewMode)
@@ -1106,8 +1108,9 @@ export default function ScheduleGrid({ detail, onChanged, myWorkerId }: Props) {
             )
             })()
             // PR-2SS-Phase-J-3 — 그룹 헤더 + 멤버 cycle/회피 행 + 슬롯 행 묶음
+            // N-40 fix — Fragment key 강화 (group_id + slot_id + idx) — 카테고리 모드 중복 방지
             return (
-              <Fragment key={slot.id}>
+              <Fragment key={`${curGrp?.id || 'nogrp'}_${slot.id}_${slotIdx}`}>
                 {/* N-40 — 카테고리 섹션 헤더 (viewMode='category' + 카테고리 변경 시) */}
                 {isNewCategoryHeader && (
                   <tr key={`cathdr-${slotIdx}-${curCat}`}>
