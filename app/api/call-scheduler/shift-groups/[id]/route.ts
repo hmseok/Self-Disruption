@@ -19,6 +19,7 @@ const ALLOWED_COLS = new Set([
   'color_tone', 'description', 'sort_order', 'is_active',
   'skip_on_holidays',         // N-16
   'include_holidays_extra',   // N-32 — 공휴일 추가 출근 (패턴 매칭 X 라도 휴일이면 출근)
+  'allow_same_day_other_group', // N-35 — 같은 날 다른 그룹과 겹침 허용
   'rotation_enabled',         // N-19-a
   'rotation_period_kind',     // N-19-a — monthly | days
   'rotation_custom_days',     // N-19-a
@@ -50,6 +51,10 @@ export async function GET(
     let hasIncludeHolidaysExtra = true
     try { await prisma.$queryRaw<any[]>`SELECT include_holidays_extra FROM cs_shift_groups LIMIT 1` }
     catch { hasIncludeHolidaysExtra = false }
+    // N-35 — allow_same_day_other_group 컬럼 graceful
+    let hasAllowOverlap = true
+    try { await prisma.$queryRaw<any[]>`SELECT allow_same_day_other_group FROM cs_shift_groups LIMIT 1` }
+    catch { hasAllowOverlap = false }
     let hasRotation = true
     try { await prisma.$queryRaw<any[]>`SELECT rotation_enabled FROM cs_shift_groups LIMIT 1` }
     catch { hasRotation = false }
@@ -84,10 +89,11 @@ export async function GET(
       return NextResponse.json({ error: '그룹을 찾을 수 없습니다.' }, { status: 404 })
     }
 
-    // N-16/N-19-a/N-32 — 별도 컬럼 조회 (graceful)
+    // N-16/N-19-a/N-32/N-35 — 별도 컬럼 조회 (graceful)
     let category = 'general'
     let skipOnHolidays = false
     let includeHolidaysExtra = false  // N-32
+    let allowOverlap = false  // N-35
     let rotationEnabled = false
     let rotationPeriodKind = 'monthly'
     let rotationCustomDays = 30
@@ -108,6 +114,13 @@ export async function GET(
       try {
         const r = await prisma.$queryRaw<any[]>`SELECT include_holidays_extra FROM cs_shift_groups WHERE id = ${id} LIMIT 1`
         includeHolidaysExtra = Boolean(r[0]?.include_holidays_extra)
+      } catch { /* graceful */ }
+    }
+    // N-35 — allow_same_day_other_group
+    if (hasAllowOverlap) {
+      try {
+        const r = await prisma.$queryRaw<any[]>`SELECT allow_same_day_other_group FROM cs_shift_groups WHERE id = ${id} LIMIT 1`
+        allowOverlap = Boolean(r[0]?.allow_same_day_other_group)
       } catch { /* graceful */ }
     }
     if (hasRotation) {
@@ -217,6 +230,7 @@ export async function GET(
       category,
       skip_on_holidays: skipOnHolidays,
       include_holidays_extra: includeHolidaysExtra,  // N-32
+      allow_same_day_other_group: allowOverlap,  // N-35
       rotation_enabled: rotationEnabled,
       rotation_period_kind: rotationPeriodKind,
       rotation_custom_days: rotationCustomDays,
@@ -270,6 +284,11 @@ export async function PATCH(
     try {
       await prisma.$queryRaw<any[]>`SELECT include_holidays_extra FROM cs_shift_groups LIMIT 1`
     } catch { hasIncludeHolidaysExtra = false }
+    // N-35 — allow_same_day_other_group 컬럼 존재 확인 (graceful)
+    let hasAllowOverlap = true
+    try {
+      await prisma.$queryRaw<any[]>`SELECT allow_same_day_other_group FROM cs_shift_groups LIMIT 1`
+    } catch { hasAllowOverlap = false }
     // N-19-a — rotation 컬럼 존재 확인 (graceful)
     let hasRotation = true
     try {
@@ -288,11 +307,12 @@ export async function PATCH(
       if (k === 'category' && !hasCategory) continue  // 마이그레이션 미적용 시 skip
       if (k === 'skip_on_holidays' && !hasSkipOnHolidays) continue  // N-16 — graceful
       if (k === 'include_holidays_extra' && !hasIncludeHolidaysExtra) continue  // N-32 — graceful
+      if (k === 'allow_same_day_other_group' && !hasAllowOverlap) continue  // N-35 — graceful
       if (rotationCols.has(k) && !hasRotation) continue  // N-19-a — graceful
       if (k === 'pattern_type' && !PATTERNS.has(String(v))) continue
       if (k === 'generation_strategy' && !STRATEGIES.has(String(v))) continue
       if (k === 'color_tone' && !COLOR_TONES.has(String(v))) continue
-      if (k === 'is_active' || k === 'skip_on_holidays' || k === 'include_holidays_extra' || k === 'rotation_enabled') {
+      if (k === 'is_active' || k === 'skip_on_holidays' || k === 'include_holidays_extra' || k === 'allow_same_day_other_group' || k === 'rotation_enabled') {
         sets.push(`${k} = ?`); params.push(v ? 1 : 0); continue
       }
       if (k === 'rotation_custom_days') {

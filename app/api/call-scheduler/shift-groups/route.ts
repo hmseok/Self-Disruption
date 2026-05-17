@@ -42,6 +42,11 @@ export async function GET(request: NextRequest) {
     try {
       await prisma.$queryRaw<any[]>`SELECT include_holidays_extra FROM cs_shift_groups LIMIT 1`
     } catch { hasIncludeHolidaysExtra = false }
+    // N-35 — allow_same_day_other_group 컬럼 graceful (같은 날 겹침 허용)
+    let hasAllowOverlap = true
+    try {
+      await prisma.$queryRaw<any[]>`SELECT allow_same_day_other_group FROM cs_shift_groups LIMIT 1`
+    } catch { hasAllowOverlap = false }
     // N-19-a — rotation 컬럼 + cs_group_shifts 테이블 graceful
     let hasRotation = true
     try {
@@ -96,6 +101,16 @@ export async function GET(request: NextRequest) {
           SELECT id, include_holidays_extra FROM cs_shift_groups WHERE is_active = 1
         `
         for (const r of ihRows) includeHolidaysMap.set(r.id, Boolean(r.include_holidays_extra))
+      } catch { /* graceful */ }
+    }
+    // N-35 — allow_same_day_other_group 별도 조회 (graceful)
+    const allowOverlapMap = new Map<string, boolean>()
+    if (hasAllowOverlap && rows.length > 0) {
+      try {
+        const aoRows = await prisma.$queryRaw<any[]>`
+          SELECT id, allow_same_day_other_group FROM cs_shift_groups WHERE is_active = 1
+        `
+        for (const r of aoRows) allowOverlapMap.set(r.id, Boolean(r.allow_same_day_other_group))
       } catch { /* graceful */ }
     }
     // N-19-a — rotation 설정 별도 조회 (graceful)
@@ -263,6 +278,7 @@ export async function GET(request: NextRequest) {
         category: catMap.get(r.id) || CATEGORIES_FALLBACK,
         skip_on_holidays: skipHolidaysMap.get(r.id) || false,  // N-16
         include_holidays_extra: includeHolidaysMap.get(r.id) || false,  // N-32
+        allow_same_day_other_group: allowOverlapMap.get(r.id) || false,  // N-35
         is_active: Boolean(r.is_active),
         is_overnight: Boolean(r.is_overnight),
         rotation_size: r.rotation_size != null ? Number(r.rotation_size) : null,

@@ -60,6 +60,8 @@ interface GroupRow {
   skip_on_holidays?: number | boolean
   // N-32 — 공휴일 추가 출근 (패턴 매칭 X 라도 휴일이면 추가 매칭) (graceful)
   include_holidays_extra?: number | boolean
+  // N-35 — 같은 날 다른 그룹과 겹침 허용 (graceful)
+  allow_same_day_other_group?: number | boolean
 }
 interface MemberRow {
   group_id: string
@@ -317,6 +319,11 @@ export async function POST(
     try {
       await prisma.$queryRaw<any[]>`SELECT include_holidays_extra FROM cs_shift_groups LIMIT 1`
     } catch { hasGroupIncludeHolidaysExtra = false }
+    // N-35 — allow_same_day_other_group 컬럼 graceful
+    let hasGroupAllowOverlap = true
+    try {
+      await prisma.$queryRaw<any[]>`SELECT allow_same_day_other_group FROM cs_shift_groups LIMIT 1`
+    } catch { hasGroupAllowOverlap = false }
     try {
       await prisma.$queryRaw<any[]>`SELECT rotation_enabled FROM cs_shift_groups LIMIT 1`
     } catch { hasGroupRotation = false }
@@ -405,6 +412,20 @@ export async function POST(
     }
     for (const g of targetGroups) {
       g.include_holidays_extra = groupIncludeHolidaysMap.get(g.id) ? 1 : 0
+    }
+
+    // N-35 — 그룹별 allow_same_day_other_group 별도 조회 (graceful)
+    const groupAllowOverlapMap = new Map<string, boolean>()
+    if (hasGroupAllowOverlap && targetGroups.length > 0) {
+      try {
+        const aoRows = await prisma.$queryRaw<any[]>`
+          SELECT id, allow_same_day_other_group FROM cs_shift_groups WHERE is_active = 1
+        `
+        for (const r of aoRows) groupAllowOverlapMap.set(r.id, Boolean(r.allow_same_day_other_group))
+      } catch { /* graceful */ }
+    }
+    for (const g of targetGroups) {
+      g.allow_same_day_other_group = groupAllowOverlapMap.get(g.id) ? 1 : 0
     }
 
     // N-19-b — 그룹 rotation 설정 별도 조회 (graceful)
@@ -1340,6 +1361,19 @@ export async function POST(
           const ratio = lookupTargetRatio(g.id, wId)
           return ratio > 0
         })
+
+        // N-35 — 이 그룹이 「같은 날 다른 그룹 겹침」 허용 X 이면 workedToday hard exclude
+        //   디폴트 false (한 사람 하루 1그룹). 24/365 특수 운영만 true.
+        //   주의: 이 그룹이 allow=1 이어도 「상대 그룹」 이 allow=0 이면 그 워커는
+        //         상대 그룹 처리 시 제외되어야 함. 단방향만 검사하면 비대칭 발생.
+        //         안전한 해석 — 어느 한쪽이라도 금지면 전체 금지.
+        //         → 이 그룹의 allow=0 일 때만 workedToday 가드 적용 (양방향 일관)
+        const groupAllowsOverlap = hasGroupAllowOverlap
+          ? Boolean(g.allow_same_day_other_group)
+          : false
+        if (!groupAllowsOverlap) {
+          candidates = candidates.filter(wId => !workedToday.has(wId))
+        }
 
         // (4) usePriority=true 면 가중치 정렬, false 면 단순 rotation
         let selected: string[]

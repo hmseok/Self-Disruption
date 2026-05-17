@@ -83,6 +83,10 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
   //  · 예: pattern='custom' (토일만) + includeHolidaysExtra=true → 토·일 + 공휴일도 출근
   //  · 별도 그룹 만들 필요 X — 한 그룹에서 평소 요일 + 휴일 동시 처리
   const [includeHolidaysExtra, setIncludeHolidaysExtra] = useState(false)
+  // N-35 — 같은 날 다른 그룹과 겹침 허용 (시간 안 겹치면 OK)
+  //  · 디폴트 false (금지 — 한 사람 하루 1그룹)
+  //  · 24/365 운영처럼 같은 워커가 같은 날 여러 그룹에 들어가야 할 때 true
+  const [allowSameDayOtherGroup, setAllowSameDayOtherGroup] = useState(false)
   // N-19-a — 시프트 로테이션 (그룹 1개에 시프트 여러 개 sequence + 워커별 시작 시점)
   const [rotationEnabled, setRotationEnabled] = useState(false)
   // N-23 — rotation ON 시 단일 slotId 를 sequence[0] 로 자동 동기화
@@ -173,6 +177,7 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
         setCategory(group.category || 'general')
         setSkipOnHolidays(Boolean(group.skip_on_holidays))  // N-16
         setIncludeHolidaysExtra(Boolean(group.include_holidays_extra))  // N-32
+        setAllowSameDayOtherGroup(Boolean(group.allow_same_day_other_group))  // N-35
         // N-19-a — 로테이션 설정 + 시프트 sequence 로드
         setRotationEnabled(Boolean(group.rotation_enabled))
         setRotationPeriodKind((group.rotation_period_kind || 'monthly') as 'monthly' | 'days')
@@ -443,6 +448,7 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
         description: description.trim() || null,
         skip_on_holidays: skipOnHolidays ? 1 : 0,  // N-16
         include_holidays_extra: includeHolidaysExtra ? 1 : 0,  // N-32
+        allow_same_day_other_group: allowSameDayOtherGroup ? 1 : 0,  // N-35
         // N-19-a — 시프트 로테이션
         rotation_enabled: rotationEnabled ? 1 : 0,
         rotation_period_kind: rotationPeriodKind,
@@ -814,6 +820,32 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
               </span>
               <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 'auto' }}>
                 {skipOnHolidays ? '주중 근무 그룹' : '휴일에도 정상 배정 (24/365)'}
+              </span>
+            </label>
+          </Field>
+
+          {/* N-35 — 같은 날 다른 그룹과 겹침 허용 (시간 안 겹치면 OK) */}
+          <Field label="다른 그룹 겹침"
+                 sub="같은 워커가 같은 날 다른 그룹에도 배정될 수 있는가 — 시간 충돌은 자동 가드. 24/365 주간+야간 같은 특수 운영에만 ON">
+            <label style={{
+              display: 'flex', alignItems: 'center', gap: 10,
+              padding: '10px 12px', borderRadius: 10,
+              background: allowSameDayOtherGroup ? 'rgba(245,158,11,0.10)' : 'rgba(0,0,0,0.03)',
+              border: `1px solid ${allowSameDayOtherGroup ? 'rgba(245,158,11,0.40)' : COLORS.borderFaint}`,
+              cursor: 'pointer',
+            }}>
+              <input type="checkbox"
+                     checked={allowSameDayOtherGroup}
+                     onChange={(e) => setAllowSameDayOtherGroup(e.target.checked)}
+                     style={{ width: 16, height: 16, cursor: 'pointer' }} />
+              <span style={{ fontSize: 12, fontWeight: 600,
+                             color: allowSameDayOtherGroup ? '#d97706' : COLORS.textPrimary }}>
+                🔀 같은 날 다른 그룹과 겹침 허용
+              </span>
+              <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 'auto' }}>
+                {allowSameDayOtherGroup
+                  ? '시간만 안 겹치면 다른 그룹 OK (24/365)'
+                  : '한 사람 하루 1그룹만 (디폴트)'}
               </span>
             </label>
           </Field>
@@ -1791,13 +1823,20 @@ function MemberCfgPanel({
         </div>
       </div>
 
-      {/* N-34 — 그룹 분배 비율 (여러 그룹 소속 워커의 균형 조정) */}
+      {/* N-34 + N-35 — 그룹 분배 비율 (다른 그룹과 상대 가중치) */}
       <div>
         <div style={cfgFieldLabel}>
-          ⚖️ 그룹 분배 비율
-          <span style={{ fontSize: 11, fontWeight: 500, color: COLORS.textMuted }}>
-            여러 그룹 소속 시 가중치 — 디폴트 1.0, 0 = 절대 안 들어감
-          </span>
+          ⚖️ 그룹 분배 비율 <span style={{ fontSize: 11, color: COLORS.info }}>(상대 가중치)</span>
+        </div>
+        <div style={{
+          padding: '8px 12px', borderRadius: 8, marginBottom: 8,
+          background: COLORS.bgBlue, border: `1px solid ${COLORS.borderBlue}`,
+          fontSize: 11, color: COLORS.info, lineHeight: 1.6,
+        }}>
+          📌 <strong>다른 그룹 대비 비율</strong> — 절대값 아닙니다.
+          <br/>· 양쪽 그룹 <strong>모두 같은 값</strong> (1.0/1.0 또는 0.5/0.5) → <strong>균등 분배</strong>
+          <br/>· 한쪽이 다른 쪽의 2배 (예: 1.0/0.5) → 비율 2:1 로 자주 들어감
+          <br/>· <strong>0</strong> 설정 → 이 그룹 절대 안 들어감 (hard exclude)
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <input type="number" min={0} max={10} step={0.1}
@@ -1808,9 +1847,9 @@ function MemberCfgPanel({
           <div style={{ flex: 1, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
             {[
               { v: '0', label: '🚫 0 (제외)', tone: 'red' },
-              { v: '0.5', label: '½ 절반', tone: 'gray' },
+              { v: '0.5', label: '½ 상대 적게', tone: 'gray' },
               { v: '1.0', label: '1× 기본', tone: 'blue' },
-              { v: '2.0', label: '2× 더 자주', tone: 'green' },
+              { v: '2.0', label: '2× 상대 자주', tone: 'green' },
             ].map(p => (
               <button key={p.v} type="button"
                       onClick={() => onChange({ target_ratio: p.v })}
@@ -1830,10 +1869,8 @@ function MemberCfgPanel({
             ))}
           </div>
         </div>
-        <div style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 6 }}>
-          예: 전정연이 「달빛 1.0 / 부엉이 1.0」 → 두 그룹 균등 분배.
-          「달빛 0.5 / 부엉이 1.0」 → 부엉이 두 배.
-          「달빛 0」 → 달빛 절대 안 감.
+        <div style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 6, lineHeight: 1.5 }}>
+          ⚠ 같은 날 두 그룹 동시 배정은 그룹 설정 「🔀 다른 그룹 겹침」 토글로 별도 통제됩니다.
         </div>
       </div>
 

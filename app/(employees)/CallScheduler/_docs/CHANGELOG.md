@@ -3,6 +3,57 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-17 (Phase N-35) — 그룹 단위 「같은 날 다른 그룹 겹침」 허용 옵션 + target_ratio UI 명확화
+
+### 사용자 보고
+> "둘 다 0.5로 두 그룹을 하니까 겹치는 날이 발생되는데"
+> "둘 다 1로 셋팅하면 맞고 이건 어떻게 쓰는게 맞는건지"
+> "그룹설정에서 다른 그룹과 같은 날에 시간만 피하면 배정 가능 여부를 설정하면 될까요?"
+
+### 진단
+1. **target_ratio 의미 오해** — 사용자가 "0.5 = 절반" 절대값으로 해석
+   · 실제는 「다른 그룹 대비 상대 가중치」 — 0.5/0.5 = 1.0/1.0 (둘 다 동일 비율)
+   · UI 텍스트가 헷갈리게 작성됨
+2. **「겹치는 날」 별개 문제** — 알고리즘이 workedToday 가드 없어 같은 워커 같은 날 양쪽 그룹 배정 가능
+
+### 사용자 결정
+- 옵션 B: 그룹 단위 토글 신설 (디폴트 금지)
+
+### 데이터 모델
+- 마이그: `migrations/2026-05-17_cs_shift_groups_allow_overlap.sql`
+- 컬럼: `cs_shift_groups.allow_same_day_other_group TINYINT(1) DEFAULT 0`
+- 디폴트 0 (금지) — 한 사람 하루 1그룹
+
+### 동작
+| 그룹 A / B 셋팅 | 결과 |
+|----------------|------|
+| 둘 다 0 (디폴트) | 같은 날 양쪽 X (한 사람 하루 1그룹) |
+| 둘 다 1 | 시간만 안 겹치면 양쪽 OK (24/365 운영) |
+| 비대칭 (한쪽만 1) | 안전한 해석 — false 그룹 입장에서 workedToday 가드 작동 → 결과적으로 겹침 방지 |
+
+### 변경
+1. **API** (shift-groups GET/POST/PATCH + [id]/GET/PATCH)
+   - allow_same_day_other_group graceful 컬럼 감지 + 응답 + ALLOWED_COLS
+2. **GroupEditor.tsx**
+   - state: `allowSameDayOtherGroup` 추가
+   - 「휴일 처리」 근처에 「🔀 다른 그룹 겹침」 토글 추가 (앰버 톤)
+3. **auto-generate/route.ts**
+   - GroupRow type 에 allow_same_day_other_group 추가
+   - graceful 컬럼 감지 + 그룹 row 에 주입
+   - candidates 필터: 현재 그룹 allow=false 면 workedToday hard exclude
+
+### target_ratio UI 명확화 (작업 2)
+- MemberCfgPanel 안내 박스 신설 (파란색)
+- 「상대 가중치」 명시 — 절대값 아님 강조
+- 둘 다 같은 값 = 균등 분배 명시
+- preset 라벨 수정: "0.5 절반" → "0.5 상대 적게", "2.0 더 자주" → "2.0 상대 자주"
+- 하단 안내에 겹침 토글 참조 추가
+
+### 효과
+- 둘 다 1.0 (디폴트) + 양쪽 그룹 allow=false → 사용자 의도대로 자연 균형 분배
+- 24/365 특수 운영 (예: 같은 사람 주간 + 야간) 만 명시 ON
+- target_ratio 의미 명확 → 운영자 혼란 방지
+
 ## 2026-05-17 (Phase N-34) — 워커별 그룹 분배 비율 (target_ratio)
 
 ### 사용자 보고
