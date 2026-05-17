@@ -35,6 +35,8 @@ interface MemberInput {
   rotation_start_date?: string | null
   rotation_start_index?: number
   rotation_end_date?: string | null
+  // N-34 — 그룹 분배 비율 (디폴트 1.0, 0 = hard exclude)
+  target_ratio?: number | null
 }
 
 function clampPriorityLevel(v: any): number {
@@ -80,6 +82,11 @@ export async function PUT(
     try {
       await prisma.$queryRaw<any[]>`SELECT rotation_start_date FROM cs_group_members LIMIT 1`
     } catch { hasMemberRotation = false }
+    // N-34 — target_ratio 컬럼 graceful 감지
+    let hasTargetRatio = true
+    try {
+      await prisma.$queryRaw<any[]>`SELECT target_ratio FROM cs_group_members LIMIT 1`
+    } catch { hasTargetRatio = false }
 
     // 기존 멤버 모두 삭제
     await prisma.$executeRaw`DELETE FROM cs_group_members WHERE group_id = ${id}`
@@ -100,7 +107,30 @@ export async function PUT(
       const rot_start = nullableStr(m.rotation_start_date)
       const rot_index = Math.max(0, Math.min(255, Number(m.rotation_start_index) || 0))
       const rot_end = nullableStr(m.rotation_end_date)
-      if (hasMemberRotation) {
+      // N-34 — target_ratio: 0 이상 실수, 디폴트 1.0
+      const target_ratio_raw = m.target_ratio
+      const target_ratio = (target_ratio_raw == null || target_ratio_raw === '' as any)
+        ? 1.0
+        : Math.max(0, Number(target_ratio_raw) || 0)
+
+      if (hasMemberRotation && hasTargetRatio) {
+        await prisma.$executeRaw`
+          INSERT INTO cs_group_members
+            (id, group_id, worker_id, priority,
+             priority_level, preferred_dow_prefer, preferred_dow_avoid,
+             max_consecutive_work_days, required_days_per_month, max_days_per_month,
+             blocked_slot_ids, work_pattern_text,
+             rotation_start_date, rotation_start_index, rotation_end_date,
+             target_ratio, created_at)
+          VALUES
+            (${memberId}, ${id}, ${m.worker_id}, ${i},
+             ${priority_level}, ${dow_prefer}, ${dow_avoid},
+             ${max_consec}, ${req_days}, ${max_days},
+             ${blocked}, ${pattern},
+             ${rot_start}, ${rot_index}, ${rot_end},
+             ${target_ratio}, NOW())
+        `
+      } else if (hasMemberRotation) {
         await prisma.$executeRaw`
           INSERT INTO cs_group_members
             (id, group_id, worker_id, priority,

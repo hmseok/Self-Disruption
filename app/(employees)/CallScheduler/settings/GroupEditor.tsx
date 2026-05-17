@@ -57,6 +57,7 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
     max_days_per_month: string
     blocked_slot_ids: Set<string>
     work_pattern_text: string
+    target_ratio: string  // N-34 — 그룹 분배 비율 (디폴트 '1.0', 0 = hard exclude)
   }
   const defaultMemberCfg = (): MemberCfg => ({
     priority_level: 2,
@@ -67,6 +68,7 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
     max_days_per_month: '',
     blocked_slot_ids: new Set(),
     work_pattern_text: '',
+    target_ratio: '1.0',
   })
   const [memberCfgs, setMemberCfgs] = useState<Record<string, MemberCfg>>({})
   const [expandedCfgWorkerId, setExpandedCfgWorkerId] = useState<string | null>(null)
@@ -208,6 +210,7 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
             max_days_per_month: m.max_days_per_month != null ? String(m.max_days_per_month) : '',
             blocked_slot_ids: new Set(Array.isArray(m.blocked_slot_ids) ? m.blocked_slot_ids : []),
             work_pattern_text: m.work_pattern_text || '',
+            target_ratio: m.target_ratio != null ? String(m.target_ratio) : '1.0',  // N-34
           }
         }
         setMemberCfgs(cfgs)
@@ -465,6 +468,8 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
           rotation_start_date: (memberRotCfgs[wId]?.start_date || '').trim() || null,
           rotation_start_index: Number(memberRotCfgs[wId]?.start_index || 0),
           rotation_end_date: (memberRotCfgs[wId]?.end_date || '').trim() || null,
+          // N-34 — 그룹 분배 비율 (0 = hard exclude)
+          target_ratio: cfg.target_ratio === '' ? 1.0 : Math.max(0, Number(cfg.target_ratio) || 0),
         }
       })
       let id = groupId
@@ -1697,6 +1702,7 @@ function MemberCfgPanel({
     max_days_per_month: string
     blocked_slot_ids: Set<string>
     work_pattern_text: string
+    target_ratio: string  // N-34
   }
   onChange: (patch: Partial<typeof cfg>) => void
   slots: ShiftSlot[]
@@ -1782,6 +1788,52 @@ function MemberCfgPanel({
               {n === 1 ? 'P1 최우선' : n === 2 ? 'P2 일반' : 'P3 백업'}
             </button>
           ))}
+        </div>
+      </div>
+
+      {/* N-34 — 그룹 분배 비율 (여러 그룹 소속 워커의 균형 조정) */}
+      <div>
+        <div style={cfgFieldLabel}>
+          ⚖️ 그룹 분배 비율
+          <span style={{ fontSize: 11, fontWeight: 500, color: COLORS.textMuted }}>
+            여러 그룹 소속 시 가중치 — 디폴트 1.0, 0 = 절대 안 들어감
+          </span>
+        </div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <input type="number" min={0} max={10} step={0.1}
+                 value={cfg.target_ratio}
+                 onChange={(e) => onChange({ target_ratio: e.target.value })}
+                 placeholder="1.0"
+                 style={{ ...cfgInputStyle, width: 140 }} />
+          <div style={{ flex: 1, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+            {[
+              { v: '0', label: '🚫 0 (제외)', tone: 'red' },
+              { v: '0.5', label: '½ 절반', tone: 'gray' },
+              { v: '1.0', label: '1× 기본', tone: 'blue' },
+              { v: '2.0', label: '2× 더 자주', tone: 'green' },
+            ].map(p => (
+              <button key={p.v} type="button"
+                      onClick={() => onChange({ target_ratio: p.v })}
+                      style={{
+                        padding: '4px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700,
+                        background: cfg.target_ratio === p.v
+                          ? (p.tone === 'red' ? COLORS.bgRed : p.tone === 'green' ? COLORS.bgGreen : p.tone === 'blue' ? COLORS.bgBlue : COLORS.bgGray)
+                          : 'transparent',
+                        color: cfg.target_ratio === p.v
+                          ? (p.tone === 'red' ? COLORS.danger : p.tone === 'green' ? COLORS.success : p.tone === 'blue' ? COLORS.info : COLORS.textSecondary)
+                          : COLORS.textSecondary,
+                        border: `1px solid ${cfg.target_ratio === p.v
+                          ? (p.tone === 'red' ? COLORS.borderRed : p.tone === 'green' ? COLORS.borderGreen : p.tone === 'blue' ? COLORS.borderBlue : COLORS.borderFaint)
+                          : COLORS.borderFaint}`,
+                        cursor: 'pointer',
+                      }}>{p.label}</button>
+            ))}
+          </div>
+        </div>
+        <div style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 6 }}>
+          예: 전정연이 「달빛 1.0 / 부엉이 1.0」 → 두 그룹 균등 분배.
+          「달빛 0.5 / 부엉이 1.0」 → 부엉이 두 배.
+          「달빛 0」 → 달빛 절대 안 감.
         </div>
       </div>
 

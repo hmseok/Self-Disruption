@@ -3,6 +3,66 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-17 (Phase N-34) — 워커별 그룹 분배 비율 (target_ratio)
+
+### 사용자 보고
+> "근무가 양쪽 그룹에 있을 때 양쪽 그룹의 우선순위도 지정할 수 있나? 어떻게 생각해?
+>  지금 전정연은 달빛 위주로만 처음에 하게 되는게 있어서 밸런스를 좀 맞출 수 있을까?
+>  아니면 배정순위가 필요한가"
+
+### 진단
+- 알고리즘 그룹 처리 순서 = sort_order ASC
+- 전정연이 달빛 + 부엉이 둘 다 소속 → 달빛이 먼저 처리되면 우선 선택
+- counter 가 글로벌 total 만 추적 → 그룹별 분배 불균형 미감지
+
+### 사용자 결정
+- 옵션 B 선택: 「워커별 그룹 분배 비율 명시」 (운영자 직접 통제)
+
+### 데이터 모델
+- 마이그: `migrations/2026-05-17_cs_group_members_target_ratio.sql`
+- 컬럼: `cs_group_members.target_ratio FLOAT NOT NULL DEFAULT 1.0`
+- `cs_group_member_versions.target_ratio` 도 (버전 timeline 일관성)
+
+### 의미 매트릭스
+| target_ratio | 의미 |
+|--------------|------|
+| **0** | 이 그룹 절대 안 들어감 (hard exclude) |
+| 0.5 | 디폴트의 절반 — 적게 들어감 |
+| **1.0** | 디폴트 — 같은 비중 |
+| 2.0 | 디폴트의 2배 — 더 자주 |
+
+### 운영 예시
+- 전정연 「달빛 1.0 / 부엉이 1.0」 → 두 그룹 균등 분배
+- 전정연 「달빛 0.5 / 부엉이 1.0」 → 부엉이 두 배
+- 전정연 「달빛 0」 → 달빛 절대 안 감
+
+### 변경
+1. **API**
+   - `members/route.ts` PUT — target_ratio 수용 + INSERT
+   - `[id]/route.ts` GET — target_ratio 별도 조회 + 응답 포함
+   - `route.ts` GET (list) — group ↔ worker ratio 일괄 조회 + member row 에 주입
+2. **GroupEditor.tsx**
+   - MemberCfg interface 에 `target_ratio: string` 추가
+   - 로드 시 server 응답에서 setup
+   - save 시 payload 에 포함
+   - MemberCfgPanel 에 「⚖️ 그룹 분배 비율」 영역 신설 (input + preset 4종)
+3. **auto-generate/route.ts**
+   - counter 구조 확장 — `by_group: Map<groupId, { total, last_date }>`
+   - prefill 시 group_id 함께 fetch — by_group 도 prefill
+   - 할당 시 by_group 도 ++
+   - target_ratio=0 candidates 단계에서 hard exclude
+   - 정렬 새 기준 (priority_level/dow 다음) — 「by_group.total / target_ratio」 작은 사람 우선
+
+### 효과
+- 전정연 양쪽 1.0 → 달빛 ↔ 부엉이 자동 균등 분배
+- 「부엉이 전담」 「달빛 안 감」 같은 케이스 명시 설정 가능
+- 그룹 간 분배 불균형 자동 해결
+
+### 검증
+- tsc PASS
+- 자동 생성 재실행 후 6월 매트릭스 — L12/L13 의 공유 워커 (전정연, 윤민진 등) 균등 분배 확인
+- target_ratio=0 설정한 워커는 그 그룹 매트릭스에 안 나오는지 확인
+
 ## 2026-05-17 (Phase N-33) — 일당 1명 로테이션 끊김 후 「처음부터 시작」 fix (counter prefill)
 
 ### 사용자 보고

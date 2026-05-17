@@ -881,10 +881,45 @@ export async function POST(
       total: number
       by_dow: number[]   // 길이 7
       last_date: string | null
+      // N-34 — 그룹별 누적 (target_ratio 균형 계산용)
+      by_group: Map<string, { total: number; last_date: string | null }>
     }>()
     const ensureCounter = (wId: string) => {
-      if (!counter.has(wId)) counter.set(wId, { total: 0, by_dow: [0,0,0,0,0,0,0], last_date: null })
+      if (!counter.has(wId)) counter.set(wId, {
+        total: 0, by_dow: [0,0,0,0,0,0,0], last_date: null,
+        by_group: new Map(),
+      })
       return counter.get(wId)!
+    }
+    // N-34 — 그룹 안 카운터 헬퍼
+    const ensureGroupBucket = (wId: string, gId: string) => {
+      const cn = ensureCounter(wId)
+      if (!cn.by_group.has(gId)) cn.by_group.set(gId, { total: 0, last_date: null })
+      return cn.by_group.get(gId)!
+    }
+
+    // N-34 — (group_id, worker_id) → target_ratio 맵 (graceful)
+    //   디폴트 1.0, 0 = hard exclude
+    const targetRatioMap = new Map<string, number>()  // key: `${groupId}_${workerId}`
+    let hasTargetRatio = true
+    try {
+      await prisma.$queryRaw<any[]>`SELECT target_ratio FROM cs_group_members LIMIT 1`
+    } catch { hasTargetRatio = false }
+    if (hasTargetRatio) {
+      try {
+        const ratioRows = await prisma.$queryRaw<any[]>`
+          SELECT group_id, worker_id, target_ratio FROM cs_group_members
+        `
+        for (const r of ratioRows) {
+          const v = Number(r.target_ratio)
+          targetRatioMap.set(`${r.group_id}_${r.worker_id}`,
+            Number.isFinite(v) && v >= 0 ? v : 1.0)
+        }
+      } catch { /* graceful */ }
+    }
+    const lookupTargetRatio = (gId: string, wId: string): number => {
+      const v = targetRatioMap.get(`${gId}_${wId}`)
+      return v == null ? 1.0 : v  // 없으면 1.0 (디폴트)
     }
 
     // ── N-33 — counter prefill (직전 30일 cs_assignments 누적) ──────
@@ -909,14 +944,17 @@ export async function POST(
         d.setDate(d.getDate() - 29)  // 30일 window (양 끝 포함)
         return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
       })()
+      // N-34 — group_id 도 함께 fetch (그룹별 누적 prefill)
       const prefillRows = await prisma.$queryRaw<Array<{
         worker_id: string
         work_date: string
         special_code: string | null
+        group_id: string | null
       }>>`
         SELECT worker_id,
                DATE_FORMAT(work_date, '%Y-%m-%d') AS work_date,
-               special_code
+               special_code,
+               group_id
         FROM cs_assignments
         WHERE work_date BETWEEN ${prefillStartDate} AND ${prefillEndDate}
           AND worker_id IS NOT NULL
@@ -929,8 +967,13 @@ export async function POST(
         const d = new Date(r.work_date + 'T00:00:00')
         const dowN = d.getDay()
         cn.by_dow[dowN]++
-        // ASC 정렬이라 마지막 r.work_date 가 가장 최근
         if (!cn.last_date || cn.last_date < r.work_date) cn.last_date = r.work_date
+        // N-34 — 그룹별 누적 (group_id 가 NULL 인 옛 데이터는 skip)
+        if (r.group_id) {
+          const gb = ensureGroupBucket(r.worker_id, r.group_id)
+          gb.total++
+          if (!gb.last_date || gb.last_date < r.work_date) gb.last_date = r.work_date
+        }
       }
     } catch (e) {
       // graceful — prefill 실패해도 자동 생성은 진행 (counter 가 빈 상태로 시작)
@@ -1292,6 +1335,12 @@ export async function POST(
           })
         }
 
+        // N-34 — target_ratio = 0 인 워커는 이 그룹에서 hard exclude
+        candidates = candidates.filter(wId => {
+          const ratio = lookupTargetRatio(g.id, wId)
+          return ratio > 0
+        })
+
         // (4) usePriority=true 면 가중치 정렬, false 면 단순 rotation
         let selected: string[]
         if (usePriority) {
@@ -1310,6 +1359,7 @@ export async function POST(
             return true
           })
           // 가중치 정렬 (K-3: 멤버 단위 priority/dow/필수일수)
+          // N-34 — 그룹 분배 비율 (target_ratio) 우선 비교 추가
           candidates.sort((a, b) => {
             const wa = lookupMember(g.id, a)
             const wb = lookupMember(g.id, b)
@@ -1328,6 +1378,17 @@ export async function POST(
             const aShort = wa?.required_days_per_month && cnA.total < wa.required_days_per_month ? 1 : 0
             const bShort = wb?.required_days_per_month && cnB.total < wb.required_days_per_month ? 1 : 0
             if (aShort !== bShort) return bShort - aShort  // shortfall 1 우선
+            // N-34 — 「그룹에서 이미 채워진 비율」 적은 사람 우선
+            //   ratio_score = by_group[g.id].total / target_ratio (작을수록 미충족 → 우선)
+            //   target_ratio = 0 은 이미 위에서 filter 됨 (hard exclude)
+            const aRatio = lookupTargetRatio(g.id, a)
+            const bRatio = lookupTargetRatio(g.id, b)
+            const aGroupCnt = cnA.by_group.get(g.id)?.total || 0
+            const bGroupCnt = cnB.by_group.get(g.id)?.total || 0
+            const aScore = aRatio > 0 ? aGroupCnt / aRatio : Infinity
+            const bScore = bRatio > 0 ? bGroupCnt / bRatio : Infinity
+            if (Math.abs(aScore - bScore) > 0.001) return aScore - bScore
+            // 그 다음 기존 기준 (요일별 / 글로벌 total / last_date 거리)
             if (cnA.by_dow[dow] !== cnB.by_dow[dow]) return cnA.by_dow[dow] - cnB.by_dow[dow]
             if (cnA.total !== cnB.total) return cnA.total - cnB.total
             const aDist = cnA.last_date
@@ -1410,6 +1471,10 @@ export async function POST(
             cn.total++
             cn.by_dow[dow]++
             cn.last_date = isoDate
+            // N-34 — 그룹별 누적도 증가
+            const gb = ensureGroupBucket(wId, g.id)
+            gb.total++
+            gb.last_date = isoDate
             // PR-2SS-b — 슬롯 종료 시각 기록 (익일 휴식 가드용)
             const slotEndMin = timeToMin(g.slot_end)
             const isOver = !!g.slot_overnight
@@ -1428,6 +1493,10 @@ export async function POST(
           cn.total++
           cn.by_dow[dow]++
           cn.last_date = isoDate
+          // N-34 — lock 도 그룹별 누적
+          const gb = ensureGroupBucket(wId, g.id)
+          gb.total++
+          gb.last_date = isoDate
           // PR-2SS-b — lock 워커도 종료 시각 기록
           const slotEndMin = timeToMin(g.slot_end)
           const isOver = !!g.slot_overnight

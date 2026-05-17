@@ -156,6 +156,25 @@ export async function GET(request: NextRequest) {
     try {
       await prisma.$queryRaw<any[]>`SELECT priority_level FROM cs_group_members LIMIT 1`
     } catch { hasMemberSettings = false }
+    // N-34 — target_ratio 컬럼 graceful
+    let hasTargetRatio = true
+    try {
+      await prisma.$queryRaw<any[]>`SELECT target_ratio FROM cs_group_members LIMIT 1`
+    } catch { hasTargetRatio = false }
+    // N-34 — 그룹 list 전체에서 worker_id 별 ratio 한 번에 조회 (group_id 별 분리)
+    const ratioByGroupWorker = new Map<string, number>()  // key: `${group_id}_${worker_id}`
+    if (hasTargetRatio) {
+      try {
+        const rrRows = await prisma.$queryRaw<any[]>`
+          SELECT group_id, worker_id, target_ratio FROM cs_group_members
+        `
+        for (const r of rrRows) {
+          const v = Number(r.target_ratio)
+          ratioByGroupWorker.set(`${r.group_id}_${r.worker_id}`,
+            Number.isFinite(v) ? v : 1.0)
+        }
+      } catch { /* graceful */ }
+    }
 
     // 멤버 chip 일괄 조회 (그룹별 워커 이름 + color_tone + 8 멤버 설정 + N-19-a 로테이션 3)
     type MemberRow = {
@@ -206,11 +225,13 @@ export async function GET(request: NextRequest) {
           `
       for (const r of memRows) {
         const arr = memberMap.get(r.group_id) || []
-        const row: MemberRow = {
+        const ratioKey = `${r.group_id}_${r.worker_id}`
+        const row: MemberRow & { target_ratio: number } = {
           id: r.worker_id,
           name: r.name,
           color_tone: r.color_tone || 'none',
           priority: Number(r.priority || 0),
+          target_ratio: ratioByGroupWorker.has(ratioKey) ? ratioByGroupWorker.get(ratioKey)! : 1.0,  // N-34
           priority_level: hasMemberSettings ? Number(r.priority_level || 2) : 2,
           preferred_dow_prefer: hasMemberSettings ? (r.preferred_dow_prefer ?? null) : null,
           preferred_dow_avoid: hasMemberSettings ? (r.preferred_dow_avoid ?? null) : null,
