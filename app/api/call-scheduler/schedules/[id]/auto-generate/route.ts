@@ -615,6 +615,12 @@ export async function POST(
     // 4) 휴일 (exclude_auto=1) — 해당 월
     // N-31 — 항상 fetch (그룹 skip_on_holidays=1 가드를 위해)
     //   다이얼로그의 「휴일 자동 제외」 옵션은 그룹 skip=0 에 대한 master kill switch 역할만
+    //
+    // N-41 — 주말 공휴일은 가드 X (사용자 결정 2026-05-17)
+    //   "둘 다 공휴일 근무 되면 안 되니" + "6월 6일은 공휴일이 아니고"
+    //   · 평일 공휴일/대체공휴일만 가드 작동 (운영상 진짜 「공휴일 휴무」 의미)
+    //   · 주말 (토/일) 공휴일은 → 「주말 근무자가 정상 근무」 (가드 X)
+    //   · 대체공휴일 페어 (3/1 일 + 3/2 월) 의 경우 → 3/2 만 가드 → 둘 다 적용 회피
     const monthStart = `${year}-${String(month).padStart(2, '0')}-01`
     const monthEnd = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
     let holidayDates = new Set<string>()
@@ -627,7 +633,28 @@ export async function POST(
         WHERE holiday_date BETWEEN ${monthStart} AND ${monthEnd}
           AND exclude_auto = 1
       ` as any
-      holidayDates = new Set(holidayList.map(h => h.holiday_date))
+      // N-43 (사용자 정정 2026-05-17) — 「대체공휴일 페어 있는 주말 공휴일」만 가드 X
+      //   · 평일 공휴일/대체공휴일 → 가드 작동 (회사 휴무)
+      //   · 대체공휴일 페어 있는 주말 공휴일 (예: 3/1 일 삼일절 + 3/2 월 대체) → 가드 X
+      //     (3/2 가 진짜 가드 → 둘 다 적용 방지)
+      //   · 페어 없는 주말 공휴일 (예: 6/6 토 현충일) → 가드 작동 (회사 휴무 그대로)
+      //
+      //   페어 인식: name 패턴 "대체공휴일(X)" 의 X 를 원본 이름과 매칭
+      const substituteOriginalNames = new Set<string>()
+      for (const h of holidayList) {
+        const m = String(h.name || '').match(/대체공휴일\(([^)]+)\)/)
+        if (m) substituteOriginalNames.add(m[1].trim())
+      }
+      const filtered = holidayList.filter(h => {
+        const d = new Date(h.holiday_date + 'T00:00:00')
+        const dow = d.getDay()
+        const isWeekend = dow === 0 || dow === 6
+        if (!isWeekend) return true  // 평일 → 가드 작동
+        // 주말 공휴일 — 대체공휴일 페어 있으면 가드 X
+        const hasPair = substituteOriginalNames.has(String(h.name || '').trim())
+        return !hasPair  // 페어 있으면 가드 X / 없으면 가드 작동
+      })
+      holidayDates = new Set(filtered.map(h => h.holiday_date))
     } catch {
       // 테이블 미적용 시 무시
     }

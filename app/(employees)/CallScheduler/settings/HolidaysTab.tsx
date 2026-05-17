@@ -350,13 +350,36 @@ export default function HolidaysTab() {
             <tbody>
               {holidays.map(h => (
                 <tr key={h.id} style={{ borderBottom: `1px solid ${COLORS.borderFaint}` }}>
-                  <td style={{ ...tdStyle, fontFamily: 'monospace' }}>{h.holiday_date}</td>
+                  <td style={{ ...tdStyle, fontFamily: 'monospace' }}>
+                    {h.holiday_date}
+                    {/* N-41 — 요일 + 주말 표시 (대체공휴일 관계 시각화) */}
+                    {(() => {
+                      const d = new Date(h.holiday_date + 'T00:00:00')
+                      const dow = d.getDay()
+                      const dowLabel = ['일','월','화','수','목','금','토'][dow]
+                      const isWeekend = dow === 0 || dow === 6
+                      return (
+                        <span style={{
+                          fontSize: 10, marginLeft: 6, padding: '1px 5px', borderRadius: 99, fontWeight: 700,
+                          background: isWeekend ? COLORS.bgGray : COLORS.bgBlue,
+                          color: isWeekend ? COLORS.textMuted : COLORS.info,
+                        }}>{dowLabel}{isWeekend ? ' (주말)' : ''}</span>
+                      )
+                    })()}
+                  </td>
                   <td style={tdStyle}>
                     <span style={{
                       color: TONE_TEXT[h.color_tone],
                       background: TONE_BG[h.color_tone] !== 'transparent' ? TONE_BG[h.color_tone] : undefined,
                       padding: '2px 8px', borderRadius: 4, fontWeight: 700,
                     }}>{h.name}</span>
+                    {/* N-41 — 대체공휴일 시각 표시 */}
+                    {h.name.includes('대체공휴일') && (
+                      <span style={{
+                        fontSize: 10, marginLeft: 6, padding: '1px 6px', borderRadius: 99,
+                        background: COLORS.bgViolet, color: '#7c3aed', fontWeight: 700,
+                      }}>🔄 대체</span>
+                    )}
                   </td>
                   <td style={tdStyle}>
                     <span style={pillStyle(TYPE_TONE[h.type])}>{TYPE_LABEL[h.type]}</span>
@@ -364,6 +387,45 @@ export default function HolidaysTab() {
                   <td style={{ ...tdStyle, fontSize: 11, color: COLORS.textMuted }}>
                     {h.is_paid && '유급 '}
                     {h.exclude_auto && '· 자동제외'}
+                    {/* N-43 — 가드 작동 여부 시각 표시 (대체공휴일 페어 인식) */}
+                    {(() => {
+                      const d = new Date(h.holiday_date + 'T00:00:00')
+                      const dow = d.getDay()
+                      const isWeekend = dow === 0 || dow === 6
+                      // 같은 연도에 「대체공휴일(X)」 row 가 있으면 X 가 페어
+                      const substituteOriginals = new Set<string>()
+                      for (const other of holidays) {
+                        const m = String(other.name || '').match(/대체공휴일\(([^)]+)\)/)
+                        if (m) substituteOriginals.add(m[1].trim())
+                      }
+                      const hasPair = substituteOriginals.has(String(h.name || '').trim())
+                      // 실제 가드: exclude_auto=1 AND (평일 OR 페어 없는 주말)
+                      const guardActive = h.exclude_auto && (!isWeekend || !hasPair)
+                      if (guardActive) {
+                        return (
+                          <span style={{
+                            display: 'inline-block', marginLeft: 4, fontSize: 9, padding: '1px 5px',
+                            borderRadius: 99, background: COLORS.bgRed, color: COLORS.danger, fontWeight: 700,
+                          }} title={isWeekend
+                            ? "주말 공휴일이지만 대체공휴일 없음 — 가드 작동 (회사 휴무 유지)"
+                            : "평일 + 자동제외 ON — 휴일 가드 작동"}>🔴 가드 ON</span>
+                        )
+                      }
+                      if (isWeekend && hasPair) {
+                        return (
+                          <span style={{
+                            display: 'inline-block', marginLeft: 4, fontSize: 9, padding: '1px 5px',
+                            borderRadius: 99, background: COLORS.bgAmber, color: COLORS.warning, fontWeight: 700,
+                          }} title="대체공휴일이 다른 평일에 있어 가드 X — 주말 근무자 정상 출근, 대체일이 진짜 가드">⚠ 주말 (대체있음) — 가드 X</span>
+                        )
+                      }
+                      return (
+                        <span style={{
+                          display: 'inline-block', marginLeft: 4, fontSize: 9, padding: '1px 5px',
+                          borderRadius: 99, background: COLORS.bgGray, color: COLORS.textMuted, fontWeight: 700,
+                        }} title="자동제외 OFF — 가드 X. 회사 휴무면 자동제외 ON 으로 토글">⚪ 가드 X</span>
+                      )
+                    })()}
                   </td>
                   <td style={{ ...tdStyle, color: COLORS.textMuted, fontSize: 12 }}>{h.memo || '·'}</td>
                   <td style={{ ...tdStyle, textAlign: 'right' }}>

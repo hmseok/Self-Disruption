@@ -58,12 +58,16 @@ export async function POST(request: NextRequest) {
     }
 
     // 새 INSERT (이제 같은 날짜에 national row 없으므로 IGNORE 불필요)
+    // N-43 (사용자 정정 2026-05-17): "정부 공휴일이 회사휴무일 맞아요"
+    //   · 정부 공휴일 = 회사 휴무 (디폴트 exclude_auto=1) — 유지
+    //   · 주말 (토/일) 에 떨어지는 케이스만 알고리즘 차원에서 자동 가드 X
+    //   · 6/6 (토) 현충일 같은 케이스도 UI 에 「주말 가드 X」 라벨로 시각화
     let inserted = 0
     let skipped = 0
     for (const h of holidays) {
       try {
         const id = crypto.randomUUID()
-        // type='national' (공휴일), exclude_auto=1 (자동 생성 제외), is_paid=1, color_tone='red'
+        // type='national' (공휴일), exclude_auto=1 (회사 휴무 디폴트), is_paid=1, color_tone='red'
         const result = await prisma.$executeRaw`
           INSERT IGNORE INTO cs_holidays
             (id, holiday_date, name, type, is_paid, exclude_auto, color_tone, memo, created_at, updated_at)
