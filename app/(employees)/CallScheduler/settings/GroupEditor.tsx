@@ -413,6 +413,15 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
   }
 
   const submit = async () => {
+    // 사용자 보고 fix (2026-05-17) — "저장 누르면 한번에 안되고 스크롤 올라가고 다시 눌러야 저장"
+    //  · 원인: 한국어 IME 조합 중 input 포커스 상태에서 저장 클릭 → onChange 미발화 → state stale
+    //  · 검증 실패 → 에러 박스가 상단에 표시 → 스크롤 위로 이동
+    //  · 두 번째 클릭은 blur 된 후 → 정상 state → 통과
+    //  fix: 클릭 시점에 활성 input blur 강제 + raf 1회 대기 (React batch update 완료)
+    if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur()
+      await new Promise<void>(resolve => requestAnimationFrame(() => resolve()))
+    }
     if (!name.trim()) { setError('이름은 필수'); return }
     if (!slotId) { setError('시프트 선택 필수'); return }
     setError(null); setSaving(true)
@@ -1600,7 +1609,16 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
 
       {/* PR-2SS-h-1-fix — 모달 폐기, 인라인 펼침으로 대체 */}
 
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 14 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8, marginTop: 14 }}>
+        {/* 사용자 보고 fix (2026-05-17) — 에러를 저장 버튼 옆에도 표시 (스크롤 X) */}
+        {error && (
+          <div style={{
+            padding: '6px 10px', borderRadius: 8,
+            background: COLORS.bgRed, border: `1px solid ${COLORS.borderRed}`,
+            color: COLORS.danger, fontSize: 12, fontWeight: 600,
+            marginRight: 'auto',
+          }}>❌ {error}</div>
+        )}
         <button type="button" onClick={onClose} style={{
           ...BTN.md, background: 'transparent', color: COLORS.textSecondary,
           border: `1px solid ${COLORS.borderFaint}`, cursor: 'pointer',
