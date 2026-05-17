@@ -629,15 +629,37 @@ export async function POST(
     //   workerCycle: Map<workerId, WorkerCycle> (워커 글로벌)
     let memberCons: Map<string, MemberConstraint> = new Map()
     let workerCycle: Map<string, WorkerCycle> = new Map()
+    // N-29-d — 워커 개인 한계 (그룹 무관 — 모든 그룹 공통 적용)
+    type WorkerLimits = {
+      max_consecutive_work_days: number | null
+      max_days_per_month: number | null
+      blocked_slot_ids: Set<string>
+      preferred_dow_prefer: number[]
+      preferred_dow_avoid: number[]
+    }
+    const workerLimits = new Map<string, WorkerLimits>()
+    let hasWorkerLimits = true
+    try {
+      await prisma.$queryRaw<any[]>`SELECT max_consecutive_work_days FROM cs_workers LIMIT 1`
+    } catch { hasWorkerLimits = false }
     if (usePriority) {
       try {
-        // 워커 글로벌 cycle 정보
-        const wcRows = await prisma.$queryRaw<any[]>`
-          SELECT id,
-                 cycle_days_on, cycle_days_off,
-                 DATE_FORMAT(cycle_start_date, '%Y-%m-%d') AS cycle_start_date
-          FROM cs_workers WHERE is_active = 1
-        `
+        // 워커 글로벌 cycle 정보 + N-29-d 개인 한계 (graceful)
+        const wcRows = hasWorkerLimits
+          ? await prisma.$queryRaw<any[]>`
+              SELECT id,
+                     cycle_days_on, cycle_days_off,
+                     DATE_FORMAT(cycle_start_date, '%Y-%m-%d') AS cycle_start_date,
+                     max_consecutive_work_days, max_days_per_month,
+                     blocked_slot_ids, preferred_dow_prefer, preferred_dow_avoid
+              FROM cs_workers WHERE is_active = 1
+            `
+          : await prisma.$queryRaw<any[]>`
+              SELECT id,
+                     cycle_days_on, cycle_days_off,
+                     DATE_FORMAT(cycle_start_date, '%Y-%m-%d') AS cycle_start_date
+              FROM cs_workers WHERE is_active = 1
+            `
         for (const w of wcRows) {
           workerCycle.set(w.id, {
             worker_id: w.id,
@@ -645,6 +667,27 @@ export async function POST(
             cycle_days_off: w.cycle_days_off != null ? Number(w.cycle_days_off) : null,
             cycle_start_date: w.cycle_start_date,
           })
+          // N-29-d — 워커 개인 한계 저장
+          if (hasWorkerLimits) {
+            let wBlocked = new Set<string>()
+            if (w.blocked_slot_ids != null) {
+              try {
+                const arr = typeof w.blocked_slot_ids === 'string'
+                  ? JSON.parse(w.blocked_slot_ids)
+                  : (Array.isArray(w.blocked_slot_ids) ? w.blocked_slot_ids : [])
+                if (Array.isArray(arr)) wBlocked = new Set(arr.map(String))
+              } catch { /* graceful */ }
+            }
+            workerLimits.set(w.id, {
+              max_consecutive_work_days: w.max_consecutive_work_days != null
+                ? Number(w.max_consecutive_work_days) : null,
+              max_days_per_month: w.max_days_per_month != null
+                ? Number(w.max_days_per_month) : null,
+              blocked_slot_ids: wBlocked,
+              preferred_dow_prefer: parseDowList(w.preferred_dow_prefer),
+              preferred_dow_avoid: parseDowList(w.preferred_dow_avoid),
+            })
+          }
         }
         // 멤버 설정 (그룹 × 워커 단위)
         try {
@@ -668,17 +711,23 @@ export async function POST(
                 if (Array.isArray(arr)) blocked = new Set(arr.map(String))
               } catch { /* 무시 */ }
             }
+            // N-29-d — 그룹 cfg 가 비어있으면 워커 cfg 적용 (워커 마스터 우선 정책)
+            const wL = workerLimits.get(r.worker_id)
+            const grpMaxConsec = r.max_consecutive_work_days != null ? Number(r.max_consecutive_work_days) : null
+            const grpMaxDays = r.max_days_per_month != null ? Number(r.max_days_per_month) : null
+            const grpDowPrefer = parseDowList(r.preferred_dow_prefer)
+            const grpDowAvoid = parseDowList(r.preferred_dow_avoid)
             memberCons.set(`${r.group_id}_${r.worker_id}`, {
               group_id: r.group_id,
               worker_id: r.worker_id,
               priority_level: Number(r.priority_level || 2),
-              preferred_dow_avoid: parseDowList(r.preferred_dow_avoid),
-              preferred_dow_prefer: parseDowList(r.preferred_dow_prefer),
+              // N-29-d — 그룹 cfg 우선, NULL/빈 set 이면 워커 cfg fallback
+              preferred_dow_avoid: grpDowAvoid.length > 0 ? grpDowAvoid : (wL?.preferred_dow_avoid || []),
+              preferred_dow_prefer: grpDowPrefer.length > 0 ? grpDowPrefer : (wL?.preferred_dow_prefer || []),
               required_days_per_month: r.required_days_per_month != null ? Number(r.required_days_per_month) : null,
-              max_days_per_month: r.max_days_per_month != null ? Number(r.max_days_per_month) : null,
-              max_consecutive_work_days: r.max_consecutive_work_days != null
-                ? Number(r.max_consecutive_work_days) : null,
-              blocked_slot_ids: blocked,
+              max_days_per_month: grpMaxDays != null ? grpMaxDays : (wL?.max_days_per_month ?? null),
+              max_consecutive_work_days: grpMaxConsec != null ? grpMaxConsec : (wL?.max_consecutive_work_days ?? null),
+              blocked_slot_ids: blocked.size > 0 ? blocked : (wL?.blocked_slot_ids || new Set()),
             })
           }
         } catch {
@@ -688,9 +737,24 @@ export async function POST(
         // 마이그 미적용 — 단순 rotation 동작
       }
     }
-    // 그룹 컨텍스트 + 워커 ID 로 멤버 제약 lookup (없으면 default — 안전 fallback)
+    // 그룹 컨텍스트 + 워커 ID 로 멤버 제약 lookup
+    // N-29-d — memberCons 없으면 워커 cfg 로 fallback (워커 마스터 적용)
     const lookupMember = (groupId: string, workerId: string): MemberConstraint | undefined => {
-      return memberCons.get(`${groupId}_${workerId}`)
+      const mc = memberCons.get(`${groupId}_${workerId}`)
+      if (mc) return mc
+      const wL = workerLimits.get(workerId)
+      if (!wL) return undefined
+      return {
+        group_id: groupId,
+        worker_id: workerId,
+        priority_level: 2,
+        preferred_dow_avoid: wL.preferred_dow_avoid,
+        preferred_dow_prefer: wL.preferred_dow_prefer,
+        required_days_per_month: null,
+        max_days_per_month: wL.max_days_per_month,
+        max_consecutive_work_days: wL.max_consecutive_work_days,
+        blocked_slot_ids: wL.blocked_slot_ids,
+      }
     }
     // cycle 포함 통합 (옛 workerCons.get 호환 — 부분 컬럼만 사용처가 있어 alias 만)
     const lookupWorkerCycle = (workerId: string): WorkerCycle | undefined => {
@@ -850,21 +914,29 @@ export async function POST(
           continue
         }
 
-        const dowSet = patternDays(g.pattern_type, g.custom_days)
-        if (!dowSet.has(dow)) continue
+        // N-30 — pattern_type='holidays_only' 처리 (휴일 전담 그룹)
+        const isHolidaysOnly = g.pattern_type === 'holidays_only'
+        if (isHolidaysOnly) {
+          // 공휴일 일자가 아니면 skip
+          if (!holidayDates.has(isoDate)) continue
+          // 휴일이면 통과 (dow 무관) — skip_on_holidays 가드도 무시 (self-conflict)
+        } else {
+          const dowSet = patternDays(g.pattern_type, g.custom_days)
+          if (!dowSet.has(dow)) continue
 
-        // 휴일 제외 — N-16: 그룹별 skip_on_holidays 우선 (legacy 전역 skipHolidays 는 master kill switch)
-        const groupSkipsHoliday = hasGroupSkipOnHolidays
-          ? Boolean(g.skip_on_holidays)
-          : skipHolidays  // 컬럼 미적용 시 legacy 전역 옵션 사용
-        if (skipHolidays && groupSkipsHoliday && holidayDates.has(isoDate)) {
-          plan.push({
-            work_date: isoDate, shift_slot_id: g.shift_slot_id, worker_id: null,
-            special_code: 'none', action: 'skip-holiday',
-            group_id: g.id, group_name: g.name,
-          })
-          byGroup[g.id].skipped++
-          continue
+          // 휴일 제외 — N-16: 그룹별 skip_on_holidays 우선 (legacy 전역 skipHolidays 는 master kill switch)
+          const groupSkipsHoliday = hasGroupSkipOnHolidays
+            ? Boolean(g.skip_on_holidays)
+            : skipHolidays  // 컬럼 미적용 시 legacy 전역 옵션 사용
+          if (skipHolidays && groupSkipsHoliday && holidayDates.has(isoDate)) {
+            plan.push({
+              work_date: isoDate, shift_slot_id: g.shift_slot_id, worker_id: null,
+              special_code: 'none', action: 'skip-holiday',
+              group_id: g.id, group_name: g.name,
+            })
+            byGroup[g.id].skipped++
+            continue
+          }
         }
 
         // ── N-21-b — 버전 timeline 우선 lookup ──

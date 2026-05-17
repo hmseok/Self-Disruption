@@ -20,7 +20,7 @@ const ALLOWED_PATCH = new Set([
   'pattern_type', 'custom_days', 'generation_strategy',
   'rotation_size', 'rotation_period_days', 'skip_on_holidays',
 ])
-const PATTERNS = new Set(['all_days', 'all_weekdays', 'weekends_only', 'custom'])
+const PATTERNS = new Set(['all_days', 'all_weekdays', 'weekends_only', 'custom', 'holidays_only'])
 const STRATEGIES = new Set(['all_members', 'rotation'])
 const PERIOD_KINDS = new Set(['monthly', 'days'])
 

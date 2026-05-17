@@ -22,7 +22,7 @@ const ALLOWED_COLS = new Set([
   'rotation_period_kind',     // N-19-a — monthly | days
   'rotation_custom_days',     // N-19-a
 ])
-const PATTERNS = new Set(['all_days', 'all_weekdays', 'weekends_only', 'custom'])
+const PATTERNS = new Set(['all_days', 'all_weekdays', 'weekends_only', 'custom', 'holidays_only'])
 const STRATEGIES = new Set(['all_members', 'rotation'])
 const COLOR_TONES = new Set([
   'blue', 'gray', 'green', 'amber', 'violet', 'red', 'none',

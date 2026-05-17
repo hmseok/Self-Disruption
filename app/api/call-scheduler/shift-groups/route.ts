@@ -13,7 +13,7 @@ function serialize<T>(data: T): T {
   ))
 }
 
-const PATTERNS = ['all_days', 'all_weekdays', 'weekends_only', 'custom'] as const
+const PATTERNS = ['all_days', 'all_weekdays', 'weekends_only', 'custom', 'holidays_only'] as const
 const STRATEGIES = ['all_members', 'rotation'] as const
 const COLOR_TONES = [
   'blue', 'gray', 'green', 'amber', 'violet', 'red', 'none',

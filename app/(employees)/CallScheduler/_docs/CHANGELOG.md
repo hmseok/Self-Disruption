@@ -3,6 +3,91 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-17 (Phase N-30) — 「공휴일만」 패턴 추가 (휴일 전담 그룹)
+
+### 사용자 보고
+> "휴일 근무는 예를 들면 모든 요일에 휴일일때만 근무하는 내용은 없는것같은데"
+
+### 변경
+- pattern_type enum 에 `'holidays_only'` 추가
+- `PATTERN_OPTIONS` 에 「공휴일만」 옵션 추가 — GroupEditor UI 표시
+- shift-groups API POST/PATCH + version PATCH 의 PATTERNS Set 확장
+- auto-generate 알고리즘 분기:
+  · `pattern_type='holidays_only'` 시 → `holidayDates.has(isoDate)` 일 때만 통과 (dow 무관)
+  · skip_on_holidays 가드 무시 (self-conflict — 휴일에 들어가는 그룹)
+  · 그 외 패턴 — 기존 로직 그대로
+
+### 운영
+- 「휴일 전담」 그룹 생성:
+  · 그룹 이름: "휴일 전담"
+  · 카테고리: 특수
+  · 시프트 선택
+  · 패턴: 「공휴일만」
+  · 멤버 추가
+- 자동 생성 → cs_holidays 일자 (예: 6/3 지방선거일, 6/6 현충일) 에만 출근
+
+### 검증
+- tsc PASS
+
+## 2026-05-17 (Phase N-29-c + N-29-d) — GroupEditor 멤버 cfg 축소 + 알고리즘 워커 cfg 우선
+
+### N-29-c (GroupEditor 축소)
+- `MemberCfgPanel` 에서 제거:
+  · 🌟 희망 요일 / 🚫 비선호 요일
+  · 🛑 월 최대 일수
+  · 🛡 연속 근무 한도
+  · 🚷 슬롯 거부
+- 유지: 우선순위 (P1/P2/P3) / 📈 월 필수 일수 (그룹 단위) / 📝 패턴 메모 / rotation 시작 (워커별)
+- 안내 메시지 추가: "💡 희망/비선호 요일 · 월 최대 일수 · 연속 근무 한도 · 슬롯 거부 는 워커 마스터에서 셋팅"
+
+### N-29-d (자동 생성 알고리즘 — 워커 cfg 우선)
+- `cs_workers` 의 개인 한계 5 컬럼 graceful fetch (`hasWorkerLimits`)
+- `workerLimits` Map 신설 — 워커별 개인 한계 저장
+- `memberCons.set` 시 **그룹 cfg 우선, NULL/빈 시 워커 cfg fallback**:
+  · max_consecutive_work_days: 그룹 NULL → 워커 사용
+  · max_days_per_month: 그룹 NULL → 워커 사용
+  · blocked_slot_ids: 그룹 빈 → 워커 사용
+  · preferred_dow_prefer/avoid: 그룹 빈 → 워커 사용
+- `lookupMember` 에 워커 cfg fallback — memberCons 없으면 워커 cfg 로 MemberConstraint 합성
+
+### 효과
+- 사용자가 워커 마스터 1번 셋팅 → 모든 그룹의 자동 생성에 동일 적용
+- 그룹마다 다른 한도 원하면 그룹 멤버 cfg 에 override 가능 (현재 UI 노출 X 단 컬럼 유지)
+- 「개인 한계」 의미가 명확 — 워커 단위 룰
+
+### 백워드 호환
+- cs_group_members 의 옛 cfg 컬럼 유지 (마이그 X) — 데이터 그대로
+- 알고리즘이 그룹 cfg 우선이라 기존 데이터 영향 없음
+
+### 검증
+- tsc PASS
+
+## 2026-05-17 (Phase N-29-b) — 워커 마스터 UI 「개인 한계」 영역
+
+### 변경 (`WorkersTab.tsx`)
+- 새 state 5종 (`editMaxConsec`, `editMaxDays`, `editBlockedSlots`, `editDowPrefer`, `editDowAvoid`)
+- `slots` 추가 fetch (`/api/call-scheduler/shift-slots`)
+- `startEdit()` 에서 워커 데이터 → 5 state 초기화
+- `saveEdit()` PATCH body 에 5 컬럼 추가
+- `PersonalLimitsPanel` 신설 (인터페이스 추가됨, IdentityPanel 아래):
+  · 📅 연속 근무 한도 (일) — 1~14
+  · 🔴 월 최대 일수 — 1~31
+  · 🌟 희망 요일 — 7 요일 토글 chip
+  · 🚫 비선호 요일 — 7 요일 토글 chip
+  · ⛔ 슬롯 거부 — 시프트 list chip
+- UI 색깔: 녹색 패널 (개인 한계 = 워커 보호 의미)
+
+### 효과
+- 사용자가 워커 1번만 셋팅 → 모든 그룹에 적용 (그룹마다 같은 값 입력 X)
+- 「전정연 연속 5일 + 월 15일 max」 같은 개인 한계가 모든 그룹의 자동 생성에 동일 적용 (N-29-d 후)
+
+### 다음 단계 (N-29-c, N-29-d)
+- N-29-c: GroupEditor 멤버 cfg 축소 (priority_level + rotation_start_* + work_pattern_text 만 유지)
+- N-29-d: auto-generate 알고리즘 — 워커 cfg 우선, 그룹 cfg fallback
+
+### 검증
+- tsc PASS
+
 ## 2026-05-17 (Phase N-29-a) — 워커 마스터 분리 (Step A — 마이그 + API)
 
 ### 사용자 보고

@@ -17,11 +17,12 @@ interface Props {
   onSaved: () => void
 }
 
-const PATTERN_OPTIONS: { value: 'all_days' | 'all_weekdays' | 'weekends_only' | 'custom'; label: string; sub: string }[] = [
-  { value: 'all_weekdays', label: '평일만',   sub: '월~금 매일' },
-  { value: 'all_days',     label: '매일',     sub: '주말 포함' },
-  { value: 'weekends_only',label: '주말만',   sub: '토·일' },
-  { value: 'custom',       label: '요일 지정', sub: '체크 선택' },
+const PATTERN_OPTIONS: { value: 'all_days' | 'all_weekdays' | 'weekends_only' | 'custom' | 'holidays_only'; label: string; sub: string }[] = [
+  { value: 'all_weekdays',  label: '평일만',     sub: '월~금 매일' },
+  { value: 'all_days',      label: '매일',       sub: '주말 포함' },
+  { value: 'weekends_only', label: '주말만',     sub: '토·일' },
+  { value: 'custom',        label: '요일 지정',  sub: '체크 선택' },
+  { value: 'holidays_only', label: '공휴일만',   sub: 'cs_holidays 일자만 — 휴일 전담 그룹' },
 ]
 const STRATEGY_OPTIONS: { value: 'all_members' | 'rotation'; label: string; sub: string }[] = [
   { value: 'all_members', label: '전원 동시', sub: '소속 멤버 모두 매일 출근' },
@@ -38,7 +39,7 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
   // 폼 상태
   const [name, setName] = useState('')
   const [slotId, setSlotId] = useState(slots[0]?.id || '')
-  const [pattern, setPattern] = useState<'all_days' | 'all_weekdays' | 'weekends_only' | 'custom'>('all_weekdays')
+  const [pattern, setPattern] = useState<'all_days' | 'all_weekdays' | 'weekends_only' | 'custom' | 'holidays_only'>('all_weekdays')
   const [customDays, setCustomDays] = useState<Set<number>>(new Set([1, 2, 3, 4, 5]))
   const [strategy, setStrategy] = useState<'all_members' | 'rotation'>('all_members')
   const [rotationSize, setRotationSize] = useState(1)
@@ -1726,74 +1727,24 @@ function MemberCfgPanel({
         </div>
       </div>
 
-      {/* 2행 — 희망 / 비선호 요일 (큰 버튼) */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-        <div>
-          <div style={cfgFieldLabel}>
-            🌟 희망 요일
-            <span style={{ fontSize: 11, fontWeight: 500, color: COLORS.textMuted }}>매치 시 ranking 우선</span>
-          </div>
-          <div style={{ display: 'flex', gap: 4 }}>
-            {[0,1,2,3,4,5,6].map(d => dowBtn(d, cfg.preferred_dow_prefer, 'prefer'))}
-          </div>
-        </div>
-        <div>
-          <div style={cfgFieldLabel}>
-            🚫 비선호 요일
-            <span style={{ fontSize: 11, fontWeight: 500, color: COLORS.textMuted }}>매치 시 후순위</span>
-          </div>
-          <div style={{ display: 'flex', gap: 4 }}>
-            {[0,1,2,3,4,5,6].map(d => dowBtn(d, cfg.preferred_dow_avoid, 'avoid'))}
-          </div>
-        </div>
+      {/* N-29-c — 개인 한계 (희망/비선호 요일 / 월 최대 / 연속 / 슬롯 거부) 는 워커 마스터로 이동 */}
+      <div style={{
+        padding: '10px 14px', borderRadius: 8,
+        background: COLORS.bgGreen, border: `1px solid ${COLORS.borderGreen}`,
+        fontSize: 12, color: COLORS.success,
+      }}>
+        💡 <strong>희망/비선호 요일 · 월 최대 일수 · 연속 근무 한도 · 슬롯 거부</strong> 는 워커 마스터 (설정 → 워커 탭) 에서 셋팅 — 모든 그룹에 동일 적용
       </div>
 
-      {/* 3행 — 일수 / 한도 (3 컬럼) */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
-        <div>
-          <div style={cfgFieldLabel}>📈 월 필수 일수</div>
-          <input type="number" min={0} value={cfg.required_days_per_month}
-                 onChange={(e) => onChange({ required_days_per_month: e.target.value })}
-                 placeholder="비움 = 무관" style={cfgInputStyle} />
-        </div>
-        <div>
-          <div style={cfgFieldLabel}>🛑 월 최대 일수</div>
-          <input type="number" min={0} value={cfg.max_days_per_month}
-                 onChange={(e) => onChange({ max_days_per_month: e.target.value })}
-                 placeholder="비움 = 무제한" style={cfgInputStyle} />
-        </div>
-        <div>
-          <div style={cfgFieldLabel}>🛡 연속 근무 한도</div>
-          <input type="number" min={0} value={cfg.max_consecutive_work_days}
-                 onChange={(e) => onChange({ max_consecutive_work_days: e.target.value })}
-                 placeholder="비움 = 무제한" style={cfgInputStyle} />
-        </div>
-      </div>
-
-      {/* 4행 — 슬롯 거부 (큼직 chip) */}
+      {/* 3행 — 그룹별 의무 (월 필수 일수만 유지) */}
       <div>
         <div style={cfgFieldLabel}>
-          🚷 슬롯 거부
-          <span style={{ fontSize: 11, fontWeight: 500, color: COLORS.textMuted }}>이 슬롯엔 절대 배정 X</span>
+          📈 월 필수 일수 (이 그룹 안)
+          <span style={{ fontSize: 11, fontWeight: 500, color: COLORS.textMuted }}>이 그룹에 최소 N일 보장</span>
         </div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-          {slots.map(s => {
-            const active = cfg.blocked_slot_ids.has(s.id)
-            return (
-              <button key={s.id} type="button" onClick={() => toggleBlockedSlot(s.id)}
-                      style={{
-                        padding: '8px 14px', borderRadius: 8, fontSize: 13, fontWeight: 800,
-                        background: active ? COLORS.bgRed : 'rgba(255,255,255,0.7)',
-                        color: active ? COLORS.danger : COLORS.textSecondary,
-                        border: `1.5px solid ${active ? COLORS.borderRed : COLORS.borderFaint}`,
-                        cursor: 'pointer', fontFamily: 'monospace',
-                        transition: 'all 0.12s',
-                      }}>
-                {active && '🚫 '}{s.code}
-              </button>
-            )
-          })}
-        </div>
+        <input type="number" min={0} value={cfg.required_days_per_month}
+               onChange={(e) => onChange({ required_days_per_month: e.target.value })}
+               placeholder="비움 = 무관" style={cfgInputStyle} />
       </div>
 
       {/* 5행 — 패턴 메모 */}

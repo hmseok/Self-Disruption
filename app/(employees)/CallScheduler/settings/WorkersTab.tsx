@@ -13,7 +13,7 @@ import { COLORS, GLASS, BTN, pillStyle } from '@/app/utils/ui-tokens'
 import { TONE_BG, TONE_TEXT } from '@/app/(employees)/CallScheduler/utils/palette'
 import { COLOR_TONE_OPTIONS } from '@/app/(employees)/CallScheduler/utils/types'
 import { getAuthHeader } from '@/app/utils/auth-client'
-import type { Worker, ColorTone } from '@/app/(employees)/CallScheduler/utils/types'
+import type { Worker, ColorTone, ShiftSlot } from '@/app/(employees)/CallScheduler/utils/types'
 
 const GROUP_OPTIONS: (string | null)[] = [null, '주간', '야간', '저녁', '관리', '기타']
 
@@ -32,6 +32,7 @@ interface RideEmp {
 export default function WorkersTab() {
   const [workers, setWorkers] = useState<Worker[]>([])
   const [employees, setEmployees] = useState<RideEmp[]>([])
+  const [slots, setSlots] = useState<ShiftSlot[]>([])  // N-29-b — 슬롯 거부 입력용
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [actionMsg, setActionMsg] = useState<{ ok: boolean; text: string } | null>(null)
@@ -45,18 +46,27 @@ export default function WorkersTab() {
   const [editCycleOn, setEditCycleOn] = useState<string>('')
   const [editCycleOff, setEditCycleOff] = useState<string>('')
   const [editCycleStart, setEditCycleStart] = useState<string>('')
+  // N-29-b — 개인 한계 (그룹 무관 — 워커 단위)
+  const [editMaxConsec, setEditMaxConsec] = useState<string>('')   // '' = 무제한
+  const [editMaxDays, setEditMaxDays] = useState<string>('')       // '' = 무제한
+  const [editBlockedSlots, setEditBlockedSlots] = useState<Set<string>>(new Set())
+  const [editDowPrefer, setEditDowPrefer] = useState<Set<number>>(new Set())
+  const [editDowAvoid, setEditDowAvoid] = useState<Set<number>>(new Set())
 
   const load = async () => {
     setLoading(true); setError(null)
     try {
       const auth = await getAuthHeader()
-      const [wRes, eRes] = await Promise.all([
+      const [wRes, eRes, sRes] = await Promise.all([
         fetch('/api/call-scheduler/workers', { headers: auth }),
         fetch('/api/ride-employees?include_inactive=0', { headers: auth }),
+        fetch('/api/call-scheduler/shift-slots', { headers: auth }),  // N-29-b
       ])
       const wJ = await wRes.json(); if (!wRes.ok) throw new Error(wJ?.error || '워커 조회 실패')
       const eJ = await eRes.json(); if (!eRes.ok) throw new Error(eJ?.error || '직원 조회 실패')
+      const sJ = sRes.ok ? await sRes.json() : { data: [] }
       setWorkers(wJ.data); setEmployees(eJ.data)
+      setSlots(Array.isArray(sJ.data) ? sJ.data : [])
     } catch (e: any) { setError(e?.message || '오류') }
     finally { setLoading(false) }
   }
@@ -77,6 +87,21 @@ export default function WorkersTab() {
     setEditCycleOn(w.cycle_days_on != null ? String(w.cycle_days_on) : '')
     setEditCycleOff(w.cycle_days_off != null ? String(w.cycle_days_off) : '')
     setEditCycleStart(w.cycle_start_date || '')
+    // N-29-b — 개인 한계 로드
+    const wx = w as any
+    setEditMaxConsec(wx.max_consecutive_work_days != null ? String(wx.max_consecutive_work_days) : '')
+    setEditMaxDays(wx.max_days_per_month != null ? String(wx.max_days_per_month) : '')
+    setEditBlockedSlots(new Set(Array.isArray(wx.blocked_slot_ids) ? wx.blocked_slot_ids : []))
+    setEditDowPrefer(new Set(
+      typeof wx.preferred_dow_prefer === 'string'
+        ? wx.preferred_dow_prefer.split(',').map((s: string) => Number(s.trim())).filter((n: number) => !isNaN(n) && n >= 0 && n <= 6)
+        : []
+    ))
+    setEditDowAvoid(new Set(
+      typeof wx.preferred_dow_avoid === 'string'
+        ? wx.preferred_dow_avoid.split(',').map((s: string) => Number(s.trim())).filter((n: number) => !isNaN(n) && n >= 0 && n <= 6)
+        : []
+    ))
   }
   const cancelEdit = () => { setEditingId(null) }
 
@@ -95,7 +120,7 @@ export default function WorkersTab() {
         const json = await res.json()
         if (!res.ok) throw new Error(json?.error || 'RideEmployees 저장 실패')
       }
-      // 2. cs_workers (정체성 + 외부 cycle 만)
+      // 2. cs_workers (정체성 + 외부 cycle + N-29-b 개인 한계)
       const wRes = await fetch(`/api/call-scheduler/workers/${w.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', ...auth },
@@ -106,6 +131,14 @@ export default function WorkersTab() {
           cycle_days_on: editCycleOn ? Number(editCycleOn) : null,
           cycle_days_off: editCycleOff ? Number(editCycleOff) : null,
           cycle_start_date: editCycleStart || null,
+          // N-29-b — 개인 한계
+          max_consecutive_work_days: editMaxConsec ? Number(editMaxConsec) : null,
+          max_days_per_month: editMaxDays ? Number(editMaxDays) : null,
+          blocked_slot_ids: Array.from(editBlockedSlots),
+          preferred_dow_prefer: editDowPrefer.size > 0
+            ? Array.from(editDowPrefer).sort().join(',') : null,
+          preferred_dow_avoid: editDowAvoid.size > 0
+            ? Array.from(editDowAvoid).sort().join(',') : null,
         }),
       })
       const wJson = await wRes.json()
@@ -347,6 +380,15 @@ export default function WorkersTab() {
                             cycleOff={editCycleOff} setCycleOff={setEditCycleOff}
                             cycleStart={editCycleStart} setCycleStart={setEditCycleStart}
                           />
+                          {/* N-29-b — 개인 한계 (그룹 무관) */}
+                          <PersonalLimitsPanel
+                            maxConsec={editMaxConsec} setMaxConsec={setEditMaxConsec}
+                            maxDays={editMaxDays} setMaxDays={setEditMaxDays}
+                            blockedSlots={editBlockedSlots} setBlockedSlots={setEditBlockedSlots}
+                            dowPrefer={editDowPrefer} setDowPrefer={setEditDowPrefer}
+                            dowAvoid={editDowAvoid} setDowAvoid={setEditDowAvoid}
+                            slots={slots}
+                          />
                         </td>
                       </tr>
                     )}
@@ -486,5 +528,139 @@ const inputStyle: React.CSSProperties = {
   width: '100%', padding: '6px 8px', fontSize: 12,
   border: `1px solid ${COLORS.borderFaint}`, borderRadius: 6,
   background: 'rgba(255,255,255,0.6)', color: COLORS.textPrimary,
+}
+
+// N-29-b — 워커 개인 한계 패널 (그룹 무관 — 모든 그룹 합산 적용)
+function PersonalLimitsPanel({
+  maxConsec, setMaxConsec, maxDays, setMaxDays,
+  blockedSlots, setBlockedSlots,
+  dowPrefer, setDowPrefer, dowAvoid, setDowAvoid,
+  slots,
+}: {
+  maxConsec: string; setMaxConsec: (v: string) => void
+  maxDays: string; setMaxDays: (v: string) => void
+  blockedSlots: Set<string>; setBlockedSlots: (v: Set<string>) => void
+  dowPrefer: Set<number>; setDowPrefer: (v: Set<number>) => void
+  dowAvoid: Set<number>; setDowAvoid: (v: Set<number>) => void
+  slots: ShiftSlot[]
+}) {
+  const DOW_LABELS = ['일', '월', '화', '수', '목', '금', '토']
+  const toggleSlot = (id: string) => {
+    const next = new Set(blockedSlots)
+    if (next.has(id)) next.delete(id); else next.add(id)
+    setBlockedSlots(next)
+  }
+  const toggleDow = (set: Set<number>, setter: (v: Set<number>) => void, d: number) => {
+    const next = new Set(set)
+    if (next.has(d)) next.delete(d); else next.add(d)
+    setter(next)
+  }
+  return (
+    <div style={{
+      ...GLASS.L3, background: COLORS.bgGreen,
+      border: `1px solid ${COLORS.borderGreen}`,
+      borderRadius: 10, padding: 12, marginTop: 8,
+    }}>
+      <div style={{
+        fontSize: 12, fontWeight: 800, color: COLORS.success, marginBottom: 10,
+        display: 'flex', alignItems: 'center', gap: 6,
+      }}>
+        🛡️ 개인 한계 (그룹 무관 — 모든 그룹 합산 적용)
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSecondary, marginBottom: 4 }}>
+            📅 연속 근무 한도 (일) <span style={{ color: COLORS.textMuted, fontWeight: 500 }}>빈 칸 = 무제한</span>
+          </div>
+          <input type="number" min={1} max={14} value={maxConsec}
+                 onChange={(e) => setMaxConsec(e.target.value)}
+                 placeholder="예: 5"
+                 style={inputStyle} />
+        </div>
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSecondary, marginBottom: 4 }}>
+            🔴 월 최대 일수 <span style={{ color: COLORS.textMuted, fontWeight: 500 }}>빈 칸 = 무제한</span>
+          </div>
+          <input type="number" min={1} max={31} value={maxDays}
+                 onChange={(e) => setMaxDays(e.target.value)}
+                 placeholder="예: 15"
+                 style={inputStyle} />
+        </div>
+      </div>
+
+      <div style={{ marginBottom: 10 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSecondary, marginBottom: 4 }}>
+          🌟 희망 요일 <span style={{ color: COLORS.textMuted, fontWeight: 500 }}>매치 시 우선순위 ↑</span>
+        </div>
+        <div style={{ display: 'flex', gap: 4 }}>
+          {DOW_LABELS.map((label, d) => {
+            const active = dowPrefer.has(d)
+            return (
+              <button key={d} type="button"
+                      onClick={() => toggleDow(dowPrefer, setDowPrefer, d)}
+                      style={{
+                        flex: 1, padding: '4px 8px', fontSize: 11, fontWeight: 700,
+                        borderRadius: 6, cursor: 'pointer',
+                        background: active ? COLORS.bgGreen : 'transparent',
+                        color: active ? COLORS.success : COLORS.textMuted,
+                        border: `1px solid ${active ? COLORS.borderGreen : COLORS.borderFaint}`,
+                      }}>{label}</button>
+            )
+          })}
+        </div>
+      </div>
+
+      <div style={{ marginBottom: 10 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSecondary, marginBottom: 4 }}>
+          🚫 비선호 요일 <span style={{ color: COLORS.textMuted, fontWeight: 500 }}>매치 시 후순위</span>
+        </div>
+        <div style={{ display: 'flex', gap: 4 }}>
+          {DOW_LABELS.map((label, d) => {
+            const active = dowAvoid.has(d)
+            return (
+              <button key={d} type="button"
+                      onClick={() => toggleDow(dowAvoid, setDowAvoid, d)}
+                      style={{
+                        flex: 1, padding: '4px 8px', fontSize: 11, fontWeight: 700,
+                        borderRadius: 6, cursor: 'pointer',
+                        background: active ? COLORS.bgRed : 'transparent',
+                        color: active ? COLORS.danger : COLORS.textMuted,
+                        border: `1px solid ${active ? COLORS.borderRed : COLORS.borderFaint}`,
+                      }}>{label}</button>
+            )
+          })}
+        </div>
+      </div>
+
+      <div>
+        <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSecondary, marginBottom: 4 }}>
+          ⛔ 슬롯 거부 <span style={{ color: COLORS.textMuted, fontWeight: 500 }}>절대 배정 X</span>
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+          {slots.map(s => {
+            const active = blockedSlots.has(s.id)
+            return (
+              <button key={s.id} type="button"
+                      onClick={() => toggleSlot(s.id)}
+                      style={{
+                        padding: '4px 10px', fontSize: 11, fontWeight: 700,
+                        borderRadius: 99, cursor: 'pointer',
+                        background: active ? COLORS.bgRed : 'transparent',
+                        color: active ? COLORS.danger : COLORS.textSecondary,
+                        border: `1px solid ${active ? COLORS.borderRed : COLORS.borderFaint}`,
+                        whiteSpace: 'nowrap',
+                      }}>
+                {s.code} {s.start_time?.substring(0,5)}~{s.end_time?.substring(0,5)}
+              </button>
+            )
+          })}
+          {slots.length === 0 && (
+            <span style={{ fontSize: 11, color: COLORS.textMuted }}>시프트 없음</span>
+          )}
+        </div>
+      </div>
+    </div>
+  )
 }
 
