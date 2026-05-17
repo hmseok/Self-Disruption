@@ -3,6 +3,100 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-17 (Phase N-33) — 일당 1명 로테이션 끊김 후 「처음부터 시작」 fix (counter prefill)
+
+### 사용자 보고
+> "시간 로테이션 말고 일당 1명씩 로테이션 그룹이 어떤 사유에 의해 하루가 끊기면
+>  근무자가 연속적으로 이어가야 하는데 그 로테이션이 다시 처음부터 시작되는 결과가 나옵니다"
+
+스크린샷 (L13 부엉이): **윤민진 → 정동민 → (빈칸) → 윤민진** 처럼 첫 워커로 reset.
+
+### Root Cause
+- `auto-generate/route.ts` 의 priority 정렬 경로 (usePriority=true 기본)
+- `counter` Map 은 **매 자동 생성 호출 시 새로 생성** (라인 880)
+- 매월 1일 자동 생성 시 모든 워커 `total=0`, `last_date=null`
+  → 정렬 기준 4(by_dow), 5(total), 6(last_date 거리) 모두 동등
+  → JS stable sort → gMembers 의 priority 순서 그대로 → **첫 워커부터 시작**
+- 같은 달 내 skip 발생 시에도 counter 변동 없으므로 다음 날 정렬이 흔들림
+
+### 변경 (`auto-generate/route.ts`)
+- counter 생성 직후 「직전 30일 cs_assignments」 prefill 추가
+- 멱등: `WHERE work_date BETWEEN ${prefillStart} AND ${prefillEnd} AND worker_id IS NOT NULL AND special_code != 'off'`
+- ASC 정렬로 마지막 row 가 최근 → `cn.last_date = r.work_date` 자연 갱신
+- graceful try/catch — prefill 실패해도 자동 생성은 진행 (이전 동작과 동일)
+
+### 효과
+- 매월 1일 정렬 시 last_date 거리 기준이 「오래 안 일한 사람 우선」 정상 작동
+- 같은 달 내 skip 후에도 자연 이어감 — 첫 워커 reset 사라짐
+- 모든 그룹 적용 (사용자 선택 — rotation 외에 균형 분배에도 의미)
+
+### 검증
+- tsc PASS
+- 자동 생성 재실행 후 L13 부엉이 / L12 달빛 매트릭스 확인 — 워커별 균등 분배 + skip 후 이어가는지
+
+## 2026-05-17 (Phase N-32) — 그룹에 「공휴일 추가 출근」 옵션 (include_holidays_extra)
+
+### 사용자 보고
+> "그룹이 너무 많아지는데 공휴일을 추가옵션으로 해야하지않아? 기존 커스텀 요일 근무인데 거기서
+>  공휴일도 근무하는걸로 지금은 둘 중 하나만 선택이 가능해서 별도로 그룹을 또 셋팅해야 하니"
+
+### 의도
+- 「토·일 + 공휴일도 출근」 같은 케이스를 위해 별도 그룹을 만들지 않아도 되게
+- 한 그룹에서 「패턴 요일 + 공휴일 추가」 동시 처리
+
+### 데이터 모델
+- 마이그: `migrations/2026-05-17_cs_shift_groups_include_holidays.sql`
+- 컬럼: `cs_shift_groups.include_holidays_extra TINYINT(1) DEFAULT 0`
+- 멱등 (information_schema 체크 + PREPARE/EXECUTE)
+
+### 동작 매트릭스
+| pattern | skip_on_holidays | include_holidays_extra | 결과 |
+|---------|------------------|----------------------|------|
+| 평일만 | 1 | 0 | 평일만 (공휴일 빠짐) |
+| 평일만 | 0 | 0 | 평일 (휴일은 패턴 매칭 X) |
+| 평일만 | 0 | **1** | **평일 + 모든 공휴일** |
+| 커스텀(토·일) | 0 | **1** | **토·일 + 모든 공휴일** |
+| 커스텀(토·일) | 1 | 0 | 토·일 (공휴일 빠짐) |
+
+- skip_on_holidays 와 include_holidays_extra 는 **상호배반** — UI 에서 한 쪽 ON 이면 다른 쪽 OFF
+- 데이터 차원에서도 안전 처리: skip 가드는 `&& !include` 조건 추가
+
+### 변경
+1. **API** (`shift-groups/route.ts`, `shift-groups/[id]/route.ts`)
+   - GET: 컬럼 graceful 감지 + 응답에 include_holidays_extra 포함
+   - POST: body 수용 (`include_holidays_extra: number`)
+   - PATCH: ALLOWED_COLS 확장 + boolean → 0/1 변환
+2. **UI** (`GroupEditor.tsx`)
+   - state: `includeHolidaysExtra` 추가
+   - 로드: `Boolean(group.include_holidays_extra)`
+   - 저장: payload 에 `include_holidays_extra: 0|1` 추가
+   - 「휴일 처리」 Field 아래에 「공휴일 추가 출근」 Field 신설 (녹색 토글)
+   - 상호배반 — skip 켜면 include 자동 해제 + disable 표시
+3. **알고리즘** (`auto-generate/route.ts`)
+   - GroupRow type 에 `include_holidays_extra?: number | boolean` 추가
+   - graceful 컬럼 감지: `hasGroupIncludeHolidaysExtra`
+   - 그룹 fetch 시 컬럼 별도 조회 + g 에 주입
+   - 비-`holidays_only` 그룹 처리:
+     ```ts
+     const dowMatch = patternDays(...).has(dow)
+     const holidayMatch = includeHolidaysExtra && isHoliday
+     if (!dowMatch && !holidayMatch) continue
+     // skip 가드: && !includeHolidaysExtra
+     ```
+
+### 운영 예시
+- 「주말+공휴일 근무조」 그룹 1개:
+  · pattern_type='custom', custom_days='0,6' (토·일)
+  · skip_on_holidays=0, include_holidays_extra=**1**
+  · 결과: 토·일 출근 + 모든 공휴일 추가 출근
+- 별도 「공휴일 전담」 그룹 불필요 — 그룹 개수 감소
+
+### 검증
+- tsc 영향: `auto-generate/route.ts`, `shift-groups/route.ts`, `shift-groups/[id]/route.ts`, `GroupEditor.tsx`
+- 마이그 적용 후: `SELECT include_holidays_extra FROM cs_shift_groups WHERE name LIKE '%주말%';`
+- 사용 시나리오 1: 주말 그룹 → include=1 토글 → 6/6 (현충일) 출근 확인
+- 사용 시나리오 2: 평일 그룹 + skip=1 → include 자동 disable → 6/3 (지방선거) 빠짐 확인
+
 ## 2026-05-17 (Phase N-31) — 휴일 가드 강화 (skip_on_holidays=1 이면 무조건 skip)
 
 ### 사용자 보고

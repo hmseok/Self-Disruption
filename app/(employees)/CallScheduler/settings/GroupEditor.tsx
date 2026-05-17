@@ -77,6 +77,10 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
   const [category, setCategory] = useState('general')
   // N-16 — 휴일(cs_holidays) 자동 제외 (주중 그룹은 true, 야간/24-365 그룹은 false)
   const [skipOnHolidays, setSkipOnHolidays] = useState(false)
+  // N-32 — 공휴일 추가 출근 (패턴 매칭 X 라도 휴일이면 추가 매칭)
+  //  · 예: pattern='custom' (토일만) + includeHolidaysExtra=true → 토·일 + 공휴일도 출근
+  //  · 별도 그룹 만들 필요 X — 한 그룹에서 평소 요일 + 휴일 동시 처리
+  const [includeHolidaysExtra, setIncludeHolidaysExtra] = useState(false)
   // N-19-a — 시프트 로테이션 (그룹 1개에 시프트 여러 개 sequence + 워커별 시작 시점)
   const [rotationEnabled, setRotationEnabled] = useState(false)
   // N-23 — rotation ON 시 단일 slotId 를 sequence[0] 로 자동 동기화
@@ -166,6 +170,7 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
         setDescription(group.description || '')
         setCategory(group.category || 'general')
         setSkipOnHolidays(Boolean(group.skip_on_holidays))  // N-16
+        setIncludeHolidaysExtra(Boolean(group.include_holidays_extra))  // N-32
         // N-19-a — 로테이션 설정 + 시프트 sequence 로드
         setRotationEnabled(Boolean(group.rotation_enabled))
         setRotationPeriodKind((group.rotation_period_kind || 'monthly') as 'monthly' | 'days')
@@ -425,6 +430,7 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
         color_tone: colorTone,
         description: description.trim() || null,
         skip_on_holidays: skipOnHolidays ? 1 : 0,  // N-16
+        include_holidays_extra: includeHolidaysExtra ? 1 : 0,  // N-32
         // N-19-a — 시프트 로테이션
         rotation_enabled: rotationEnabled ? 1 : 0,
         rotation_period_kind: rotationPeriodKind,
@@ -782,7 +788,11 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
             }}>
               <input type="checkbox"
                      checked={skipOnHolidays}
-                     onChange={(e) => setSkipOnHolidays(e.target.checked)}
+                     onChange={(e) => {
+                       const v = e.target.checked
+                       setSkipOnHolidays(v)
+                       if (v) setIncludeHolidaysExtra(false)  // 상호배반 — skip ON 이면 include OFF
+                     }}
                      style={{ width: 16, height: 16, cursor: 'pointer' }} />
               <span style={{ fontSize: 12, fontWeight: 600,
                              color: skipOnHolidays ? COLORS.info : COLORS.textPrimary }}>
@@ -790,6 +800,36 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
               </span>
               <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 'auto' }}>
                 {skipOnHolidays ? '주중 근무 그룹' : '휴일에도 정상 배정 (24/365)'}
+              </span>
+            </label>
+          </Field>
+
+          {/* N-32 — 공휴일 추가 출근 (skip 과 상호배반) */}
+          <Field label="공휴일 추가 출근"
+                 sub="패턴 매칭 X 라도 공휴일이면 추가 출근 — 「토·일 + 공휴일」 같은 케이스를 별도 그룹 없이 처리">
+            <label style={{
+              display: 'flex', alignItems: 'center', gap: 10,
+              padding: '10px 12px', borderRadius: 10,
+              background: includeHolidaysExtra ? 'rgba(34,197,94,0.10)' : 'rgba(0,0,0,0.03)',
+              border: `1px solid ${includeHolidaysExtra ? 'rgba(34,197,94,0.40)' : COLORS.borderFaint}`,
+              cursor: skipOnHolidays ? 'not-allowed' : 'pointer',
+              opacity: skipOnHolidays ? 0.5 : 1,
+            }}>
+              <input type="checkbox"
+                     checked={includeHolidaysExtra}
+                     disabled={skipOnHolidays}
+                     onChange={(e) => setIncludeHolidaysExtra(e.target.checked)}
+                     style={{ width: 16, height: 16, cursor: skipOnHolidays ? 'not-allowed' : 'pointer' }} />
+              <span style={{ fontSize: 12, fontWeight: 600,
+                             color: includeHolidaysExtra ? '#16a34a' : COLORS.textPrimary }}>
+                🎉 공휴일에도 추가로 출근
+              </span>
+              <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 'auto' }}>
+                {skipOnHolidays
+                  ? '⚠ 휴일 제외 ON 상태'
+                  : includeHolidaysExtra
+                  ? '패턴 요일 + 모든 공휴일 출근'
+                  : '패턴 요일만 출근 (휴일 무관)'}
               </span>
             </label>
           </Field>

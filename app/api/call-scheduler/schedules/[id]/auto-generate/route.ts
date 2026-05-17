@@ -58,6 +58,8 @@ interface GroupRow {
   slot_night_premium_rate?: number
   // N-16 — 그룹별 휴일 자동 제외 (graceful)
   skip_on_holidays?: number | boolean
+  // N-32 — 공휴일 추가 출근 (패턴 매칭 X 라도 휴일이면 추가 매칭) (graceful)
+  include_holidays_extra?: number | boolean
 }
 interface MemberRow {
   group_id: string
@@ -310,6 +312,11 @@ export async function POST(
     try {
       await prisma.$queryRaw<any[]>`SELECT skip_on_holidays FROM cs_shift_groups LIMIT 1`
     } catch { hasGroupSkipOnHolidays = false }
+    // N-32 — include_holidays_extra 컬럼 graceful
+    let hasGroupIncludeHolidaysExtra = true
+    try {
+      await prisma.$queryRaw<any[]>`SELECT include_holidays_extra FROM cs_shift_groups LIMIT 1`
+    } catch { hasGroupIncludeHolidaysExtra = false }
     try {
       await prisma.$queryRaw<any[]>`SELECT rotation_enabled FROM cs_shift_groups LIMIT 1`
     } catch { hasGroupRotation = false }
@@ -384,6 +391,20 @@ export async function POST(
     // 각 그룹 row 에 skip_on_holidays 주입
     for (const g of targetGroups) {
       g.skip_on_holidays = groupSkipHolidaysMap.get(g.id) ? 1 : 0
+    }
+
+    // N-32 — 그룹별 include_holidays_extra 별도 조회 (graceful)
+    const groupIncludeHolidaysMap = new Map<string, boolean>()
+    if (hasGroupIncludeHolidaysExtra && targetGroups.length > 0) {
+      try {
+        const ihRows = await prisma.$queryRaw<any[]>`
+          SELECT id, include_holidays_extra FROM cs_shift_groups WHERE is_active = 1
+        `
+        for (const r of ihRows) groupIncludeHolidaysMap.set(r.id, Boolean(r.include_holidays_extra))
+      } catch { /* graceful */ }
+    }
+    for (const g of targetGroups) {
+      g.include_holidays_extra = groupIncludeHolidaysMap.get(g.id) ? 1 : 0
     }
 
     // N-19-b — 그룹 rotation 설정 별도 조회 (graceful)
@@ -865,6 +886,57 @@ export async function POST(
       if (!counter.has(wId)) counter.set(wId, { total: 0, by_dow: [0,0,0,0,0,0,0], last_date: null })
       return counter.get(wId)!
     }
+
+    // ── N-33 — counter prefill (직전 30일 cs_assignments 누적) ──────
+    //  사용자 보고: "일당 1명 로테이션 그룹이 어떤 사유에 의해 하루가 끊기면
+    //              근무자가 연속적으로 이어가야 하는데 로테이션이 다시 처음부터 시작"
+    //
+    //  원인: counter Map 이 매 자동 생성마다 새로 생성 → 매월 1일에 모두 total=0,
+    //        last_date=null → JS stable sort → gMembers 의 priority 순서 그대로
+    //        → 첫 워커부터 다시 시작
+    //
+    //  해결: 자동 생성 시작 직전에 직전 30일 cs_assignments 조회하여 counter prefill
+    //        → last_date 거리 기준이 "오래 안 일한 사람 우선" 정상 작동
+    //        → 같은 달 내 skip 후에도 자연 이어감
+    try {
+      const prefillEndDate = (() => {
+        const d = new Date(`${monthStart}T00:00:00`)
+        d.setDate(d.getDate() - 1)  // monthStart 의 전날
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+      })()
+      const prefillStartDate = (() => {
+        const d = new Date(`${prefillEndDate}T00:00:00`)
+        d.setDate(d.getDate() - 29)  // 30일 window (양 끝 포함)
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+      })()
+      const prefillRows = await prisma.$queryRaw<Array<{
+        worker_id: string
+        work_date: string
+        special_code: string | null
+      }>>`
+        SELECT worker_id,
+               DATE_FORMAT(work_date, '%Y-%m-%d') AS work_date,
+               special_code
+        FROM cs_assignments
+        WHERE work_date BETWEEN ${prefillStartDate} AND ${prefillEndDate}
+          AND worker_id IS NOT NULL
+          AND (special_code IS NULL OR special_code != 'off')
+        ORDER BY worker_id, work_date ASC
+      `
+      for (const r of prefillRows) {
+        const cn = ensureCounter(r.worker_id)
+        cn.total++
+        const d = new Date(r.work_date + 'T00:00:00')
+        const dowN = d.getDay()
+        cn.by_dow[dowN]++
+        // ASC 정렬이라 마지막 r.work_date 가 가장 최근
+        if (!cn.last_date || cn.last_date < r.work_date) cn.last_date = r.work_date
+      }
+    } catch (e) {
+      // graceful — prefill 실패해도 자동 생성은 진행 (counter 가 빈 상태로 시작)
+      console.warn('[N-33] counter prefill failed:', (e as any)?.message || e)
+    }
+
     // PR-2SS-b — 워커별 마지막 슬롯 종료 시각 추적 (익일 휴식 검사용)
     //   endMin: 자정 기준 분 단위 (overnight 슬롯이면 +24*60)
     //   endIsoDate: 슬롯이 끝난 날짜 (overnight 면 다음 날, 아니면 같은 날)
@@ -922,17 +994,27 @@ export async function POST(
           // 휴일이면 통과 (dow 무관) — skip_on_holidays 가드도 무시 (self-conflict)
         } else {
           const dowSet = patternDays(g.pattern_type, g.custom_days)
-          if (!dowSet.has(dow)) continue
+          const dowMatch = dowSet.has(dow)
+          // N-32 — 패턴 매칭 X 라도 공휴일이면 추가 출근 (include_holidays_extra)
+          const isHoliday = holidayDates.has(isoDate)
+          const includeHolidaysExtra = hasGroupIncludeHolidaysExtra
+            ? Boolean(g.include_holidays_extra)
+            : false
+          const holidayMatch = includeHolidaysExtra && isHoliday
+          if (!dowMatch && !holidayMatch) continue
 
           // N-31 — 휴일 가드 강화:
           //   그룹.skip_on_holidays=1 → 다이얼로그 옵션과 무관하게 무조건 skip (그룹 셋팅 우선)
           //   그룹.skip_on_holidays=0 + 다이얼로그 ON (skipHolidays=true) → 전역 강제 skip
           //   그룹.skip_on_holidays=0 + 다이얼로그 OFF → 휴일 출근 (24/365 운영)
+          //
+          // N-32 추가:
+          //   include_holidays_extra=1 이면 휴일이 「추가 매칭」 사유 → skip 가드 우회
+          //   (skip 과 include 는 상호배반 — UI 에서 보장하지만 데이터 차원에서 안전 처리)
           const groupSkipsHoliday = hasGroupSkipOnHolidays
             ? Boolean(g.skip_on_holidays)
             : false
-          const isHoliday = holidayDates.has(isoDate)
-          const shouldSkipForHoliday = isHoliday && (groupSkipsHoliday || skipHolidays)
+          const shouldSkipForHoliday = isHoliday && (groupSkipsHoliday || skipHolidays) && !includeHolidaysExtra
           if (shouldSkipForHoliday) {
             plan.push({
               work_date: isoDate, shift_slot_id: g.shift_slot_id, worker_id: null,

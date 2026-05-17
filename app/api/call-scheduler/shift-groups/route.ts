@@ -37,6 +37,11 @@ export async function GET(request: NextRequest) {
     try {
       await prisma.$queryRaw<any[]>`SELECT skip_on_holidays FROM cs_shift_groups LIMIT 1`
     } catch { hasSkipOnHolidays = false }
+    // N-32 — include_holidays_extra 컬럼 graceful (공휴일 추가 출근)
+    let hasIncludeHolidaysExtra = true
+    try {
+      await prisma.$queryRaw<any[]>`SELECT include_holidays_extra FROM cs_shift_groups LIMIT 1`
+    } catch { hasIncludeHolidaysExtra = false }
     // N-19-a — rotation 컬럼 + cs_group_shifts 테이블 graceful
     let hasRotation = true
     try {
@@ -82,6 +87,16 @@ export async function GET(request: NextRequest) {
         SELECT id, skip_on_holidays FROM cs_shift_groups WHERE is_active = 1
       `
       for (const r of shRows) skipHolidaysMap.set(r.id, Boolean(r.skip_on_holidays))
+    }
+    // N-32 — include_holidays_extra 별도 조회 (graceful)
+    const includeHolidaysMap = new Map<string, boolean>()
+    if (hasIncludeHolidaysExtra && rows.length > 0) {
+      try {
+        const ihRows = await prisma.$queryRaw<any[]>`
+          SELECT id, include_holidays_extra FROM cs_shift_groups WHERE is_active = 1
+        `
+        for (const r of ihRows) includeHolidaysMap.set(r.id, Boolean(r.include_holidays_extra))
+      } catch { /* graceful */ }
     }
     // N-19-a — rotation 설정 별도 조회 (graceful)
     const rotationMap = new Map<string, {
@@ -226,6 +241,7 @@ export async function GET(request: NextRequest) {
         ...r,
         category: catMap.get(r.id) || CATEGORIES_FALLBACK,
         skip_on_holidays: skipHolidaysMap.get(r.id) || false,  // N-16
+        include_holidays_extra: includeHolidaysMap.get(r.id) || false,  // N-32
         is_active: Boolean(r.is_active),
         is_overnight: Boolean(r.is_overnight),
         rotation_size: r.rotation_size != null ? Number(r.rotation_size) : null,
@@ -265,6 +281,7 @@ export async function POST(request: NextRequest) {
     const description: string | null = body?.description ?? null
     const sort_order: number = Number(body?.sort_order) || 0
     const skip_on_holidays: number = body?.skip_on_holidays ? 1 : 0  // N-16
+    const include_holidays_extra: number = body?.include_holidays_extra ? 1 : 0  // N-32
 
     // category 컬럼 존재 여부 (graceful)
     let hasCategory = true
@@ -278,9 +295,27 @@ export async function POST(request: NextRequest) {
     try {
       await prisma.$queryRaw<any[]>`SELECT skip_on_holidays FROM cs_shift_groups LIMIT 1`
     } catch { hasSkipOnHolidays = false }
+    // N-32 — include_holidays_extra 컬럼 존재 여부 (graceful)
+    let hasIncludeHolidaysExtra = true
+    try {
+      await prisma.$queryRaw<any[]>`SELECT include_holidays_extra FROM cs_shift_groups LIMIT 1`
+    } catch { hasIncludeHolidaysExtra = false }
 
     const id = crypto.randomUUID()
-    if (hasCategory && hasSkipOnHolidays) {
+    if (hasCategory && hasSkipOnHolidays && hasIncludeHolidaysExtra) {
+      await prisma.$executeRaw`
+        INSERT INTO cs_shift_groups
+          (id, name, category, shift_slot_id, pattern_type, custom_days,
+           generation_strategy, rotation_size, rotation_period_days,
+           color_tone, description, sort_order, skip_on_holidays, include_holidays_extra,
+           is_active, created_at, updated_at)
+        VALUES
+          (${id}, ${name}, ${category}, ${shift_slot_id}, ${pattern_type}, ${custom_days},
+           ${generation_strategy}, ${rotation_size}, ${rotation_period_days},
+           ${color_tone}, ${description}, ${sort_order}, ${skip_on_holidays}, ${include_holidays_extra},
+           1, NOW(), NOW())
+      `
+    } else if (hasCategory && hasSkipOnHolidays) {
       await prisma.$executeRaw`
         INSERT INTO cs_shift_groups
           (id, name, category, shift_slot_id, pattern_type, custom_days,
