@@ -6,6 +6,79 @@
 
 ## 2026-05-13
 
+### PR-MTG-V2-Visibility — 회의별 공개 범위 + 공동 편집자
+
+**사용자 명령**:
+> 「인사마스터에 페이지 읽고 쓰고 수정 삭제 권한과 전체인지 부서만인지의 설정이 있는데 그걸다 열어줬고... 일단 외부매니저한테도 다공개되는것 보니 인사마스터 기준으로 그냥 다열리는것같아 추가적인 회의록 특성에 맞는 별도 권한관리가 있어야 되지않을까」
+> → 「B 메인 (회의록 안 통합) + C 일부 (admin/master 자동)」 추천대로 가시죠
+
+**3 commit 분리**:
+- 31d6d91 [공통/DB] migrations/2026-05-16_meetings_visibility.sql
+- 13c6c98 [API] route.ts visibility 필터 + meeting_editors CRUD
+- 본 commit [UI] MeetingHeaderBar visibility select + MeetingPermissionsPanel + 「🔒 권한」 탭
+
+**Visibility 4종 (meetings.visibility)**:
+| 값 | 의미 | 조회 가능 |
+|----|------|---------|
+| `public` 🌐 | 전사 공개 | 모든 인증 직원 (외부매니저 포함) |
+| `department` 🏢 | 부서 공개 | 회의 부서 === ride_employees.department 인 사람 |
+| `attendees` 🔒 | 참석자만 (DEFAULT) | meeting_attendees + organizer + created_by |
+| `private` 🔐 | 비공개 | organizer + created_by + meeting_editors |
+
+**API 권한 매트릭스**:
+- 조회: admin/master (모두) + visibility 별 필터
+- 편집: admin/master + organizer + created_by + meeting_editors.role='editor' + can_edit_perm
+- 편집자 관리 (POST/DELETE editors): organizer/created_by/admin/master 만
+
+**신규 API**: `/api/meetings/[id]/editors` GET / POST / DELETE
+- POST `{ profile_id, role? }` → INSERT ON DUPLICATE KEY UPDATE
+- profile_id 필수 — 인증 계정 없는 직원 (ride_employees.profile_id=null) 은 편집자 지정 불가
+
+**신규 컴포넌트**: `MeetingPermissionsPanel.tsx`
+- 「🔒 공개 범위」 4 radio + 각 옵션 상세 설명 (외부 노출 위험 등)
+- 「👤 공동 편집자/조회자」 직원 추가 select (role: editor / viewer)
+- 마이그 미적용 시 amber 배너 + 기능 차단
+
+**MeetingHeaderBar 통합**:
+- 메타 라인에 「🔒 공개 범위」 inline select (4 옵션, 헤더에서 빠른 변경)
+- read-only 모드: 태그 표시 (🌐 전사 / 🏢 부서 / 🔒 참석자만 / 🔐 비공개)
+
+**MeetingsLayoutV2 통합**:
+- meta.visibility 로드/저장 (default 'attendees')
+- Tab type 'permissions' 추가
+- 「🔒 권한」 탭 → MeetingPermissionsPanel 마운트 (canManage=canEdit)
+
+**Rule 8 End-to-End 시뮬레이션**:
+- 사용자 회의 페이지 진입 → meta.visibility 로드
+- 헤더 또는 권한 탭에서 visibility 변경 → onMetaChange → PATCH meetings (visibility allowed)
+- 「공동 편집자 추가」 → POST editors → 다음 GET 목록부터 그 사용자도 조회 가능
+- 외부매니저 사용자 진입 시: visibility=attendees 인 회의는 안 보임 (meeting_attendees 에 없으면)
+
+**Rule 11 SQL 사전 검증** ✓:
+- meetings.visibility (본 PR 마이그)
+- meeting_editors.id/meeting_id/profile_id/role/added_by/added_at (본 PR 마이그)
+- ride_employees.profile_id/department/is_active (기존)
+- meeting_attendees.profile_id (기존)
+
+**Rule 14 동형 패턴 ✓**:
+- AttendeeManager / ActionItemList / MentionEmployee / MeetingPermissionsPanel 모두 ride_employees 기반 + profile_id 분기 (외부 fallback)
+
+**Rule 21**: 3 commit 분리 (공통/DB + api:meetings + meetings)
+**Rule 22**: 본 CHANGELOG ✓
+**Rule 23**: graceful fallback
+- meeting_editors 테이블 미적용 시 → editors 패널에 배너
+- meetings.visibility 컬럼 미적용 시 → 1054 발생 (사용자 마이그 적용 권장 — 현재 명시 fallback 없음)
+
+**GATE 진행 상태**:
+- G3 사용자 GO ✓
+- G5 tsc PASS / G6 lint:harness 새 위반 0건
+- G7 Designer — 사용자 검수 (공개 범위 4 옵션 / 편집자 추가 동작 / 외부매니저 안 보이는지)
+
+**후속 PR (HR 세션 협업)**:
+- ride_departments.leader_employee_id 완성 후 부서장 자동 편집 권한 추가 (V2-Visibility-FK)
+
+---
+
 ### PR-MTG-V2-Note — 개인 메모 (회의별, 본인만)
 
 **사용자 명령**: 「여기 회의록 안에 메모라던가 to do 같은것도 구성하면 좀 도움되지않을까?」 → 「개인 메모 + 내 TODO 대시보드」 둘 다 선택 (2 + 4) → 「ㄱㄱ」

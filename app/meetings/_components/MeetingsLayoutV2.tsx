@@ -11,6 +11,7 @@ import AutoSaveIndicator, { type SaveStatus } from './AutoSaveIndicator'
 import AttendeeManager from './AttendeeManager'
 import ActionItemList from './ActionItemList'
 import PersonalNoteEditor from './PersonalNoteEditor'
+import MeetingPermissionsPanel from './MeetingPermissionsPanel'
 import { v1ToV2Body, appendV1ToBody } from './v1ToV2Body'
 
 // ═══════════════════════════════════════════════════════════════
@@ -22,7 +23,7 @@ import { v1ToV2Body, appendV1ToBody } from './v1ToV2Body'
 
 interface Props {
   meetingId: string         // 필수 — /meetings/new 는 POST 후 [id] 로 redirect
-  initialTab?: 'body' | 'attendees' | 'actions' | 'note' | 'legacy'
+  initialTab?: 'body' | 'attendees' | 'actions' | 'note' | 'permissions' | 'legacy'
 }
 
 interface CurrentUser {
@@ -31,13 +32,14 @@ interface CurrentUser {
   [k: string]: any
 }
 
-type Tab = 'body' | 'attendees' | 'actions' | 'note' | 'legacy'
+type Tab = 'body' | 'attendees' | 'actions' | 'note' | 'permissions' | 'legacy'
 
 const EMPTY_META: MeetingMeta = {
   title: '', type: 'specific',
   meeting_date: new Date().toISOString().slice(0, 16),
   duration_min: 60, location: '',
   organizer_id: null, department: '', status: 'draft',
+  visibility: 'attendees',
 }
 
 export default function MeetingsLayoutV2({ meetingId, initialTab = 'body' }: Props) {
@@ -104,6 +106,7 @@ export default function MeetingsLayoutV2({ meetingId, initialTab = 'body' }: Pro
         organizer_id: m.organizer_id || null,
         department: m.department || '',
         status: m.status || 'draft',
+        visibility: m.visibility || 'attendees',
       })
       setCreatedBy(m.created_by || null)
       setAttendees(json.data.attendees || [])
@@ -511,6 +514,7 @@ export default function MeetingsLayoutV2({ meetingId, initialTab = 'body' }: Pro
           <TabBtn label={`👥 참석자 ${attendees.length}`} active={activeTab === 'attendees'} onClick={() => setActiveTab('attendees')} />
           <TabBtn label={`✓ 액션 ${actionItems.length}`}  active={activeTab === 'actions'}   onClick={() => setActiveTab('actions')} />
           <TabBtn label="📓 내 메모"     active={activeTab === 'note'}     onClick={() => setActiveTab('note')} />
+          <TabBtn label="🔒 권한"        active={activeTab === 'permissions'} onClick={() => setActiveTab('permissions')} />
           {hasLegacy && (
             <TabBtn label="📎 V1 섹션 (legacy)" active={activeTab === 'legacy'} onClick={() => setActiveTab('legacy')} />
           )}
@@ -569,6 +573,16 @@ export default function MeetingsLayoutV2({ meetingId, initialTab = 'body' }: Pro
               editable={!noteMigrationPending}
             />
           </div>
+        )}
+
+        {activeTab === 'permissions' && (
+          <MeetingPermissionsPanel
+            meetingId={meetingId}
+            meta={meta}
+            onVisibilityChange={(v) => onMetaChange({ visibility: v })}
+            employees={employees}
+            canManage={canEdit}
+          />
         )}
 
         {activeTab === 'legacy' && hasLegacy && (

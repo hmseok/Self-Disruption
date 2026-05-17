@@ -31,6 +31,7 @@ export interface MeetingMeta {
   organizer_id: string | null
   department: string | null
   status: string                        // draft | published | archived
+  visibility?: string                   // public | department | attendees | private (PR-V2-Visibility)
 }
 
 interface EmployeeOption {
@@ -242,6 +243,25 @@ export default function MeetingHeaderBar({ meta, onMetaChange, trailing, editabl
         ) : meta.organizer_id ? (
           <span style={inlineTag}>
             👤 {employees.find(e => e.profile_id === meta.organizer_id)?.name || '주관자'}
+          </span>
+        ) : null}
+
+        {/* 공개 범위 (visibility) — PR-V2-Visibility */}
+        {editable ? (
+          <select value={meta.visibility || 'attendees'}
+            onChange={(e) => onMetaChange({ visibility: e.target.value })}
+            title="회의록 공개 범위 — 참석자만 / 부서원 / 전사 / 비공개"
+            style={inlineSelect}>
+            <option value="attendees">🔒 참석자만 (기본)</option>
+            <option value="department">🏢 부서 공개</option>
+            <option value="public">🌐 전사 공개</option>
+            <option value="private">🔐 비공개 (편집자만)</option>
+          </select>
+        ) : meta.visibility ? (
+          <span style={inlineTag}>
+            {meta.visibility === 'public' ? '🌐 전사' :
+              meta.visibility === 'department' ? '🏢 부서' :
+              meta.visibility === 'private' ? '🔐 비공개' : '🔒 참석자만'}
           </span>
         ) : null}
 
