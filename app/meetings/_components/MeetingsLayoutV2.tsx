@@ -10,6 +10,7 @@ import TiptapEditor from './TiptapEditor'
 import AutoSaveIndicator, { type SaveStatus } from './AutoSaveIndicator'
 import AttendeeManager from './AttendeeManager'
 import ActionItemList from './ActionItemList'
+import PersonalNoteEditor from './PersonalNoteEditor'
 import { v1ToV2Body, appendV1ToBody } from './v1ToV2Body'
 
 // ═══════════════════════════════════════════════════════════════
@@ -21,7 +22,7 @@ import { v1ToV2Body, appendV1ToBody } from './v1ToV2Body'
 
 interface Props {
   meetingId: string         // 필수 — /meetings/new 는 POST 후 [id] 로 redirect
-  initialTab?: 'body' | 'attendees' | 'actions' | 'legacy'
+  initialTab?: 'body' | 'attendees' | 'actions' | 'note' | 'legacy'
 }
 
 interface CurrentUser {
@@ -30,7 +31,7 @@ interface CurrentUser {
   [k: string]: any
 }
 
-type Tab = 'body' | 'attendees' | 'actions' | 'legacy'
+type Tab = 'body' | 'attendees' | 'actions' | 'note' | 'legacy'
 
 const EMPTY_META: MeetingMeta = {
   title: '', type: 'specific',
@@ -255,6 +256,80 @@ export default function MeetingsLayoutV2({ meetingId, initialTab = 'body' }: Pro
     childTimerRef.current = setTimeout(() => { void saveChildren(attendees, next) }, 1000)
   }, [attendees, saveChildren])
 
+  // ── 개인 메모 (PR-MTG-V2-Note) ───────────────────────────────
+  const [noteBody, setNoteBody] = useState<JSONContent | null>(null)
+  const [noteMigrationPending, setNoteMigrationPending] = useState(false)
+  const [noteSaveStatus, setNoteSaveStatus] = useState<SaveStatus>('idle')
+  const [noteLastSavedAt, setNoteLastSavedAt] = useState<Date | null>(null)
+  const [noteError, setNoteError] = useState<string | undefined>(undefined)
+  const noteTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const pendingNoteRef = useRef<{ body: JSONContent; text: string } | null>(null)
+
+  const loadNote = useCallback(async () => {
+    try {
+      const { json } = await fetchWithAuth(`/api/meetings/${meetingId}/personal-note`)
+      if (json?._migration_pending) {
+        setNoteMigrationPending(true)
+        setNoteBody(null)
+        setNoteSaveStatus('migration')
+        return
+      }
+      if (json?.data) {
+        setNoteBody(json.data.body || null)
+        setNoteLastSavedAt(json.data.updated_at ? new Date(json.data.updated_at) : null)
+        setNoteSaveStatus('idle')
+        setNoteMigrationPending(false)
+      }
+    } catch (e) {
+      console.warn('[loadNote]', e)
+    }
+  }, [meetingId])
+  useEffect(() => { void loadNote() }, [loadNote])
+
+  const flushNote = useCallback(async () => {
+    if (noteMigrationPending) return
+    const pending = pendingNoteRef.current
+    if (!pending) return
+    pendingNoteRef.current = null
+    setNoteSaveStatus('saving')
+    try {
+      const { ok, json, status } = await fetchWithAuth(`/api/meetings/${meetingId}/personal-note`, {
+        method: 'PUT',
+        body: { body: pending.body, body_text: pending.text },
+      })
+      if (ok) {
+        setNoteLastSavedAt(new Date())
+        setNoteSaveStatus('saved')
+        setNoteError(undefined)
+      } else if (status === 503 && json?._migration_pending) {
+        setNoteMigrationPending(true)
+        setNoteSaveStatus('migration')
+      } else {
+        setNoteSaveStatus('error')
+        setNoteError(json?.error || '저장 실패')
+      }
+    } catch (e: any) {
+      setNoteSaveStatus('error')
+      setNoteError(e?.message || '네트워크 오류')
+    }
+  }, [meetingId, noteMigrationPending])
+
+  const onNoteChange = useCallback((json: JSONContent, text: string) => {
+    pendingNoteRef.current = { body: json, text }
+    setNoteBody(json)
+    setNoteSaveStatus('pending')
+    if (noteTimerRef.current) clearTimeout(noteTimerRef.current)
+    noteTimerRef.current = setTimeout(() => { void flushNote() }, 1500)
+  }, [flushNote])
+
+  useEffect(() => {
+    return () => {
+      if (noteTimerRef.current) clearTimeout(noteTimerRef.current)
+      if (pendingNoteRef.current) { void flushNote() }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   // ── V1 → V2 본문 변환 (PR-MTG-V2-F) ─────────────────────────
   const [convertingV1, setConvertingV1] = useState(false)
   const onConvertV1 = useCallback(async () => {
@@ -435,6 +510,7 @@ export default function MeetingsLayoutV2({ meetingId, initialTab = 'body' }: Pro
           <TabBtn label="📝 본문"        active={activeTab === 'body'} onClick={() => setActiveTab('body')} />
           <TabBtn label={`👥 참석자 ${attendees.length}`} active={activeTab === 'attendees'} onClick={() => setActiveTab('attendees')} />
           <TabBtn label={`✓ 액션 ${actionItems.length}`}  active={activeTab === 'actions'}   onClick={() => setActiveTab('actions')} />
+          <TabBtn label="📓 내 메모"     active={activeTab === 'note'}     onClick={() => setActiveTab('note')} />
           {hasLegacy && (
             <TabBtn label="📎 V1 섹션 (legacy)" active={activeTab === 'legacy'} onClick={() => setActiveTab('legacy')} />
           )}
@@ -467,6 +543,32 @@ export default function MeetingsLayoutV2({ meetingId, initialTab = 'body' }: Pro
             employees={employees}
             editable={canEdit}
           />
+        )}
+
+        {activeTab === 'note' && (
+          <div>
+            {noteMigrationPending && (
+              <div style={{
+                ...GLASS.L3, border: '1px solid rgba(239,68,68,0.4)',
+                borderRadius: 10, padding: '10px 14px', marginBottom: 10,
+                color: '#b91c1c', fontSize: 12, fontWeight: 600,
+              }}>
+                ⚠ DB 마이그 미적용 — 개인 메모 저장 불가. 관리자에게 <code style={{ background: 'rgba(0,0,0,0.06)', padding: '1px 6px', borderRadius: 4 }}>migrations/2026-05-16_meeting_personal_notes.sql</code> 적용 요청.
+              </div>
+            )}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 6 }}>
+              <AutoSaveIndicator
+                status={noteSaveStatus}
+                lastSavedAt={noteLastSavedAt}
+                message={noteError}
+              />
+            </div>
+            <PersonalNoteEditor
+              value={noteBody}
+              onChange={onNoteChange}
+              editable={!noteMigrationPending}
+            />
+          </div>
         )}
 
         {activeTab === 'legacy' && hasLegacy && (

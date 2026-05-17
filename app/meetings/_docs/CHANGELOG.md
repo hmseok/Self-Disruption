@@ -6,6 +6,38 @@
 
 ## 2026-05-13
 
+### PR-MTG-V2-Note — 개인 메모 (회의별, 본인만)
+
+**사용자 명령**: 「여기 회의록 안에 메모라던가 to do 같은것도 구성하면 좀 도움되지않을까?」 → 「개인 메모 + 내 TODO 대시보드」 둘 다 선택 (2 + 4) → 「ㄱㄱ」
+
+**4 commit 분리 진행**:
+- 30f99d6 [공통/DB] migrations/2026-05-16_meeting_personal_notes.sql
+- cb7166e [API] /api/meetings/[id]/personal-note GET/PUT
+- 79693bf [UI 컴포넌트] PersonalNoteEditor.tsx (TipTap 간소화)
+- 본 commit [UI 통합] MeetingsLayoutV2 「📓 내 메모」 탭 + CHANGELOG
+
+**MeetingsLayoutV2 변경**:
+- import PersonalNoteEditor
+- Tab type 'note' 추가
+- noteBody / noteMigrationPending / noteSaveStatus / noteLastSavedAt / noteError state
+- loadNote (mount 시 GET) / flushNote (PUT upsert) / onNoteChange (debounce 1.5s)
+- noteTimerRef cleanup on unmount + best-effort flush
+- 마이그 미적용 시 amber 배너 + editable=false
+- AutoSaveIndicator 별도 표시 (본문과 분리)
+
+**Rule 8/11/14/21/22/23 모두 준수** (전체 PR 묶음 기준):
+- Rule 11: meeting_personal_notes 컬럼 사전 검증 ✓
+- Rule 14: V2-A body endpoint 패턴 동형 (loadBody/loadNote, flushBody/flushNote)
+- Rule 21: 4 commit 분리 (공통/DB + api:meetings + meetings 컴포넌트 + meetings 통합)
+- Rule 23: ER_NO_SUCH_TABLE (1146) 캐치 → _migration_pending
+
+**🔧 진행 중 사고 회고**:
+- UI 통합 commit 도중 다른 세션 race 로 working tree 변경 소실
+- 사용자 「잠시 대기」 후 재시도 → 본 commit 으로 복구 완료
+- 향후 같은 race 발생 시: 단일 commit 즉시 + 작은 단위 + 다른 세션 안정화 후 진입
+
+---
+
 ### PR-MTG-V2-Dept — 부서 표현 일관성 + UX 강화
 
 **사용자 명령**:
