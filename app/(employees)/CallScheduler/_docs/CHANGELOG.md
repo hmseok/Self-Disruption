@@ -3,6 +3,86 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-17 (Phase N-27) — rotation cursor 균등 분배 fix (전정연 자주 출근 문제)
+
+### 사용자 보고
+> "전정연 반복적으로 같은그룹에서 돌아가지 않고 반복적으로 나옴"
+
+### 진단
+- SUB 그룹: generation_strategy='rotation', rotation_size=1, rotation_period_days=1, 멤버 3명 (priority 0/1/2)
+- 멤버 모두 전속 직원 (외부 cycle X) — 정상 cycle 이면 매일 1명씩 3일 cycle
+- 매트릭스 패턴: 6/1 전정연(p0) / 6/2 전유하(p1) / 6/3 전정연 / 6/4 윤민진(p2) / 6/5 전정연 → cursor 어긋남
+
+### 원인
+기존 cursor 코드 (auto-generate/route.ts):
+```js
+arr.push(candidates[(st.cursor + i) % candidates.length])
+st.cursor = (st.cursor + size) % candidates.length
+```
+- `candidates.length` 가 매일 다름 (휴가/회피일/슬롯거부 가드로 후보 변동)
+- 그 변동에 따라 cursor mod 가 흔들림
+- → priority 0 인 워커 (전정연) 가 candidates 첫 번째에 자주 들어가 자주 차례
+
+### Fix (`auto-generate/route.ts`)
+```js
+// N-27 — cursor mod gMembers.length (고정) + candidates 에 없으면 다음 워커로 skip
+const memberLen = Math.max(1, gMembers.length)
+const candidateSet = new Set(candidates)
+let cur = st.cursor
+let scanned = 0
+while (arr.length < size && scanned < memberLen) {
+  const wId = gMembers[cur % memberLen]
+  if (candidateSet.has(wId) && !arr.includes(wId)) arr.push(wId)
+  cur = (cur + 1) % memberLen
+  scanned++
+}
+st.cursor = (st.cursor + size) % memberLen  // candidates.length → memberLen
+```
+
+### 효과
+- cursor 가 gMembers 전체 인덱스 (고정 길이) 기준 — candidates 변동 무관
+- 한 워커가 가드 (휴가/회피) 로 빠져도 cursor 는 정상 advance
+- 균등 cycle 보장 — 3 멤버면 정확히 3일 cycle
+
+### 백워드 호환
+- 다른 그룹 (all_members) 은 영향 없음
+- rotation 그룹의 candidate 가 가드로 모두 빠질 경우 selected 빈 배열 (기존과 동일)
+
+### 검증
+- tsc PASS
+- 자동 생성 재실행 후 매트릭스 확인 필요 (예상: 전정연·전유하·윤민진이 균등 3일 cycle)
+
+## 2026-05-17 (Phase N-26) — 매트릭스 시간순 view + 그룹 라벨 inline
+
+### 사용자 보고
+> "매트릭스가 그룹상관없이 시간대별로 시프트 시간순서대로 나와야하는데 보기가 불편해"
+
+### 변경 (`ScheduleGrid.tsx`)
+1. **slotsByGroup 시간순 sort**:
+   - `slot.start_time` ASC (overnight 도 자기 start_time 기준)
+   - 동시간이면 slot.code 사전순
+   - 모든 (group, slot) row 가 시간 순서대로 평탄화 — 그룹과 무관
+2. **그룹 헤더 row 제거** (`isNewGroupSection = false`):
+   - 시간순이라 같은 그룹이 비연속적 → 그룹 헤더 row 의미 사라짐
+   - 그룹 외부/회피 행도 제거
+3. **그룹 라벨 inline** (slot 헤더 우측 작은 chip):
+   - 그룹 이름 + rotation 순서 (예: 「로테이션 ·1」 = rotation sequence 1번)
+   - 그룹 색 (category 별)
+4. **중복 방지**:
+   - 같은 (group, slot) 페어가 두 번 row 생성되지 않도록 `seenPairs` Set
+
+### 효과
+- 매트릭스가 시간순 (L01 07:30 → L02 08:00 → L03 08:30 → L05 09:00 → L07 10:00 → L09 11:00 → ...)
+- 그룹 라벨은 slot 헤더 우측 작은 chip 으로 식별
+- rotation 그룹의 sequence 시프트도 각각 시간순 위치에 배치 (예: 로테이션 ·1 = L01 / 로테이션 ·2 = L02)
+
+### 백워드 호환
+- 그룹 row 분리 (N-25 Step B) + group_id 필터 그대로 유지
+- 시간 정렬 + 헤더만 변경
+
+### 검증
+- tsc PASS
+
 ## 2026-05-16 (Phase N-25 Step B) — ScheduleGrid 그룹별 row 분리 + rotation sequence 펼침
 
 ### 사용자 보고

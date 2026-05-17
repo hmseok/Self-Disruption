@@ -306,13 +306,14 @@ export default function ScheduleGrid({ detail, onChanged, myWorkerId }: Props) {
   }, [assignments, slotById])
 
   // N-25 Step B — slots → (group, slot) 단위 row 산출
+  // N-26 — row 를 시작 시간 순으로 정렬 (그룹과 무관 — 사용자 의도)
   // rotation_enabled 그룹은 rotation_shifts 의 모든 시프트를 sub-row 로 펼침
   // 일반 그룹은 g.shift_slot_id 단일 row
   // 그룹 없는 slot 은 groupInfo=null
   type GroupInfo = { id: string; name: string; category: string; member_ids: string[] }
   const slotsByGroup = useMemo(() => {
     const rows: Array<{ slot: ShiftSlot; groupInfo: GroupInfo | null; rotationOrder: number }> = []
-    const usedSlotIds = new Set<string>()
+    const seenPairs = new Set<string>()  // group_id + slot_id 중복 방지
     // 1) 활성 그룹별 row 생성 (rotation 은 sequence 펼침)
     for (const g of allGroups) {
       const groupInfo: GroupInfo = {
@@ -324,24 +325,43 @@ export default function ScheduleGrid({ detail, onChanged, myWorkerId }: Props) {
         for (let i = 0; i < sorted.length; i++) {
           const slot = slots.find(s => s.id === sorted[i].shift_slot_id)
           if (slot) {
-            rows.push({ slot, groupInfo, rotationOrder: i + 1 })
-            usedSlotIds.add(slot.id)
+            const key = `${g.id}_${slot.id}`
+            if (!seenPairs.has(key)) {
+              rows.push({ slot, groupInfo, rotationOrder: i + 1 })
+              seenPairs.add(key)
+            }
           }
         }
       } else {
         const slot = slots.find(s => s.id === g.shift_slot_id)
         if (slot) {
-          rows.push({ slot, groupInfo, rotationOrder: 0 })
-          usedSlotIds.add(slot.id)
+          const key = `${g.id}_${slot.id}`
+          if (!seenPairs.has(key)) {
+            rows.push({ slot, groupInfo, rotationOrder: 0 })
+            seenPairs.add(key)
+          }
         }
       }
     }
-    // 2) 그룹 없는 slot (옛 데이터 등) — 그대로 표시
+    // 2) 그룹 없는 slot — 별도 row (groupInfo=null)
+    const usedSlotIds = new Set(rows.map(r => r.slot.id))
     for (const s of slots) {
       if (!usedSlotIds.has(s.id)) {
         rows.push({ slot: s, groupInfo: null, rotationOrder: 0 })
       }
     }
+    // N-26 — 시작 시간 ASC 정렬 (overnight 도 자기 start_time 기준)
+    rows.sort((a, b) => {
+      const toMin = (t: string) => {
+        const [h, m] = t.split(':').map(Number)
+        return (h || 0) * 60 + (m || 0)
+      }
+      const aMin = toMin(a.slot.start_time)
+      const bMin = toMin(b.slot.start_time)
+      if (aMin !== bMin) return aMin - bMin
+      // 동시간이면 slot.code 사전순
+      return a.slot.code.localeCompare(b.slot.code)
+    })
     return rows
   }, [allGroups, slots])
 
@@ -800,10 +820,9 @@ export default function ScheduleGrid({ detail, onChanged, myWorkerId }: Props) {
           {slotsByGroup.map(({ slot, groupInfo, rotationOrder }, slotIdx) => {
             // PR-2SS-Phase-J-3 — 그룹 변경 시 헤더 + 그룹 멤버 cycle/회피 행 inline
             // N-25 Step B — groupInfo 우선 (없으면 slotGroups[slot.id] fallback)
+            // N-26 — 시간순 정렬이라 같은 그룹이 비연속적 — 그룹 헤더 row 비활성 (isNewGroupSection=false)
             const curGrp = groupInfo || slotGroups[slot.id] || null
-            const prevRow = slotIdx > 0 ? slotsByGroup[slotIdx-1] : null
-            const prevGrp = prevRow ? (prevRow.groupInfo || slotGroups[prevRow.slot.id] || null) : null
-            const isNewGroupSection = !prevGrp || (curGrp?.id || '') !== (prevGrp?.id || '')
+            const isNewGroupSection = false  // N-26 — 시간순 view 라 그룹 헤더 row 표시 X
             // J-2C — 매니저 토글 OFF 면 그룹 섹션 안 외부/회피 행 모두 빈 배열 (다른 직원 시야 차단)
             const sectionExt = (showPrivate && isNewGroupSection && curGrp)
               ? externalCycleWorkers.filter(ew => curGrp.member_ids.includes(ew.id))
@@ -853,7 +872,7 @@ export default function ScheduleGrid({ detail, onChanged, myWorkerId }: Props) {
                 fontSize: 11, minWidth: 148, maxWidth: 168,  // J-2B — 200~220 → 148~168
                 borderLeft: `3px solid ${grpBorder}`,
               }}>
-                {/* 1행: 슬롯 코드 + 시간 (한 줄) */}
+                {/* 1행: 슬롯 코드 + 시간 + 그룹 라벨 (N-26 — 시간순 view 라 라벨 inline) */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 2 }}>
                   <span style={{
                     fontSize: 9, color: COLORS.textMuted, fontFamily: 'monospace', fontWeight: 700,
@@ -862,6 +881,17 @@ export default function ScheduleGrid({ detail, onChanged, myWorkerId }: Props) {
                     {slot.start_time.substring(0,5)}~{slot.end_time.substring(0,5)}
                     {isOvernight && <span style={{ fontSize: 8, color: COLORS.warning, marginLeft: 2 }}>익</span>}
                   </span>
+                  {curGrp && (
+                    <span style={{
+                      fontSize: 9, fontWeight: 700, color: COLORS.textSecondary,
+                      background: headerColor, padding: '1px 5px', borderRadius: 4,
+                      border: `1px solid ${headerBorder}`,
+                      marginLeft: 'auto',
+                    }} title={`그룹: ${curGrp.name}${rotationOrder > 0 ? ` (rotation ${rotationOrder}번)` : ''}`}>
+                      {curGrp.name}
+                      {rotationOrder > 0 && <span style={{ marginLeft: 2, opacity: 0.7 }}>·{rotationOrder}</span>}
+                    </span>
+                  )}
                 </div>
                 {/* 2행: 24h 시간 막대 (항상 24h, 익일 wrap 분리) */}
                 <div style={{

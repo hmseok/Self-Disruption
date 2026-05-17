@@ -1181,19 +1181,33 @@ export async function POST(
         } else {
           // 단순 rotation (legacy)
           if (g.generation_strategy === 'rotation') {
+            // N-27 — cursor 균등 분배 fix
+            // 기존: cursor mod candidates.length → candidates 변동 시 cursor 흔들림 (전정연 자주 출근 버그)
+            // 새: cursor mod gMembers.length (고정) + candidates 에 없으면 다음 워커로 skip
             const st = rotState.get(g.id) || { cursor: 0, dayInPeriod: 0 }
             const size = Math.max(1, g.rotation_size || 1)
+            const memberLen = Math.max(1, gMembers.length)
             const arr: string[] = []
-            for (let i = 0; i < size; i++) {
-              arr.push(candidates[(st.cursor + i) % candidates.length])
+            // cursor 부터 시작해 candidates 에 있는 size 명 선택
+            const candidateSet = new Set(candidates)
+            let cur = st.cursor
+            let scanned = 0
+            while (arr.length < size && scanned < memberLen) {
+              const wId = gMembers[cur % memberLen]
+              if (candidateSet.has(wId) && !arr.includes(wId)) {
+                arr.push(wId)
+              }
+              cur = (cur + 1) % memberLen
+              scanned++
             }
+            // cursor advance — 항상 size 칸 (candidates 변동 무관)
             st.dayInPeriod++
             if (st.dayInPeriod >= (g.rotation_period_days || 1)) {
-              st.cursor = (st.cursor + size) % Math.max(1, candidates.length)
+              st.cursor = (st.cursor + size) % memberLen
               st.dayInPeriod = 0
             }
             rotState.set(g.id, st)
-            selected = Array.from(new Set(arr)).slice(0, need)
+            selected = arr.slice(0, need)
           } else {
             // all_members
             selected = candidates.slice(0, need)
