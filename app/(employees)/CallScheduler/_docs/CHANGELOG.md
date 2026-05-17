@@ -16,11 +16,14 @@
    - 응답에 `replaced` 카운터 추가
    - 「공식 공휴일 마스터 = API 데이터」 보장
 
-2. **`lib/korea-holiday-api.ts`** — 임시공휴일 보강
-   - `getExtraHolidaysOverride(year)` 함수 신설
-   - 한국천문연구원 API 는 임시공휴일 (지방선거 등) 즉시 미반영
-   - API 응답 후 알려진 임시공휴일 추가 (날짜 dedupe)
-   - 2026: 제8회 전국동시지방선거 (6/3)
+2. **`lib/korea-holiday-api.ts`** — 양 endpoint 통합 호출 (사용자 추가 보고)
+   - 사용자: "행안부 데이터는 못 가져온다는 얘기? 발표된 지 좀 됐는데"
+   - 진단: 한국천문연구원 SpcdeInfoService 에 endpoint 여러 개
+     · getRestDeInfo (휴일 정보 — 기존 사용)
+     · getHoliDeInfo (공휴일 정보 — 임시공휴일 포함)
+   - 변경: 두 endpoint 모두 호출 → 응답 merge + dedupe
+   - 효과: 행안부 지정 임시공휴일 (지방선거 등) 자동 fetch
+   - getExtraHolidaysOverride 는 API 반영 전 짧은 기간 보강용으로만 유지
 
 3. **`HolidaysTab.tsx`** — UI 메시지 + 안내 텍스트
    - confirm 메시지: 「기존 national 대체 / 회사휴무 보존」 명시

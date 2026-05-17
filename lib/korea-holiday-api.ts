@@ -79,44 +79,40 @@ export async function getKoreaHolidays(year: number): Promise<KoreaHoliday[]> {
     throw new Error(`연도 범위 오류: ${year} (2010~2099)`)
   }
 
-  const url = `https://apis.data.go.kr/B090041/openapi/service/SpcdeInfoService/getRestDeInfo`
-    + `?serviceKey=${encodeURIComponent(apiKey)}`
-    + `&solYear=${year}`
-    + `&numOfRows=100`
+  // 한국천문연구원 SpcdeInfoService 의 여러 endpoint 통합 호출:
+  //   · getRestDeInfo — 휴일 정보 (공휴일 + 일요일)
+  //   · getHoliDeInfo — 공휴일 정보 (임시공휴일 포함 — 행안부 지정 지방선거일 등)
+  //   · getAnniversaryInfo — 기념일 (참고용, 가져오면 노이즈라 미사용)
+  // 둘 다 호출 → dedupe 로 임시공휴일 누락 방지
+  const baseUrl = `https://apis.data.go.kr/B090041/openapi/service/SpcdeInfoService`
+  const endpoints = ['getRestDeInfo', 'getHoliDeInfo']
+  const allItems: Array<Record<string, string>> = []
 
-  // 외부 API 호출 — 실패 시 fallback 으로 graceful 처리
-  let xml = ''
-  try {
-    const res = await fetch(url, {
-      method: 'GET',
-      cache: 'no-store',
-    })
-    if (!res.ok) {
-      const fb = getFallbackHolidays(year)
-      if (fb.length > 0) return fb
-      throw new Error(`공공데이터 API HTTP ${res.status}: ${await res.text().catch(() => '')}`)
-    }
-    xml = await res.text()
-  } catch (e: any) {
-    // network 에러 등도 fallback
-    const fb = getFallbackHolidays(year)
-    if (fb.length > 0) return fb
-    throw e
+  for (const ep of endpoints) {
+    const url = `${baseUrl}/${ep}`
+      + `?serviceKey=${encodeURIComponent(apiKey)}`
+      + `&solYear=${year}`
+      + `&numOfRows=100`
+    try {
+      const res = await fetch(url, { method: 'GET', cache: 'no-store' })
+      if (!res.ok) continue  // 한 endpoint 실패해도 다른 것 계속
+      const epXml = await res.text()
+      const codeMatch = epXml.match(/<resultCode>(\w+)<\/resultCode>/)
+      if (codeMatch && codeMatch[1] !== '00') continue
+      const items = parseXmlItems(epXml)
+      allItems.push(...items)
+    } catch { /* graceful — 다른 endpoint 시도 */ }
   }
 
-  // resultCode 검증 — 실패 시 fallback
-  const resultCodeMatch = xml.match(/<resultCode>(\w+)<\/resultCode>/)
-  const resultCode = resultCodeMatch?.[1] || ''
-  if (resultCode && resultCode !== '00') {
+  // 모두 실패 → fallback
+  if (allItems.length === 0) {
     const fb = getFallbackHolidays(year)
     if (fb.length > 0) return fb
-    const msgMatch = xml.match(/<resultMsg>([^<]+)<\/resultMsg>/)
-    throw new Error(`공공데이터 API resultCode=${resultCode}: ${msgMatch?.[1] || '응답 오류'}`)
+    throw new Error(`공공데이터 API 모든 endpoint 실패 (${endpoints.join(', ')})`)
   }
 
-  const items = parseXmlItems(xml)
   const result: KoreaHoliday[] = []
-  for (const it of items) {
+  for (const it of allItems) {
     if (it.isHoliday !== 'Y') continue  // 휴일만
     const iso = locdateToIso(it.locdate)
     if (!iso) continue
@@ -159,15 +155,17 @@ export async function getKoreaHolidays(year: number): Promise<KoreaHoliday[]> {
 }
 
 /**
- * 알려진 임시공휴일 (행정안전부 지정 — 한국천문연구원 API 누락 보강).
- * 정부 발표 후 매뉴얼 업데이트 필요.
+ * 알려진 임시공휴일 보강 — 한국천문연구원 API 양 endpoint 모두 누락된 경우만.
+ *
+ * 2026-05-17 변경:
+ *   · getRestDeInfo + getHoliDeInfo 둘 다 호출하므로 일반적으로 보강 필요 X
+ *   · 정부가 임시공휴일 지정 직후 API 반영 전 기간 (몇 주) 만 필요
+ *   · 정부 발표 후 한국천문연구원 반영되면 이 list 에서 제거
  */
 function getExtraHolidaysOverride(year: number): KoreaHoliday[] {
   const extras: Record<number, Array<{ date: string; name: string }>> = {
-    2026: [
-      { date: '2026-06-03', name: '제8회 전국동시지방선거' },
-    ],
-    // 향후: 대선/총선/임시공휴일 등 정부 발표 시 추가
+    // 2026-06-03 지방선거: getHoliDeInfo 가 반영하면 자동 fetch — list 에서 제거 가능
+    // 임시공휴일 신규 지정 발생 시 정부 발표 → API 반영까지 임시로 추가
   }
   const list = extras[year] || []
   return list.map(h => ({
@@ -233,7 +231,7 @@ function getFallbackHolidays(year: number): KoreaHoliday[] {
       // 부처님오신날 (양력 5/24 일) → 대체공휴일 5/25 (월)
       { date: '2026-05-24', name: '부처님오신날' },
       { date: '2026-05-25', name: '대체공휴일(부처님오신날)', is_substitute: true },
-      // 제8회 전국동시지방선거 — 임시공휴일 (행정안전부 지정)
+      // 제8회 전국동시지방선거 — 임시공휴일 (행정안전부 지정, API 키 없을 때 fallback)
       { date: '2026-06-03', name: '제8회 전국동시지방선거' },
       // 추석 연휴 (양력 9/24~9/26) — 추석 9/25 금
       { date: '2026-09-24', name: '추석' },
