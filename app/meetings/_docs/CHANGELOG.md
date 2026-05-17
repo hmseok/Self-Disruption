@@ -6,6 +6,76 @@
 
 ## 2026-05-13
 
+### PR-MTG-V2-Me — 내 TODO 대시보드 (/meetings/me)
+
+**사용자 명령**: 「3번 (한꺼번에)」 + 「ㄱㄱ」 — Note + Visibility 후 마지막.
+
+**범위**: 모든 회의의 action_items 중 본인 담당 (assignee_id = user.id) 만 모은 개별 대시보드.
+
+**3 commit 분리**:
+- f977414 [API] /api/meetings/me/actions (GET + PATCH)
+- 41e288c [공통] PageTitle + menu-registry — /meetings/me 등록
+- 본 commit [UI] /meetings/me/page.tsx + CHANGELOG
+
+**신규 API** — `/api/meetings/me/actions`:
+- GET `?status=open|done|dropped|all&limit=200` → `{ data: [], stats: {...} }`
+- WHERE ai.assignee_id = user.id AND m.deleted_at IS NULL
+- 정렬: open 우선 → due_date ASC NULLS LAST → created_at DESC
+- 응답 컬럼: ai.* + m.title/meeting_date/type + p.name AS organizer_name
+- 통계: total / open_cnt / done_cnt / dropped_cnt / overdue_cnt / due_week_cnt
+- PATCH `{ action_id, status }` → 단일 액션 상태 변경 (권한: assignee/organizer/created_by/admin/master)
+  - status='done' → done_at=NOW() / 그 외 NULL
+
+**공통 파일 등록**:
+- `PageTitle.tsx` PATH_TO_GROUP/PAGE_NAMES `/meetings/me` 추가 → 「Employee of Ride Inc. > 내 TODO」
+- `menu-registry.ts` mod-meetings-me (sortOrder 53, work-essentials 그룹) — 「✓ 내 TODO」
+
+**UI** — `/meetings/me/page.tsx`:
+- DcStatStrip 5 카드: 진행중 / 마감 임박 / 지연 / 완료 / 전체
+- DcToolbar: 검색 + 상태 필터 (진행중/완료/취소/전체) + trailing 안내
+- NeuDataTable 8 컬럼 sortBy (Rule 18 의무):
+  - ✓ 체크박스 (인라인 토글)
+  - 할 일 (내용)
+  - 회의 (제목 + type 아이콘)
+  - 주관자
+  - 회의일
+  - 마감일 (overdue 빨강 + ⚠ N일 / soon amber + D-N)
+  - 상태 (진행중/완료/취소)
+  - 액션 (회의록 버튼 + 취소 ×)
+- 인라인 ☑ 토글 → toggleStatus → PATCH → 토스트
+- 행 클릭 → 해당 회의록 페이지 이동
+- 「회의록」 버튼 → 같음
+- 「×」 → status='dropped'
+- 모바일 카드 + 토스트 (Rule 20)
+- 검색 client-side (할일/회의제목/주관자)
+
+**Rule 8 시뮬레이션**:
+- 페이지 진입 → GET → 본인 담당 action_items + 통계
+- ☑ 클릭 → PATCH status='done' → done_at=NOW() → 다시 GET
+- 회의록 버튼 → /meetings/<id> 이동
+- 상태 필터 변경 → GET 재호출
+
+**Rule 11 SQL 사전 검증**:
+- meeting_action_items.assignee_id/content/due_date/status/done_at/done_note/created_at — 기존
+- meetings.id/title/meeting_date/type/organizer_id/deleted_at — 기존
+- profiles.id/name — 기존
+- CURDATE() / DATE_ADD / CASE WHEN — 화이트리스트 (CLAUDE.md Rule 13)
+
+**Rule 14 동형 패턴**:
+- DcStatStrip / DcToolbar / NeuDataTable 패턴 — /meetings 메인과 동일
+- Rule 18 모든 컬럼 sortBy
+- Rule 19 nowrap / Rule 20 토스트
+
+**Rule 21**: 3 commit 분리 (api:meetings + 공통 + meetings)
+**Rule 22**: 본 CHANGELOG ✓
+
+**GATE 진행 상태**:
+- G3 사용자 GO 「ㄱㄱ」 ✓
+- G5 tsc PASS / G6 lint:harness 새 위반 0건
+- G7 Designer — 사용자 검수 (/meetings/me 진입 → 본인 액션만 표시)
+
+---
+
 ### PR-MTG-V2-Visibility — 회의별 공개 범위 + 공동 편집자
 
 **사용자 명령**:
