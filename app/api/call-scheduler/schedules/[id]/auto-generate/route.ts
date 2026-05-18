@@ -659,6 +659,9 @@ export async function POST(
     }
 
     // 5) 연차 — 해당 월 걸친 것
+    // N-52 (사용자 보고 2026-05-17): "매니저 등록한 게 적용 안 됨"
+    //   원인: status 필터 없어서 pending/rejected 도 포함 → 잘못된 휴가 적용
+    //   fix: status='approved' 만 가드 작동 (cs_leaves.status IN approved)
     let leaves: LeaveRow[] = []
     try {
       leaves = await prisma.$queryRaw<any[]>`
@@ -667,7 +670,8 @@ export async function POST(
                DATE_FORMAT(end_date, '%Y-%m-%d')   AS end_date,
                am_pm
         FROM cs_leaves
-        WHERE NOT (end_date < ${monthStart} OR start_date > ${monthEnd})
+        WHERE status = 'approved'
+          AND NOT (end_date < ${monthStart} OR start_date > ${monthEnd})
       ` as any
     } catch {
       // 테이블 미적용 시 무시

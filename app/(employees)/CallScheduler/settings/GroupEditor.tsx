@@ -1550,55 +1550,15 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
                               ))}
                             </div>
                           )}
-                          {/* N-39 — scope 토글 (전체 그룹 = 연차 / 이 그룹만 = 회피일) */}
-                          <div style={{ display: 'flex', gap: 4, marginBottom: 4 }}>
-                            {([
-                              { v: 'global', label: '📅 연차 (전체 그룹)', tone: 'blue' },
-                              { v: 'group', label: '⛔ 회피일 (이 그룹만)', tone: 'amber' },
-                            ] as const).map(opt => (
-                              <button key={opt.v} type="button"
-                                      onClick={() => setSkipForm(w.id, { scope: opt.v })}
-                                      style={{
-                                        flex: 1, padding: '4px 8px', fontSize: 11, fontWeight: 700,
-                                        borderRadius: 6, cursor: 'pointer',
-                                        background: form.scope === opt.v
-                                          ? (opt.tone === 'blue' ? COLORS.bgBlue : COLORS.bgAmber)
-                                          : 'transparent',
-                                        color: form.scope === opt.v
-                                          ? (opt.tone === 'blue' ? COLORS.info : COLORS.warning)
-                                          : COLORS.textMuted,
-                                        border: `1px solid ${form.scope === opt.v
-                                          ? (opt.tone === 'blue' ? COLORS.borderBlue : COLORS.borderAmber)
-                                          : COLORS.borderFaint}`,
-                                      }}>{opt.label}</button>
-                            ))}
-                          </div>
-                          {/* 빠른 입력 한 줄 */}
-                          <div style={{ display: 'flex', gap: 4, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-                            <input type="date" value={form.start}
-                                   onChange={(e) => setSkipForm(w.id, {
-                                     start: e.target.value,
-                                     // 종료일이 비어있으면 시작일과 동일하게 (단일 일자 빠른 입력)
-                                     end: form.end || e.target.value,
-                                   })}
-                                   style={skipInlineInputStyle} title="시작일" />
-                            <span style={{ fontSize: 11, color: COLORS.textMuted, padding: '0 2px' }}>~</span>
-                            <input type="date" value={form.end}
-                                   onChange={(e) => setSkipForm(w.id, { end: e.target.value })}
-                                   style={skipInlineInputStyle} title="종료일" />
-                            <input type="text" value={form.reason}
-                                   onChange={(e) => setSkipForm(w.id, { reason: e.target.value })}
-                                   placeholder={form.scope === 'global' ? '사유 (연차)' : '사유 (회피일)'}
-                                   style={{ ...skipInlineInputStyle, flex: 1, minWidth: 100 }} />
-                            <button type="button" onClick={() => addSkipInline(w.id)} disabled={form.saving}
-                                    style={{
-                                      padding: '8px 18px', borderRadius: 8, fontSize: 13, fontWeight: 800,
-                                      background: COLORS.primary, color: '#fff', border: 'none',
-                                      cursor: form.saving ? 'not-allowed' : 'pointer',
-                                      opacity: form.saving ? 0.5 : 1,
-                                    }}>
-                              {form.saving ? '...' : '+ 추가'}
-                            </button>
+                          {/* N-52 (사용자 결정 2026-05-17): 「그룹 내 설정 삭제」 — 등록 폼 제거
+                              "동기화 안 되어서 그룹 내 설정 삭제" → 등록은 「직원 요청 검토」 페이지에서만
+                              여기는 회피일 list 읽기 전용 표시 */}
+                          <div style={{
+                            padding: '6px 10px', borderRadius: 6,
+                            background: COLORS.bgBlue, border: `1px solid ${COLORS.borderBlue}`,
+                            fontSize: 11, color: COLORS.info, lineHeight: 1.5,
+                          }}>
+                            💡 회피일/연차 등록은 <strong>「직원 요청 검토」 페이지</strong>에서만 가능 (단일 등록 위치)
                           </div>
                         </div>
                       )}
