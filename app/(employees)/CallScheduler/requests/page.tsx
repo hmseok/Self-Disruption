@@ -222,6 +222,73 @@ export default function RequestsPage() {
   const swapPending = swaps.filter(s => s.status === 'pending').length
   const totalPending = skipPending + leavePending + swapPending
 
+  // N-50 — 회피일 「승인/거절 취소」 (대기로 되돌림) + 삭제
+  const revertSkip = async (skip: SkipRow) => {
+    if (!confirm(`${skip.worker_name || '워커'} 회피일 승인/거절 취소 (대기로 되돌림)?`)) return
+    setBusy(`skip-${skip.id}`); setMsg(null)
+    try {
+      const auth = await getAuthHeader()
+      const res = await fetch(
+        `/api/call-scheduler/shift-groups/${skip.group_id}/skip-dates/${skip.id}`,
+        { method: 'PATCH', headers: { 'Content-Type': 'application/json', ...auth },
+          body: JSON.stringify({ status: 'requested' }) },
+      )
+      const json = await res.json()
+      if (!res.ok) throw new Error(json?.error || '실패')
+      setMsg({ ok: true, text: `${skip.worker_name || '워커'} 회피일 대기로 되돌림` })
+      load()
+    } catch (e: any) { setMsg({ ok: false, text: e?.message || '오류' }) }
+    finally { setBusy(null) }
+  }
+  const deleteSkip = async (skip: SkipRow) => {
+    if (!confirm(`${skip.worker_name || '워커'} 회피일 완전 삭제 — 되돌릴 수 없음. 계속?`)) return
+    setBusy(`skip-${skip.id}`); setMsg(null)
+    try {
+      const auth = await getAuthHeader()
+      const res = await fetch(
+        `/api/call-scheduler/shift-groups/${skip.group_id}/skip-dates/${skip.id}`,
+        { method: 'DELETE', headers: auth },
+      )
+      const json = await res.json()
+      if (!res.ok) throw new Error(json?.error || '실패')
+      setMsg({ ok: true, text: `${skip.worker_name || '워커'} 회피일 삭제` })
+      load()
+    } catch (e: any) { setMsg({ ok: false, text: e?.message || '오류' }) }
+    finally { setBusy(null) }
+  }
+  // N-50 — 연차 「승인/거절 취소」 + 삭제
+  const revertLeave = async (leave: LeaveRow) => {
+    if (!confirm(`${leave.worker_name} 연차 승인/거절 취소 (대기로 되돌림)?`)) return
+    setBusy(`leave-${leave.id}`); setMsg(null)
+    try {
+      const auth = await getAuthHeader()
+      const res = await fetch(`/api/call-scheduler/leaves/${leave.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json', ...auth },
+        body: JSON.stringify({ status: 'pending' }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json?.error || '실패')
+      setMsg({ ok: true, text: `${leave.worker_name} 연차 대기로 되돌림` })
+      load()
+    } catch (e: any) { setMsg({ ok: false, text: e?.message || '오류' }) }
+    finally { setBusy(null) }
+  }
+  const deleteLeave = async (leave: LeaveRow) => {
+    if (!confirm(`${leave.worker_name} 연차 완전 삭제 — 되돌릴 수 없음. 계속?`)) return
+    setBusy(`leave-${leave.id}`); setMsg(null)
+    try {
+      const auth = await getAuthHeader()
+      const res = await fetch(`/api/call-scheduler/leaves/${leave.id}`, {
+        method: 'DELETE', headers: auth,
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json?.error || '실패')
+      setMsg({ ok: true, text: `${leave.worker_name} 연차 삭제` })
+      load()
+    } catch (e: any) { setMsg({ ok: false, text: e?.message || '오류' }) }
+    finally { setBusy(null) }
+  }
+
   // 회피 status 변경
   const updateSkip = async (skip: SkipRow, status: 'approved' | 'rejected', note?: string | null) => {
     setBusy(`skip-${skip.id}`); setMsg(null)
@@ -481,7 +548,9 @@ export default function RequestsPage() {
                 : <SkipList rows={skips} busy={busy}
                     onApprove={(s) => updateSkip(s, 'approved')}
                     onReject={(s) => openRejectModal('skip', s.worker_name || '워커',
-                      (note) => updateSkip(s, 'rejected', note))} />}
+                      (note) => updateSkip(s, 'rejected', note))}
+                    onRevert={revertSkip}
+                    onDelete={deleteSkip} />}
             </>
           )}
 
@@ -583,7 +652,9 @@ export default function RequestsPage() {
                 : <LeaveList rows={leaves} busy={busy}
                     onApprove={(r) => resolve('leave', r.id, 'approve', r.worker_name)}
                     onReject={(r) => openRejectModal('leave', r.worker_name,
-                      (note) => resolve('leave', r.id, 'reject', r.worker_name, note))} />}
+                      (note) => resolve('leave', r.id, 'reject', r.worker_name, note))}
+                    onRevert={revertLeave}
+                    onDelete={deleteLeave} />}
             </>
           )}
 
@@ -666,11 +737,13 @@ function EmptyHint({ text }: { text: string }) {
 }
 
 // ── 회피일 list ────────────────────────────────────────────────────
-function SkipList({ rows, busy, onApprove, onReject }: {
+function SkipList({ rows, busy, onApprove, onReject, onRevert, onDelete }: {
   rows: SkipRow[]
   busy: string | null
   onApprove: (s: SkipRow) => void
   onReject: (s: SkipRow) => void
+  onRevert: (s: SkipRow) => void  // N-50 — 승인/거절 → 대기로 되돌리기
+  onDelete: (s: SkipRow) => void  // N-50 — 완전 삭제
 }) {
   // 그룹별 묶기
   const byGroup = rows.reduce((acc: Record<string, SkipRow[]>, r) => {
@@ -728,6 +801,14 @@ function SkipList({ rows, busy, onApprove, onReject }: {
                       onReject={() => onReject(r)}
                     />
                   )}
+                  {/* N-50 — 승인/거절 row 매니저 액션: 대기로 되돌리기 / 삭제 */}
+                  {!isPending && (
+                    <ManagerRowActions
+                      busyKey={busy === `skip-${r.id}`}
+                      onRevert={() => onRevert(r)}
+                      onDelete={() => onDelete(r)}
+                    />
+                  )}
                 </div>
               )
             })}
@@ -738,12 +819,48 @@ function SkipList({ rows, busy, onApprove, onReject }: {
   )
 }
 
+// N-50 — 매니저 row 액션 (승인 취소 / 삭제)
+function ManagerRowActions({ busyKey, onRevert, onDelete }: {
+  busyKey: boolean
+  onRevert: () => void
+  onDelete: () => void
+}) {
+  return (
+    <div style={{ display: 'flex', gap: 4 }}>
+      <button type="button" disabled={busyKey} onClick={onRevert}
+              title="승인/거절 취소 — 대기 상태로 되돌리기"
+              style={{
+                ...BTN.sm,
+                background: 'transparent', color: COLORS.textSecondary,
+                border: `1px solid ${COLORS.borderFaint}`,
+                cursor: busyKey ? 'not-allowed' : 'pointer',
+                opacity: busyKey ? 0.5 : 1,
+              }}>
+        ↩ 취소
+      </button>
+      <button type="button" disabled={busyKey} onClick={onDelete}
+              title="완전 삭제"
+              style={{
+                ...BTN.sm,
+                background: 'transparent', color: COLORS.danger,
+                border: `1px solid ${COLORS.borderRed}`,
+                cursor: busyKey ? 'not-allowed' : 'pointer',
+                opacity: busyKey ? 0.5 : 1,
+              }}>
+        🗑
+      </button>
+    </div>
+  )
+}
+
 // ── 휴가 list ──────────────────────────────────────────────────────
-function LeaveList({ rows, busy, onApprove, onReject }: {
+function LeaveList({ rows, busy, onApprove, onReject, onRevert, onDelete }: {
   rows: LeaveRow[]
   busy: string | null
   onApprove: (r: LeaveRow) => void
   onReject: (r: LeaveRow) => void
+  onRevert?: (r: LeaveRow) => void  // N-50
+  onDelete?: (r: LeaveRow) => void  // N-50
 }) {
   return (
     <div style={{ ...GLASS.L4, borderRadius: 12, padding: 14, display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -790,6 +907,14 @@ function LeaveList({ rows, busy, onApprove, onReject }: {
                 busyKey={busy === `leave-${r.id}`}
                 onApprove={() => onApprove(r)}
                 onReject={() => onReject(r)}
+              />
+            )}
+            {/* N-50 — 승인/거절 row 매니저 액션 */}
+            {!isPending && onRevert && onDelete && (
+              <ManagerRowActions
+                busyKey={busy === `leave-${r.id}`}
+                onRevert={() => onRevert(r)}
+                onDelete={() => onDelete(r)}
               />
             )}
           </div>

@@ -107,6 +107,81 @@ export default function WorkersTab() {
   }
   const cancelEdit = () => { setEditingId(null) }
 
+  // N-50 — 영구 링크 토큰 발급/복사/폐기
+  const handleTokenAction = async (w: Worker, emp: any) => {
+    const currentToken = emp?.public_token
+    const linkBase = typeof window !== 'undefined' ? window.location.origin : 'https://hmseok.com'
+    const linkFor = (t: string) => `${linkBase}/CallScheduler/e/${t}`
+
+    if (currentToken) {
+      // 토큰 있음 — 복사 / 재발급 / 폐기 선택
+      const url = linkFor(currentToken)
+      const choice = window.prompt(
+        `${w.name} 영구 링크\n\n${url}\n\n[OK] = 복사\n[취소] = 다른 액션 선택`,
+        url,
+      )
+      if (choice !== null) {
+        // 복사
+        try {
+          await navigator.clipboard.writeText(url)
+          setActionMsg({ ok: true, text: `${w.name} 영구 링크 복사됨` })
+        } catch {
+          setActionMsg({ ok: false, text: '복사 실패 — 수동 복사' })
+        }
+        return
+      }
+      // 취소 → 추가 액션
+      const nextAction = window.prompt(
+        `${w.name}\n[r] 재발급 (기존 무효화)\n[d] 폐기\n[취소] = 닫기`,
+        '',
+      )
+      if (nextAction === 'r') {
+        // 재발급
+        try {
+          const auth = await getAuthHeader()
+          const res = await fetch(`/api/ride-employees/${emp.id}/token`, { method: 'POST', headers: auth })
+          const json = await res.json()
+          if (!res.ok) throw new Error(json?.error || '재발급 실패')
+          setActionMsg({ ok: true, text: `${w.name} 토큰 재발급` })
+          await load()
+        } catch (e: any) {
+          setActionMsg({ ok: false, text: e?.message || '오류' })
+        }
+      } else if (nextAction === 'd') {
+        // 폐기
+        if (!confirm(`${w.name} 영구 링크 폐기 — 기존 링크 무효화. 계속?`)) return
+        try {
+          const auth = await getAuthHeader()
+          const res = await fetch(`/api/ride-employees/${emp.id}/token`, { method: 'DELETE', headers: auth })
+          const json = await res.json()
+          if (!res.ok) throw new Error(json?.error || '폐기 실패')
+          setActionMsg({ ok: true, text: `${w.name} 토큰 폐기` })
+          await load()
+        } catch (e: any) {
+          setActionMsg({ ok: false, text: e?.message || '오류' })
+        }
+      }
+    } else {
+      // 토큰 없음 — 발급
+      if (!confirm(`${w.name} 영구 링크 발급 — 비로그인 본인 페이지 접속 가능. 계속?`)) return
+      try {
+        const auth = await getAuthHeader()
+        const res = await fetch(`/api/ride-employees/${emp.id}/token`, { method: 'POST', headers: auth })
+        const json = await res.json()
+        if (!res.ok) throw new Error(json?.error || '발급 실패')
+        const newToken = json.data?.public_token
+        const url = newToken ? linkFor(newToken) : ''
+        try {
+          if (url) await navigator.clipboard.writeText(url)
+        } catch { /* graceful */ }
+        setActionMsg({ ok: true, text: `${w.name} 토큰 발급 + 링크 복사됨: ${url}` })
+        await load()
+      } catch (e: any) {
+        setActionMsg({ ok: false, text: e?.message || '오류' })
+      }
+    }
+  }
+
   const saveEdit = async (w: Worker) => {
     setSaving(true); setActionMsg(null)
     try {
@@ -365,6 +440,23 @@ export default function WorkersTab() {
                                     ...BTN.sm, background: 'transparent', color: COLORS.info,
                                     border: `1px solid ${COLORS.borderBlue}`, cursor: 'pointer',
                                   }}>편집</button>
+                        )}
+                        {/* N-50 — 영구 링크 토큰 발급/복사/폐기 */}
+                        {!isEditing && employee && (
+                          <button type="button"
+                                  onClick={() => handleTokenAction(worker, employee)}
+                                  title={(employee as any).public_token
+                                    ? '영구 링크 발급됨 — 클릭: 복사 / 재발급 / 폐기'
+                                    : '영구 링크 발급 (비로그인 본인 페이지 공유용)'}
+                                  style={{
+                                    ...BTN.sm, marginLeft: 4,
+                                    background: (employee as any).public_token ? COLORS.bgGreen : 'transparent',
+                                    color: (employee as any).public_token ? COLORS.success : COLORS.textSecondary,
+                                    border: `1px solid ${(employee as any).public_token ? COLORS.borderGreen : COLORS.borderFaint}`,
+                                    cursor: 'pointer',
+                                  }}>
+                            🔗 {(employee as any).public_token ? '링크' : '발급'}
+                          </button>
                         )}
                         {!isEditing && worker.is_external && (
                           <span style={{
