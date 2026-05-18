@@ -26,11 +26,10 @@ interface FeatureFlags {
   hasExternal: boolean    // is_external + external_pattern
   hasCycle: boolean       // cycle_days_on/off/start
   hasPersonalLimits: boolean  // N-29-a — max_consecutive, max_days, blocked_slot_ids, preferred_dow_*
-  hasWorkCycle: boolean   // N-56 — work_cycle_pattern + work_cycle_start_date
 }
 
 async function detectFeatures(): Promise<FeatureFlags> {
-  let hasExternal = true, hasCycle = true, hasPersonalLimits = true, hasWorkCycle = true
+  let hasExternal = true, hasCycle = true, hasPersonalLimits = true
   try {
     await prisma.$queryRaw<any[]>`SELECT is_external FROM cs_workers LIMIT 1`
   } catch { hasExternal = false }
@@ -41,18 +40,14 @@ async function detectFeatures(): Promise<FeatureFlags> {
   try {
     await prisma.$queryRaw<any[]>`SELECT max_consecutive_work_days FROM cs_workers LIMIT 1`
   } catch { hasPersonalLimits = false }
-  // N-56 — work_cycle_pattern 컬럼 graceful 감지
-  try {
-    await prisma.$queryRaw<any[]>`SELECT work_cycle_pattern FROM cs_workers LIMIT 1`
-  } catch { hasWorkCycle = false }
-  return { hasExternal, hasCycle, hasPersonalLimits, hasWorkCycle }
+  return { hasExternal, hasCycle, hasPersonalLimits }
 }
 
 export async function GET(request: NextRequest) {
   const user = await verifyUser(request)
   if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
   try {
-    const { hasExternal, hasCycle, hasPersonalLimits, hasWorkCycle } = await detectFeatures()
+    const { hasExternal, hasCycle, hasPersonalLimits } = await detectFeatures()
     let rows: any[]
     if (hasCycle) {
       rows = await prisma.$queryRaw<any[]>`
@@ -88,8 +83,6 @@ export async function GET(request: NextRequest) {
       preferred_dow_prefer: string | null
       preferred_dow_avoid: string | null
       min_days_per_month: number | null  // N-36
-      work_cycle_pattern: string | null  // N-56
-      work_cycle_start_date: string | null  // N-56
     }>()
     // N-36 — min_days_per_month 컬럼 graceful
     let hasMinDays = true
@@ -98,20 +91,20 @@ export async function GET(request: NextRequest) {
     } catch { hasMinDays = false }
     if (hasPersonalLimits && rows.length > 0) {
       try {
-        // 동적 SELECT 컬럼 구성 (graceful — 컬럼 존재 여부에 따라)
-        const extraCols: string[] = []
-        if (hasMinDays) extraCols.push('min_days_per_month')
-        if (hasWorkCycle) {
-          extraCols.push('work_cycle_pattern')
-          extraCols.push(`DATE_FORMAT(work_cycle_start_date, '%Y-%m-%d') AS work_cycle_start_date`)
-        }
-        const extraSql = extraCols.length > 0 ? `, ${extraCols.join(', ')}` : ''
-        const limitRows = await prisma.$queryRawUnsafe<any[]>(`
-          SELECT id, max_consecutive_work_days, max_days_per_month,
-                 blocked_slot_ids, preferred_dow_prefer, preferred_dow_avoid${extraSql}
-          FROM cs_workers
-          WHERE is_active = 1
-        `)
+        const limitRows = hasMinDays
+          ? await prisma.$queryRaw<any[]>`
+              SELECT id, max_consecutive_work_days, max_days_per_month,
+                     blocked_slot_ids, preferred_dow_prefer, preferred_dow_avoid,
+                     min_days_per_month
+              FROM cs_workers
+              WHERE is_active = 1
+            `
+          : await prisma.$queryRaw<any[]>`
+              SELECT id, max_consecutive_work_days, max_days_per_month,
+                     blocked_slot_ids, preferred_dow_prefer, preferred_dow_avoid
+              FROM cs_workers
+              WHERE is_active = 1
+            `
         for (const r of limitRows) {
           limitsMap.set(r.id, {
             max_consecutive_work_days: r.max_consecutive_work_days != null
@@ -127,8 +120,6 @@ export async function GET(request: NextRequest) {
             preferred_dow_avoid: r.preferred_dow_avoid ?? null,
             min_days_per_month: hasMinDays && r.min_days_per_month != null
               ? Number(r.min_days_per_month) : null,
-            work_cycle_pattern: hasWorkCycle ? (r.work_cycle_pattern ?? null) : null,
-            work_cycle_start_date: hasWorkCycle ? (r.work_cycle_start_date ?? null) : null,
           })
         }
       } catch { /* graceful */ }
@@ -153,9 +144,7 @@ export async function GET(request: NextRequest) {
         preferred_dow_avoid: limits?.preferred_dow_avoid ?? null,
         // N-36 — 글로벌 월 최소 근무일수
         min_days_per_month: limits?.min_days_per_month ?? null,
-        // N-56 — 비균등 cycle 패턴 CSV (예: '1,2,1,4')
-        work_cycle_pattern: limits?.work_cycle_pattern ?? null,
-        work_cycle_start_date: limits?.work_cycle_start_date ?? null,
+        // N-56-b — work_cycle_pattern 은 그룹멤버 레벨로 이동 (cs_group_members.work_cycle_*)
       }
     })
     return NextResponse.json({ data: serialize(data), error: null })

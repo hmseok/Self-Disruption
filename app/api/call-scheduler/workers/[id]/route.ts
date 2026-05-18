@@ -11,15 +11,15 @@ import { prisma } from '@/lib/prisma'
 const ALLOWED = new Set([
   'color_tone', 'group_label', 'phone', 'email',
   'is_external', 'external_pattern',
-  // Phase K — 외부 근무 cycle (워커 글로벌)
+  // Phase K — 외부 근무 cycle (워커 글로벌, 외부 회사 일정)
   'cycle_days_on', 'cycle_days_off', 'cycle_start_date',
   // N-29-a — 개인 한계 (그룹 무관 — 워커 단위)
   'max_consecutive_work_days', 'max_days_per_month',
   'blocked_slot_ids', 'preferred_dow_prefer', 'preferred_dow_avoid',
   // N-36 — 글로벌 월 최소 근무일수
   'min_days_per_month',
-  // N-56 — 비균등 cycle 패턴 CSV
-  'work_cycle_pattern', 'work_cycle_start_date',
+  // N-56-b — work_cycle_pattern 은 그룹멤버 레벨로 이동 (cs_group_members.work_cycle_*)
+  //   워커 컬럼 (cs_workers.work_cycle_*) 은 DB 유지 / API 사용 X
 ])
 const COLOR_TONES = new Set([
   'blue', 'gray', 'green', 'amber', 'violet', 'red', 'none',
@@ -37,7 +37,7 @@ export async function PATCH(
     const body = await request.json()
 
     // 컬럼 존재 확인 (graceful)
-    let hasExt = true, hasCycle = true, hasLimits = true, hasWorkCycle = true
+    let hasExt = true, hasCycle = true, hasLimits = true
     try {
       await prisma.$queryRaw<any[]>`SELECT is_external FROM cs_workers LIMIT 1`
     } catch { hasExt = false }
@@ -48,17 +48,12 @@ export async function PATCH(
     try {
       await prisma.$queryRaw<any[]>`SELECT max_consecutive_work_days FROM cs_workers LIMIT 1`
     } catch { hasLimits = false }
-    // N-56 — work_cycle_pattern 컬럼 graceful
-    try {
-      await prisma.$queryRaw<any[]>`SELECT work_cycle_pattern FROM cs_workers LIMIT 1`
-    } catch { hasWorkCycle = false }
 
     const CYCLE_COLS = new Set(['cycle_days_on', 'cycle_days_off', 'cycle_start_date'])
     const LIMIT_COLS = new Set([
       'max_consecutive_work_days', 'max_days_per_month',
       'blocked_slot_ids', 'preferred_dow_prefer', 'preferred_dow_avoid',
     ])
-    const WORK_CYCLE_COLS = new Set(['work_cycle_pattern', 'work_cycle_start_date'])
     const NULLABLE_NUM = new Set(['max_consecutive_work_days', 'max_days_per_month'])
 
     const sets: string[] = []
@@ -68,23 +63,7 @@ export async function PATCH(
       if ((k === 'is_external' || k === 'external_pattern') && !hasExt) continue
       if (CYCLE_COLS.has(k) && !hasCycle) continue
       if (LIMIT_COLS.has(k) && !hasLimits) continue
-      if (WORK_CYCLE_COLS.has(k) && !hasWorkCycle) continue
       if (k === 'color_tone' && !COLOR_TONES.has(String(v))) continue
-      // N-56 — work_cycle_pattern: '1,2,1,4' 형식 (정수 CSV, 양수만)
-      if (k === 'work_cycle_pattern') {
-        if (v == null || v === '') {
-          sets.push(`${k} = ?`); params.push(null); continue
-        }
-        const csv = String(v).trim()
-        const parts = csv.split(',').map(s => s.trim())
-        const allValid = parts.length >= 2 && parts.every(p => /^\d+$/.test(p) && Number(p) > 0)
-        if (!allValid) continue   // invalid → skip
-        sets.push(`${k} = ?`); params.push(parts.join(',')); continue
-      }
-      if (k === 'work_cycle_start_date') {
-        const s = v == null || v === '' ? null : String(v).slice(0, 10)
-        sets.push(`${k} = ?`); params.push(s); continue
-      }
       if (k === 'is_external') {
         sets.push(`${k} = ?`); params.push(v ? 1 : 0); continue
       }

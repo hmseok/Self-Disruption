@@ -891,23 +891,25 @@ export async function POST(
     try {
       await prisma.$queryRaw<any[]>`SELECT min_days_per_month FROM cs_workers LIMIT 1`
     } catch { hasWorkerMinDays = false }
-    // N-56 — work_cycle_pattern 컬럼 graceful
-    let hasWorkCyclePattern = true
+    // N-56-b — work_cycle_pattern (그룹멤버) 컬럼 graceful
+    //   같은 워커가 부엉이/달빛 등 여러 그룹에 다른 출발일로 들어갈 수 있음
+    let hasMemberWorkCycle = true
     try {
-      await prisma.$queryRaw<any[]>`SELECT work_cycle_pattern FROM cs_workers LIMIT 1`
-    } catch { hasWorkCyclePattern = false }
-    // N-56 — 비균등 cycle 패턴 (workerId → WorkCyclePattern)
-    const workerWorkCycleMap = new Map<string, WorkCyclePattern>()
-    if (hasWorkCyclePattern) {
+      await prisma.$queryRaw<any[]>`SELECT work_cycle_pattern FROM cs_group_members LIMIT 1`
+    } catch { hasMemberWorkCycle = false }
+    // memberId → WorkCyclePattern (key = `${groupId}_${workerId}`)
+    const memberWorkCycleMap = new Map<string, WorkCyclePattern>()
+    if (hasMemberWorkCycle) {
       try {
         const wcpRows = await prisma.$queryRaw<any[]>`
-          SELECT id, work_cycle_pattern,
+          SELECT group_id, worker_id, work_cycle_pattern,
                  DATE_FORMAT(work_cycle_start_date, '%Y-%m-%d') AS work_cycle_start_date
-          FROM cs_workers WHERE is_active = 1
+          FROM cs_group_members
+          WHERE work_cycle_pattern IS NOT NULL AND work_cycle_pattern <> ''
         `
         for (const r of wcpRows) {
           const p = parseWorkCyclePattern(r.work_cycle_pattern, r.work_cycle_start_date)
-          if (p) workerWorkCycleMap.set(String(r.id), p)
+          if (p) memberWorkCycleMap.set(`${r.group_id}_${r.worker_id}`, p)
         }
       } catch { /* graceful */ }
     }
@@ -1361,8 +1363,9 @@ export async function POST(
             byGroup[g.id].skipped++
             continue
           }
-          // N-56 — 비균등 cycle 패턴 — active 멤버의 휴무일이면 빈자리
-          const sqWcp = workerWorkCycleMap.get(activeWorker)
+          // N-56-b — 멤버 비균등 cycle 패턴 — active 멤버의 휴무 phase 면 빈자리
+          //   squad cycle 안에서도 멤버 cycle 패턴 유효
+          const sqWcp = memberWorkCycleMap.get(`${g.id}_${activeWorker}`)
           if (sqWcp && !isWorkDayByCyclePattern(sqWcp, isoDate)) {
             warnings.push({
               type: 'squad_work_cycle_off',
@@ -1634,10 +1637,11 @@ export async function POST(
           return sp !== 'off'  // 종일 off 면 제외
         })
 
-        // N-56 — 워커별 비균등 cycle 패턴 (당사 근무 cycle) — 휴무 phase 면 hard exclude
-        //   priority/rotation/squad 모든 경로 공통 적용
+        // N-56-b — 멤버 비균등 cycle 패턴 (그룹별 출발일) — 휴무 phase 면 hard exclude
+        //   같은 워커가 부엉이/달빛 같은 다른 그룹에 다른 출발일로 들어갈 수 있음
+        //   priority/rotation 모든 경로 공통 적용
         candidates = candidates.filter(wId => {
-          const wcp = workerWorkCycleMap.get(wId)
+          const wcp = memberWorkCycleMap.get(`${g.id}_${wId}`)
           if (!wcp) return true
           if (!isWorkDayByCyclePattern(wcp, isoDate)) {
             warnings.push({
@@ -1792,8 +1796,9 @@ export async function POST(
             // PR-2QQ-d-revert: 외부 cycle (워커 글로벌) — 외부 근무 phase 면 당사 후보 X
             const cy = lookupWorkerCycle(wId)
             if (cy && !isAvailableOnCycle(cy as any, isoDate)) return false
-            // N-56 — 비균등 cycle 패턴 (당사 근무 cycle) — 휴무 phase 면 당사 후보 X
-            const wcp = workerWorkCycleMap.get(wId)
+            // N-56-b — 멤버 비균등 cycle 패턴 (당사 근무 cycle) — 휴무 phase 면 당사 후보 X
+            //   이미 위에서 그룹멤버 단위로 한 번 가드했지만 priority 분기에서 재확인 (호환)
+            const wcp = memberWorkCycleMap.get(`${g.id}_${wId}`)
             if (wcp && !isWorkDayByCyclePattern(wcp, isoDate)) return false
             return true
           })

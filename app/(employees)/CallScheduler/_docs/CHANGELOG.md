@@ -3,6 +3,79 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-18 (Phase N-56-b) — work_cycle_pattern 워커→멤버 레벨 이동
+
+### 사용자 결정
+> "워커 로 불규칙 셋팅하면 안되고 그룹으로 해야할것같은데
+>  정동민은 부엉이,달빛 둘다 들어가고 패턴은 같지만 출발일을 다르게 가져갈거라서
+>  워커에는 2&2 외부패턴만 남아있는게 맞네"
+>
+> "외부일정은 2^2 고정이면 나머지 근무가능일에 일하면서
+>  그안에서 새로운 패턴을 그룹에 셋팅하는거고"
+
+### 운영 모델
+```
+정동민 (cs_workers):
+  · is_external = 1
+  · cycle_days_on = 2 / cycle_days_off = 2 (외부 회사 일정, 글로벌)
+  · work_cycle_pattern = (사용 X)
+
+정동민 in 부엉이 (cs_group_members):
+  · work_cycle_pattern = '1,2,1,4'
+  · work_cycle_start_date = 2026-06-01
+
+정동민 in 달빛 (cs_group_members):
+  · work_cycle_pattern = '1,2,1,4'   ← 같은 패턴
+  · work_cycle_start_date = 2026-06-04  ← 출발일만 다름
+```
+
+### 운영 예시 (정동민 P1 + A/B/C P2, 그룹 rotation_period_days=2)
+```
+06-01 정동민 (cycle 1근무 + P1)
+06-02 A (정동민 휴무 → P2 rotation 시작)
+06-03 A (2일 연속)
+06-04 정동민 (cycle 1근무 + P1)
+06-05 B (정동민 휴무 → P2 rotation)
+06-06 B
+06-07 C
+06-08 C
+06-09 정동민 (cycle 반복)
+```
+
+### 데이터 모델 (마이그: 2026-05-18_cs_group_members_work_cycle.sql)
+- `cs_group_members.work_cycle_pattern` VARCHAR(64) — '1,2,1,4'
+- `cs_group_members.work_cycle_start_date` DATE — 그룹마다 다른 출발일
+
+### N-55 A/B조 cycle UI 폐기 (사용자 선택 A — 완전 제거)
+- 「🎭 A/B조 cycle」 UI 영역 제거 (그룹 셋팅 + 멤버 cfg squad selector)
+- DB 컬럼 (`cs_shift_groups.cycle_kind` / `cs_group_members.squad`) 은 안전 유지
+- 기존 squad_rotation 셋팅된 그룹은 알고리즘 그대로 작동 (호환)
+- 새 셋팅은 N-56-b 멤버 cycle 로 표현 (출발일 어긋나게 잡으면 동일 효과)
+
+### 변경
+1. **마이그** — cs_group_members 2 컬럼 추가 (멱등)
+2. **API members PUT** — work_cycle_pattern + start_date 받기 (graceful)
+3. **API shift-groups GET** — 멤버 응답에 포함 (graceful)
+4. **API workers (PATCH/GET)** — work_cycle_* 처리 제거 (cs_workers 컬럼은 deprecate, drop X)
+5. **types.ts** — Worker 에서 제거, GroupMemberSettings 에 추가
+6. **WorkersTab IdentityPanel** — 「🔁 비균등 cycle」 영역 제거 + 안내 배너
+7. **GroupEditor MemberCfgPanel** — 「🔁 비균등 cycle 패턴」 영역 추가 (CSV + 시작일 + 미리보기)
+8. **GroupEditor** — N-55 A/B조 cycle UI 완전 제거
+9. **auto-generate** — `workerWorkCycleMap` → `memberWorkCycleMap` (Map<`${gId}_${wId}`, ...>)
+   - 같은 워커가 그룹마다 다른 cycle 가능
+   - squad_rotation active 멤버 가드도 멤버 레벨로
+
+### GATE 진행 상태
+- ✅ G3 사용자 GO + 「A: N-55 UI 완전 제거」 명시 결정
+- ✅ G5 tsc PASS (변경 파일 에러 0건)
+- ⏳ G6 lint:harness 새 위반 0건 (예상)
+- ⚠ G7 Designer 시각 검수 — 배포 후 사용자 확인
+
+### 마이그 적용 필수
+- `migrations/2026-05-18_cs_group_members_work_cycle.sql`
+
+---
+
 ## 2026-05-18 (Phase N-56 + N-57) — 비균등 cycle 패턴 + Cross-group cover
 
 ### N-56 — 워커별 비균등 cycle 패턴 (CSV)

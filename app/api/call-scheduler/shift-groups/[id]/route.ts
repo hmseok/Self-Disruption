@@ -248,7 +248,8 @@ export async function GET(
       } catch { /* graceful */ }
     }
 
-    // N-55 — squad 별도 조회 (graceful)
+    // N-55 — squad 별도 조회 (graceful) — DEPRECATED in N-56-b (UI 제거)
+    //   DB 컬럼은 유지 (기존 데이터 안전), 응답에는 포함 (호환성)
     const squadMap = new Map<string, { squad: string | null; squad_order: number | null }>()
     if (hasSquad) {
       try {
@@ -259,6 +260,28 @@ export async function GET(
           squadMap.set(String(r.worker_id), {
             squad: r.squad || null,
             squad_order: r.squad_order != null ? Number(r.squad_order) : null,
+          })
+        }
+      } catch { /* graceful */ }
+    }
+
+    // N-56-b — work_cycle_pattern / start_date 별도 조회 (graceful)
+    let hasMemberWorkCycle = true
+    try {
+      await prisma.$queryRaw<any[]>`SELECT work_cycle_pattern FROM cs_group_members LIMIT 1`
+    } catch { hasMemberWorkCycle = false }
+    const workCycleMap = new Map<string, { pattern: string | null; start_date: string | null }>()
+    if (hasMemberWorkCycle) {
+      try {
+        const wcRows = await prisma.$queryRaw<any[]>`
+          SELECT worker_id, work_cycle_pattern,
+                 DATE_FORMAT(work_cycle_start_date, '%Y-%m-%d') AS work_cycle_start_date
+          FROM cs_group_members WHERE group_id = ${id}
+        `
+        for (const r of wcRows) {
+          workCycleMap.set(String(r.worker_id), {
+            pattern: r.work_cycle_pattern || null,
+            start_date: r.work_cycle_start_date || null,
           })
         }
       } catch { /* graceful */ }
@@ -282,8 +305,11 @@ export async function GET(
       rotation_end_date: hasMemberRotation ? (r.rotation_end_date ?? null) : null,
       target_ratio: ratioMap.has(String(r.worker_id)) ? ratioMap.get(String(r.worker_id))! : 1.0,  // N-34
       coverage_priority: covMap.has(String(r.worker_id)) ? covMap.get(String(r.worker_id)) : null,  // N-36
-      squad: squadMap.get(String(r.worker_id))?.squad ?? null,  // N-55
-      squad_order: squadMap.get(String(r.worker_id))?.squad_order ?? null,  // N-55
+      squad: squadMap.get(String(r.worker_id))?.squad ?? null,  // N-55 (deprecated)
+      squad_order: squadMap.get(String(r.worker_id))?.squad_order ?? null,  // N-55 (deprecated)
+      // N-56-b — 멤버 비균등 cycle 패턴 (그룹별 다른 출발일)
+      work_cycle_pattern: workCycleMap.get(String(r.worker_id))?.pattern ?? null,
+      work_cycle_start_date: workCycleMap.get(String(r.worker_id))?.start_date ?? null,
     }))
 
     const group = {

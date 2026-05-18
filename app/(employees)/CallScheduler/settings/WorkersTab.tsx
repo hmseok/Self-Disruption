@@ -53,9 +53,7 @@ export default function WorkersTab() {
   const [editBlockedSlots, setEditBlockedSlots] = useState<Set<string>>(new Set())
   const [editDowPrefer, setEditDowPrefer] = useState<Set<number>>(new Set())
   const [editDowAvoid, setEditDowAvoid] = useState<Set<number>>(new Set())
-  // N-56 — 비균등 cycle 패턴 CSV
-  const [editWorkCyclePattern, setEditWorkCyclePattern] = useState<string>('')   // 예: '1,2,1,4'
-  const [editWorkCycleStartDate, setEditWorkCycleStartDate] = useState<string>('')
+  // N-56-b — 비균등 cycle 패턴 은 그룹멤버 cfg 로 이동 (GroupEditor MemberCfgPanel)
 
   const load = async () => {
     setLoading(true); setError(null)
@@ -107,9 +105,6 @@ export default function WorkersTab() {
         ? wx.preferred_dow_avoid.split(',').map((s: string) => Number(s.trim())).filter((n: number) => !isNaN(n) && n >= 0 && n <= 6)
         : []
     ))
-    // N-56 — 비균등 cycle 패턴
-    setEditWorkCyclePattern(typeof wx.work_cycle_pattern === 'string' ? wx.work_cycle_pattern : '')
-    setEditWorkCycleStartDate(wx.work_cycle_start_date || '')
   }
   const cancelEdit = () => { setEditingId(null) }
 
@@ -234,9 +229,7 @@ export default function WorkersTab() {
             ? Array.from(editDowPrefer).sort().join(',') : null,
           preferred_dow_avoid: editDowAvoid.size > 0
             ? Array.from(editDowAvoid).sort().join(',') : null,
-          // N-56 — 비균등 cycle 패턴 CSV
-          work_cycle_pattern: editWorkCyclePattern.trim() || null,
-          work_cycle_start_date: editWorkCycleStartDate || null,
+          // N-56-b — work_cycle_pattern 은 그룹멤버 cfg 로 이동
         }),
       })
       const wJson = await wRes.json()
@@ -494,8 +487,6 @@ export default function WorkersTab() {
                             cycleOn={editCycleOn} setCycleOn={setEditCycleOn}
                             cycleOff={editCycleOff} setCycleOff={setEditCycleOff}
                             cycleStart={editCycleStart} setCycleStart={setEditCycleStart}
-                            workCyclePattern={editWorkCyclePattern} setWorkCyclePattern={setEditWorkCyclePattern}
-                            workCycleStartDate={editWorkCycleStartDate} setWorkCycleStartDate={setEditWorkCycleStartDate}
                           />
                           {/* N-29-b — 개인 한계 (그룹 무관) */}
                           <PersonalLimitsPanel
@@ -561,30 +552,18 @@ const tdStyle: React.CSSProperties = {
 }
 
 // Phase K — 워커 정체성 패널 (외부 직원 + 외부 근무 cycle)
-// N-56 — 비균등 cycle 패턴 (work_cycle_pattern CSV) 추가
+// N-56-b — 비균등 cycle 패턴 은 그룹멤버 cfg 로 이동 (MemberCfgPanel)
 function IdentityPanel({
   isExternal, setIsExternal,
   cycleOn, setCycleOn,
   cycleOff, setCycleOff,
   cycleStart, setCycleStart,
-  workCyclePattern, setWorkCyclePattern,
-  workCycleStartDate, setWorkCycleStartDate,
 }: {
   isExternal: boolean; setIsExternal: (v: boolean) => void
   cycleOn: string; setCycleOn: (v: string) => void
   cycleOff: string; setCycleOff: (v: string) => void
   cycleStart: string; setCycleStart: (v: string) => void
-  // N-56 — 비균등 cycle 패턴
-  workCyclePattern: string; setWorkCyclePattern: (v: string) => void
-  workCycleStartDate: string; setWorkCycleStartDate: (v: string) => void
 }) {
-  // N-56 — 패턴 검증 + 미리보기
-  const csvParts = workCyclePattern.trim().split(',').map(s => s.trim())
-  const csvValid = csvParts.length >= 2 && csvParts.every(p => /^\d+$/.test(p) && Number(p) > 0)
-  const csvSum = csvValid ? csvParts.reduce((s, p) => s + Number(p), 0) : 0
-  const csvPreview = csvValid
-    ? csvParts.map((p, i) => `${p}${i % 2 === 0 ? '근무' : '휴무'}`).join(' → ')
-    : null
   return (
     <div style={{
       display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14,
@@ -642,50 +621,13 @@ function IdentityPanel({
         <div style={{ fontSize: 9, color: COLORS.textMuted, marginTop: 6 }}>
           예: 외부 근무 2일 / 외부 휴무 2일 / 시작 2026-05-01 → 5/1·2 외부 근무 (당사 X), 5/3·4 외부 휴무 (당사 가능)
         </div>
-      </div>
-
-      {/* N-56 — 비균등 cycle 패턴 (당사 근무 cycle) */}
-      <div style={{
-        gridColumn: '1 / span 2',
-        ...GLASS.L1, borderRadius: 8, padding: 10,
-        background: COLORS.bgAmber, border: `1px solid ${COLORS.borderAmber}`,
-      }}>
-        <div style={{ fontSize: 12, fontWeight: 800, color: COLORS.warning, marginBottom: 6 }}>
-          🔁 비균등 근무 cycle (당사) — CSV 패턴
+        <div style={{
+          fontSize: 10, color: COLORS.info, marginTop: 8,
+          padding: '6px 10px', borderRadius: 6,
+          background: COLORS.bgBlue, border: `1px solid ${COLORS.borderBlue}`,
+        }}>
+          💡 당사 근무 cycle (예: 1,2,1,4 비균등) 은 「그룹 → 멤버 cfg」 에서 그룹별로 설정 (출발일 그룹마다 다름)
         </div>
-        <div style={{ fontSize: 10, color: COLORS.textMuted, marginBottom: 8 }}>
-          예: 정동민 「1근무 2휴무 1근무 4휴무」 = <code>1,2,1,4</code> (전체 8일 cycle).
-          위 외부 cycle 과 다른 점: 이 cycle 의 근무일이 <strong>당사 근무 가능일</strong>.
-          빈 칸 = 비활성 (균등 cycle 또는 그룹 패턴 사용).
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 8 }}>
-          <div>
-            <FieldLabel>패턴 (CSV)</FieldLabel>
-            <input type="text" value={workCyclePattern}
-                   onChange={(e) => setWorkCyclePattern(e.target.value)}
-                   placeholder="1,2,1,4"
-                   style={{
-                     ...inputStyle,
-                     borderColor: workCyclePattern && !csvValid ? COLORS.borderRed : COLORS.borderFaint,
-                   }} />
-          </div>
-          <div>
-            <FieldLabel>시작 기준일</FieldLabel>
-            <input type="date" value={workCycleStartDate}
-                   onChange={(e) => setWorkCycleStartDate(e.target.value)}
-                   style={inputStyle} />
-          </div>
-        </div>
-        {csvPreview && (
-          <div style={{ fontSize: 11, color: COLORS.success, marginTop: 6, fontWeight: 600 }}>
-            ✓ 미리보기: {csvPreview} <span style={{ color: COLORS.textMuted, fontWeight: 400 }}>(전체 {csvSum}일 반복)</span>
-          </div>
-        )}
-        {workCyclePattern && !csvValid && (
-          <div style={{ fontSize: 11, color: COLORS.danger, marginTop: 6 }}>
-            ✗ 형식 오류 — 양수 정수 콤마 구분 필요 (예: 1,2,1,4)
-          </div>
-        )}
       </div>
     </div>
   )

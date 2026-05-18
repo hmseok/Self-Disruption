@@ -58,8 +58,11 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
     work_pattern_text: string
     target_ratio: string  // N-34 — 그룹 분배 비율 (디폴트 '1.0', 0 = hard exclude)
     coverage_priority: string  // N-36 — 휴가 커버 우선순위 ('' = priority_level 따라감, '1'/'2'/'3')
-    squad: string  // N-55 — A/B조 ('A' | 'B' | '')
-    squad_order: string  // N-55 — 조 안 순서
+    squad: string  // N-55 (deprecated in N-56-b — DB 보존, UI 제거)
+    squad_order: string  // N-55 (deprecated)
+    // N-56-b — 멤버 비균등 cycle 패턴 (그룹마다 다른 출발일 가능)
+    work_cycle_pattern: string         // CSV '1,2,1,4' / '' = 없음
+    work_cycle_start_date: string      // 'YYYY-MM-DD' / ''
   }
   const defaultMemberCfg = (): MemberCfg => ({
     priority_level: 2,
@@ -73,6 +76,8 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
     coverage_priority: '',
     squad: '',
     squad_order: '',
+    work_cycle_pattern: '',
+    work_cycle_start_date: '',
   })
   const [memberCfgs, setMemberCfgs] = useState<Record<string, MemberCfg>>({})
   const [expandedCfgWorkerId, setExpandedCfgWorkerId] = useState<string | null>(null)
@@ -243,8 +248,11 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
             work_pattern_text: m.work_pattern_text || '',
             target_ratio: m.target_ratio != null ? String(m.target_ratio) : '1.0',  // N-34
             coverage_priority: m.coverage_priority != null ? String(m.coverage_priority) : '',  // N-36
-            squad: (m.squad === 'A' || m.squad === 'B') ? m.squad : '',  // N-55
-            squad_order: m.squad_order != null ? String(m.squad_order) : '',  // N-55
+            squad: (m.squad === 'A' || m.squad === 'B') ? m.squad : '',  // N-55 (deprecated)
+            squad_order: m.squad_order != null ? String(m.squad_order) : '',  // N-55 (deprecated)
+            // N-56-b — 멤버 비균등 cycle 패턴
+            work_cycle_pattern: m.work_cycle_pattern || '',
+            work_cycle_start_date: m.work_cycle_start_date || '',
           }
         }
         setMemberCfgs(cfgs)
@@ -553,9 +561,12 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
           target_ratio: cfg.target_ratio === '' ? 1.0 : Math.max(0, Number(cfg.target_ratio) || 0),
           // N-36 — 휴가 커버 우선순위 ('' → null = priority_level 따라감)
           coverage_priority: cfg.coverage_priority === '' ? null : Math.min(3, Math.max(1, Number(cfg.coverage_priority) || 0)) || null,
-          // N-55 — A/B조
+          // N-55 — A/B조 (deprecated, DB 보존)
           squad: cfg.squad === 'A' || cfg.squad === 'B' ? cfg.squad : null,
           squad_order: cfg.squad_order === '' ? null : Math.max(0, Number(cfg.squad_order) || 0),
+          // N-56-b — 멤버 비균등 cycle 패턴 (그룹마다 다른 출발일 가능)
+          work_cycle_pattern: cfg.work_cycle_pattern?.trim() || null,
+          work_cycle_start_date: cfg.work_cycle_start_date || null,
         }
       })
       let id = groupId
@@ -901,53 +912,10 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
                    style={inputStyle} placeholder="자유 메모" />
           </Field>
 
-          {/* N-55 — A/B조 cycle (조원수 × N일 cycle) */}
-          <Field label="🎭 A/B조 cycle 로테이션"
-                 sub="A조 → B조 자동 cycle. 각자 N일씩 일함. 멤버 cfg 에서 A/B/순서 지정">
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-              <label style={{
-                display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px',
-                borderRadius: 8, cursor: 'pointer',
-                background: cycleKind === 'squad_rotation' ? COLORS.bgViolet : 'rgba(0,0,0,0.03)',
-                border: `1px solid ${cycleKind === 'squad_rotation' ? COLORS.borderViolet : COLORS.borderFaint}`,
-              }}>
-                <input type="checkbox"
-                       checked={cycleKind === 'squad_rotation'}
-                       onChange={(e) => setCycleKind(e.target.checked ? 'squad_rotation' : '')} />
-                <span style={{ fontSize: 12, fontWeight: 700,
-                               color: cycleKind === 'squad_rotation' ? '#7c3aed' : COLORS.textPrimary }}>
-                  🎭 A/B조 cycle 사용
-                </span>
-              </label>
-              {cycleKind === 'squad_rotation' && (
-                <>
-                  <div>
-                    <div style={{ fontSize: 10, color: COLORS.textMuted, marginBottom: 2 }}>각자 N일씩</div>
-                    <input type="number" min={1} max={30} value={cycleDaysPerMember}
-                           onChange={(e) => setCycleDaysPerMember(e.target.value)}
-                           placeholder="5"
-                           style={{ ...inputStyle, width: 80, padding: '6px 10px' }} />
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 10, color: COLORS.textMuted, marginBottom: 2 }}>cycle 시작일</div>
-                    <input type="date" value={cycleStartDate}
-                           onChange={(e) => setCycleStartDate(e.target.value)}
-                           style={{ ...inputStyle, width: 140, padding: '6px 10px' }} />
-                  </div>
-                </>
-              )}
-            </div>
-            {cycleKind === 'squad_rotation' && (
-              <div style={{
-                marginTop: 8, padding: '8px 12px', borderRadius: 8,
-                background: COLORS.bgBlue, border: `1px solid ${COLORS.borderBlue}`,
-                fontSize: 11, color: COLORS.info, lineHeight: 1.5,
-              }}>
-                💡 멤버 cfg 에서 「🎭 소속 조 (A/B) + 순서」 지정 필요. 알고리즘이 cycle 시작일부터
-                A조 (멤버×N일) → B조 (멤버×N일) → 반복으로 자동 배정.
-              </div>
-            )}
-          </Field>
+          {/* N-55 A/B조 cycle UI 는 N-56-b 에서 폐기 — 멤버 cfg work_cycle_pattern 으로 단일화
+              · DB 컬럼 (cs_shift_groups.cycle_kind / cs_group_members.squad) 은 안전 유지
+              · cycle_kind='squad_rotation' 으로 셋팅된 기존 그룹은 알고리즘이 그대로 작동
+              · 새 셋팅은 「멤버 cfg → 🔁 비균등 cycle 패턴」 에서 (그룹마다 다른 출발일 가능) */}
 
           {/* N-16 — 휴일 자동 제외 (주중 그룹은 ON, 야간/24-365 그룹은 OFF) */}
           <Field label="휴일 처리"
@@ -1969,8 +1937,10 @@ function MemberCfgPanel({
     work_pattern_text: string
     target_ratio: string  // N-34
     coverage_priority: string  // N-36
-    squad: string  // N-55
-    squad_order: string  // N-55
+    squad: string  // N-55 (deprecated)
+    squad_order: string  // N-55 (deprecated)
+    work_cycle_pattern: string  // N-56-b
+    work_cycle_start_date: string  // N-56-b
   }
   onChange: (patch: Partial<typeof cfg>) => void
   slots: ShiftSlot[]
@@ -2059,41 +2029,54 @@ function MemberCfgPanel({
         </div>
       </div>
 
-      {/* N-55 — A/B조 (squad_rotation 시) */}
+      {/* N-56-b — 멤버 비균등 cycle 패턴 (그룹마다 다른 출발일 가능) */}
       <div>
         <div style={cfgFieldLabel}>
-          🎭 소속 조 (A/B cycle)
+          🔁 비균등 근무 cycle (이 그룹)
           <span style={{ fontSize: 11, fontWeight: 500, color: COLORS.textMuted }}>
-            그룹 cycle_kind='squad_rotation' 일 때만 적용
+            CSV 패턴 + 시작일 — 빈 칸 = 일반 분배
           </span>
         </div>
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-          {(['', 'A', 'B'] as const).map(s => (
-            <button key={s || 'none'} type="button"
-                    onClick={() => onChange({ squad: s })}
-                    style={{
-                      flex: 1, padding: '8px', borderRadius: 8, fontSize: 12, fontWeight: 800,
-                      background: cfg.squad === s
-                        ? (s === 'A' ? COLORS.bgBlue : s === 'B' ? COLORS.bgGreen : COLORS.bgGray)
-                        : 'rgba(255,255,255,0.7)',
-                      color: cfg.squad === s
-                        ? (s === 'A' ? COLORS.info : s === 'B' ? COLORS.success : COLORS.textSecondary)
-                        : COLORS.textSecondary,
-                      border: `2px solid ${cfg.squad === s
-                        ? (s === 'A' ? COLORS.borderBlue : s === 'B' ? COLORS.borderGreen : COLORS.borderFaint)
-                        : COLORS.borderFaint}`,
-                      cursor: 'pointer',
-                    }}>{s === '' ? '─ 없음' : s === 'A' ? '🅰 A조' : '🅱 B조'}</button>
-          ))}
-          <input type="number" min={0} max={20}
-                 value={cfg.squad_order}
-                 onChange={(e) => onChange({ squad_order: e.target.value })}
-                 placeholder="순서"
-                 style={{ ...cfgInputStyle, width: 80 }} />
+        <div style={{
+          padding: '8px 12px', borderRadius: 8, marginBottom: 8,
+          background: COLORS.bgAmber, border: `1px solid ${COLORS.borderAmber}`,
+          fontSize: 11, color: COLORS.warning, lineHeight: 1.6,
+        }}>
+          💡 예: 정동민 「1근무 2휴무 1근무 4휴무」 = <code>1,2,1,4</code> (전체 8일).
+          짝수 idx=근무 / 홀수 idx=휴무. 같은 워커가 부엉이/달빛 같은 다른 그룹에서
+          <strong> 출발일만 다르게 잡으면</strong> 자연스럽게 어긋남.
         </div>
-        <div style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 4 }}>
-          예: A조 [윤민진(1), 전유하(2), 전정연(3)] → 그룹 cycle 시작 후 윤민진 N일 → 전유하 N일 → 전정연 N일 → B조 시작
+        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 6 }}>
+          <input type="text"
+                 value={cfg.work_cycle_pattern || ''}
+                 onChange={(e) => onChange({ work_cycle_pattern: e.target.value })}
+                 placeholder="1,2,1,4"
+                 style={cfgInputStyle} />
+          <input type="date"
+                 value={cfg.work_cycle_start_date || ''}
+                 onChange={(e) => onChange({ work_cycle_start_date: e.target.value })}
+                 style={cfgInputStyle} />
         </div>
+        {(() => {
+          const csv = (cfg.work_cycle_pattern || '').trim()
+          if (!csv) return null
+          const parts = csv.split(',').map(s => s.trim())
+          const valid = parts.length >= 2 && parts.every(p => /^\d+$/.test(p) && Number(p) > 0)
+          if (!valid) {
+            return (
+              <div style={{ fontSize: 11, color: COLORS.danger, marginTop: 6 }}>
+                ✗ 형식 오류 — 양수 정수 콤마 구분 (예: 1,2,1,4)
+              </div>
+            )
+          }
+          const sum = parts.reduce((s, p) => s + Number(p), 0)
+          const preview = parts.map((p, i) => `${p}${i % 2 === 0 ? '근무' : '휴무'}`).join(' → ')
+          return (
+            <div style={{ fontSize: 11, color: COLORS.success, marginTop: 6, fontWeight: 600 }}>
+              ✓ {preview} <span style={{ color: COLORS.textMuted, fontWeight: 400 }}>(전체 {sum}일 반복)</span>
+            </div>
+          )
+        })()}
       </div>
 
       {/* N-36 — 휴가 커버 우선순위 (priority_level 과 독립) */}

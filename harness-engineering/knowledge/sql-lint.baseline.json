@@ -331,6 +331,6 @@
       "column": "purchase_price"
     }
   ],
-  "generatedAt": "2026-05-18T08:56:50.160Z",
+  "generatedAt": "2026-05-18T09:42:42.209Z",
   "note": "기존 SQL 컬럼 위반 — known issue 로 처리. 새 위반만 lint fail."
 }

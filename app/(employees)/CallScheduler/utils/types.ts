@@ -73,9 +73,7 @@ export interface Worker {
   cycle_days_on?: number | null        // 외부 연속 근무일
   cycle_days_off?: number | null       // 외부 연속 휴무일
   cycle_start_date?: string | null     // 'YYYY-MM-DD' 사이클 1일차 (외부 근무 첫째 날)
-  // N-56 — 비균등 cycle 패턴 (당사 근무 cycle) — CSV '1,2,1,4' = 1근무 2휴무 1근무 4휴무
-  work_cycle_pattern?: string | null
-  work_cycle_start_date?: string | null
+  // N-56-b — work_cycle_pattern 은 그룹멤버 레벨로 이동 (GroupMemberSettings 참조)
   // N-29-b 호환 — UI 가 참조하는 (워커 글로벌) 개인 한계
   max_consecutive_work_days?: number | null
   max_days_per_month?: number | null
@@ -101,6 +99,10 @@ export interface GroupMemberSettings {
   max_days_per_month?: number | null
   blocked_slot_ids?: string[] | null   // ['L01','L02']
   work_pattern_text?: string | null    // '2-on-2-off' 자유 메모
+  // N-56-b — 멤버 단위 비균등 cycle 패턴 (그룹마다 다른 출발일 가능)
+  // CSV '1,2,1,4' = 1근무 2휴무 1근무 4휴무 (전체 8일 cycle)
+  work_cycle_pattern?: string | null
+  work_cycle_start_date?: string | null
   // join 결과 (UI 표출용)
   worker_name?: string
   worker_color_tone?: ColorTone

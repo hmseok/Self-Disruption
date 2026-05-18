@@ -41,6 +41,10 @@ interface MemberInput {
   // N-55 — A/B조 squad
   squad?: string | null      // 'A' | 'B' | null
   squad_order?: number | null  // 조 안 순서
+  // N-56-b — 그룹멤버 비균등 cycle 패턴 (당사 근무 cycle)
+  // CSV '1,2,1,4' = 1근무 2휴무 1근무 4휴무 (그룹마다 다른 출발일 가능)
+  work_cycle_pattern?: string | null
+  work_cycle_start_date?: string | null
 }
 
 function clampPriorityLevel(v: any): number {
@@ -101,6 +105,11 @@ export async function PUT(
     try {
       await prisma.$queryRaw<any[]>`SELECT squad FROM cs_group_members LIMIT 1`
     } catch { hasSquad = false }
+    // N-56-b — work_cycle_pattern (그룹멤버) graceful 감지
+    let hasMemberWorkCycle = true
+    try {
+      await prisma.$queryRaw<any[]>`SELECT work_cycle_pattern FROM cs_group_members LIMIT 1`
+    } catch { hasMemberWorkCycle = false }
 
     // 기존 멤버 모두 삭제
     await prisma.$executeRaw`DELETE FROM cs_group_members WHERE group_id = ${id}`
@@ -197,6 +206,29 @@ export async function PUT(
         try {
           await prisma.$executeRaw`
             UPDATE cs_group_members SET squad = ${squad}, squad_order = ${squadOrder}
+            WHERE id = ${memberId}
+          `
+        } catch { /* graceful */ }
+      }
+      // N-56-b — work_cycle_pattern / start_date 별도 UPDATE (graceful)
+      //   CSV 검증: 콤마 구분 양수 정수 2개 이상
+      if (hasMemberWorkCycle) {
+        let wcp: string | null = null
+        const raw = m.work_cycle_pattern
+        if (raw != null && raw !== '') {
+          const parts = String(raw).split(',').map(s => s.trim())
+          if (parts.length >= 2 && parts.every(p => /^\d+$/.test(p) && Number(p) > 0)) {
+            wcp = parts.join(',')
+          }
+        }
+        const wcStart = m.work_cycle_start_date == null || m.work_cycle_start_date === ''
+          ? null
+          : String(m.work_cycle_start_date).slice(0, 10)
+        try {
+          await prisma.$executeRaw`
+            UPDATE cs_group_members
+              SET work_cycle_pattern = ${wcp},
+                  work_cycle_start_date = ${wcStart}
             WHERE id = ${memberId}
           `
         } catch { /* graceful */ }
