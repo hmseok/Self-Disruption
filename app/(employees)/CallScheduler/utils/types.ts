@@ -73,6 +73,16 @@ export interface Worker {
   cycle_days_on?: number | null        // 외부 연속 근무일
   cycle_days_off?: number | null       // 외부 연속 휴무일
   cycle_start_date?: string | null     // 'YYYY-MM-DD' 사이클 1일차 (외부 근무 첫째 날)
+  // N-56 — 비균등 cycle 패턴 (당사 근무 cycle) — CSV '1,2,1,4' = 1근무 2휴무 1근무 4휴무
+  work_cycle_pattern?: string | null
+  work_cycle_start_date?: string | null
+  // N-29-b 호환 — UI 가 참조하는 (워커 글로벌) 개인 한계
+  max_consecutive_work_days?: number | null
+  max_days_per_month?: number | null
+  blocked_slot_ids?: string[] | null
+  preferred_dow_prefer?: string | null
+  preferred_dow_avoid?: string | null
+  min_days_per_month?: number | null
 }
 
 // Phase K — 그룹 안에서의 멤버 설정 (cs_group_members 행)

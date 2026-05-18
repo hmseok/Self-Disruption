@@ -62,6 +62,10 @@ interface GroupRow {
   include_holidays_extra?: number | boolean
   // N-35 — 같은 날 다른 그룹과 겹침 허용 (graceful)
   allow_same_day_other_group?: number | boolean
+  // N-55 — A/B조 cycle (squad_rotation) (graceful)
+  cycle_kind?: string | null
+  cycle_days_per_member?: number | null
+  cycle_start_date?: string | null
 }
 interface MemberRow {
   group_id: string
@@ -235,6 +239,39 @@ function isAvailableOnCycle(w: WorkerConstraint, isoDate: string): boolean {
   const phase = ((elapsed % cycle) + cycle) % cycle
   // phase >= cycle_days_on 이면 외부 휴무 phase (= 당사 가능)
   return phase >= w.cycle_days_on
+}
+
+// N-56 — 비균등 cycle 패턴 (당사 근무 cycle)
+//   CSV '1,2,1,4' = 1근무 2휴무 1근무 4휴무 (전체 8일 cycle)
+//   짝수 idx (0, 2, ...) = 근무 / 홀수 idx (1, 3, ...) = 휴무
+//   반환: true = 근무 가능일 / false = 휴무일 (당사 X)
+interface WorkCyclePattern {
+  parts: number[]      // 파싱된 cycle 일수 배열
+  total: number        // sum(parts) — 전체 cycle 일수
+  startIso: string     // 'YYYY-MM-DD'
+}
+function parseWorkCyclePattern(csv: string | null | undefined, startIso: string | null | undefined): WorkCyclePattern | null {
+  if (!csv || !startIso) return null
+  const parts = String(csv).split(',').map(s => Number(s.trim()))
+  if (parts.length < 2 || !parts.every(n => Number.isFinite(n) && n > 0)) return null
+  const total = parts.reduce((a, b) => a + b, 0)
+  if (total <= 0) return null
+  return { parts, total, startIso }
+}
+function isWorkDayByCyclePattern(p: WorkCyclePattern, isoDate: string): boolean {
+  const start = new Date(p.startIso + 'T00:00:00').getTime()
+  const cur = new Date(isoDate + 'T00:00:00').getTime()
+  let elapsed = Math.floor((cur - start) / (24 * 60 * 60 * 1000))
+  if (elapsed < 0) return false   // 시작 전 = 당사 미정 → 휴무로 처리
+  elapsed = ((elapsed % p.total) + p.total) % p.total
+  let acc = 0
+  for (let i = 0; i < p.parts.length; i++) {
+    acc += p.parts[i]
+    if (elapsed < acc) {
+      return i % 2 === 0   // 짝수 idx = 근무 phase
+    }
+  }
+  return false   // 도달 X (방어)
 }
 
 // PR-2QQ-d-3 — 그룹 × 요일별 min_workers 결정 (디폴트 fallback)
@@ -427,6 +464,99 @@ export async function POST(
       g.allow_same_day_other_group = groupAllowOverlapMap.get(g.id) ? 1 : 0
     }
 
+    // N-55 — 그룹 cycle (squad_rotation) 셋팅 + 멤버 squad 정보 (graceful)
+    let hasGroupCycle = true
+    try {
+      await prisma.$queryRaw<any[]>`SELECT cycle_kind FROM cs_shift_groups LIMIT 1`
+    } catch { hasGroupCycle = false }
+    let hasMemberSquad = true
+    try {
+      await prisma.$queryRaw<any[]>`SELECT squad FROM cs_group_members LIMIT 1`
+    } catch { hasMemberSquad = false }
+    type CycleCfg = { kind: string | null; days: number | null; start: string | null }
+    const groupCycleMap = new Map<string, CycleCfg>()
+    if (hasGroupCycle && targetGroups.length > 0) {
+      try {
+        const ccRows = await prisma.$queryRaw<any[]>`
+          SELECT id, cycle_kind, cycle_days_per_member,
+                 DATE_FORMAT(cycle_start_date, '%Y-%m-%d') AS cycle_start_date
+          FROM cs_shift_groups WHERE is_active = 1
+        `
+        for (const r of ccRows) {
+          groupCycleMap.set(r.id, {
+            kind: r.cycle_kind || null,
+            days: r.cycle_days_per_member != null ? Number(r.cycle_days_per_member) : null,
+            start: r.cycle_start_date || null,
+          })
+        }
+      } catch { /* graceful */ }
+    }
+    for (const g of targetGroups) {
+      const cc = groupCycleMap.get(g.id)
+      g.cycle_kind = cc?.kind || null
+      g.cycle_days_per_member = cc?.days ?? null
+      g.cycle_start_date = cc?.start ?? null
+    }
+    // 멤버 squad 매핑 (group_id + worker_id → {squad, order})
+    type SquadInfo = { squad: 'A' | 'B'; order: number }
+    const memberSquadMap = new Map<string, SquadInfo>()
+    if (hasMemberSquad && targetGroups.length > 0) {
+      try {
+        const sqRows = await prisma.$queryRaw<any[]>`
+          SELECT group_id, worker_id, squad, squad_order
+          FROM cs_group_members
+          WHERE squad IN ('A', 'B')
+        `
+        for (const r of sqRows) {
+          memberSquadMap.set(`${r.group_id}_${r.worker_id}`, {
+            squad: r.squad === 'A' ? 'A' : 'B',
+            order: r.squad_order != null ? Number(r.squad_order) : 0,
+          })
+        }
+      } catch { /* graceful */ }
+    }
+    // 일자별 active 멤버 계산 헬퍼
+    function computeActiveSquadMember(g: GroupRow, isoDate: string): string | null {
+      const kind = g.cycle_kind
+      if (kind !== 'squad_rotation') return null
+      const N = Math.max(1, Number(g.cycle_days_per_member) || 5)
+      const cycleStart = g.cycle_start_date || null
+      if (!cycleStart) return null
+      // 그룹의 A/B 멤버 목록 추출
+      const gMembers = membersByGroup.get(g.id) || []
+      const aList: Array<{ wId: string; order: number }> = []
+      const bList: Array<{ wId: string; order: number }> = []
+      for (const wId of gMembers) {
+        const sq = memberSquadMap.get(`${g.id}_${wId}`)
+        if (!sq) continue
+        if (sq.squad === 'A') aList.push({ wId, order: sq.order })
+        else bList.push({ wId, order: sq.order })
+      }
+      aList.sort((x, y) => x.order - y.order)
+      bList.sort((x, y) => x.order - y.order)
+      const A = aList.map(x => x.wId)
+      const B = bList.map(x => x.wId)
+      if (A.length === 0 && B.length === 0) return null
+      const aCycleLen = A.length * N
+      const bCycleLen = B.length * N
+      const total = aCycleLen + bCycleLen
+      if (total === 0) return null
+      // 일자 차이 계산
+      const s = new Date(cycleStart + 'T00:00:00')
+      const d = new Date(isoDate + 'T00:00:00')
+      const elapsed = Math.floor((d.getTime() - s.getTime()) / 86400000)
+      if (elapsed < 0) return null
+      const pos = ((elapsed % total) + total) % total
+      if (pos < aCycleLen && A.length > 0) {
+        const idx = Math.floor(pos / N)
+        return A[Math.min(idx, A.length - 1)]
+      } else if (B.length > 0) {
+        const idx = Math.floor((pos - aCycleLen) / N)
+        return B[Math.min(idx, B.length - 1)]
+      }
+      return null
+    }
+
     // N-19-b — 그룹 rotation 설정 별도 조회 (graceful)
     type GroupRotationCfg = { enabled: boolean; period_kind: string; period_days: number }
     const groupRotMap = new Map<string, GroupRotationCfg>()
@@ -611,6 +741,47 @@ export async function POST(
       membersByGroup.set(m.group_id, arr)
     }
 
+    // N-57 — Cross-group cover pairs (이 그룹 결원 시 cover 그룹 멤버 진입 허용)
+    //   coverPairsBySource: Map<source_group_id, Array<{cover_group_id, priority}>>
+    interface CoverPairInfo { cover_group_id: string; priority: number }
+    const coverPairsBySource = new Map<string, CoverPairInfo[]>()
+    let hasCoverPairs = true
+    try {
+      await prisma.$queryRaw<any[]>`SELECT 1 FROM cs_group_cover_pairs LIMIT 1`
+    } catch { hasCoverPairs = false }
+    if (hasCoverPairs && groupIds.length > 0) {
+      try {
+        const placeholders = groupIds.map(() => '?').join(',')
+        const cpRows = await prisma.$queryRawUnsafe<any[]>(`
+          SELECT source_group_id, cover_group_id, priority
+          FROM cs_group_cover_pairs
+          WHERE is_active = 1 AND source_group_id IN (${placeholders})
+          ORDER BY priority ASC
+        `, ...groupIds) as any
+        for (const r of cpRows) {
+          const arr = coverPairsBySource.get(r.source_group_id) || []
+          arr.push({
+            cover_group_id: String(r.cover_group_id),
+            priority: r.priority != null ? Number(r.priority) : 1,
+          })
+          coverPairsBySource.set(r.source_group_id, arr)
+        }
+      } catch { /* graceful */ }
+    }
+    // helper: source 그룹의 cover 멤버 IDs (priority 순 평탄화)
+    const getCoverWorkers = (sourceGroupId: string): string[] => {
+      const pairs = coverPairsBySource.get(sourceGroupId)
+      if (!pairs || pairs.length === 0) return []
+      const out: string[] = []
+      for (const p of pairs) {
+        const members = membersByGroup.get(p.cover_group_id) || []
+        for (const wId of members) {
+          if (!out.includes(wId)) out.push(wId)
+        }
+      }
+      return out
+    }
+
     // 4) 휴일 (exclude_auto=1) — 해당 월
     // N-31 — 항상 fetch (그룹 skip_on_holidays=1 가드를 위해)
     //   다이얼로그의 「휴일 자동 제외」 옵션은 그룹 skip=0 에 대한 master kill switch 역할만
@@ -720,6 +891,26 @@ export async function POST(
     try {
       await prisma.$queryRaw<any[]>`SELECT min_days_per_month FROM cs_workers LIMIT 1`
     } catch { hasWorkerMinDays = false }
+    // N-56 — work_cycle_pattern 컬럼 graceful
+    let hasWorkCyclePattern = true
+    try {
+      await prisma.$queryRaw<any[]>`SELECT work_cycle_pattern FROM cs_workers LIMIT 1`
+    } catch { hasWorkCyclePattern = false }
+    // N-56 — 비균등 cycle 패턴 (workerId → WorkCyclePattern)
+    const workerWorkCycleMap = new Map<string, WorkCyclePattern>()
+    if (hasWorkCyclePattern) {
+      try {
+        const wcpRows = await prisma.$queryRaw<any[]>`
+          SELECT id, work_cycle_pattern,
+                 DATE_FORMAT(work_cycle_start_date, '%Y-%m-%d') AS work_cycle_start_date
+          FROM cs_workers WHERE is_active = 1
+        `
+        for (const r of wcpRows) {
+          const p = parseWorkCyclePattern(r.work_cycle_pattern, r.work_cycle_start_date)
+          if (p) workerWorkCycleMap.set(String(r.id), p)
+        }
+      } catch { /* graceful */ }
+    }
     // N-36 — min_days_per_month 별도 조회 (graceful)
     const workerMinDaysMap = new Map<string, number>()
     if (hasWorkerMinDays) {
@@ -1093,6 +1284,9 @@ export async function POST(
       // PR-2SS-d revert — seniority_short 폐기
       // PR-2SS-h-1 — 그룹 회피일 (approved 매치 시 후보 제외)
       | { type: 'group_skip'; worker_id: string; group_id: string; date: string; reason: string | null }
+      // N-56 — 비균등 cycle 패턴 휴무 phase
+      | { type: 'work_cycle_off'; worker_id: string; date: string; pattern: string }
+      | { type: 'squad_work_cycle_off'; worker_id: string; group_id: string; date: string; pattern: string }
     const warnings: Warning[] = []
 
     // group_id → rotation cursor (usePriority=false 일 때만 사용)
@@ -1122,6 +1316,89 @@ export async function POST(
             }
           }
           continue
+        }
+
+        // N-55 — cycle_kind='squad_rotation' 우선 처리 (A/B조 cycle)
+        //   조원수 × N일 cycle: 일자별 active 멤버 결정 → 그 사람만 배정
+        //   휴가/회피일/skip 등 가드는 그대로 적용
+        if (g.cycle_kind === 'squad_rotation') {
+          // 패턴 매칭 — pattern_type='all_days' 가 일반적이지만 다른 패턴도 적용
+          const dowSet = patternDays(g.pattern_type, g.custom_days)
+          if (!dowSet.has(dow)) continue
+          // 휴일 가드
+          const groupSkipsHoliday = hasGroupSkipOnHolidays
+            ? Boolean(g.skip_on_holidays)
+            : false
+          const isHoliday = holidayDates.has(isoDate)
+          if (isHoliday && (groupSkipsHoliday || skipHolidays)) {
+            plan.push({
+              work_date: isoDate, shift_slot_id: g.shift_slot_id, worker_id: null,
+              special_code: 'none', action: 'skip-holiday',
+              group_id: g.id, group_name: g.name,
+            })
+            byGroup[g.id].skipped++
+            continue
+          }
+          // 일자별 active 멤버 1명
+          const activeWorker = computeActiveSquadMember(g, isoDate)
+          if (!activeWorker) {
+            // cycle 셋팅 미흡 또는 멤버 없음 — 빈자리
+            byGroup[g.id].skipped++
+            continue
+          }
+          // 휴가/회피일 체크 → 안 일하면 빈자리 (N-51 자동 재배정 이후 fix 가능)
+          const lm = workerLeaveMap.get(activeWorker)
+          const sp = lm?.get(isoDate)
+          if (sp === 'off') {
+            byGroup[g.id].skipped++
+            continue
+          }
+          const gSkips = groupSkipMap.get(g.id) || []
+          const skipMatch = gSkips.find(s =>
+            s.worker_id === activeWorker && isoDate >= s.start_date && isoDate <= s.end_date
+          )
+          if (skipMatch) {
+            byGroup[g.id].skipped++
+            continue
+          }
+          // N-56 — 비균등 cycle 패턴 — active 멤버의 휴무일이면 빈자리
+          const sqWcp = workerWorkCycleMap.get(activeWorker)
+          if (sqWcp && !isWorkDayByCyclePattern(sqWcp, isoDate)) {
+            warnings.push({
+              type: 'squad_work_cycle_off',
+              worker_id: activeWorker, group_id: g.id, date: isoDate,
+              pattern: sqWcp.parts.join(','),
+            })
+            byGroup[g.id].skipped++
+            continue
+          }
+          // 외부 cycle — active 멤버가 외부 근무 phase 면 빈자리
+          const sqCy = lookupWorkerCycle(activeWorker)
+          if (sqCy && !isAvailableOnCycle(sqCy as any, isoDate)) {
+            byGroup[g.id].skipped++
+            continue
+          }
+          // INSERT
+          const specialCode: 'none' | 'am_half' | 'pm_half' = sp ?? 'none'
+          plan.push({
+            work_date: isoDate,
+            shift_slot_id: g.shift_slot_id,
+            worker_id: activeWorker,
+            special_code: specialCode,
+            action: 'insert',
+            group_id: g.id, group_name: g.name,
+          })
+          byGroup[g.id].generated++
+          workedToday.add(activeWorker)
+          // counter 갱신
+          const cn = ensureCounter(activeWorker)
+          cn.total++
+          cn.by_dow[dow]++
+          cn.last_date = isoDate
+          const gb = ensureGroupBucket(activeWorker, g.id)
+          gb.total++
+          gb.last_date = isoDate
+          continue  // 이 일자 이 그룹 끝
         }
 
         // N-30 — pattern_type='holidays_only' 처리 (휴일 전담 그룹)
@@ -1339,7 +1616,15 @@ export async function POST(
         const need = Math.max(0, minN - lockedSet.size)
 
         // (3) 후보 풀 (멤버 - lock - on_leave - at_max - 패턴 미일치)
-        let candidates = gMembers.filter(wId => !lockedSet.has(wId))
+        // N-57 — Cross-group cover: 자기 그룹 멤버 + cover 그룹 멤버 (낮은 priority)
+        const coverWorkers = getCoverWorkers(g.id)
+        const coverWorkerSet = new Set(coverWorkers)
+        // candidates 구성: 자기 그룹 멤버 우선 + cover 그룹 멤버 (자기 그룹에 없는 사람만)
+        const initialPool = [
+          ...gMembers,
+          ...coverWorkers.filter(wId => !gMembers.includes(wId)),
+        ]
+        let candidates = initialPool.filter(wId => !lockedSet.has(wId))
 
         // 휴가 워커 제외 (full off 인 경우만 — am_half/pm_half 는 후보 유지하되 special_code 적용)
         candidates = candidates.filter(wId => {
@@ -1347,6 +1632,29 @@ export async function POST(
           if (!lm) return true
           const sp = lm.get(isoDate)
           return sp !== 'off'  // 종일 off 면 제외
+        })
+
+        // N-56 — 워커별 비균등 cycle 패턴 (당사 근무 cycle) — 휴무 phase 면 hard exclude
+        //   priority/rotation/squad 모든 경로 공통 적용
+        candidates = candidates.filter(wId => {
+          const wcp = workerWorkCycleMap.get(wId)
+          if (!wcp) return true
+          if (!isWorkDayByCyclePattern(wcp, isoDate)) {
+            warnings.push({
+              type: 'work_cycle_off',
+              worker_id: wId, date: isoDate, pattern: wcp.parts.join(','),
+            })
+            return false
+          }
+          return true
+        })
+
+        // PR-2QQ-d-revert — 외부 cycle (워커 글로벌) — 외부 근무 phase 면 hard exclude
+        //   N-56 과 함께 모든 경로 공통 가드 (priority 안에 있던 가드는 중복이지만 graceful)
+        candidates = candidates.filter(wId => {
+          const cy = lookupWorkerCycle(wId)
+          if (!cy) return true
+          return isAvailableOnCycle(cy as any, isoDate)
         })
 
         // PR-2SS-b — 익일 휴식 가드 (슬롯의 next_day_blocking_hours 적용)
@@ -1484,6 +1792,9 @@ export async function POST(
             // PR-2QQ-d-revert: 외부 cycle (워커 글로벌) — 외부 근무 phase 면 당사 후보 X
             const cy = lookupWorkerCycle(wId)
             if (cy && !isAvailableOnCycle(cy as any, isoDate)) return false
+            // N-56 — 비균등 cycle 패턴 (당사 근무 cycle) — 휴무 phase 면 당사 후보 X
+            const wcp = workerWorkCycleMap.get(wId)
+            if (wcp && !isWorkDayByCyclePattern(wcp, isoDate)) return false
             return true
           })
           // 가중치 정렬 (K-3: 멤버 단위 priority/dow/필수일수)
@@ -1496,6 +1807,11 @@ export async function POST(
             const pb = wb?.priority_level || 2
             const cnA = ensureCounter(a)
             const cnB = ensureCounter(b)
+            // N-57 — Cover 그룹 멤버는 자기 그룹 멤버보다 항상 후순위
+            //   자기 그룹 멤버가 다 빠진 경우에만 cover 멤버가 진입
+            const aIsCover = !gMembers.includes(a) && coverWorkerSet.has(a) ? 1 : 0
+            const bIsCover = !gMembers.includes(b) && coverWorkerSet.has(b) ? 1 : 0
+            if (aIsCover !== bIsCover) return aIsCover - bIsCover  // 0 (own) 먼저, 1 (cover) 나중
             // N-36 — 글로벌 min_days_per_month shortfall 최우선
             //   외부인력 같은 「의도된 적은 출근」 보장 — 평소엔 후순위지만 min 까지는 보장
             const wlA = workerLimits.get(a)

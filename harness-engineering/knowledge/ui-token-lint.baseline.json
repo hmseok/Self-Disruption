@@ -56,79 +56,97 @@
     },
     {
       "file": "app/(employees)/CallScheduler/settings/GroupEditor.tsx",
-      "line": 800,
+      "line": 883,
       "label": "glass-bg-hardcode",
       "snippet": "boxShadow: active ? `0 0 0 2px rgba(255,255,255,0.9)` : 'none',"
     },
     {
       "file": "app/(employees)/CallScheduler/settings/GroupEditor.tsx",
-      "line": 1260,
-      "label": "glass-bg-hardcode",
-      "snippet": "background: 'rgba(255,255,255,0.85)',"
-    },
-    {
-      "file": "app/(employees)/CallScheduler/settings/GroupEditor.tsx",
-      "line": 1291,
-      "label": "glass-bg-hardcode",
-      "snippet": "background: isWeekend ? COLORS.bgGray : 'rgba(255,255,255,0.85)',"
-    },
-    {
-      "file": "app/(employees)/CallScheduler/settings/GroupEditor.tsx",
-      "line": 1317,
-      "label": "glass-bg-hardcode",
-      "snippet": "background: 'rgba(255,255,255,0.7)', padding: '1px 6px', borderRadius: 99,"
-    },
-    {
-      "file": "app/(employees)/CallScheduler/settings/GroupEditor.tsx",
-      "line": 1325,
-      "label": "glass-bg-hardcode",
-      "snippet": "background: 'rgba(255,255,255,0.85)', borderRadius: 8, padding: 10,"
-    },
-    {
-      "file": "app/(employees)/CallScheduler/settings/GroupEditor.tsx",
-      "line": 1369,
+      "line": 1047,
       "label": "glass-bg-hardcode",
       "snippet": "background: 'rgba(255,255,255,0.5)',"
     },
     {
       "file": "app/(employees)/CallScheduler/settings/GroupEditor.tsx",
-      "line": 1440,
+      "line": 1083,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.6)', flex: 1, maxWidth: 240,"
+    },
+    {
+      "file": "app/(employees)/CallScheduler/settings/GroupEditor.tsx",
+      "line": 1489,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.85)',"
+    },
+    {
+      "file": "app/(employees)/CallScheduler/settings/GroupEditor.tsx",
+      "line": 1520,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: isWeekend ? COLORS.bgGray : 'rgba(255,255,255,0.85)',"
+    },
+    {
+      "file": "app/(employees)/CallScheduler/settings/GroupEditor.tsx",
+      "line": 1546,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.7)', padding: '1px 6px', borderRadius: 99,"
+    },
+    {
+      "file": "app/(employees)/CallScheduler/settings/GroupEditor.tsx",
+      "line": 1554,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.85)', borderRadius: 8, padding: 10,"
+    },
+    {
+      "file": "app/(employees)/CallScheduler/settings/GroupEditor.tsx",
+      "line": 1598,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.5)',"
+    },
+    {
+      "file": "app/(employees)/CallScheduler/settings/GroupEditor.tsx",
+      "line": 1669,
       "label": "glass-bg-hardcode",
       "snippet": "background: expandedCfgWorkerId === w.id ? COLORS.bgBlue : 'rgba(255,255,255,0.5)',"
     },
     {
       "file": "app/(employees)/CallScheduler/settings/GroupEditor.tsx",
-      "line": 1456,
+      "line": 1685,
       "label": "glass-bg-hardcode",
       "snippet": ": 'rgba(255,255,255,0.5)',"
     },
     {
       "file": "app/(employees)/CallScheduler/settings/GroupEditor.tsx",
-      "line": 1483,
+      "line": 1712,
       "label": "glass-bg-hardcode",
       "snippet": "background: 'rgba(255,255,255,0.96)',"
     },
     {
       "file": "app/(employees)/CallScheduler/settings/GroupEditor.tsx",
-      "line": 1774,
+      "line": 2005,
       "label": "glass-bg-hardcode",
       "snippet": "? (kind === 'prefer' ? COLORS.bgGreen : COLORS.bgRed) : 'rgba(255,255,255,0.7)',"
     },
     {
       "file": "app/(employees)/CallScheduler/settings/GroupEditor.tsx",
-      "line": 1796,
+      "line": 2027,
       "label": "glass-bg-hardcode",
       "snippet": "background: 'rgba(255,255,255,0.96)',"
     },
     {
       "file": "app/(employees)/CallScheduler/settings/GroupEditor.tsx",
-      "line": 1814,
+      "line": 2045,
       "label": "glass-bg-hardcode",
       "snippet": ": 'rgba(255,255,255,0.7)',"
     },
     {
       "file": "app/(employees)/CallScheduler/settings/GroupEditor.tsx",
-      "line": 1859,
+      "line": 2078,
+      "label": "glass-bg-hardcode",
+      "snippet": ": 'rgba(255,255,255,0.7)',"
+    },
+    {
+      "file": "app/(employees)/CallScheduler/settings/GroupEditor.tsx",
+      "line": 2127,
       "label": "glass-bg-hardcode",
       "snippet": ": 'rgba(255,255,255,0.7)',"
     },
@@ -200,13 +218,13 @@
     },
     {
       "file": "app/(employees)/CallScheduler/settings/WorkersTab.tsx",
-      "line": 527,
+      "line": 538,
       "label": "glass-bg-hardcode",
       "snippet": "background: 'rgba(255,255,255,0.5)',"
     },
     {
       "file": "app/(employees)/CallScheduler/settings/WorkersTab.tsx",
-      "line": 637,
+      "line": 705,
       "label": "glass-bg-hardcode",
       "snippet": "background: 'rgba(255,255,255,0.6)', color: COLORS.textPrimary,"
     },
@@ -3259,6 +3277,6 @@
       "snippet": "boxShadow: '6px 6px 18px rgba(140,170,210,0.14), -6px -6px 18px rgba(255,255,255,0.47)',"
     }
   ],
-  "generatedAt": "2026-05-18T06:05:31.475Z",
+  "generatedAt": "2026-05-18T08:56:33.480Z",
   "note": "UI 토큰 hardcode (inline rgba). 기존 위반 동결, 새 위반만 차단."
 }

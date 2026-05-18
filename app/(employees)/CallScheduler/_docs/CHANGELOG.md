@@ -3,6 +3,135 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-18 (Phase N-56 + N-57) — 비균등 cycle 패턴 + Cross-group cover
+
+### N-56 — 워커별 비균등 cycle 패턴 (CSV)
+
+#### 사용자 결정
+> "정동민씨를 1근무 2휴무 1근무 4휴무 로설정이 가능하게 해야할것같아"
+> → CSV 패턴: `1,2,1,4` (전체 8일 cycle)
+>   짝수 idx (0, 2, ...) = 근무 일수
+>   홀수 idx (1, 3, ...) = 휴무 일수
+
+#### 운영 예시 (정동민)
+```
+work_cycle_pattern = '1,2,1,4' (전체 8일 cycle)
+start_date 2026-06-01:
+  06-01 (1근무) → 06-02~03 (2휴무) → 06-04 (1근무) → 06-05~08 (4휴무) → 06-09 다시 시작
+```
+
+#### 데이터 모델 (마이그: 2026-05-17_cs_workers_work_cycle_pattern.sql)
+- `cs_workers.work_cycle_pattern` VARCHAR(64) — '1,2,1,4' 형식 CSV
+- `cs_workers.work_cycle_start_date` DATE — cycle 기준 시작일
+
+#### 변경
+1. **마이그** — 멱등 2 컬럼 추가
+2. **API workers (GET/PATCH)** — work_cycle_pattern + start_date 처리 + 응답 포함
+3. **WorkersTab UI** — IdentityPanel 안 「🔁 비균등 근무 cycle (CSV 패턴)」 영역
+   - 패턴 입력 + 시작일 + 미리보기 (`1근무 → 2휴무 → 1근무 → 4휴무`)
+4. **auto-generate 알고리즘** — `parseWorkCyclePattern` + `isWorkDayByCyclePattern` 헬퍼
+   - 모든 경로 (priority / rotation / squad) 공통 휴무 phase 가드
+   - squad_rotation 의 active 멤버도 휴무 phase 면 빈자리
+
+### N-57 — Cross-group cover 명시 매핑 (그룹 페어)
+
+#### 사용자 결정
+> "서브던, 부엉이던 휴가면 서로 그룹근무자가 커버하는것으로 셋팅하고 싶은데"
+> → source_group_id (휴가 발생) → cover_group_id (커버할 그룹) 명시 매핑
+
+#### 운영 예시
+```
+부엉이 휴가 시 → 서브 멤버 cover 후보 진입
+서브 휴가 시 → 부엉이 멤버 cover 후보 진입
+(상호 cover 는 양쪽 그룹에서 각각 설정 필요)
+```
+
+#### 데이터 모델 (마이그: 2026-05-17_cs_group_cover_pairs.sql)
+- `cs_group_cover_pairs` 신설
+  - source_group_id (휴가 발생 그룹)
+  - cover_group_id (커버할 그룹)
+  - priority TINYINT (1~3)
+  - is_active TINYINT(1)
+  - UNIQUE (source_group_id, cover_group_id)
+
+#### 변경
+1. **마이그** — cs_group_cover_pairs 멱등 CREATE
+2. **API** — GET / PUT /api/call-scheduler/shift-groups/[id]/cover-pairs
+3. **GroupEditor UI** — 「🔗 휴가 커버 그룹」 패널 (그룹 셋팅 옆)
+   - 모든 그룹 dropdown → 선택 → 추가
+   - priority 토글 (P1/P2/P3)
+   - × 삭제
+4. **auto-generate 알고리즘** — `getCoverWorkers(sourceGroupId)` 헬퍼
+   - candidates 풀에 cover 그룹 멤버 추가 (자기 그룹에 없는 사람만)
+   - 정렬 시 cover 멤버 항상 후순위 (own 먼저, cover 나중)
+   - 자기 그룹 멤버 전원 fill / 휴가 / max 도달 시점에만 cover 멤버 진입
+
+### GATE 진행 상태
+- ✅ G3 설계서 + 사용자 GO (AskUserQuestion: "A. CSV 패턴" + "B. 명시 매핑 (그룹 페어)")
+- ⏳ G5 tsc PASS (push 후 확인 필요)
+- ⏳ G6 lint:harness (push 시 자동)
+- ⚠ G7 Designer 시각 검수 — 사용자 직접 확인 권장
+- ✅ Rule 22 CHANGELOG 갱신 (본 entry)
+- ⚠ 마이그 적용 필수:
+  - `migrations/2026-05-17_cs_workers_work_cycle_pattern.sql`
+  - `migrations/2026-05-17_cs_group_cover_pairs.sql`
+
+---
+
+## 2026-05-17 (Phase N-55) — A/B조 cycle 로테이션 (조원수 × N일)
+
+### 사용자 결정
+> "A조 워커 한바퀴 돌면 B조 스타트"
+> "조원수 × N일 (각자 N일씩)"
+
+### 운영 예시 (부엉이)
+```
+A조: [윤민진(1), 전유하(2), 전정연(3)] = 3명 × 5일 = 15일
+B조: [정동민(1), 백업(2)] = 2명 × 5일 = 10일
+전체 cycle = 25일 → 반복
+
+일자 0~4:   윤민진 (A1, 5일)
+일자 5~9:   전유하 (A2, 5일)
+일자 10~14: 전정연 (A3, 5일)
+일자 15~19: 정동민 (B1, 5일)
+일자 20~24: 백업 (B2, 5일)
+일자 25~:   반복 (윤민진)
+```
+
+### 데이터 모델 (마이그: 2026-05-17_cs_squad_rotation.sql)
+- `cs_shift_groups.cycle_kind` VARCHAR(20) — 'squad_rotation' | NULL
+- `cs_shift_groups.cycle_days_per_member` INT — 각자 N일
+- `cs_shift_groups.cycle_start_date` DATE — cycle 기준일
+- `cs_group_members.squad` VARCHAR(1) — 'A' | 'B'
+- `cs_group_members.squad_order` INT — 조 안 순서
+
+### API
+- shift-groups [id] GET — cycle_* + members 의 squad 응답
+- shift-groups [id] PATCH — cycle_* 수용
+- members PUT — squad / squad_order 별도 UPDATE (graceful)
+
+### UI (GroupEditor)
+- 그룹 셋팅 「🎭 A/B조 cycle 로테이션」 영역 — 체크박스 + N일 + cycle 시작일
+- MemberCfgPanel 「🎭 소속 조 (A/B cycle)」 영역 — A/B/없음 + 순서 input
+
+### 알고리즘 (auto-generate)
+- groupCycleMap + memberSquadMap fetch (graceful)
+- computeActiveSquadMember(g, isoDate) 헬퍼:
+  · elapsed = isoDate - cycle_start_date
+  · total = A.length × N + B.length × N
+  · pos = elapsed % total
+  · pos < A_cycle_len → A조[idx]
+  · else → B조[idx]
+- 메인 loop 진입 시 cycle_kind='squad_rotation' 우선 분기
+- 휴일 가드 / 휴가 / 회피일 그대로 적용
+- active 멤버가 휴가/회피 시 → 빈자리 (N-51 자동 재배정 후 fix 가능)
+
+### 사용 절차
+1. 마이그 적용
+2. 부엉이 그룹 편집 → 🎭 A/B조 cycle 체크 + N=5 + 시작일 2026-06-01
+3. 멤버 cfg → 각자 A/B + 순서 지정 (A1, A2, A3, B1, B2)
+4. 자동 생성 재실행 → 25일 cycle 자동 반복
+
 ## 2026-05-17 (Phase N-53) — 카카오 알림톡/SMS 자동 발송 (토큰 발급 시)
 
 ### 사용자 결정

@@ -38,6 +38,9 @@ interface MemberInput {
   target_ratio?: number | null
   // N-36 — 휴가 커버 우선순위 (1~3, NULL = priority_level 따라감)
   coverage_priority?: number | null
+  // N-55 — A/B조 squad
+  squad?: string | null      // 'A' | 'B' | null
+  squad_order?: number | null  // 조 안 순서
 }
 
 function clampPriorityLevel(v: any): number {
@@ -93,6 +96,11 @@ export async function PUT(
     try {
       await prisma.$queryRaw<any[]>`SELECT coverage_priority FROM cs_group_members LIMIT 1`
     } catch { hasCoveragePriority = false }
+    // N-55 — squad 컬럼 graceful 감지
+    let hasSquad = true
+    try {
+      await prisma.$queryRaw<any[]>`SELECT squad FROM cs_group_members LIMIT 1`
+    } catch { hasSquad = false }
 
     // 기존 멤버 모두 삭제
     await prisma.$executeRaw`DELETE FROM cs_group_members WHERE group_id = ${id}`
@@ -178,6 +186,17 @@ export async function PUT(
         try {
           await prisma.$executeRaw`
             UPDATE cs_group_members SET coverage_priority = ${coverage_priority}
+            WHERE id = ${memberId}
+          `
+        } catch { /* graceful */ }
+      }
+      // N-55 — squad / squad_order 별도 UPDATE (graceful)
+      if (hasSquad) {
+        const squad = m.squad === 'A' || m.squad === 'B' ? m.squad : null
+        const squadOrder = m.squad_order != null ? Math.max(0, Number(m.squad_order) || 0) : null
+        try {
+          await prisma.$executeRaw`
+            UPDATE cs_group_members SET squad = ${squad}, squad_order = ${squadOrder}
             WHERE id = ${memberId}
           `
         } catch { /* graceful */ }

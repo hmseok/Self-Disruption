@@ -23,6 +23,10 @@ const ALLOWED_COLS = new Set([
   'rotation_enabled',         // N-19-a
   'rotation_period_kind',     // N-19-a — monthly | days
   'rotation_custom_days',     // N-19-a
+  // N-55 — A/B조 cycle
+  'cycle_kind',                // 'squad_rotation' | NULL
+  'cycle_days_per_member',     // 각자 N일
+  'cycle_start_date',          // YYYY-MM-DD
 ])
 const PATTERNS = new Set(['all_days', 'all_weekdays', 'weekends_only', 'custom', 'holidays_only'])
 const STRATEGIES = new Set(['all_members', 'rotation'])
@@ -55,6 +59,13 @@ export async function GET(
     let hasAllowOverlap = true
     try { await prisma.$queryRaw<any[]>`SELECT allow_same_day_other_group FROM cs_shift_groups LIMIT 1` }
     catch { hasAllowOverlap = false }
+    // N-55 — cycle_kind / squad 컬럼 graceful
+    let hasCycle = true
+    try { await prisma.$queryRaw<any[]>`SELECT cycle_kind FROM cs_shift_groups LIMIT 1` }
+    catch { hasCycle = false }
+    let hasSquad = true
+    try { await prisma.$queryRaw<any[]>`SELECT squad FROM cs_group_members LIMIT 1` }
+    catch { hasSquad = false }
     let hasRotation = true
     try { await prisma.$queryRaw<any[]>`SELECT rotation_enabled FROM cs_shift_groups LIMIT 1` }
     catch { hasRotation = false }
@@ -121,6 +132,22 @@ export async function GET(
       try {
         const r = await prisma.$queryRaw<any[]>`SELECT allow_same_day_other_group FROM cs_shift_groups WHERE id = ${id} LIMIT 1`
         allowOverlap = Boolean(r[0]?.allow_same_day_other_group)
+      } catch { /* graceful */ }
+    }
+    // N-55 — cycle 셋팅 별도 조회
+    let cycleKind: string | null = null
+    let cycleDaysPerMember: number | null = null
+    let cycleStartDate: string | null = null
+    if (hasCycle) {
+      try {
+        const r = await prisma.$queryRaw<any[]>`
+          SELECT cycle_kind, cycle_days_per_member,
+                 DATE_FORMAT(cycle_start_date, '%Y-%m-%d') AS cycle_start_date
+          FROM cs_shift_groups WHERE id = ${id} LIMIT 1
+        `
+        cycleKind = r[0]?.cycle_kind || null
+        cycleDaysPerMember = r[0]?.cycle_days_per_member != null ? Number(r[0].cycle_days_per_member) : null
+        cycleStartDate = r[0]?.cycle_start_date || null
       } catch { /* graceful */ }
     }
     if (hasRotation) {
@@ -221,6 +248,22 @@ export async function GET(
       } catch { /* graceful */ }
     }
 
+    // N-55 — squad 별도 조회 (graceful)
+    const squadMap = new Map<string, { squad: string | null; squad_order: number | null }>()
+    if (hasSquad) {
+      try {
+        const sRows = await prisma.$queryRaw<any[]>`
+          SELECT worker_id, squad, squad_order FROM cs_group_members WHERE group_id = ${id}
+        `
+        for (const r of sRows) {
+          squadMap.set(String(r.worker_id), {
+            squad: r.squad || null,
+            squad_order: r.squad_order != null ? Number(r.squad_order) : null,
+          })
+        }
+      } catch { /* graceful */ }
+    }
+
     // 멤버 응답 정규화 (parse blocked_slot_ids JSON)
     const members = memberRows.map(r => ({
       ...r,
@@ -239,6 +282,8 @@ export async function GET(
       rotation_end_date: hasMemberRotation ? (r.rotation_end_date ?? null) : null,
       target_ratio: ratioMap.has(String(r.worker_id)) ? ratioMap.get(String(r.worker_id))! : 1.0,  // N-34
       coverage_priority: covMap.has(String(r.worker_id)) ? covMap.get(String(r.worker_id)) : null,  // N-36
+      squad: squadMap.get(String(r.worker_id))?.squad ?? null,  // N-55
+      squad_order: squadMap.get(String(r.worker_id))?.squad_order ?? null,  // N-55
     }))
 
     const group = {
@@ -247,6 +292,10 @@ export async function GET(
       skip_on_holidays: skipOnHolidays,
       include_holidays_extra: includeHolidaysExtra,  // N-32
       allow_same_day_other_group: allowOverlap,  // N-35
+      // N-55 — A/B조 cycle
+      cycle_kind: cycleKind,
+      cycle_days_per_member: cycleDaysPerMember,
+      cycle_start_date: cycleStartDate,
       rotation_enabled: rotationEnabled,
       rotation_period_kind: rotationPeriodKind,
       rotation_custom_days: rotationCustomDays,
@@ -305,6 +354,11 @@ export async function PATCH(
     try {
       await prisma.$queryRaw<any[]>`SELECT allow_same_day_other_group FROM cs_shift_groups LIMIT 1`
     } catch { hasAllowOverlap = false }
+    // N-55 — cycle 컬럼 존재 확인 (graceful)
+    let hasCyclePatch = true
+    try {
+      await prisma.$queryRaw<any[]>`SELECT cycle_kind FROM cs_shift_groups LIMIT 1`
+    } catch { hasCyclePatch = false }
     // N-19-a — rotation 컬럼 존재 확인 (graceful)
     let hasRotation = true
     try {
@@ -324,6 +378,7 @@ export async function PATCH(
       if (k === 'skip_on_holidays' && !hasSkipOnHolidays) continue  // N-16 — graceful
       if (k === 'include_holidays_extra' && !hasIncludeHolidaysExtra) continue  // N-32 — graceful
       if (k === 'allow_same_day_other_group' && !hasAllowOverlap) continue  // N-35 — graceful
+      if ((k === 'cycle_kind' || k === 'cycle_days_per_member' || k === 'cycle_start_date') && !hasCyclePatch) continue  // N-55
       if (rotationCols.has(k) && !hasRotation) continue  // N-19-a — graceful
       if (k === 'pattern_type' && !PATTERNS.has(String(v))) continue
       if (k === 'generation_strategy' && !STRATEGIES.has(String(v))) continue

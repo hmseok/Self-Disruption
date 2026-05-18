@@ -58,6 +58,8 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
     work_pattern_text: string
     target_ratio: string  // N-34 — 그룹 분배 비율 (디폴트 '1.0', 0 = hard exclude)
     coverage_priority: string  // N-36 — 휴가 커버 우선순위 ('' = priority_level 따라감, '1'/'2'/'3')
+    squad: string  // N-55 — A/B조 ('A' | 'B' | '')
+    squad_order: string  // N-55 — 조 안 순서
   }
   const defaultMemberCfg = (): MemberCfg => ({
     priority_level: 2,
@@ -69,6 +71,8 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
     work_pattern_text: '',
     target_ratio: '1.0',
     coverage_priority: '',
+    squad: '',
+    squad_order: '',
   })
   const [memberCfgs, setMemberCfgs] = useState<Record<string, MemberCfg>>({})
   const [expandedCfgWorkerId, setExpandedCfgWorkerId] = useState<string | null>(null)
@@ -79,6 +83,24 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
   const [category, setCategory] = useState('general')
   // N-16 — 휴일(cs_holidays) 자동 제외 (주중 그룹은 true, 야간/24-365 그룹은 false)
   const [skipOnHolidays, setSkipOnHolidays] = useState(false)
+  // N-57 — Cross-group cover pairs (이 그룹 휴가 시 다른 그룹 멤버 cover)
+  interface CoverPair {
+    id?: string
+    cover_group_id: string
+    cover_group_name?: string
+    cover_group_category?: string | null
+    priority: number
+    memo?: string | null
+    is_active?: boolean
+  }
+  const [coverPairs, setCoverPairs] = useState<CoverPair[]>([])
+  const [coverPairsMissing, setCoverPairsMissing] = useState(false)   // 마이그 미적용
+  const [allGroupsForCover, setAllGroupsForCover] = useState<Array<{ id: string; name: string; category: string | null }>>([])
+  // N-55 — A/B조 cycle (squad_rotation)
+  //   조원수 × N일 cycle: A조 (n명 × N일) → B조 (m명 × N일) → 반복
+  const [cycleKind, setCycleKind] = useState<'squad_rotation' | ''>('')
+  const [cycleDaysPerMember, setCycleDaysPerMember] = useState<string>('5')
+  const [cycleStartDate, setCycleStartDate] = useState<string>('')
   // N-32 — 공휴일 추가 출근 (패턴 매칭 X 라도 휴일이면 추가 매칭)
   //  · 예: pattern='custom' (토일만) + includeHolidaysExtra=true → 토·일 + 공휴일도 출근
   //  · 별도 그룹 만들 필요 X — 한 그룹에서 평소 요일 + 휴일 동시 처리
@@ -177,6 +199,10 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
         setDescription(group.description || '')
         setCategory(group.category || 'general')
         setSkipOnHolidays(Boolean(group.skip_on_holidays))  // N-16
+        // N-55 — cycle 셋팅 로드
+        setCycleKind((group.cycle_kind === 'squad_rotation' ? 'squad_rotation' : '') as 'squad_rotation' | '')
+        setCycleDaysPerMember(group.cycle_days_per_member != null ? String(group.cycle_days_per_member) : '5')
+        setCycleStartDate(group.cycle_start_date || '')
         setIncludeHolidaysExtra(Boolean(group.include_holidays_extra))  // N-32
         setAllowSameDayOtherGroup(Boolean(group.allow_same_day_other_group))  // N-35
         // N-19-a — 로테이션 설정 + 시프트 sequence 로드
@@ -217,6 +243,8 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
             work_pattern_text: m.work_pattern_text || '',
             target_ratio: m.target_ratio != null ? String(m.target_ratio) : '1.0',  // N-34
             coverage_priority: m.coverage_priority != null ? String(m.coverage_priority) : '',  // N-36
+            squad: (m.squad === 'A' || m.squad === 'B') ? m.squad : '',  // N-55
+            squad_order: m.squad_order != null ? String(m.squad_order) : '',  // N-55
           }
         }
         setMemberCfgs(cfgs)
@@ -254,6 +282,29 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
             setVersionsMissing(true)
           }
         } catch { setVersionsMissing(true) }
+        // N-57 — Cover Pairs 로드 (graceful)
+        try {
+          const cpRes = await fetch(`/api/call-scheduler/shift-groups/${groupId}/cover-pairs`, { headers: auth })
+          const cpJson = await cpRes.json()
+          if (cpRes.ok && Array.isArray(cpJson.data)) {
+            setCoverPairs(cpJson.data)
+            if (cpJson._migration_pending) setCoverPairsMissing(true)
+          } else if (cpJson?._migration_pending) {
+            setCoverPairsMissing(true)
+          }
+        } catch { setCoverPairsMissing(true) }
+        // N-57 — 모든 그룹 목록 (cover 대상 선택용 — 본 그룹 제외)
+        try {
+          const agRes = await fetch(`/api/call-scheduler/shift-groups`, { headers: auth })
+          const agJson = await agRes.json()
+          if (agRes.ok && Array.isArray(agJson.data)) {
+            setAllGroupsForCover(
+              agJson.data
+                .filter((g: any) => g.id !== groupId && g.is_active !== false)
+                .map((g: any) => ({ id: g.id, name: g.name, category: g.category }))
+            )
+          }
+        } catch { /* graceful */ }
       } catch (e: any) { setError(e?.message || '오류') }
       finally { if (!abort) setLoading(false) }
     })()
@@ -468,6 +519,10 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
         color_tone: colorTone,
         description: description.trim() || null,
         skip_on_holidays: skipOnHolidays ? 1 : 0,  // N-16
+        // N-55 — A/B조 cycle
+        cycle_kind: cycleKind || null,
+        cycle_days_per_member: cycleKind && cycleDaysPerMember ? Math.max(1, Number(cycleDaysPerMember) || 5) : null,
+        cycle_start_date: cycleKind && cycleStartDate ? cycleStartDate : null,
         include_holidays_extra: includeHolidaysExtra ? 1 : 0,  // N-32
         allow_same_day_other_group: allowSameDayOtherGroup ? 1 : 0,  // N-35
         // N-19-a — 시프트 로테이션
@@ -498,6 +553,9 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
           target_ratio: cfg.target_ratio === '' ? 1.0 : Math.max(0, Number(cfg.target_ratio) || 0),
           // N-36 — 휴가 커버 우선순위 ('' → null = priority_level 따라감)
           coverage_priority: cfg.coverage_priority === '' ? null : Math.min(3, Math.max(1, Number(cfg.coverage_priority) || 0)) || null,
+          // N-55 — A/B조
+          squad: cfg.squad === 'A' || cfg.squad === 'B' ? cfg.squad : null,
+          squad_order: cfg.squad_order === '' ? null : Math.max(0, Number(cfg.squad_order) || 0),
         }
       })
       let id = groupId
@@ -537,6 +595,31 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
         })
         const mJ = await mRes.json()
         if (!mRes.ok) throw new Error(mJ?.error || '멤버 저장 실패')
+      }
+      // N-57 — Cover Pairs 저장 (기존 그룹만 — 신규는 ID 받은 후)
+      if (!coverPairsMissing && id) {
+        try {
+          const cpRes = await fetch(`/api/call-scheduler/shift-groups/${id}/cover-pairs`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', ...auth },
+            body: JSON.stringify({
+              pairs: coverPairs.map(p => ({
+                cover_group_id: p.cover_group_id,
+                priority: p.priority,
+                memo: p.memo || null,
+                is_active: p.is_active !== false,
+              })),
+            }),
+          })
+          const cpJ = await cpRes.json()
+          if (!cpRes.ok) {
+            if (cpJ?.error?.includes('마이그')) {
+              setCoverPairsMissing(true)
+            } else {
+              console.warn('Cover Pairs 저장 실패:', cpJ?.error)
+            }
+          }
+        } catch { /* graceful */ }
       }
       // PR-2QQ-d-2 — 최소 인원 셋팅 저장 (신규/편집 공통)
       if (!coverageMissing && id) {
@@ -818,6 +901,54 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
                    style={inputStyle} placeholder="자유 메모" />
           </Field>
 
+          {/* N-55 — A/B조 cycle (조원수 × N일 cycle) */}
+          <Field label="🎭 A/B조 cycle 로테이션"
+                 sub="A조 → B조 자동 cycle. 각자 N일씩 일함. 멤버 cfg 에서 A/B/순서 지정">
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+              <label style={{
+                display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px',
+                borderRadius: 8, cursor: 'pointer',
+                background: cycleKind === 'squad_rotation' ? COLORS.bgViolet : 'rgba(0,0,0,0.03)',
+                border: `1px solid ${cycleKind === 'squad_rotation' ? COLORS.borderViolet : COLORS.borderFaint}`,
+              }}>
+                <input type="checkbox"
+                       checked={cycleKind === 'squad_rotation'}
+                       onChange={(e) => setCycleKind(e.target.checked ? 'squad_rotation' : '')} />
+                <span style={{ fontSize: 12, fontWeight: 700,
+                               color: cycleKind === 'squad_rotation' ? '#7c3aed' : COLORS.textPrimary }}>
+                  🎭 A/B조 cycle 사용
+                </span>
+              </label>
+              {cycleKind === 'squad_rotation' && (
+                <>
+                  <div>
+                    <div style={{ fontSize: 10, color: COLORS.textMuted, marginBottom: 2 }}>각자 N일씩</div>
+                    <input type="number" min={1} max={30} value={cycleDaysPerMember}
+                           onChange={(e) => setCycleDaysPerMember(e.target.value)}
+                           placeholder="5"
+                           style={{ ...inputStyle, width: 80, padding: '6px 10px' }} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 10, color: COLORS.textMuted, marginBottom: 2 }}>cycle 시작일</div>
+                    <input type="date" value={cycleStartDate}
+                           onChange={(e) => setCycleStartDate(e.target.value)}
+                           style={{ ...inputStyle, width: 140, padding: '6px 10px' }} />
+                  </div>
+                </>
+              )}
+            </div>
+            {cycleKind === 'squad_rotation' && (
+              <div style={{
+                marginTop: 8, padding: '8px 12px', borderRadius: 8,
+                background: COLORS.bgBlue, border: `1px solid ${COLORS.borderBlue}`,
+                fontSize: 11, color: COLORS.info, lineHeight: 1.5,
+              }}>
+                💡 멤버 cfg 에서 「🎭 소속 조 (A/B) + 순서」 지정 필요. 알고리즘이 cycle 시작일부터
+                A조 (멤버×N일) → B조 (멤버×N일) → 반복으로 자동 배정.
+              </div>
+            )}
+          </Field>
+
           {/* N-16 — 휴일 자동 제외 (주중 그룹은 ON, 야간/24-365 그룹은 OFF) */}
           <Field label="휴일 처리"
                  sub="공휴일/임시휴일(휴일 설정 탭)에 자동 배정에서 제외할지 — 주중 근무 그룹은 ON, 24/365 운영 그룹은 OFF">
@@ -871,6 +1002,104 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
               </span>
             </label>
           </Field>
+
+          {/* N-57 — Cross-group cover pairs */}
+          {!isNew && (
+            <Field label="🔗 휴가 커버 그룹 (cross-group cover)"
+                   sub="이 그룹 멤버 휴가 시 다른 그룹의 멤버가 cover 가능. 예: 부엉이 ↔ 서브 (서로 커버)">
+              {coverPairsMissing ? (
+                <div style={{
+                  padding: '10px 12px', borderRadius: 10,
+                  background: COLORS.bgAmber, border: `1px solid ${COLORS.borderAmber}`,
+                  fontSize: 11, color: COLORS.warning,
+                }}>
+                  ⚠ 마이그 미적용 — <code>migrations/2026-05-17_cs_group_cover_pairs.sql</code> 실행 후 사용 가능
+                </div>
+              ) : (
+                <div style={{
+                  padding: '10px 12px', borderRadius: 10,
+                  background: 'rgba(168,85,247,0.06)',
+                  border: `1px solid rgba(168,85,247,0.30)`,
+                }}>
+                  {coverPairs.length === 0 ? (
+                    <div style={{ fontSize: 11, color: COLORS.textMuted, marginBottom: 8 }}>
+                      이 그룹에서 휴가 발생 시 cover 할 다른 그룹 멤버가 없음 (그룹 내 워커만 cover)
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+                      {coverPairs.map((cp, idx) => (
+                        <div key={cp.id || `${cp.cover_group_id}-${idx}`} style={{
+                          display: 'flex', alignItems: 'center', gap: 4,
+                          padding: '4px 8px', borderRadius: 99,
+                          background: 'rgba(168,85,247,0.12)',
+                          border: '1px solid rgba(168,85,247,0.30)',
+                          fontSize: 11, fontWeight: 700, color: '#7c3aed',
+                        }}>
+                          <span>🔗 {cp.cover_group_name || cp.cover_group_id.slice(0, 8)}</span>
+                          <select value={cp.priority}
+                                  onChange={(e) => {
+                                    const nv = Number(e.target.value)
+                                    setCoverPairs(prev => prev.map((p, i) => i === idx ? { ...p, priority: nv } : p))
+                                  }}
+                                  style={{
+                                    padding: '1px 4px', fontSize: 10, borderRadius: 4,
+                                    border: '1px solid rgba(168,85,247,0.30)',
+                                    background: 'rgba(255,255,255,0.5)',
+                                  }}>
+                            <option value={1}>P1 최우선</option>
+                            <option value={2}>P2 보조</option>
+                            <option value={3}>P3 최후</option>
+                          </select>
+                          <button type="button"
+                                  onClick={() => setCoverPairs(prev => prev.filter((_, i) => i !== idx))}
+                                  style={{
+                                    background: 'transparent', border: 'none', cursor: 'pointer',
+                                    color: COLORS.danger, fontSize: 14, padding: 0, lineHeight: 1,
+                                  }}>×</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    <span style={{ fontSize: 11, color: COLORS.textSecondary, fontWeight: 700 }}>+ 추가:</span>
+                    <select
+                      value=""
+                      onChange={(e) => {
+                        const gid = e.target.value
+                        if (!gid) return
+                        if (coverPairs.some(p => p.cover_group_id === gid)) return
+                        const grp = allGroupsForCover.find(g => g.id === gid)
+                        setCoverPairs(prev => [...prev, {
+                          cover_group_id: gid,
+                          cover_group_name: grp?.name,
+                          cover_group_category: grp?.category ?? null,
+                          priority: 1,
+                          is_active: true,
+                        }])
+                      }}
+                      style={{
+                        padding: '4px 8px', fontSize: 11, borderRadius: 6,
+                        border: `1px solid ${COLORS.borderFaint}`,
+                        background: 'rgba(255,255,255,0.6)', flex: 1, maxWidth: 240,
+                      }}>
+                      <option value="">— 그룹 선택 —</option>
+                      {allGroupsForCover
+                        .filter(g => !coverPairs.some(p => p.cover_group_id === g.id))
+                        .map(g => (
+                          <option key={g.id} value={g.id}>
+                            {g.name}{g.category ? ` (${g.category})` : ''}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                  <div style={{ fontSize: 10, color: COLORS.textMuted, marginTop: 6, lineHeight: 1.5 }}>
+                    💡 자동 생성 알고리즘이 이 그룹 결원 시 위 그룹의 멤버를 후보에 추가 (priority 순).
+                    상호 cover 는 양쪽 그룹에서 각각 설정 필요 (한 방향).
+                  </div>
+                </div>
+              )}
+            </Field>
+          )}
 
           {/* N-32 — 공휴일 추가 출근 (skip 과 상호배반) */}
           <Field label="공휴일 추가 출근"
@@ -1740,6 +1969,8 @@ function MemberCfgPanel({
     work_pattern_text: string
     target_ratio: string  // N-34
     coverage_priority: string  // N-36
+    squad: string  // N-55
+    squad_order: string  // N-55
   }
   onChange: (patch: Partial<typeof cfg>) => void
   slots: ShiftSlot[]
@@ -1825,6 +2056,43 @@ function MemberCfgPanel({
               {n === 1 ? 'P1 최우선' : n === 2 ? 'P2 일반' : 'P3 백업'}
             </button>
           ))}
+        </div>
+      </div>
+
+      {/* N-55 — A/B조 (squad_rotation 시) */}
+      <div>
+        <div style={cfgFieldLabel}>
+          🎭 소속 조 (A/B cycle)
+          <span style={{ fontSize: 11, fontWeight: 500, color: COLORS.textMuted }}>
+            그룹 cycle_kind='squad_rotation' 일 때만 적용
+          </span>
+        </div>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          {(['', 'A', 'B'] as const).map(s => (
+            <button key={s || 'none'} type="button"
+                    onClick={() => onChange({ squad: s })}
+                    style={{
+                      flex: 1, padding: '8px', borderRadius: 8, fontSize: 12, fontWeight: 800,
+                      background: cfg.squad === s
+                        ? (s === 'A' ? COLORS.bgBlue : s === 'B' ? COLORS.bgGreen : COLORS.bgGray)
+                        : 'rgba(255,255,255,0.7)',
+                      color: cfg.squad === s
+                        ? (s === 'A' ? COLORS.info : s === 'B' ? COLORS.success : COLORS.textSecondary)
+                        : COLORS.textSecondary,
+                      border: `2px solid ${cfg.squad === s
+                        ? (s === 'A' ? COLORS.borderBlue : s === 'B' ? COLORS.borderGreen : COLORS.borderFaint)
+                        : COLORS.borderFaint}`,
+                      cursor: 'pointer',
+                    }}>{s === '' ? '─ 없음' : s === 'A' ? '🅰 A조' : '🅱 B조'}</button>
+          ))}
+          <input type="number" min={0} max={20}
+                 value={cfg.squad_order}
+                 onChange={(e) => onChange({ squad_order: e.target.value })}
+                 placeholder="순서"
+                 style={{ ...cfgInputStyle, width: 80 }} />
+        </div>
+        <div style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 4 }}>
+          예: A조 [윤민진(1), 전유하(2), 전정연(3)] → 그룹 cycle 시작 후 윤민진 N일 → 전유하 N일 → 전정연 N일 → B조 시작
         </div>
       </div>
 
