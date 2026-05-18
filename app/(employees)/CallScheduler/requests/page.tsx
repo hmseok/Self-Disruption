@@ -106,6 +106,47 @@ export default function RequestsPage() {
     ? groups.filter(g => g.member_ids.includes(regWorkerId))
     : []
 
+  // N-49 — 휴가 직접 등록 (워커 + 일자 + 사유 → POST /api/.../leaves)
+  const [regLeaveWorkerId, setRegLeaveWorkerId] = useState<string>('')
+  const [regLeaveStart, setRegLeaveStart] = useState<string>('')
+  const [regLeaveEnd, setRegLeaveEnd] = useState<string>('')
+  const [regLeaveReason, setRegLeaveReason] = useState<string>('')
+  const [regLeaveBusy, setRegLeaveBusy] = useState(false)
+  const registerLeave = async () => {
+    if (!regLeaveWorkerId || !regLeaveStart || !regLeaveEnd) {
+      setMsg({ ok: false, text: '워커 / 시작일 / 종료일 모두 필수' })
+      return
+    }
+    if (regLeaveStart > regLeaveEnd) {
+      setMsg({ ok: false, text: '시작일이 종료일보다 이후입니다' })
+      return
+    }
+    setRegLeaveBusy(true); setMsg(null)
+    try {
+      const auth = await getAuthHeader()
+      const res = await fetch(`/api/call-scheduler/leaves`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...auth },
+        body: JSON.stringify({
+          worker_id: regLeaveWorkerId,
+          leave_type: 'annual',
+          start_date: regLeaveStart,
+          end_date: regLeaveEnd,
+          am_pm: 'full',
+          reason: regLeaveReason.trim() || null,
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json?.error || '등록 실패')
+      const wName = workers.find(w => w.id === regLeaveWorkerId)?.name || ''
+      setMsg({ ok: true, text: `${wName} 연차 등록 — ${regLeaveStart}${regLeaveStart !== regLeaveEnd ? ` ~ ${regLeaveEnd}` : ''}` })
+      setRegLeaveStart(''); setRegLeaveEnd(''); setRegLeaveReason('')
+      load()
+    } catch (e: any) {
+      setMsg({ ok: false, text: e?.message || '오류' })
+    } finally { setRegLeaveBusy(false) }
+  }
+
   // N-15 — 매니저 직접 등록 (status=approved 즉시)
   const registerSkip = async () => {
     if (!regWorkerId || !regGroupId || !regStart || !regEnd) {
@@ -444,14 +485,106 @@ export default function RequestsPage() {
             </>
           )}
 
-          {/* 🙋 휴가 */}
+          {/* 🙋 휴가 — N-49: 직원 신청 검토 + 매니저 직접 등록 */}
           {tab === 'leave' && (
-            leaves.length === 0
-              ? <EmptyHint text="휴가 신청이 없습니다." />
-              : <LeaveList rows={leaves} busy={busy}
-                  onApprove={(r) => resolve('leave', r.id, 'approve', r.worker_name)}
-                  onReject={(r) => openRejectModal('leave', r.worker_name,
-                    (note) => resolve('leave', r.id, 'reject', r.worker_name, note))} />
+            <>
+              {/* N-49 매니저 직접 등록 패널 */}
+              <div style={{ ...GLASS.L4, borderRadius: 12, padding: 14, marginBottom: 14 }}>
+                <div style={{ fontSize: 13, fontWeight: 800, color: '#0f2440', marginBottom: 10 }}>
+                  📝 매니저 직접 등록 (연차)
+                  <span style={{ fontSize: 11, fontWeight: 500, color: COLORS.textMuted, marginLeft: 6 }}>
+                    워커 선택 → 일자 → [+ 등록] (전체 그룹 적용 / 즉시 승인)
+                  </span>
+                </div>
+                {/* 워커 chip 선택 */}
+                <div style={{ marginBottom: 8 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSecondary, marginBottom: 4 }}>
+                    워커
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                    {workers.map(w => {
+                      const active = regLeaveWorkerId === w.id
+                      const tone = w.color_tone as keyof typeof TONE_BG
+                      return (
+                        <button key={w.id} type="button"
+                                onClick={() => setRegLeaveWorkerId(active ? '' : w.id)}
+                                style={{
+                                  padding: '5px 11px', borderRadius: 6, fontSize: 12, fontWeight: 700,
+                                  background: active
+                                    ? '#0f2440'
+                                    : (TONE_BG[tone] !== 'transparent' ? TONE_BG[tone] : COLORS.bgGray),
+                                  color: active ? '#fff' : (TONE_TEXT[tone] || COLORS.textPrimary),
+                                  border: `1px solid ${active ? '#0f2440' : COLORS.borderFaint}`,
+                                  cursor: 'pointer',
+                                }}>
+                          {w.name}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+                {/* 일자 + 사유 + 등록 */}
+                <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end', flexWrap: 'wrap', marginTop: 8 }}>
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSecondary, marginBottom: 4 }}>
+                      시작일
+                    </div>
+                    <input type="date" value={regLeaveStart}
+                           onChange={(e) => {
+                             setRegLeaveStart(e.target.value)
+                             if (!regLeaveEnd || regLeaveEnd < e.target.value) setRegLeaveEnd(e.target.value)
+                           }}
+                           style={{
+                             padding: '6px 10px', fontSize: 12, fontWeight: 600,
+                             border: `1px solid ${COLORS.borderFaint}`, borderRadius: 6,
+                             background: 'rgba(255,255,255,1)',
+                           }} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSecondary, marginBottom: 4 }}>
+                      종료일
+                    </div>
+                    <input type="date" value={regLeaveEnd}
+                           onChange={(e) => setRegLeaveEnd(e.target.value)}
+                           style={{
+                             padding: '6px 10px', fontSize: 12, fontWeight: 600,
+                             border: `1px solid ${COLORS.borderFaint}`, borderRadius: 6,
+                             background: 'rgba(255,255,255,1)',
+                           }} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 200 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSecondary, marginBottom: 4 }}>
+                      사유 (선택)
+                    </div>
+                    <input type="text" value={regLeaveReason}
+                           onChange={(e) => setRegLeaveReason(e.target.value)}
+                           placeholder="예: 개인 사정 / 가족 행사 / ..."
+                           style={{
+                             width: '100%', padding: '6px 10px', fontSize: 12, fontWeight: 500,
+                             border: `1px solid ${COLORS.borderFaint}`, borderRadius: 6,
+                             background: 'rgba(255,255,255,1)',
+                           }} />
+                  </div>
+                  <button type="button" onClick={registerLeave} disabled={regLeaveBusy}
+                          style={{
+                            padding: '8px 18px', borderRadius: 8, fontSize: 13, fontWeight: 800,
+                            background: '#0f2440', color: '#fff', border: 'none',
+                            cursor: regLeaveBusy ? 'not-allowed' : 'pointer',
+                            opacity: regLeaveBusy ? 0.6 : 1,
+                          }}>
+                    {regLeaveBusy ? '...' : '+ 등록'}
+                  </button>
+                </div>
+              </div>
+
+              {/* 직원 신청 검토 + 등록된 휴가 list */}
+              {leaves.length === 0
+                ? <EmptyHint text="휴가 신청 / 등록 없음." />
+                : <LeaveList rows={leaves} busy={busy}
+                    onApprove={(r) => resolve('leave', r.id, 'approve', r.worker_name)}
+                    onReject={(r) => openRejectModal('leave', r.worker_name,
+                      (note) => resolve('leave', r.id, 'reject', r.worker_name, note))} />}
+            </>
           )}
 
           {/* 🔄 교체 */}

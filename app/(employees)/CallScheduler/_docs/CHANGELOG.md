@@ -3,6 +3,20 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-17 (Phase N-49) — 직원 요청 검토 휴가 탭 매니저 직접 등록
+
+사용자 보고 (스크린샷): 회피일 탭에만 매니저 직접 등록 UI 있음 → 휴가 탭에도 추가
+
+▸ 변경 (requests/page.tsx)
+- registerLeave 함수 신설 — POST /api/call-scheduler/leaves (leave_type='annual', am_pm='full')
+- 휴가 탭 안에 「📝 매니저 직접 등록 (연차)」 패널
+- 워커 선택 → 시작일/종료일 → 사유 → + 등록
+- 회피일과 동일 UX, 차이: 그룹 선택 X (전체 그룹 적용 — 연차는 글로벌)
+
+▸ 효과
+- 매니저가 직원 요청 검토 페이지에서 연차도 즉시 등록 가능
+- 즉시 승인 status='approved' (회피일과 동일)
+
 ## 2026-05-17 (Phase N-48) — required_days_per_month 완전 제거
 
 ### 사용자 결정
