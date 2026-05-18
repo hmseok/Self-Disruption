@@ -32,6 +32,8 @@
 | `app/hr/*` | **hr 세션 (신설 2026-05-11)** | ✅ |
 | `app/api/ride-employees/*` | **hr 세션 (신설 2026-05-11)** | ✅ |
 | `app/api/ride-departments/*` | **hr 세션 (신설 2026-05-11)** | ✅ |
+| `app/RideCompliance/*` | **compliance 세션 (신설 2026-05-11)** | ✅ |
+| `app/api/ride-compliance/*` | **compliance 세션 (신설 2026-05-11)** | ✅ |
 | `app/RideMTOps/*` | MT팀 세션 (위탁: 메뉴 등록 메인 세션) | ✅ |
 | `app/api/cafe24/maintenance-tours,legal-inspections,chargers/*` | MT팀 세션 | ✅ |
 | `app/loans*/*` | 본 도메인 세션 (자율) | ✅ |
