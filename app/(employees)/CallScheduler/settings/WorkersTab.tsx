@@ -163,7 +163,7 @@ export default function WorkersTab() {
       }
     } else {
       // 토큰 없음 — 발급
-      if (!confirm(`${w.name} 영구 링크 발급 — 비로그인 본인 페이지 접속 가능. 계속?`)) return
+      if (!confirm(`${w.name} 영구 링크 발급 + 자동 발송 (카카오/SMS). 계속?`)) return
       try {
         const auth = await getAuthHeader()
         const res = await fetch(`/api/ride-employees/${emp.id}/token`, { method: 'POST', headers: auth })
@@ -174,7 +174,17 @@ export default function WorkersTab() {
         try {
           if (url) await navigator.clipboard.writeText(url)
         } catch { /* graceful */ }
-        setActionMsg({ ok: true, text: `${w.name} 토큰 발급 + 링크 복사됨: ${url}` })
+        // N-53 — 발송 결과 안내
+        const notify = json.data?.notify_result
+        let notifyMsg = ''
+        if (notify?.success) {
+          notifyMsg = notify.channel === 'kakao' ? ' / 📱 카카오 알림톡 발송' : ' / 📱 SMS 발송'
+        } else if (notify?.reason) {
+          notifyMsg = ` / ⚠ 발송 skip: ${notify.reason}`
+        } else if (notify?.error) {
+          notifyMsg = ` / ❌ 발송 실패: ${notify.error}`
+        }
+        setActionMsg({ ok: true, text: `${w.name} 토큰 발급 + 링크 복사${notifyMsg}` })
         await load()
       } catch (e: any) {
         setActionMsg({ ok: false, text: e?.message || '오류' })

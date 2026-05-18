@@ -3,6 +3,33 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-17 (Phase N-53) — 카카오 알림톡/SMS 자동 발송 (토큰 발급 시)
+
+### 사용자 결정
+> "배포하면 자동 전용링크발송 및 비로그인 본인 페이지 ..."
+> 채널: 카카오 알림톡 + 시점: 토큰 발급 시 자동
+
+### 변경
+1. **`lib/notification.ts` 신설** — 솔라피 (CoolSMS) API wrapper
+   - sendKakaoOrSms(opts) — 알림톡 우선 + SMS fallback
+   - buildScheduleLinkMessage — SMS 본문 빌더
+   - 환경변수: SOLAPI_API_KEY / SOLAPI_API_SECRET / SOLAPI_FROM_PHONE / KAKAO_PFID / KAKAO_TEMPLATE_ID
+2. **`/api/ride-employees/[id]/token POST`** — 발급 후 자동 발송 호출
+   - 응답에 `notify_result` 포함 (성공/실패/skip 사유)
+   - 환경변수 미설정 시 graceful — 토큰만 발급
+3. **`WorkersTab.tsx`** — 발급 후 결과 메시지 표시 (📱 카카오/SMS 발송 / ⚠ skip / ❌ 실패)
+
+### 운영자 셋팅 필요 (배포 후)
+- 솔라피 가입 (https://solapi.com) → API KEY
+- 발신번호 인증 (회사 대표번호) → 1일
+- 카카오 비즈니스 채널 (https://business.kakao.com) → 채널 등록
+- 알림톡 템플릿 작성 + 카카오 심사 → 3~5일
+- Cloud Run 환경변수 등록 (5종)
+
+### 후속 작업
+- N-54 연차 사용일 계산 (실제 근무일만 차감)
+- N-51 자동 재배정
+
 ## 2026-05-17 (Phase N-52) — 연차/회피일 동기화 fix (status 필터 + 그룹 내 등록 폼 제거)
 
 ### 사용자 보고

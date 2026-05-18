@@ -200,13 +200,13 @@
     },
     {
       "file": "app/(employees)/CallScheduler/settings/WorkersTab.tsx",
-      "line": 517,
+      "line": 527,
       "label": "glass-bg-hardcode",
       "snippet": "background: 'rgba(255,255,255,0.5)',"
     },
     {
       "file": "app/(employees)/CallScheduler/settings/WorkersTab.tsx",
-      "line": 627,
+      "line": 637,
       "label": "glass-bg-hardcode",
       "snippet": "background: 'rgba(255,255,255,0.6)', color: COLORS.textPrimary,"
     },
@@ -3259,6 +3259,6 @@
       "snippet": "boxShadow: '6px 6px 18px rgba(140,170,210,0.14), -6px -6px 18px rgba(255,255,255,0.47)',"
     }
   ],
-  "generatedAt": "2026-05-18T05:37:29.684Z",
+  "generatedAt": "2026-05-18T06:05:31.475Z",
   "note": "UI 토큰 hardcode (inline rgba). 기존 위반 동결, 새 위반만 차단."
 }
