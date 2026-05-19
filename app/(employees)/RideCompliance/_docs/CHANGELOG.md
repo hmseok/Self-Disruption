@@ -6,6 +6,47 @@
 
 ---
 
+## v1.3-G — 매뉴얼 본문 import seed + 운영 가이드 컴팩트 list 재설계 (2026-05-19)
+
+**사용자 통찰 (2026-05-19)**:
+1. "메뉴얼을 아직도 볼 수 없는데" → sandbox 추출본 활용 자동 import (옵션 A)
+2. "운영 가이드 카드탭은 보기가 썩 편하지 않다" → 컴팩트 list 재설계 (옵션 2)
+
+**1. 매뉴얼 본문 import seed 작업**:
+- `migrations/_seed/manuals/` 4 매뉴얼 마크다운:
+  - `RIDE-PMP.md` (169 KB, 통합본 9장 27조 + 별첨 7)
+  - `RIDE-M01.md` (55 KB, 유출 대응 + 서식 6종)
+  - `RIDE-M05.md` (8 KB, 파기 절차)
+  - `RIDE-M06.md` (23 KB, 단말기 반출)
+- 자동 마크다운 헤더 변환: 제N장 → `##`, 제N조 → `###`, 별첨 → `##`, 서식 → `###`
+- `harness-engineering/scripts/seed-compliance-manuals.js` 신규 — Node + Prisma 로 4 매뉴얼 본문을 DB content_md 에 UPDATE
+- `package.json scripts`: `seed:compliance-manuals` 추가
+- 사용법: `npm run seed:compliance-manuals` (1회 실행, OVERWRITE=1 환경변수로 재실행 가능)
+- 미포함: RIDE-M02/M03/M04 (PDF 원본 없음) → 사용자가 UI 「✎ 본문 편집」 으로 직접 작성
+
+**2. 운영 가이드 탭 — 카드 grid → 컴팩트 list (옵션 2)**:
+- 변경 위치: `OperationGuideTabContent` 함수 안의 9 step 카드 grid 영역
+- 신규 컴포넌트 `PlaybookStepList`:
+  - 한 행 = [번호 배지] + emoji 제목 + 진행상태 배지 + 요약 + 「→ 바로가기」 + 「▸ 펼침 토글」
+  - 한 화면에 9 step 모두 보임 (시각적 압축)
+  - 「▸ 펼침」 클릭 시 상세 (목적·근거·빈도·책임·산출 + 상세 설명 + 추가 link)
+  - 다음 우선 step 자동 강조 (배경 색 + 「👉 다음」 배지)
+- 카드 grid 의 큰 시각 영역 → list 의 한 줄 (정보 밀도 ↑)
+
+**효과**:
+- 매뉴얼 4건 본문 즉시 열람 가능 (npm run seed:compliance-manuals 실행 후)
+- 운영 가이드 한눈에 9 step 진행 상태 + 필요시 상세 펼침
+- 사용자 진입 → 다음 우선 step → 바로가기 → 작업 흐름 자연스러움
+
+**Rule 준수**:
+- ✅ Rule 14 동형 / Rule 19 줄바꿈 / Rule 20 글래스 패널
+- ✅ Rule 22 _docs 갱신 / Rule 27 lint:harness 통과
+
+**다음 PR (1.3-H 예정)**:
+- 매뉴얼 간 정합성 검사 (cross-reference lint) — 인명/빈도/서식번호/조항번호/시행일 충돌·누락 자동 감지
+
+---
+
 ## v1.3-F — 운영 가이드 탭 (9 step Playbook) (2026-05-19)
 
 **사용자 통찰 (2026-05-19)**:

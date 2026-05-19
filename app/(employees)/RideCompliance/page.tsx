@@ -1055,78 +1055,12 @@ function OperationGuideTabContent(props: {
         </p>
       </div>
 
-      {/* 9 Step 카드 grid (3×3) */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 14 }}>
-        {PLAYBOOK_STEPS.map(step => {
-          const st = stepStatus[step.statusKey]
-          const isDone = st.done
-          const isNext = nextStep === step.num
-          const borderColor = isDone ? COLORS.success : isNext ? COLORS.warning : COLORS.borderSubtle
-          const badgeBg = isDone ? COLORS.bgGreen : isNext ? COLORS.bgAmber : COLORS.bgGray
-          const badgeColor = isDone ? COLORS.success : isNext ? COLORS.warning : COLORS.textSecondary
-          const badgeLabel = isDone ? '✓ 진행 중' : isNext ? '👉 다음 단계' : '대기'
-          return (
-            <div key={step.num} style={{
-              ...GLASS.L3, padding: 16, borderRadius: 12,
-              borderLeft: `4px solid ${borderColor}`,
-              boxShadow: isNext ? `0 0 0 2px ${COLORS.warning}30` : undefined,
-            }}>
-              {/* 헤더 */}
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 10 }}>
-                <div style={{
-                  width: 36, height: 36, borderRadius: '50%',
-                  background: isDone ? COLORS.bgGreen : COLORS.bgBlue,
-                  color: isDone ? COLORS.success : COLORS.primary,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 14, fontWeight: 700, flexShrink: 0,
-                }}>
-                  {isDone ? '✓' : step.num}
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <h3 style={{ margin: '2px 0 4px', fontSize: 14, color: COLORS.textPrimary }}>
-                    {step.emoji} {step.title}
-                  </h3>
-                  <span style={{
-                    display: 'inline-block', padding: '2px 8px', borderRadius: 10,
-                    background: badgeBg, color: badgeColor,
-                    fontSize: 10, fontWeight: 600,
-                  }}>{badgeLabel}</span>
-                  <span style={{ marginLeft: 6, fontSize: 11, color: COLORS.textMuted }}>{st.summary}</span>
-                </div>
-              </div>
-
-              {/* 본문 */}
-              <p style={{ margin: '0 0 10px', fontSize: 12, color: COLORS.textSecondary, lineHeight: 1.6 }}>
-                {step.detail}
-              </p>
-
-              {/* 메타 4행 */}
-              <div style={{ background: COLORS.bgGray, padding: 10, borderRadius: 6, fontSize: 11, lineHeight: 1.7 }}>
-                <MetaLine label="🎯 목적" value={step.purpose} />
-                <MetaLine label="📜 근거" value={step.legal} />
-                <MetaLine label="📅 빈도" value={step.frequency + (step.months.length > 0 ? ` (${step.months.join('·')}월)` : '')} />
-                <MetaLine label="👤 책임" value={step.responsible} />
-                <MetaLine label="📝 산출" value={step.output} />
-              </div>
-
-              {/* 바로가기 버튼 */}
-              <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
-                {step.links.map((link, i) => (
-                  link.tab ? (
-                    <button key={i} onClick={() => props.onTabChange(link.tab!)}
-                      style={{ ...BTN.sm, border: 'none', background: COLORS.bgBlue, color: COLORS.primary, cursor: 'pointer' }}>
-                      → {link.label}
-                    </button>
-                  ) : (
-                    <Link key={i} href={link.href} style={{ ...BTN.sm, border: 'none', background: COLORS.bgBlue, color: COLORS.primary, textDecoration: 'none', display: 'inline-block' }}>
-                      → {link.label}
-                    </Link>
-                  )
-                ))}
-              </div>
-            </div>
-          )
-        })}
+      {/* 9 Step 컴팩트 list — 사용자 통찰 (2026-05-19): "카드 grid 가 보기 편하지 않다" → 옵션 2 list 형식 */}
+      <div style={{ ...GLASS.L3, padding: 0, borderRadius: 12, overflow: 'hidden' }}>
+        <PlaybookStepList
+          steps={PLAYBOOK_STEPS} stepStatus={stepStatus} nextStep={nextStep}
+          onTabChange={props.onTabChange}
+        />
       </div>
 
       {/* 12개월 캘린더 (별첨 7 RIDE-PLAN-2026 시각화) */}
@@ -1176,6 +1110,139 @@ function MetaLine(props: { label: string; value: string }) {
     <div style={{ display: 'flex', gap: 6, marginBottom: 2 }}>
       <span style={{ color: COLORS.textMuted, flexShrink: 0, minWidth: 50 }}>{props.label}</span>
       <span style={{ color: COLORS.textPrimary, lineHeight: 1.5 }}>{props.value}</span>
+    </div>
+  )
+}
+
+// ────────── 운영 가이드 컴팩트 list (옵션 2) ──────────
+// 각 행: [번호] emoji 제목 + 진행상태 배지 + 요약 + 「→ 바로가기」 + 「상세 ▾」
+// 「상세 ▾」 클릭 시 펼침 — 목적/근거/빈도/책임/산출
+function PlaybookStepList(props: {
+  steps: PlaybookStep[]
+  stepStatus: Record<string, { done: boolean; summary: string }>
+  nextStep: number | null
+  onTabChange: (key: TabKey) => void
+}) {
+  const [expanded, setExpanded] = useState<number | null>(null)
+
+  return (
+    <div>
+      {props.steps.map((step, idx) => {
+        const st = props.stepStatus[step.statusKey]
+        const isDone = st.done
+        const isNext = props.nextStep === step.num
+        const isExpanded = expanded === step.num
+        const isLast = idx === props.steps.length - 1
+
+        // 상태별 색상
+        const badgeBg = isDone ? COLORS.bgGreen : isNext ? COLORS.bgAmber : COLORS.bgGray
+        const badgeColor = isDone ? COLORS.success : isNext ? COLORS.warning : COLORS.textMuted
+        const badgeLabel = isDone ? '✓ 완료' : isNext ? '👉 다음' : '대기'
+        const numBg = isDone ? COLORS.success : isNext ? COLORS.warning : COLORS.textMuted
+
+        return (
+          <div key={step.num} style={{
+            borderBottom: isLast ? 'none' : `1px solid ${COLORS.borderSubtle}`,
+            background: isNext ? `${COLORS.warning}08` : 'transparent',
+          }}>
+            {/* 메인 행 */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: '36px 1fr auto auto',
+              gap: 12, alignItems: 'center',
+              padding: '12px 16px',
+              cursor: 'pointer',
+            }} onClick={() => setExpanded(isExpanded ? null : step.num)}>
+              {/* 번호 배지 */}
+              <div style={{
+                width: 28, height: 28, borderRadius: '50%',
+                background: numBg, color: '#fff',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 12, fontWeight: 700,
+              }}>
+                {isDone ? '✓' : step.num}
+              </div>
+
+              {/* 제목 + 요약 */}
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.textPrimary, marginBottom: 2 }}>
+                  {step.emoji} {step.title}
+                  {step.months.length > 0 && (
+                    <span style={{ marginLeft: 8, fontSize: 10, color: COLORS.textMuted, fontWeight: 500 }}>
+                      ({step.months.join('·')}월)
+                    </span>
+                  )}
+                </div>
+                <div style={{ fontSize: 11, color: COLORS.textSecondary }}>
+                  <span style={{
+                    display: 'inline-block', padding: '1px 6px', borderRadius: 8,
+                    background: badgeBg, color: badgeColor,
+                    fontSize: 10, fontWeight: 600, marginRight: 6,
+                  }}>{badgeLabel}</span>
+                  {st.summary}
+                </div>
+              </div>
+
+              {/* 바로가기 버튼 (첫 번째 link 만 표시 — 추가 link 는 펼침 영역에) */}
+              <div style={{ display: 'flex', gap: 4 }} onClick={e => e.stopPropagation()}>
+                {step.links.slice(0, 1).map((link, i) => (
+                  link.tab ? (
+                    <button key={i} onClick={() => props.onTabChange(link.tab!)}
+                      style={{ ...BTN.sm, border: 'none', background: COLORS.bgBlue, color: COLORS.primary, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                      → {link.label}
+                    </button>
+                  ) : (
+                    <Link key={i} href={link.href} style={{ ...BTN.sm, border: 'none', background: COLORS.bgBlue, color: COLORS.primary, textDecoration: 'none', display: 'inline-block', whiteSpace: 'nowrap' }}>
+                      → {link.label}
+                    </Link>
+                  )
+                ))}
+              </div>
+
+              {/* 펼침 토글 */}
+              <span style={{ fontSize: 12, color: COLORS.textMuted, width: 20, textAlign: 'center' }}>
+                {isExpanded ? '▾' : '▸'}
+              </span>
+            </div>
+
+            {/* 펼침 영역 — 목적/근거/빈도/책임/산출 + 상세 설명 */}
+            {isExpanded && (
+              <div style={{
+                padding: '0 16px 14px 64px',
+                fontSize: 12, color: COLORS.textSecondary, lineHeight: 1.7,
+              }}>
+                <p style={{ margin: '0 0 10px', color: COLORS.textPrimary }}>
+                  {step.detail}
+                </p>
+                <div style={{ background: COLORS.bgGray, padding: 10, borderRadius: 6, fontSize: 11, lineHeight: 1.8 }}>
+                  <MetaLine label="🎯 목적" value={step.purpose} />
+                  <MetaLine label="📜 근거" value={step.legal} />
+                  <MetaLine label="📅 빈도" value={step.frequency + (step.months.length > 0 ? ` (${step.months.join('·')}월)` : '')} />
+                  <MetaLine label="👤 책임" value={step.responsible} />
+                  <MetaLine label="📝 산출" value={step.output} />
+                </div>
+                {/* 추가 link (첫 번째 제외) */}
+                {step.links.length > 1 && (
+                  <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+                    {step.links.slice(1).map((link, i) => (
+                      link.tab ? (
+                        <button key={i} onClick={() => props.onTabChange(link.tab!)}
+                          style={{ ...BTN.sm, border: 'none', background: COLORS.bgBlue, color: COLORS.primary, cursor: 'pointer' }}>
+                          → {link.label}
+                        </button>
+                      ) : (
+                        <Link key={i} href={link.href} style={{ ...BTN.sm, border: 'none', background: COLORS.bgBlue, color: COLORS.primary, textDecoration: 'none', display: 'inline-block' }}>
+                          → {link.label}
+                        </Link>
+                      )
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )
+      })}
     </div>
   )
 }
