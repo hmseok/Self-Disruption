@@ -78,7 +78,9 @@ export default function AssignmentCell({ assignment, worker, onClick, onQuickAct
   const dowPreferMatch = worker && dow != null && memberPreferDow
     ? matchDow(memberPreferDow, dow) : false
   // Phase E — 가드 위반 우선순위: time_conflict > next_day_block > consec_limit > Phase D
-  const hasTimeConflict = violations?.has('time_conflict')
+  // N-65-fix3-ui — cover_added 셀은 의도된 추가 근무 → time_conflict 빨간 테두리 무시
+  const isCoverAdded = assignment?.substitution_reason === 'cover_added'
+  const hasTimeConflict = !isCoverAdded && violations?.has('time_conflict')
   const hasNextDayBlock = violations?.has('next_day_block')
   const hasConsecLimit = violations?.has('consec_limit')
   const violationBorder = hasTimeConflict

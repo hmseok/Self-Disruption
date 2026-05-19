@@ -3,6 +3,39 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-19 (Phase N-65-fix3) — cover 조건을 ownShort 로 + UI 빨간 테두리 무시
+
+### 사용자 보고
+> "다 했습니다. 그래도 적용 안 됍니다"
+
+매트릭스 거의 모든 셀에 🤝 + 빨간 테두리 여전.
+
+### 원인
+`p2Short` 계산이 `isP2 = priority_level <= 2` → **P1 도 포함**.
+정동민 (P1) cycle 휴무 phase (월 75%) 마다 → p2Short ≥ 1 → 매일 cover 진입.
+
+### 수정 (auto-generate route)
+`p2Short` → `ownShort` 로 교체:
+```ts
+const ownCandidates = candidates.filter(wId => gMembers.includes(wId))
+const ownShort = Math.max(0, need - ownCandidates.length)
+```
+- 자기 그룹 후보가 need 못 채울 때만 cover 진입
+- 정동민 cycle 휴무 phase 라도 P2 3명 있으면 need=1 채워짐 → cover X
+- 회피일/연차로 자기 멤버 더 빠져서 need 못 채울 때만 cover 진입
+
+### UI 수정 (AssignmentCell)
+- `substitution_reason === 'cover_added'` 셀은 `time_conflict` 빨간 테두리 무시
+- 의도된 추가 근무이므로 시간 충돌 가드 = 시각 노이즈 제거
+
+### 알고리즘 우선순위 (최종)
+1. P1 자기 그룹 (cycle 정상)
+2. **ownShort > 0** + cover 후보 → cover 진입 (진짜 결원)
+3. prev P2 cursor (period_days, cycle 정상)
+4. 자기 P2 / P3 cov / 기타
+
+---
+
 ## 2026-05-19 (Phase N-65-fix2) — cover 우선을 「P2 결원 시」 만 작동
 
 ### 사용자 보고

@@ -2012,6 +2012,11 @@ export async function POST(
           //   cover_pairs 매핑 + workedToday 만 검사
           const coverWorkingToday = candidates.filter(wId =>
             coverWorkerSet.has(wId) && workedToday.has(wId))
+          // N-65-fix3 — 자기 그룹 후보 부족 (need 보다 적음) = 진짜 결원
+          //   p2Short (P1 포함) 는 정동민 cycle 휴무 phase 마다 trigger → 광범위 cover 발생
+          //   대신 「자기 그룹 후보 자체가 need 보다 적은가」 로 판정 → 진짜 결원 시점만 cover
+          const ownCandidates = candidates.filter(wId => gMembers.includes(wId))
+          const ownShort = Math.max(0, need - ownCandidates.length)
 
           let selectedList: string[]
           if (p1InCandidates && need > 0) {
@@ -2019,10 +2024,11 @@ export async function POST(
             //   기존 가중치 정렬에서 P1 이 위쪽 → slice 로 자연 우선
             selectedList = candidates.slice(0, need)
             // prev 갱신 X — P2 cursor 위치 유지 (정동민 cycle 근무 phase 동안 P2 dayInPeriod 정지)
-          } else if (p2Short > 0 && coverWorkingToday.length > 0 && need > 0) {
-            // N-65-fix2 — 자기 그룹 P2 결원 (p2Short > 0) 발생 시에만 cover 우선
-            //   평상 시 (자기 P2 충분) 은 P2 cursor 따라 정상 cycle 분배
-            //   결원 발생 = 자기 그룹 멤버 일부가 빠진 상황 → cover 진입
+          } else if (ownShort > 0 && coverWorkingToday.length > 0 && need > 0) {
+            // N-65-fix3 — 자기 그룹 후보 부족 (need 보다 적음) = 진짜 결원 → cover 진입
+            //   평상 시 (자기 P2 충분 = need 채울 만큼) 은 P2 cursor 따라 정상 cycle 분배
+            //   정동민 cycle 휴무 phase 라도 P2 3명 있으면 need=1 채워짐 → cover X
+            //   회피일/연차로 자기 멤버 더 빠져서 need 못 채울 때만 cover 진입
             selectedList = [
               ...coverWorkingToday.slice(0, need),
               ...candidates.filter(wId => !coverWorkingToday.includes(wId))
