@@ -3,6 +3,36 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-19 (Phase N-65-fix2) — cover 우선을 「P2 결원 시」 만 작동
+
+### 사용자 보고
+> "왜 전부다 악수가 됐지"
+
+매트릭스 거의 모든 셀에 🤝 cover_added 마커 + 빨간 테두리 (시간 충돌) 표시.
+자기 P2 cursor 가 작동 안 함.
+
+### 원인
+N-65-fix 의 알고리즘 순서:
+1. P1 후보 → 정동민
+2. cover + workedToday → 매일 우선 ← 문제
+3. prev P2 cursor (안 들어감)
+4. P3 cov / 기타
+
+cover 가 P2 cursor 보다 먼저 → 매일 같은 사람이 두 그룹 동시 진입 → cycle 깨짐
+
+### 수정
+cover 진입 조건에 **`p2Short > 0`** 추가
+- 자기 그룹 P2 결원 발생 시에만 cover 우선
+- 평상 시 (자기 P2 충분) 은 prev cursor → 정상 cycle 분배
+
+### 알고리즘 순서 (수정 후)
+1. P1 자기 그룹 (cycle 정상)
+2. **P2 결원 + cover 후보** → cover 진입 (사용자 의도)
+3. prev P2 cursor (period_days)
+4. 자기 P2 / P3 cov / 기타
+
+---
+
 ## 2026-05-19 (Phase N-65-fix) — cover self-filter 제거 (멤버 동일 그룹 작동)
 
 ### 사용자 보고

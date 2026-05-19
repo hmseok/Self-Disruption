@@ -2019,8 +2019,10 @@ export async function POST(
             //   기존 가중치 정렬에서 P1 이 위쪽 → slice 로 자연 우선
             selectedList = candidates.slice(0, need)
             // prev 갱신 X — P2 cursor 위치 유지 (정동민 cycle 근무 phase 동안 P2 dayInPeriod 정지)
-          } else if (coverWorkingToday.length > 0 && need > 0) {
-            // N-65 — cover 그룹의 cycle 근무자가 추가 근무로 cover (자기 그룹 cycle 보호)
+          } else if (p2Short > 0 && coverWorkingToday.length > 0 && need > 0) {
+            // N-65-fix2 — 자기 그룹 P2 결원 (p2Short > 0) 발생 시에만 cover 우선
+            //   평상 시 (자기 P2 충분) 은 P2 cursor 따라 정상 cycle 분배
+            //   결원 발생 = 자기 그룹 멤버 일부가 빠진 상황 → cover 진입
             selectedList = [
               ...coverWorkingToday.slice(0, need),
               ...candidates.filter(wId => !coverWorkingToday.includes(wId))
