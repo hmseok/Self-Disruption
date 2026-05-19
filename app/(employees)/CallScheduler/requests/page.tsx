@@ -157,10 +157,12 @@ export default function RequestsPage() {
     } finally { setRegLeaveBusy(false) }
   }
 
-  // N-15 — 매니저 직접 등록 (status=approved 즉시)
+  // N-15 + N-60 — 매니저 직접 등록 (글로벌 회피일 — 모든 그룹 적용)
+  //   사용자 정책: "그룹별 없애고 직원 요청 통합 → 전역 셋팅"
+  //   → /api/call-scheduler/skip-dates 글로벌 API 호출 (group_id=NULL)
   const registerSkip = async () => {
-    if (!regWorkerId || !regGroupId || !regStart || !regEnd) {
-      setMsg({ ok: false, text: '워커 / 그룹 / 시작일 / 종료일 모두 필수' })
+    if (!regWorkerId || !regStart || !regEnd) {
+      setMsg({ ok: false, text: '워커 / 시작일 / 종료일 모두 필수' })
       return
     }
     if (regStart > regEnd) {
@@ -170,7 +172,7 @@ export default function RequestsPage() {
     setRegBusy(true); setMsg(null)
     try {
       const auth = await getAuthHeader()
-      const res = await fetch(`/api/call-scheduler/shift-groups/${regGroupId}/skip-dates`, {
+      const res = await fetch('/api/call-scheduler/skip-dates', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...auth },
         body: JSON.stringify({
@@ -184,8 +186,8 @@ export default function RequestsPage() {
       const json = await res.json()
       if (!res.ok) throw new Error(json?.error || '등록 실패')
       const wName = workers.find(w => w.id === regWorkerId)?.name || ''
-      setMsg({ ok: true, text: `${wName} 회피일 등록 — ${regStart}${regStart !== regEnd ? ` ~ ${regEnd}` : ''}` })
-      // 폼 리셋 (워커/그룹은 유지 — 연속 입력 편의)
+      setMsg({ ok: true, text: `${wName} 회피일 등록 (전역) — ${regStart}${regStart !== regEnd ? ` ~ ${regEnd}` : ''}` })
+      // 폼 리셋 (워커는 유지 — 연속 입력 편의)
       setRegStart(''); setRegEnd(''); setRegReason('')
       load()
     } catch (e: any) {
@@ -468,51 +470,15 @@ export default function RequestsPage() {
                     })}
                   </div>
                 </div>
-                {/* 그룹 chip (워커 선택 시만) */}
+                {/* N-60 — 회피일은 전역 적용 (모든 그룹) — 그룹 선택 UI 제거
+                    안내 배너만 표시 */}
                 {regWorkerId && (
-                  <div style={{ marginBottom: 8 }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSecondary, marginBottom: 4 }}>
-                      그룹 {regWorkerGroups.length === 0 && (
-                        <span style={{ fontWeight: 500, color: COLORS.danger }}>
-                          (이 워커가 속한 활성 그룹 없음 — 그룹 셋팅 먼저)
-                        </span>
-                      )}
-                    </div>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                      {regWorkerGroups.map(g => {
-                        const active = regGroupId === g.id
-                        // N-59 — 같은 이름 그룹 구별: shift 시간 + 카테고리 표시
-                        const gx = g as any
-                        const shiftInfo = gx.shift_start && gx.shift_end
-                          ? `${gx.shift_code || ''} ${String(gx.shift_start).slice(0,5)}~${String(gx.shift_end).slice(0,5)}`
-                          : ''
-                        return (
-                          <button key={g.id} type="button"
-                                  onClick={() => setRegGroupId(active ? '' : g.id)}
-                                  style={{
-                                    padding: '5px 11px', borderRadius: 6, fontSize: 12, fontWeight: 700,
-                                    background: active ? '#0f2440' : COLORS.bgGray,
-                                    color: active ? '#fff' : '#64748b',
-                                    border: `1px solid ${active ? '#0f2440' : COLORS.borderFaint}`,
-                                    cursor: 'pointer',
-                                    display: 'flex', alignItems: 'center', gap: 4,
-                                  }}>
-                            <span>🚧 {g.name}</span>
-                            {shiftInfo && (
-                              <span style={{
-                                fontSize: 10, fontWeight: 500, opacity: 0.85,
-                              }}>· {shiftInfo}</span>
-                            )}
-                            {gx.category && (
-                              <span style={{
-                                fontSize: 9, fontWeight: 600, padding: '1px 5px', borderRadius: 4,
-                                background: active ? 'rgba(255,255,255,0.20)' : 'rgba(0,0,0,0.06)',
-                              }}>[{gx.category}]</span>
-                            )}
-                          </button>
-                        )
-                      })}
-                    </div>
+                  <div style={{
+                    marginBottom: 8, padding: '8px 12px', borderRadius: 8,
+                    background: COLORS.bgBlue, border: `1px solid ${COLORS.borderBlue}`,
+                    fontSize: 11, color: COLORS.info, lineHeight: 1.5,
+                  }}>
+                    🌐 <strong>전역 회피일</strong> — 이 워커가 속한 <strong>모든 활성 그룹</strong>에서 자동 제외됩니다 (그룹별 분리 없음).
                   </div>
                 )}
                 {/* 일자 + 사유 + 등록 */}

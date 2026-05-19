@@ -3,6 +3,39 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-19 (Phase N-60) — 회피일 전역 적용 (group_id NULL = 글로벌)
+
+### 사용자 정책
+> "그룹별을 없애고 직원요청으로 통합했으니 전역셋팅으로 휴가,회피일 모두 적용되어야합니다."
+
+### 데이터 모델 변경 (마이그: 2026-05-19_cs_skip_dates_global.sql)
+- `cs_group_member_skip_dates.group_id` → NULL 허용
+- 기존 행 모두 `group_id = NULL` 로 UPDATE (글로벌 전환)
+- 의미: `group_id = NULL` = 모든 활성 그룹 적용 (글로벌)
+- 호환: 특정 ID 셋팅 시 기존 그룹별 동작 유지
+
+### 변경
+1. **API** — `POST /api/call-scheduler/skip-dates` (글로벌 등록) 추가
+   - group_id = NULL 로 INSERT
+   - 매니저 직접 등록 = 즉시 승인 (status=approved)
+2. **알고리즘** (auto-generate route)
+   - globalSkipRows 별도 보관
+   - 모든 그룹 가드에 globalSkipRows 자동 추가
+   - skipsForGroup = [그룹별 + 글로벌] 통합 검사
+3. **UI** (requests/page.tsx)
+   - 회피일 등록 시 그룹 chip 선택 UI 제거
+   - 「🌐 전역 회피일 — 모든 활성 그룹 자동 제외」 안내 배너
+   - 워커 + 일자 + 사유만 입력 → 글로벌 API 호출
+
+### 효과
+- 정동민 회피일 1건 등록 → 부엉/달빛 모두 자동 제외
+- 사용자가 그룹별 셋팅 안 해도 「당일 종일 OFF」 동작
+
+### 마이그 적용 필수
+- `migrations/2026-05-19_cs_skip_dates_global.sql`
+
+---
+
 ## 2026-05-18 (Phase N-59) — 같은 이름 그룹 dropdown 에 시프트 정보 표시
 
 ### 사용자 결정

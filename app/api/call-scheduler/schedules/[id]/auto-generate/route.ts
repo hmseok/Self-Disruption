@@ -1045,9 +1045,12 @@ export async function POST(
       return workerCycle.get(workerId)
     }
 
-    // 5-C) PR-2SS-h-1 — 그룹 차원 회피일 (graceful)
+    // 5-C) PR-2SS-h-1 + N-60 — 회피일 (그룹별 + 글로벌 통합)
+    //   group_id = NULL → 모든 그룹 글로벌 적용 (N-60)
+    //   group_id = 특정 ID → 기존 그룹별 동작 (호환)
     //   approved status 만 후보 제외 — requested/rejected/canceled 는 영향 X
     const groupSkipMap = new Map<string, GroupSkipRow[]>()  // group_id → rows
+    const globalSkipRows: GroupSkipRow[] = []  // group_id IS NULL — 모든 그룹에 적용
     try {
       const skipRows: any[] = await prisma.$queryRaw<any[]>`
         SELECT group_id, worker_id,
@@ -1059,15 +1062,21 @@ export async function POST(
           AND NOT (end_date < ${monthStart} OR start_date > ${monthEnd})
       `
       for (const r of skipRows) {
-        const arr = groupSkipMap.get(r.group_id) || []
-        arr.push({
-          group_id: r.group_id,
+        const row: GroupSkipRow = {
+          group_id: r.group_id || '__global__',
           worker_id: r.worker_id,
           start_date: r.start_date,
           end_date: r.end_date,
           reason: r.reason,
-        })
-        groupSkipMap.set(r.group_id, arr)
+        }
+        if (r.group_id == null) {
+          // N-60 — 글로벌 회피일 (모든 그룹에 적용)
+          globalSkipRows.push(row)
+        } else {
+          const arr = groupSkipMap.get(r.group_id) || []
+          arr.push(row)
+          groupSkipMap.set(r.group_id, arr)
+        }
       }
     } catch {
       // 마이그 미적용 — 회피일 가드 비활성
@@ -1355,7 +1364,7 @@ export async function POST(
             byGroup[g.id].skipped++
             continue
           }
-          const gSkips = groupSkipMap.get(g.id) || []
+          const gSkips = [...(groupSkipMap.get(g.id) || []), ...globalSkipRows]  // N-60 글로벌 + 그룹별
           const skipMatch = gSkips.find(s =>
             s.worker_id === activeWorker && isoDate >= s.start_date && isoDate <= s.end_date
           )
@@ -1475,7 +1484,7 @@ export async function POST(
               const sp = lm?.get(isoDate)
               if (sp === 'off') continue
               // 그룹 회피일 (PR-2SS-h-1 — 그룹 단위, 버전 무관)
-              const gSkips = groupSkipMap.get(g.id) || []
+              const gSkips = [...(groupSkipMap.get(g.id) || []), ...globalSkipRows]  // N-60 글로벌 + 그룹별
               const skipMatch = gSkips.find(s =>
                 s.worker_id === wId && isoDate >= s.start_date && isoDate <= s.end_date
               )
@@ -1540,7 +1549,7 @@ export async function POST(
             if (sp === 'off') continue
 
             // 그룹 회피일 (PR-2SS-h-1) — approved 상태 매치 시 후보 제외
-            const gSkips = groupSkipMap.get(g.id) || []
+            const gSkips = [...(groupSkipMap.get(g.id) || []), ...globalSkipRows]  // N-60 글로벌 + 그룹별
             const skipMatch = gSkips.find(s =>
               s.worker_id === wId && isoDate >= s.start_date && isoDate <= s.end_date
             )
@@ -1723,9 +1732,9 @@ export async function POST(
 
         // PR-2SS-d revert — min_seniority 가드 폐기 (매니저 직접 판단)
 
-        // PR-2SS-h-1 — 그룹 차원 회피일 hard exclude (approved status)
-        const skipsForGroup = groupSkipMap.get(g.id)
-        if (skipsForGroup && skipsForGroup.length > 0) {
+        // PR-2SS-h-1 + N-60 — 회피일 hard exclude (그룹별 + 글로벌)
+        const skipsForGroup = [...(groupSkipMap.get(g.id) || []), ...globalSkipRows]
+        if (skipsForGroup.length > 0) {
           candidates = candidates.filter(wId => {
             const matched = skipsForGroup.find(s =>
               s.worker_id === wId && isoDate >= s.start_date && isoDate <= s.end_date
