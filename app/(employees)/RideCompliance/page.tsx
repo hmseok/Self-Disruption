@@ -48,7 +48,138 @@ const btnSuccess: React.CSSProperties = {
   background: COLORS.bgGreen, color: COLORS.success, cursor: 'pointer',
 }
 
-type TabKey = 'dashboard' | 'assets' | 'incidents' | 'officers' | 'documents' | 'annual_ops' | 'submissions'
+type TabKey = 'dashboard' | 'guide' | 'assets' | 'incidents' | 'officers' | 'documents' | 'annual_ops' | 'submissions'
+
+// ════════════════════════════════════════════════════════════════
+// Phase 1.3-F — 운영 가이드 Step Playbook (9 단계)
+// 매뉴얼 통합본 5.17 9장 27조 + 별첨 7 RIDE-PLAN-2026 기반
+// 사용자 통찰 (2026-05-19): "step-by-step 으로 진행하면 정보보안을 규정에 맞게 확립하고 놓치지 않고 진행"
+// ════════════════════════════════════════════════════════════════
+interface PlaybookStep {
+  num: number
+  title: string
+  emoji: string
+  purpose: string      // 왜?
+  legal: string        // 법적 근거
+  frequency: string    // 빈도
+  responsible: string  // 책임자
+  output: string       // 산출물
+  detail: string       // 상세 설명 (2-3줄)
+  links: { label: string; href: string; tab?: TabKey }[]
+  months: number[]     // 별첨 7 12개월 캘린더 매핑
+  statusKey: 'officers' | 'documents' | 'assets' | 'plan' | 'education' | 'inspection' | 'audit' | 'processor' | 'incident'
+}
+
+const PLAYBOOK_STEPS: PlaybookStep[] = [
+  {
+    num: 1, title: '조직 임명', emoji: '👔',
+    purpose: '책임·권한 매트릭스의 출발점 — 모든 다음 단계가 이 역할에 의존',
+    legal: '매뉴얼 제6조 (책임자 지정) · 제9조 (취급자 범위) / 개인정보보호법 제31조',
+    frequency: '최초 1회 + 인사 변동 시',
+    responsible: '대표이사 임명 · 시스템 관리자 등록',
+    output: 'ride_compliance_officers row (CPO 1명 + 관리자 N명 + 취급자 다수)',
+    detail: '라이드케어 「개인정보보호 내부관리계획서」 제6조는 책임자(CPO)·관리자·취급자 3-tier 매핑을 의무화. 임명 없이는 검수·승인·결재 흐름 작동 불가.',
+    links: [{ label: '조직 매핑 탭', href: '#', tab: 'officers' }],
+    months: [], // 상시
+    statusKey: 'officers',
+  },
+  {
+    num: 2, title: '자료(매뉴얼·서식) 등록·검수', emoji: '📚',
+    purpose: '운영의 원본 무결성 — 검수 안 된 매뉴얼·서식은 작성·결재 불가',
+    legal: '사용자 추가-C 통찰 + KISA 권고 / 매뉴얼 제·개정 이력 관리',
+    frequency: '매뉴얼 등록 시 + 개정 시',
+    responsible: '관리자(URL 입력) → CPO(검수 완료)',
+    output: 'documents.is_master_verified = 1 + document_versions row',
+    detail: '매뉴얼 7건 + 서식 18건 + 정책 1건 = 26건 모두 file_url 입력 후 CPO 검수 완료해야 운영 task 의 related_form 으로 연결 가능. 미검수 서식은 작성 차단.',
+    links: [{ label: '자료실 탭', href: '#', tab: 'documents' }],
+    months: [],
+    statusKey: 'documents',
+  },
+  {
+    num: 3, title: '정보자산 등록', emoji: '📦',
+    purpose: '기술적·관리적 보호조치 대상 식별 — 무엇을 어떤 등급으로 보호할지 명시',
+    legal: '매뉴얼 제10조(물리적) · 제12조(접근권한) · 제13조(암호화) · 제14조(접근통제) · 제17조(CCTV) · 제18조(스마트기기)',
+    frequency: '자산 도입 시 + 분기 점검',
+    responsible: '관리자(석호민 부장 등)',
+    output: 'ride_compliance_assets row (9 type · 3 classification · PII flag)',
+    detail: '서버 / PC / 문서 / 저장매체 / CCTV / 스마트기기 / 소프트웨어 / 네트워크 등 9 유형, 공개·내부·대외비 3 등급. 개인정보 포함 자산은 제13조 암호화 의무.',
+    links: [{ label: '정보자산 탭', href: '#', tab: 'assets' }],
+    months: [],
+    statusKey: 'assets',
+  },
+  {
+    num: 4, title: '연간 계획 수립', emoji: '📅',
+    purpose: '법정 의무를 12개월 운영 캘린더로 — 누락 방지',
+    legal: '개인정보보호법 제29조 + 시행령 제30조',
+    frequency: '매년 1월',
+    responsible: '관리자 작성 · CPO 승인',
+    output: 'annual_plans 1행 + tasks 12행 (월별) + F-06 연간 교육계획서',
+    detail: 'RIDE-PLAN-2026 별첨 7 의 12개월 일람표가 곧 task carousel. 마이그 적용 시 자동 12 task 생성. 매월 D-7/D-3/D-day 알림.',
+    links: [{ label: '연간 운영 탭', href: '#', tab: 'annual_ops' }],
+    months: [1],
+    statusKey: 'plan',
+  },
+  {
+    num: 5, title: '교육 실시', emoji: '🎓',
+    purpose: '취급자의 인식 제고 + 법적 의무 (미실시 시 과태료)',
+    legal: '매뉴얼 제22~23조 / 개인정보보호법 제29조 + 시행령 제30조',
+    frequency: '연 2회 (2월·7월) + 신규 입사자 + 미참석자 보충',
+    responsible: 'CPO 계획 · 관리자 실시',
+    output: 'F-07 교육 이수 확인서 (3년 보존) · tasks completion',
+    detail: '전 임·직원 + 개인정보취급자 + 신규 + 수탁업체 대상. 집체·인터넷·그룹웨어·외부위탁 가능. 출장/휴가 미참석자 별도 시행.',
+    links: [{ label: '연간 운영 탭 (2월·7월)', href: '#', tab: 'annual_ops' }],
+    months: [2, 7],
+    statusKey: 'education',
+  },
+  {
+    num: 6, title: '정기 점검 · 파기', emoji: '🔍',
+    purpose: '안전성 확보조치 의무 + 보유기간 경과 정보 안전 처리',
+    legal: '매뉴얼 제20조(자체감사) + 제28~33조(파기) / 안전성 확보조치 기준 제5조',
+    frequency: '분기 1회 (3·6·9·12월)',
+    responsible: '관리자 실시 · CPO 승인',
+    output: 'F-M05-01 파기 신청서 + F-M05-02 파기 대장(3년 보존) + F-M05-03 완료 확인서',
+    detail: '분기마다 정보보안 점검 (체크리스트) + 개인정보 파기 + CPO 승인. 접근권한 반기 점검 (3·6·9·10월). 백업 복구 테스트 분기 1회.',
+    links: [{ label: '연간 운영 탭 (3/6/9/12월)', href: '#', tab: 'annual_ops' }],
+    months: [3, 6, 9, 12],
+    statusKey: 'inspection',
+  },
+  {
+    num: 7, title: '자체 감사', emoji: '🔎',
+    purpose: '개인정보 처리 실태 점검 + CPO 정기 보고',
+    legal: '매뉴얼 제20~21조 / 개인정보보호법 제31조',
+    frequency: '반기 1회 (5월·10월)',
+    responsible: 'CPO 책임 · 감사자 실시',
+    output: '감사 결과보고서 (3년 보존) + 개선사항 조치계획',
+    detail: '상·하반기 1회씩 자체감사 실시. 감사 대상·절차·방법 계획 수립 후 진행. CPO 보고 + 조치계획 + 차년도 반영.',
+    links: [{ label: '연간 운영 탭 (5/10월)', href: '#', tab: 'annual_ops' }],
+    months: [5, 10],
+    statusKey: 'audit',
+  },
+  {
+    num: 8, title: '수탁사 관리', emoji: '🤝',
+    purpose: '제3자 위탁 시 위탁자(라이드)의 감독 책임',
+    legal: '매뉴얼 제24조 / 개인정보보호법 제26조',
+    frequency: '반기 1회 (4월·9월)',
+    responsible: '관리자',
+    output: '수탁사 현황 + 계약서 검토 + 보안교육 이수 + 점검 기록',
+    detail: '수탁업체 현황 점검 + 계약서 검토·갱신 + 수탁업체 개인정보취급자 보안교육·점검. 위탁 업무·수탁자 공개 의무.',
+    links: [{ label: '연간 운영 탭 (4/9월)', href: '#', tab: 'annual_ops' }],
+    months: [4, 9],
+    statusKey: 'processor',
+  },
+  {
+    num: 9, title: '침해사고 대응', emoji: '🚨',
+    purpose: '24시간 통지 의무 + 정보주체 피해 최소화',
+    legal: '매뉴얼 제25~27조 + 유출대응 매뉴얼 RIDE-M01 / 개인정보보호법 제34조',
+    frequency: '사고 발생 즉시',
+    responsible: '취급자 신고 → 관리팀 일선 → 관리자·CPO',
+    output: 'incidents row + F-M01-01~06 (6 서식 — 접수보고서/통지서/대응일지 등) + 24h SLA',
+    detail: '제27조 "즉시 모든 직원은 관리팀에 사고 접수". 24시간 이내 정보주체 통지 (5개 항목 — 항목/시점/피해최소화/대응조치/연락처). 긴급조치 우선 시 단서 적용.',
+    links: [{ label: '침해사고 탭', href: '#', tab: 'incidents' }],
+    months: [], // 상시
+    statusKey: 'incident',
+  },
+]
 
 // ────────── Phase 1.1 인터페이스 ──────────
 interface Officer {
@@ -599,13 +730,14 @@ export default function RideCompliancePage() {
       <div style={{ ...GLASS.L5, padding: '0 16px', borderRadius: 10, marginBottom: 16, overflowX: 'auto' }}>
         <div style={{ display: 'flex', gap: 0, alignItems: 'center' }}>
           {([
-            { key: 'dashboard',  label: '대시보드',  emoji: '📊' },
-            { key: 'assets',     label: '정보자산',  emoji: '📦' },
-            { key: 'incidents',  label: '침해사고',  emoji: '🚨' },
-            { key: 'officers',   label: '조직 매핑', emoji: '👔' },
-            { key: 'documents',  label: '자료실',    emoji: '📚' },
-            { key: 'annual_ops', label: '연간 운영', emoji: '📅' },
-            { key: 'submissions', label: '서식 작성', emoji: '📝' },
+            { key: 'dashboard',  label: '대시보드',     emoji: '📊' },
+            { key: 'guide',      label: '운영 가이드',  emoji: '📖' },
+            { key: 'assets',     label: '정보자산',     emoji: '📦' },
+            { key: 'incidents',  label: '침해사고',     emoji: '🚨' },
+            { key: 'officers',   label: '조직 매핑',    emoji: '👔' },
+            { key: 'documents',  label: '자료실',       emoji: '📚' },
+            { key: 'annual_ops', label: '연간 운영',    emoji: '📅' },
+            { key: 'submissions', label: '서식 작성',   emoji: '📝' },
           ] as { key: TabKey; label: string; emoji: string }[]).map(t => {
             const active = tab === t.key
             return (
@@ -755,6 +887,15 @@ export default function RideCompliancePage() {
       )}
 
       {/* Phase 1.1 탭들 */}
+      {/* 운영 가이드 탭 (Phase 1.3-F) — 사용자 통찰 "step-by-step 으로 규정에 맞게 확립" */}
+      {tab === 'guide' && (
+        <OperationGuideTabContent
+          officers={officers} documents={documents} assets={assets}
+          tasks={tasks} incidents={incidents} annualPlan={annualPlan}
+          onTabChange={setTab}
+        />
+      )}
+
       {tab === 'assets' && (
         <AssetsTabContent
           rows={filteredAssets} allRows={assets}
@@ -823,6 +964,218 @@ export default function RideCompliancePage() {
       {verifyModal && <VerifyModal doc={verifyModal} onClose={() => setVerifyModal(null)} onSaved={() => { setVerifyModal(null); fetchAll() }} />}
       {taskActionModal && <TaskActionModal task={taskActionModal} canCpoReview={isCpoLike} canManager={isMgrLike} onClose={() => setTaskActionModal(null)} onSaved={() => { setTaskActionModal(null); fetchAll() }} />}
       {submitFormModal && <SubmitFormModal doc={submitFormModal.doc} task={submitFormModal.task} onClose={() => setSubmitFormModal(null)} onSaved={() => { setSubmitFormModal(null); fetchAll() }} />}
+    </div>
+  )
+}
+
+// ════════════════════════════════════════════════════════════════
+// Phase 1.3-F — 운영 가이드 탭 (Step Playbook)
+// 매뉴얼 통합본 5.17 9장 + 별첨 7 RIDE-PLAN-2026 기반 9 step
+// 사용자 통찰: "step-by-step 으로 진행하면 정보보안을 규정에 맞게 확립하고 놓치지 않고 진행"
+// ════════════════════════════════════════════════════════════════
+function OperationGuideTabContent(props: {
+  officers: Officer[]
+  documents: ComplianceDocument[]
+  assets: Asset[]
+  tasks: ComplianceTask[]
+  incidents: Incident[]
+  annualPlan: AnnualPlan | null
+  onTabChange: (key: TabKey) => void
+}) {
+  // 각 step 의 진행 상태 자동 계산
+  const stepStatus = useMemo(() => {
+    const officersActive = props.officers.filter(o => o.is_active === 1)
+    const cpoCount = officersActive.filter(o => o.role === 'cpo').length
+    const mgrCount = officersActive.filter(o => o.role === 'manager').length
+
+    const docsTotal = props.documents.length
+    const docsVerified = props.documents.filter(d => d.is_master_verified === 1).length
+    const docsPending = props.documents.filter(d => d.is_master_verified === 0).length
+
+    const assetsTotal = props.assets.length
+
+    const planExists = !!props.annualPlan
+    const planTasks = props.tasks.length
+
+    const eduTasks = props.tasks.filter(t => t.category === 'education')
+    const eduDone = eduTasks.filter(t => t.status === 'done').length
+
+    const inspTasks = props.tasks.filter(t => t.category === 'inspection' || t.category === 'destruction')
+    const inspDone = inspTasks.filter(t => t.status === 'done').length
+
+    const auditTasks = props.tasks.filter(t => t.category === 'audit')
+    const auditDone = auditTasks.filter(t => t.status === 'done').length
+
+    const procTasks = props.tasks.filter(t => t.category === 'processor')
+    const procDone = procTasks.filter(t => t.status === 'done').length
+
+    const incidentsOpen = props.incidents.filter(i => i.status !== 'resolved' && i.status !== 'closed').length
+    const incidentsTotal = props.incidents.length
+
+    return {
+      officers: { done: cpoCount >= 1 && mgrCount >= 1, summary: `CPO ${cpoCount}명 · 관리자 ${mgrCount}명`, total: officersActive.length },
+      documents: { done: docsTotal > 0 && docsPending === 0, summary: `검수 ${docsVerified}/${docsTotal}`, pending: docsPending },
+      assets: { done: assetsTotal > 0, summary: `등록 ${assetsTotal}건`, total: assetsTotal },
+      plan: { done: planExists && planTasks >= 12, summary: planExists ? `${props.annualPlan?.plan_code} · task ${planTasks}/12` : '미수립', total: planTasks },
+      education: { done: eduTasks.length > 0 && eduDone >= 2, summary: `${eduDone}/${eduTasks.length} 회 완료`, total: eduTasks.length },
+      inspection: { done: inspTasks.length > 0 && inspDone >= 4, summary: `${inspDone}/${inspTasks.length} 회 완료`, total: inspTasks.length },
+      audit: { done: auditTasks.length > 0 && auditDone >= 2, summary: `${auditDone}/${auditTasks.length} 회 완료`, total: auditTasks.length },
+      processor: { done: procTasks.length > 0 && procDone >= 2, summary: `${procDone}/${procTasks.length} 회 완료`, total: procTasks.length },
+      incident: { done: true, summary: incidentsOpen > 0 ? `⚠ 미해결 ${incidentsOpen}건` : `누적 ${incidentsTotal}건 모두 종결`, total: incidentsTotal },
+    }
+  }, [props.officers, props.documents, props.assets, props.tasks, props.incidents, props.annualPlan])
+
+  // 다음 우선 step 자동 식별 (가장 빠른 미완료 step)
+  const nextStep = useMemo(() => {
+    for (const step of PLAYBOOK_STEPS) {
+      const st = stepStatus[step.statusKey]
+      if (!st.done) return step.num
+    }
+    return null
+  }, [stepStatus])
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* 안내 패널 */}
+      <div style={{ ...GLASS.L3, padding: 18, borderRadius: 12, borderLeft: `4px solid ${COLORS.primary}` }}>
+        <h2 style={{ margin: '0 0 8px', fontSize: 16, color: COLORS.textPrimary }}>📖 정보보안 운영 9 step — 규정에 맞게 단계별로 확립</h2>
+        <p style={{ margin: 0, fontSize: 13, color: COLORS.textSecondary, lineHeight: 1.7 }}>
+          라이드케어 「개인정보보호 내부관리계획서」 V1.0 (RIDE-PMP-2026-001) 의 9장 27조 + 별첨 7 RIDE-PLAN-2026 을 9개 운영 step 으로 재구성했습니다.
+          각 step 카드의 <strong>목적·법적 근거·빈도·산출물</strong> 을 확인하고, 「바로가기」 로 해당 탭에서 작업할 수 있습니다.
+          {nextStep && (
+            <span style={{ display: 'block', marginTop: 8, padding: '8px 12px', background: COLORS.bgAmber, color: COLORS.warning, borderRadius: 6, fontWeight: 600 }}>
+              👉 다음 우선 step: <strong>Step {nextStep}. {PLAYBOOK_STEPS[nextStep - 1].title}</strong> {PLAYBOOK_STEPS[nextStep - 1].emoji}
+            </span>
+          )}
+          {!nextStep && (
+            <span style={{ display: 'block', marginTop: 8, padding: '8px 12px', background: COLORS.bgGreen, color: COLORS.success, borderRadius: 6, fontWeight: 600 }}>
+              ✅ 모든 step 진행 중 — 연간 캘린더 기반 정상 운영
+            </span>
+          )}
+        </p>
+      </div>
+
+      {/* 9 Step 카드 grid (3×3) */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 14 }}>
+        {PLAYBOOK_STEPS.map(step => {
+          const st = stepStatus[step.statusKey]
+          const isDone = st.done
+          const isNext = nextStep === step.num
+          const borderColor = isDone ? COLORS.success : isNext ? COLORS.warning : COLORS.borderSubtle
+          const badgeBg = isDone ? COLORS.bgGreen : isNext ? COLORS.bgAmber : COLORS.bgGray
+          const badgeColor = isDone ? COLORS.success : isNext ? COLORS.warning : COLORS.textSecondary
+          const badgeLabel = isDone ? '✓ 진행 중' : isNext ? '👉 다음 단계' : '대기'
+          return (
+            <div key={step.num} style={{
+              ...GLASS.L3, padding: 16, borderRadius: 12,
+              borderLeft: `4px solid ${borderColor}`,
+              boxShadow: isNext ? `0 0 0 2px ${COLORS.warning}30` : undefined,
+            }}>
+              {/* 헤더 */}
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 10 }}>
+                <div style={{
+                  width: 36, height: 36, borderRadius: '50%',
+                  background: isDone ? COLORS.bgGreen : COLORS.bgBlue,
+                  color: isDone ? COLORS.success : COLORS.primary,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 14, fontWeight: 700, flexShrink: 0,
+                }}>
+                  {isDone ? '✓' : step.num}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <h3 style={{ margin: '2px 0 4px', fontSize: 14, color: COLORS.textPrimary }}>
+                    {step.emoji} {step.title}
+                  </h3>
+                  <span style={{
+                    display: 'inline-block', padding: '2px 8px', borderRadius: 10,
+                    background: badgeBg, color: badgeColor,
+                    fontSize: 10, fontWeight: 600,
+                  }}>{badgeLabel}</span>
+                  <span style={{ marginLeft: 6, fontSize: 11, color: COLORS.textMuted }}>{st.summary}</span>
+                </div>
+              </div>
+
+              {/* 본문 */}
+              <p style={{ margin: '0 0 10px', fontSize: 12, color: COLORS.textSecondary, lineHeight: 1.6 }}>
+                {step.detail}
+              </p>
+
+              {/* 메타 4행 */}
+              <div style={{ background: COLORS.bgGray, padding: 10, borderRadius: 6, fontSize: 11, lineHeight: 1.7 }}>
+                <MetaLine label="🎯 목적" value={step.purpose} />
+                <MetaLine label="📜 근거" value={step.legal} />
+                <MetaLine label="📅 빈도" value={step.frequency + (step.months.length > 0 ? ` (${step.months.join('·')}월)` : '')} />
+                <MetaLine label="👤 책임" value={step.responsible} />
+                <MetaLine label="📝 산출" value={step.output} />
+              </div>
+
+              {/* 바로가기 버튼 */}
+              <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
+                {step.links.map((link, i) => (
+                  link.tab ? (
+                    <button key={i} onClick={() => props.onTabChange(link.tab!)}
+                      style={{ ...BTN.sm, border: 'none', background: COLORS.bgBlue, color: COLORS.primary, cursor: 'pointer' }}>
+                      → {link.label}
+                    </button>
+                  ) : (
+                    <Link key={i} href={link.href} style={{ ...BTN.sm, border: 'none', background: COLORS.bgBlue, color: COLORS.primary, textDecoration: 'none', display: 'inline-block' }}>
+                      → {link.label}
+                    </Link>
+                  )
+                ))}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* 12개월 캘린더 (별첨 7 RIDE-PLAN-2026 시각화) */}
+      <div style={{ ...GLASS.L3, padding: 18, borderRadius: 12 }}>
+        <h3 style={{ margin: '0 0 12px', fontSize: 14, color: COLORS.textPrimary }}>📅 12개월 운영 캘린더 (별첨 7 RIDE-PLAN-2026)</h3>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: 4 }}>
+          {[1,2,3,4,5,6,7,8,9,10,11,12].map(m => {
+            const stepsInMonth = PLAYBOOK_STEPS.filter(s => s.months.includes(m))
+            const monthTasks = props.tasks.filter(t => t.scheduled_month === m)
+            const tasksDone = monthTasks.filter(t => t.status === 'done').length
+            return (
+              <div key={m} style={{
+                padding: 8, borderRadius: 6, border: `1px solid ${COLORS.borderSubtle}`,
+                background: stepsInMonth.length > 0 ? COLORS.bgBlue : COLORS.bgGray,
+                minHeight: 80,
+              }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.textPrimary, textAlign: 'center', marginBottom: 6 }}>{m}월</div>
+                {stepsInMonth.map(s => (
+                  <div key={s.num} style={{ fontSize: 10, color: COLORS.primary, marginBottom: 2 }}>{s.emoji}</div>
+                ))}
+                {monthTasks.length > 0 && (
+                  <div style={{ fontSize: 9, color: COLORS.textMuted, textAlign: 'center', marginTop: 4 }}>
+                    {tasksDone}/{monthTasks.length}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+        <p style={{ margin: '10px 0 0', fontSize: 11, color: COLORS.textMuted }}>
+          색칠된 월은 별첨 7 의 정기 task 가 배정된 달. 숫자는 task 완료/전체.
+          상시 step (1번 조직 임명, 2번 자료 검수, 9번 침해사고) 은 캘린더 외 — 카드 grid 참조.
+        </p>
+      </div>
+
+      {/* 매뉴얼 인용 안내 */}
+      <div style={{ ...GLASS.L3, padding: 14, borderRadius: 10, fontSize: 11, color: COLORS.textMuted, lineHeight: 1.6 }}>
+        💡 본 가이드는 「개인정보보호 내부관리계획서」 V1.0 (RIDE-PMP-2026-001) 및 별첨 7 RIDE-PLAN-2026 의 모든 조항을 9 step 으로 재구성한 것입니다.
+        원본 매뉴얼 내용은 「자료실」 탭의 각 매뉴얼 페이지에서 확인할 수 있습니다.
+      </div>
+    </div>
+  )
+}
+
+function MetaLine(props: { label: string; value: string }) {
+  return (
+    <div style={{ display: 'flex', gap: 6, marginBottom: 2 }}>
+      <span style={{ color: COLORS.textMuted, flexShrink: 0, minWidth: 50 }}>{props.label}</span>
+      <span style={{ color: COLORS.textPrimary, lineHeight: 1.5 }}>{props.value}</span>
     </div>
   )
 }
