@@ -990,7 +990,17 @@ function DocumentsTabContent(props: {
   isCpo: boolean; isMgr: boolean
 }) {
   const cols: TableColumn<ComplianceDocument>[] = [
-    { key: 'doc_code', label: '코드', sortBy: r => r.doc_code, render: r => <strong style={{ color: COLORS.textPrimary }}>{r.doc_code}</strong> },
+    { key: 'doc_code', label: '코드', sortBy: r => r.doc_code, render: r => {
+      // Phase 1.3 — 매뉴얼·서식별 페이지로 deep-link
+      const href = r.doc_type === 'manual'
+        ? `/RideCompliance/manuals/${r.doc_code}`
+        : r.doc_type === 'form'
+          ? `/RideCompliance/forms/${r.doc_code}`
+          : null
+      return href
+        ? <Link href={href} style={{ color: COLORS.primary, fontWeight: 600 }}>{r.doc_code}</Link>
+        : <strong style={{ color: COLORS.textPrimary }}>{r.doc_code}</strong>
+    } },
     { key: 'doc_type', label: '유형', sortBy: r => r.doc_type, render: r => {
       const t = DOC_TYPE_LABEL[r.doc_type]; return <span>{t?.emoji} {t?.label || r.doc_type}</span>
     } },

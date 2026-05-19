@@ -6,6 +6,45 @@
 
 ---
 
+## v1.3 — Phase 1.3-A + 1.3-B + 1.3-D 매뉴얼·서식별 종류 페이지 + 마크다운 본문 + GCS 통합 (2026-05-19)
+
+**사용자 통찰 (2026-05-19) 모두 반영**:
+- "매뉴얼은 종류별로 구분되어 있으면 좋겠다" → `/RideCompliance/manuals/[code]` 매뉴얼 7건 독립 라우트
+- "가장 안전하고 확실한 보존" → 마크다운 본문 (DB) + PDF 원본 (GCS or 외부 link) 동시 보존 (옵션 D)
+- "서식관리·각양식은 실제 페이지로 종류별 다르게" → `/RideCompliance/forms/[code]` 동적 페이지 (카테고리 / 개별 / index 3 분기)
+
+**신규 파일 5개 (1209줄)**:
+- `migrations/2026-05-19_ride_compliance_phase13.sql` (130줄) — ALTER TABLE 5건 (content_md / form_fields_schema / gcs_object_path)
+- `app/api/ride-compliance/documents/[id]/content/route.ts` (103줄) — 본문 GET/PATCH. PATCH 시 자동 검수 revoke (안전 기본값)
+- `app/api/ride-compliance/upload-url/route.ts` (139줄) — GCS signed URL POST (업로드) / GET (다운로드). env 미설정 시 501 + 셋업 가이드
+- `app/(employees)/RideCompliance/manuals/[code]/page.tsx` (450줄) — 매뉴얼별 페이지 + 좌측 메타·원본·버전 + 우측 마크다운 뷰어/에디터 + UploadModal (link/GCS 토글)
+- `app/(employees)/RideCompliance/forms/[code]/page.tsx` (387줄) — 카테고리/개별/index 3 분기 + 작성 인스턴스 list + SubmitModal
+
+**변경 파일 2개**:
+- `app/(employees)/RideCompliance/page.tsx` — DocumentsTabContent 의 doc_code 컬럼 Link 처리 (매뉴얼·서식 페이지로 deep-link)
+- `app/api/ride-compliance/documents/route.ts` — update_file_url_only 분기 확장 (gcs_object_path 동시 갱신, 컬럼 미존재 시 graceful fallback)
+
+**향후 작업**:
+- Phase 1.3-C — 19 서식별 fields 정의 (JSON schema) + 종류별 작성 폼 + 검토 흐름
+- Phase 1.3-E — 매뉴얼 본문 마크다운 import script (sandbox 의 추출 텍스트 4671줄을 시드 import)
+- Phase 1.4 — 개인정보 처리방침 + 동의 이력
+
+**Rule 준수 self-check (Rule 27 commit GATE)**:
+- ✅ Rule 1 풀 파이프라인 (DB ALTER + API 2 신규 + UI 2 신규 + 2 수정)
+- ✅ Rule 7 GO 키워드 수신 후 코드 작성 (Q1=2 + Q2=나)
+- ✅ Rule 11 컬럼 사전 검증 (content_md/form_fields_schema/gcs_object_path 모두 명시)
+- ✅ Rule 14 동형 (Phase 1.1/1.2 라이드 모듈 패턴)
+- ✅ Rule 18 NeuDataTable 모든 컬럼 sortBy
+- ✅ Rule 19 줄바꿈 최소화
+- ✅ Rule 20 글래스 패널 (alert 미사용)
+- ✅ Rule 21 자기 모듈만 (menu-registry 미수정)
+- ✅ Rule 22 _docs 갱신 (CHANGELOG v1.3)
+- ✅ Rule 23 graceful fallback — `_migration_pending: 'phase13'`, GCS env 미설정 시 501 + 가이드
+- ✅ Rule 27 commit GATE
+- ✅ `git commit --no-verify` 미사용
+
+---
+
 ## v1.2 — Phase 1.2 자료·서식 카탈로그 + 버전 + 주기적 운영 Task + 작성 트래커 (2026-05-18)
 
 **사용자 통찰 (2026-05-18) 모두 반영**:

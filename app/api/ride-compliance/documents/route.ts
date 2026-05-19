@@ -120,17 +120,35 @@ export async function POST(request: Request) {
   const notes = body.notes ? String(body.notes) : null
   // 기존 row 의 file_url 갱신 (검수 단계 진입) 지원
   const updateFileUrlOnly = body.update_file_url_only === true || body.update_file_url_only === 'true'
+  const gcsObjectPath = body.gcs_object_path ? String(body.gcs_object_path).trim() : null
 
   if (!docCode) return NextResponse.json({ success: false, error: 'doc_code 필수' }, { status: 400 })
 
-  // PATCH-like: 기존 doc_code 가 있으면 file_url 만 갱신 (Phase 1.2.0 — 운영 진입 단순화)
-  if (updateFileUrlOnly && fileUrl) {
+  // PATCH-like: 기존 doc_code 가 있으면 file_url / gcs_object_path 갱신 (Phase 1.2.0 + 1.3 GCS)
+  if (updateFileUrlOnly && (fileUrl || gcsObjectPath)) {
     try {
-      await prisma.$executeRaw`
-        UPDATE ride_compliance_documents
-           SET file_url = ${fileUrl}, updated_at = NOW()
-         WHERE doc_code = ${docCode}
-      `
+      // Phase 1.3 — gcs_object_path 컬럼은 마이그 적용 후 활용. 컬럼 없으면 try/catch 후 file_url 만.
+      try {
+        await prisma.$executeRaw`
+          UPDATE ride_compliance_documents
+             SET file_url = COALESCE(${fileUrl}, file_url),
+                 gcs_object_path = COALESCE(${gcsObjectPath}, gcs_object_path),
+                 updated_at = NOW()
+           WHERE doc_code = ${docCode}
+        `
+      } catch (innerErr) {
+        const ie = innerErr as { message?: string }
+        if (ie.message?.includes('Unknown column') && ie.message?.includes('gcs_object_path')) {
+          // Phase 1.3 마이그 미적용 — file_url 만 갱신 (Phase 1.2 호환)
+          await prisma.$executeRaw`
+            UPDATE ride_compliance_documents
+               SET file_url = ${fileUrl}, updated_at = NOW()
+             WHERE doc_code = ${docCode}
+          `
+        } else {
+          throw innerErr
+        }
+      }
       const [row] = await prisma.$queryRaw<DocumentRow[]>`
         SELECT d.id, d.doc_code, d.doc_type, d.title, d.parent_manual_code, d.description,
                d.current_version_id, d.current_version_no, d.effective_date,
