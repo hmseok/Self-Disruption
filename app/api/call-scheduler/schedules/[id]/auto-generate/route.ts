@@ -1993,7 +1993,14 @@ export async function POST(
             const mc = lookupMember(g.id, wId)
             return (mc?.priority_level ?? 2) >= 3
           }
-          const p2TotalMembers = gMembers.filter(isP2)
+          // N-65-fix5 — p2Short 계산은 P2 만 (P1 제외)
+          //   기존: isP2 (P1+P2 포함) → 정동민 cycle 휴무 phase 마다 p2Short = 1 → N-46 분기로 빠짐
+          //   fix5: P2 만 카운트 → 정동민 휴무 = p2Short 영향 X → 정상 cursor 분기 진입
+          const isP2Strict = (wId: string): boolean => {
+            const mc = lookupMember(g.id, wId)
+            return (mc?.priority_level ?? 2) === 2
+          }
+          const p2TotalMembers = gMembers.filter(isP2Strict)
           const p2AvailableNow = p2TotalMembers.filter(wId => candidates.includes(wId))
           const p2Short = Math.max(0, p2TotalMembers.length - p2AvailableNow.length)
 

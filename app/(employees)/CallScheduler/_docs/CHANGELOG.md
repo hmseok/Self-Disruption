@@ -3,6 +3,42 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-19 (Phase N-65-fix5) — p2Short 가 P1 제외 (cursor 분기 진입)
+
+### 데이터 분석 (fix4 push 후 SQL)
+```
+6/2~3 윤민진  ← cursor 1
+6/5~6 전정연  ← cursor 2
+6/7~8 전유하  ← cursor 3
+6/10~11 전정연  ← 또 전정연! 윤민진이 와야 (last_date 가장 오래)
+6/13~14 전유하
+6/15  윤민진  ← 이제야
+```
+
+### 원인
+fix4 의 새 cursor 분기가 작동 안 함.
+실제로 N-46 분기 (P2 결원 P3 cov) 로 빠짐:
+```ts
+const isP2 = (wId) => priority_level <= 2  // P1 도 포함!
+p2TotalMembers = 4명 (정동민 P1 + P2 3명)
+정동민 cycle 휴무 phase (월 75%) → p2AvailableNow=3 → p2Short=1
+→ N-46 분기 진입 → fix4 안 탐 → candidates 가중치 정렬 → by_dow 가드로 전정연 우선
+```
+
+### 수정 (auto-generate route)
+`p2Short` 계산은 P2 만 카운트:
+```ts
+const isP2Strict = (wId) => priority_level === 2  // P2 만
+const p2TotalMembers = gMembers.filter(isP2Strict)
+```
+
+### 효과
+- 정동민 cycle 휴무 phase 라도 p2Short = 0
+- fix4 새 cursor 분기 정상 진입 → last_date 가장 오래된 P2 우선
+- 자연 순환: 윤민진 → 전유하 → 전정연 → 윤민진 → ...
+
+---
+
 ## 2026-05-19 (Phase N-65-fix4) — P2 cursor 동률 시 last_date 가드 (균등 순환)
 
 ### 사용자 보고
