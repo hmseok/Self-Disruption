@@ -125,7 +125,7 @@ export default function FormDetailPage() {
       <div style={{ padding: 40, maxWidth: 760 }}>
         <div style={{ ...GLASS.L3, padding: 24, borderRadius: 12, borderLeft: `4px solid ${COLORS.danger}` }}>
           <h2 style={{ margin: 0, color: COLORS.danger, fontSize: 18 }}>❌ 서식 코드 &quot;{code}&quot; 미존재</h2>
-          <Link href="/RideCompliance" style={{ color: COLORS.primary, marginTop: 12, display: 'inline-block', fontSize: 13 }}>← 자료실로</Link>
+          <Link href="/RideCompliance?tab=documents" style={{ color: COLORS.primary, marginTop: 12, display: 'inline-block', fontSize: 13 }}>← 자료실로</Link>
         </div>
       </div>
     )
@@ -140,7 +140,7 @@ export default function FormDetailPage() {
 function CategoriesIndex(props: { allForms: FormDoc[]; allSubs: Submission[] }) {
   return (
     <div style={{ padding: '24px 32px', maxWidth: 1400, margin: '0 auto' }}>
-      <Link href="/RideCompliance" style={{ color: COLORS.primary, fontSize: 13, marginBottom: 8, display: 'inline-block' }}>← 라이드 정보보안</Link>
+      <Link href="/RideCompliance?tab=documents" style={{ color: COLORS.primary, fontSize: 13, marginBottom: 8, display: 'inline-block' }}>← 라이드 정보보안</Link>
       <h1 style={{ margin: '4px 0 16px', fontSize: 20 }}>📝 서식 카테고리</h1>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 14 }}>
         {Object.entries(CATEGORY_MAP).map(([catCode, info]) => {
@@ -193,7 +193,7 @@ function CategoryView(props: { code: string; info: { parent: string | null; labe
 
   return (
     <div style={{ padding: '24px 32px', maxWidth: 1400, margin: '0 auto' }}>
-      <Link href="/RideCompliance" style={{ color: COLORS.primary, fontSize: 13, marginBottom: 8, display: 'inline-block' }}>← 라이드 정보보안</Link>
+      <Link href="/RideCompliance?tab=documents" style={{ color: COLORS.primary, fontSize: 13, marginBottom: 8, display: 'inline-block' }}>← 라이드 정보보안</Link>
       <h1 style={{ margin: '4px 0 4px', fontSize: 20 }}>📝 {props.info.label}</h1>
       <p style={{ margin: '0 0 16px', fontSize: 13, color: COLORS.textSecondary }}>{props.info.description}</p>
 
@@ -241,7 +241,7 @@ function IndividualFormView(props: {
   return (
     <div style={{ padding: '24px 32px', maxWidth: 1400, margin: '0 auto' }}>
       <div style={{ marginBottom: 8 }}>
-        <Link href="/RideCompliance" style={{ color: COLORS.primary, fontSize: 13 }}>← 라이드 정보보안</Link>
+        <Link href="/RideCompliance?tab=documents" style={{ color: COLORS.primary, fontSize: 13 }}>← 라이드 정보보안</Link>
         {props.form.parent_manual_code && (
           <>
             <span style={{ color: COLORS.textMuted, margin: '0 6px' }}>·</span>

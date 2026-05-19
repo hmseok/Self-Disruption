@@ -19,6 +19,7 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { getStoredToken, getStoredUser } from '@/lib/auth-client'
 import { COLORS, GLASS, BTN } from '@/app/utils/ui-tokens'
+import { renderMarkdown } from '@/lib/simple-markdown'
 
 const btnPrimary: React.CSSProperties = { ...BTN.md, border: `1px solid ${COLORS.borderSubtle}`, background: COLORS.bgBlue, color: COLORS.primary, cursor: 'pointer' }
 const btnSecondary: React.CSSProperties = { ...BTN.md, border: `1px solid ${COLORS.borderSubtle}`, background: COLORS.bgGray, color: COLORS.textSecondary, cursor: 'pointer' }
@@ -162,7 +163,7 @@ export default function ManualDetailPage() {
     <div style={{ padding: 40, maxWidth: 760 }}>
       <div style={{ ...GLASS.L3, padding: 24, borderRadius: 12, borderLeft: `4px solid ${COLORS.danger}` }}>
         <h2 style={{ margin: 0, color: COLORS.danger, fontSize: 18 }}>❌ {error}</h2>
-        <Link href="/RideCompliance" style={{ color: COLORS.primary, marginTop: 12, display: 'inline-block', fontSize: 13 }}>← 자료실로</Link>
+        <Link href="/RideCompliance?tab=documents" style={{ color: COLORS.primary, marginTop: 12, display: 'inline-block', fontSize: 13 }}>← 자료실로</Link>
       </div>
     </div>
   )
@@ -174,7 +175,7 @@ export default function ManualDetailPage() {
 
   return (
     <div style={{ padding: '24px 32px', maxWidth: 1400, margin: '0 auto' }}>
-      <Link href="/RideCompliance" style={{ color: COLORS.primary, fontSize: 13, marginBottom: 8, display: 'inline-block' }}>← 라이드 정보보안</Link>
+      <Link href="/RideCompliance?tab=documents" style={{ color: COLORS.primary, fontSize: 13, marginBottom: 8, display: 'inline-block' }}>← 라이드 정보보안</Link>
       <h1 style={{ margin: '4px 0 4px', fontSize: 20 }}>📘 {meta.doc_code} · {meta.title}</h1>
       {desc && <p style={{ margin: '0 0 16px', fontSize: 13, color: COLORS.textSecondary }}>{desc.intro}</p>}
 
@@ -275,13 +276,16 @@ export default function ManualDetailPage() {
           {!editMode && (
             <>
               {detail?.content_md ? (
-                <pre style={{
-                  whiteSpace: 'pre-wrap', wordWrap: 'break-word',
+                <div style={{
                   fontFamily: '"Pretendard", -apple-system, sans-serif',
-                  fontSize: 13, lineHeight: 1.8, color: COLORS.textPrimary,
-                  background: COLORS.bgGray, padding: 16, borderRadius: 6,
-                  margin: 0, maxHeight: 700, overflowY: 'auto',
-                }}>{detail.content_md}</pre>
+                  color: COLORS.textPrimary,
+                  background: '#fff', padding: '24px 32px', borderRadius: 8,
+                  maxHeight: 720, overflowY: 'auto',
+                  border: `1px solid ${COLORS.borderSubtle}`,
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                }}>
+                  {renderMarkdown(detail.content_md)}
+                </div>
               ) : (
                 <div style={{ padding: 40, textAlign: 'center', color: COLORS.textSecondary, fontSize: 13 }}>
                   <div style={{ fontSize: 32, marginBottom: 8 }}>📝</div>

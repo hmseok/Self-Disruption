@@ -6,6 +6,51 @@
 
 ---
 
+## v1.3-G2 + 1.3-H — 본문 마크다운 렌더링 + 뒤로가기 UX + 정합성 검사 통합 (2026-05-19)
+
+**사용자 피드백 4건**:
+1. "본문이 기존 문서 형식처럼 제대로 정리 안 되어있음" → 마크다운 → HTML 렌더링
+2. "뒤로하면 메인탭으로 가는 것도 불편" → ?tab=documents query param + useSearchParams
+3. "제대로 안 나온 것도 있음" → 본문 표시 영역 PDF 문서 형식으로 정돈
+4. "서로간의 정합성 검사의 영역도 안 보임" → 1.3-H 즉시 통합
+
+**신규 파일 2건**:
+- `lib/simple-markdown.ts` (196줄) — 경량 마크다운 → React 노드 파서
+  - H1~H4 / 단락 / 수평선 / 리스트 (불릿·번호) / 표 / inline (bold·code)
+  - PDF 문서처럼 정돈된 시각 렌더링 (헤더 borderBottom, 단락 padding)
+- `app/api/ride-compliance/consistency-check/route.ts` (271줄) — 매뉴얼 cross-reference lint
+  - 7 카테고리: people / forms / clauses / dates / frequency / orphans / coverage
+  - 정합성 점수 100점 만점 (error 10 / warning 3 / info 1 차감)
+
+**변경 4 파일**:
+- `app/(employees)/RideCompliance/page.tsx` (2023→2179줄, +156)
+  - `useSearchParams` 추가 — URL `?tab=documents` 로 진입 시 자동 탭 설정
+  - 운영 가이드 탭 안에 `ConsistencyCheckWidget` 추가 (검사 시작 버튼 + 결과 카테고리별 펼침)
+  - `StatBlock` 보조 컴포넌트
+- `app/(employees)/RideCompliance/manuals/[code]/page.tsx` — `<pre>` raw text → `renderMarkdown()` 호출
+- `app/(employees)/RideCompliance/manuals/[code]/page.tsx` — 뒤로가기 link 모두 `?tab=documents` 로
+- `app/(employees)/RideCompliance/forms/[code]/page.tsx` — 뒤로가기 link 모두 `?tab=documents` 로
+
+**효과**:
+- 매뉴얼 본문이 시각적으로 정돈됨 (헤더·단락·표·리스트 모두 마크다운 렌더링)
+- 매뉴얼·서식 페이지에서 ← 뒤로가기 시 자료실 탭으로 직접 (메인 X)
+- 운영 가이드 탭 안에 「🔍 매뉴얼 정합성 검사」 위젯 — 검사 클릭 → 7 카테고리 자동 lint → 결과
+- 정합성 점수 자동 (예: 0 issues → 100점)
+
+**검증 항목 (7 카테고리)**:
+1. people — 매뉴얼 외 인명 발견 (제6조 명시 인원 외 등장 시 warning)
+2. forms — F-M01-01 등 catalog 미등록 서식 참조 (error)
+3. clauses — 제N조 범위 초과 (통합본 제1~33조)
+4. dates — V1.0 시행일 2026-05-20 불일치
+5. frequency — 빈도 표기 약함 (정보 알림)
+6. orphans — 검수 완료지만 본문 미입력
+7. coverage — RIDE-M02 등 catalog 미등록 매뉴얼 인용
+
+**Rule 준수**:
+- ✅ Rule 14 동형 / Rule 19/20 / Rule 22 _docs / Rule 27 lint:harness 통과
+
+---
+
 ## v1.3-G — 매뉴얼 본문 import seed + 운영 가이드 컴팩트 list 재설계 (2026-05-19)
 
 **사용자 통찰 (2026-05-19)**:

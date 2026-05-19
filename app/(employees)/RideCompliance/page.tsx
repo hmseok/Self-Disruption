@@ -24,6 +24,7 @@
 
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { getStoredToken, getStoredUser } from '@/lib/auth-client'
 import { usePermission } from '@/app/hooks/usePermission'
 import NeuDataTable, { type TableColumn } from '@/app/components/NeuDataTable'
@@ -492,7 +493,10 @@ export default function RideCompliancePage() {
   const { hasPageAccess } = usePermission()
   const canAccess = user?.role === 'admin' || hasPageAccess('/RideCompliance')
 
-  const [tab, setTab] = useState<TabKey>('dashboard')
+  // URL query ?tab=documents 로 진입 시 자동 탭 설정 (사용자 추가 통찰 — 뒤로가기 UX)
+  const searchParams = useSearchParams()
+  const initialTab = (searchParams?.get('tab') as TabKey) || 'dashboard'
+  const [tab, setTab] = useState<TabKey>(initialTab)
 
   // Phase 1.1 데이터
   const [officers, setOfficers] = useState<Officer[]>([])
@@ -1063,6 +1067,10 @@ function OperationGuideTabContent(props: {
         />
       </div>
 
+      {/* 매뉴얼 간 정합성 검사 — 사용자 통찰 (2026-05-19): "각 매뉴얼간의 오류체크도 가능해야합니다" */}
+      <ConsistencyCheckWidget />
+
+
       {/* 12개월 캘린더 (별첨 7 RIDE-PLAN-2026 시각화) */}
       <div style={{ ...GLASS.L3, padding: 18, borderRadius: 12 }}>
         <h3 style={{ margin: '0 0 12px', fontSize: 14, color: COLORS.textPrimary }}>📅 12개월 운영 캘린더 (별첨 7 RIDE-PLAN-2026)</h3>
@@ -1243,6 +1251,154 @@ function PlaybookStepList(props: {
           </div>
         )
       })}
+    </div>
+  )
+}
+
+// ────────── 매뉴얼 간 정합성 검사 위젯 (Phase 1.3-H 통합) ──────────
+// 사용자 통찰: "각 매뉴얼간의 오류체크도 가능해야합니다"
+// 7 카테고리 (people/forms/clauses/dates/frequency/orphans/coverage) 자동 검증
+function ConsistencyCheckWidget() {
+  const [loading, setLoading] = useState(false)
+  const [result, setResult] = useState<{
+    issues: Array<{ severity: string; category: string; message: string; doc_codes: string[]; detail?: string }>
+    stats: { total_docs?: number; manuals?: number; forms?: number; with_content?: number; verified?: number; error?: number; warning?: number; info?: number; score?: number }
+  } | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [expanded, setExpanded] = useState(false)
+
+  const runCheck = async () => {
+    setLoading(true); setError(null)
+    try {
+      const token = getStoredToken()
+      const res = await fetch('/api/ride-compliance/consistency-check', {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        cache: 'no-store',
+      })
+      const json = await res.json()
+      if (!res.ok || !json.success) { setError(json.error || `HTTP ${res.status}`); return }
+      setResult(json.data)
+      setExpanded(true)
+    } catch (e) { setError(String(e)) } finally { setLoading(false) }
+  }
+
+  const issuesByCategory = useMemo(() => {
+    if (!result) return {} as Record<string, typeof result.issues>
+    const map: Record<string, typeof result.issues> = {}
+    for (const issue of result.issues) {
+      if (!map[issue.category]) map[issue.category] = []
+      map[issue.category].push(issue)
+    }
+    return map
+  }, [result])
+
+  const CATEGORY_LABEL: Record<string, string> = {
+    people: '👥 인명·직책',
+    forms: '📝 서식 참조',
+    clauses: '📜 조항 번호',
+    dates: '📅 시행일',
+    frequency: '🔁 빈도 표기',
+    orphans: '⚠ 검수·본문 정합',
+    coverage: '🔗 매뉴얼 참조',
+  }
+
+  const scoreColor = (result?.stats.score ?? 100) >= 90 ? COLORS.success
+                   : (result?.stats.score ?? 0) >= 70 ? COLORS.warning : COLORS.danger
+
+  return (
+    <div style={{ ...GLASS.L3, padding: 18, borderRadius: 12, borderLeft: `4px solid ${COLORS.info}` }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+        <h3 style={{ margin: 0, fontSize: 14, color: COLORS.textPrimary }}>🔍 매뉴얼 간 정합성 검사</h3>
+        {result && (
+          <span style={{ padding: '2px 10px', borderRadius: 10, background: `${scoreColor}18`, color: scoreColor, fontSize: 12, fontWeight: 700 }}>
+            정합성 점수 {result.stats.score}/100
+          </span>
+        )}
+        <button onClick={runCheck} disabled={loading} style={{ ...btnPrimary, marginLeft: 'auto' }}>
+          {loading ? '검사 중…' : result ? '🔄 재검사' : '🔍 검사 시작'}
+        </button>
+      </div>
+      <p style={{ margin: '0 0 12px', fontSize: 12, color: COLORS.textSecondary, lineHeight: 1.6 }}>
+        매뉴얼·서식 26건의 cross-reference 자동 검증 — 인명 일관성 / 서식 참조 / 조항 번호 / 시행일 / 빈도 / 본문 정합 / 매뉴얼 참조 7 카테고리.
+      </p>
+
+      {error && (
+        <div style={{ padding: '8px 12px', borderRadius: 6, background: `${COLORS.danger}18`, color: COLORS.danger, fontSize: 13, marginBottom: 12 }}>
+          ❌ {error}
+        </div>
+      )}
+
+      {result && (
+        <>
+          {/* 통계 row */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: 8, marginBottom: 14 }}>
+            <StatBlock label="총 문서" value={result.stats.total_docs ?? 0} color={COLORS.info} />
+            <StatBlock label="본문 있음" value={result.stats.with_content ?? 0} color={COLORS.success} />
+            <StatBlock label="검수 완료" value={result.stats.verified ?? 0} color={COLORS.success} />
+            <StatBlock label="🔴 error" value={result.stats.error ?? 0} color={COLORS.danger} />
+            <StatBlock label="🟡 warning" value={result.stats.warning ?? 0} color={COLORS.warning} />
+            <StatBlock label="🔵 info" value={result.stats.info ?? 0} color={COLORS.info} />
+          </div>
+
+          {/* 결과 펼침 */}
+          {expanded && result.issues.length === 0 && (
+            <div style={{ padding: 16, textAlign: 'center', background: COLORS.bgGreen, borderRadius: 8, color: COLORS.success, fontSize: 14 }}>
+              ✅ 정합성 이슈 없음 — 모든 매뉴얼·서식이 일관성 있게 등록·검수됐습니다.
+            </div>
+          )}
+
+          {expanded && result.issues.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {Object.entries(issuesByCategory).map(([cat, issues]) => (
+                <div key={cat} style={{ border: `1px solid ${COLORS.borderSubtle}`, borderRadius: 8, overflow: 'hidden' }}>
+                  <div style={{ padding: '8px 14px', background: COLORS.bgGray, fontSize: 12, fontWeight: 700, color: COLORS.textPrimary }}>
+                    {CATEGORY_LABEL[cat] || cat} <span style={{ marginLeft: 6, color: COLORS.textMuted, fontWeight: 500 }}>({issues.length}건)</span>
+                  </div>
+                  {issues.map((issue, i) => {
+                    const sevColor = issue.severity === 'error' ? COLORS.danger : issue.severity === 'warning' ? COLORS.warning : COLORS.info
+                    const sevBg = issue.severity === 'error' ? COLORS.bgRed : issue.severity === 'warning' ? COLORS.bgAmber : COLORS.bgBlue
+                    return (
+                      <div key={i} style={{ padding: '10px 14px', borderTop: i > 0 ? `1px solid ${COLORS.borderSubtle}` : 'none' }}>
+                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 4 }}>
+                          <span style={{ padding: '1px 6px', borderRadius: 4, background: sevBg, color: sevColor, fontSize: 10, fontWeight: 700, flexShrink: 0 }}>
+                            {issue.severity.toUpperCase()}
+                          </span>
+                          <span style={{ fontSize: 12, color: COLORS.textPrimary, fontWeight: 600 }}>{issue.message}</span>
+                        </div>
+                        {issue.detail && (
+                          <div style={{ marginLeft: 56, fontSize: 11, color: COLORS.textSecondary, lineHeight: 1.6 }}>
+                            {issue.detail}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {expanded && (
+            <button onClick={() => setExpanded(false)} style={{ ...btnSecondary, marginTop: 12, fontSize: 11 }}>
+              ▴ 결과 접기
+            </button>
+          )}
+          {!expanded && (
+            <button onClick={() => setExpanded(true)} style={{ ...btnSecondary, marginTop: 8, fontSize: 11 }}>
+              ▾ {result.issues.length} 건 결과 펼치기
+            </button>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
+function StatBlock(props: { label: string; value: number; color: string }) {
+  return (
+    <div style={{ padding: '8px 10px', borderRadius: 6, background: COLORS.bgGray, textAlign: 'center' }}>
+      <div style={{ fontSize: 10, color: COLORS.textMuted, marginBottom: 2 }}>{props.label}</div>
+      <div style={{ fontSize: 16, fontWeight: 700, color: props.color }}>{props.value}</div>
     </div>
   )
 }
