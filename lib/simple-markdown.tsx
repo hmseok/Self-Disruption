@@ -48,6 +48,16 @@ const DEFAULT_STYLES: Required<Style> = {
   td: { padding: '6px 10px', border: '1px solid rgba(0,0,0,0.1)', verticalAlign: 'top' },
 }
 
+// Phase 1.4-fix4 — 섹션 타입별 본문 헤더 색상 (사용자 통찰 2026-05-19):
+// "본문 내부에서도 종류별로 구분"
+const SECTION_TYPE_DECOR: Record<SectionType, { color: string; bg: string; emoji: string; label: string }> = {
+  chapter:    { color: '#3b6eb5', bg: '#eff6ff', emoji: '📖', label: '본문' },
+  attachment: { color: '#7c3aed', bg: '#f5f3ff', emoji: '📎', label: '별첨' },
+  form:       { color: '#10b981', bg: '#f0fdf4', emoji: '📝', label: '서식' },
+  general:    { color: '#475569', bg: '#f8fafc', emoji: '📋', label: '일반규정' },
+  other:      { color: '#94a3b8', bg: 'transparent', emoji: '·',  label: '기타' },
+}
+
 // ───────────────────────────────────────────────────────────
 // Phase 1.4-fix2 — 매뉴얼 본문 자동 섹션 추출 (사용자 통찰 2026-05-19):
 // "내부계획서 별첨섹션·일반규정·다른 양식 등 섹션 구분 → 검수에 도움"
@@ -174,11 +184,39 @@ export function renderMarkdown(text: string, customStyle?: Style): React.ReactNo
     if (headerMatch) {
       const level = headerMatch[1].length
       const content = headerMatch[2]
-      const style = level === 1 ? styles.h1 : level === 2 ? styles.h2 : level === 3 ? styles.h3 : styles.h4
+      const baseStyle = level === 1 ? styles.h1 : level === 2 ? styles.h2 : level === 3 ? styles.h3 : styles.h4
       const Tag = (`h${level}` as 'h1' | 'h2' | 'h3' | 'h4')
-      // Phase 1.4-fix2 — 섹션 anchor scroll 위해 id 부여 (slug)
       const headerId = `md-${level}-${headerSlug(content, key)}`
-      nodes.push(React.createElement(Tag, { key: `h${key++}`, id: headerId, style }, renderInline(content, `h${key}-`)))
+
+      // Phase 1.4-fix4 — 섹션 타입별 색상·이모지·borderLeft tint (H1/H2 만 적용)
+      const secType = level <= 2 ? inferSectionType(content) : null
+      const decor = secType ? SECTION_TYPE_DECOR[secType] : null
+      const headerStyle: React.CSSProperties = decor && secType !== 'other'
+        ? {
+            ...baseStyle,
+            color: decor.color,
+            background: decor.bg,
+            borderLeft: `4px solid ${decor.color}`,
+            padding: level === 1 ? '12px 16px 8px' : '10px 14px 6px',
+            borderRadius: 6,
+            borderBottom: 'none',  // tint 박스로 충분 — borderBottom 제거
+          }
+        : baseStyle
+
+      const headerContent = decor && secType !== 'other'
+        ? [
+            <span key="emoji" style={{ marginRight: 8, fontSize: '0.9em' }}>{decor.emoji}</span>,
+            <span key="label" style={{
+              display: 'inline-block', padding: '1px 7px', borderRadius: 8,
+              background: decor.color, color: '#fff',
+              fontSize: '0.55em', fontWeight: 700, verticalAlign: 'middle',
+              marginRight: 8,
+            }}>{decor.label}</span>,
+            ...renderInline(content, `h${key}-`),
+          ]
+        : renderInline(content, `h${key}-`)
+
+      nodes.push(React.createElement(Tag, { key: `h${key++}`, id: headerId, style: headerStyle }, headerContent))
       i++
       continue
     }
