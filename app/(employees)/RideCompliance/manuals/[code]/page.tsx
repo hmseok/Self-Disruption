@@ -181,8 +181,8 @@ export default function ManualDetailPage() {
 
       {/* 좌우 2단 레이아웃 */}
       <div style={{ display: 'grid', gridTemplateColumns: '260px 1fr', gap: 16 }}>
-        {/* 좌측: 메타 + 원본 파일 + 버전 이력 */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        {/* 좌측: 메타 + 원본 파일 + 버전 이력 + 섹션 목차 — Phase 1.4-fix5 자체 스크롤 */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14, maxHeight: 'calc(100vh - 160px)', overflowY: 'auto', paddingRight: 4 }}>
           {/* 메타 카드 */}
           <div style={{ ...GLASS.L3, padding: 16, borderRadius: 10 }}>
             <h3 style={{ margin: '0 0 10px', fontSize: 13, color: COLORS.textSecondary }}>📋 매뉴얼 정보</h3>
@@ -287,17 +287,17 @@ export default function ManualDetailPage() {
           {!editMode && (
             <>
               {detail?.content_md ? (
-                <div style={{
+                <div id="manual-body-scroll" style={{
                   fontFamily: '"Pretendard", -apple-system, sans-serif',
                   color: COLORS.textPrimary,
                   background: '#fff', padding: '24px 32px', borderRadius: 8,
                   border: `1px solid ${COLORS.borderSubtle}`,
                   boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                  // Phase 1.4-fix5 — 자체 스크롤 컨테이너 (anchor scrollIntoView 가 본문 박스 안에서 동작)
+                  maxHeight: 'calc(100vh - 220px)', overflowY: 'auto',
                 }}>
-                  {/* Phase 1.4-fix3 — maxHeight·overflow 제거: 페이지 전체 스크롤 → anchor 정상 작동
-                      + 헤더 anchor 시 sticky 영역에 가려지지 않도록 scrollMarginTop */}
                   <style>{`
-                    [id^="md-1-"], [id^="md-2-"], [id^="md-3-"], [id^="md-4-"] { scroll-margin-top: 80px; }
+                    [id^="md-1-"], [id^="md-2-"], [id^="md-3-"], [id^="md-4-"] { scroll-margin-top: 16px; }
                   `}</style>
                   {renderMarkdown(detail.content_md)}
                 </div>
@@ -397,7 +397,19 @@ interface ReviewData {
 // ────────── Phase 1.4-fix2 섹션 목차 (사용자 통찰 — 별첨/일반규정/서식 자동 분리) ──────────
 // 본문 마크다운에서 H1·H2 자동 추출 → 타입별 색상 + 클릭 시 anchor scroll
 function SectionTOC(props: { content: string }) {
-  const sections = useMemo<MarkdownSection[]>(() => extractSections(props.content, 2), [props.content])
+  // Phase 1.4-fix5 — 중복 제거 (같은 title 첫 번째만 유지). PDF 추출 시 페이지 헤더 반복 발생 회피.
+  const sections = useMemo<MarkdownSection[]>(() => {
+    const all = extractSections(props.content, 2)
+    const seen = new Set<string>()
+    const uniq: MarkdownSection[] = []
+    for (const s of all) {
+      const key = s.title.trim()
+      if (seen.has(key)) continue
+      seen.add(key)
+      uniq.push(s)
+    }
+    return uniq
+  }, [props.content])
   const [filter, setFilter] = useState<'all' | 'chapter' | 'attachment' | 'form' | 'general'>('all')
 
   const counts = useMemo(() => ({
@@ -424,8 +436,17 @@ function SectionTOC(props: { content: string }) {
   }
 
   const scrollTo = (id: string) => {
+    // Phase 1.4-fix5 — 본문 박스 (#manual-body-scroll) 내부 스크롤
+    const container = document.getElementById('manual-body-scroll')
     const el = document.getElementById(id)
-    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    if (!el) return
+    if (container) {
+      // 본문 박스가 자체 스크롤 컨테이너면 offsetTop 기반 정확 스크롤
+      const top = el.offsetTop - container.offsetTop - 16
+      container.scrollTo({ top, behavior: 'smooth' })
+    } else {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
   }
 
   return (
