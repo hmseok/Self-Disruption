@@ -15,11 +15,11 @@
  */
 
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { getStoredToken, getStoredUser } from '@/lib/auth-client'
 import { COLORS, GLASS, BTN } from '@/app/utils/ui-tokens'
-import { renderMarkdown } from '@/lib/simple-markdown'
+import { renderMarkdown, extractSections, type MarkdownSection } from '@/lib/simple-markdown'
 
 const btnPrimary: React.CSSProperties = { ...BTN.md, border: `1px solid ${COLORS.borderSubtle}`, background: COLORS.bgBlue, color: COLORS.primary, cursor: 'pointer' }
 const btnSecondary: React.CSSProperties = { ...BTN.md, border: `1px solid ${COLORS.borderSubtle}`, background: COLORS.bgGray, color: COLORS.textSecondary, cursor: 'pointer' }
@@ -180,7 +180,7 @@ export default function ManualDetailPage() {
       {desc && <p style={{ margin: '0 0 16px', fontSize: 13, color: COLORS.textSecondary }}>{desc.intro}</p>}
 
       {/* 좌우 2단 레이아웃 */}
-      <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '260px 1fr', gap: 16 }}>
         {/* 좌측: 메타 + 원본 파일 + 버전 이력 */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           {/* 메타 카드 */}
@@ -245,10 +245,15 @@ export default function ManualDetailPage() {
             )}
           </div>
 
-          {/* 장 목차 (해당 시) */}
-          {desc?.chapters && (
+          {/* Phase 1.4-fix2 — 본문 자동 섹션 목차 (사용자 통찰 — 별첨/일반규정/서식 자동 분리) */}
+          {detail?.content_md && (
+            <SectionTOC content={detail.content_md} />
+          )}
+
+          {/* 장 목차 (해당 시 — 매뉴얼 description 의 static chapters fallback) */}
+          {desc?.chapters && !detail?.content_md && (
             <div style={{ ...GLASS.L3, padding: 16, borderRadius: 10 }}>
-              <h3 style={{ margin: '0 0 10px', fontSize: 13, color: COLORS.textSecondary }}>📑 장 목차</h3>
+              <h3 style={{ margin: '0 0 10px', fontSize: 13, color: COLORS.textSecondary }}>📑 장 목차 (참고)</h3>
               <ol style={{ margin: 0, paddingLeft: 18, fontSize: 12, lineHeight: 1.8, color: COLORS.textSecondary }}>
                 {desc.chapters.map((c, i) => <li key={i}>{c}</li>)}
               </ol>
@@ -383,13 +388,105 @@ interface ReviewData {
   llm_debug?: Record<string, unknown>
 }
 
+// ────────── Phase 1.4-fix2 섹션 목차 (사용자 통찰 — 별첨/일반규정/서식 자동 분리) ──────────
+// 본문 마크다운에서 H1·H2 자동 추출 → 타입별 색상 + 클릭 시 anchor scroll
+function SectionTOC(props: { content: string }) {
+  const sections = useMemo<MarkdownSection[]>(() => extractSections(props.content, 2), [props.content])
+  const [filter, setFilter] = useState<'all' | 'chapter' | 'attachment' | 'form' | 'general'>('all')
+
+  const counts = useMemo(() => ({
+    chapter: sections.filter(s => s.type === 'chapter').length,
+    attachment: sections.filter(s => s.type === 'attachment').length,
+    form: sections.filter(s => s.type === 'form').length,
+    general: sections.filter(s => s.type === 'general').length,
+    other: sections.filter(s => s.type === 'other').length,
+  }), [sections])
+
+  const filtered = useMemo(() => {
+    if (filter === 'all') return sections
+    return sections.filter(s => s.type === filter)
+  }, [sections, filter])
+
+  if (sections.length === 0) return null
+
+  const TYPE_LABEL: Record<MarkdownSection['type'], { label: string; color: string; emoji: string }> = {
+    chapter:    { label: '본문',     color: COLORS.primary,    emoji: '📖' },
+    attachment: { label: '별첨',     color: '#7c3aed',          emoji: '📎' },
+    form:       { label: '서식',     color: COLORS.success,    emoji: '📝' },
+    general:    { label: '일반규정', color: COLORS.textSecondary, emoji: '📋' },
+    other:      { label: '기타',     color: COLORS.textMuted,  emoji: '·' },
+  }
+
+  const scrollTo = (id: string) => {
+    const el = document.getElementById(id)
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
+  return (
+    <div style={{ ...GLASS.L3, padding: 14, borderRadius: 10 }}>
+      <h3 style={{ margin: '0 0 8px', fontSize: 13, color: COLORS.textSecondary, display: 'flex', alignItems: 'center', gap: 6 }}>
+        📑 섹션 목차
+        <span style={{ marginLeft: 'auto', fontSize: 10, color: COLORS.textMuted, fontWeight: 500 }}>{sections.length}건</span>
+      </h3>
+
+      {/* 타입 필터 chips */}
+      <div style={{ display: 'flex', gap: 4, marginBottom: 8, flexWrap: 'wrap' }}>
+        {[
+          { v: 'all' as const, label: `전체 ${sections.length}` },
+          ...(counts.chapter > 0    ? [{ v: 'chapter' as const,    label: `📖 본문 ${counts.chapter}` }] : []),
+          ...(counts.attachment > 0 ? [{ v: 'attachment' as const, label: `📎 별첨 ${counts.attachment}` }] : []),
+          ...(counts.form > 0       ? [{ v: 'form' as const,       label: `📝 서식 ${counts.form}` }] : []),
+          ...(counts.general > 0    ? [{ v: 'general' as const,    label: `📋 일반 ${counts.general}` }] : []),
+        ].map(f => (
+          <button key={f.v} onClick={() => setFilter(f.v)}
+            style={{ ...BTN.sm, fontSize: 10, border: 'none',
+              background: filter === f.v ? COLORS.bgBlue : COLORS.bgGray,
+              color: filter === f.v ? COLORS.primary : COLORS.textSecondary, cursor: 'pointer',
+            }}>{f.label}</button>
+        ))}
+      </div>
+
+      {/* 섹션 list */}
+      <div style={{ maxHeight: 400, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 3 }}>
+        {filtered.length === 0 ? (
+          <div style={{ padding: 10, textAlign: 'center', fontSize: 11, color: COLORS.textMuted }}>해당 타입 섹션 없음</div>
+        ) : filtered.map(s => {
+          const t = TYPE_LABEL[s.type]
+          return (
+            <button key={s.id} onClick={() => scrollTo(s.id)}
+              style={{
+                padding: '6px 8px', borderRadius: 4, border: 'none',
+                background: 'transparent', cursor: 'pointer', textAlign: 'left',
+                display: 'flex', gap: 6, alignItems: 'flex-start',
+                fontSize: 11, lineHeight: 1.5,
+                paddingLeft: 8 + (s.level - 1) * 10,  // H1=8, H2=18 들여쓰기
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = COLORS.bgGray }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
+            >
+              <span style={{ color: t.color, fontWeight: 700, flexShrink: 0, fontSize: 10 }}>{t.emoji}</span>
+              <span style={{ color: COLORS.textPrimary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {s.title}
+              </span>
+            </button>
+          )
+        })}
+      </div>
+      <p style={{ marginTop: 8, marginBottom: 0, fontSize: 10, color: COLORS.textMuted, lineHeight: 1.5 }}>
+        클릭 시 본문에서 해당 위치로 스크롤. 검수 시 본문/별첨/서식 단위로 확인 가능.
+      </p>
+    </div>
+  )
+}
+
+// 컴팩트 banner + 풀스크린 모달
 function AutoReviewPanel(props: { docId: string; docCode: string; verified: boolean; canApprove: boolean; onSaved: () => void }) {
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<ReviewData | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [expanded, setExpanded] = useState(true)
+  const [modalOpen, setModalOpen] = useState(false)
   const [approving, setApproving] = useState(false)
-  const [approveResult, setApproveResult] = useState<{ schedule: { applied_tasks: number; skipped_duplicates: number; applied_task_codes: string[] } | null } | null>(null)
+  const [approveMsg, setApproveMsg] = useState<string | null>(null)
 
   const runReview = async (useLlm: boolean) => {
     setLoading(true); setError(null)
@@ -403,6 +500,7 @@ function AutoReviewPanel(props: { docId: string; docCode: string; verified: bool
       const json = await res.json()
       if (!res.ok || !json.success) { setError(json.error || `HTTP ${res.status}`); return }
       setResult(json.data)
+      setModalOpen(true)
     } catch (e) { setError(String(e)) } finally { setLoading(false) }
   }
 
@@ -418,7 +516,9 @@ function AutoReviewPanel(props: { docId: string; docCode: string; verified: bool
       })
       const json = await res.json()
       if (!res.ok || !json.success) { setError(json.error || `HTTP ${res.status}`); return }
-      setApproveResult(json.data)
+      const sched = json.data?.schedule
+      setApproveMsg(`✅ 승인 완료 — 신규 task ${sched?.applied_tasks ?? 0}건 자동 생성${sched?.skipped_duplicates ? ` · 중복 스킵 ${sched.skipped_duplicates}` : ''}`)
+      setModalOpen(false)
       props.onSaved()
     } catch (e) { setError(String(e)) } finally { setApproving(false) }
   }
@@ -427,84 +527,153 @@ function AutoReviewPanel(props: { docId: string; docCode: string; verified: bool
                    : (result?.lint.score ?? 0) >= 70 ? COLORS.warning : COLORS.danger
 
   return (
-    <div style={{ ...GLASS.L3, padding: 16, borderRadius: 10, borderLeft: `4px solid ${COLORS.info}`, marginBottom: 12 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-        <h3 style={{ margin: 0, fontSize: 13, color: COLORS.textPrimary }}>🔍 자동 검토 (Phase 1.4)</h3>
-        {result && (
+    <>
+      {/* 컴팩트 banner — 본문 영역 위에 작게 */}
+      <div style={{ ...GLASS.L3, padding: '10px 14px', borderRadius: 10, borderLeft: `4px solid ${COLORS.info}`, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <h3 style={{ margin: 0, fontSize: 13, color: COLORS.textPrimary }}>🔍 자동 검토</h3>
+        {result ? (
           <>
-            <span style={{ padding: '2px 8px', borderRadius: 8, background: `${scoreColor}18`, color: scoreColor, fontSize: 11, fontWeight: 700 }}>
-              점수 {result.lint.score}/100
-            </span>
+            <span style={{ padding: '2px 8px', borderRadius: 8, background: `${scoreColor}18`, color: scoreColor, fontSize: 11, fontWeight: 700 }}>점수 {result.lint.score}/100</span>
             <span style={{ fontSize: 11, color: COLORS.textMuted }}>
-              {result.lint.passed}/{result.lint.total_rules} 통과 · 액션 {result.actions.total_actions} 추출 ({result.actions.extraction_method})
+              lint {result.lint.passed}/{result.lint.total_rules} 통과 · 액션 {result.actions.total_actions} 추출 ({result.actions.extraction_method})
             </span>
+            <button onClick={() => setModalOpen(true)} style={{ ...btnPrimary, fontSize: 11 }}>📊 상세 보기</button>
+            <button onClick={() => runReview(true)} disabled={loading} style={{ ...btnSecondary, fontSize: 11 }}>🔄 재검토 + LLM</button>
+            {props.canApprove && !props.verified && (
+              <button onClick={approve} disabled={approving} style={{ ...btnSuccess, fontSize: 11 }}>
+                {approving ? '승인 중…' : '✓ 승인 + 스케줄'}
+              </button>
+            )}
+          </>
+        ) : (
+          <>
+            <span style={{ fontSize: 11, color: COLORS.textMuted, flex: '1 1 auto' }}>
+              본문에서 법적/보안 14 룰 + 액션 자동 추출
+            </span>
+            <button onClick={() => runReview(false)} disabled={loading} style={{ ...btnSecondary, fontSize: 11 }}>
+              {loading ? '검토 중…' : '🔍 1차 검토 (정규식)'}
+            </button>
+            <button onClick={() => runReview(true)} disabled={loading} style={{ ...btnPrimary, fontSize: 11 }}>
+              {loading ? '검토 중…' : '🤖 2차 검토 (+LLM)'}
+            </button>
           </>
         )}
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
-          {!result && (
-            <>
-              <button onClick={() => runReview(false)} disabled={loading} style={{ ...btnSecondary, fontSize: 11 }}>
-                {loading ? '검토 중...' : '🔍 검토 (정규식만)'}
-              </button>
-              <button onClick={() => runReview(true)} disabled={loading} style={{ ...btnPrimary, fontSize: 11 }}>
-                {loading ? '검토 중...' : '🤖 검토 + LLM'}
-              </button>
-            </>
-          )}
-          {result && (
-            <>
-              <button onClick={() => runReview(true)} disabled={loading} style={{ ...btnSecondary, fontSize: 11 }}>
-                🔄 재검토
-              </button>
-              {props.canApprove && !props.verified && (
-                <button onClick={approve} disabled={approving} style={{ ...btnSuccess, fontSize: 11 }}>
-                  {approving ? '승인 중...' : '✓ 승인 + 스케줄 적용'}
-                </button>
-              )}
-            </>
-          )}
-          <button onClick={() => setExpanded(!expanded)} style={{ ...btnSecondary, fontSize: 11 }}>
-            {expanded ? '▴ 접기' : '▾ 펼치기'}
-          </button>
-        </div>
       </div>
 
       {error && <div style={{ padding: '8px 12px', borderRadius: 6, background: `${COLORS.danger}18`, color: COLORS.danger, fontSize: 12, marginBottom: 8 }}>❌ {error}</div>}
-
-      {approveResult && (
-        <div style={{ padding: '10px 14px', borderRadius: 6, background: COLORS.bgGreen, fontSize: 12, color: COLORS.success, marginBottom: 8, lineHeight: 1.7 }}>
-          ✅ 승인 완료 + 스케줄 적용
-          {approveResult.schedule && (
-            <span style={{ marginLeft: 8 }}>
-              · 신규 task {approveResult.schedule.applied_tasks}건 자동 생성
-              {approveResult.schedule.skipped_duplicates > 0 && ` · 중복 스킵 ${approveResult.schedule.skipped_duplicates}건`}
-            </span>
-          )}
+      {approveMsg && (
+        <div style={{ padding: '8px 12px', borderRadius: 6, background: COLORS.bgGreen, color: COLORS.success, fontSize: 12, marginBottom: 8 }}>
+          {approveMsg}
         </div>
       )}
 
-      {expanded && result && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 10 }}>
+      {/* 풀스크린 모달 — 상세 결과 */}
+      {modalOpen && result && (
+        <ReviewDetailModal
+          docCode={props.docCode}
+          result={result}
+          canApprove={props.canApprove && !props.verified}
+          onApprove={approve}
+          onRerun={() => runReview(true)}
+          onClose={() => setModalOpen(false)}
+        />
+      )}
+    </>
+  )
+}
+
+// ────────── 자동 검토 풀스크린 모달 ──────────
+type ActionRow = ReviewData['actions']['actions'][number]
+
+function ReviewDetailModal(props: {
+  docCode: string
+  result: ReviewData
+  canApprove: boolean
+  onApprove: () => void
+  onRerun: () => void
+  onClose: () => void
+}) {
+  const [actionTypeFilter, setActionTypeFilter] = useState<string>('all')
+  const [lintSeverityFilter, setLintSeverityFilter] = useState<string>('all')
+
+  const { lint, actions } = props.result
+
+  const filteredActions: ActionRow[] = useMemo(() => {
+    if (actionTypeFilter === 'all') return actions.actions
+    return actions.actions.filter(a => a.type === actionTypeFilter)
+  }, [actions.actions, actionTypeFilter])
+
+  const filteredIssues = useMemo(() => {
+    if (lintSeverityFilter === 'all') return lint.issues
+    if (lintSeverityFilter === 'passed') return lint.passed_issues
+    return lint.issues.filter(i => i.severity === lintSeverityFilter)
+  }, [lint.issues, lint.passed_issues, lintSeverityFilter])
+
+  const scoreColor = lint.score >= 90 ? COLORS.success : lint.score >= 70 ? COLORS.warning : COLORS.danger
+
+  return (
+    <div onClick={props.onClose} style={{
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: 20,
+    }}>
+      <div onClick={e => e.stopPropagation()} style={{
+        ...GLASS.L1, padding: 0, borderRadius: 12, maxWidth: 1400, width: '95vw',
+        height: '92vh', display: 'flex', flexDirection: 'column', overflow: 'hidden',
+      }}>
+        {/* 헤더 */}
+        <div style={{ padding: '14px 20px', borderBottom: `1px solid ${COLORS.borderSubtle}`, display: 'flex', alignItems: 'center', gap: 10 }}>
+          <h2 style={{ margin: 0, fontSize: 16 }}>🔍 자동 검토 결과 — {props.docCode}</h2>
+          <span style={{ padding: '3px 10px', borderRadius: 10, background: `${scoreColor}18`, color: scoreColor, fontSize: 13, fontWeight: 700 }}>
+            점수 {lint.score}/100
+          </span>
+          <span style={{ fontSize: 11, color: COLORS.textMuted }}>
+            엔진 {actions.extraction_method} · lint {lint.passed}/{lint.total_rules} · 액션 {actions.total_actions}건
+          </span>
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+            <button onClick={props.onRerun} style={{ ...btnSecondary, fontSize: 11 }}>🔄 재검토</button>
+            {props.canApprove && <button onClick={props.onApprove} style={{ ...btnSuccess, fontSize: 11 }}>✓ 승인 + 스케줄</button>}
+            <button onClick={props.onClose} style={{ background: 'transparent', border: 'none', fontSize: 18, cursor: 'pointer', color: COLORS.textSecondary }}>✕</button>
+          </div>
+        </div>
+
+        {/* 본문 — 좌(lint) 우(actions) */}
+        <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0, minHeight: 0 }}>
           {/* Lint 결과 */}
-          <div style={{ background: COLORS.bgGray, padding: 12, borderRadius: 6 }}>
-            <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8 }}>
-              📋 Lint 결과 — {result.lint.passed}/{result.lint.total_rules} 통과
-              <span style={{ marginLeft: 8, fontSize: 10, color: COLORS.danger }}>error {result.lint.errors}</span>
-              <span style={{ marginLeft: 4, fontSize: 10, color: COLORS.warning }}>warning {result.lint.warnings}</span>
-              <span style={{ marginLeft: 4, fontSize: 10, color: COLORS.info }}>info {result.lint.infos}</span>
+          <div style={{ padding: 16, borderRight: `1px solid ${COLORS.borderSubtle}`, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+            <div style={{ marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+              <h3 style={{ margin: 0, fontSize: 13, color: COLORS.textPrimary }}>📋 Lint 14 규칙</h3>
+              <span style={{ fontSize: 11, color: COLORS.danger }}>error {lint.errors}</span>
+              <span style={{ fontSize: 11, color: COLORS.warning }}>warning {lint.warnings}</span>
+              <span style={{ fontSize: 11, color: COLORS.info }}>info {lint.infos}</span>
+              <span style={{ fontSize: 11, color: COLORS.success }}>passed {lint.passed}</span>
             </div>
-            <div style={{ maxHeight: 280, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
-              {result.lint.issues.length === 0 ? (
-                <div style={{ padding: 12, textAlign: 'center', color: COLORS.success, fontSize: 11 }}>✅ 모든 룰 통과</div>
-              ) : result.lint.issues.map((iss, i) => {
-                const sevColor = iss.severity === 'error' ? COLORS.danger : iss.severity === 'warning' ? COLORS.warning : COLORS.info
+            <div style={{ display: 'flex', gap: 4, marginBottom: 10, flexWrap: 'wrap' }}>
+              {(['all', 'error', 'warning', 'info', 'passed'] as const).map(s => (
+                <button key={s} onClick={() => setLintSeverityFilter(s)}
+                  style={{ ...BTN.sm, border: 'none',
+                    background: lintSeverityFilter === s ? COLORS.bgBlue : COLORS.bgGray,
+                    color: lintSeverityFilter === s ? COLORS.primary : COLORS.textSecondary, cursor: 'pointer',
+                  }}>{s}</button>
+              ))}
+            </div>
+            <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6, paddingRight: 4 }}>
+              {filteredIssues.length === 0 ? (
+                <div style={{ padding: 20, textAlign: 'center', color: COLORS.textMuted, fontSize: 12 }}>해당 필터의 항목 없음</div>
+              ) : filteredIssues.map((iss, i) => {
+                const sevColor = iss.passed ? COLORS.success
+                  : iss.severity === 'error' ? COLORS.danger
+                  : iss.severity === 'warning' ? COLORS.warning : COLORS.info
                 return (
-                  <div key={i} style={{ padding: '6px 8px', borderRadius: 4, background: '#fff', borderLeft: `3px solid ${sevColor}` }}>
-                    <div style={{ fontSize: 11, fontWeight: 600 }}>
-                      <span style={{ color: sevColor, marginRight: 4 }}>[{iss.rule_id}]</span>
-                      {iss.label}
+                  <div key={i} style={{ padding: 10, borderRadius: 6, background: '#fff', borderLeft: `3px solid ${sevColor}`, border: `1px solid ${COLORS.borderSubtle}` }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4, display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                      <span style={{ color: sevColor }}>{iss.passed ? '✓' : '⚠'} [{iss.rule_id}]</span>
+                      <span>{iss.label}</span>
+                      <span style={{ fontSize: 10, color: COLORS.textMuted, marginLeft: 'auto' }}>{iss.category}</span>
                     </div>
-                    {iss.hint && <div style={{ fontSize: 10, color: COLORS.textSecondary, marginTop: 2 }}>💡 {iss.hint}</div>}
+                    <div style={{ fontSize: 11, color: COLORS.textSecondary, lineHeight: 1.5 }}>{iss.description}</div>
+                    {iss.hint && !iss.passed && (
+                      <div style={{ fontSize: 11, color: COLORS.warning, marginTop: 4, padding: '4px 8px', background: COLORS.bgAmber, borderRadius: 4 }}>💡 {iss.hint}</div>
+                    )}
                   </div>
                 )
               })}
@@ -512,55 +681,62 @@ function AutoReviewPanel(props: { docId: string; docCode: string; verified: bool
           </div>
 
           {/* 추출 액션 */}
-          <div style={{ background: COLORS.bgGray, padding: 12, borderRadius: 6 }}>
-            <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8 }}>
-              🎯 추출 액션 ({result.actions.total_actions}건)
-              <span style={{ marginLeft: 8, fontSize: 10, color: COLORS.textMuted }}>
-                task {result.actions.by_type.task || 0} · form {result.actions.by_type.form || 0} · notify {result.actions.by_type.notify || 0} · policy {result.actions.by_type.policy || 0}
+          <div style={{ padding: 16, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+            <div style={{ marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+              <h3 style={{ margin: 0, fontSize: 13, color: COLORS.textPrimary }}>🎯 추출 액션 ({actions.total_actions}건)</h3>
+              <span style={{ fontSize: 11, color: COLORS.textMuted }}>
+                task {actions.by_type.task || 0} · form {actions.by_type.form || 0} · notify {actions.by_type.notify || 0} · policy {actions.by_type.policy || 0}
               </span>
             </div>
-            <div style={{ maxHeight: 280, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
-              {result.actions.actions.length === 0 ? (
-                <div style={{ padding: 12, textAlign: 'center', color: COLORS.textMuted, fontSize: 11 }}>액션 미추출</div>
-              ) : result.actions.actions.slice(0, 30).map((a, i) => {
+            <div style={{ display: 'flex', gap: 4, marginBottom: 10, flexWrap: 'wrap' }}>
+              {[
+                { v: 'all', label: '전체' },
+                { v: 'task', label: 'task' },
+                { v: 'form', label: 'form' },
+                { v: 'notify', label: 'notify' },
+                { v: 'policy', label: 'policy' },
+              ].map(f => (
+                <button key={f.v} onClick={() => setActionTypeFilter(f.v)}
+                  style={{ ...BTN.sm, border: 'none',
+                    background: actionTypeFilter === f.v ? COLORS.bgBlue : COLORS.bgGray,
+                    color: actionTypeFilter === f.v ? COLORS.primary : COLORS.textSecondary, cursor: 'pointer',
+                  }}>{f.label}</button>
+              ))}
+              <span style={{ marginLeft: 'auto', fontSize: 11, color: COLORS.textMuted }}>{filteredActions.length} 건</span>
+            </div>
+            <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6, paddingRight: 4 }}>
+              {filteredActions.length === 0 ? (
+                <div style={{ padding: 20, textAlign: 'center', color: COLORS.textMuted, fontSize: 12 }}>해당 필터의 액션 없음</div>
+              ) : filteredActions.map((a, i) => {
                 const typeColor = a.type === 'task' ? COLORS.primary : a.type === 'form' ? COLORS.info : a.type === 'notify' ? COLORS.warning : COLORS.textSecondary
                 return (
-                  <div key={i} style={{ padding: '6px 8px', borderRadius: 4, background: '#fff', borderLeft: `3px solid ${typeColor}` }}>
-                    <div style={{ fontSize: 11 }}>
-                      <span style={{ color: typeColor, fontWeight: 700, marginRight: 6 }}>[{a.type}]</span>
-                      {a.frequency && <span style={{ marginRight: 6, fontSize: 10, color: COLORS.textMuted }}>{a.frequency}{a.months && a.months.length > 0 ? ` (${a.months.join(',')}월)` : ''}</span>}
-                      {a.category && <span style={{ marginRight: 6, fontSize: 10, color: COLORS.textSecondary }}>· {a.category}</span>}
+                  <div key={i} style={{ padding: 10, borderRadius: 6, background: '#fff', borderLeft: `3px solid ${typeColor}`, border: `1px solid ${COLORS.borderSubtle}` }}>
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 11, marginBottom: 4, flexWrap: 'wrap' }}>
+                      <span style={{ color: typeColor, fontWeight: 700 }}>[{a.type}]</span>
+                      {a.frequency && <span style={{ color: COLORS.textMuted }}>{a.frequency}{a.months && a.months.length > 0 ? ` (${a.months.join(',')}월)` : ''}</span>}
+                      {a.category && <span style={{ color: COLORS.textSecondary }}>· {a.category}</span>}
+                      {a.responsible && <span style={{ color: COLORS.info, marginLeft: 'auto' }}>👤 {a.responsible}</span>}
                     </div>
-                    <div style={{ fontSize: 11, color: COLORS.textPrimary, marginTop: 2 }}>{a.description}</div>
-                    {(a.legal_reference || a.responsible || (a.form_codes && a.form_codes.length > 0)) && (
-                      <div style={{ fontSize: 10, color: COLORS.textMuted, marginTop: 2 }}>
-                        {a.legal_reference && <span style={{ marginRight: 6 }}>📜 {a.legal_reference}</span>}
-                        {a.responsible && <span style={{ marginRight: 6 }}>👤 {a.responsible}</span>}
+                    <div style={{ fontSize: 12, color: COLORS.textPrimary, marginBottom: 4, lineHeight: 1.5 }}>{a.description}</div>
+                    {(a.legal_reference || (a.form_codes && a.form_codes.length > 0)) && (
+                      <div style={{ fontSize: 10, color: COLORS.textMuted, display: 'flex', gap: 8 }}>
+                        {a.legal_reference && <span>📜 {a.legal_reference}</span>}
                         {a.form_codes && a.form_codes.length > 0 && <span>📝 {a.form_codes.join(', ')}</span>}
                       </div>
                     )}
                   </div>
                 )
               })}
-              {result.actions.actions.length > 30 && (
-                <div style={{ padding: 8, textAlign: 'center', color: COLORS.textMuted, fontSize: 10 }}>
-                  ... 그 외 {result.actions.actions.length - 30}건 (상세는 DB extracted_actions 참조)
-                </div>
-              )}
             </div>
           </div>
         </div>
-      )}
 
-      {expanded && !result && !loading && (
-        <div style={{ padding: 12, fontSize: 12, color: COLORS.textSecondary, lineHeight: 1.6 }}>
-          매뉴얼 본문에서 자동으로 법적/보안/품질 기준을 검사하고 운영 액션을 추출합니다.
-          <ul style={{ margin: '6px 0 0', paddingLeft: 18, fontSize: 11 }}>
-            <li><strong>정규식 검토</strong>: 즉시, 무료 (14 lint 규칙 + 정규식 액션 추출)</li>
-            <li><strong>LLM 검토</strong>: Gemini 호출 (자연어 이해, 더 정확) — GEMINI_API_KEY 환경변수 필요</li>
-          </ul>
+        {/* 푸터 */}
+        <div style={{ padding: '10px 20px', borderTop: `1px solid ${COLORS.borderSubtle}`, fontSize: 11, color: COLORS.textMuted, display: 'flex', alignItems: 'center', gap: 8 }}>
+          💡 1차 정규식 → 2차 LLM → 승인. 승인 시 task 자동 생성 (액션 [task] 만). [form][notify][policy] 는 참고 정보.
+          <span style={{ marginLeft: 'auto' }}>📂 review_results.history 에 자동 누적 (최신 10건)</span>
         </div>
-      )}
+      </div>
     </div>
   )
 }

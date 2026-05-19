@@ -48,6 +48,74 @@ const DEFAULT_STYLES: Required<Style> = {
   td: { padding: '6px 10px', border: '1px solid rgba(0,0,0,0.1)', verticalAlign: 'top' },
 }
 
+// ───────────────────────────────────────────────────────────
+// Phase 1.4-fix2 — 매뉴얼 본문 자동 섹션 추출 (사용자 통찰 2026-05-19):
+// "내부계획서 별첨섹션·일반규정·다른 양식 등 섹션 구분 → 검수에 도움"
+// ───────────────────────────────────────────────────────────
+
+export type SectionType = 'chapter' | 'attachment' | 'form' | 'general' | 'other'
+
+export interface MarkdownSection {
+  id: string             // anchor id (md-{level}-{slug-{key}})
+  level: number          // H1=1, H2=2, ...
+  title: string          // 헤더 본문
+  type: SectionType
+  index: number          // 본문 내 순서 (0부터)
+}
+
+/** 한글 + 영문 + 숫자 + 일부 기호만 남기고 slug 생성 */
+function headerSlug(content: string, fallbackKey: number): string {
+  const cleaned = content
+    .replace(/[\s ]+/g, '-')
+    .replace(/[^a-zA-Z0-9가-힣\-_]/g, '')
+    .toLowerCase()
+    .substring(0, 60)
+  return cleaned.length > 0 ? `${cleaned}-${fallbackKey}` : `n${fallbackKey}`
+}
+
+/** 헤더 본문에서 섹션 타입 자동 추론 */
+function inferSectionType(title: string): SectionType {
+  if (/^제\s*\d+\s*장|^제[1-9]\d*장/.test(title)) return 'chapter'
+  if (/^별첨\s*\d+|^별첨/.test(title)) return 'attachment'
+  if (/^서식\s+F-|^F-M\d{2}-\d{2}|^F-\d{2}|^F-14-\d/.test(title)) return 'form'
+  if (/총칙|용어\s*정의|적용\s*범위|일반\s*규정/.test(title)) return 'general'
+  return 'other'
+}
+
+/**
+ * 마크다운 본문에서 H1~H2 헤더 위치·타입 자동 추출.
+ * 매뉴얼 페이지의 좌측 「📑 섹션 목차」 사이드바용.
+ *
+ * @param maxLevel  추출할 최대 헤더 레벨 (기본 2 — H1·H2 만)
+ */
+export function extractSections(text: string, maxLevel = 2): MarkdownSection[] {
+  if (!text || !text.trim()) return []
+  const lines = text.split('\n')
+  const sections: MarkdownSection[] = []
+  let key = 0
+  let idx = 0
+
+  for (const line of lines) {
+    const trimmed = line.trim()
+    const match = trimmed.match(/^(#{1,4})\s+(.+)$/)
+    if (match) {
+      const level = match[1].length
+      key++  // renderMarkdown 의 key++ 와 동일 카운터 (id 매칭)
+      if (level <= maxLevel) {
+        const title = match[2]
+        sections.push({
+          id: `md-${level}-${headerSlug(title, key)}`,
+          level,
+          title,
+          type: inferSectionType(title),
+          index: idx++,
+        })
+      }
+    }
+  }
+  return sections
+}
+
 /** inline 마크다운 — **bold**, `code` */
 function renderInline(text: string, keyPrefix = ''): React.ReactNode[] {
   const nodes: React.ReactNode[] = []
@@ -108,7 +176,9 @@ export function renderMarkdown(text: string, customStyle?: Style): React.ReactNo
       const content = headerMatch[2]
       const style = level === 1 ? styles.h1 : level === 2 ? styles.h2 : level === 3 ? styles.h3 : styles.h4
       const Tag = (`h${level}` as 'h1' | 'h2' | 'h3' | 'h4')
-      nodes.push(React.createElement(Tag, { key: `h${key++}`, style }, renderInline(content, `h${key}-`)))
+      // Phase 1.4-fix2 — 섹션 anchor scroll 위해 id 부여 (slug)
+      const headerId = `md-${level}-${headerSlug(content, key)}`
+      nodes.push(React.createElement(Tag, { key: `h${key++}`, id: headerId, style }, renderInline(content, `h${key}-`)))
       i++
       continue
     }

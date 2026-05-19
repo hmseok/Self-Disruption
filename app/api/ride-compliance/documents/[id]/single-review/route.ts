@@ -79,10 +79,26 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       llmDebug = { llm_called: false, reason: useLlm ? 'GEMINI_API_KEY 미설정' : 'use_llm=false' }
     }
 
-    // 5. DB 저장
-    const reviewResultsJson = JSON.stringify({
+    // 5. DB 저장 — Phase 1.4-fix1: history 배열로 누적 (사용자 통찰 "재확인·2차 확인" 추적)
+    // 기존 review_results 가져와서 history append
+    const existing = await prisma.$queryRaw<Array<{ review_results: unknown }>>`
+      SELECT review_results FROM ride_compliance_documents WHERE id = ${id} LIMIT 1
+    `
+    let prevHistory: Array<Record<string, unknown>> = []
+    try {
+      const prev = typeof existing[0]?.review_results === 'string'
+        ? JSON.parse(existing[0].review_results as string)
+        : (existing[0]?.review_results as { history?: Array<Record<string, unknown>> } | undefined)
+      if (prev?.history && Array.isArray(prev.history)) prevHistory = prev.history
+    } catch { /* 첫 검토 또는 schema 변경 — 빈 history 로 시작 */ }
+
+    const newEntry = {
+      id: `rev-${Date.now()}`,
+      engine: actionResult.extraction_method,
+      checked_by: user.id,
+      checked_at: new Date().toISOString(),
+      score: lintResult.score,
       lint: {
-        score: lintResult.score,
         total_rules: lintResult.total_rules,
         passed: lintResult.passed,
         errors: lintResult.errors,
@@ -91,9 +107,20 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
         issues: lintResult.issues,
         passed_issues: lintResult.passed_issues,
       },
+      action_summary: {
+        total: actionResult.total_actions,
+        by_type: actionResult.by_type,
+      },
       llm_debug: llmDebug,
-      checked_by: user.id,
-      checked_at: new Date().toISOString(),
+    }
+    // 최신 10건만 보관
+    prevHistory.push(newEntry)
+    if (prevHistory.length > 10) prevHistory = prevHistory.slice(-10)
+
+    const reviewResultsJson = JSON.stringify({
+      latest_id: newEntry.id,
+      latest: newEntry,
+      history: prevHistory,
     })
     const actionsJson = JSON.stringify(actionResult)
 
