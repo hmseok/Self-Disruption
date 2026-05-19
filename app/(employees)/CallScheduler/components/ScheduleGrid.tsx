@@ -1129,11 +1129,13 @@ export default function ScheduleGrid({ detail, onChanged, myWorkerId }: Props) {
             // N-40 fix — Fragment key 강화 (group_id + slot_id + idx) — 카테고리 모드 중복 방지
             return (
               <Fragment key={`${curGrp?.id || 'nogrp'}_${slot.id}_${slotIdx}`}>
-                {/* N-40 — 카테고리 섹션 헤더 (viewMode='category' + 카테고리 변경 시) */}
+                {/* N-40 + N-62 — 카테고리 섹션 헤더 (좌측 sticky 얇은 띠로 축소)
+                    이전: 풀 row + padding 8 + fontSize 13 → 세로 공간 낭비
+                    개선: 좌측 라벨만 표시 + 얇은 띠 + 우측은 카테고리 색 배경만 */}
                 {isNewCategoryHeader && (
                   <tr key={`cathdr-${slotIdx}-${curCat}`}>
-                    <td colSpan={days.length + 1} style={{
-                      padding: '8px 14px', position: 'sticky', left: 0,
+                    <td style={{
+                      padding: '2px 10px', position: 'sticky', left: 0, zIndex: 2,
                       background: curCat === '주간' ? COLORS.bgBlue
                                 : curCat === '저녁' ? COLORS.bgAmber
                                 : curCat === '야간' ? COLORS.bgViolet
@@ -1144,34 +1146,60 @@ export default function ScheduleGrid({ detail, onChanged, myWorkerId }: Props) {
                            : curCat === '야간' ? '#7c3aed'
                            : curCat === '특수' ? COLORS.danger
                            : COLORS.textSecondary,
-                      fontWeight: 800, fontSize: 13,
-                      borderTop: `4px solid ${
+                      fontWeight: 800, fontSize: 11,
+                      borderTop: `3px solid ${
                         curCat === '주간' ? COLORS.borderBlue
                         : curCat === '저녁' ? COLORS.borderAmber
                         : curCat === '야간' ? COLORS.borderViolet
                         : curCat === '특수' ? COLORS.borderRed
                         : COLORS.borderFaint}`,
                       borderBottom: `1px solid ${COLORS.borderFaint}`,
-                      letterSpacing: '0.3px',
+                      letterSpacing: '0.2px', whiteSpace: 'nowrap',
+                      lineHeight: 1.2,
                     }}>
                       {catLabel}
                     </td>
+                    {/* 우측 일자 컬럼은 카테고리 색 얇은 띠만 (라벨 없음) */}
+                    <td colSpan={days.length} style={{
+                      padding: 0,
+                      background: curCat === '주간' ? COLORS.bgBlue
+                                : curCat === '저녁' ? COLORS.bgAmber
+                                : curCat === '야간' ? COLORS.bgViolet
+                                : curCat === '특수' ? COLORS.bgRed
+                                : COLORS.bgGray,
+                      borderTop: `3px solid ${
+                        curCat === '주간' ? COLORS.borderBlue
+                        : curCat === '저녁' ? COLORS.borderAmber
+                        : curCat === '야간' ? COLORS.borderViolet
+                        : curCat === '특수' ? COLORS.borderRed
+                        : COLORS.borderFaint}`,
+                      borderBottom: `1px solid ${COLORS.borderFaint}`,
+                      height: 8,
+                    }} />
                   </tr>
                 )}
+                {/* N-62 — 그룹 헤더도 얇은 띠로 축소 */}
                 {isNewGroupSection && curGrp && (
                   <tr key={`gh-${slot.id}`}>
-                    <td colSpan={days.length + 1} style={{
-                      padding: '6px 12px', position: 'sticky', left: 0,
+                    <td style={{
+                      padding: '2px 12px', position: 'sticky', left: 0, zIndex: 2,
                       background: headerColor, color: COLORS.textPrimary,
-                      fontWeight: 800, fontSize: 12,
-                      borderTop: `3px solid ${headerBorder}`,
+                      fontWeight: 800, fontSize: 11,
+                      borderTop: `2px solid ${headerBorder}`,
                       borderBottom: `1px solid ${headerBorder}`,
+                      whiteSpace: 'nowrap', lineHeight: 1.3,
                     }}>
                       🚧 {curGrp.name}
-                      <span style={{ fontSize: 10, fontWeight: 500, color: COLORS.textMuted, marginLeft: 8 }}>
-                        {cat} · 멤버 {curGrp.member_ids.length}명
+                      <span style={{ fontSize: 9, fontWeight: 500, color: COLORS.textMuted, marginLeft: 6 }}>
+                        · {curGrp.member_ids.length}명
                       </span>
                     </td>
+                    <td colSpan={days.length} style={{
+                      padding: 0, background: headerColor,
+                      borderTop: `2px solid ${headerBorder}`,
+                      borderBottom: `1px solid ${headerBorder}`,
+                      height: 6,
+                    }} />
                   </tr>
                 )}
                 {sectionExt.map(ew => (
