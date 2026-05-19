@@ -89,6 +89,11 @@ export default function ManualDetailPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [editMode, setEditMode] = useState(false)
+  // Phase 1.4-fix8 — 본문 표시 모드: 마크다운 / PDF
+  const [viewMode, setViewMode] = useState<'md' | 'pdf'>('md')
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null)
+  const [pdfLoading, setPdfLoading] = useState(false)
+  const [pdfError, setPdfError] = useState<string | null>(null)
   const [editContent, setEditContent] = useState('')
   const [saving, setSaving] = useState(false)
   const [uploadOpen, setUploadOpen] = useState(false)
@@ -132,6 +137,36 @@ export default function ManualDetailPage() {
   }
 
   useEffect(() => { fetchAll() /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [code])
+
+  // Phase 1.4-fix8 — PDF mode 진입 시 GCS signed URL 발급
+  const loadPdf = async () => {
+    if (pdfUrl) { setViewMode('pdf'); return }  // 이미 발급된 URL 있으면 재사용
+    setPdfLoading(true); setPdfError(null)
+    try {
+      const token = getStoredToken()
+      // 외부 link (file_url) 가 있으면 그대로 사용
+      if (meta?.file_url) {
+        setPdfUrl(meta.file_url)
+        setViewMode('pdf')
+        setPdfLoading(false)
+        return
+      }
+      // GCS path 가 있으면 signed URL 발급
+      if (detail?.gcs_object_path) {
+        const res = await fetch(`/api/ride-compliance/upload-url?object_path=${encodeURIComponent(detail.gcs_object_path)}`,
+          { headers: token ? { Authorization: `Bearer ${token}` } : {} })
+        const json = await res.json()
+        if (json.success && json.data?.download_url) {
+          setPdfUrl(json.data.download_url)
+          setViewMode('pdf')
+        } else {
+          setPdfError(json.error || 'PDF URL 발급 실패')
+        }
+      } else {
+        setPdfError('원본 PDF 미등록 — 좌측 「📎 원본 등록」 으로 GCS 업로드 또는 외부 link 입력 필요')
+      }
+    } catch (e) { setPdfError(String(e)) } finally { setPdfLoading(false) }
+  }
 
   const saveContent = async () => {
     if (!detail) return
@@ -270,9 +305,24 @@ export default function ManualDetailPage() {
         )}
 
         <div style={{ ...GLASS.L3, padding: 20, borderRadius: 10, flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', marginBottom: 14, flexShrink: 0 }}>
-            <h3 style={{ margin: 0, fontSize: 14 }}>📖 본문</h3>
-            {isAdminOrMgr && !editMode && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, flexShrink: 0 }}>
+            <h3 style={{ margin: 0, fontSize: 14 }}>{viewMode === 'pdf' ? '📄 PDF 원본' : '📖 본문 (마크다운)'}</h3>
+            {/* Phase 1.4-fix8 — mode 토글 (마크다운 / PDF) */}
+            {!editMode && detail && (
+              <div style={{ display: 'flex', gap: 0, border: `1px solid ${COLORS.borderSubtle}`, borderRadius: 6, overflow: 'hidden' }}>
+                <button onClick={() => setViewMode('md')}
+                  style={{ ...BTN.sm, border: 'none', cursor: 'pointer',
+                    background: viewMode === 'md' ? COLORS.bgBlue : 'transparent',
+                    color: viewMode === 'md' ? COLORS.primary : COLORS.textSecondary,
+                  }}>📖 마크다운</button>
+                <button onClick={() => loadPdf()} disabled={pdfLoading}
+                  style={{ ...BTN.sm, border: 'none', cursor: 'pointer',
+                    background: viewMode === 'pdf' ? COLORS.bgBlue : 'transparent',
+                    color: viewMode === 'pdf' ? COLORS.primary : COLORS.textSecondary,
+                  }}>{pdfLoading ? '⏳ 로딩…' : '📄 PDF'}</button>
+              </div>
+            )}
+            {isAdminOrMgr && !editMode && viewMode === 'md' && (
               <button onClick={() => setEditMode(true)} style={{ ...btnPrimary, marginLeft: 'auto' }}>
                 ✎ 본문 편집
               </button>
@@ -284,8 +334,31 @@ export default function ManualDetailPage() {
               </div>
             )}
           </div>
+          {pdfError && (
+            <div style={{ padding: '8px 12px', borderRadius: 6, background: `${COLORS.danger}18`, color: COLORS.danger, fontSize: 12, marginBottom: 8, flexShrink: 0 }}>
+              ❌ {pdfError}
+            </div>
+          )}
 
-          {!editMode && (
+          {/* Phase 1.4-fix8 — PDF mode 시 iframe 임베드 (브라우저 내장 PDF 뷰어) */}
+          {viewMode === 'pdf' && !editMode && pdfUrl && (
+            <iframe
+              src={pdfUrl}
+              title={`${meta?.doc_code || ''} PDF`}
+              style={{
+                flex: 1, width: '100%', minHeight: 0,
+                border: `1px solid ${COLORS.borderSubtle}`,
+                borderRadius: 8, background: '#fff',
+              }}
+            />
+          )}
+          {viewMode === 'pdf' && !pdfUrl && !pdfError && !pdfLoading && (
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: COLORS.textMuted, fontSize: 13 }}>
+              📄 PDF 로딩 중...
+            </div>
+          )}
+
+          {viewMode === 'md' && !editMode && (
             <>
               {detail?.content_md ? (
                 <div id="manual-body-scroll" style={{

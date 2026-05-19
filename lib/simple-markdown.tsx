@@ -102,7 +102,8 @@ export function extractSections(text: string, maxLevel = 2): MarkdownSection[] {
   if (!text || !text.trim()) return []
   const lines = text.split('\n')
   const sections: MarkdownSection[] = []
-  let key = 0
+  // Phase 1.4-fix7 — renderMarkdown 의 headerCount 와 동일. 모든 헤더 (H1~H4) 마다 증가.
+  let headerCount = 0
   let idx = 0
 
   for (const line of lines) {
@@ -110,11 +111,11 @@ export function extractSections(text: string, maxLevel = 2): MarkdownSection[] {
     const match = trimmed.match(/^(#{1,4})\s+(.+)$/)
     if (match) {
       const level = match[1].length
-      key++  // renderMarkdown 의 key++ 와 동일 카운터 (id 매칭)
+      headerCount++
       if (level <= maxLevel) {
         const title = match[2]
         sections.push({
-          id: `md-${level}-${headerSlug(title, key)}`,
+          id: `md-${level}-${headerSlug(title, headerCount)}`,
           level,
           title,
           type: inferSectionType(title),
@@ -164,6 +165,8 @@ export function renderMarkdown(text: string, customStyle?: Style): React.ReactNo
   const nodes: React.ReactNode[] = []
   let i = 0
   let key = 0
+  // Phase 1.4-fix7 — extractSections 와 동일한 헤더 카운터 (anchor id 일치 위함)
+  let headerCount = 0
 
   while (i < lines.length) {
     const line = lines[i]
@@ -186,7 +189,9 @@ export function renderMarkdown(text: string, customStyle?: Style): React.ReactNo
       const content = headerMatch[2]
       const baseStyle = level === 1 ? styles.h1 : level === 2 ? styles.h2 : level === 3 ? styles.h3 : styles.h4
       const Tag = (`h${level}` as 'h1' | 'h2' | 'h3' | 'h4')
-      const headerId = `md-${level}-${headerSlug(content, key)}`
+      // Phase 1.4-fix7 — extractSections 와 동일한 headerCount 사용 (key 카운터 X)
+      headerCount++
+      const headerId = `md-${level}-${headerSlug(content, headerCount)}`
 
       // Phase 1.4-fix4 — 섹션 타입별 색상·이모지·borderLeft tint (H1/H2 만 적용)
       const secType = level <= 2 ? inferSectionType(content) : null
