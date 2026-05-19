@@ -68,7 +68,12 @@ export default function RequestsPage() {
   const [rejectNote, setRejectNote] = useState('')
   // N-15 — 매니저 직접 등록 (회피일)
   const [workers, setWorkers] = useState<Array<{ id: string; name: string; color_tone: ColorTone }>>([])
-  const [groups, setGroups] = useState<Array<{ id: string; name: string; member_ids: string[] }>>([])
+  // N-59 — 같은 이름 그룹 구별을 위한 shift 정보 포함
+  const [groups, setGroups] = useState<Array<{
+    id: string; name: string; member_ids: string[]
+    shift_code?: string | null; shift_start?: string | null; shift_end?: string | null
+    category?: string | null
+  }>>([])
   const [regWorkerId, setRegWorkerId] = useState<string>('')
   const [regGroupId, setRegGroupId] = useState<string>('')
   const [regStart, setRegStart] = useState<string>('')
@@ -95,6 +100,11 @@ export default function RequestsPage() {
         setGroups((gJ.data || []).filter((g: any) => g.is_active !== false).map((g: any) => ({
           id: g.id, name: g.name,
           member_ids: Array.isArray(g.members) ? g.members.map((m: any) => m.id) : [],
+          // N-59 — 같은 이름 그룹 구별 위한 shift 정보
+          shift_code: g.slot_code || null,
+          shift_start: g.start_time || null,
+          shift_end: g.end_time || null,
+          category: g.category || null,
         })))
       } catch { /* graceful */ }
     })()
@@ -471,6 +481,11 @@ export default function RequestsPage() {
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                       {regWorkerGroups.map(g => {
                         const active = regGroupId === g.id
+                        // N-59 — 같은 이름 그룹 구별: shift 시간 + 카테고리 표시
+                        const gx = g as any
+                        const shiftInfo = gx.shift_start && gx.shift_end
+                          ? `${gx.shift_code || ''} ${String(gx.shift_start).slice(0,5)}~${String(gx.shift_end).slice(0,5)}`
+                          : ''
                         return (
                           <button key={g.id} type="button"
                                   onClick={() => setRegGroupId(active ? '' : g.id)}
@@ -480,8 +495,20 @@ export default function RequestsPage() {
                                     color: active ? '#fff' : '#64748b',
                                     border: `1px solid ${active ? '#0f2440' : COLORS.borderFaint}`,
                                     cursor: 'pointer',
+                                    display: 'flex', alignItems: 'center', gap: 4,
                                   }}>
-                            🚧 {g.name}
+                            <span>🚧 {g.name}</span>
+                            {shiftInfo && (
+                              <span style={{
+                                fontSize: 10, fontWeight: 500, opacity: 0.85,
+                              }}>· {shiftInfo}</span>
+                            )}
+                            {gx.category && (
+                              <span style={{
+                                fontSize: 9, fontWeight: 600, padding: '1px 5px', borderRadius: 4,
+                                background: active ? 'rgba(255,255,255,0.20)' : 'rgba(0,0,0,0.06)',
+                              }}>[{gx.category}]</span>
+                            )}
                           </button>
                         )
                       })}

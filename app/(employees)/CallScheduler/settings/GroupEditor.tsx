@@ -100,7 +100,11 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
   }
   const [coverPairs, setCoverPairs] = useState<CoverPair[]>([])
   const [coverPairsMissing, setCoverPairsMissing] = useState(false)   // 마이그 미적용
-  const [allGroupsForCover, setAllGroupsForCover] = useState<Array<{ id: string; name: string; category: string | null }>>([])
+  // N-59 — 같은 이름 그룹 구별을 위한 shift 정보 포함
+  const [allGroupsForCover, setAllGroupsForCover] = useState<Array<{
+    id: string; name: string; category: string | null
+    shift_code?: string | null; shift_start?: string | null; shift_end?: string | null
+  }>>([])
   // N-55 — A/B조 cycle (squad_rotation)
   //   조원수 × N일 cycle: A조 (n명 × N일) → B조 (m명 × N일) → 반복
   const [cycleKind, setCycleKind] = useState<'squad_rotation' | ''>('')
@@ -302,6 +306,7 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
           }
         } catch { setCoverPairsMissing(true) }
         // N-57 — 모든 그룹 목록 (cover 대상 선택용 — 본 그룹 제외)
+        // N-59 — 같은 이름 구별 위해 shift 정보 같이 로드
         try {
           const agRes = await fetch(`/api/call-scheduler/shift-groups`, { headers: auth })
           const agJson = await agRes.json()
@@ -309,7 +314,12 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
             setAllGroupsForCover(
               agJson.data
                 .filter((g: any) => g.id !== groupId && g.is_active !== false)
-                .map((g: any) => ({ id: g.id, name: g.name, category: g.category }))
+                .map((g: any) => ({
+                  id: g.id, name: g.name, category: g.category,
+                  shift_code: g.slot_code || null,
+                  shift_start: g.start_time || null,
+                  shift_end: g.end_time || null,
+                }))
             )
           }
         } catch { /* graceful */ }
@@ -1053,11 +1063,18 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
                       <option value="">— 그룹 선택 —</option>
                       {allGroupsForCover
                         .filter(g => !coverPairs.some(p => p.cover_group_id === g.id))
-                        .map(g => (
-                          <option key={g.id} value={g.id}>
-                            {g.name}{g.category ? ` (${g.category})` : ''}
-                          </option>
-                        ))}
+                        .map(g => {
+                          // N-59 — 같은 이름 그룹 구별: shift 시간 정보 표시
+                          const shiftInfo = g.shift_start && g.shift_end
+                            ? ` (${g.shift_code || ''} ${String(g.shift_start).slice(0,5)}~${String(g.shift_end).slice(0,5)})`
+                            : ''
+                          const catInfo = g.category ? ` [${g.category}]` : ''
+                          return (
+                            <option key={g.id} value={g.id}>
+                              {g.name}{shiftInfo}{catInfo}
+                            </option>
+                          )
+                        })}
                     </select>
                   </div>
                   <div style={{ fontSize: 10, color: COLORS.textMuted, marginTop: 6, lineHeight: 1.5 }}>
