@@ -3,6 +3,43 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-18 (Phase N-58) — limit 컬럼 0 → NULL 정규화
+
+### 사용자 보고
+> "빈 칸이면 미설정이죠 0이 되면 안 되죠"
+>
+> 정동민 max_days_per_month=0 인 상태에서 자동 생성 → 매월 1회만 출근
+> (06-01 만 진입, cycle 1,2,1,4 작동했지만 max 가드가 0 으로 첫 출근 후 매번 제외)
+
+### 원인
+- 옛 마이그/초기 데이터로 cs_workers.max_days_per_month=0 누적
+- UI 「빈 칸 = 무제한」 안내지만 DB 에 0 들어가면 알고리즘이 「최대 0일」 로 해석
+- 같은 부류: max_consecutive_work_days / min_days_per_month
+- 같은 부류 영역: cs_group_members.max_days_per_month / max_consecutive_work_days (N-14 동형)
+
+### 변경
+1. **마이그** (2026-05-18_cs_limits_zero_to_null.sql)
+   - cs_workers / cs_group_members 의 limit 컬럼 0 → NULL UPDATE
+   - DEFAULT NULL 보장 (이미 NULL 이면 no-op)
+
+2. **알고리즘 방어** (auto-generate route.ts)
+   - max_days_per_month 가드: `> 0` 추가 (0 이면 NULL 처럼 통과)
+   - max_consecutive_work_days: 기존부터 `> 0` 가드 있음 (확인)
+   - min_days_per_month shortfall: `> 0` 가드 추가
+
+3. **API 정규화** (workers PATCH / members PUT)
+   - 입력 0 또는 음수 → NULL 변환 (`nullableLimit` 헬퍼)
+   - 사용자 빈 칸 의도와 일치
+
+### 효과
+- 옛 데이터의 max_days=0 도 무제한 동작 (regression 방지)
+- 새 입력 0 도 안전하게 NULL 로 정규화
+
+### 마이그 적용 필수
+- `migrations/2026-05-18_cs_limits_zero_to_null.sql`
+
+---
+
 ## 2026-05-18 (Phase N-56-b) — work_cycle_pattern 워커→멤버 레벨 이동
 
 ### 사용자 결정

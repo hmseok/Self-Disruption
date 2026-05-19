@@ -54,6 +54,11 @@ function nullableNum(v: any): number | null {
   if (v == null || v === '') return null
   const n = Number(v); return Number.isFinite(n) ? n : null
 }
+// N-58 — limit 컬럼 (max/min) 은 0 도 미설정 동의어로 NULL 처리
+function nullableLimit(v: any): number | null {
+  if (v == null || v === '') return null
+  const n = Number(v); return Number.isFinite(n) && n > 0 ? n : null
+}
 function nullableStr(v: any): string | null {
   if (v == null) return null
   const s = String(v).trim(); return s.length > 0 ? s : null
@@ -121,8 +126,9 @@ export async function PUT(
       const priority_level = clampPriorityLevel(m.priority_level)
       const dow_prefer = nullableStr(m.preferred_dow_prefer)
       const dow_avoid = nullableStr(m.preferred_dow_avoid)
-      const max_consec = nullableNum(m.max_consecutive_work_days)
-      const max_days = nullableNum(m.max_days_per_month)
+      // N-58 — limit 컬럼 0 → NULL 정규화
+      const max_consec = nullableLimit(m.max_consecutive_work_days)
+      const max_days = nullableLimit(m.max_days_per_month)
       const blocked = Array.isArray(m.blocked_slot_ids) && m.blocked_slot_ids.length > 0
         ? JSON.stringify(m.blocked_slot_ids.map(String)) : null
       const pattern = nullableStr(m.work_pattern_text)

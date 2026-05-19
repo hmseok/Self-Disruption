@@ -1760,11 +1760,14 @@ export async function POST(
           const cn = counter.get(wId)
           if (!cn) return true  // counter 0 인 사람은 max 0건 비교 → 통과
           // 워커 글로벌 max (모든 그룹 합산 기준)
+          //   N-58 — 0 은 미설정 동의어로 처리 (workerMax > 0 가드 추가)
+          //          DB 옛 데이터에 0 누적된 경우 매월 0회 출근 방지
           const workerMax = workerLimits.get(wId)?.max_days_per_month
-          if (workerMax != null && cn.total >= workerMax) return false
+          if (workerMax != null && workerMax > 0 && cn.total >= workerMax) return false
           // 멤버 cfg max (이 그룹 명시 — 더 빡빡할 수 있음)
           const memberCfg = memberCons.get(`${g.id}_${wId}`)
-          if (memberCfg?.max_days_per_month != null && cn.total >= memberCfg.max_days_per_month) return false
+          if (memberCfg?.max_days_per_month != null && memberCfg.max_days_per_month > 0
+              && cn.total >= memberCfg.max_days_per_month) return false
           return true
         })
 
@@ -1785,10 +1788,11 @@ export async function POST(
         let selected: string[]
         if (usePriority) {
           // max 초과 / 패턴 불일치 워커 제외 — K-3: 멤버 단위
+          //   N-58 — 0 은 미설정 동의어로 처리 (> 0 가드)
           candidates = candidates.filter(wId => {
             const mc = lookupMember(g.id, wId)
             if (mc) {
-              if (mc.max_days_per_month != null) {
+              if (mc.max_days_per_month != null && mc.max_days_per_month > 0) {
                 const cn = counter.get(wId)
                 if (cn && cn.total >= mc.max_days_per_month) return false
               }
@@ -1819,10 +1823,13 @@ export async function POST(
             if (aIsCover !== bIsCover) return aIsCover - bIsCover  // 0 (own) 먼저, 1 (cover) 나중
             // N-36 — 글로벌 min_days_per_month shortfall 최우선
             //   외부인력 같은 「의도된 적은 출근」 보장 — 평소엔 후순위지만 min 까지는 보장
+            //   N-58 — min=0 은 미설정 동의어 (> 0 가드)
             const wlA = workerLimits.get(a)
             const wlB = workerLimits.get(b)
-            const aGlobalShort = wlA?.min_days_per_month != null && cnA.total < wlA.min_days_per_month ? 1 : 0
-            const bGlobalShort = wlB?.min_days_per_month != null && cnB.total < wlB.min_days_per_month ? 1 : 0
+            const aGlobalShort = wlA?.min_days_per_month != null && wlA.min_days_per_month > 0
+              && cnA.total < wlA.min_days_per_month ? 1 : 0
+            const bGlobalShort = wlB?.min_days_per_month != null && wlB.min_days_per_month > 0
+              && cnB.total < wlB.min_days_per_month ? 1 : 0
             if (aGlobalShort !== bGlobalShort) return bGlobalShort - aGlobalShort  // shortfall 1 우선
             // priority_level (평소 순위) — coverage_priority 가 명시되면 fallback 으로만 사용
             // 부족분 채우기 단계(아래 단순 rotation 분기) 가 아닌 평소 정렬에서는 priority_level 사용

@@ -55,6 +55,9 @@ export async function PATCH(
       'blocked_slot_ids', 'preferred_dow_prefer', 'preferred_dow_avoid',
     ])
     const NULLABLE_NUM = new Set(['max_consecutive_work_days', 'max_days_per_month'])
+    // N-58 — 0 또는 음수는 미설정 동의어 → NULL 로 통일
+    //   대상: max_consecutive_work_days / max_days_per_month / min_days_per_month
+    const ZERO_TO_NULL = new Set(['max_consecutive_work_days', 'max_days_per_month', 'min_days_per_month'])
 
     const sets: string[] = []
     const params: any[] = []
@@ -68,7 +71,26 @@ export async function PATCH(
         sets.push(`${k} = ?`); params.push(v ? 1 : 0); continue
       }
       if (k === 'cycle_days_on' || k === 'cycle_days_off' || NULLABLE_NUM.has(k)) {
-        sets.push(`${k} = ?`); params.push(v == null || v === '' ? null : Number(v)); continue
+        // N-58 — limit 컬럼은 0 → NULL 정규화 (사용자 빈 칸 의도 보존)
+        let num: number | null
+        if (v == null || v === '') {
+          num = null
+        } else {
+          const n = Number(v)
+          num = !Number.isFinite(n) || (ZERO_TO_NULL.has(k) && n <= 0) ? null : n
+        }
+        sets.push(`${k} = ?`); params.push(num); continue
+      }
+      if (k === 'min_days_per_month') {
+        // N-58 — min_days 도 동일 정규화
+        let num: number | null
+        if (v == null || v === '') {
+          num = null
+        } else {
+          const n = Number(v)
+          num = !Number.isFinite(n) || n <= 0 ? null : n
+        }
+        sets.push(`${k} = ?`); params.push(num); continue
       }
       if (k === 'blocked_slot_ids') {
         // JSON 배열 → string
