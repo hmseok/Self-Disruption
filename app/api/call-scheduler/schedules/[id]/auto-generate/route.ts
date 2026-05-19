@@ -1137,6 +1137,7 @@ export async function POST(
 
     // ── 7) 계획 산출 ────────────────────────────────────────────────
     // N-61 — 대체 사유 (원래 우선순위 워커가 빠진 사유)
+    // N-65 — cover_added: cover 그룹 멤버가 추가 근무로 진입한 경우
     type SubstitutionReason =
       | 'group_skip'      // 회피일 (글로벌 또는 그룹별)
       | 'work_cycle_off'  // 비균등 cycle 휴무 phase
@@ -1145,6 +1146,7 @@ export async function POST(
       | 'consec'          // 연속 한도 도달
       | 'slot_blocked'    // 슬롯 거부
       | 'cycle_external'  // 외부 cycle 근무 (당사 X)
+      | 'cover_added'     // N-65 cover 그룹에서 추가 근무 진입
 
     interface PlanRow {
       work_date: string
@@ -1325,10 +1327,29 @@ export async function POST(
     const determineSubstitution = (
       g: GroupRow, wId: string, isoDate: string
     ): { reason: SubstitutionReason | null; forWorkerId: string | null } => {
+      const gMems = membersByGroup.get(g.id) || []
+      const isOwnMember = gMems.includes(wId)
+
+      // N-65 — cover 그룹 멤버가 진입한 경우 (자기 그룹 멤버 아님)
+      if (!isOwnMember) {
+        // 자기 그룹의 빠진 P1 / P2 우선 찾기 (대체 대상)
+        const blockedOwn = gMems.find(ownId => {
+          // 회피일/연차/cycle 휴무 등으로 빠진 사람
+          const skipsArr = [...(groupSkipMap.get(g.id) || []), ...globalSkipRows]
+          if (skipsArr.find(s => s.worker_id === ownId
+              && isoDate >= s.start_date && isoDate <= s.end_date)) return true
+          const lm = workerLeaveMap.get(ownId)
+          if (lm?.get(isoDate) === 'off') return true
+          const wcp = memberWorkCycleMap.get(`${g.id}_${ownId}`)
+          if (wcp && !isWorkDayByCyclePattern(wcp, isoDate)) return true
+          return false
+        })
+        return { reason: 'cover_added', forWorkerId: blockedOwn || null }
+      }
+
       const myPriority = lookupMember(g.id, wId)?.priority_level ?? 2
       if (myPriority === 1) return { reason: null, forWorkerId: null }  // P1 본인 = 대체 X
 
-      const gMems = membersByGroup.get(g.id) || []
       const p1Members = gMems.filter(otherId => otherId !== wId &&
         (lookupMember(g.id, otherId)?.priority_level ?? 2) === 1)
 
@@ -1979,12 +2000,26 @@ export async function POST(
           const prev = prevDaySelectedMap.get(g.id)
           const prevWorkerIsP1 = prev ? isP1(prev.worker_id) : false
 
+          // N-65 — cover 멤버 + 오늘 다른 그룹 cycle 근무자 추적
+          //   사용자 의도: cycle 패턴 고정 + 결원 시 「당일 cover 그룹에 이미 일하는 사람」 추가 근무로 cover
+          //   효과: 자기 그룹 P2 cycle 안 깨고 cover 그룹 cycle 근무자가 임시 추가 근무
+          const coverWorkingToday = candidates.filter(wId =>
+            !gMembers.includes(wId) && coverWorkerSet.has(wId) && workedToday.has(wId))
+
           let selectedList: string[]
           if (p1InCandidates && need > 0) {
             // N-63 — P1 후보 있으면 P1 우선 (cursor 무관)
             //   기존 가중치 정렬에서 P1 이 위쪽 → slice 로 자연 우선
             selectedList = candidates.slice(0, need)
             // prev 갱신 X — P2 cursor 위치 유지 (정동민 cycle 근무 phase 동안 P2 dayInPeriod 정지)
+          } else if (coverWorkingToday.length > 0 && need > 0) {
+            // N-65 — cover 그룹의 cycle 근무자가 추가 근무로 cover (자기 그룹 cycle 보호)
+            selectedList = [
+              ...coverWorkingToday.slice(0, need),
+              ...candidates.filter(wId => !coverWorkingToday.includes(wId))
+                .slice(0, Math.max(0, need - coverWorkingToday.length)),
+            ]
+            // prev 갱신 X — cover 진입은 추가 근무, 자기 그룹 cursor 영향 X
           } else if (prev && !prevWorkerIsP1 && prev.dayInPeriod < period
                      && candidates.includes(prev.worker_id) && need > 0) {
             // N-63 — 전일 P2 selected 가 후보면 그 워커 우선 (period_days 까지 연속)

@@ -662,6 +662,26 @@ export default function ScheduleGrid({ detail, onChanged, myWorkerId }: Props) {
                   title="카테고리(주간/야간/특수) 별로 그룹핑 ↔ 평면 시간순">
             {viewMode === 'category' ? '🗂 카테고리 그룹' : '⏱ 평면 시간순'}
           </button>
+          {/* N-64 — 대체 내역 토글 (상단 + 하단 패널 스크롤) */}
+          {(() => {
+            const subCount = assignments.filter(a => a.substitution_reason && a.substituted_for_worker_id).length
+            if (subCount === 0) return null
+            return (
+              <button type="button"
+                      onClick={() => {
+                        const el = document.getElementById('substitution-panel-anchor')
+                        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                      }}
+                      style={{
+                        padding: '3px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700,
+                        background: COLORS.bgAmber, color: COLORS.warning,
+                        border: `1px solid ${COLORS.borderAmber}`, cursor: 'pointer',
+                      }}
+                      title="대체 내역 패널로 스크롤">
+                📋 대체 {subCount}건 ▼
+              </button>
+            )
+          })()}
         </div>
       </div>
       <table style={{
@@ -1300,6 +1320,7 @@ const SUB_REASON_META: Record<string, { icon: string; label: string; color: stri
   consec:         { icon: '📅', label: '연속 한도', color: COLORS.warning },
   slot_blocked:   { icon: '⛔', label: '슬롯 거부', color: COLORS.danger },
   cycle_external: { icon: '🌐', label: '외부 cycle', color: '#7c3aed' },
+  cover_added:    { icon: '🤝', label: '추가 근무', color: COLORS.success },
 }
 function SubstitutionPanel({
   assignments, workerMap,
@@ -1319,9 +1340,10 @@ function SubstitutionPanel({
     reasonCounts.set(r, (reasonCounts.get(r) || 0) + 1)
   }
   return (
-    <div style={{
+    <div id="substitution-panel-anchor" style={{
       marginTop: 12, ...GLASS.L4, borderRadius: 10, padding: 12,
       border: `1px solid ${COLORS.borderAmber}`,
+      scrollMarginTop: 80,
     }}>
       <button type="button"
               onClick={() => setExpanded(v => !v)}

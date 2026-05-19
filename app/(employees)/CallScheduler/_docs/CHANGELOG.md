@@ -3,6 +3,54 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-19 (Phase N-64 + N-65) — 대체 내역 상단 토글 + cover 우선 (cycle 보호)
+
+### 사용자 의도
+> "그냥 그당일근무자가 추가근무를 해서 싸이클패턴을 안바꾸려고 하는거"
+> "근무자가 스케줄을 미리 파악할수있게 고정으로"
+> "매트릭스이름에서 어떻게 변경되었는지 바로 접거나"
+
+운영 모델 확정:
+- 평소: 부엉/달빛 cycle 패턴 고정 (P2 들 cycle 안 깨짐)
+- 결원 시: 다른 그룹의 「당일 cycle 정상 근무자」 가 추가 근무로 임시 cover
+- 자기 그룹 P2 의 차례를 침범하지 않음 (cycle 보호)
+
+### N-65 — 알고리즘 변경 (auto-generate)
+- **cover 멤버 + workedToday 가 자기 그룹 P2 보다 우선** (우선순위 역전)
+- 우선순위:
+  1. P1 자기 그룹 (cycle 정상)
+  2. cover 그룹 멤버 + 오늘 그 그룹에 일하는 사람 (추가 근무, cycle 영향 X)
+  3. 전일 P2 prev (N-63 period_days)
+  4. 자기 그룹 P2 / P3 (cycle 영향)
+  5. cover 멤버 X workedToday (다른 그룹 안 일하는 사람)
+
+### substitution_reason 'cover_added' 추가
+- determineSubstitution 이 cover 그룹 멤버 진입 감지 → reason='cover_added'
+- substituted_for_worker_id = 자기 그룹의 빠진 사람
+
+### N-64 — 매트릭스 상단 「📋 대체 N건 ▼」 토글
+- 매트릭스 헤더의 view 토글 옆에 노란 배지 버튼
+- 클릭 시 하단 「📋 대체 내역」 패널로 부드러운 자동 스크롤
+- substitution 0건이면 버튼 미표시
+
+### UI 마커 추가
+- AssignmentCell: 🤝 (cover_added) 아이콘 추가
+- SUB_REASON_META 에 cover_added 등록 (success 색)
+
+### 효과
+- 자기 그룹 cycle 패턴 안정 (P2 들의 일자 고정)
+- cover 그룹 cycle 근무자가 결원 시 추가 근무로 cover
+- 운영자가 cover/대체 내역 한눈에 매트릭스 상단 배지로 확인
+
+### 운영 셋팅 필수 (사용자 직접)
+- 부엉/달빛 그룹 「🔀 같은 날 다른 그룹과 겹침 허용」 ON
+  ```sql
+  UPDATE cs_shift_groups SET allow_same_day_other_group = 1
+  WHERE name IN ('부엉', '달빛') AND is_active = 1;
+  ```
+
+---
+
 ## 2026-05-19 (Phase N-63) — Priority 모드에서 rotation_period_days 지원
 
 ### 사용자 발견

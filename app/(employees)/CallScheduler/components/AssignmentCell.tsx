@@ -28,6 +28,7 @@ interface Props {
 }
 
 // N-61 — 대체 사유 마커 + 라벨
+// N-65 — cover_added: cover 그룹 추가 근무
 const SUBSTITUTION_META: Record<string, { icon: string; label: string }> = {
   group_skip:     { icon: '⚠', label: '회피일' },
   work_cycle_off: { icon: '🔁', label: 'cycle 휴무' },
@@ -36,6 +37,7 @@ const SUBSTITUTION_META: Record<string, { icon: string; label: string }> = {
   consec:         { icon: '📅', label: '연속 한도' },
   slot_blocked:   { icon: '⛔', label: '슬롯 거부' },
   cycle_external: { icon: '🌐', label: '외부 cycle' },
+  cover_added:    { icon: '🤝', label: '추가 근무 (cover)' },
 }
 
 // Phase D — 요일 매치 검사 헬퍼
