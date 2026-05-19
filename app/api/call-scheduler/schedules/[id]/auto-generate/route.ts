@@ -2064,7 +2064,25 @@ export async function POST(
             const newP2 = selectedList.find(wId => !isP1(wId) && !isP3(wId))
             if (newP2) prevDaySelectedMap.set(g.id, { worker_id: newP2, dayInPeriod: 1 })
           } else {
-            selectedList = candidates.slice(0, need)
+            // N-65-fix4 — 새 P2 cursor 시 「counter 적음 + last_date 오래」 명시 정렬
+            //   기존 candidates.sort 의 by_dow / target_ratio 가드가 cycle 순환을 방해
+            //   여기서 명시적 cursor 이동 → 윤민진/전유하/전정연 자연 순환 보장
+            const p2Pool = candidates.filter(wId => !isP1(wId))
+            if (p2Pool.length > 0 && need > 0) {
+              p2Pool.sort((a, b) => {
+                const cnA = ensureCounter(a)
+                const cnB = ensureCounter(b)
+                // counter 적은 사람 우선
+                if (cnA.total !== cnB.total) return cnA.total - cnB.total
+                // 동률 시 last_date 오래된 사람 우선 (자연 순환)
+                const aLast = cnA.last_date || '0000-00-00'
+                const bLast = cnB.last_date || '0000-00-00'
+                return aLast.localeCompare(bLast)
+              })
+              selectedList = p2Pool.slice(0, need)
+            } else {
+              selectedList = candidates.slice(0, need)
+            }
             // N-63 — P2 새 cursor 시작
             const newP2 = selectedList.find(wId => !isP1(wId))
             if (newP2) prevDaySelectedMap.set(g.id, { worker_id: newP2, dayInPeriod: 1 })

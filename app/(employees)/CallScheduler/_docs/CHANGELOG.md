@@ -3,6 +3,40 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-19 (Phase N-65-fix4) — P2 cursor 동률 시 last_date 가드 (균등 순환)
+
+### 사용자 보고
+> "패턴 출발이 아직 조금 이상합니다. 싸이클이 틀어지네요"
+
+매트릭스 실측 (부엉 6월 초 2주):
+- 윤민진: 3일 (적음)
+- 전정연: 4일
+- 전유하: 4일
+
+cursor 동률 시 정렬 결과 → 전정연/전유하 자주, 윤민진 후순위
+
+### 원인
+새 P2 cursor 시 `candidates.slice(0, need)` 사용 → candidates 의 가중치 정렬이 by_dow 가드 (N-27) 영향
+- counter 동률 시 「같은 요일 자주 안 들어간 사람」 우선
+- last_date 가드는 더 뒤 → 묻힘
+
+### 수정 (auto-generate route)
+새 P2 cursor 결정 시 **명시적 정렬**:
+```ts
+const p2Pool = candidates.filter(wId => !isP1(wId))
+p2Pool.sort((a, b) => {
+  if (cnA.total !== cnB.total) return cnA.total - cnB.total  // counter 적은 우선
+  return aLast.localeCompare(bLast)  // last_date 오래된 사람 우선
+})
+selectedList = p2Pool.slice(0, need)
+```
+
+### 효과
+- P2 들 자연 순환: 윤민진 → 전유하 → 전정연 → 윤민진 → ...
+- 매월 균등 분배 보장
+
+---
+
 ## 2026-05-19 (Phase N-65-fix3) — cover 조건을 ownShort 로 + UI 빨간 테두리 무시
 
 ### 사용자 보고
