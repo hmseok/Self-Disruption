@@ -89,8 +89,9 @@ export default function ManualDetailPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [editMode, setEditMode] = useState(false)
-  // Phase 1.4-fix8 — 본문 표시 모드: 마크다운 / PDF
-  const [viewMode, setViewMode] = useState<'md' | 'pdf'>('md')
+  // Phase 1.4-fix10 — 사용자 통찰 (2026-05-19): "마크다운도 실제처럼 구성 안 됨, 최대한 가깝게"
+  // → 진입 시 PDF 모드 기본 (PDF 가 원본 그대로). 마크다운은 검색/anchor/검토 보조용.
+  const [viewMode, setViewMode] = useState<'md' | 'pdf'>('pdf')
   const [pdfUrl, setPdfUrl] = useState<string | null>(null)
   const [pdfLoading, setPdfLoading] = useState(false)
   const [pdfError, setPdfError] = useState<string | null>(null)
@@ -137,6 +138,18 @@ export default function ManualDetailPage() {
   }
 
   useEffect(() => { fetchAll() /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [code])
+
+  // Phase 1.4-fix10 — 데이터 로드 완료 후 PDF 자동 로딩 (없으면 마크다운 fallback)
+  useEffect(() => {
+    if (!meta || !detail) return
+    const hasPdf = !!(meta.file_url || detail.gcs_object_path)
+    if (hasPdf && !pdfUrl && !pdfLoading) {
+      loadPdf().catch(() => { /* graceful */ })
+    } else if (!hasPdf) {
+      setViewMode('md')  // PDF 없으면 마크다운으로 자동 전환
+    }
+    /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, [meta?.id, detail?.gcs_object_path, detail?.file_url])
 
   // Phase 1.4-fix8 — PDF mode 진입 시 GCS signed URL 발급
   const loadPdf = async () => {
