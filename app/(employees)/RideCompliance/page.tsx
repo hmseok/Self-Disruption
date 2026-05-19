@@ -1,14 +1,18 @@
 'use client'
 
 /**
- * /RideCompliance — 라이드 정보보안 (RideCompliance) 메인 대시보드
+ * /RideCompliance — 라이드 정보보안 메인 대시보드
  *
- * Phase 1.1 — NavTabs 4탭 (대시보드/자산/사고/조직) + DcStatStrip 5 stat.
- * 자산·사고 상세는 sub-route (/RideCompliance/{assets,incidents}/[id]) 로 분리 (하이브리드 [E]).
+ * Phase 1.1 (코어 운영 데이터): 대시보드 / 정보자산 / 침해사고 / 조직 매핑
+ * Phase 1.2 (자료·운영 + 추가 통찰): 자료실 / 연간 운영 / 서식 작성 + 대시보드 위젯 3개
  *
- * 단일 진실 원본: 라이드케어 「개인정보보호 내부관리계획서 (매뉴얼 통합본)」 V1.0
+ * 단일 진실 원본: 라이드케어 「개인정보보호 내부관리계획서 (통합본)」 V1.0
  *                 RIDE-PMP-2026-001 (시행 2026.05.20).
- * 페르소나: 석호민 부장 (개인정보보호 관리자, 주 사용자).
+ *
+ * 사용자 통찰 (2026-05-18):
+ *   추가-A: 운영자가 매뉴얼대로 진행 체크 (전사 진행률)
+ *   추가-B: D-7/D-3/D-day 임박 알림 (다가오는 일정 위젯 + 색상)
+ *   추가-C: 원본 검수 단계 분리 (자료실의 is_master_verified 플래그 + CPO 검수 UI)
  *
  * 디자인 규칙:
  *  · Rule 14 — RideVehicleRegistry 동형 (NavTabs + DcStatStrip + NeuDataTable)
@@ -39,9 +43,14 @@ const btnDanger: React.CSSProperties = {
   ...BTN.md, border: `1px solid ${COLORS.borderSubtle}`,
   background: COLORS.bgRed, color: COLORS.danger, cursor: 'pointer',
 }
+const btnSuccess: React.CSSProperties = {
+  ...BTN.md, border: `1px solid ${COLORS.borderSubtle}`,
+  background: COLORS.bgGreen, color: COLORS.success, cursor: 'pointer',
+}
 
-type TabKey = 'dashboard' | 'assets' | 'incidents' | 'officers'
+type TabKey = 'dashboard' | 'assets' | 'incidents' | 'officers' | 'documents' | 'annual_ops' | 'submissions'
 
+// ────────── Phase 1.1 인터페이스 ──────────
 interface Officer {
   id: string
   user_id: string
@@ -106,10 +115,97 @@ interface Incident {
   updated_at: string
 }
 
+// ────────── Phase 1.2 인터페이스 ──────────
+interface ComplianceDocument {
+  id: string
+  doc_code: string
+  doc_type: string
+  title: string
+  parent_manual_code: string | null
+  description: string | null
+  current_version_no: string | null
+  effective_date: string | null
+  retention_years: number
+  classification: string
+  is_master_verified: number
+  verified_by_user_id: string | null
+  verified_by_user_name: string | null
+  verified_by_cpo_at: string | null
+  verification_note: string | null
+  file_url: string | null
+  status: string
+  sort_order: number
+  notes: string | null
+  created_at: string
+  updated_at: string
+}
+
+interface AnnualPlan {
+  id: string
+  plan_year: number
+  plan_code: string
+  title: string
+  prepared_by_user_name: string | null
+  approved_by_user_name: string | null
+  approved_at: string | null
+  effective_date: string
+  scope: string | null
+  legal_basis: string | null
+  status: string
+}
+
+interface ComplianceTask {
+  id: string
+  annual_plan_id: string
+  task_code: string
+  scheduled_month: number
+  category: string
+  title: string
+  description: string | null
+  legal_reference: string | null
+  related_form_codes: string | null
+  assignee_user_id: string | null
+  assignee_user_name: string | null
+  due_date: string
+  reminder_d7_sent: number
+  reminder_d3_sent: number
+  reminder_dday_sent: number
+  status: string
+  completed_at: string | null
+  completed_by_user_id: string | null
+  completed_by_user_name: string | null
+  evidence_notes: string | null
+  cpo_reviewed_at: string | null
+  cpo_review_note: string | null
+  plan_code: string | null
+}
+
+interface FormSubmission {
+  id: string
+  submission_code: string
+  document_id: string
+  document_code: string
+  document_title: string | null
+  task_id: string | null
+  task_code: string | null
+  title: string | null
+  submitted_by_user_id: string
+  submitted_by_user_name: string | null
+  submitted_at: string
+  file_url: string | null
+  retention_until: string
+  reviewed_by_user_name: string | null
+  reviewed_at: string | null
+  review_status: string
+  review_note: string | null
+  notes: string | null
+}
+
+// ────────── 라벨 매핑 ──────────
 const ROLE_LABEL: Record<string, { label: string; emoji: string; color: string }> = {
-  cpo:           { label: '책임자 (CPO)',   emoji: '👔', color: COLORS.primary },
-  manager:       { label: '관리자',         emoji: '🛡️', color: COLORS.info },
-  handler:       { label: '취급자',         emoji: '👥', color: COLORS.textSecondary },
+  cpo:           { label: '책임자 (CPO)',     emoji: '👔', color: COLORS.primary },
+  manager:       { label: '관리자',           emoji: '🛡️', color: COLORS.info },
+  handler:       { label: '취급자',           emoji: '👥', color: COLORS.textSecondary },
   incident_team: { label: '관리팀(사고일선)', emoji: '🚨', color: COLORS.warning },
 }
 
@@ -164,6 +260,48 @@ const ASSET_STATUS_LABEL: Record<string, { label: string; color: string }> = {
   lost:     { label: '분실',   color: COLORS.danger },
 }
 
+const DOC_TYPE_LABEL: Record<string, { label: string; emoji: string }> = {
+  manual: { label: '매뉴얼', emoji: '📘' },
+  form:   { label: '서식',   emoji: '📝' },
+  policy: { label: '정책',   emoji: '📜' },
+}
+
+const DOC_STATUS_LABEL: Record<string, { label: string; color: string }> = {
+  pending:    { label: '검수 대기', color: COLORS.warning },
+  active:     { label: '활성',     color: COLORS.success },
+  superseded: { label: '대체됨',   color: COLORS.textSecondary },
+  retired:    { label: '폐기',     color: COLORS.textMuted },
+}
+
+const TASK_CATEGORY_LABEL: Record<string, { label: string; emoji: string; color: string }> = {
+  plan:          { label: '계획',     emoji: '📋', color: COLORS.primary },
+  education:     { label: '교육',     emoji: '🎓', color: COLORS.info },
+  inspection:    { label: '점검',     emoji: '🔍', color: COLORS.info },
+  destruction:   { label: '파기',     emoji: '🗑️', color: COLORS.warning },
+  audit:         { label: '감사',     emoji: '🔎', color: COLORS.primary },
+  processor:     { label: '수탁사',   emoji: '🤝', color: COLORS.info },
+  drill:         { label: '훈련',     emoji: '🎯', color: COLORS.warning },
+  access_review: { label: '권한검토', emoji: '🔑', color: COLORS.info },
+  backup_test:   { label: '백업복구', emoji: '💾', color: COLORS.info },
+  closing:       { label: '결산',     emoji: '🏁', color: COLORS.primary },
+}
+
+const TASK_STATUS_LABEL: Record<string, { label: string; color: string }> = {
+  pending:     { label: '예정',   color: COLORS.textSecondary },
+  in_progress: { label: '진행 중', color: COLORS.info },
+  done:        { label: '완료',   color: COLORS.success },
+  overdue:     { label: '지연',   color: COLORS.danger },
+  skipped:     { label: '건너뜀', color: COLORS.textMuted },
+}
+
+const REVIEW_STATUS_LABEL: Record<string, { label: string; color: string }> = {
+  submitted: { label: '제출됨', color: COLORS.warning },
+  approved:  { label: '승인',   color: COLORS.success },
+  rejected:  { label: '반려',   color: COLORS.danger },
+  archived:  { label: '보관',   color: COLORS.textSecondary },
+}
+
+// ────────── 헬퍼 함수 ──────────
 function fmtDate(d: string | null | undefined): string {
   if (!d) return ''
   const dt = new Date(d)
@@ -178,7 +316,7 @@ function fmtDateTime(d: string | null | undefined): string {
   return `${fmtDate(d)} ${String(dt.getHours()).padStart(2, '0')}:${String(dt.getMinutes()).padStart(2, '0')}`
 }
 
-/** 24h SLA 잔여 계산 — 매뉴얼 제25조 ① (정보주체 24시간 통지 의무) */
+/** 24h SLA 잔여 — 침해사고 통지 의무 (제25조 ①) */
 function slaRemainHours(detectedAt: string, notifiedAt: string | null): number | null {
   if (notifiedAt) return null
   const detected = new Date(detectedAt).getTime()
@@ -187,6 +325,36 @@ function slaRemainHours(detectedAt: string, notifiedAt: string | null): number |
   return 24 - elapsed
 }
 
+/** task due_date 잔여 일수 (음수 = overdue) — 사용자 추가-B 통찰 */
+function daysUntilDue(dueDate: string): number {
+  const due = new Date(dueDate).getTime()
+  if (isNaN(due)) return 999
+  const now = Date.now()
+  return Math.ceil((due - now) / (24 * 60 * 60 * 1000))
+}
+
+/** D-7/D-3/D-day 색상 결정 — 사용자 추가-B 통찰 */
+function urgencyColor(days: number): { color: string; bg: string; label: string } {
+  if (days < 0) return { color: COLORS.danger, bg: COLORS.bgRed, label: `${Math.abs(days)}일 초과` }
+  if (days === 0) return { color: COLORS.danger, bg: COLORS.bgRed, label: '오늘 마감' }
+  if (days <= 3) return { color: COLORS.danger, bg: COLORS.bgRed, label: `D-${days}` }
+  if (days <= 7) return { color: COLORS.warning, bg: COLORS.bgAmber, label: `D-${days}` }
+  if (days <= 14) return { color: COLORS.info, bg: COLORS.bgBlue, label: `D-${days}` }
+  return { color: COLORS.textSecondary, bg: COLORS.bgGray, label: `D-${days}` }
+}
+
+/** related_form_codes JSON 파싱 (안전) */
+function parseFormCodes(json: string | null): string[] {
+  if (!json) return []
+  try {
+    const arr = JSON.parse(json)
+    return Array.isArray(arr) ? arr.filter((x): x is string => typeof x === 'string') : []
+  } catch { return [] }
+}
+
+// ════════════════════════════════════════════════════════════════
+// 메인 컴포넌트
+// ════════════════════════════════════════════════════════════════
 export default function RideCompliancePage() {
   const [user, setUser] = useState<{ id?: string; role?: string; name?: string } | null>(null)
   const [authChecked, setAuthChecked] = useState(false)
@@ -195,27 +363,49 @@ export default function RideCompliancePage() {
 
   const [tab, setTab] = useState<TabKey>('dashboard')
 
+  // Phase 1.1 데이터
   const [officers, setOfficers] = useState<Officer[]>([])
   const [assets, setAssets] = useState<Asset[]>([])
   const [incidents, setIncidents] = useState<Incident[]>([])
-  const [migrationPending, setMigrationPending] = useState(false)
-  const [loadError, setLoadError] = useState<string | null>(null)
+  // Phase 1.2 데이터
+  const [documents, setDocuments] = useState<ComplianceDocument[]>([])
+  const [annualPlan, setAnnualPlan] = useState<AnnualPlan | null>(null)
+  const [tasks, setTasks] = useState<ComplianceTask[]>([])
+  const [submissions, setSubmissions] = useState<FormSubmission[]>([])
 
-  // 필터 상태
+  const [migrationPending, setMigrationPending] = useState<{ p11: boolean; p12: boolean }>({ p11: false, p12: false })
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [myRole, setMyRole] = useState<string | null>(null)
+
+  // Phase 1.1 필터
   const [assetTypeFilter, setAssetTypeFilter] = useState('')
   const [assetClassFilter, setAssetClassFilter] = useState('')
   const [assetStatusFilter, setAssetStatusFilter] = useState('')
   const [assetQuery, setAssetQuery] = useState('')
-
   const [incidentTypeFilter, setIncidentTypeFilter] = useState('')
   const [incidentSeverityFilter, setIncidentSeverityFilter] = useState('')
   const [incidentStatusFilter, setIncidentStatusFilter] = useState('')
   const [incidentQuery, setIncidentQuery] = useState('')
 
-  // 모달 상태
+  // Phase 1.2 필터
+  const [docTypeFilter, setDocTypeFilter] = useState('')
+  const [docStatusFilter, setDocStatusFilter] = useState('')
+  const [docVerifiedFilter, setDocVerifiedFilter] = useState('')
+  const [docQuery, setDocQuery] = useState('')
+  const [taskCategoryFilter, setTaskCategoryFilter] = useState('')
+  const [taskStatusFilter, setTaskStatusFilter] = useState('')
+  const [taskMonthFilter, setTaskMonthFilter] = useState('')
+  const [subDocFilter, setSubDocFilter] = useState('')
+  const [subStatusFilter, setSubStatusFilter] = useState('')
+
+  // 모달
   const [assetModalOpen, setAssetModalOpen] = useState(false)
   const [incidentModalOpen, setIncidentModalOpen] = useState(false)
   const [officerModalOpen, setOfficerModalOpen] = useState(false)
+  const [docFileUrlModal, setDocFileUrlModal] = useState<ComplianceDocument | null>(null)
+  const [verifyModal, setVerifyModal] = useState<ComplianceDocument | null>(null)
+  const [taskActionModal, setTaskActionModal] = useState<ComplianceTask | null>(null)
+  const [submitFormModal, setSubmitFormModal] = useState<{ doc: ComplianceDocument; task?: ComplianceTask } | null>(null)
 
   useEffect(() => {
     setUser(getStoredUser())
@@ -227,17 +417,30 @@ export default function RideCompliancePage() {
     const token = getStoredToken()
     const headers = token ? { Authorization: `Bearer ${token}` } : {}
     try {
-      const [ofRes, asRes, inRes] = await Promise.all([
+      const [ofRes, asRes, inRes, docRes, planRes, taskRes, subRes] = await Promise.all([
         fetch('/api/ride-compliance/officers', { headers, cache: 'no-store' }),
         fetch('/api/ride-compliance/assets', { headers, cache: 'no-store' }),
         fetch('/api/ride-compliance/incidents', { headers, cache: 'no-store' }),
+        fetch('/api/ride-compliance/documents', { headers, cache: 'no-store' }),
+        fetch('/api/ride-compliance/annual-plans?year=2026', { headers, cache: 'no-store' }),
+        fetch('/api/ride-compliance/tasks?plan_year=2026', { headers, cache: 'no-store' }),
+        fetch('/api/ride-compliance/form-submissions', { headers, cache: 'no-store' }),
       ])
-      const [ofJ, asJ, inJ] = await Promise.all([ofRes.json(), asRes.json(), inRes.json()])
+      const [ofJ, asJ, inJ, docJ, planJ, taskJ, subJ] = await Promise.all([
+        ofRes.json(), asRes.json(), inRes.json(), docRes.json(), planRes.json(), taskRes.json(), subRes.json(),
+      ])
       setOfficers(ofJ.data || [])
       setAssets(asJ.data || [])
       setIncidents(inJ.data || [])
-      const pending = !!(ofJ.meta?._migration_pending || asJ.meta?._migration_pending || inJ.meta?._migration_pending)
-      setMigrationPending(pending)
+      setDocuments(docJ.data || [])
+      setAnnualPlan((planJ.data || [])[0] || null)
+      setTasks(taskJ.data || [])
+      setSubmissions(subJ.data || [])
+      setMyRole(ofJ.meta?.my_role || null)
+      // _migration_pending 구분: phase11 (officers/assets/incidents) vs phase12 (documents/tasks 등)
+      const p11Pending = !!(ofJ.meta?._migration_pending === true)
+      const p12Pending = !!(docJ.meta?._migration_pending === 'phase12' || taskJ.meta?._migration_pending === 'phase12')
+      setMigrationPending({ p11: p11Pending, p12: p12Pending })
       setLoadError(null)
     } catch (e) {
       setLoadError(String(e))
@@ -248,53 +451,102 @@ export default function RideCompliancePage() {
     if (authChecked && canAccess) fetchAll()
   }, [authChecked, canAccess, fetchAll])
 
-  // 필터링 (클라이언트 side — 단순 모듈)
-  const filteredAssets = useMemo(() => {
-    return assets.filter(a => {
-      if (assetTypeFilter && a.asset_type !== assetTypeFilter) return false
-      if (assetClassFilter && a.classification !== assetClassFilter) return false
-      if (assetStatusFilter && a.status !== assetStatusFilter) return false
-      if (assetQuery && !(`${a.name} ${a.asset_code} ${a.location || ''}`).toLowerCase().includes(assetQuery.toLowerCase())) return false
-      return true
-    })
-  }, [assets, assetTypeFilter, assetClassFilter, assetStatusFilter, assetQuery])
+  // ────────── 필터링 ──────────
+  const filteredAssets = useMemo(() => assets.filter(a => {
+    if (assetTypeFilter && a.asset_type !== assetTypeFilter) return false
+    if (assetClassFilter && a.classification !== assetClassFilter) return false
+    if (assetStatusFilter && a.status !== assetStatusFilter) return false
+    if (assetQuery && !(`${a.name} ${a.asset_code} ${a.location || ''}`).toLowerCase().includes(assetQuery.toLowerCase())) return false
+    return true
+  }), [assets, assetTypeFilter, assetClassFilter, assetStatusFilter, assetQuery])
 
-  const filteredIncidents = useMemo(() => {
-    return incidents.filter(i => {
-      if (incidentTypeFilter && i.incident_type !== incidentTypeFilter) return false
-      if (incidentSeverityFilter && i.severity !== incidentSeverityFilter) return false
-      if (incidentStatusFilter && i.status !== incidentStatusFilter) return false
-      if (incidentQuery && !(`${i.title} ${i.incident_code} ${i.cause_summary || ''}`).toLowerCase().includes(incidentQuery.toLowerCase())) return false
-      return true
-    })
-  }, [incidents, incidentTypeFilter, incidentSeverityFilter, incidentStatusFilter, incidentQuery])
+  const filteredIncidents = useMemo(() => incidents.filter(i => {
+    if (incidentTypeFilter && i.incident_type !== incidentTypeFilter) return false
+    if (incidentSeverityFilter && i.severity !== incidentSeverityFilter) return false
+    if (incidentStatusFilter && i.status !== incidentStatusFilter) return false
+    if (incidentQuery && !(`${i.title} ${i.incident_code} ${i.cause_summary || ''}`).toLowerCase().includes(incidentQuery.toLowerCase())) return false
+    return true
+  }), [incidents, incidentTypeFilter, incidentSeverityFilter, incidentStatusFilter, incidentQuery])
 
-  // DcStatStrip 5 stat
+  const filteredDocs = useMemo(() => documents.filter(d => {
+    if (docTypeFilter && d.doc_type !== docTypeFilter) return false
+    if (docStatusFilter && d.status !== docStatusFilter) return false
+    if (docVerifiedFilter === '1' && d.is_master_verified !== 1) return false
+    if (docVerifiedFilter === '0' && d.is_master_verified !== 0) return false
+    if (docQuery && !(`${d.title} ${d.doc_code} ${d.description || ''}`).toLowerCase().includes(docQuery.toLowerCase())) return false
+    return true
+  }), [documents, docTypeFilter, docStatusFilter, docVerifiedFilter, docQuery])
+
+  const filteredTasks = useMemo(() => tasks.filter(t => {
+    if (taskCategoryFilter && t.category !== taskCategoryFilter) return false
+    if (taskStatusFilter && t.status !== taskStatusFilter) return false
+    if (taskMonthFilter && t.scheduled_month !== parseInt(taskMonthFilter, 10)) return false
+    return true
+  }), [tasks, taskCategoryFilter, taskStatusFilter, taskMonthFilter])
+
+  const filteredSubmissions = useMemo(() => submissions.filter(s => {
+    if (subDocFilter && s.document_code !== subDocFilter) return false
+    if (subStatusFilter && s.review_status !== subStatusFilter) return false
+    return true
+  }), [submissions, subDocFilter, subStatusFilter])
+
+  // ────────── 대시보드 통계 ──────────
   const stats: StatItem[] = useMemo(() => {
     const totalAssets = assets.length
     const piiAssets = assets.filter(a => a.contains_pii === 1).length
     const openIncidents = incidents.filter(i => i.status !== 'resolved' && i.status !== 'closed').length
     const slaWarn = incidents.filter(i => {
-      const r = slaRemainHours(i.detected_at, i.notified_at)
-      return r !== null && r < 6
+      const r = slaRemainHours(i.detected_at, i.notified_at); return r !== null && r < 6
     }).length
     const activeCpoMgr = officers.filter(o => o.is_active === 1 && (o.role === 'cpo' || o.role === 'manager')).length
 
-    const quarterStart = (() => {
-      const now = new Date()
-      const q = Math.floor(now.getMonth() / 3)
-      return new Date(now.getFullYear(), q * 3, 1)
-    })()
-    const newThisQuarter = assets.filter(a => new Date(a.created_at) >= quarterStart).length
+    // Phase 1.2 stat
+    const totalDocs = documents.length
+    const verifiedDocs = documents.filter(d => d.is_master_verified === 1).length
+    const pendingVerify = documents.filter(d => d.is_master_verified === 0).length
+
+    const doneTasks = tasks.filter(t => t.status === 'done').length
+    const totalTasks = tasks.length
+    const overdueTasks = tasks.filter(t => {
+      if (t.status === 'done' || t.status === 'skipped') return false
+      return daysUntilDue(t.due_date) < 0
+    }).length
 
     return [
-      { label: '정보자산', value: totalAssets, unit: '건', icon: '📦', subValue: `PII ${piiAssets}건`, tint: 'blue' },
       { label: '미해결 사고', value: openIncidents, unit: '건', icon: '🚨', subValue: slaWarn > 0 ? `⚠ SLA임박 ${slaWarn}건` : '', subTone: slaWarn > 0 ? 'down' : 'neutral', tint: openIncidents > 0 ? 'red' : 'green' },
-      { label: 'CPO·관리자 현직', value: activeCpoMgr, unit: '명', icon: '🛡️', tint: 'purple' },
-      { label: '본 분기 신규 자산', value: newThisQuarter, unit: '건', icon: '📈', tint: 'amber' },
-      { label: '교육 이수율', value: 'Phase 1.2', icon: '🎓', tint: 'slate' },
+      { label: '정보자산', value: totalAssets, unit: '건', icon: '📦', subValue: `PII ${piiAssets}건`, tint: 'blue' },
+      { label: '매뉴얼·서식', value: `${verifiedDocs}/${totalDocs}`, icon: '📚', subValue: pendingVerify > 0 ? `검수대기 ${pendingVerify}` : '전체 검수완료', subTone: pendingVerify > 0 ? 'down' : 'up', tint: pendingVerify > 0 ? 'amber' : 'green' },
+      { label: '연간 task 진행', value: `${doneTasks}/${totalTasks}`, icon: '📅', subValue: overdueTasks > 0 ? `⚠ 지연 ${overdueTasks}건` : '', subTone: overdueTasks > 0 ? 'down' : 'neutral', tint: overdueTasks > 0 ? 'red' : 'blue' },
+      { label: 'CPO·관리자', value: activeCpoMgr, unit: '명', icon: '👔', tint: 'purple' },
     ]
-  }, [assets, incidents, officers])
+  }, [assets, incidents, officers, documents, tasks])
+
+  // ────────── 다가오는 일정 (D-14 이내, status pending/in_progress) ──────────
+  const upcomingTasks = useMemo(() => {
+    return tasks
+      .filter(t => t.status === 'pending' || t.status === 'in_progress')
+      .map(t => ({ task: t, days: daysUntilDue(t.due_date) }))
+      .filter(x => x.days <= 14)
+      .sort((a, b) => a.days - b.days)
+      .slice(0, 8)
+  }, [tasks])
+
+  // ────────── 검수 대기 매뉴얼·서식 ──────────
+  const pendingVerifyDocs = useMemo(() => {
+    return documents.filter(d => d.is_master_verified === 0 && d.status === 'pending').sort((a, b) => a.sort_order - b.sort_order)
+  }, [documents])
+
+  // ────────── 카테고리별 진행률 ──────────
+  const progressByCategory = useMemo(() => {
+    const cats = Object.keys(TASK_CATEGORY_LABEL)
+    return cats.map(cat => {
+      const catTasks = tasks.filter(t => t.category === cat)
+      const total = catTasks.length
+      const done = catTasks.filter(t => t.status === 'done').length
+      const overdue = catTasks.filter(t => t.status !== 'done' && t.status !== 'skipped' && daysUntilDue(t.due_date) < 0).length
+      return { cat, total, done, overdue }
+    }).filter(x => x.total > 0)
+  }, [tasks])
 
   if (!authChecked) return null
 
@@ -313,24 +565,28 @@ export default function RideCompliancePage() {
     )
   }
 
+  const isCpoLike = myRole === 'cpo'
+  const isMgrLike = myRole === 'cpo' || myRole === 'manager'
+
   return (
-    <div style={{ padding: '24px 32px', maxWidth: 1600, margin: '0 auto' }}>
+    <div style={{ padding: '24px 32px', maxWidth: 1700, margin: '0 auto' }}>
       {/* 헤더 */}
       <div style={{ marginBottom: 16 }}>
         <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700 }}>🔒 라이드 정보보안</h1>
         <p style={{ margin: '4px 0 0', fontSize: 13, color: COLORS.textSecondary }}>
-          라이드케어 「개인정보보호 내부관리계획서」 V1.0 (RIDE-PMP-2026-001, 시행 2026.05.20) 기반 운영 모듈 · Phase 1.1 코어 3 도메인
+          라이드케어 「개인정보보호 내부관리계획서」 V1.0 (RIDE-PMP-2026-001, 시행 2026.05.20) 기반 운영 모듈
+          {annualPlan && ` · 연간계획 ${annualPlan.plan_code}`}
+          {myRole && ` · 내 역할: ${ROLE_LABEL[myRole]?.label || myRole}`}
         </p>
       </div>
 
       {/* 마이그 미적용 배너 */}
-      {migrationPending && (
+      {migrationPending.p12 && (
         <div style={{
           ...GLASS.L3, padding: '12px 16px', borderRadius: 10, marginBottom: 16,
-          borderLeft: `4px solid ${COLORS.warning}`,
-          color: COLORS.textPrimary, fontSize: 13,
+          borderLeft: `4px solid ${COLORS.warning}`, color: COLORS.textPrimary, fontSize: 13,
         }}>
-          ⚠ 마이그레이션 미적용 — <code style={{ fontSize: 12 }}>migrations/2026-05-18_ride_compliance_phase11.sql</code> 적용 후 새로고침. 빈 화면은 마이그 대기 상태입니다 (Rule 23 graceful fallback).
+          ⚠ Phase 1.2 마이그레이션 미적용 — <code style={{ fontSize: 12 }}>migrations/2026-05-18_ride_compliance_phase12.sql</code> 적용 후 새로고침. 자료실·연간운영·서식작성 탭은 마이그 적용 후 활성화됩니다.
         </div>
       )}
       {loadError && (
@@ -339,14 +595,17 @@ export default function RideCompliancePage() {
         </div>
       )}
 
-      {/* NavTabs */}
-      <div style={{ ...GLASS.L5, padding: '0 24px', borderRadius: 10, marginBottom: 16 }}>
+      {/* NavTabs — 7 탭 */}
+      <div style={{ ...GLASS.L5, padding: '0 16px', borderRadius: 10, marginBottom: 16, overflowX: 'auto' }}>
         <div style={{ display: 'flex', gap: 0, alignItems: 'center' }}>
           {([
-            { key: 'dashboard', label: '대시보드', emoji: '📊' },
-            { key: 'assets',    label: '정보자산',  emoji: '📦' },
-            { key: 'incidents', label: '침해사고',  emoji: '🚨' },
-            { key: 'officers',  label: '조직 매핑', emoji: '👔' },
+            { key: 'dashboard',  label: '대시보드',  emoji: '📊' },
+            { key: 'assets',     label: '정보자산',  emoji: '📦' },
+            { key: 'incidents',  label: '침해사고',  emoji: '🚨' },
+            { key: 'officers',   label: '조직 매핑', emoji: '👔' },
+            { key: 'documents',  label: '자료실',    emoji: '📚' },
+            { key: 'annual_ops', label: '연간 운영', emoji: '📅' },
+            { key: 'submissions', label: '서식 작성', emoji: '📝' },
           ] as { key: TabKey; label: string; emoji: string }[]).map(t => {
             const active = tab === t.key
             return (
@@ -357,11 +616,9 @@ export default function RideCompliancePage() {
                   background: active ? `${COLORS.primary}18` : 'transparent',
                   border: 'none',
                   borderBottom: active ? `2px solid ${COLORS.primary}` : '2px solid transparent',
-                  padding: '14px 20px',
-                  fontSize: 14,
-                  fontWeight: active ? 700 : 500,
+                  padding: '14px 18px', fontSize: 13, fontWeight: active ? 700 : 500,
                   color: active ? COLORS.primary : COLORS.textSecondary,
-                  cursor: 'pointer',
+                  cursor: 'pointer', whiteSpace: 'nowrap',
                 }}
               >
                 {t.emoji} {t.label}
@@ -375,33 +632,139 @@ export default function RideCompliancePage() {
       {tab === 'dashboard' && (
         <>
           <DcStatStrip stats={stats} fullWidth />
-          <div style={{ ...GLASS.L3, padding: 20, borderRadius: 12, marginTop: 16 }}>
-            <h3 style={{ margin: '0 0 12px', fontSize: 15 }}>📋 운영 안내 (매뉴얼 통합본 5.17 기반)</h3>
-            <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, lineHeight: 1.8, color: COLORS.textSecondary }}>
-              <li>침해사고는 발견 즉시 「침해사고」 탭에서 신고 — 매뉴얼 제27조 의무 (모든 직원, 관리팀 일선 접수).</li>
-              <li>정보주체 통지는 발생일 + 24시간 이내 의무 — 매뉴얼 제25조 ① (긴급조치 시 단서 조항 적용).</li>
-              <li>자산 등급: <strong>대외비</strong> 는 CPO·관리자만 열람 (매뉴얼 본문 분류와 일치).</li>
-              <li>연간 운영 캘린더: RIDE-PLAN-2026 (별첨 7) — 교육 연 2회, 자체감사 반기 1회, 파기 분기 1회.</li>
-              <li>Phase 1.2 이후 추가 예정: 교육 이수 관리, 자체감사, 연간계획 캘린더, 파기 이력, 수탁사 점검.</li>
+
+          {/* 위젯 행 1: 다가오는 일정 + 검수 대기 */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 16, marginTop: 16 }}>
+            {/* 📌 다가오는 일정 — 사용자 추가-B 통찰 */}
+            <div style={{ ...GLASS.L3, padding: 18, borderRadius: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
+                <h3 style={{ margin: 0, fontSize: 14 }}>📌 다가오는 일정 (D-14 이내)</h3>
+                <span style={{ marginLeft: 'auto', fontSize: 11, color: COLORS.textMuted }}>총 {upcomingTasks.length}건</span>
+              </div>
+              {upcomingTasks.length === 0 ? (
+                <div style={{ padding: 24, textAlign: 'center', fontSize: 13, color: COLORS.textSecondary }}>
+                  📭 다가오는 task 없음 — 모두 완료됐거나 14일 이후 일정
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {upcomingTasks.map(({ task, days }) => {
+                    const u = urgencyColor(days)
+                    const cat = TASK_CATEGORY_LABEL[task.category]
+                    return (
+                      <div key={task.id}
+                        onClick={() => setTaskActionModal(task)}
+                        style={{
+                          display: 'grid', gridTemplateColumns: '70px 1fr auto',
+                          alignItems: 'center', gap: 12, padding: '10px 12px',
+                          borderRadius: 8, border: `1px solid ${COLORS.borderSubtle}`,
+                          background: u.bg, cursor: 'pointer',
+                        }}>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: u.color }}>{u.label}</span>
+                        <span style={{ fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {cat?.emoji} <strong>{task.scheduled_month}월</strong> {task.title}
+                        </span>
+                        <span style={{ fontSize: 11, color: COLORS.textMuted }}>{fmtDate(task.due_date)}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* 🔴 검수 대기 매뉴얼·서식 — 사용자 추가-C 통찰 */}
+            <div style={{ ...GLASS.L3, padding: 18, borderRadius: 12, borderLeft: `4px solid ${pendingVerifyDocs.length > 0 ? COLORS.warning : COLORS.success}` }}>
+              <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
+                <h3 style={{ margin: 0, fontSize: 14 }}>🔴 검수 대기 매뉴얼·서식</h3>
+                <span style={{ marginLeft: 'auto', fontSize: 11, color: COLORS.textMuted }}>총 {pendingVerifyDocs.length}건</span>
+              </div>
+              {pendingVerifyDocs.length === 0 ? (
+                <div style={{ padding: 24, textAlign: 'center', fontSize: 13, color: COLORS.success }}>
+                  ✅ 모든 매뉴얼·서식 검수 완료
+                </div>
+              ) : (
+                <>
+                  <div style={{ maxHeight: 200, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {pendingVerifyDocs.slice(0, 8).map(d => (
+                      <div key={d.id}
+                        onClick={() => isCpoLike ? setVerifyModal(d) : setDocFileUrlModal(d)}
+                        style={{ padding: '8px 10px', fontSize: 12, borderRadius: 6, border: `1px solid ${COLORS.borderSubtle}`, background: COLORS.bgGray, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span>{DOC_TYPE_LABEL[d.doc_type]?.emoji}</span>
+                        <strong style={{ color: COLORS.textPrimary }}>{d.doc_code}</strong>
+                        <span style={{ color: COLORS.textSecondary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{d.title}</span>
+                        <span style={{ marginLeft: 'auto', fontSize: 10, color: d.file_url ? COLORS.warning : COLORS.danger }}>
+                          {d.file_url ? '📎 검수대기' : '⚠ URL미입력'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  <p style={{ marginTop: 10, marginBottom: 0, fontSize: 11, color: COLORS.textMuted }}>
+                    {isCpoLike ? 'CPO 권한 — 클릭 시 검수 처리' : '클릭 시 file_url 입력 모달'}
+                  </p>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* 위젯 행 2: 연간 진행률 (사용자 추가-A 통찰) */}
+          <div style={{ ...GLASS.L3, padding: 18, borderRadius: 12, marginTop: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
+              <h3 style={{ margin: 0, fontSize: 14 }}>📈 연간 운영 진행률 (RIDE-PLAN-2026)</h3>
+              <span style={{ marginLeft: 'auto', fontSize: 11, color: COLORS.textMuted }}>
+                전체 {tasks.filter(t => t.status === 'done').length}/{tasks.length} 완료
+              </span>
+            </div>
+            {progressByCategory.length === 0 ? (
+              <div style={{ padding: 24, textAlign: 'center', fontSize: 13, color: COLORS.textSecondary }}>
+                연간 task 미생성 — Phase 1.2 마이그 적용 필요
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10 }}>
+                {progressByCategory.map(({ cat, total, done, overdue }) => {
+                  const c = TASK_CATEGORY_LABEL[cat]
+                  const pct = total > 0 ? Math.round((done / total) * 100) : 0
+                  return (
+                    <div key={cat} style={{ padding: 10, borderRadius: 8, border: `1px solid ${COLORS.borderSubtle}`, background: COLORS.bgGray }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: c?.color }}>{c?.emoji} {c?.label}</span>
+                        <span style={{ fontSize: 11, color: COLORS.textMuted }}>{done}/{total}</span>
+                      </div>
+                      <div style={{ height: 6, background: COLORS.bgGray, borderRadius: 3, overflow: 'hidden' }}>
+                        <div style={{ height: '100%', width: `${pct}%`, background: overdue > 0 ? COLORS.danger : COLORS.success }} />
+                      </div>
+                      {overdue > 0 && (
+                        <span style={{ fontSize: 10, color: COLORS.danger, marginTop: 2, display: 'block' }}>⚠ 지연 {overdue}건</span>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* 위젯 행 3: 매뉴얼 안내 */}
+          <div style={{ ...GLASS.L3, padding: 18, borderRadius: 12, marginTop: 16 }}>
+            <h3 style={{ margin: '0 0 8px', fontSize: 14 }}>📋 운영 안내 (매뉴얼 통합본 5.17)</h3>
+            <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12, lineHeight: 1.8, color: COLORS.textSecondary }}>
+              <li>침해사고: 발견 즉시 「침해사고」 탭 신고 — 매뉴얼 제27조. 정보주체 통지는 24h 이내 (제25조 ①).</li>
+              <li>매뉴얼·서식: 「자료실」 탭에서 원본 등록 → CPO 검수 → 활성화. 검수 미완료 서식은 작성 불가.</li>
+              <li>연간 운영: 「연간 운영」 탭에서 월별 task 진행 추적. D-7/D-3/D-day 임박 시 색상 변경.</li>
+              <li>서식 작성: 「서식 작성」 탭에서 인스턴스 list + 보존만료 추적 (3년).</li>
             </ul>
           </div>
         </>
       )}
 
-      {/* 자산 탭 */}
+      {/* Phase 1.1 탭들 */}
       {tab === 'assets' && (
         <AssetsTabContent
-          rows={filteredAssets}
-          allRows={assets}
+          rows={filteredAssets} allRows={assets}
           query={assetQuery} setQuery={setAssetQuery}
           typeFilter={assetTypeFilter} setTypeFilter={setAssetTypeFilter}
           classFilter={assetClassFilter} setClassFilter={setAssetClassFilter}
           statusFilter={assetStatusFilter} setStatusFilter={setAssetStatusFilter}
-          onCreate={() => setAssetModalOpen(true)}
+          onCreate={() => setAssetModalOpen(true)} canEdit={isMgrLike}
         />
       )}
-
-      {/* 사고 탭 */}
       {tab === 'incidents' && (
         <IncidentsTabContent
           rows={filteredIncidents}
@@ -412,73 +775,94 @@ export default function RideCompliancePage() {
           onCreate={() => setIncidentModalOpen(true)}
         />
       )}
-
-      {/* 조직 탭 */}
       {tab === 'officers' && (
         <OfficersTabContent rows={officers} onCreate={() => setOfficerModalOpen(true)} userRole={user?.role} />
       )}
 
-      {/* 모달들 */}
-      {assetModalOpen && (
-        <AssetModal onClose={() => setAssetModalOpen(false)} onSaved={() => { setAssetModalOpen(false); fetchAll() }} />
+      {/* Phase 1.2 탭들 */}
+      {tab === 'documents' && (
+        <DocumentsTabContent
+          rows={filteredDocs} allRows={documents}
+          query={docQuery} setQuery={setDocQuery}
+          typeFilter={docTypeFilter} setTypeFilter={setDocTypeFilter}
+          statusFilter={docStatusFilter} setStatusFilter={setDocStatusFilter}
+          verifiedFilter={docVerifiedFilter} setVerifiedFilter={setDocVerifiedFilter}
+          onFileUrlClick={(d) => setDocFileUrlModal(d)}
+          onVerifyClick={(d) => setVerifyModal(d)}
+          isCpo={isCpoLike} isMgr={isMgrLike}
+        />
       )}
-      {incidentModalOpen && (
-        <IncidentModal assets={assets} onClose={() => setIncidentModalOpen(false)} onSaved={() => { setIncidentModalOpen(false); fetchAll() }} />
+      {tab === 'annual_ops' && (
+        <AnnualOpsTabContent
+          plan={annualPlan}
+          rows={filteredTasks} allRows={tasks}
+          categoryFilter={taskCategoryFilter} setCategoryFilter={setTaskCategoryFilter}
+          statusFilter={taskStatusFilter} setStatusFilter={setTaskStatusFilter}
+          monthFilter={taskMonthFilter} setMonthFilter={setTaskMonthFilter}
+          documents={documents}
+          onTaskClick={(t) => setTaskActionModal(t)}
+          onSubmitForm={(doc, task) => setSubmitFormModal({ doc, task })}
+        />
       )}
-      {officerModalOpen && (
-        <OfficerModal onClose={() => setOfficerModalOpen(false)} onSaved={() => { setOfficerModalOpen(false); fetchAll() }} />
+      {tab === 'submissions' && (
+        <SubmissionsTabContent
+          rows={filteredSubmissions} allRows={submissions}
+          docFilter={subDocFilter} setDocFilter={setSubDocFilter}
+          statusFilter={subStatusFilter} setStatusFilter={setSubStatusFilter}
+          documents={documents}
+          onCreate={(doc) => setSubmitFormModal({ doc })}
+        />
       )}
+
+      {/* 모달들 — Phase 1.1 */}
+      {assetModalOpen && <AssetModal onClose={() => setAssetModalOpen(false)} onSaved={() => { setAssetModalOpen(false); fetchAll() }} />}
+      {incidentModalOpen && <IncidentModal assets={assets} onClose={() => setIncidentModalOpen(false)} onSaved={() => { setIncidentModalOpen(false); fetchAll() }} />}
+      {officerModalOpen && <OfficerModal onClose={() => setOfficerModalOpen(false)} onSaved={() => { setOfficerModalOpen(false); fetchAll() }} />}
+      {/* 모달들 — Phase 1.2 */}
+      {docFileUrlModal && <DocFileUrlModal doc={docFileUrlModal} onClose={() => setDocFileUrlModal(null)} onSaved={() => { setDocFileUrlModal(null); fetchAll() }} />}
+      {verifyModal && <VerifyModal doc={verifyModal} onClose={() => setVerifyModal(null)} onSaved={() => { setVerifyModal(null); fetchAll() }} />}
+      {taskActionModal && <TaskActionModal task={taskActionModal} canCpoReview={isCpoLike} canManager={isMgrLike} onClose={() => setTaskActionModal(null)} onSaved={() => { setTaskActionModal(null); fetchAll() }} />}
+      {submitFormModal && <SubmitFormModal doc={submitFormModal.doc} task={submitFormModal.task} onClose={() => setSubmitFormModal(null)} onSaved={() => { setSubmitFormModal(null); fetchAll() }} />}
     </div>
   )
 }
 
-// ─────────────────────────────────────────────────────────────────
-// 자산 탭
-// ─────────────────────────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════════
+// Phase 1.1 탭 컴포넌트들 (기존 유지)
+// ════════════════════════════════════════════════════════════════
 function AssetsTabContent(props: {
-  rows: Asset[]
-  allRows: Asset[]
+  rows: Asset[]; allRows: Asset[]
   query: string; setQuery: (v: string) => void
   typeFilter: string; setTypeFilter: (v: string) => void
   classFilter: string; setClassFilter: (v: string) => void
   statusFilter: string; setStatusFilter: (v: string) => void
-  onCreate: () => void
+  onCreate: () => void; canEdit: boolean
 }) {
   const cols: TableColumn<Asset>[] = [
     { key: 'asset_code', label: '자산코드', sortBy: r => r.asset_code, render: r => (
-      <Link href={`/RideCompliance/assets/${r.id}`} style={{ color: COLORS.primary, fontWeight: 600 }}>
-        {r.asset_code}
-      </Link>
+      <Link href={`/RideCompliance/assets/${r.id}`} style={{ color: COLORS.primary, fontWeight: 600 }}>{r.asset_code}</Link>
     ) },
     { key: 'name', label: '자산명', sortBy: r => r.name, render: r => r.name },
     { key: 'asset_type', label: '유형', sortBy: r => r.asset_type, render: r => {
-      const t = ASSET_TYPE_LABEL[r.asset_type]
-      return <span>{t?.emoji} {t?.label || r.asset_type}</span>
+      const t = ASSET_TYPE_LABEL[r.asset_type]; return <span>{t?.emoji} {t?.label || r.asset_type}</span>
     } },
     { key: 'classification', label: '등급', sortBy: r => r.classification, render: r => {
-      const c = CLASSIFICATION_LABEL[r.classification]
-      return <span style={{ color: c?.color, fontWeight: 600 }}>{c?.label || r.classification}</span>
+      const c = CLASSIFICATION_LABEL[r.classification]; return <span style={{ color: c?.color, fontWeight: 600 }}>{c?.label || r.classification}</span>
     } },
     { key: 'contains_pii', label: 'PII', sortBy: r => r.contains_pii, render: r => r.contains_pii === 1 ? '🔐' : '' },
     { key: 'encryption_status', label: '암호화', sortBy: r => r.encryption_status, render: r => r.encryption_status },
     { key: 'owner_user_name', label: '보유자', sortBy: r => r.owner_user_name || '', render: r => r.owner_user_name || '—' },
     { key: 'location', label: '위치', sortBy: r => r.location || '', render: r => r.location || '—' },
     { key: 'status', label: '상태', sortBy: r => r.status, render: r => {
-      const s = ASSET_STATUS_LABEL[r.status]
-      return <span style={{ color: s?.color, fontWeight: 600 }}>{s?.label || r.status}</span>
+      const s = ASSET_STATUS_LABEL[r.status]; return <span style={{ color: s?.color, fontWeight: 600 }}>{s?.label || r.status}</span>
     } },
     { key: 'created_at', label: '등록일', sortBy: r => r.created_at, render: r => fmtDate(r.created_at) },
   ]
-
   return (
     <div style={{ ...GLASS.L3, padding: 20, borderRadius: 12 }}>
       <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginBottom: 16 }}>
-        <input
-          placeholder="자산명·코드·위치 검색"
-          value={props.query}
-          onChange={e => props.setQuery(e.target.value)}
-          style={{ flex: '1 1 200px', minWidth: 200, padding: '8px 12px', border: `1px solid ${COLORS.borderSubtle}`, borderRadius: 6, fontSize: 13 }}
-        />
+        <input placeholder="자산명·코드·위치 검색" value={props.query} onChange={e => props.setQuery(e.target.value)}
+          style={{ flex: '1 1 200px', minWidth: 200, padding: '8px 12px', border: `1px solid ${COLORS.borderSubtle}`, borderRadius: 6, fontSize: 13 }} />
         <select value={props.typeFilter} onChange={e => props.setTypeFilter(e.target.value)} style={selStyle()}>
           <option value="">유형: 전체</option>
           {Object.entries(ASSET_TYPE_LABEL).map(([k, v]) => <option key={k} value={k}>{v.emoji} {v.label}</option>)}
@@ -491,19 +875,14 @@ function AssetsTabContent(props: {
           <option value="">상태: 전체</option>
           {Object.entries(ASSET_STATUS_LABEL).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
         </select>
-        <button onClick={props.onCreate} style={{ ...btnPrimary, marginLeft: 'auto' }}>＋ 자산 등록</button>
+        {props.canEdit && <button onClick={props.onCreate} style={{ ...btnPrimary, marginLeft: 'auto' }}>＋ 자산 등록</button>}
       </div>
-      <div style={{ marginBottom: 8, fontSize: 12, color: COLORS.textSecondary }}>
-        총 {props.allRows.length} 건 중 {props.rows.length} 건 표시
-      </div>
+      <div style={{ marginBottom: 8, fontSize: 12, color: COLORS.textSecondary }}>총 {props.allRows.length}건 중 {props.rows.length}건 표시</div>
       <NeuDataTable columns={cols} data={props.rows} rowKey={r => r.id} />
     </div>
   )
 }
 
-// ─────────────────────────────────────────────────────────────────
-// 사고 탭
-// ─────────────────────────────────────────────────────────────────
 function IncidentsTabContent(props: {
   rows: Incident[]
   query: string; setQuery: (v: string) => void
@@ -514,22 +893,17 @@ function IncidentsTabContent(props: {
 }) {
   const cols: TableColumn<Incident>[] = [
     { key: 'incident_code', label: '사고번호', sortBy: r => r.incident_code, render: r => (
-      <Link href={`/RideCompliance/incidents/${r.id}`} style={{ color: COLORS.primary, fontWeight: 600 }}>
-        {r.incident_code}
-      </Link>
+      <Link href={`/RideCompliance/incidents/${r.id}`} style={{ color: COLORS.primary, fontWeight: 600 }}>{r.incident_code}</Link>
     ) },
     { key: 'title', label: '제목', sortBy: r => r.title, render: r => r.title },
     { key: 'incident_type', label: '유형', sortBy: r => r.incident_type, render: r => {
-      const t = INCIDENT_TYPE_LABEL[r.incident_type]
-      return <span>{t?.emoji} {t?.label || r.incident_type}</span>
+      const t = INCIDENT_TYPE_LABEL[r.incident_type]; return <span>{t?.emoji} {t?.label || r.incident_type}</span>
     } },
     { key: 'severity', label: '심각도', sortBy: r => r.severity, render: r => {
-      const s = SEVERITY_LABEL[r.severity]
-      return <span style={{ color: s?.color, fontWeight: 600 }}>{s?.label || r.severity}</span>
+      const s = SEVERITY_LABEL[r.severity]; return <span style={{ color: s?.color, fontWeight: 600 }}>{s?.label || r.severity}</span>
     } },
     { key: 'status', label: '상태', sortBy: r => r.status, render: r => {
-      const s = INCIDENT_STATUS_LABEL[r.status]
-      return <span style={{ color: s?.color, fontWeight: 600 }}>{s?.label || r.status}</span>
+      const s = INCIDENT_STATUS_LABEL[r.status]; return <span style={{ color: s?.color, fontWeight: 600 }}>{s?.label || r.status}</span>
     } },
     { key: 'sla', label: '24h SLA', sortBy: r => slaRemainHours(r.detected_at, r.notified_at) ?? 9999, render: r => {
       if (r.notified_at) return <span style={{ color: COLORS.success }}>✓ 통지완료</span>
@@ -537,24 +911,19 @@ function IncidentsTabContent(props: {
       const h = slaRemainHours(r.detected_at, r.notified_at)
       if (h === null) return '—'
       if (h < 0) return <span style={{ color: COLORS.danger, fontWeight: 700 }}>⚠ 초과</span>
-      if (h < 6) return <span style={{ color: COLORS.danger, fontWeight: 700 }}>⏰ {Math.floor(h)}h 남음</span>
-      if (h < 12) return <span style={{ color: COLORS.warning }}>{Math.floor(h)}h 남음</span>
-      return <span style={{ color: COLORS.textSecondary }}>{Math.floor(h)}h 남음</span>
+      if (h < 6) return <span style={{ color: COLORS.danger, fontWeight: 700 }}>⏰ {Math.floor(h)}h</span>
+      if (h < 12) return <span style={{ color: COLORS.warning }}>{Math.floor(h)}h</span>
+      return <span style={{ color: COLORS.textSecondary }}>{Math.floor(h)}h</span>
     } },
     { key: 'reporter_user_name', label: '신고자', sortBy: r => r.reporter_user_name || '', render: r => r.reporter_user_name || '—' },
     { key: 'detected_at', label: '감지일시', sortBy: r => r.detected_at, render: r => fmtDateTime(r.detected_at) },
     { key: 'affected_subjects_count', label: '영향(명)', sortBy: r => r.affected_subjects_count ?? 0, render: r => r.affected_subjects_count ?? '—' },
   ]
-
   return (
     <div style={{ ...GLASS.L3, padding: 20, borderRadius: 12 }}>
       <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginBottom: 16 }}>
-        <input
-          placeholder="제목·번호·경위 검색"
-          value={props.query}
-          onChange={e => props.setQuery(e.target.value)}
-          style={{ flex: '1 1 200px', minWidth: 200, padding: '8px 12px', border: `1px solid ${COLORS.borderSubtle}`, borderRadius: 6, fontSize: 13 }}
-        />
+        <input placeholder="제목·번호·경위 검색" value={props.query} onChange={e => props.setQuery(e.target.value)}
+          style={{ flex: '1 1 200px', minWidth: 200, padding: '8px 12px', border: `1px solid ${COLORS.borderSubtle}`, borderRadius: 6, fontSize: 13 }} />
         <select value={props.typeFilter} onChange={e => props.setTypeFilter(e.target.value)} style={selStyle()}>
           <option value="">유형: 전체</option>
           {Object.entries(INCIDENT_TYPE_LABEL).map(([k, v]) => <option key={k} value={k}>{v.emoji} {v.label}</option>)}
@@ -574,14 +943,10 @@ function IncidentsTabContent(props: {
   )
 }
 
-// ─────────────────────────────────────────────────────────────────
-// 조직 탭
-// ─────────────────────────────────────────────────────────────────
 function OfficersTabContent(props: { rows: Officer[]; onCreate: () => void; userRole?: string }) {
   const cols: TableColumn<Officer>[] = [
     { key: 'role', label: '역할', sortBy: r => r.role, render: r => {
-      const t = ROLE_LABEL[r.role]
-      return <span style={{ color: t?.color, fontWeight: 700 }}>{t?.emoji} {t?.label || r.role}</span>
+      const t = ROLE_LABEL[r.role]; return <span style={{ color: t?.color, fontWeight: 700 }}>{t?.emoji} {t?.label || r.role}</span>
     } },
     { key: 'user_name', label: '성명', sortBy: r => r.user_name || '', render: r => r.user_name || '(미확인)' },
     { key: 'display_title', label: '직책', sortBy: r => r.display_title || '', render: r => r.display_title || '—' },
@@ -591,22 +956,18 @@ function OfficersTabContent(props: { rows: Officer[]; onCreate: () => void; user
     { key: 'is_active', label: '상태', sortBy: r => r.is_active, render: r => r.is_active === 1 ? <span style={{ color: COLORS.success }}>현직</span> : <span style={{ color: COLORS.textSecondary }}>해임</span> },
     { key: 'notes', label: '비고', sortBy: r => r.notes || '', render: r => r.notes || '—' },
   ]
-
   const canEdit = props.userRole === 'admin'
-
   return (
     <div style={{ ...GLASS.L3, padding: 20, borderRadius: 12 }}>
       <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16, gap: 12 }}>
         <div style={{ fontSize: 13, color: COLORS.textSecondary }}>
           매뉴얼 통합본 5.17 제6조·제9조 기반 3-tier 조직 매핑. 임명은 CPO·시스템관리자가 등록.
         </div>
-        {canEdit && (
-          <button onClick={props.onCreate} style={{ ...btnPrimary, marginLeft: 'auto' }}>＋ 임명 등록</button>
-        )}
+        {canEdit && <button onClick={props.onCreate} style={{ ...btnPrimary, marginLeft: 'auto' }}>＋ 임명 등록</button>}
       </div>
       {props.rows.length === 0 ? (
         <div style={{ padding: 32, textAlign: 'center', color: COLORS.textSecondary, fontSize: 13 }}>
-          등록된 임명 기록이 없습니다. 매뉴얼 통합본 5.17 제6조 명시 인원(임성민 이사 CPO / 석호민·양재희 부장 관리자) 을 먼저 등록하시기 바랍니다.
+          등록된 임명 기록이 없습니다. 매뉴얼 통합본 5.17 제6조 명시 인원 (임성민 이사 CPO / 석호민·양재희 부장 관리자) 을 먼저 등록하시기 바랍니다.
         </div>
       ) : (
         <NeuDataTable columns={cols} data={props.rows} rowKey={r => r.id} />
@@ -615,262 +976,558 @@ function OfficersTabContent(props: { rows: Officer[]; onCreate: () => void; user
   )
 }
 
-// ─────────────────────────────────────────────────────────────────
-// 모달들
-// ─────────────────────────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════════
+// Phase 1.2 탭 컴포넌트들
+// ════════════════════════════════════════════════════════════════
+function DocumentsTabContent(props: {
+  rows: ComplianceDocument[]; allRows: ComplianceDocument[]
+  query: string; setQuery: (v: string) => void
+  typeFilter: string; setTypeFilter: (v: string) => void
+  statusFilter: string; setStatusFilter: (v: string) => void
+  verifiedFilter: string; setVerifiedFilter: (v: string) => void
+  onFileUrlClick: (d: ComplianceDocument) => void
+  onVerifyClick: (d: ComplianceDocument) => void
+  isCpo: boolean; isMgr: boolean
+}) {
+  const cols: TableColumn<ComplianceDocument>[] = [
+    { key: 'doc_code', label: '코드', sortBy: r => r.doc_code, render: r => <strong style={{ color: COLORS.textPrimary }}>{r.doc_code}</strong> },
+    { key: 'doc_type', label: '유형', sortBy: r => r.doc_type, render: r => {
+      const t = DOC_TYPE_LABEL[r.doc_type]; return <span>{t?.emoji} {t?.label || r.doc_type}</span>
+    } },
+    { key: 'title', label: '제목', sortBy: r => r.title, render: r => r.title },
+    { key: 'parent_manual_code', label: '소속', sortBy: r => r.parent_manual_code || '', render: r => r.parent_manual_code || '—' },
+    { key: 'current_version_no', label: '버전', sortBy: r => r.current_version_no || 'V1.0', render: r => r.current_version_no || 'V1.0' },
+    { key: 'effective_date', label: '시행일', sortBy: r => r.effective_date || '', render: r => r.effective_date ? fmtDate(r.effective_date) : '—' },
+    { key: 'retention_years', label: '보존(년)', sortBy: r => r.retention_years, render: r => `${r.retention_years}년` },
+    { key: 'classification', label: '등급', sortBy: r => r.classification, render: r => {
+      const c = CLASSIFICATION_LABEL[r.classification]; return <span style={{ color: c?.color, fontWeight: 600 }}>{c?.label || r.classification}</span>
+    } },
+    { key: 'file_url', label: '원본', sortBy: r => r.file_url ? 1 : 0, render: r => r.file_url ? (
+      <a href={r.file_url} target="_blank" rel="noopener" style={{ color: COLORS.primary, fontSize: 12 }}>📎 열기</a>
+    ) : <span style={{ color: COLORS.textMuted, fontSize: 11 }}>미입력</span> },
+    { key: 'status', label: '상태', sortBy: r => r.status, render: r => {
+      const s = DOC_STATUS_LABEL[r.status]
+      const verified = r.is_master_verified === 1
+      return <span style={{ color: s?.color, fontWeight: 600 }}>{verified ? '✓ ' : ''}{s?.label || r.status}</span>
+    } },
+    { key: 'actions', label: '액션', render: r => (
+      <div style={{ display: 'flex', gap: 4 }}>
+        {props.isMgr && !r.file_url && <button onClick={() => props.onFileUrlClick(r)} style={{ ...BTN.sm, border: 'none', background: COLORS.bgAmber, color: COLORS.warning, cursor: 'pointer' }}>📎 URL입력</button>}
+        {props.isMgr && r.file_url && r.is_master_verified === 0 && !props.isCpo && <span style={{ fontSize: 11, color: COLORS.warning }}>CPO 검수 대기</span>}
+        {props.isCpo && r.file_url && r.is_master_verified === 0 && <button onClick={() => props.onVerifyClick(r)} style={{ ...BTN.sm, border: 'none', background: COLORS.bgGreen, color: COLORS.success, cursor: 'pointer' }}>✓ 검수</button>}
+        {props.isCpo && r.is_master_verified === 1 && <button onClick={() => props.onVerifyClick(r)} style={{ ...BTN.sm, border: 'none', background: COLORS.bgGray, color: COLORS.textSecondary, cursor: 'pointer' }}>↩ 재검수</button>}
+        {props.isMgr && r.file_url && <button onClick={() => props.onFileUrlClick(r)} style={{ ...BTN.sm, border: 'none', background: COLORS.bgGray, color: COLORS.textSecondary, cursor: 'pointer' }}>✎</button>}
+      </div>
+    ) },
+  ]
+  return (
+    <div style={{ ...GLASS.L3, padding: 20, borderRadius: 12 }}>
+      <div style={{ marginBottom: 12, padding: '10px 14px', borderRadius: 8, background: COLORS.bgBlue, fontSize: 12, color: COLORS.textSecondary, borderLeft: `4px solid ${COLORS.info}` }}>
+        💡 매뉴얼·서식 카탈로그 — 관리자가 file_url 입력 → CPO가 검수 완료 → 활성화. 검수 미완료 서식은 「서식 작성」 탭에서 사용 불가.
+      </div>
+      <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginBottom: 16 }}>
+        <input placeholder="제목·코드·설명 검색" value={props.query} onChange={e => props.setQuery(e.target.value)}
+          style={{ flex: '1 1 200px', minWidth: 200, padding: '8px 12px', border: `1px solid ${COLORS.borderSubtle}`, borderRadius: 6, fontSize: 13 }} />
+        <select value={props.typeFilter} onChange={e => props.setTypeFilter(e.target.value)} style={selStyle()}>
+          <option value="">유형: 전체</option>
+          {Object.entries(DOC_TYPE_LABEL).map(([k, v]) => <option key={k} value={k}>{v.emoji} {v.label}</option>)}
+        </select>
+        <select value={props.statusFilter} onChange={e => props.setStatusFilter(e.target.value)} style={selStyle()}>
+          <option value="">상태: 전체</option>
+          {Object.entries(DOC_STATUS_LABEL).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+        </select>
+        <select value={props.verifiedFilter} onChange={e => props.setVerifiedFilter(e.target.value)} style={selStyle()}>
+          <option value="">검수: 전체</option>
+          <option value="1">✓ 검수완료</option>
+          <option value="0">⚠ 미검수</option>
+        </select>
+      </div>
+      <div style={{ marginBottom: 8, fontSize: 12, color: COLORS.textSecondary }}>총 {props.allRows.length}건 중 {props.rows.length}건 표시</div>
+      <NeuDataTable columns={cols} data={props.rows} rowKey={r => r.id} />
+    </div>
+  )
+}
+
+function AnnualOpsTabContent(props: {
+  plan: AnnualPlan | null
+  rows: ComplianceTask[]; allRows: ComplianceTask[]
+  categoryFilter: string; setCategoryFilter: (v: string) => void
+  statusFilter: string; setStatusFilter: (v: string) => void
+  monthFilter: string; setMonthFilter: (v: string) => void
+  documents: ComplianceDocument[]
+  onTaskClick: (t: ComplianceTask) => void
+  onSubmitForm: (doc: ComplianceDocument, task: ComplianceTask) => void
+}) {
+  const cols: TableColumn<ComplianceTask>[] = [
+    { key: 'scheduled_month', label: '월', sortBy: r => r.scheduled_month, render: r => `${r.scheduled_month}월` },
+    { key: 'task_code', label: 'task코드', sortBy: r => r.task_code, render: r => <span style={{ fontSize: 11, color: COLORS.textMuted }}>{r.task_code}</span> },
+    { key: 'category', label: '구분', sortBy: r => r.category, render: r => {
+      const c = TASK_CATEGORY_LABEL[r.category]; return <span style={{ color: c?.color, fontWeight: 600 }}>{c?.emoji} {c?.label || r.category}</span>
+    } },
+    { key: 'title', label: '제목', sortBy: r => r.title, render: r => (
+      <span onClick={() => props.onTaskClick(r)} style={{ cursor: 'pointer', color: COLORS.primary }}>{r.title}</span>
+    ) },
+    { key: 'due_date', label: '기한', sortBy: r => r.due_date, render: r => fmtDate(r.due_date) },
+    { key: 'days', label: 'D-day', sortBy: r => daysUntilDue(r.due_date), render: r => {
+      if (r.status === 'done' || r.status === 'skipped') return '—'
+      const days = daysUntilDue(r.due_date); const u = urgencyColor(days)
+      return <span style={{ color: u.color, fontWeight: 700, fontSize: 12 }}>{u.label}</span>
+    } },
+    { key: 'related_form_codes', label: '관련 서식', sortBy: r => r.related_form_codes || '', render: r => {
+      const codes = parseFormCodes(r.related_form_codes); if (codes.length === 0) return <span style={{ color: COLORS.textMuted }}>—</span>
+      return (
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+          {codes.map(code => {
+            const doc = props.documents.find(d => d.doc_code === code)
+            const verified = doc?.is_master_verified === 1
+            return (
+              <button key={code} onClick={() => doc && props.onSubmitForm(doc, r)}
+                disabled={!verified}
+                title={verified ? `${doc?.title} 작성` : `${code} 원본 미검수 — 자료실에서 검수 필요`}
+                style={{ ...BTN.sm, border: 'none',
+                  background: verified ? COLORS.bgGreen : COLORS.bgRed,
+                  color: verified ? COLORS.success : COLORS.danger,
+                  cursor: verified ? 'pointer' : 'not-allowed', opacity: verified ? 1 : 0.6 }}>
+                {verified ? '✓' : '⚠'} {code}
+              </button>
+            )
+          })}
+        </div>
+      )
+    } },
+    { key: 'status', label: '상태', sortBy: r => r.status, render: r => {
+      const s = TASK_STATUS_LABEL[r.status]; return <span style={{ color: s?.color, fontWeight: 600 }}>{s?.label || r.status}</span>
+    } },
+    { key: 'assignee_user_name', label: '담당', sortBy: r => r.assignee_user_name || '', render: r => r.assignee_user_name || '—' },
+    { key: 'completed_at', label: '완료', sortBy: r => r.completed_at || '', render: r => r.completed_at ? fmtDate(r.completed_at) : '—' },
+  ]
+  return (
+    <div style={{ ...GLASS.L3, padding: 20, borderRadius: 12 }}>
+      {props.plan && (
+        <div style={{ marginBottom: 16, padding: '14px 18px', borderRadius: 8, background: COLORS.bgBlue, borderLeft: `4px solid ${COLORS.primary}` }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.textPrimary }}>📅 {props.plan.title}</div>
+          <div style={{ fontSize: 12, color: COLORS.textSecondary, marginTop: 4 }}>
+            {props.plan.plan_code} · 시행 {fmtDate(props.plan.effective_date)} · {props.plan.scope}
+          </div>
+          <div style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 4 }}>{props.plan.legal_basis}</div>
+        </div>
+      )}
+      <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginBottom: 16 }}>
+        <select value={props.monthFilter} onChange={e => props.setMonthFilter(e.target.value)} style={selStyle()}>
+          <option value="">월: 전체</option>
+          {[1,2,3,4,5,6,7,8,9,10,11,12].map(m => <option key={m} value={m}>{m}월</option>)}
+        </select>
+        <select value={props.categoryFilter} onChange={e => props.setCategoryFilter(e.target.value)} style={selStyle()}>
+          <option value="">구분: 전체</option>
+          {Object.entries(TASK_CATEGORY_LABEL).map(([k, v]) => <option key={k} value={k}>{v.emoji} {v.label}</option>)}
+        </select>
+        <select value={props.statusFilter} onChange={e => props.setStatusFilter(e.target.value)} style={selStyle()}>
+          <option value="">상태: 전체</option>
+          {Object.entries(TASK_STATUS_LABEL).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+        </select>
+        <span style={{ marginLeft: 'auto', fontSize: 12, color: COLORS.textSecondary }}>총 {props.allRows.length}건 중 {props.rows.length}건</span>
+      </div>
+      <NeuDataTable columns={cols} data={props.rows} rowKey={r => r.id} />
+    </div>
+  )
+}
+
+function SubmissionsTabContent(props: {
+  rows: FormSubmission[]; allRows: FormSubmission[]
+  docFilter: string; setDocFilter: (v: string) => void
+  statusFilter: string; setStatusFilter: (v: string) => void
+  documents: ComplianceDocument[]
+  onCreate: (doc: ComplianceDocument) => void
+}) {
+  const cols: TableColumn<FormSubmission>[] = [
+    { key: 'submission_code', label: '제출번호', sortBy: r => r.submission_code, render: r => <strong style={{ color: COLORS.primary }}>{r.submission_code}</strong> },
+    { key: 'document_code', label: '서식', sortBy: r => r.document_code, render: r => <span>{r.document_code}</span> },
+    { key: 'document_title', label: '서식명', sortBy: r => r.document_title || '', render: r => r.document_title || '—' },
+    { key: 'title', label: '제목', sortBy: r => r.title || '', render: r => r.title || '—' },
+    { key: 'task_code', label: '연계 task', sortBy: r => r.task_code || '', render: r => r.task_code ? <span style={{ fontSize: 11, color: COLORS.textMuted }}>{r.task_code}</span> : '—' },
+    { key: 'submitted_by_user_name', label: '작성자', sortBy: r => r.submitted_by_user_name || '', render: r => r.submitted_by_user_name || '—' },
+    { key: 'submitted_at', label: '작성일', sortBy: r => r.submitted_at, render: r => fmtDate(r.submitted_at) },
+    { key: 'file_url', label: '첨부', sortBy: r => r.file_url ? 1 : 0, render: r => r.file_url ? <a href={r.file_url} target="_blank" rel="noopener" style={{ color: COLORS.primary, fontSize: 12 }}>📎</a> : '—' },
+    { key: 'retention_until', label: '보존만료', sortBy: r => r.retention_until, render: r => {
+      const days = daysUntilDue(r.retention_until)
+      if (days < 90 && days >= 0) return <span style={{ color: COLORS.warning, fontWeight: 600 }}>⚠ {fmtDate(r.retention_until)}</span>
+      if (days < 0) return <span style={{ color: COLORS.danger, fontWeight: 700 }}>만료 {Math.abs(days)}일</span>
+      return fmtDate(r.retention_until)
+    } },
+    { key: 'review_status', label: '검토상태', sortBy: r => r.review_status, render: r => {
+      const s = REVIEW_STATUS_LABEL[r.review_status]; return <span style={{ color: s?.color, fontWeight: 600 }}>{s?.label || r.review_status}</span>
+    } },
+  ]
+  // 검수 완료 서식만 작성 가능
+  const verifiedForms = props.documents.filter(d => d.doc_type === 'form' && d.is_master_verified === 1)
+  return (
+    <div style={{ ...GLASS.L3, padding: 20, borderRadius: 12 }}>
+      <div style={{ marginBottom: 12, padding: '10px 14px', borderRadius: 8, background: COLORS.bgAmber, fontSize: 12, color: COLORS.textSecondary, borderLeft: `4px solid ${COLORS.warning}` }}>
+        💡 서식 작성 인스턴스 — 매뉴얼 보존 기간 (3년) 자동 추적. 검수 완료된 서식만 작성 가능 (검수 미완료는 자료실에서 먼저 처리).
+      </div>
+      <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginBottom: 16 }}>
+        <select value={props.docFilter} onChange={e => props.setDocFilter(e.target.value)} style={selStyle()}>
+          <option value="">서식: 전체</option>
+          {verifiedForms.map(d => <option key={d.id} value={d.doc_code}>{d.doc_code} {d.title}</option>)}
+        </select>
+        <select value={props.statusFilter} onChange={e => props.setStatusFilter(e.target.value)} style={selStyle()}>
+          <option value="">상태: 전체</option>
+          {Object.entries(REVIEW_STATUS_LABEL).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+        </select>
+        <span style={{ marginLeft: 'auto', fontSize: 12, color: COLORS.textSecondary }}>총 {props.allRows.length}건 중 {props.rows.length}건</span>
+      </div>
+      {verifiedForms.length > 0 && (
+        <div style={{ marginBottom: 16, padding: '12px 14px', borderRadius: 8, background: COLORS.bgGray, border: `1px solid ${COLORS.borderSubtle}` }}>
+          <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 8, color: COLORS.textSecondary }}>✓ 활성 서식 — 클릭하여 작성:</div>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {verifiedForms.map(d => (
+              <button key={d.id} onClick={() => props.onCreate(d)}
+                style={{ ...BTN.sm, border: 'none', background: COLORS.bgGreen, color: COLORS.success, cursor: 'pointer' }}>
+                📝 {d.doc_code}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      <NeuDataTable columns={cols} data={props.rows} rowKey={r => r.id} />
+    </div>
+  )
+}
+
+// ════════════════════════════════════════════════════════════════
+// 모달들 — Phase 1.1 (기존 유지)
+// ════════════════════════════════════════════════════════════════
 function AssetModal(props: { onClose: () => void; onSaved: () => void }) {
   const [form, setForm] = useState({
-    name: '',
-    asset_type: 'pc',
-    classification: 'internal',
-    location: '',
-    os_or_spec: '',
-    contains_pii: false,
-    access_control: '',
-    encryption_status: 'none',
-    acquired_at: '',
-    notes: '',
+    name: '', asset_type: 'pc', classification: 'internal', location: '', os_or_spec: '',
+    contains_pii: false, access_control: '', encryption_status: 'none', acquired_at: '', notes: '',
   })
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
+  const [saving, setSaving] = useState(false); const [error, setError] = useState<string | null>(null)
   const save = async () => {
     if (!form.name.trim()) { setError('자산명을 입력하세요'); return }
     setSaving(true); setError(null)
     try {
       const token = getStoredToken()
-      const res = await fetch('/api/ride-compliance/assets', {
-        method: 'POST',
+      const res = await fetch('/api/ride-compliance/assets', { method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-        body: JSON.stringify(form),
-      })
+        body: JSON.stringify(form) })
       const json = await res.json()
       if (!res.ok || !json.success) { setError(json.error || `HTTP ${res.status}`); return }
       props.onSaved()
-    } catch (e) {
-      setError(String(e))
-    } finally {
-      setSaving(false)
-    }
+    } catch (e) { setError(String(e)) } finally { setSaving(false) }
   }
-
   return (
     <Modal title="📦 정보자산 등록" onClose={props.onClose}>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-        <Field label="자산명 *">
-          <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} style={inpStyle()} />
-        </Field>
-        <Field label="유형 *">
-          <select value={form.asset_type} onChange={e => setForm({ ...form, asset_type: e.target.value })} style={inpStyle()}>
-            {Object.entries(ASSET_TYPE_LABEL).map(([k, v]) => <option key={k} value={k}>{v.emoji} {v.label}</option>)}
-          </select>
-        </Field>
-        <Field label="등급 *">
-          <select value={form.classification} onChange={e => setForm({ ...form, classification: e.target.value })} style={inpStyle()}>
-            {Object.entries(CLASSIFICATION_LABEL).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-          </select>
-        </Field>
-        <Field label="암호화 (제13조)">
-          <select value={form.encryption_status} onChange={e => setForm({ ...form, encryption_status: e.target.value })} style={inpStyle()}>
-            <option value="none">없음</option>
-            <option value="partial">부분</option>
-            <option value="full">전체</option>
-          </select>
-        </Field>
-        <Field label="위치">
-          <input value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} placeholder="예: 본사 3F 서버실" style={inpStyle()} />
-        </Field>
-        <Field label="사양/OS">
-          <input value={form.os_or_spec} onChange={e => setForm({ ...form, os_or_spec: e.target.value })} placeholder="예: Ubuntu 24.04 / 32GB" style={inpStyle()} />
-        </Field>
-        <Field label="접근통제 요약 (제12·14조)">
-          <input value={form.access_control} onChange={e => setForm({ ...form, access_control: e.target.value })} placeholder="예: 2FA + IP 화이트리스트" style={inpStyle()} />
-        </Field>
-        <Field label="취득일">
-          <input type="date" value={form.acquired_at} onChange={e => setForm({ ...form, acquired_at: e.target.value })} style={inpStyle()} />
-        </Field>
-        <Field label="개인정보 포함" full>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-            <input type="checkbox" checked={form.contains_pii} onChange={e => setForm({ ...form, contains_pii: e.target.checked })} />
-            <span style={{ fontSize: 13 }}>이 자산은 개인정보를 포함합니다 (제19조 주민번호 처리 제한 등 적용)</span>
-          </label>
-        </Field>
-        <Field label="비고" full>
-          <textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} rows={3} style={{ ...inpStyle(), resize: 'vertical' }} />
-        </Field>
+        <Field label="자산명 *"><input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} style={inpStyle()} /></Field>
+        <Field label="유형 *"><select value={form.asset_type} onChange={e => setForm({ ...form, asset_type: e.target.value })} style={inpStyle()}>
+          {Object.entries(ASSET_TYPE_LABEL).map(([k, v]) => <option key={k} value={k}>{v.emoji} {v.label}</option>)}
+        </select></Field>
+        <Field label="등급 *"><select value={form.classification} onChange={e => setForm({ ...form, classification: e.target.value })} style={inpStyle()}>
+          {Object.entries(CLASSIFICATION_LABEL).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+        </select></Field>
+        <Field label="암호화 (제13조)"><select value={form.encryption_status} onChange={e => setForm({ ...form, encryption_status: e.target.value })} style={inpStyle()}>
+          <option value="none">없음</option><option value="partial">부분</option><option value="full">전체</option>
+        </select></Field>
+        <Field label="위치"><input value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} placeholder="예: 본사 3F 서버실" style={inpStyle()} /></Field>
+        <Field label="사양/OS"><input value={form.os_or_spec} onChange={e => setForm({ ...form, os_or_spec: e.target.value })} placeholder="예: Ubuntu 24.04 / 32GB" style={inpStyle()} /></Field>
+        <Field label="접근통제 (제12·14조)"><input value={form.access_control} onChange={e => setForm({ ...form, access_control: e.target.value })} placeholder="예: 2FA + IP 화이트리스트" style={inpStyle()} /></Field>
+        <Field label="취득일"><input type="date" value={form.acquired_at} onChange={e => setForm({ ...form, acquired_at: e.target.value })} style={inpStyle()} /></Field>
+        <Field label="개인정보 포함" full><label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+          <input type="checkbox" checked={form.contains_pii} onChange={e => setForm({ ...form, contains_pii: e.target.checked })} />
+          <span style={{ fontSize: 13 }}>이 자산은 개인정보를 포함합니다 (제19조 적용)</span>
+        </label></Field>
+        <Field label="비고" full><textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} rows={3} style={{ ...inpStyle(), resize: 'vertical' }} /></Field>
       </div>
-      {error && <div style={{ marginTop: 12, padding: '8px 12px', borderRadius: 6, background: `${COLORS.danger}18`, color: COLORS.danger, fontSize: 13 }}>{error}</div>}
-      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 16 }}>
-        <button onClick={props.onClose} style={btnSecondary}>취소</button>
-        <button onClick={save} disabled={saving} style={btnPrimary}>{saving ? '저장 중...' : '등록'}</button>
-      </div>
+      {error && <ErrorBox text={error} />}
+      <ModalActions onClose={props.onClose} onSave={save} saving={saving} />
     </Modal>
   )
 }
 
 function IncidentModal(props: { assets: Asset[]; onClose: () => void; onSaved: () => void }) {
   const [form, setForm] = useState({
-    title: '',
-    incident_type: 'internal_leak',
-    severity: 'medium',
-    occurred_at: '',
-    affected_pii_items: '',
-    affected_subjects_count: '',
-    cause_summary: '',
-    containment_actions: '',
-    related_asset_id: '',
+    title: '', incident_type: 'internal_leak', severity: 'medium', occurred_at: '',
+    affected_pii_items: '', affected_subjects_count: '', cause_summary: '', containment_actions: '', related_asset_id: '',
   })
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
+  const [saving, setSaving] = useState(false); const [error, setError] = useState<string | null>(null)
   const save = async () => {
     if (!form.title.trim()) { setError('제목을 입력하세요'); return }
     setSaving(true); setError(null)
     try {
       const token = getStoredToken()
-      const payload = {
-        ...form,
+      const payload = { ...form,
         affected_subjects_count: form.affected_subjects_count ? parseInt(form.affected_subjects_count, 10) : null,
         related_asset_id: form.related_asset_id || null,
       }
-      const res = await fetch('/api/ride-compliance/incidents', {
-        method: 'POST',
+      const res = await fetch('/api/ride-compliance/incidents', { method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-        body: JSON.stringify(payload),
-      })
+        body: JSON.stringify(payload) })
       const json = await res.json()
       if (!res.ok || !json.success) { setError(json.error || `HTTP ${res.status}`); return }
       props.onSaved()
-    } catch (e) {
-      setError(String(e))
-    } finally {
-      setSaving(false)
-    }
+    } catch (e) { setError(String(e)) } finally { setSaving(false) }
   }
-
   return (
     <Modal title="🚨 침해사고 신고 (제27조)" onClose={props.onClose}>
-      <div style={{ marginBottom: 12, padding: '8px 12px', borderRadius: 6, background: `${COLORS.warning}15`, fontSize: 12, color: COLORS.textSecondary }}>
-        매뉴얼 제27조: 「개인정보 침해사고의 접수 또는 인지 시, 즉시 모든 직원은 관리팀에 사고를 접수」.
-        제25조 ①: 정보주체 24시간 이내 통지 의무 (긴급조치 우선 시 단서 적용).
-      </div>
+      <NoticeBox color={COLORS.warning} text="매뉴얼 제27조 — 즉시 모든 직원은 관리팀에 사고 접수. 제25조 ① — 정보주체 24시간 이내 통지 의무." />
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-        <Field label="사고 제목 *" full>
-          <input value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} style={inpStyle()} />
-        </Field>
-        <Field label="유형 *">
-          <select value={form.incident_type} onChange={e => setForm({ ...form, incident_type: e.target.value })} style={inpStyle()}>
-            {Object.entries(INCIDENT_TYPE_LABEL).map(([k, v]) => <option key={k} value={k}>{v.emoji} {v.label}</option>)}
-          </select>
-        </Field>
-        <Field label="심각도 *">
-          <select value={form.severity} onChange={e => setForm({ ...form, severity: e.target.value })} style={inpStyle()}>
-            {Object.entries(SEVERITY_LABEL).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-          </select>
-        </Field>
-        <Field label="발생 시점 (추정)">
-          <input type="datetime-local" value={form.occurred_at} onChange={e => setForm({ ...form, occurred_at: e.target.value })} style={inpStyle()} />
-        </Field>
-        <Field label="관련 자산 (선택)">
-          <select value={form.related_asset_id} onChange={e => setForm({ ...form, related_asset_id: e.target.value })} style={inpStyle()}>
-            <option value="">(없음)</option>
-            {props.assets.map(a => <option key={a.id} value={a.id}>{a.asset_code} · {a.name}</option>)}
-          </select>
-        </Field>
-        <Field label="유출 개인정보 항목 (제25조 ①-1)" full>
-          <textarea value={form.affected_pii_items} onChange={e => setForm({ ...form, affected_pii_items: e.target.value })} rows={2} placeholder="예: 이름, 휴대폰번호, 차량번호" style={{ ...inpStyle(), resize: 'vertical' }} />
-        </Field>
-        <Field label="영향 정보주체 수 (추정)">
-          <input type="number" min={0} value={form.affected_subjects_count} onChange={e => setForm({ ...form, affected_subjects_count: e.target.value })} style={inpStyle()} />
-        </Field>
-        <Field label="시점과 경위 (제25조 ①-2)" full>
-          <textarea value={form.cause_summary} onChange={e => setForm({ ...form, cause_summary: e.target.value })} rows={3} style={{ ...inpStyle(), resize: 'vertical' }} />
-        </Field>
-        <Field label="긴급조치 내역 (제25조 ① 단서)" full>
-          <textarea value={form.containment_actions} onChange={e => setForm({ ...form, containment_actions: e.target.value })} rows={3} placeholder="예: 접속경로 차단 · 취약점 점검·보완 · 유출 데이터 삭제" style={{ ...inpStyle(), resize: 'vertical' }} />
-        </Field>
+        <Field label="사고 제목 *" full><input value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} style={inpStyle()} /></Field>
+        <Field label="유형 *"><select value={form.incident_type} onChange={e => setForm({ ...form, incident_type: e.target.value })} style={inpStyle()}>
+          {Object.entries(INCIDENT_TYPE_LABEL).map(([k, v]) => <option key={k} value={k}>{v.emoji} {v.label}</option>)}
+        </select></Field>
+        <Field label="심각도 *"><select value={form.severity} onChange={e => setForm({ ...form, severity: e.target.value })} style={inpStyle()}>
+          {Object.entries(SEVERITY_LABEL).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+        </select></Field>
+        <Field label="발생 시점 (추정)"><input type="datetime-local" value={form.occurred_at} onChange={e => setForm({ ...form, occurred_at: e.target.value })} style={inpStyle()} /></Field>
+        <Field label="관련 자산 (선택)"><select value={form.related_asset_id} onChange={e => setForm({ ...form, related_asset_id: e.target.value })} style={inpStyle()}>
+          <option value="">(없음)</option>
+          {props.assets.map(a => <option key={a.id} value={a.id}>{a.asset_code} · {a.name}</option>)}
+        </select></Field>
+        <Field label="유출 개인정보 항목 (제25조 ①-1)" full><textarea value={form.affected_pii_items} onChange={e => setForm({ ...form, affected_pii_items: e.target.value })} rows={2} placeholder="예: 이름, 휴대폰번호, 차량번호" style={{ ...inpStyle(), resize: 'vertical' }} /></Field>
+        <Field label="영향 정보주체 수 (추정)"><input type="number" min={0} value={form.affected_subjects_count} onChange={e => setForm({ ...form, affected_subjects_count: e.target.value })} style={inpStyle()} /></Field>
+        <Field label="시점과 경위 (제25조 ①-2)" full><textarea value={form.cause_summary} onChange={e => setForm({ ...form, cause_summary: e.target.value })} rows={3} style={{ ...inpStyle(), resize: 'vertical' }} /></Field>
+        <Field label="긴급조치 내역 (제25조 ① 단서)" full><textarea value={form.containment_actions} onChange={e => setForm({ ...form, containment_actions: e.target.value })} rows={3} placeholder="예: 접속경로 차단·취약점 점검·유출 데이터 삭제" style={{ ...inpStyle(), resize: 'vertical' }} /></Field>
       </div>
-      {error && <div style={{ marginTop: 12, padding: '8px 12px', borderRadius: 6, background: `${COLORS.danger}18`, color: COLORS.danger, fontSize: 13 }}>{error}</div>}
-      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 16 }}>
-        <button onClick={props.onClose} style={btnSecondary}>취소</button>
-        <button onClick={save} disabled={saving} style={btnDanger}>{saving ? '신고 중...' : '신고'}</button>
-      </div>
+      {error && <ErrorBox text={error} />}
+      <ModalActions onClose={props.onClose} onSave={save} saving={saving} saveLabel="🚨 신고" saveStyle={btnDanger} />
     </Modal>
   )
 }
 
 function OfficerModal(props: { onClose: () => void; onSaved: () => void }) {
   const [form, setForm] = useState({
-    user_id: '',
-    role: 'manager',
-    display_title: '',
-    business_unit: '라이드케어',
-    appointed_at: new Date().toISOString().slice(0, 10),
-    notes: '',
+    user_id: '', role: 'manager', display_title: '', business_unit: '라이드케어',
+    appointed_at: new Date().toISOString().slice(0, 10), notes: '',
   })
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
+  const [saving, setSaving] = useState(false); const [error, setError] = useState<string | null>(null)
   const save = async () => {
     if (!form.user_id.trim()) { setError('user_id (cuid) 를 입력하세요'); return }
     setSaving(true); setError(null)
     try {
       const token = getStoredToken()
-      const res = await fetch('/api/ride-compliance/officers', {
-        method: 'POST',
+      const res = await fetch('/api/ride-compliance/officers', { method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-        body: JSON.stringify(form),
-      })
+        body: JSON.stringify(form) })
       const json = await res.json()
       if (!res.ok || !json.success) { setError(json.error || `HTTP ${res.status}`); return }
       props.onSaved()
-    } catch (e) {
-      setError(String(e))
-    } finally {
-      setSaving(false)
-    }
+    } catch (e) { setError(String(e)) } finally { setSaving(false) }
   }
-
   return (
     <Modal title="👔 임명 등록" onClose={props.onClose}>
-      <div style={{ marginBottom: 12, padding: '8px 12px', borderRadius: 6, background: `${COLORS.info}15`, fontSize: 12, color: COLORS.textSecondary }}>
-        매뉴얼 통합본 5.17 제6조 명시 인원: <strong>임성민 이사 (CPO)</strong>, <strong>석호민 부장 (관리자)</strong>, <strong>양재희 부장 (관리자)</strong>.
-        user_id 는 라이드 users 테이블의 cuid (string 36자 이내).
-      </div>
+      <NoticeBox color={COLORS.info} text="매뉴얼 통합본 5.17 제6조 명시 인원: 임성민 이사 (CPO), 석호민 부장 (관리자), 양재희 부장 (관리자). user_id 는 profiles 의 cuid." />
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-        <Field label="user_id (cuid) *" full>
-          <input value={form.user_id} onChange={e => setForm({ ...form, user_id: e.target.value })} placeholder="users.id" style={inpStyle()} />
-        </Field>
-        <Field label="역할 *">
-          <select value={form.role} onChange={e => setForm({ ...form, role: e.target.value })} style={inpStyle()}>
-            {Object.entries(ROLE_LABEL).map(([k, v]) => <option key={k} value={k}>{v.emoji} {v.label}</option>)}
-          </select>
-        </Field>
-        <Field label="임명일 *">
-          <input type="date" value={form.appointed_at} onChange={e => setForm({ ...form, appointed_at: e.target.value })} style={inpStyle()} />
-        </Field>
-        <Field label="직책">
-          <input value={form.display_title} onChange={e => setForm({ ...form, display_title: e.target.value })} placeholder="예: 라이드케어 개인정보보호 책임자" style={inpStyle()} />
-        </Field>
-        <Field label="사업부">
-          <input value={form.business_unit} onChange={e => setForm({ ...form, business_unit: e.target.value })} style={inpStyle()} />
-        </Field>
-        <Field label="비고" full>
-          <input value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} placeholder="예: 매뉴얼 통합본 5.17 제6조 명시" style={inpStyle()} />
-        </Field>
+        <Field label="user_id (cuid) *" full><input value={form.user_id} onChange={e => setForm({ ...form, user_id: e.target.value })} placeholder="profiles.id" style={inpStyle()} /></Field>
+        <Field label="역할 *"><select value={form.role} onChange={e => setForm({ ...form, role: e.target.value })} style={inpStyle()}>
+          {Object.entries(ROLE_LABEL).map(([k, v]) => <option key={k} value={k}>{v.emoji} {v.label}</option>)}
+        </select></Field>
+        <Field label="임명일 *"><input type="date" value={form.appointed_at} onChange={e => setForm({ ...form, appointed_at: e.target.value })} style={inpStyle()} /></Field>
+        <Field label="직책"><input value={form.display_title} onChange={e => setForm({ ...form, display_title: e.target.value })} placeholder="예: 라이드케어 개인정보보호 책임자" style={inpStyle()} /></Field>
+        <Field label="사업부"><input value={form.business_unit} onChange={e => setForm({ ...form, business_unit: e.target.value })} style={inpStyle()} /></Field>
+        <Field label="비고" full><input value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} placeholder="예: 매뉴얼 통합본 5.17 제6조 명시" style={inpStyle()} /></Field>
       </div>
-      {error && <div style={{ marginTop: 12, padding: '8px 12px', borderRadius: 6, background: `${COLORS.danger}18`, color: COLORS.danger, fontSize: 13 }}>{error}</div>}
+      {error && <ErrorBox text={error} />}
+      <ModalActions onClose={props.onClose} onSave={save} saving={saving} />
+    </Modal>
+  )
+}
+
+// ════════════════════════════════════════════════════════════════
+// 모달들 — Phase 1.2
+// ════════════════════════════════════════════════════════════════
+function DocFileUrlModal(props: { doc: ComplianceDocument; onClose: () => void; onSaved: () => void }) {
+  const [fileUrl, setFileUrl] = useState(props.doc.file_url || '')
+  const [saving, setSaving] = useState(false); const [error, setError] = useState<string | null>(null)
+  const save = async () => {
+    setSaving(true); setError(null)
+    try {
+      const token = getStoredToken()
+      const res = await fetch('/api/ride-compliance/documents', { method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ doc_code: props.doc.doc_code, file_url: fileUrl, update_file_url_only: true }) })
+      const json = await res.json()
+      if (!res.ok || !json.success) { setError(json.error || `HTTP ${res.status}`); return }
+      props.onSaved()
+    } catch (e) { setError(String(e)) } finally { setSaving(false) }
+  }
+  return (
+    <Modal title={`📎 원본 파일 URL — ${props.doc.doc_code}`} onClose={props.onClose}>
+      <NoticeBox color={COLORS.info} text={`${props.doc.title} 의 원본 파일 URL 을 입력합니다. GCS signed URL / GDrive / Notion 등 외부 link 가능. URL 입력 후 CPO 검수 단계 진입.`} />
+      <Field label="원본 파일 URL *">
+        <input value={fileUrl} onChange={e => setFileUrl(e.target.value)} placeholder="https://..." style={inpStyle()} />
+      </Field>
+      <div style={{ marginTop: 8, fontSize: 11, color: COLORS.textMuted }}>
+        Phase 1.2.0: 외부 URL paste / Phase 1.2.1 (다음 PR): GCS 자동 업로드 통합 예정
+      </div>
+      {error && <ErrorBox text={error} />}
+      <ModalActions onClose={props.onClose} onSave={save} saving={saving} saveLabel="저장" />
+    </Modal>
+  )
+}
+
+function VerifyModal(props: { doc: ComplianceDocument; onClose: () => void; onSaved: () => void }) {
+  const [note, setNote] = useState('')
+  const [saving, setSaving] = useState(false); const [error, setError] = useState<string | null>(null)
+  const alreadyVerified = props.doc.is_master_verified === 1
+
+  const submit = async (revoke: boolean) => {
+    setSaving(true); setError(null)
+    try {
+      const token = getStoredToken()
+      const res = await fetch(`/api/ride-compliance/documents/${props.doc.id}/verify`, { method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ verification_note: note, revoke }) })
+      const json = await res.json()
+      if (!res.ok || !json.success) { setError(json.error || `HTTP ${res.status}`); return }
+      props.onSaved()
+    } catch (e) { setError(String(e)) } finally { setSaving(false) }
+  }
+  return (
+    <Modal title={`${alreadyVerified ? '↩ 재검수' : '✓ CPO 원본 검수'} — ${props.doc.doc_code}`} onClose={props.onClose}>
+      <NoticeBox color={alreadyVerified ? COLORS.warning : COLORS.success}
+        text={alreadyVerified
+          ? `이미 검수 완료된 ${props.doc.title}. 재검수 시 status='pending' 으로 되돌립니다 (개정·오류 발견 시).`
+          : `${props.doc.title} 원본 파일 (${props.doc.file_url || '미입력'}) 을 검수합니다. 검수 완료 시 운영 task의 related_form 으로 연결 가능.`} />
+      {!alreadyVerified && !props.doc.file_url && (
+        <ErrorBox text="file_url 미입력 — 관리자가 URL 등록 후 검수 가능합니다" />
+      )}
+      <Field label="검수 코멘트 (선택)" full>
+        <textarea value={note} onChange={e => setNote(e.target.value)} rows={3} style={{ ...inpStyle(), resize: 'vertical' }} placeholder="예: 매뉴얼 통합본 5.17 본문과 일치 확인" />
+      </Field>
+      {error && <ErrorBox text={error} />}
       <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 16 }}>
         <button onClick={props.onClose} style={btnSecondary}>취소</button>
-        <button onClick={save} disabled={saving} style={btnPrimary}>{saving ? '저장 중...' : '등록'}</button>
+        {alreadyVerified ? (
+          <button onClick={() => submit(true)} disabled={saving} style={btnDanger}>{saving ? '처리 중...' : '↩ 재검수 (pending 으로)'}</button>
+        ) : (
+          <button onClick={() => submit(false)} disabled={saving || !props.doc.file_url} style={btnSuccess}>{saving ? '검수 중...' : '✓ 검수 완료'}</button>
+        )}
       </div>
     </Modal>
   )
 }
 
-// ─────────────────────────────────────────────────────────────────
+function TaskActionModal(props: { task: ComplianceTask; canCpoReview: boolean; canManager: boolean; onClose: () => void; onSaved: () => void }) {
+  const [evidenceNotes, setEvidenceNotes] = useState(props.task.evidence_notes || '')
+  const [cpoNote, setCpoNote] = useState(props.task.cpo_review_note || '')
+  const [saving, setSaving] = useState(false); const [error, setError] = useState<string | null>(null)
+  const cat = TASK_CATEGORY_LABEL[props.task.category]
+  const formCodes = parseFormCodes(props.task.related_form_codes)
+  const days = daysUntilDue(props.task.due_date)
+  const u = urgencyColor(days)
+
+  const submit = async (action: string) => {
+    setSaving(true); setError(null)
+    try {
+      const token = getStoredToken()
+      const res = await fetch(`/api/ride-compliance/tasks/${props.task.id}/complete`, { method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ action, evidence_notes: evidenceNotes, cpo_review_note: cpoNote }) })
+      const json = await res.json()
+      if (!res.ok || !json.success) { setError(json.error || `HTTP ${res.status}`); return }
+      props.onSaved()
+    } catch (e) { setError(String(e)) } finally { setSaving(false) }
+  }
+  return (
+    <Modal title={`${cat?.emoji} ${props.task.task_code} — ${props.task.title}`} onClose={props.onClose}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+        <div style={{ padding: '10px 14px', borderRadius: 8, background: u.bg, borderLeft: `4px solid ${u.color}` }}>
+          <div style={{ fontSize: 11, color: COLORS.textMuted }}>기한 · {props.task.scheduled_month}월</div>
+          <div style={{ fontSize: 16, fontWeight: 700, color: u.color }}>{fmtDate(props.task.due_date)} ({u.label})</div>
+        </div>
+        <div style={{ padding: '10px 14px', borderRadius: 8, background: COLORS.bgGray, border: `1px solid ${COLORS.borderSubtle}` }}>
+          <div style={{ fontSize: 11, color: COLORS.textMuted }}>현재 상태</div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: TASK_STATUS_LABEL[props.task.status]?.color }}>
+            {TASK_STATUS_LABEL[props.task.status]?.label || props.task.status}
+          </div>
+        </div>
+      </div>
+      <div style={{ marginBottom: 12, padding: '10px 14px', borderRadius: 8, background: COLORS.bgGray, border: `1px solid ${COLORS.borderSubtle}`, fontSize: 13, color: COLORS.textSecondary, whiteSpace: 'pre-wrap' }}>
+        {props.task.description || '—'}
+      </div>
+      {props.task.legal_reference && (
+        <div style={{ marginBottom: 12, fontSize: 12, color: COLORS.textMuted }}>📜 근거: {props.task.legal_reference}</div>
+      )}
+      {formCodes.length > 0 && (
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: COLORS.textSecondary, marginBottom: 6 }}>📝 관련 서식:</div>
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+            {formCodes.map(code => (
+              <span key={code} style={{ ...BTN.sm, background: COLORS.bgBlue, color: COLORS.primary, border: 'none' }}>{code}</span>
+            ))}
+          </div>
+        </div>
+      )}
+      <Field label="증빙 메모 (완료 시 기록)" full>
+        <textarea value={evidenceNotes} onChange={e => setEvidenceNotes(e.target.value)} rows={3} placeholder="예: 1차 교육 32명 이수, F-07 32건 작성 보관" style={{ ...inpStyle(), resize: 'vertical' }} />
+      </Field>
+      {props.canCpoReview && (
+        <Field label="CPO 검토 코멘트 (CPO 만 작성)" full>
+          <textarea value={cpoNote} onChange={e => setCpoNote(e.target.value)} rows={2} placeholder="CPO 의견" style={{ ...inpStyle(), resize: 'vertical' }} />
+        </Field>
+      )}
+      {error && <ErrorBox text={error} />}
+      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 16, flexWrap: 'wrap' }}>
+        <button onClick={props.onClose} style={btnSecondary}>닫기</button>
+        {props.task.status === 'pending' && <button onClick={() => submit('start')} disabled={saving} style={btnPrimary}>▶ 진행 시작</button>}
+        {props.task.status !== 'done' && props.task.status !== 'skipped' && <button onClick={() => submit('complete')} disabled={saving} style={btnSuccess}>✓ 완료 처리</button>}
+        {props.canCpoReview && props.task.status === 'done' && <button onClick={() => submit('cpo_review')} disabled={saving} style={btnPrimary}>👔 CPO 검토 기록</button>}
+        {props.canManager && (props.task.status === 'done' || props.task.status === 'skipped') && <button onClick={() => submit('reopen')} disabled={saving} style={btnSecondary}>↩ 재오픈</button>}
+        {props.canManager && props.task.status === 'pending' && <button onClick={() => submit('skip')} disabled={saving} style={btnDanger}>⊘ 건너뛰기</button>}
+      </div>
+    </Modal>
+  )
+}
+
+function SubmitFormModal(props: { doc: ComplianceDocument; task?: ComplianceTask; onClose: () => void; onSaved: () => void }) {
+  const [title, setTitle] = useState(props.task ? `${props.task.scheduled_month}월 ${props.task.title}` : '')
+  const [fileUrl, setFileUrl] = useState('')
+  const [notes, setNotes] = useState('')
+  const [saving, setSaving] = useState(false); const [error, setError] = useState<string | null>(null)
+  const save = async () => {
+    setSaving(true); setError(null)
+    try {
+      const token = getStoredToken()
+      const res = await fetch('/api/ride-compliance/form-submissions', { method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({
+          document_code: props.doc.doc_code,
+          task_id: props.task?.id || null,
+          title,
+          file_url: fileUrl || null,
+          notes: notes || null,
+        }) })
+      const json = await res.json()
+      if (!res.ok || !json.success) { setError(json.error || `HTTP ${res.status}`); return }
+      props.onSaved()
+    } catch (e) { setError(String(e)) } finally { setSaving(false) }
+  }
+  return (
+    <Modal title={`📝 서식 작성 — ${props.doc.doc_code} ${props.doc.title}`} onClose={props.onClose}>
+      {props.doc.is_master_verified !== 1 && (
+        <ErrorBox text="원본 미검수 서식 — 자료실 탭에서 CPO 검수 완료 후 작성 가능합니다 (추가-C 통찰)" />
+      )}
+      <NoticeBox color={COLORS.success}
+        text={`보존기간 ${props.doc.retention_years}년 자동 설정 (작성일 + ${props.doc.retention_years}년 후 보존만료). ${props.task ? `연계 task: ${props.task.task_code}` : '연계 task 없음 (수시 작성)'}.`} />
+      <Field label="작성 제목 *" full>
+        <input value={title} onChange={e => setTitle(e.target.value)} placeholder="예: 2026년 2월 1차 교육 이수 확인서" style={inpStyle()} />
+      </Field>
+      <Field label="첨부 파일 URL (선택)" full>
+        <input value={fileUrl} onChange={e => setFileUrl(e.target.value)} placeholder="https://... (작성된 PDF/DOCX URL)" style={inpStyle()} />
+      </Field>
+      <Field label="메모 (선택)" full>
+        <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3} style={{ ...inpStyle(), resize: 'vertical' }} />
+      </Field>
+      {error && <ErrorBox text={error} />}
+      <ModalActions onClose={props.onClose} onSave={save} saving={saving} saveLabel="📝 작성 완료" saveStyle={btnSuccess} disabled={props.doc.is_master_verified !== 1} />
+    </Modal>
+  )
+}
+
+// ════════════════════════════════════════════════════════════════
 // 공용 UI 헬퍼
-// ─────────────────────────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════════
 function Modal(props: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
     <div onClick={props.onClose} style={{
@@ -879,10 +1536,10 @@ function Modal(props: { title: string; onClose: () => void; children: React.Reac
     }}>
       <div onClick={e => e.stopPropagation()} style={{
         ...GLASS.L1, padding: 24, borderRadius: 12,
-        maxWidth: 720, width: '90vw', maxHeight: '90vh', overflowY: 'auto',
+        maxWidth: 760, width: '92vw', maxHeight: '92vh', overflowY: 'auto',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16 }}>
-          <h2 style={{ margin: 0, fontSize: 18 }}>{props.title}</h2>
+          <h2 style={{ margin: 0, fontSize: 17 }}>{props.title}</h2>
           <button onClick={props.onClose} style={{ marginLeft: 'auto', background: 'transparent', border: 'none', fontSize: 20, cursor: 'pointer', color: COLORS.textSecondary }}>✕</button>
         </div>
         {props.children}
@@ -893,9 +1550,36 @@ function Modal(props: { title: string; onClose: () => void; children: React.Reac
 
 function Field(props: { label: string; full?: boolean; children: React.ReactNode }) {
   return (
-    <div style={{ gridColumn: props.full ? '1 / -1' : 'auto' }}>
+    <div style={{ gridColumn: props.full ? '1 / -1' : 'auto', marginBottom: 12 }}>
       <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: COLORS.textSecondary, marginBottom: 4 }}>{props.label}</label>
       {props.children}
+    </div>
+  )
+}
+
+function NoticeBox(props: { color: string; text: string }) {
+  return (
+    <div style={{ marginBottom: 12, padding: '8px 12px', borderRadius: 6, background: `${props.color}15`, fontSize: 12, color: COLORS.textSecondary, borderLeft: `3px solid ${props.color}` }}>
+      💡 {props.text}
+    </div>
+  )
+}
+
+function ErrorBox(props: { text: string }) {
+  return (
+    <div style={{ marginTop: 12, marginBottom: 8, padding: '8px 12px', borderRadius: 6, background: `${COLORS.danger}18`, color: COLORS.danger, fontSize: 13 }}>
+      ❌ {props.text}
+    </div>
+  )
+}
+
+function ModalActions(props: { onClose: () => void; onSave: () => void; saving: boolean; saveLabel?: string; saveStyle?: React.CSSProperties; disabled?: boolean }) {
+  return (
+    <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 16 }}>
+      <button onClick={props.onClose} style={btnSecondary}>취소</button>
+      <button onClick={props.onSave} disabled={props.saving || props.disabled} style={props.saveStyle || btnPrimary}>
+        {props.saving ? '저장 중...' : (props.saveLabel || '등록')}
+      </button>
     </div>
   )
 }

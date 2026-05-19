@@ -6,6 +6,69 @@
 
 ---
 
+## v1.2 — Phase 1.2 자료·서식 카탈로그 + 버전 + 주기적 운영 Task + 작성 트래커 (2026-05-18)
+
+**사용자 통찰 (2026-05-18) 모두 반영**:
+- 추가-A: 관리자가 매뉴얼대로 진행 체크 — 연간 진행률 carousel 위젯 (카테고리별 mini gauge)
+- 추가-B: D-7/D-3/D-day 임박 알림 — `tasks.reminder_*_sent` 컬럼 + 「📌 다가오는 일정」 위젯 색상 (D-3 빨강 / D-7 앰버 / D-14 파랑)
+- 추가-C: 원본 검수 단계 분리 — `documents.is_master_verified` + `/verify` PATCH + form-submissions 마스터 미검수 차단
+
+**신규 파일 11개 (1593 + α 줄)**:
+- `migrations/2026-05-18_ride_compliance_phase12.sql` (382줄) — 5 테이블 CREATE + 시드 44행
+- `app/api/ride-compliance/documents/route.ts` (188줄) — GET/POST (+ update_file_url_only 분기)
+- `app/api/ride-compliance/documents/[id]/verify/route.ts` (81줄) — CPO 검수 PATCH (+ revoke)
+- `app/api/ride-compliance/document-versions/route.ts` (145줄) — 버전 이력 GET/POST (활성화 자동 supersede)
+- `app/api/ride-compliance/annual-plans/route.ts` (129줄) — 연간 마스터 GET/POST
+- `app/api/ride-compliance/tasks/route.ts` (197줄) — 월별 task GET (+upcoming_days 필터) /POST
+- `app/api/ride-compliance/tasks/[id]/complete/route.ts` (107줄) — 5 액션 PATCH (start/complete/cpo_review/reopen/skip)
+- `app/api/ride-compliance/form-submissions/route.ts` (190줄) — 작성 인스턴스 GET (+expiring_days) /POST (+ MASTER_NOT_VERIFIED 차단)
+- `_docs/COMPLIANCE-DATA-MODEL.md` (421줄) — 14 도메인 포용 재구조 + Phase 1.2 5 테이블 상세
+- `lib/ride-compliance-perm.ts` 확장 — `canVerifyMaster` (CPO only), `canSubmitForm` 추가
+
+**변경 파일 1개**:
+- `app/(employees)/RideCompliance/page.tsx` (909→1593줄) — NavTabs 4→7 탭, 위젯 3, 모달 4 추가
+
+**시드 데이터 (마이그 적용 즉시 운영 가능)**:
+- documents 25행 — 6 매뉴얼 (RIDE-PMP, RIDE-M01~06) + 18 서식 (F-M01-01~06, F-M02-01~04, F-M05-01~04, F-14-1/2, F-06, F-07) + 1 정책 (RIDE-POL-PRIVACY). 모두 `status='pending'`, `is_master_verified=0`, `file_url=NULL` — 관리자 URL 입력 → CPO 검수 → 활성화 흐름.
+- document_versions 6행 — 각 매뉴얼 V1.0 (시행 2026.05.20)
+- annual_plans 1행 — RIDE-PLAN-2026-001 (시행 2026.05.20)
+- tasks 12행 — 별첨 7 의 1~12월 task carousel
+
+**매뉴얼 조항 매핑 (Phase 1.2 신규)**:
+- documents ← 통합본 5.17 「파생서류 목차」 별첨 1~6 + 별첨 7 (F-06/F-07)
+- document_versions ← 통합본 5.17 「제·개정 이력」 (2019.07.01~2026.05.15)
+- annual_plans ← 별첨 7 RIDE-PLAN-2026-001 + 개인정보보호법 제29조
+- tasks ← 별첨 7 「2026년 상·하반기 월별 관리 일정」
+- form_submissions ← 18 서식 + 제33조 「파기대장 최소 3년」 + 제15조 「접속기록」 3년 보존
+
+**검증**:
+- `npm run lint:harness` ✅ 새 critical 위반 0, commit 통과 (hardcode `rgba(255,255,255,0.5)` 4건 → `COLORS.bgGray` 치환)
+- 누적 신규 파일 11개, 약 2200줄 추가
+
+**향후 작업**:
+- Phase 1.2.1 — GCS 자동 업로드 + signed URL 통합 (현재 외부 URL paste)
+- Phase 1.2.2 — D-7/D-3/D-day 자동 알림 발송 (scheduled-tasks Cron + 이메일/잔디)
+- Phase 1.2.3 — 월간 결과보고서 PDF export
+- Phase 1.3 — audits / destructions / access_reviews / drills / processors
+
+**Rule 준수 self-check (Rule 27 commit GATE)**:
+- ✅ Rule 1 풀 파이프라인 (DB 5 + API 10 + UI 7탭)
+- ✅ Rule 7 GO 키워드 수신 후 코드 작성
+- ✅ Rule 11 컬럼 사전 검증 (Profile 일관 사용)
+- ✅ Rule 14 동형 (Phase 1.1 / RideAssets 패턴)
+- ✅ Rule 18 NeuDataTable 모든 컬럼 sortBy
+- ✅ Rule 19 줄바꿈 최소화 (가급적 한 줄)
+- ✅ Rule 20 결과 글래스 패널 (alert 미사용)
+- ✅ Rule 21 자기 모듈만 (menu-registry 미수정)
+- ✅ Rule 22 _docs 갱신 (DATA-MODEL + 본 CHANGELOG)
+- ✅ Rule 23 graceful fallback (`_migration_pending: 'phase12'`)
+- ✅ Rule 24 시드 멱등 (INSERT IGNORE + UNIQUE KEY)
+- ✅ Rule 26 페르소나 흐름 (사용자 추가-A/B/C 통찰 반영)
+- ✅ Rule 27 commit GATE
+- ✅ `git commit --no-verify` 미사용
+
+---
+
 ## v1.1-FIX1 — Hotfix users → profiles 치환 (2026-05-18)
 
 **원인**: 사용자 콘솔 진단에서 `/api/ride-compliance/officers` 응답이

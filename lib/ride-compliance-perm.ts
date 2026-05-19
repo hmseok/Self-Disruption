@@ -92,3 +92,24 @@ export async function canHandleIncident(user: UserLike | null | undefined): Prom
 export function canReportIncident(user: UserLike | null | undefined): boolean {
   return !!(user && user.id)
 }
+
+/**
+ * Phase 1.2 — 매뉴얼·서식 원본 검수 권한 (CPO only).
+ *
+ * 사용자 추가-C 통찰: 매뉴얼·서식 원본이 시스템에 정확히 등록되었음을
+ * CPO가 검수 완료해야 운영 task의 related_form 으로 연결 가능.
+ * isCpo 와 동일 의미 — 단 의미 명확화를 위해 별도 helper.
+ */
+export async function canVerifyMaster(user: UserLike | null | undefined): Promise<boolean> {
+  return await isCpo(user)
+}
+
+/**
+ * Phase 1.2 — 서식 작성 권한.
+ * 매뉴얼 제27조 (모든 직원 사고 접수) 와 유사하게 — 인증된 모든 사용자가
+ * 본인 명의로 서식 작성 가능 (예: 교육 이수확인서 F-07 본인 작성).
+ * 단 매니저급 서식 (감사 결과보고서 등) 은 application 단에서 별도 게이트.
+ */
+export function canSubmitForm(user: UserLike | null | undefined): boolean {
+  return !!(user && user.id)
+}
