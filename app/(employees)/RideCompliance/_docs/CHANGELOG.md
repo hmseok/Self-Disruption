@@ -6,6 +6,31 @@
 
 ---
 
+## v1.1-FIX1 — Hotfix users → profiles 치환 (2026-05-18)
+
+**원인**: 사용자 콘솔 진단에서 `/api/ride-compliance/officers` 응답이
+`{ success: true, data: [], meta: { _migration_pending: true, my_role: 'cpo' } }`.
+실제 마이그는 정상(테이블 3개·컬럼 11/19/26 모두 생성). 본 시스템 인증 테이블은
+`users` 가 아니라 `profiles` (`@@map("profiles")` 모델 Profile, `password_hash` 보유).
+SQL `LEFT JOIN users u` 가 "doesn't exist" 로 throw → catch 분기가 마이그 미적용으로 오인.
+
+**치환** (10건 + 주석 2건):
+- `app/api/ride-compliance/officers/route.ts` × 2 (GET / POST 응답)
+- `app/api/ride-compliance/assets/route.ts` × 4 (`LEFT JOIN users ou` + `LEFT JOIN users ru`, GET + POST 응답)
+- `app/api/ride-compliance/incidents/route.ts` × 4 (`LEFT JOIN users ru` + `LEFT JOIN users au`, GET + POST 응답)
+- `lib/ride-compliance-perm.ts` 주석 2건 (`users.role` → `profiles.role`)
+- bonus: `btnSecondary` 의 hardcode `rgba(255,255,255,0.6)` → `COLORS.bgGray` (ui-token-lint 통과)
+
+**검증**:
+- `npm run lint:harness` ✅ 새 critical 위반 0, commit 통과
+- Rule 11 컬럼 사전 검증: Profile 모델 `id Char(36)` + `name String?` + `role` 모두 존재 확인
+- Rule 27 GATE: G5 단순 치환 ✓ / G6 lint 통과 ✓
+- 테스트 권장: `fetch('/api/ride-compliance/officers', { headers: { Authorization: \`Bearer \${localStorage.getItem('fmi_token')}\` } }).then(r=>r.json())` → `meta._migration_pending` 미포함 ✅
+
+**참고**: 다른 라이드 API (`app/api/ride-assets/route.ts` 등)도 `LEFT JOIN users` 사용 중 → 본 세션 영역 외라 미수정. 메인 세션이 일괄 수정 검토 권장.
+
+---
+
 ## v1.1 — Phase 1.1 코어 3 도메인 (2026-05-18, compliance 세션)
 
 ### 신규 파일

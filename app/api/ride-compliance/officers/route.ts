@@ -48,7 +48,7 @@ export async function GET(request: Request) {
              u.name AS user_name,
              o.created_at, o.updated_at
         FROM ride_compliance_officers o
-        LEFT JOIN users u ON u.id = o.user_id
+        LEFT JOIN profiles u ON u.id = o.user_id
        WHERE (${meOnly ? user.id : '__ALL__'} = '__ALL__' OR o.user_id = ${user.id})
          AND (${roleFilter} = '' OR o.role = ${roleFilter})
          AND (${includeReleased ? 1 : 0} = 1 OR (o.is_active = 1 AND (o.released_at IS NULL OR o.released_at > CURDATE())))
@@ -123,7 +123,7 @@ export async function POST(request: Request) {
              u.name AS user_name,
              o.created_at, o.updated_at
         FROM ride_compliance_officers o
-        LEFT JOIN users u ON u.id = o.user_id
+        LEFT JOIN profiles u ON u.id = o.user_id
        WHERE o.id = ${id}
        LIMIT 1
     `

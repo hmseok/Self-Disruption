@@ -9,7 +9,7 @@
  *   3. 'handler'       — 개인정보취급자 (전 임·직원) — 본인 사고 보고 + 본인 자산 조회
  *   4. 'incident_team' — 관리팀 침해사고 일선 (제26조 ①) — 사고 1차 분류
  *
- * 시스템 admin (users.role === 'admin') 은 cpo 와 동일 권한으로 처리.
+ * 시스템 admin (profiles.role === 'admin') 은 cpo 와 동일 권한으로 처리.
  *
  * 마이그레이션 미적용 환경에서도 graceful — 테이블 없으면 admin role 만 통과.
  *
@@ -29,7 +29,7 @@ export type ComplianceRole = 'cpo' | 'manager' | 'handler' | 'incident_team' | n
 /**
  * 사용자의 현재 활성 컴플라이언스 역할 반환.
  *
- * users.role === 'admin' → 'cpo' 로 매핑 (시스템 관리자 자동 권한).
+ * profiles.role === 'admin' → 'cpo' 로 매핑 (시스템 관리자 자동 권한).
  * 1명이 여러 role 보유 가능 — 우선순위: cpo > manager > incident_team > handler.
  * 마이그 미적용 시 admin → 'cpo', 일반 사용자 → null.
  */

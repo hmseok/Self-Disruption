@@ -33,7 +33,7 @@ const btnPrimary: React.CSSProperties = {
 }
 const btnSecondary: React.CSSProperties = {
   ...BTN.md, border: `1px solid ${COLORS.borderSubtle}`,
-  background: 'rgba(255,255,255,0.6)', color: COLORS.textSecondary, cursor: 'pointer',
+  background: COLORS.bgGray, color: COLORS.textSecondary, cursor: 'pointer',
 }
 const btnDanger: React.CSSProperties = {
   ...BTN.md, border: `1px solid ${COLORS.borderSubtle}`,

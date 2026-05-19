@@ -84,8 +84,8 @@ export async function GET(request: Request) {
              i.status, i.cpo_reviewed_at, i.cpo_review_note, i.retention_until,
              i.created_by, i.created_at, i.updated_at
         FROM ride_compliance_incidents i
-        LEFT JOIN users ru ON ru.id = i.reporter_user_id
-        LEFT JOIN users au ON au.id = i.assignee_user_id
+        LEFT JOIN profiles ru ON ru.id = i.reporter_user_id
+        LEFT JOIN profiles au ON au.id = i.assignee_user_id
         LEFT JOIN ride_compliance_assets ra ON ra.id = i.related_asset_id
        WHERE (${canHandle ? '__ALL__' : user.id} = '__ALL__' OR i.reporter_user_id = ${user.id})
          AND (${type} = '' OR i.incident_type = ${type})
@@ -204,8 +204,8 @@ export async function POST(request: Request) {
              i.status, i.cpo_reviewed_at, i.cpo_review_note, i.retention_until,
              i.created_by, i.created_at, i.updated_at
         FROM ride_compliance_incidents i
-        LEFT JOIN users ru ON ru.id = i.reporter_user_id
-        LEFT JOIN users au ON au.id = i.assignee_user_id
+        LEFT JOIN profiles ru ON ru.id = i.reporter_user_id
+        LEFT JOIN profiles au ON au.id = i.assignee_user_id
         LEFT JOIN ride_compliance_assets ra ON ra.id = i.related_asset_id
        WHERE i.id = ${result.id}
        LIMIT 1

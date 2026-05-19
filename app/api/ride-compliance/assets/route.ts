@@ -74,8 +74,8 @@ export async function GET(request: Request) {
              a.acquired_at, a.decommissioned_at, a.status, a.notes,
              a.created_by, a.created_at, a.updated_at
         FROM ride_compliance_assets a
-        LEFT JOIN users ou ON ou.id = a.owner_user_id
-        LEFT JOIN users ru ON ru.id = a.responsible_user_id
+        LEFT JOIN profiles ou ON ou.id = a.owner_user_id
+        LEFT JOIN profiles ru ON ru.id = a.responsible_user_id
        WHERE (${isMgr ? '__ALL__' : user.id} = '__ALL__' OR a.owner_user_id = ${user.id})
          AND (${type} = '' OR a.asset_type = ${type})
          AND (${classification} = '' OR a.classification = ${classification})
@@ -182,8 +182,8 @@ export async function POST(request: Request) {
              a.acquired_at, a.decommissioned_at, a.status, a.notes,
              a.created_by, a.created_at, a.updated_at
         FROM ride_compliance_assets a
-        LEFT JOIN users ou ON ou.id = a.owner_user_id
-        LEFT JOIN users ru ON ru.id = a.responsible_user_id
+        LEFT JOIN profiles ou ON ou.id = a.owner_user_id
+        LEFT JOIN profiles ru ON ru.id = a.responsible_user_id
        WHERE a.id = ${result.id}
        LIMIT 1
     `
