@@ -261,7 +261,8 @@ export default function ManualDetailPage() {
           )}
         </div>
 
-        {/* 우측: 본문 */}
+        {/* 우측: 자동 검토 banner + 본문 — wrapper div 필수 (grid 의 두 번째 cell 1개) */}
+        <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         {/* Phase 1.4 — 자동 검토 패널 */}
         {detail?.content_md && (
           <AutoReviewPanel docId={detail.id} docCode={detail.doc_code} verified={meta.is_master_verified === 1} canApprove={isAdminOrMgr} onSaved={fetchAll} />
@@ -329,6 +330,7 @@ export default function ManualDetailPage() {
             </>
           )}
         </div>
+        </div>{/* /우측 wrapper */}
       </div>
 
       {/* 원본 업로드 모달 */}
