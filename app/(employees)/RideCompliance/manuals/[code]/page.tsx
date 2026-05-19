@@ -98,6 +98,8 @@ export default function ManualDetailPage() {
   const [editContent, setEditContent] = useState('')
   const [saving, setSaving] = useState(false)
   const [uploadOpen, setUploadOpen] = useState(false)
+  // Phase 1.4-fix11 — PDF 다운로드 + 새 버전 업로드 워크플로우
+  const [newVersionOpen, setNewVersionOpen] = useState(false)
 
   useEffect(() => { setUser(getStoredUser()) }, [])
 
@@ -340,6 +342,21 @@ export default function ManualDetailPage() {
                 ✎ 본문 편집
               </button>
             )}
+            {/* Phase 1.4-fix11 — PDF 모드 액션 (다운로드 + 새 버전 업로드) */}
+            {!editMode && viewMode === 'pdf' && pdfUrl && (
+              <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+                <a href={pdfUrl} download
+                  style={{ ...btnSecondary, fontSize: 11, textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}
+                  title="현재 PDF 를 다운로드 (외부 도구로 편집·서명·하이라이트)"
+                >📥 PDF 다운로드</a>
+                {isAdminOrMgr && (
+                  <button onClick={() => setNewVersionOpen(true)}
+                    style={{ ...btnPrimary, fontSize: 11 }}
+                    title="편집한 PDF 를 새 버전 (V1.1) 으로 업로드 — 기존 V1.0 은 superseded, CPO 재검수 필요"
+                  >📤 새 버전 업로드</button>
+                )}
+              </div>
+            )}
             {editMode && (
               <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
                 <button onClick={() => { setEditMode(false); setEditContent(detail?.content_md || '') }} style={btnSecondary}>취소</button>
@@ -428,8 +445,34 @@ export default function ManualDetailPage() {
       {uploadOpen && detail && (
         <UploadModal doc={detail} onClose={() => setUploadOpen(false)} onSaved={() => { setUploadOpen(false); fetchAll() }} />
       )}
+
+      {/* Phase 1.4-fix11 — 새 버전 업로드 모달 (PDF 다운로드 → 외부 편집 → 신규 V1.1 등록) */}
+      {newVersionOpen && detail && (
+        <NewVersionUploadModal
+          doc={detail}
+          versions={versions}
+          onClose={() => setNewVersionOpen(false)}
+          onSaved={() => {
+            setNewVersionOpen(false)
+            setPdfUrl(null)  // 캐시 무효화 — 다음 PDF 로딩 시 새 버전으로 signed URL 재발급
+            fetchAll()
+          }}
+        />
+      )}
     </div>
   )
+}
+
+// Phase 1.4-fix11 — 버전 문자열 (V1.0) → 다음 minor 버전 (V1.1) 계산
+function nextVersionNo(versions: DocumentVersion[]): string {
+  if (!versions || versions.length === 0) return 'V1.0'
+  // 최신 (effective_date desc, 첫번째) 의 버전 파싱
+  const latest = versions[0].version_no || 'V1.0'
+  const m = latest.match(/^V(\d+)\.(\d+)$/i)
+  if (!m) return 'V1.1'
+  const major = parseInt(m[1], 10)
+  const minor = parseInt(m[2], 10)
+  return `V${major}.${minor + 1}`
 }
 
 function MetaRow(props: { label: string; value: React.ReactNode }) {
@@ -965,6 +1008,163 @@ function UploadModal(props: { doc: DocumentDetail; onClose: () => void; onSaved:
             </div>
           </>
         )}
+      </div>
+    </div>
+  )
+}
+
+// ────────── Phase 1.4-fix11 새 버전 업로드 모달 ──────────
+// 워크플로우:
+//   1. 자동 계산된 다음 버전 (V1.0 → V1.1) 표시
+//   2. PDF 파일 선택 + 개정 사항 입력
+//   3. signed URL 발급 → GCS PUT → POST document-versions (activate=true)
+//   4. document-versions API 가 자동:
+//      · 기존 active 버전 → superseded
+//      · documents.current_version_id + current_version_no + gcs_object_path 갱신
+//      · is_master_verified=0 reset + status=pending (CPO 재검수 필요)
+function NewVersionUploadModal(props: {
+  doc: DocumentDetail
+  versions: DocumentVersion[]
+  onClose: () => void
+  onSaved: () => void
+}) {
+  const computedNext = useMemo(() => nextVersionNo(props.versions), [props.versions])
+  const [versionNo, setVersionNo] = useState(computedNext)
+  const [effectiveDate, setEffectiveDate] = useState(() => new Date().toISOString().slice(0, 10))
+  const [changeSummary, setChangeSummary] = useState('')
+  const [file, setFile] = useState<File | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [progress, setProgress] = useState('')
+
+  const submit = async () => {
+    if (!file) { setError('PDF 파일을 선택하세요'); return }
+    if (!versionNo.match(/^V\d+\.\d+$/i)) { setError('버전 형식: V1.1 (V숫자.숫자)'); return }
+    if (!effectiveDate) { setError('시행일 필수'); return }
+    if (!changeSummary.trim()) { setError('개정 사항 (change summary) 필수'); return }
+
+    setSaving(true); setError(null)
+    try {
+      const token = getStoredToken()
+
+      // 1. signed URL 발급
+      setProgress('1/3 GCS signed URL 발급 중...')
+      const urlRes = await fetch('/api/ride-compliance/upload-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({
+          doc_code: props.doc.doc_code,
+          original_name: `${versionNo}_${file.name}`,
+          content_type: file.type || 'application/pdf',
+        }),
+      })
+      const urlJ = await urlRes.json()
+      if (!urlRes.ok || !urlJ.success) {
+        setError(urlJ.error || `signed URL 발급 실패 (HTTP ${urlRes.status})`)
+        return
+      }
+
+      // 2. GCS 직접 업로드
+      setProgress('2/3 GCS 업로드 중...')
+      const putRes = await fetch(urlJ.data.upload_url, {
+        method: 'PUT',
+        headers: { 'Content-Type': file.type || 'application/pdf' },
+        body: file,
+      })
+      if (!putRes.ok) {
+        setError(`GCS 업로드 실패 (HTTP ${putRes.status})`)
+        return
+      }
+
+      // 3. document-versions POST — activate=true + gcs_object_path 동기화 + 검수 reset
+      setProgress('3/3 버전 등록 + 검수 reset 중...')
+      const verRes = await fetch('/api/ride-compliance/document-versions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({
+          document_id: props.doc.id,
+          version_no: versionNo,
+          effective_date: effectiveDate,
+          change_summary: changeSummary,
+          gcs_object_path: urlJ.data.gcs_object_path,
+          activate: true,
+          reset_master_verification: true,
+        }),
+      })
+      const verJ = await verRes.json()
+      if (!verRes.ok || !verJ.success) {
+        setError(verJ.error || `버전 등록 실패 (HTTP ${verRes.status})`)
+        return
+      }
+
+      // 성공
+      props.onSaved()
+    } catch (e) {
+      setError(String(e))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div onClick={props.onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1500, padding: 20 }}>
+      <div onClick={e => e.stopPropagation()} style={{ ...GLASS.L1, padding: 24, borderRadius: 12, maxWidth: 640, width: '92vw' }}>
+        <div style={{ display: 'flex', alignItems: 'center', marginBottom: 8 }}>
+          <h2 style={{ margin: 0, fontSize: 17 }}>📤 새 버전 업로드 — {props.doc.doc_code}</h2>
+          <button onClick={props.onClose} style={{ marginLeft: 'auto', background: 'transparent', border: 'none', fontSize: 20, cursor: 'pointer', color: COLORS.textSecondary }}>✕</button>
+        </div>
+        <p style={{ margin: '0 0 16px', fontSize: 12, color: COLORS.textSecondary, lineHeight: 1.6 }}>
+          📥 다운로드 → 외부 도구 (Acrobat·Preview·Word 등) 로 자유롭게 편집·서명·하이라이트 → 📤 새 버전으로 업로드.
+          기존 <b>{props.doc.current_version_no || 'V1.0'}</b> 은 자동 <span style={{ color: COLORS.textMuted }}>superseded</span>,
+          새 버전은 <b style={{ color: COLORS.warning }}>검수 대기</b> 로 reset (CPO 재검수 필요).
+        </p>
+
+        {/* 버전 번호 + 시행일 */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+          <div>
+            <label style={{ fontSize: 11, color: COLORS.textMuted, display: 'block', marginBottom: 4 }}>새 버전 번호</label>
+            <input value={versionNo} onChange={e => setVersionNo(e.target.value)} placeholder="V1.1"
+              style={{ width: '100%', padding: '8px 10px', border: `1px solid ${COLORS.borderSubtle}`, borderRadius: 6, fontSize: 13, fontFamily: 'monospace' }} />
+          </div>
+          <div>
+            <label style={{ fontSize: 11, color: COLORS.textMuted, display: 'block', marginBottom: 4 }}>시행일</label>
+            <input type="date" value={effectiveDate} onChange={e => setEffectiveDate(e.target.value)}
+              style={{ width: '100%', padding: '8px 10px', border: `1px solid ${COLORS.borderSubtle}`, borderRadius: 6, fontSize: 13 }} />
+          </div>
+        </div>
+
+        {/* 개정 사항 */}
+        <label style={{ fontSize: 11, color: COLORS.textMuted, display: 'block', marginBottom: 4 }}>개정 사항 (change summary) *</label>
+        <textarea value={changeSummary} onChange={e => setChangeSummary(e.target.value)}
+          placeholder="예: 제15조 백업 주기 월 1회 → 주 1회 강화, F-M01-03 통지서 양식 갱신"
+          style={{ width: '100%', height: 70, padding: 10, border: `1px solid ${COLORS.borderSubtle}`, borderRadius: 6, fontSize: 12, marginBottom: 10, resize: 'vertical', fontFamily: 'inherit' }} />
+
+        {/* 파일 선택 */}
+        <label style={{ fontSize: 11, color: COLORS.textMuted, display: 'block', marginBottom: 4 }}>새 PDF 파일 *</label>
+        <input type="file" accept=".pdf" onChange={e => setFile(e.target.files?.[0] || null)}
+          style={{ width: '100%', padding: '8px 10px', border: `1px solid ${COLORS.borderSubtle}`, borderRadius: 6, fontSize: 12, marginBottom: 10 }} />
+        {file && (
+          <div style={{ padding: '6px 10px', borderRadius: 4, background: COLORS.bgBlue, color: COLORS.primary, fontSize: 11, marginBottom: 10 }}>
+            📄 {file.name} · {(file.size / 1024 / 1024).toFixed(2)} MB
+          </div>
+        )}
+
+        {progress && <div style={{ padding: '8px 12px', borderRadius: 6, background: COLORS.bgBlue, color: COLORS.primary, fontSize: 12, marginBottom: 10 }}>⏳ {progress}</div>}
+        {error && <div style={{ padding: '8px 12px', borderRadius: 6, background: `${COLORS.danger}18`, color: COLORS.danger, fontSize: 12, marginBottom: 10 }}>❌ {error}</div>}
+
+        <div style={{ marginBottom: 12, padding: '8px 12px', borderRadius: 6, background: COLORS.bgAmber, fontSize: 11, color: COLORS.textSecondary, lineHeight: 1.6 }}>
+          💡 업로드 완료 후 자동 처리:
+          <br />· 기존 <b>{props.doc.current_version_no || 'V1.0'}</b> → <span style={{ color: COLORS.textMuted }}>superseded</span> (이력 보존)
+          <br />· 신규 <b>{versionNo}</b> → <span style={{ color: COLORS.success }}>active</span> (즉시 표시)
+          <br />· <b>검수 대기</b> 로 reset — CPO 임성민 이사 재검수 후 활성
+        </div>
+
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+          <button onClick={props.onClose} style={btnSecondary}>취소</button>
+          <button onClick={submit} disabled={saving || !file || !changeSummary.trim()} style={btnSuccess}>
+            {saving ? '처리 중...' : `📤 ${versionNo} 등록`}
+          </button>
+        </div>
       </div>
     </div>
   )

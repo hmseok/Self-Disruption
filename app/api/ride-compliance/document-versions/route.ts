@@ -88,6 +88,9 @@ export async function POST(request: Request) {
   const changeSummary = body.change_summary ? String(body.change_summary) : null
   const approvedBy = body.approved_by ? String(body.approved_by).trim() : null
   const fileUrl = body.file_url ? String(body.file_url).trim() : null
+  // Phase 1.4-fix11 — PDF 새 버전 업로드 시 GCS object path 동기화 + 검수 자동 reset
+  const gcsObjectPath = body.gcs_object_path ? String(body.gcs_object_path).trim() : null
+  const resetMasterVerification = body.reset_master_verification !== false  // 기본 true (새 버전 활성 시 CPO 재검수 필요)
   const activateNow = body.activate === true || body.activate === 'true'
 
   if (!documentId) return NextResponse.json({ success: false, error: 'document_id 필수' }, { status: 400 })
@@ -116,15 +119,70 @@ export async function POST(request: Request) {
              AND id <> ${id}
              AND status = 'active'
         `
-        // documents 의 current_version 캐시 갱신
-        await tx.$executeRaw`
-          UPDATE ride_compliance_documents
-             SET current_version_id = ${id},
-                 current_version_no = ${versionNo},
-                 effective_date = ${effectiveDate},
-                 updated_at = NOW()
-           WHERE id = ${documentId}
-        `
+        // documents 의 current_version 캐시 + (옵션) gcs_object_path + (옵션) 검수 reset
+        // Phase 1.4-fix11: gcs_object_path 컬럼 미적용(Phase 1.3 미적용) 환경 호환 위해 try/catch
+        try {
+          if (resetMasterVerification) {
+            await tx.$executeRaw`
+              UPDATE ride_compliance_documents
+                 SET current_version_id = ${id},
+                     current_version_no = ${versionNo},
+                     effective_date = ${effectiveDate},
+                     gcs_object_path = COALESCE(${gcsObjectPath}, gcs_object_path),
+                     file_url = COALESCE(${fileUrl}, file_url),
+                     is_master_verified = 0,
+                     verified_by_user_id = NULL,
+                     verified_by_cpo_at = NULL,
+                     verification_note = NULL,
+                     status = 'pending',
+                     updated_at = NOW()
+               WHERE id = ${documentId}
+            `
+          } else {
+            await tx.$executeRaw`
+              UPDATE ride_compliance_documents
+                 SET current_version_id = ${id},
+                     current_version_no = ${versionNo},
+                     effective_date = ${effectiveDate},
+                     gcs_object_path = COALESCE(${gcsObjectPath}, gcs_object_path),
+                     file_url = COALESCE(${fileUrl}, file_url),
+                     updated_at = NOW()
+               WHERE id = ${documentId}
+            `
+          }
+        } catch (innerErr) {
+          const ie = innerErr as { message?: string }
+          if (ie.message?.includes('Unknown column') && ie.message?.includes('gcs_object_path')) {
+            // Phase 1.3 미적용 — gcs_object_path 빼고 갱신
+            if (resetMasterVerification) {
+              await tx.$executeRaw`
+                UPDATE ride_compliance_documents
+                   SET current_version_id = ${id},
+                       current_version_no = ${versionNo},
+                       effective_date = ${effectiveDate},
+                       file_url = COALESCE(${fileUrl}, file_url),
+                       is_master_verified = 0,
+                       verified_by_user_id = NULL,
+                       verified_by_cpo_at = NULL,
+                       status = 'pending',
+                       updated_at = NOW()
+                 WHERE id = ${documentId}
+              `
+            } else {
+              await tx.$executeRaw`
+                UPDATE ride_compliance_documents
+                   SET current_version_id = ${id},
+                       current_version_no = ${versionNo},
+                       effective_date = ${effectiveDate},
+                       file_url = COALESCE(${fileUrl}, file_url),
+                       updated_at = NOW()
+                 WHERE id = ${documentId}
+              `
+            }
+          } else {
+            throw innerErr
+          }
+        }
       }
     })
 
