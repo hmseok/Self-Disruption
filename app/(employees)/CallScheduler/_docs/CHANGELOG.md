@@ -3,6 +3,38 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-19 (Phase N-65-fix) — cover self-filter 제거 (멤버 동일 그룹 작동)
+
+### 사용자 보고
+> "결원시 동일날 옆그룹에서 커버는 아닌걸로 오이네 패터이 변경되는것보니"
+
+### 원인
+N-65 의 `coverWorkingToday` 필터에 `!gMembers.includes(wId)` 가드
+→ 자기 그룹 멤버 제외 → 부엉/달빛 같이 멤버 동일이면 cover 후보 0
+
+### 수정 (auto-generate route)
+1. `coverWorkingToday` 필터에서 self filter 제거
+   - 이전: `!gMembers.includes(wId) && coverWorkerSet.has(wId) && workedToday.has(wId)`
+   - 변경: `coverWorkerSet.has(wId) && workedToday.has(wId)`
+2. `determineSubstitution` 시그니처에 `workedTodaySet` 인자 추가
+3. cover 진입 판단 조건 확장:
+   - A. cover_pairs 매핑 + workedToday (이미 다른 그룹 일함 → 추가 근무)
+   - B. 자기 그룹 멤버 아님 (외부 cover — 멤버 다른 경우)
+
+### 효과
+- 멤버 동일 그룹 (부엉/달빛) 에서 cover 정상 작동
+- 결원 시 다른 그룹 일하는 사람이 추가 근무로 cover
+- 자기 그룹 P2 cycle 흐름 보호
+
+### 운영 검증
+정동민 6/20 회피일 결원 시점:
+- 부엉 처리 (먼저): 정동민 빠짐 → cover 후보 비어있음 (workedToday 비어있음) → P2 진입
+- 달빛 처리: workedToday 에 부엉 selected 추가됨 → cover 후보 진입 가능
+
+⚠ 한계: 첫 처리 그룹은 cover 작동 X (순서 의존). 향후 2-pass 알고리즘 필요 (N-67).
+
+---
+
 ## 2026-05-19 (Phase N-66-a + N-66-b) — 매트릭스 검수 모드 + 라벨 자연어화
 
 ### 사용자 요청

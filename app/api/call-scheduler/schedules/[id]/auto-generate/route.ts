@@ -1325,16 +1325,21 @@ export async function POST(
     //   현재 그룹 g 의 isoDate 일자에 워커 wId 가 배정될 때
     //   "원래 더 우선이었지만 빠진 P1 워커가 있는지" 확인 + 사유 반환
     const determineSubstitution = (
-      g: GroupRow, wId: string, isoDate: string
+      g: GroupRow, wId: string, isoDate: string,
+      workedTodaySet?: Set<string>,
     ): { reason: SubstitutionReason | null; forWorkerId: string | null } => {
       const gMems = membersByGroup.get(g.id) || []
       const isOwnMember = gMems.includes(wId)
+      // cover_pairs 의 cover_group 멤버 (전역 cover 그룹 집합)
+      const coverSetForGroup = new Set(getCoverWorkers(g.id))
 
-      // N-65 — cover 그룹 멤버가 진입한 경우 (자기 그룹 멤버 아님)
-      if (!isOwnMember) {
+      // N-65-fix — cover 진입 판단 (멤버 동일이라도 작동)
+      //   조건 A: cover_pairs 매핑 + workedToday (이미 다른 그룹 일함 → 추가 근무)
+      //   조건 B: 자기 그룹 멤버 아님 (외부 cover — 멤버 다른 경우)
+      const isAddedAsCover = coverSetForGroup.has(wId) && (workedTodaySet?.has(wId) || false)
+      if (isAddedAsCover || !isOwnMember) {
         // 자기 그룹의 빠진 P1 / P2 우선 찾기 (대체 대상)
         const blockedOwn = gMems.find(ownId => {
-          // 회피일/연차/cycle 휴무 등으로 빠진 사람
           const skipsArr = [...(groupSkipMap.get(g.id) || []), ...globalSkipRows]
           if (skipsArr.find(s => s.worker_id === ownId
               && isoDate >= s.start_date && isoDate <= s.end_date)) return true
@@ -2003,8 +2008,10 @@ export async function POST(
           // N-65 — cover 멤버 + 오늘 다른 그룹 cycle 근무자 추적
           //   사용자 의도: cycle 패턴 고정 + 결원 시 「당일 cover 그룹에 이미 일하는 사람」 추가 근무로 cover
           //   효과: 자기 그룹 P2 cycle 안 깨고 cover 그룹 cycle 근무자가 임시 추가 근무
+          //   N-65-fix — self filter 제거 (멤버 동일 그룹에서도 cover 작동)
+          //   cover_pairs 매핑 + workedToday 만 검사
           const coverWorkingToday = candidates.filter(wId =>
-            !gMembers.includes(wId) && coverWorkerSet.has(wId) && workedToday.has(wId))
+            coverWorkerSet.has(wId) && workedToday.has(wId))
 
           let selectedList: string[]
           if (p1InCandidates && need > 0) {
@@ -2113,7 +2120,7 @@ export async function POST(
             byGroup[g.id].skipped++
           } else {
             // N-61 — 대체 사유 추적 (원래 P1 이 빠진 자리인지 확인)
-            const sub = determineSubstitution(g, wId, isoDate)
+            const sub = determineSubstitution(g, wId, isoDate, workedToday)
             plan.push({
               work_date: isoDate, shift_slot_id: g.shift_slot_id, worker_id: wId,
               special_code: special,
