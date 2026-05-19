@@ -139,6 +139,11 @@ export interface Assignment {
   day_hours?: number | null      // 일반 시간
   night_hours?: number | null    // 가산 시간대 시간
   premium_hours?: number | null  // 가산 적용 후 (= night_hours × rate)
+  // N-61 — 대체 메타 (원래 우선순위 워커가 빠진 자리인지)
+  //  reason: group_skip / work_cycle_off / leave / max_days / consec / slot_blocked / cycle_external
+  //  null = 정상 배정
+  substitution_reason?: string | null
+  substituted_for_worker_id?: string | null
 }
 
 // PR-2SS-h-1 — 그룹 차원 회피일 (cs_group_member_skip_dates)

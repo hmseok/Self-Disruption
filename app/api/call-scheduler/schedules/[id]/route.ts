@@ -144,12 +144,41 @@ export async function GET(
                  note
           FROM cs_assignments WHERE schedule_id = ${id}
         `
-    const assignments = assignRows.map(r => ({
-      ...r,
-      computed_hours: Number(r.computed_hours || 0),
-      manual_lock: hasLockCol ? Boolean(r.manual_lock) : false,
-      group_id: hasAsnGroupId ? (r.group_id ?? null) : null,
-    }))
+    // N-61 — substitution 컬럼 별도 조회 (graceful)
+    let hasAsnSubstitution = true
+    try {
+      await prisma.$queryRaw<any[]>`SELECT substitution_reason FROM cs_assignments LIMIT 1`
+    } catch { hasAsnSubstitution = false }
+    const substitutionMap = new Map<string, { reason: string | null; for_worker_id: string | null }>()
+    if (hasAsnSubstitution) {
+      try {
+        const subRows = await prisma.$queryRaw<any[]>`
+          SELECT id, substitution_reason, substituted_for_worker_id
+          FROM cs_assignments WHERE schedule_id = ${id}
+        `
+        for (const r of subRows) {
+          if (r.substitution_reason || r.substituted_for_worker_id) {
+            substitutionMap.set(String(r.id), {
+              reason: r.substitution_reason || null,
+              for_worker_id: r.substituted_for_worker_id || null,
+            })
+          }
+        }
+      } catch { /* graceful */ }
+    }
+
+    const assignments = assignRows.map(r => {
+      const sub = substitutionMap.get(String(r.id))
+      return {
+        ...r,
+        computed_hours: Number(r.computed_hours || 0),
+        manual_lock: hasLockCol ? Boolean(r.manual_lock) : false,
+        group_id: hasAsnGroupId ? (r.group_id ?? null) : null,
+        // N-61 — 대체 메타 (null 이면 정상 배정)
+        substitution_reason: sub?.reason ?? null,
+        substituted_for_worker_id: sub?.for_worker_id ?? null,
+      }
+    })
 
     // 5) 배포 이력
     const distRows = await prisma.$queryRaw<any[]>`

@@ -1136,6 +1136,16 @@ export async function POST(
     }
 
     // ── 7) 계획 산출 ────────────────────────────────────────────────
+    // N-61 — 대체 사유 (원래 우선순위 워커가 빠진 사유)
+    type SubstitutionReason =
+      | 'group_skip'      // 회피일 (글로벌 또는 그룹별)
+      | 'work_cycle_off'  // 비균등 cycle 휴무 phase
+      | 'leave'           // 연차
+      | 'max_days'        // 월 최대 일수 도달
+      | 'consec'          // 연속 한도 도달
+      | 'slot_blocked'    // 슬롯 거부
+      | 'cycle_external'  // 외부 cycle 근무 (당사 X)
+
     interface PlanRow {
       work_date: string
       shift_slot_id: string
@@ -1144,6 +1154,9 @@ export async function POST(
       action: 'insert' | 'update' | 'skip-existing' | 'skip-holiday' | 'skip-no-member'
       group_id: string
       group_name: string
+      // N-61 — 대체 메타 (정상 배정 시 NULL)
+      substitution_reason?: SubstitutionReason | null
+      substituted_for_worker_id?: string | null
     }
     const plan: PlanRow[] = []
     const byGroup: Record<string, { generated: number; skipped: number }> = {}
@@ -1299,6 +1312,59 @@ export async function POST(
       | { type: 'work_cycle_off'; worker_id: string; date: string; pattern: string }
       | { type: 'squad_work_cycle_off'; worker_id: string; group_id: string; date: string; pattern: string }
     const warnings: Warning[] = []
+
+    // N-61 — 대체 사유 추적 helper
+    //   현재 그룹 g 의 isoDate 일자에 워커 wId 가 배정될 때
+    //   "원래 더 우선이었지만 빠진 P1 워커가 있는지" 확인 + 사유 반환
+    const determineSubstitution = (
+      g: GroupRow, wId: string, isoDate: string
+    ): { reason: SubstitutionReason | null; forWorkerId: string | null } => {
+      const myPriority = lookupMember(g.id, wId)?.priority_level ?? 2
+      if (myPriority === 1) return { reason: null, forWorkerId: null }  // P1 본인 = 대체 X
+
+      const gMems = membersByGroup.get(g.id) || []
+      const p1Members = gMems.filter(otherId => otherId !== wId &&
+        (lookupMember(g.id, otherId)?.priority_level ?? 2) === 1)
+
+      for (const p1Id of p1Members) {
+        // 1. 회피일 (그룹별 + 글로벌)
+        const skipsArr = [...(groupSkipMap.get(g.id) || []), ...globalSkipRows]
+        const skipMatch = skipsArr.find(s =>
+          s.worker_id === p1Id && isoDate >= s.start_date && isoDate <= s.end_date)
+        if (skipMatch) return { reason: 'group_skip', forWorkerId: p1Id }
+        // 2. 연차
+        const lm = workerLeaveMap.get(p1Id)
+        if (lm?.get(isoDate) === 'off') return { reason: 'leave', forWorkerId: p1Id }
+        // 3. 멤버 cycle 휴무
+        const wcp = memberWorkCycleMap.get(`${g.id}_${p1Id}`)
+        if (wcp && !isWorkDayByCyclePattern(wcp, isoDate)) {
+          return { reason: 'work_cycle_off', forWorkerId: p1Id }
+        }
+        // 4. 외부 cycle
+        const cy = lookupWorkerCycle(p1Id)
+        if (cy && !isAvailableOnCycle(cy as any, isoDate)) {
+          return { reason: 'cycle_external', forWorkerId: p1Id }
+        }
+        // 5. max_days_per_month
+        const cn = counter.get(p1Id)
+        const workerMax = workerLimits.get(p1Id)?.max_days_per_month
+        if (cn && workerMax != null && workerMax > 0 && cn.total >= workerMax) {
+          return { reason: 'max_days', forWorkerId: p1Id }
+        }
+        // 6. 연속 한도
+        const consec = workerConsec.get(p1Id) || 0
+        const memberMaxConsec = lookupMember(g.id, p1Id)?.max_consecutive_work_days
+        if (memberMaxConsec != null && memberMaxConsec > 0 && consec >= memberMaxConsec) {
+          return { reason: 'consec', forWorkerId: p1Id }
+        }
+        // 7. 슬롯 거부
+        const mc = lookupMember(g.id, p1Id)
+        if (mc && mc.blocked_slot_ids.has(g.shift_slot_id)) {
+          return { reason: 'slot_blocked', forWorkerId: p1Id }
+        }
+      }
+      return { reason: null, forWorkerId: null }
+    }
 
     // group_id → rotation cursor (usePriority=false 일 때만 사용)
     const rotState = new Map<string, { cursor: number; dayInPeriod: number }>()
@@ -1979,11 +2045,15 @@ export async function POST(
             })
             byGroup[g.id].skipped++
           } else {
+            // N-61 — 대체 사유 추적 (원래 P1 이 빠진 자리인지 확인)
+            const sub = determineSubstitution(g, wId, isoDate)
             plan.push({
               work_date: isoDate, shift_slot_id: g.shift_slot_id, worker_id: wId,
               special_code: special,
               action: existing ? 'update' : 'insert',
               group_id: g.id, group_name: g.name,
+              substitution_reason: sub.reason,
+              substituted_for_worker_id: sub.forWorkerId,
             })
             byGroup[g.id].generated++
             byDate[isoDate] = byDate[isoDate] || { generated: 0 }
@@ -2169,6 +2239,11 @@ export async function POST(
     try {
       await prisma.$queryRaw<any[]>`SELECT group_id FROM cs_assignments LIMIT 1`
     } catch { hasAsnGroupId = false }
+    // N-61 — cs_assignments.substitution_reason / substituted_for_worker_id 컬럼 graceful
+    let hasAsnSubstitution = true
+    try {
+      await prisma.$queryRaw<any[]>`SELECT substitution_reason FROM cs_assignments LIMIT 1`
+    } catch { hasAsnSubstitution = false }
 
     // N-23 fix — rotation 그룹은 워커별 다른 shift_slot_id 가 plan 에 들어감.
     // targetGroups 는 그룹 row 라 g.shift_slot_id (단일) 만 매칭 → undefined 에러.
@@ -2223,6 +2298,20 @@ export async function POST(
         slot_night_period_end: g.slot_night_period_end || null,
         slot_night_premium_rate: Number(g.slot_night_premium_rate || 0),
       }
+    }
+
+    // N-61 — INSERT 후 substitution 메타 별도 UPDATE (graceful)
+    const applySubstitution = async (asnId: string, p: PlanRow) => {
+      if (!hasAsnSubstitution) return
+      if (!p.substitution_reason && !p.substituted_for_worker_id) return
+      try {
+        await prisma.$executeRaw`
+          UPDATE cs_assignments
+          SET substitution_reason = ${p.substitution_reason || null},
+              substituted_for_worker_id = ${p.substituted_for_worker_id || null}
+          WHERE id = ${asnId}
+        `
+      } catch { /* graceful */ }
     }
 
     if (clearFirst) {
@@ -2288,6 +2377,8 @@ export async function POST(
               (${newId}, ${scheduleId}, ${p.work_date}, ${p.shift_slot_id}, ${p.worker_id}, ${p.special_code}, ${hours}, NOW(), NOW())
           `
         }
+        // N-61 — substitution 메타 별도 UPDATE
+        await applySubstitution(newId, p)
       }
     } else {
       // 일반 적용 — insert / update 만
@@ -2345,6 +2436,8 @@ export async function POST(
                 (${newId}, ${scheduleId}, ${p.work_date}, ${p.shift_slot_id}, ${p.worker_id}, ${p.special_code}, ${hours}, NOW(), NOW())
             `
           }
+          // N-61 — substitution 메타 별도 UPDATE
+          await applySubstitution(newId, p)
         } else {
           // update — PR-2OO: (date, slot, worker) 키
           const existing = existingMap.get(`${p.work_date}_${p.shift_slot_id}_${p.worker_id || 'null'}`)!

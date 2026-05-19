@@ -1075,6 +1075,10 @@ export default function ScheduleGrid({ detail, onChanged, myWorkerId }: Props) {
                           const memberCfg = (slotGrp && a.worker_id)
                             ? memberCfgMap.get(`${slotGrp.id}_${a.worker_id}`)
                             : undefined
+                          // N-61 — 대체된 원래 워커 이름 lookup
+                          const substitutedForName = a.substituted_for_worker_id
+                            ? (workerMap.get(a.substituted_for_worker_id)?.name || null)
+                            : null
                           return (
                             <AssignmentCell
                               key={a.id}
@@ -1096,6 +1100,7 @@ export default function ScheduleGrid({ detail, onChanged, myWorkerId }: Props) {
                               memberPreferDow={memberCfg?.preferred_dow_prefer || null}
                               memberAvoidDow={memberCfg?.preferred_dow_avoid || null}
                               violations={violations}
+                              substitutedForWorkerName={substitutedForName}
                             />
                           )
                         })
@@ -1227,6 +1232,11 @@ export default function ScheduleGrid({ detail, onChanged, myWorkerId }: Props) {
         </tbody>
       </table>
 
+      <SubstitutionPanel
+        assignments={assignments}
+        workerMap={workerMap}
+      />
+
       <WorkerPicker
         open={!!pickerSlot}
         onClose={() => { setPickerSlot(null); setPickerDate(''); setPickerAssignmentId(null) }}
@@ -1249,4 +1259,115 @@ export default function ScheduleGrid({ detail, onChanged, myWorkerId }: Props) {
       )}
     </div>
   )
+}
+
+// N-61 — 대체 내역 펼침 패널
+//   매트릭스 하단에 「📋 대체 내역 (N건)」 펼침 표시
+//   사용자 운영 검수용: 어느 셀이 누구를 대체했고 사유가 뭔지 한눈에
+const SUB_REASON_META: Record<string, { icon: string; label: string; color: string }> = {
+  group_skip:     { icon: '⚠', label: '회피일',    color: COLORS.danger },
+  work_cycle_off: { icon: '🔁', label: 'cycle 휴무', color: COLORS.warning },
+  leave:          { icon: '🏖', label: '연차',      color: COLORS.info },
+  max_days:       { icon: '🚫', label: '월 최대',   color: COLORS.danger },
+  consec:         { icon: '📅', label: '연속 한도', color: COLORS.warning },
+  slot_blocked:   { icon: '⛔', label: '슬롯 거부', color: COLORS.danger },
+  cycle_external: { icon: '🌐', label: '외부 cycle', color: '#7c3aed' },
+}
+function SubstitutionPanel({
+  assignments, workerMap,
+}: {
+  assignments: Assignment[]
+  workerMap: Map<string, Worker>
+}) {
+  const [expanded, setExpanded] = useState(true)
+  const subs = assignments
+    .filter(a => a.substitution_reason && a.substituted_for_worker_id)
+    .sort((a, b) => a.work_date.localeCompare(b.work_date))
+  if (subs.length === 0) return null
+  // reason 별 카운트
+  const reasonCounts = new Map<string, number>()
+  for (const a of subs) {
+    const r = a.substitution_reason!
+    reasonCounts.set(r, (reasonCounts.get(r) || 0) + 1)
+  }
+  return (
+    <div style={{
+      marginTop: 12, ...GLASS.L4, borderRadius: 10, padding: 12,
+      border: `1px solid ${COLORS.borderAmber}`,
+    }}>
+      <button type="button"
+              onClick={() => setExpanded(v => !v)}
+              style={{
+                width: '100%', display: 'flex', alignItems: 'center', gap: 8,
+                background: 'transparent', border: 'none', cursor: 'pointer',
+                padding: 0, textAlign: 'left',
+              }}>
+        <span style={{ fontSize: 13, fontWeight: 800, color: COLORS.warning }}>
+          📋 대체 내역 ({subs.length}건)
+        </span>
+        <span style={{ display: 'flex', gap: 6, marginLeft: 6 }}>
+          {Array.from(reasonCounts.entries()).map(([r, c]) => {
+            const meta = SUB_REASON_META[r]
+            if (!meta) return null
+            return (
+              <span key={r} style={{
+                fontSize: 11, fontWeight: 700, color: meta.color,
+                padding: '2px 6px', borderRadius: 99,
+                background: 'rgba(0,0,0,0.04)',
+              }}>{meta.icon} {meta.label} {c}</span>
+            )
+          })}
+        </span>
+        <span style={{ marginLeft: 'auto', fontSize: 11, color: COLORS.textMuted }}>
+          {expanded ? '▼ 접기' : '▶ 펼치기'}
+        </span>
+      </button>
+      {expanded && (
+        <div style={{ marginTop: 10, overflow: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+            <thead>
+              <tr style={{ borderBottom: `1px solid ${COLORS.borderFaint}` }}>
+                <th style={subThStyle}>날짜</th>
+                <th style={subThStyle}>원래</th>
+                <th style={subThStyle}>대체</th>
+                <th style={subThStyle}>사유</th>
+              </tr>
+            </thead>
+            <tbody>
+              {subs.map(a => {
+                const orig = a.substituted_for_worker_id
+                  ? workerMap.get(a.substituted_for_worker_id) : null
+                const repl = a.worker_id ? workerMap.get(a.worker_id) : null
+                const meta = a.substitution_reason ? SUB_REASON_META[a.substitution_reason] : null
+                return (
+                  <tr key={a.id} style={{ borderBottom: `1px solid ${COLORS.borderFaint}` }}>
+                    <td style={subTdStyle}>{a.work_date}</td>
+                    <td style={subTdStyle}>{orig?.name || a.substituted_for_worker_id?.slice(0, 8) || '-'}</td>
+                    <td style={{ ...subTdStyle, fontWeight: 700 }}>{repl?.name || '-'}</td>
+                    <td style={subTdStyle}>
+                      {meta && (
+                        <span style={{
+                          fontSize: 11, fontWeight: 700, color: meta.color,
+                          padding: '2px 7px', borderRadius: 99,
+                          background: 'rgba(0,0,0,0.04)',
+                        }}>{meta.icon} {meta.label}</span>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
+}
+const subThStyle: React.CSSProperties = {
+  padding: '6px 10px', textAlign: 'left',
+  color: COLORS.textSecondary, fontWeight: 700, fontSize: 11,
+  whiteSpace: 'nowrap',
+}
+const subTdStyle: React.CSSProperties = {
+  padding: '6px 10px', whiteSpace: 'nowrap', color: COLORS.textPrimary,
 }

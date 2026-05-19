@@ -3,6 +3,48 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-19 (Phase N-61) — 대체 내역 추적 (셀 마커 + 펼침 패널)
+
+### 사용자 요청
+> "매트릭스도 어떤사유 휴가나,회피 기타이유등으로 변경대치 된사항도 보여야하지않나요"
+
+### 데이터 모델 (마이그: 2026-05-19_cs_assignments_substitution.sql)
+- `cs_assignments.substitution_reason` VARCHAR(64) NULL
+- `cs_assignments.substituted_for_worker_id` CHAR(36) NULL
+
+reason 종류 (자동 생성 시 알고리즘이 결정):
+- `group_skip` — 회피일 (글로벌 또는 그룹별)
+- `work_cycle_off` — 비균등 cycle 휴무 phase
+- `leave` — 연차/휴가
+- `max_days` — 월 최대 일수 도달
+- `consec` — 연속 한도 도달
+- `slot_blocked` — 슬롯 거부
+- `cycle_external` — 외부 cycle 근무 (당사 X)
+
+### 변경
+1. **알고리즘 (auto-generate route)**
+   - `determineSubstitution()` helper — 매 (group, worker, date) 처리 시
+     "원래 P1 우선이었지만 빠진 사람" 추적
+   - PlanRow 에 substitution_reason / substituted_for_worker_id 메타 추가
+   - INSERT 후 `applySubstitution()` 으로 별도 UPDATE (graceful)
+
+2. **API (`/api/call-scheduler/schedules/[id]`)**
+   - 응답 assignments[] 에 substitution_reason / substituted_for_worker_id 포함 (graceful)
+
+3. **UI (AssignmentCell)**
+   - 셀 안 워커 이름 앞에 사유 마커 표시 (⚠ / 🔁 / 🏖 / 🚫 / 📅 / ⛔ / 🌐)
+   - 셀 hover 시 「원래 정동민 (회피일) 대체」 같은 tooltip
+
+4. **UI (ScheduleGrid)**
+   - 매트릭스 하단 「📋 대체 내역 (N건)」 펼침 패널 추가
+   - 날짜순 표: 날짜 / 원래 워커 / 대체 워커 / 사유 배지
+   - reason 별 카운트 요약
+
+### 마이그 적용 필수
+- `migrations/2026-05-19_cs_assignments_substitution.sql`
+
+---
+
 ## 2026-05-19 (Phase N-60) — 회피일 전역 적용 (group_id NULL = 글로벌)
 
 ### 사용자 정책

@@ -23,6 +23,19 @@ interface Props {
   violations?: Set<'time_conflict' | 'next_day_block' | 'consec_limit'>
   // Phase F — 빈 셀 사유 분석 (그룹 회피 멤버 등)
   emptyReason?: string  // hover 툴팁용
+  // N-61 — 대체 사유 표시 (원래 워커 이름 + 사유 마커)
+  substitutedForWorkerName?: string | null
+}
+
+// N-61 — 대체 사유 마커 + 라벨
+const SUBSTITUTION_META: Record<string, { icon: string; label: string }> = {
+  group_skip:     { icon: '⚠', label: '회피일' },
+  work_cycle_off: { icon: '🔁', label: 'cycle 휴무' },
+  leave:          { icon: '🏖', label: '연차' },
+  max_days:       { icon: '🚫', label: '월 최대 도달' },
+  consec:         { icon: '📅', label: '연속 한도' },
+  slot_blocked:   { icon: '⛔', label: '슬롯 거부' },
+  cycle_external: { icon: '🌐', label: '외부 cycle' },
 }
 
 // Phase D — 요일 매치 검사 헬퍼
@@ -36,7 +49,7 @@ function matchDow(csv: string | null | undefined, dow: number): boolean {
     .includes(dow)
 }
 
-export default function AssignmentCell({ assignment, worker, onClick, onQuickAction, dow, memberPreferDow, memberAvoidDow, violations, emptyReason }: Props) {
+export default function AssignmentCell({ assignment, worker, onClick, onQuickAction, dow, memberPreferDow, memberAvoidDow, violations, emptyReason, substitutedForWorkerName }: Props) {
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null)
 
   useEffect(() => {
@@ -128,7 +141,13 @@ export default function AssignmentCell({ assignment, worker, onClick, onQuickAct
                        : hasNextDayBlock ? ' [🌙 익일 휴식 위반]'
                        : hasConsecLimit ? ' [📅 연속 한도 도달]'
                        : ''
-        return base + dowLayer + vioLayer
+        // N-61 — 대체 사유 layer
+        const subReason = assignment?.substitution_reason
+        const subMeta = subReason ? SUBSTITUTION_META[subReason] : null
+        const subLayer = subMeta
+          ? ` [${subMeta.icon} 원래 ${substitutedForWorkerName || '?'} (${subMeta.label}) 대체]`
+          : ''
+        return base + dowLayer + vioLayer + subLayer
       })()}
     >
       <span style={{
@@ -145,6 +164,14 @@ export default function AssignmentCell({ assignment, worker, onClick, onQuickAct
         {/* Phase E — 가드 위반 아이콘 */}
         {violationIcon && (
           <span style={{ marginRight: 2, fontSize: 11 }}>{violationIcon}</span>
+        )}
+        {/* N-61 — 대체 사유 마커 (원래 우선순위 워커가 빠진 자리) */}
+        {assignment?.substitution_reason && SUBSTITUTION_META[assignment.substitution_reason] && (
+          <span style={{
+            marginRight: 2, fontSize: 10, opacity: 0.85,
+          }} title={`원래 ${substitutedForWorkerName || '?'} (${SUBSTITUTION_META[assignment.substitution_reason].label}) 대체`}>
+            {SUBSTITUTION_META[assignment.substitution_reason].icon}
+          </span>
         )}
         {worker?.name || (isOff ? '휴' : '')}
       </span>
