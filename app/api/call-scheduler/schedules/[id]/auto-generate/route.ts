@@ -1313,6 +1313,12 @@ export async function POST(
       | { type: 'squad_work_cycle_off'; worker_id: string; group_id: string; date: string; pattern: string }
     const warnings: Warning[] = []
 
+    // N-63 — Priority 모드에서 rotation_period_days 지원
+    //   그룹별 「전일 P2 selected + dayInPeriod 카운터」 추적
+    //   P1 정동민이 cycle 근무 phase 면 P1 우선 (prev 갱신 X — P2 cursor 유지)
+    //   P1 휴무 phase 면 prev P2 우선 (period_days 까지 연속) → 채우면 cursor 이동
+    const prevDaySelectedMap = new Map<string, { worker_id: string; dayInPeriod: number }>()
+
     // N-61 — 대체 사유 추적 helper
     //   현재 그룹 g 의 isoDate 일자에 워커 wId 가 배정될 때
     //   "원래 더 우선이었지만 빠진 P1 워커가 있는지" 확인 + 사유 반환
@@ -1965,9 +1971,31 @@ export async function POST(
           const p2AvailableNow = p2TotalMembers.filter(wId => candidates.includes(wId))
           const p2Short = Math.max(0, p2TotalMembers.length - p2AvailableNow.length)
 
+          // N-63 — P1 후보 / 전일 P2 prev 추적
+          const isP1 = (wId: string): boolean =>
+            (lookupMember(g.id, wId)?.priority_level ?? 2) === 1
+          const p1InCandidates = candidates.some(isP1)
+          const period = Math.max(1, g.rotation_period_days || 1)
+          const prev = prevDaySelectedMap.get(g.id)
+          const prevWorkerIsP1 = prev ? isP1(prev.worker_id) : false
+
           let selectedList: string[]
-          if (p2Short > 0 && need > 0) {
-            // P3 cov 후보 정렬 (cov 우선)
+          if (p1InCandidates && need > 0) {
+            // N-63 — P1 후보 있으면 P1 우선 (cursor 무관)
+            //   기존 가중치 정렬에서 P1 이 위쪽 → slice 로 자연 우선
+            selectedList = candidates.slice(0, need)
+            // prev 갱신 X — P2 cursor 위치 유지 (정동민 cycle 근무 phase 동안 P2 dayInPeriod 정지)
+          } else if (prev && !prevWorkerIsP1 && prev.dayInPeriod < period
+                     && candidates.includes(prev.worker_id) && need > 0) {
+            // N-63 — 전일 P2 selected 가 후보면 그 워커 우선 (period_days 까지 연속)
+            const others = candidates.filter(wId => wId !== prev.worker_id)
+            selectedList = [prev.worker_id, ...others.slice(0, Math.max(0, need - 1))]
+            prevDaySelectedMap.set(g.id, {
+              worker_id: prev.worker_id,
+              dayInPeriod: prev.dayInPeriod + 1,
+            })
+          } else if (p2Short > 0 && need > 0) {
+            // 기존 N-46 — P3 cov 우선 (P2 결원 채우기)
             const p3Pool = candidates
               .filter(isP3)
               .sort((a, b) => {
@@ -1977,15 +2005,19 @@ export async function POST(
                 const bCov = lookupCoveragePriority(g.id, b, pb)
                 return aCov - bCov  // cov 작을수록 우선
               })
-            // P2 결원 수 + need 중 작은 만큼 P3 우선 선택
             const p3Pick = p3Pool.slice(0, Math.min(p2Short, need))
-            // 나머지 need → 기존 정렬된 candidates 에서 (P3 pick 제외)
             const usedSet = new Set(p3Pick)
             const restPool = candidates.filter(wId => !usedSet.has(wId))
             const restPick = restPool.slice(0, need - p3Pick.length)
             selectedList = [...p3Pick, ...restPick]
+            // N-63 — P2 새 cursor 시작 (P3 pick 외 P2 가 있으면 그 사람으로)
+            const newP2 = selectedList.find(wId => !isP1(wId) && !isP3(wId))
+            if (newP2) prevDaySelectedMap.set(g.id, { worker_id: newP2, dayInPeriod: 1 })
           } else {
             selectedList = candidates.slice(0, need)
+            // N-63 — P2 새 cursor 시작
+            const newP2 = selectedList.find(wId => !isP1(wId))
+            if (newP2) prevDaySelectedMap.set(g.id, { worker_id: newP2, dayInPeriod: 1 })
           }
           selected = selectedList
         } else {

@@ -3,6 +3,46 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-19 (Phase N-63) — Priority 모드에서 rotation_period_days 지원
+
+### 사용자 발견
+> "한사람이 2일씩 정동민제외 나머지분들은 적용이 안되고잇네요"
+> "로테이션 주기를 2일로 해놨는데"
+
+### 원인
+- usePriority=true (디폴트) 모드: 매일 가중치 정렬 → cursor 무관 → 매일 다른 사람
+- rotation_period_days 셋팅은 usePriority=false 모드에서만 작동
+- 결과: 매일 윤민진 → 전유하 → 전정연 (period_days 무시)
+
+### 변경 (auto-generate route)
+**prevDaySelectedMap** — 그룹별 「전일 P2 selected + dayInPeriod」 추적
+
+알고리즘 순서:
+1. **P1 (정동민) 후보 있나?** → 있으면 P1 선택 (cursor 무관, P2 prev 갱신 X)
+2. **전일 P2 워커가 후보 + dayInPeriod < period 면** → 그 워커 우선 (연속 N일)
+3. **P2 결원 (N-46)** → P3 cov 우선 + 새 P2 cursor 시작
+4. **나머지** → 가중치 정렬 + 새 P2 cursor 시작
+
+### 효과
+- 정동민 cycle 근무 phase = 정동민 (P1)
+- 정동민 휴무 phase = P2 한 사람 2일씩 (rotation_period_days 적용)
+
+### 운영 예시 (period=2)
+```
+6/1  정동민   (P1 cycle 근무)
+6/2  윤민진   (P2 cursor 시작, day 1/2)
+6/3  윤민진   (day 2/2)
+6/4  정동민   (P1 cycle, prev P2 dayInPeriod 정지)
+6/5  전유하   (P2 cursor 이동, day 1/2)
+6/6  전유하   (day 2/2)
+6/7  전정연   (P2 cursor 이동)
+6/8  전정연
+6/9  정동민   (P1 cycle 반복)
+...
+```
+
+---
+
 ## 2026-05-19 (Phase N-62) — 매트릭스 카테고리/그룹 헤더 좌측 sticky 축소
 
 ### 사용자 요청
