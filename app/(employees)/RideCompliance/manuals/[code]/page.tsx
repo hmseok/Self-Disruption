@@ -291,10 +291,14 @@ export default function ManualDetailPage() {
                   fontFamily: '"Pretendard", -apple-system, sans-serif',
                   color: COLORS.textPrimary,
                   background: '#fff', padding: '24px 32px', borderRadius: 8,
-                  maxHeight: 720, overflowY: 'auto',
                   border: `1px solid ${COLORS.borderSubtle}`,
                   boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
                 }}>
+                  {/* Phase 1.4-fix3 — maxHeight·overflow 제거: 페이지 전체 스크롤 → anchor 정상 작동
+                      + 헤더 anchor 시 sticky 영역에 가려지지 않도록 scrollMarginTop */}
+                  <style>{`
+                    [id^="md-1-"], [id^="md-2-"], [id^="md-3-"], [id^="md-4-"] { scroll-margin-top: 80px; }
+                  `}</style>
                   {renderMarkdown(detail.content_md)}
                 </div>
               ) : (
@@ -448,8 +452,8 @@ function SectionTOC(props: { content: string }) {
         ))}
       </div>
 
-      {/* 섹션 list */}
-      <div style={{ maxHeight: 400, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 3 }}>
+      {/* 섹션 list — Phase 1.4-fix3: maxHeight 제거, 전체 list 표시 (자체 스크롤 X) */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
         {filtered.length === 0 ? (
           <div style={{ padding: 10, textAlign: 'center', fontSize: 11, color: COLORS.textMuted }}>해당 타입 섹션 없음</div>
         ) : filtered.map(s => {
