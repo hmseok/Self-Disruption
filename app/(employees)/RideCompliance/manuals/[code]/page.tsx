@@ -257,6 +257,11 @@ export default function ManualDetailPage() {
         </div>
 
         {/* 우측: 본문 */}
+        {/* Phase 1.4 — 자동 검토 패널 */}
+        {detail?.content_md && (
+          <AutoReviewPanel docId={detail.id} docCode={detail.doc_code} verified={meta.is_master_verified === 1} canApprove={isAdminOrMgr} onSaved={fetchAll} />
+        )}
+
         <div style={{ ...GLASS.L3, padding: 20, borderRadius: 10, minHeight: 600 }}>
           <div style={{ display: 'flex', alignItems: 'center', marginBottom: 14 }}>
             <h3 style={{ margin: 0, fontSize: 14 }}>📖 본문</h3>
@@ -334,6 +339,228 @@ function MetaRow(props: { label: string; value: React.ReactNode }) {
     <div style={{ display: 'flex', padding: '4px 0', fontSize: 12 }}>
       <span style={{ width: 70, color: COLORS.textMuted, flexShrink: 0 }}>{props.label}</span>
       <span style={{ color: COLORS.textPrimary }}>{props.value}</span>
+    </div>
+  )
+}
+
+// ────────── Phase 1.4 자동 검토 패널 ──────────
+interface LintIssue {
+  rule_id: string
+  category: 'legal' | 'security' | 'quality'
+  severity: 'error' | 'warning' | 'info'
+  label: string
+  description: string
+  hint?: string
+  passed: boolean
+}
+
+interface ReviewData {
+  lint: {
+    score: number
+    total_rules: number
+    passed: number
+    errors: number
+    warnings: number
+    infos: number
+    issues: LintIssue[]
+    passed_issues: LintIssue[]
+  }
+  actions: {
+    total_actions: number
+    by_type: Record<string, number>
+    actions: Array<{
+      type: string
+      frequency?: string
+      months?: number[]
+      category?: string
+      description: string
+      form_codes?: string[]
+      legal_reference?: string
+      responsible?: string
+    }>
+    extraction_method: string
+  }
+  llm_debug?: Record<string, unknown>
+}
+
+function AutoReviewPanel(props: { docId: string; docCode: string; verified: boolean; canApprove: boolean; onSaved: () => void }) {
+  const [loading, setLoading] = useState(false)
+  const [result, setResult] = useState<ReviewData | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [expanded, setExpanded] = useState(true)
+  const [approving, setApproving] = useState(false)
+  const [approveResult, setApproveResult] = useState<{ schedule: { applied_tasks: number; skipped_duplicates: number; applied_task_codes: string[] } | null } | null>(null)
+
+  const runReview = async (useLlm: boolean) => {
+    setLoading(true); setError(null)
+    try {
+      const token = getStoredToken()
+      const res = await fetch(`/api/ride-compliance/documents/${props.docId}/single-review`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ use_llm: useLlm }),
+      })
+      const json = await res.json()
+      if (!res.ok || !json.success) { setError(json.error || `HTTP ${res.status}`); return }
+      setResult(json.data)
+    } catch (e) { setError(String(e)) } finally { setLoading(false) }
+  }
+
+  const approve = async () => {
+    if (!confirm('CPO 승인 + 스케줄 자동 적용? (추출된 액션이 tasks 로 자동 생성됩니다)')) return
+    setApproving(true); setError(null)
+    try {
+      const token = getStoredToken()
+      const res = await fetch(`/api/ride-compliance/documents/${props.docId}/approve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ approve_note: '자동 검토 통과 후 승인' }),
+      })
+      const json = await res.json()
+      if (!res.ok || !json.success) { setError(json.error || `HTTP ${res.status}`); return }
+      setApproveResult(json.data)
+      props.onSaved()
+    } catch (e) { setError(String(e)) } finally { setApproving(false) }
+  }
+
+  const scoreColor = (result?.lint.score ?? 100) >= 90 ? COLORS.success
+                   : (result?.lint.score ?? 0) >= 70 ? COLORS.warning : COLORS.danger
+
+  return (
+    <div style={{ ...GLASS.L3, padding: 16, borderRadius: 10, borderLeft: `4px solid ${COLORS.info}`, marginBottom: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+        <h3 style={{ margin: 0, fontSize: 13, color: COLORS.textPrimary }}>🔍 자동 검토 (Phase 1.4)</h3>
+        {result && (
+          <>
+            <span style={{ padding: '2px 8px', borderRadius: 8, background: `${scoreColor}18`, color: scoreColor, fontSize: 11, fontWeight: 700 }}>
+              점수 {result.lint.score}/100
+            </span>
+            <span style={{ fontSize: 11, color: COLORS.textMuted }}>
+              {result.lint.passed}/{result.lint.total_rules} 통과 · 액션 {result.actions.total_actions} 추출 ({result.actions.extraction_method})
+            </span>
+          </>
+        )}
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+          {!result && (
+            <>
+              <button onClick={() => runReview(false)} disabled={loading} style={{ ...btnSecondary, fontSize: 11 }}>
+                {loading ? '검토 중...' : '🔍 검토 (정규식만)'}
+              </button>
+              <button onClick={() => runReview(true)} disabled={loading} style={{ ...btnPrimary, fontSize: 11 }}>
+                {loading ? '검토 중...' : '🤖 검토 + LLM'}
+              </button>
+            </>
+          )}
+          {result && (
+            <>
+              <button onClick={() => runReview(true)} disabled={loading} style={{ ...btnSecondary, fontSize: 11 }}>
+                🔄 재검토
+              </button>
+              {props.canApprove && !props.verified && (
+                <button onClick={approve} disabled={approving} style={{ ...btnSuccess, fontSize: 11 }}>
+                  {approving ? '승인 중...' : '✓ 승인 + 스케줄 적용'}
+                </button>
+              )}
+            </>
+          )}
+          <button onClick={() => setExpanded(!expanded)} style={{ ...btnSecondary, fontSize: 11 }}>
+            {expanded ? '▴ 접기' : '▾ 펼치기'}
+          </button>
+        </div>
+      </div>
+
+      {error && <div style={{ padding: '8px 12px', borderRadius: 6, background: `${COLORS.danger}18`, color: COLORS.danger, fontSize: 12, marginBottom: 8 }}>❌ {error}</div>}
+
+      {approveResult && (
+        <div style={{ padding: '10px 14px', borderRadius: 6, background: COLORS.bgGreen, fontSize: 12, color: COLORS.success, marginBottom: 8, lineHeight: 1.7 }}>
+          ✅ 승인 완료 + 스케줄 적용
+          {approveResult.schedule && (
+            <span style={{ marginLeft: 8 }}>
+              · 신규 task {approveResult.schedule.applied_tasks}건 자동 생성
+              {approveResult.schedule.skipped_duplicates > 0 && ` · 중복 스킵 ${approveResult.schedule.skipped_duplicates}건`}
+            </span>
+          )}
+        </div>
+      )}
+
+      {expanded && result && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 10 }}>
+          {/* Lint 결과 */}
+          <div style={{ background: COLORS.bgGray, padding: 12, borderRadius: 6 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8 }}>
+              📋 Lint 결과 — {result.lint.passed}/{result.lint.total_rules} 통과
+              <span style={{ marginLeft: 8, fontSize: 10, color: COLORS.danger }}>error {result.lint.errors}</span>
+              <span style={{ marginLeft: 4, fontSize: 10, color: COLORS.warning }}>warning {result.lint.warnings}</span>
+              <span style={{ marginLeft: 4, fontSize: 10, color: COLORS.info }}>info {result.lint.infos}</span>
+            </div>
+            <div style={{ maxHeight: 280, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {result.lint.issues.length === 0 ? (
+                <div style={{ padding: 12, textAlign: 'center', color: COLORS.success, fontSize: 11 }}>✅ 모든 룰 통과</div>
+              ) : result.lint.issues.map((iss, i) => {
+                const sevColor = iss.severity === 'error' ? COLORS.danger : iss.severity === 'warning' ? COLORS.warning : COLORS.info
+                return (
+                  <div key={i} style={{ padding: '6px 8px', borderRadius: 4, background: '#fff', borderLeft: `3px solid ${sevColor}` }}>
+                    <div style={{ fontSize: 11, fontWeight: 600 }}>
+                      <span style={{ color: sevColor, marginRight: 4 }}>[{iss.rule_id}]</span>
+                      {iss.label}
+                    </div>
+                    {iss.hint && <div style={{ fontSize: 10, color: COLORS.textSecondary, marginTop: 2 }}>💡 {iss.hint}</div>}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* 추출 액션 */}
+          <div style={{ background: COLORS.bgGray, padding: 12, borderRadius: 6 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8 }}>
+              🎯 추출 액션 ({result.actions.total_actions}건)
+              <span style={{ marginLeft: 8, fontSize: 10, color: COLORS.textMuted }}>
+                task {result.actions.by_type.task || 0} · form {result.actions.by_type.form || 0} · notify {result.actions.by_type.notify || 0} · policy {result.actions.by_type.policy || 0}
+              </span>
+            </div>
+            <div style={{ maxHeight: 280, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {result.actions.actions.length === 0 ? (
+                <div style={{ padding: 12, textAlign: 'center', color: COLORS.textMuted, fontSize: 11 }}>액션 미추출</div>
+              ) : result.actions.actions.slice(0, 30).map((a, i) => {
+                const typeColor = a.type === 'task' ? COLORS.primary : a.type === 'form' ? COLORS.info : a.type === 'notify' ? COLORS.warning : COLORS.textSecondary
+                return (
+                  <div key={i} style={{ padding: '6px 8px', borderRadius: 4, background: '#fff', borderLeft: `3px solid ${typeColor}` }}>
+                    <div style={{ fontSize: 11 }}>
+                      <span style={{ color: typeColor, fontWeight: 700, marginRight: 6 }}>[{a.type}]</span>
+                      {a.frequency && <span style={{ marginRight: 6, fontSize: 10, color: COLORS.textMuted }}>{a.frequency}{a.months && a.months.length > 0 ? ` (${a.months.join(',')}월)` : ''}</span>}
+                      {a.category && <span style={{ marginRight: 6, fontSize: 10, color: COLORS.textSecondary }}>· {a.category}</span>}
+                    </div>
+                    <div style={{ fontSize: 11, color: COLORS.textPrimary, marginTop: 2 }}>{a.description}</div>
+                    {(a.legal_reference || a.responsible || (a.form_codes && a.form_codes.length > 0)) && (
+                      <div style={{ fontSize: 10, color: COLORS.textMuted, marginTop: 2 }}>
+                        {a.legal_reference && <span style={{ marginRight: 6 }}>📜 {a.legal_reference}</span>}
+                        {a.responsible && <span style={{ marginRight: 6 }}>👤 {a.responsible}</span>}
+                        {a.form_codes && a.form_codes.length > 0 && <span>📝 {a.form_codes.join(', ')}</span>}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+              {result.actions.actions.length > 30 && (
+                <div style={{ padding: 8, textAlign: 'center', color: COLORS.textMuted, fontSize: 10 }}>
+                  ... 그 외 {result.actions.actions.length - 30}건 (상세는 DB extracted_actions 참조)
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {expanded && !result && !loading && (
+        <div style={{ padding: 12, fontSize: 12, color: COLORS.textSecondary, lineHeight: 1.6 }}>
+          매뉴얼 본문에서 자동으로 법적/보안/품질 기준을 검사하고 운영 액션을 추출합니다.
+          <ul style={{ margin: '6px 0 0', paddingLeft: 18, fontSize: 11 }}>
+            <li><strong>정규식 검토</strong>: 즉시, 무료 (14 lint 규칙 + 정규식 액션 추출)</li>
+            <li><strong>LLM 검토</strong>: Gemini 호출 (자연어 이해, 더 정확) — GEMINI_API_KEY 환경변수 필요</li>
+          </ul>
+        </div>
+      )}
     </div>
   )
 }

@@ -6,6 +6,53 @@
 
 ---
 
+## v1.4 — 자동 검토·정합성·승인·스케줄 자동화 (2026-05-19)
+
+**사용자 비전 (2026-05-19)**:
+"업로드 서류의 기본 법적/보안 기준 검토 작동 + 단일 검토가 행동·진행 스케줄·액션 영역 요약 추출 + 단일 검토 완료 시 다른 서류 간 정합성 검수 + 최종 정정 또는 완료 승인이 되면 기준에 따라 적용 스케줄·스텝별 자동 작동"
+
+**결단**: `3+LLM` — Phase 1.4-A1 + B + C + D 일괄 진행 + Gemini LLM 통합.
+
+**신규 파일 8개 (1,925줄)**:
+- `migrations/2026-05-19_ride_compliance_phase14.sql` (108) — 8 컬럼 ALTER (review_results JSON / extracted_actions JSON / last_reviewed_at / review_score / review_engine / schedule_applied_at + tasks 의 source_document_id + auto_generated)
+- `lib/compliance-lint-rules.ts` (215) — 14 lint 규칙 (LEGAL 7 + SEC 5 + QUAL 2). 점수 100 만점 (error -10 / warning -3 / info -1)
+- `lib/compliance-action-extractor.ts` (211) — 정규식 기반 액션 추출 (task / form / notify / policy). 주기·카테고리·책임자·서식코드·법조항 자동 인식
+- `lib/compliance-llm-extractor.ts` (260) — Gemini gemini-2.5-flash 통합 (Rule 3 안전망: thinkingBudget=0 / responseMimeType=json / timeout 25s / graceful fallback)
+- `lib/compliance-schedule-applier.ts` (200) — extracted_actions → tasks 자동 INSERT (frequency→months 변환, 중복 회피, auto_generated=1 추적)
+- `app/api/ride-compliance/documents/[id]/single-review/route.ts` (151) — POST: lint + 액션 추출 통합 + DB 저장
+- `app/api/ride-compliance/documents/[id]/approve/route.ts` (99) — POST CPO 승인 + 스케줄 자동 적용
+- `app/(employees)/RideCompliance/manuals/[code]/page.tsx` — AutoReviewPanel 컴포넌트 추가 (lint 결과 + 액션 list + 승인 버튼)
+
+**14 Lint 규칙**:
+LEGAL-01 내부관리계획 의무사항 / LEGAL-02 교육 빈도 / LEGAL-03 자체감사 / LEGAL-04 파기 / LEGAL-05 24h 통지 / LEGAL-06 보존기간 / LEGAL-07 접근권한
+SEC-01 등급 분류 / SEC-02 암호화 / SEC-03 접근통제 / SEC-04 접속기록 / SEC-05 물리적 접근제한
+QUAL-01 본문 길이 / QUAL-02 서식 참조
+
+**액션 추출 4 type**:
+- task — 주기 운영 (annual/biannual/quarterly/monthly/on_event)
+- form — 서식 작성 (F-* 인용)
+- notify — 통지·보고 (24h)
+- policy — 정책 적용 (등급·암호화·2FA)
+
+**스케줄 자동 적용 흐름**:
+1. 관리자 「🔍 검토 시작」 → single-review API → lint + 추출
+2. CPO 「✓ 승인 + 스케줄 적용」 → approve API
+3. extracted_actions.actions 의 task 만 → frequency·months 따라 ride_compliance_tasks 자동 INSERT
+4. source_document_id + auto_generated=1 추적
+5. 9 step playbook 의 해당 step 자동 활성화 (stepStatus 자동 계산)
+
+**Rule 준수 (Rule 1 풀 파이프라인 + Rule 3 외부 LLM 안전망)**:
+- ✅ Rule 1 풀 파이프라인 (DB + lib + API + UI)
+- ✅ Rule 3 [A] 모델 quirk: gemini-2.5-flash + thinkingBudget=0 + responseMimeType=json
+- ✅ Rule 3 [C] 안전망: timeout 25s + 본문 100KB 제한 + graceful fallback (env 미설정 시 정규식만)
+- ✅ Rule 14 동형 / Rule 22 _docs / Rule 23 graceful (_migration_pending phase14) / Rule 24 멱등 (UNIQUE task_code)
+- ✅ Rule 27 lint:harness 새 critical 위반 0
+
+**Phase 1.5 예고**:
+산출물·외부 송부 트래커 (deliverables) — 임명장 / 단말기 반출대장 / 파기 확인서 / 유출 통지서 등 외부 송부 통합 관리.
+
+---
+
 ## v1.3-G2 + 1.3-H — 본문 마크다운 렌더링 + 뒤로가기 UX + 정합성 검사 통합 (2026-05-19)
 
 **사용자 피드백 4건**:
