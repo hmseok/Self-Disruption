@@ -180,9 +180,10 @@ export default function ManualDetailPage() {
       {desc && <p style={{ margin: '0 0 16px', fontSize: 13, color: COLORS.textSecondary }}>{desc.intro}</p>}
 
       {/* 좌우 2단 레이아웃 */}
-      <div style={{ display: 'grid', gridTemplateColumns: '260px 1fr', gap: 16 }}>
-        {/* 좌측: 메타 + 원본 파일 + 버전 이력 + 섹션 목차 — Phase 1.4-fix5 자체 스크롤 */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14, maxHeight: 'calc(100vh - 160px)', overflowY: 'auto', paddingRight: 4 }}>
+      {/* Phase 1.4-fix6 — flex 레이아웃 + 명시적 height: 양쪽 column 자체 스크롤 안정화 */}
+      <div style={{ display: 'flex', gap: 16, height: 'calc(100vh - 160px)' }}>
+        {/* 좌측: 메타 + 원본 파일 + 버전 이력 + 섹션 목차 — 자체 스크롤 */}
+        <div style={{ width: 260, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 14, overflowY: 'auto', paddingRight: 4 }}>
           {/* 메타 카드 */}
           <div style={{ ...GLASS.L3, padding: 16, borderRadius: 10 }}>
             <h3 style={{ margin: '0 0 10px', fontSize: 13, color: COLORS.textSecondary }}>📋 매뉴얼 정보</h3>
@@ -261,15 +262,15 @@ export default function ManualDetailPage() {
           )}
         </div>
 
-        {/* 우측: 자동 검토 banner + 본문 — wrapper div 필수 (grid 의 두 번째 cell 1개) */}
-        <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+        {/* 우측: 자동 검토 banner + 본문 — flex column + 자체 스크롤 */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0 }}>
         {/* Phase 1.4 — 자동 검토 패널 */}
         {detail?.content_md && (
           <AutoReviewPanel docId={detail.id} docCode={detail.doc_code} verified={meta.is_master_verified === 1} canApprove={isAdminOrMgr} onSaved={fetchAll} />
         )}
 
-        <div style={{ ...GLASS.L3, padding: 20, borderRadius: 10, minHeight: 600 }}>
-          <div style={{ display: 'flex', alignItems: 'center', marginBottom: 14 }}>
+        <div style={{ ...GLASS.L3, padding: 20, borderRadius: 10, flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', marginBottom: 14, flexShrink: 0 }}>
             <h3 style={{ margin: 0, fontSize: 14 }}>📖 본문</h3>
             {isAdminOrMgr && !editMode && (
               <button onClick={() => setEditMode(true)} style={{ ...btnPrimary, marginLeft: 'auto' }}>
@@ -293,8 +294,8 @@ export default function ManualDetailPage() {
                   background: '#fff', padding: '24px 32px', borderRadius: 8,
                   border: `1px solid ${COLORS.borderSubtle}`,
                   boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-                  // Phase 1.4-fix5 — 자체 스크롤 컨테이너 (anchor scrollIntoView 가 본문 박스 안에서 동작)
-                  maxHeight: 'calc(100vh - 220px)', overflowY: 'auto',
+                  // Phase 1.4-fix6 — flex column 의 자식이므로 flex: 1 + overflowY: auto 로 자체 스크롤
+                  flex: 1, overflowY: 'auto', minHeight: 0,
                 }}>
                   <style>{`
                     [id^="md-1-"], [id^="md-2-"], [id^="md-3-"], [id^="md-4-"] { scroll-margin-top: 16px; }
@@ -436,17 +437,17 @@ function SectionTOC(props: { content: string }) {
   }
 
   const scrollTo = (id: string) => {
-    // Phase 1.4-fix5 — 본문 박스 (#manual-body-scroll) 내부 스크롤
+    // Phase 1.4-fix6 — getBoundingClientRect 기반 정확 계산 (offsetTop 은 offsetParent 기준이라 부정확)
     const container = document.getElementById('manual-body-scroll')
     const el = document.getElementById(id)
-    if (!el) return
-    if (container) {
-      // 본문 박스가 자체 스크롤 컨테이너면 offsetTop 기반 정확 스크롤
-      const top = el.offsetTop - container.offsetTop - 16
-      container.scrollTo({ top, behavior: 'smooth' })
-    } else {
-      el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    if (!el || !container) {
+      el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      return
     }
+    const cRect = container.getBoundingClientRect()
+    const eRect = el.getBoundingClientRect()
+    const top = eRect.top - cRect.top + container.scrollTop - 16
+    container.scrollTo({ top, behavior: 'smooth' })
   }
 
   return (
