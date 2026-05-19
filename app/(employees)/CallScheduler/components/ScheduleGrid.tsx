@@ -321,6 +321,23 @@ export default function ScheduleGrid({ detail, onChanged, myWorkerId }: Props) {
       localStorage.setItem('cs-matrix-view-mode', viewMode)
     }
   }, [viewMode])
+
+  // N-66-a — 매트릭스 상세 모드 (검수 / 상세 / 요약)
+  //   상세: 현재처럼 모든 셀 풀 컬러 (디폴트)
+  //   검수: 결원/회피/cover 셀만 컬러 강조, 정상 셀은 회색 (이상한 셀 한눈에)
+  //   요약: 카테고리별 1줄 요약 (충원/회피/cover 카운트 — TBD, 별도 commit)
+  const [detailMode, setDetailMode] = useState<'detail' | 'review'>('detail')
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('cs-matrix-detail-mode')
+      if (saved === 'review' || saved === 'detail') setDetailMode(saved as 'detail' | 'review')
+    }
+  }, [])
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('cs-matrix-detail-mode', detailMode)
+    }
+  }, [detailMode])
   // 카테고리 정렬 순서 (운영 흐름에 맞춰)
   const CATEGORY_ORDER: Record<string, number> = {
     '주간': 1, '저녁': 2, '야간': 3, '특수': 4, 'general': 5, '일반': 5,
@@ -661,6 +678,19 @@ export default function ScheduleGrid({ detail, onChanged, myWorkerId }: Props) {
                   }}
                   title="카테고리(주간/야간/특수) 별로 그룹핑 ↔ 평면 시간순">
             {viewMode === 'category' ? '🗂 카테고리 그룹' : '⏱ 평면 시간순'}
+          </button>
+          {/* N-66-a — 매트릭스 상세 모드 (상세 ↔ 검수) */}
+          <button type="button"
+                  onClick={() => setDetailMode(m => m === 'detail' ? 'review' : 'detail')}
+                  style={{
+                    padding: '3px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700,
+                    background: detailMode === 'review' ? COLORS.bgAmber : 'transparent',
+                    color: detailMode === 'review' ? COLORS.warning : COLORS.textSecondary,
+                    border: `1px solid ${detailMode === 'review' ? COLORS.borderAmber : COLORS.borderFaint}`,
+                    cursor: 'pointer',
+                  }}
+                  title="검수 모드 — 결원/회피/cover 셀만 컬러 강조, 정상 셀 회색">
+            {detailMode === 'review' ? '🔍 검수 모드' : '📋 상세 모드'}
           </button>
           {/* N-64 — 대체 내역 토글 (상단 + 하단 패널 스크롤) */}
           {(() => {
@@ -1099,29 +1129,35 @@ export default function ScheduleGrid({ detail, onChanged, myWorkerId }: Props) {
                           const substitutedForName = a.substituted_for_worker_id
                             ? (workerMap.get(a.substituted_for_worker_id)?.name || null)
                             : null
+                          // N-66-a — 검수 모드: 정상 셀 회색 + 결원/회피/cover 만 컬러
+                          const isAbnormal = !!a.substitution_reason || !a.worker_id
+                                          || (violations && violations.size > 0)
+                          const dimInReview = detailMode === 'review' && !isAbnormal
                           return (
-                            <AssignmentCell
-                              key={a.id}
-                              assignment={a}
-                              worker={w}
-                              onClick={() => {
-                                if (swapMode) {
-                                  if (!swapFirst) {
-                                    setSwapFirst({ a, slotId: slot.id, date: d })
+                            <div style={{ opacity: dimInReview ? 0.25 : 1 }}>
+                              <AssignmentCell
+                                key={a.id}
+                                assignment={a}
+                                worker={w}
+                                onClick={() => {
+                                  if (swapMode) {
+                                    if (!swapFirst) {
+                                      setSwapFirst({ a, slotId: slot.id, date: d })
+                                    } else {
+                                      handleSwap({ a, slotId: slot.id, date: d })
+                                    }
                                   } else {
-                                    handleSwap({ a, slotId: slot.id, date: d })
+                                    setPickerSlot(slot); setPickerDate(d); setPickerAssignmentId(a.id)
                                   }
-                                } else {
-                                  setPickerSlot(slot); setPickerDate(d); setPickerAssignmentId(a.id)
-                                }
-                              }}
-                              onQuickAction={swapMode ? undefined : (action) => handleQuickAction(a, slot, d, action)}
-                              dow={cellDow}
-                              memberPreferDow={memberCfg?.preferred_dow_prefer || null}
-                              memberAvoidDow={memberCfg?.preferred_dow_avoid || null}
-                              violations={violations}
-                              substitutedForWorkerName={substitutedForName}
-                            />
+                                }}
+                                onQuickAction={swapMode ? undefined : (action) => handleQuickAction(a, slot, d, action)}
+                                dow={cellDow}
+                                memberPreferDow={memberCfg?.preferred_dow_prefer || null}
+                                memberAvoidDow={memberCfg?.preferred_dow_avoid || null}
+                                violations={violations}
+                                substitutedForWorkerName={substitutedForName}
+                              />
+                            </div>
                           )
                         })
                       )}

@@ -25,8 +25,8 @@ const PATTERN_OPTIONS: { value: 'all_days' | 'all_weekdays' | 'weekends_only' | 
   { value: 'holidays_only', label: '공휴일만',   sub: 'cs_holidays 일자만 — 휴일 전담 그룹' },
 ]
 const STRATEGY_OPTIONS: { value: 'all_members' | 'rotation'; label: string; sub: string }[] = [
-  { value: 'all_members', label: '전원 동시', sub: '소속 멤버 모두 매일 출근' },
-  { value: 'rotation',    label: '로테이션',  sub: '순서대로 일부만 — 야간조 등' },
+  { value: 'all_members', label: '👥 모두 매일 출근', sub: '소속 멤버 전원 매일 — 고정 인력 그룹' },
+  { value: 'rotation',    label: '🔄 순환 배정',     sub: '하루 N명씩 차례대로 — 야간/야간조 등' },
 ]
 const DOW_LABELS = ['일', '월', '화', '수', '목', '금', '토']
 
@@ -874,12 +874,12 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
             </div>
             {strategy === 'rotation' && (
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginTop: 8 }}>
-                <Field label="하루 인원" sub="rotation 시">
+                <Field label="👥 하루 N명" sub="순환 배정 시 하루에 몇 명 출근">
                   <input type="number" min={1} value={rotationSize}
                          onChange={(e) => setRotationSize(Number(e.target.value))}
                          style={inputStyle} />
                 </Field>
-                <Field label="로테이션 주기 (일)" sub="몇 일마다 교대">
+                <Field label="⏱ 한 사람 연속 N일" sub="같은 사람을 N일 연속으로 배정 (예: 2 = 2일 연속 같은 사람)">
                   <input type="number" min={1} value={rotationPeriod}
                          onChange={(e) => setRotationPeriod(Number(e.target.value))}
                          style={inputStyle} />
@@ -928,8 +928,8 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
               · 새 셋팅은 「멤버 cfg → 🔁 비균등 cycle 패턴」 에서 (그룹마다 다른 출발일 가능) */}
 
           {/* N-16 — 휴일 자동 제외 (주중 그룹은 ON, 야간/24-365 그룹은 OFF) */}
-          <Field label="휴일 처리"
-                 sub="공휴일/임시휴일(휴일 설정 탭)에 자동 배정에서 제외할지 — 주중 근무 그룹은 ON, 24/365 운영 그룹은 OFF">
+          <Field label="🎌 공휴일 처리"
+                 sub="공휴일에 이 그룹을 자동 배정에서 빼낼지 — 주중 근무 그룹은 ON, 24/365 운영 그룹은 OFF">
             <label style={{
               display: 'flex', alignItems: 'center', gap: 10,
               padding: '10px 12px', borderRadius: 10,
@@ -956,8 +956,8 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
           </Field>
 
           {/* N-35 — 같은 날 다른 그룹과 겹침 허용 (시간 안 겹치면 OK) */}
-          <Field label="다른 그룹 겹침"
-                 sub="같은 워커가 같은 날 다른 그룹에도 배정될 수 있는가 — 시간 충돌은 자동 가드. 24/365 주간+야간 같은 특수 운영에만 ON">
+          <Field label="🤝 다른 그룹 추가 근무 허용"
+                 sub="결원 시 다른 그룹 근무자가 이 그룹에 추가로 들어와 cover 가능 — 자기 그룹 cycle 보호. 「휴가 커버 그룹」 페어와 함께 ON 권장">
             <label style={{
               display: 'flex', alignItems: 'center', gap: 10,
               padding: '10px 12px', borderRadius: 10,
@@ -1087,8 +1087,8 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
           )}
 
           {/* N-32 — 공휴일 추가 출근 (skip 과 상호배반) */}
-          <Field label="공휴일 추가 출근"
-                 sub="패턴 매칭 X 라도 공휴일이면 추가 출근 — 「토·일 + 공휴일」 같은 케이스를 별도 그룹 없이 처리">
+          <Field label="🎉 공휴일에도 출근"
+                 sub="평소 패턴과 무관하게 공휴일이면 출근 — 「토·일 + 공휴일」 같이 별도 그룹 만들 필요 없음">
             <label style={{
               display: 'flex', alignItems: 'center', gap: 10,
               padding: '10px 12px', borderRadius: 10,
@@ -2040,7 +2040,7 @@ function MemberCfgPanel({
                       cursor: 'pointer',
                       transition: 'all 0.15s',
                     }}>
-              {n === 1 ? 'P1 최우선' : n === 2 ? 'P2 일반' : 'P3 백업'}
+              {n === 1 ? '⭐ 1순위 (P1)' : n === 2 ? '👤 2순위 (P2)' : '💤 백업 (P3)'}
             </button>
           ))}
         </div>
@@ -2099,9 +2099,9 @@ function MemberCfgPanel({
       {/* N-36 — 휴가 커버 우선순위 (priority_level 과 독립) */}
       <div>
         <div style={cfgFieldLabel}>
-          🆘 휴가 커버 순위
+          🆘 결원 시 투입 순서
           <span style={{ fontSize: 11, fontWeight: 500, color: COLORS.textMuted }}>
-            평소 우선순위와 별개 — 누군가 휴가/결원 발생 시 메우는 순서
+            평소 우선순위와 별개 — 누군가 휴가/회피로 빠지면 메우는 순서
           </span>
         </div>
         <div style={{
@@ -2109,14 +2109,14 @@ function MemberCfgPanel({
           background: COLORS.bgAmber, border: `1px solid ${COLORS.borderAmber}`,
           fontSize: 11, color: COLORS.warning, lineHeight: 1.6,
         }}>
-          💡 예: 외부인력은 평소 P3 (백업, 적게 들어감) + 휴가 커버 C1 (결원 시 1순위)
+          💡 예: 외부인력은 평소 백업 (P3) + 결원 시 1순위 투입
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           {[
-            { v: '', label: '─ priority 따라감', tone: 'gray' },
-            { v: '1', label: 'C1 1순위', tone: 'red' },
-            { v: '2', label: 'C2 2순위', tone: 'blue' },
-            { v: '3', label: 'C3 3순위', tone: 'gray' },
+            { v: '', label: '─ 우선순위 따라감', tone: 'gray' },
+            { v: '1', label: '🔴 결원 시 1순위', tone: 'red' },
+            { v: '2', label: '🔵 결원 시 2순위', tone: 'blue' },
+            { v: '3', label: '⚪ 결원 시 3순위', tone: 'gray' },
           ].map(p => (
             <button key={p.v || 'inherit'} type="button"
                     onClick={() => onChange({ coverage_priority: p.v })}
@@ -2140,7 +2140,7 @@ function MemberCfgPanel({
       {/* N-34 + N-35 — 그룹 분배 비율 (다른 그룹과 상대 가중치) */}
       <div>
         <div style={cfgFieldLabel}>
-          ⚖️ 그룹 분배 비율 <span style={{ fontSize: 11, color: COLORS.info }}>(상대 가중치)</span>
+          ⚖️ 이 그룹 출근 비율 <span style={{ fontSize: 11, color: COLORS.info }}>(다른 그룹 대비)</span>
         </div>
         <div style={{
           padding: '8px 12px', borderRadius: 8, marginBottom: 8,
