@@ -2025,72 +2025,52 @@ export async function POST(
           const ownCandidates = candidates.filter(wId => gMembers.includes(wId))
           const ownShort = Math.max(0, need - ownCandidates.length)
 
+          // N-66-algo — 알고리즘 분기 단순화 (5 → 3)
+          //   기존 분기들 (cover / p2Short / prev / else) 이 엇갈리며 cursor 깨짐
+          //   3 분기로 단순화: P1 / prev P2 / 새 cursor
           let selectedList: string[]
           if (p1InCandidates && need > 0) {
-            // N-63 — P1 후보 있으면 P1 우선 (cursor 무관)
+            // [분기 1] P1 후보 있으면 P1 우선 (cycle 정상)
             //   기존 가중치 정렬에서 P1 이 위쪽 → slice 로 자연 우선
+            //   prev 갱신 X — P2 cursor 위치 유지 (P1 cycle 근무 phase 동안 P2 dayInPeriod 정지)
             selectedList = candidates.slice(0, need)
-            // prev 갱신 X — P2 cursor 위치 유지 (정동민 cycle 근무 phase 동안 P2 dayInPeriod 정지)
-          } else if (ownShort > 0 && coverWorkingToday.length > 0 && need > 0) {
-            // N-65-fix3 — 자기 그룹 후보 부족 (need 보다 적음) = 진짜 결원 → cover 진입
-            //   평상 시 (자기 P2 충분 = need 채울 만큼) 은 P2 cursor 따라 정상 cycle 분배
-            //   정동민 cycle 휴무 phase 라도 P2 3명 있으면 need=1 채워짐 → cover X
-            //   회피일/연차로 자기 멤버 더 빠져서 need 못 채울 때만 cover 진입
-            selectedList = [
-              ...coverWorkingToday.slice(0, need),
-              ...candidates.filter(wId => !coverWorkingToday.includes(wId))
-                .slice(0, Math.max(0, need - coverWorkingToday.length)),
-            ]
-            // prev 갱신 X — cover 진입은 추가 근무, 자기 그룹 cursor 영향 X
           } else if (prev && !prevWorkerIsP1 && prev.dayInPeriod < period
                      && candidates.includes(prev.worker_id) && need > 0) {
-            // N-63 — 전일 P2 selected 가 후보면 그 워커 우선 (period_days 까지 연속)
+            // [분기 2] 전일 P2 selected + period_days 내 → 그 워커 우선 (연속 근무)
             const others = candidates.filter(wId => wId !== prev.worker_id)
             selectedList = [prev.worker_id, ...others.slice(0, Math.max(0, need - 1))]
             prevDaySelectedMap.set(g.id, {
               worker_id: prev.worker_id,
               dayInPeriod: prev.dayInPeriod + 1,
             })
-          } else if (p2Short > 0 && need > 0) {
-            // 기존 N-46 — P3 cov 우선 (P2 결원 채우기)
-            const p3Pool = candidates
-              .filter(isP3)
-              .sort((a, b) => {
-                const pa = lookupMember(g.id, a)?.priority_level ?? 3
-                const pb = lookupMember(g.id, b)?.priority_level ?? 3
-                const aCov = lookupCoveragePriority(g.id, a, pa)
-                const bCov = lookupCoveragePriority(g.id, b, pb)
-                return aCov - bCov  // cov 작을수록 우선
-              })
-            const p3Pick = p3Pool.slice(0, Math.min(p2Short, need))
-            const usedSet = new Set(p3Pick)
-            const restPool = candidates.filter(wId => !usedSet.has(wId))
-            const restPick = restPool.slice(0, need - p3Pick.length)
-            selectedList = [...p3Pick, ...restPick]
-            // N-63 — P2 새 cursor 시작 (P3 pick 외 P2 가 있으면 그 사람으로)
-            const newP2 = selectedList.find(wId => !isP1(wId) && !isP3(wId))
-            if (newP2) prevDaySelectedMap.set(g.id, { worker_id: newP2, dayInPeriod: 1 })
           } else {
-            // N-65-fix4 — 새 P2 cursor 시 「counter 적음 + last_date 오래」 명시 정렬
-            //   기존 candidates.sort 의 by_dow / target_ratio 가드가 cycle 순환을 방해
-            //   여기서 명시적 cursor 이동 → 윤민진/전유하/전정연 자연 순환 보장
-            const p2Pool = candidates.filter(wId => !isP1(wId))
-            if (p2Pool.length > 0 && need > 0) {
-              p2Pool.sort((a, b) => {
+            // [분기 3] 새 P2 cursor — 자기 그룹 P2 우선, 부족 시 cover 또는 fallback
+            const ownP2Candidates = candidates.filter(wId =>
+              gMembers.includes(wId) && !isP1(wId))
+
+            if (ownP2Candidates.length >= need && need > 0) {
+              // 자기 그룹 P2 충분 → counter 적음 + last_date 오래된 사람 우선 (자연 순환)
+              ownP2Candidates.sort((a, b) => {
                 const cnA = ensureCounter(a)
                 const cnB = ensureCounter(b)
-                // counter 적은 사람 우선
                 if (cnA.total !== cnB.total) return cnA.total - cnB.total
-                // 동률 시 last_date 오래된 사람 우선 (자연 순환)
                 const aLast = cnA.last_date || '0000-00-00'
                 const bLast = cnB.last_date || '0000-00-00'
                 return aLast.localeCompare(bLast)
               })
-              selectedList = p2Pool.slice(0, need)
+              selectedList = ownP2Candidates.slice(0, need)
+            } else if (coverWorkingToday.length > 0 && need > 0) {
+              // 자기 P2 부족 → cover 그룹 진입 (추가 근무, cycle 영향 X)
+              selectedList = [
+                ...coverWorkingToday.slice(0, need),
+                ...candidates.filter(wId => !coverWorkingToday.includes(wId))
+                  .slice(0, Math.max(0, need - coverWorkingToday.length)),
+              ]
             } else {
+              // fallback: candidates 정렬 첫째 (P3 cov 등)
               selectedList = candidates.slice(0, need)
             }
-            // N-63 — P2 새 cursor 시작
+            // P2 새 cursor 시작
             const newP2 = selectedList.find(wId => !isP1(wId))
             if (newP2) prevDaySelectedMap.set(g.id, { worker_id: newP2, dayInPeriod: 1 })
           }

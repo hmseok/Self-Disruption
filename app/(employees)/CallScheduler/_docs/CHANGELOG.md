@@ -3,6 +3,68 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-19 (Phase N-66-algo) — P2 cursor 알고리즘 분기 단순화 (5→3)
+
+### 사용자 보고
+> "안 잡히네" — fix5 push 후에도 6/10 = 전정연 (윤민진 와야)
+
+### 분석
+5 분기 (P1 / cover / prev / p2Short / else) 가 엇갈리며 cursor 깨짐:
+- fix4 의 else 분기가 작동 안 함
+- p2Short / N-46 / cover 분기들이 cursor 분기를 가로채
+
+### 수정 — 3 분기로 단순화
+
+**[분기 1] P1 우선**
+```ts
+if (p1InCandidates) selectedList = candidates.slice(0, need)
+// prev 갱신 X (P2 cursor 위치 유지)
+```
+
+**[분기 2] prev P2 cursor (period_days 내)**
+```ts
+else if (prev && prev.dayInPeriod < period && candidates.includes(prev.worker_id)) {
+  selectedList = [prev.worker_id, ...]
+  prev.dayInPeriod++
+}
+```
+
+**[분기 3] 새 P2 cursor**
+```ts
+else {
+  if (ownP2Candidates.length >= need) {
+    // 자기 P2 충분 → counter + last_date 정렬
+    selectedList = ownP2 정렬 후 slice
+  } else if (coverWorkingToday.length > 0) {
+    // 자기 P2 부족 → cover 진입
+  } else {
+    // fallback
+  }
+}
+```
+
+### 효과
+- N-46 분기 제거 (P3 cov 는 fallback 에서 candidates 정렬로 자연 처리)
+- cover 진입 조건 명확화: 자기 P2 부족 시만
+- cursor 깨짐 방지: prev 또는 ownP2 정렬 둘 중 하나로 결정
+
+### 기대 결과 (부엉 6월)
+```
+6/1  정동민
+6/2~3  윤민진 (cursor 1)
+6/4  정동민
+6/5~6  전유하 (cursor 이동 — counter+last_date 정렬)
+6/7~8  전정연 (cursor 이동)
+6/9  정동민
+6/10~11 윤민진 (last_date 6/3 가장 오래)
+6/12 정동민
+6/13~14 전유하
+6/15~16 전정연
+...
+```
+
+---
+
 ## 2026-05-19 (Phase N-65-fix5) — p2Short 가 P1 제외 (cursor 분기 진입)
 
 ### 데이터 분석 (fix4 push 후 SQL)
