@@ -3,6 +3,53 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-19 (Phase N-66-algo2) — P2 cursor 라운드 로빈 (멤버 등록 순서)
+
+### 사용자 지적
+> "로테이션 패턴이 있는데 last_date 를 왜 찾나"
+> "그거 이제 안 합니다. 패턴 고정이라"
+
+### 변경 (N-66-algo 의 단순화 후속)
+last_date 정렬 폐기 → **멤버 등록 순서 기반 round-robin cursor**
+
+```ts
+// 그룹별 p2CursorMap 추적
+const p2CursorMap = new Map<string, number>()
+
+// 새 P2 cursor 분기:
+const p2Members = gMembers.filter(isP2Strict)  // priority ASC 순서
+const startCur = p2CursorMap.get(g.id) ?? 0
+for (let i = 0; i < p2Members.length; i++) {
+  const idx = (startCur + i) % p2Members.length
+  const wId = p2Members[idx]
+  if (candidates.includes(wId)) {
+    candidate = wId
+    nextCursor = (idx + 1) % p2Members.length
+    break
+  }
+}
+```
+
+### 효과
+- 멤버 등록 순서 그대로 cursor 돈다 (사용자 의도)
+- counter / last_date 가드 제거 → 단순 명료
+- 「로테이션 주기 N일」 셋팅의 정확한 구현
+
+### 예: 부엉 P2 = [전정연, 윤민진, 전유하] (등록 순)
+```
+6/2~3  전정연 (cursor 0)
+6/5~6  윤민진 (cursor 1)
+6/7~8  전유하 (cursor 2)
+6/10~11 전정연 (cursor 0 — 라운드 로빈)
+6/13~14 윤민진
+6/15~16 전유하
+...
+```
+
+각자 매월 약 8일 균등 출근 (cycle 휴무 빼고).
+
+---
+
 ## 2026-05-19 (Phase N-66-algo) — P2 cursor 알고리즘 분기 단순화 (5→3)
 
 ### 사용자 보고

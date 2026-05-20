@@ -1321,6 +1321,12 @@ export async function POST(
     //   P1 휴무 phase 면 prev P2 우선 (period_days 까지 연속) → 채우면 cursor 이동
     const prevDaySelectedMap = new Map<string, { worker_id: string; dayInPeriod: number }>()
 
+    // N-66-algo2 — 그룹별 P2 라운드 로빈 cursor (멤버 등록 순서 기반)
+    //   사용자: "로테이션 패턴 있는데 last_date 를 왜 찾나"
+    //   → 멤버 priority (등록 순서) 그대로 cursor 돌아감
+    //   period_days 채우면 cursor +1
+    const p2CursorMap = new Map<string, number>()
+
     // N-61 — 대체 사유 추적 helper
     //   현재 그룹 g 의 isoDate 일자에 워커 wId 가 배정될 때
     //   "원래 더 우선이었지만 빠진 P1 워커가 있는지" 확인 + 사유 반환
@@ -2044,35 +2050,40 @@ export async function POST(
               dayInPeriod: prev.dayInPeriod + 1,
             })
           } else {
-            // [분기 3] 새 P2 cursor — 자기 그룹 P2 우선, 부족 시 cover 또는 fallback
-            const ownP2Candidates = candidates.filter(wId =>
-              gMembers.includes(wId) && !isP1(wId))
-
-            if (ownP2Candidates.length >= need && need > 0) {
-              // 자기 그룹 P2 충분 → counter 적음 + last_date 오래된 사람 우선 (자연 순환)
-              ownP2Candidates.sort((a, b) => {
-                const cnA = ensureCounter(a)
-                const cnB = ensureCounter(b)
-                if (cnA.total !== cnB.total) return cnA.total - cnB.total
-                const aLast = cnA.last_date || '0000-00-00'
-                const bLast = cnB.last_date || '0000-00-00'
-                return aLast.localeCompare(bLast)
-              })
-              selectedList = ownP2Candidates.slice(0, need)
+            // [분기 3] 새 P2 cursor — 라운드 로빈 (멤버 등록 순서)
+            //   N-66-algo2 — 사용자 의도: 「로테이션 패턴 = 멤버 등록 순서」
+            //   last_date 정렬 폐기. p2CursorMap 으로 cursor 명시 추적.
+            //   cursor 위치 멤버가 candidates 에 있으면 그 사람, 없으면 다음 cursor.
+            const p2Members = gMembers.filter(isP2Strict)
+            let candidate: string | null = null
+            let nextCursor: number | null = null
+            if (p2Members.length > 0 && need > 0) {
+              const startCur = p2CursorMap.get(g.id) ?? 0
+              for (let i = 0; i < p2Members.length; i++) {
+                const idx = (startCur + i) % p2Members.length
+                const wId = p2Members[idx]
+                if (candidates.includes(wId)) {
+                  candidate = wId
+                  nextCursor = (idx + 1) % p2Members.length
+                  break
+                }
+              }
+            }
+            if (candidate && need > 0) {
+              selectedList = [candidate]
+              if (nextCursor != null) p2CursorMap.set(g.id, nextCursor)
+              prevDaySelectedMap.set(g.id, { worker_id: candidate, dayInPeriod: 1 })
             } else if (coverWorkingToday.length > 0 && need > 0) {
-              // 자기 P2 부족 → cover 그룹 진입 (추가 근무, cycle 영향 X)
+              // 자기 P2 후보 0 → cover 진입 (추가 근무)
               selectedList = [
                 ...coverWorkingToday.slice(0, need),
                 ...candidates.filter(wId => !coverWorkingToday.includes(wId))
                   .slice(0, Math.max(0, need - coverWorkingToday.length)),
               ]
             } else {
-              // fallback: candidates 정렬 첫째 (P3 cov 등)
+              // fallback
               selectedList = candidates.slice(0, need)
             }
-            // P2 새 cursor 시작
-            const newP2 = selectedList.find(wId => !isP1(wId))
-            if (newP2) prevDaySelectedMap.set(g.id, { worker_id: newP2, dayInPeriod: 1 })
           }
           selected = selectedList
         } else {
