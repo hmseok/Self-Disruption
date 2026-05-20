@@ -2201,15 +2201,25 @@ export async function POST(
             } else {
               const planned = precomputed.get(isoDate) || null
               if (planned == null) {
-                // [분기 2] P1 cycle 근무일인데 P1 후보 없음 = P1 결원 (회피/연차)
-                //   cover 우선, 없으면 임시 채움 — 사전 계산표 영향 X (cursor 폐기)
+                // [분기 2-N70] P1 cycle 근무일 + P1 회피/연차 = P1 결원
+                //   cover = 어제 이 그룹 P2 의 「추가 근무」 (1일 연장)
+                //   ★ 시간 겹치는 클러스터 — 옆 그룹 당일 근무자 끌어오기 X
+                //     (부엉 20:30~08:30 ∩ 달빛 19:00~23:00 → 한 사람 둘 다 불가)
+                //   어제 P2 가 없거나 오늘 다른 그룹 근무 중이면 → 그날 쉬는 P2
                 precomputedOwnerId = cycleP1Id
-                if (coverWorkingToday.length > 0) {
-                  selectedList = coverWorkingToday.slice(0, need)
-                  selectedViaCover = true
+                const prevWorker = precomputed.get(addDays(isoDate, -1)) || null
+                const freeP2 = candidates.filter(w => !workedToday.has(w))
+                if (prevWorker && freeP2.includes(prevWorker)) {
+                  selectedList = [
+                    prevWorker,
+                    ...freeP2.filter(w => w !== prevWorker).slice(0, Math.max(0, need - 1)),
+                  ]
+                } else if (freeP2.length > 0) {
+                  selectedList = freeP2.slice(0, need)
                 } else {
                   selectedList = candidates.slice(0, need)
                 }
+                selectedViaCover = true
               } else if (candidates.includes(planned)) {
                 // [분기 3] P2 자리 — 사전 계산된 워커 정상 출근 (cursor 없음 = 안 깨짐)
                 precomputedOwnerId = planned
@@ -2219,16 +2229,13 @@ export async function POST(
                     .slice(0, Math.max(0, need - 1)),
                 ]
               } else {
-                // [분기 4] 사전 계산된 P2 가 회피/연차 → cover 우선, 없으면 다른 후보
+                // [분기 4-N70] 사전 계산된 P2 가 회피/연차 → 그날 쉬는 P2 로 대체
                 //   계획 점유자(planned)는 그대로 — 다음 날 자리 안 밀림
+                //   selectedViaCover X → 대체 사유는 whyWorkerOut(planned) 로 정확 표기
                 precomputedOwnerId = planned
-                if (coverWorkingToday.length > 0) {
-                  selectedList = [
-                    ...coverWorkingToday.slice(0, need),
-                    ...candidates.filter(w => !coverWorkingToday.includes(w))
-                      .slice(0, Math.max(0, need - coverWorkingToday.length)),
-                  ]
-                  selectedViaCover = true
+                const freeP2 = candidates.filter(w => !workedToday.has(w))
+                if (freeP2.length > 0) {
+                  selectedList = freeP2.slice(0, need)
                 } else {
                   selectedList = candidates.slice(0, need)
                 }
