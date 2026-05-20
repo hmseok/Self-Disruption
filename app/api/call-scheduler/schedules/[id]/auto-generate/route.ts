@@ -274,42 +274,6 @@ function isWorkDayByCyclePattern(p: WorkCyclePattern, isoDate: string): boolean 
   return false   // 도달 X (방어)
 }
 
-// N-68 — P1 cycle 패턴에서 「P2 자리 일자」의 전역 순번 계산 (cursor 폐기용)
-//   P1 (정동민) cycle 휴무일 = P2 자리. cycle startIso 부터 P2 자리에만 0,1,2,... 순번 부여
-//   반환 null = 이 날은 P1 cycle 근무일 (P2 자리 아님)
-//   반환 number = 이 날의 P2 자리 전역 순번 (날짜 → 순번 순수 함수 — 월 경계 무관 연속)
-function p2SlotOrdinal(p: WorkCyclePattern, isoDate: string): number | null {
-  const start = new Date(p.startIso + 'T00:00:00').getTime()
-  const cur = new Date(isoDate + 'T00:00:00').getTime()
-  const elapsed = Math.floor((cur - start) / (24 * 60 * 60 * 1000))
-  if (elapsed < 0) return null   // cycle 시작 전 — P2 자리 아님
-  // 한 cycle 안 휴무(P2 자리) 일수 = 홀수 idx parts 합
-  let offPerCycle = 0
-  for (let i = 1; i < p.parts.length; i += 2) offPerCycle += p.parts[i]
-  const fullCycles = Math.floor(elapsed / p.total)
-  const r = ((elapsed % p.total) + p.total) % p.total
-  // r 위치가 어느 segment 인지 + 그 전까지 휴무 일수
-  let acc = 0
-  let offBeforeR = 0
-  let isOffDay = false
-  for (let i = 0; i < p.parts.length; i++) {
-    const segEnd = acc + p.parts[i]
-    if (r < segEnd) {
-      if (i % 2 === 1) {           // 홀수 idx = 휴무 segment → P2 자리
-        isOffDay = true
-        offBeforeR += (r - acc)    // 이 segment 안 r 이전 휴무 일수
-      } else {
-        isOffDay = false           // 짝수 idx = 근무 segment → P1 일
-      }
-      break
-    }
-    if (i % 2 === 1) offBeforeR += p.parts[i]  // 지나간 휴무 segment 전체
-    acc = segEnd
-  }
-  if (!isOffDay) return null
-  return fullCycles * offPerCycle + offBeforeR
-}
-
 // PR-2QQ-d-3 — 그룹 × 요일별 min_workers 결정 (디폴트 fallback)
 function lookupMinCoverage(
   coverageByGroup: Map<string, CoverageRow[]>,
@@ -1443,39 +1407,116 @@ export async function POST(
     // group_id → rotation cursor (usePriority=false 일 때만 사용)
     const rotState = new Map<string, { cursor: number; dayInPeriod: number }>()
 
-    // ── N-68 — P2 배정 사전 계산 (cursor 깨짐 원천 차단) ──────────────
-    //  사용자 보고: N-63~67 cursor 8회 fix 후에도 회피일 부근 cursor 어긋남
-    //  원인: 일자 루프 안 실시간 cursor 추적이 회피/cover/cycle 조합에 취약
-    //  해결: 일자 루프 전에 그룹별 P2 배정표를 사전 계산
-    //        P2 자리 = P1(정동민) cycle 휴무일 → period_days 단위 라운드 로빈
-    //        회피/연차는 런타임 가드에서 처리 (사전 계산표는 「고정 패턴」만)
-    //  효과: 어떤 회피/cover 조합도 P2 cycle 안 깨짐 (날짜 → 워커 순수 함수)
+    // ── N-69 — 클러스터 조율 P2 사전 계산 (두 그룹 충돌 0) ──────────────
+    //  사용자 보고: N-68 (그룹별 사전 계산) 후에도 부엉·달빛 두 그룹이
+    //              같은 P2 풀을 공유 → 같은 날 같은 사람 동시 배정
+    //  원인: 그룹별로 따로 계산 → 서로 모름. 시프트 시간도 겹쳐 한 사람이 둘 다 불가.
+    //  해결: cycle-P1 그룹들을 P2 풀(멤버 집합)로 묶어 클러스터 단위 사전 계산
+    //        · P2 자리 = P1(정동민) cycle 근무일 아닌 날 (cycle 시작 전 포함)
+    //        · period 단위 연속 블록 → 라운드 로빈 (연속 2일 우선 — 사용자 결정 N-69)
+    //        · 같은 날 클러스터 내 다른 그룹엔 절대 같은 사람 X (그리디 충돌 회피)
+    //  효과: 회피/cover 어떤 조합도 안 깨짐 + 두 그룹 사람 안 겹침
     const p2PrecomputedMap = new Map<string, Map<string, string>>()  // groupId → (isoDate → workerId)
     const cycleP1ByGroup = new Map<string, string>()                 // groupId → cycle-P1 workerId
-    for (const g of targetGroups) {
-      const gm = membersByGroup.get(g.id) || []
-      if (gm.length === 0) continue
-      // cycle 패턴 보유 멤버 = P1 (정동민) — 첫 번째
-      const cycleP1 = gm.find(wId => memberWorkCycleMap.has(`${g.id}_${wId}`))
-      if (!cycleP1) continue  // cycle-P1 없는 그룹 → 기존 cursor 분기 사용
-      const p1pat = memberWorkCycleMap.get(`${g.id}_${cycleP1}`)!
-      // P2 멤버 = cycle 미보유 + 백업(P3) 아님 — 등록 순서 (priority ASC) 유지
-      const p2Members = gm.filter(wId =>
-        wId !== cycleP1
-        && !memberWorkCycleMap.has(`${g.id}_${wId}`)
-        && (lookupMember(g.id, wId)?.priority_level ?? 2) !== 3)
-      if (p2Members.length === 0) continue
-      const period = Math.max(1, g.rotation_period_days || 1)
-      const table = new Map<string, string>()
-      for (let d = 1; d <= lastDay; d++) {
-        const isoDate = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`
-        const ord = p2SlotOrdinal(p1pat, isoDate)
-        if (ord == null) continue  // P1 cycle 근무일 — P2 자리 아님
-        const idx = Math.floor(ord / period) % p2Members.length
-        table.set(isoDate, p2Members[idx])
+    {
+      const isoOf = (d: number) =>
+        `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+      const diffDays = (a: string, b: string) =>
+        Math.round((new Date(b + 'T00:00:00').getTime() - new Date(a + 'T00:00:00').getTime()) / 86400000)
+      // 블록 동일 시작일 tiebreak 용 그룹 정렬 순서
+      const groupOrderMap = new Map<string, number>()
+      targetGroups.forEach((g, i) => groupOrderMap.set(g.id, i))
+      // 1. cycle-P1 그룹 수집
+      interface CycleGroupInfo {
+        groupId: string; cycleP1: string; p1pat: WorkCyclePattern
+        p2Members: string[]; period: number
       }
-      p2PrecomputedMap.set(g.id, table)
-      cycleP1ByGroup.set(g.id, cycleP1)
+      const cycleGroups: CycleGroupInfo[] = []
+      for (const g of targetGroups) {
+        const gm = membersByGroup.get(g.id) || []
+        if (gm.length === 0) continue
+        const cycleP1 = gm.find(wId => memberWorkCycleMap.has(`${g.id}_${wId}`))
+        if (!cycleP1) continue  // cycle-P1 없는 그룹 → 기존 cursor 분기
+        const p1pat = memberWorkCycleMap.get(`${g.id}_${cycleP1}`)!
+        const p2Members = gm.filter(wId =>
+          wId !== cycleP1
+          && !memberWorkCycleMap.has(`${g.id}_${wId}`)
+          && (lookupMember(g.id, wId)?.priority_level ?? 2) !== 3)
+        if (p2Members.length === 0) continue
+        cycleGroups.push({
+          groupId: g.id, cycleP1, p1pat, p2Members,
+          period: Math.max(1, g.rotation_period_days || 1),
+        })
+        cycleP1ByGroup.set(g.id, cycleP1)
+      }
+      // 2. P2 풀(멤버 집합) 시그니처로 클러스터 묶기
+      const clusters = new Map<string, CycleGroupInfo[]>()
+      for (const ci of cycleGroups) {
+        const sig = [...ci.p2Members].sort().join('|')
+        const arr = clusters.get(sig) || []
+        arr.push(ci)
+        clusters.set(sig, arr)
+      }
+      // 3. 클러스터별 — 블록 생성 → 정렬 → 그리디 배정
+      interface Block { groupId: string; days: string[]; order: number }
+      for (const cluster of clusters.values()) {
+        const pool = cluster[0].p2Members  // 클러스터 공통 풀 (등록 순서)
+        const blocks: Block[] = []
+        for (const ci of cluster) {
+          // P2 자리 일자 = P1 cycle 근무일 아닌 날 (cycle 시작 전 포함)
+          const p2Days: string[] = []
+          for (let d = 1; d <= lastDay; d++) {
+            const iso = isoOf(d)
+            if (!isWorkDayByCyclePattern(ci.p1pat, iso)) p2Days.push(iso)
+          }
+          // 연속 구간 → period 청크
+          let runStart = 0
+          for (let i = 0; i <= p2Days.length; i++) {
+            const isBreak = i === p2Days.length
+              || (i > 0 && diffDays(p2Days[i - 1], p2Days[i]) !== 1)
+            if (isBreak) {
+              for (let c = runStart; c < i; c += ci.period) {
+                blocks.push({
+                  groupId: ci.groupId,
+                  days: p2Days.slice(c, Math.min(c + ci.period, i)),
+                  order: groupOrderMap.get(ci.groupId) ?? 0,
+                })
+              }
+              runStart = i
+            }
+          }
+        }
+        // 정렬: 첫 날 ASC → 그룹 순서
+        blocks.sort((a, b) =>
+          a.days[0] < b.days[0] ? -1 : a.days[0] > b.days[0] ? 1 : a.order - b.order)
+        // 그리디 배정 — cursor 라운드 로빈 + 같은 날 충돌 회피
+        const assignedByDay = new Map<string, Set<string>>()
+        let cursor = 0
+        for (const blk of blocks) {
+          let chosen: string | null = null
+          for (let i = 0; i < pool.length; i++) {
+            const cand = pool[(cursor + i) % pool.length]
+            const conflict = blk.days.some(d => assignedByDay.get(d)?.has(cand))
+            if (!conflict) {
+              chosen = cand
+              cursor = (cursor + i + 1) % pool.length
+              break
+            }
+          }
+          if (!chosen) {  // 풀 전원 충돌 (pool ≥ 동시 그룹수 면 발생 X)
+            chosen = pool[cursor % pool.length]
+            cursor = (cursor + 1) % pool.length
+          }
+          const table = p2PrecomputedMap.get(blk.groupId) || new Map<string, string>()
+          for (const d of blk.days) {
+            table.set(d, chosen)
+            const set = assignedByDay.get(d) || new Set<string>()
+            set.add(chosen)
+            assignedByDay.set(d, set)
+          }
+          p2PrecomputedMap.set(blk.groupId, table)
+        }
+      }
     }
 
     // N-68 — 특정 워커가 isoDate 에 빠진 사유 (없으면 null = 정상 출근 가능)
