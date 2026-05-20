@@ -1418,6 +1418,7 @@ export async function POST(
     //  효과: 회피/cover 어떤 조합도 안 깨짐 + 두 그룹 사람 안 겹침
     const p2PrecomputedMap = new Map<string, Map<string, string>>()  // groupId → (isoDate → workerId)
     const cycleP1ByGroup = new Map<string, string>()                 // groupId → cycle-P1 workerId
+    const clusterPeersMap = new Map<string, string[]>()              // groupId → 같은 클러스터 옆그룹 ids
     {
       const isoOf = (d: number) =>
         `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`
@@ -1461,6 +1462,11 @@ export async function POST(
       interface Block { groupId: string; days: string[]; order: number }
       for (const cluster of clusters.values()) {
         const pool = cluster[0].p2Members  // 클러스터 공통 풀 (등록 순서)
+        // N-71 — 클러스터 peer 등록 (회피/휴가 cover 대상 = 옆그룹)
+        for (const ci of cluster) {
+          clusterPeersMap.set(ci.groupId,
+            cluster.filter(x => x.groupId !== ci.groupId).map(x => x.groupId))
+        }
         const blocks: Block[] = []
         for (const ci of cluster) {
           // P2 자리 일자 = P1 cycle 근무일 아닌 날 (cycle 시작 전 포함)
@@ -1539,6 +1545,39 @@ export async function POST(
       if (memberMaxConsec != null && memberMaxConsec > 0 && consec >= memberMaxConsec) return 'consec'
       const mc = lookupMember(g.id, ownId)
       if (mc && mc.blocked_slot_ids.has(g.shift_slot_id)) return 'slot_blocked'
+      return null
+    }
+
+    // N-71 — 같은 클러스터 옆그룹의 isoDate 근무자 (회피/휴가 cover 대상)
+    //   사용자 정답지: cover = 「그날 옆그룹에서 일하는 사람」 (정동민이든 P2든)
+    //   그 사람이 그날 두 그룹을 다 맡음 — 추가 근무 (P2 cycle 안 건드림)
+    const whoWorksClusterPeer = (gId: string, isoDate: string): string | null => {
+      const peers = clusterPeersMap.get(gId) || []
+      for (const peerId of peers) {
+        // 옆그룹 P1 (정동민) cycle 근무일?
+        const peerP1 = cycleP1ByGroup.get(peerId)
+        if (peerP1) {
+          const pat = memberWorkCycleMap.get(`${peerId}_${peerP1}`)
+          if (pat && isWorkDayByCyclePattern(pat, isoDate)) {
+            // 정동민 근무일 — 본인이 회피/연차 아니면 정동민이 cover
+            const skipsArr = [...(groupSkipMap.get(peerId) || []), ...globalSkipRows]
+            const onSkip = skipsArr.some(s => s.worker_id === peerP1
+              && isoDate >= s.start_date && isoDate <= s.end_date)
+            const onLeave = workerLeaveMap.get(peerP1)?.get(isoDate) === 'off'
+            if (!onSkip && !onLeave) return peerP1
+            continue  // 옆그룹도 정동민 결원 — 다음 peer
+          }
+        }
+        // P2 자리 — 옆그룹 사전 계산 P2
+        const peerP2 = p2PrecomputedMap.get(peerId)?.get(isoDate)
+        if (peerP2) {
+          const skipsArr = [...(groupSkipMap.get(peerId) || []), ...globalSkipRows]
+          const onSkip = skipsArr.some(s => s.worker_id === peerP2
+            && isoDate >= s.start_date && isoDate <= s.end_date)
+          const onLeave = workerLeaveMap.get(peerP2)?.get(isoDate) === 'off'
+          if (!onSkip && !onLeave) return peerP2
+        }
+      }
       return null
     }
 
@@ -2201,23 +2240,17 @@ export async function POST(
             } else {
               const planned = precomputed.get(isoDate) || null
               if (planned == null) {
-                // [분기 2-N70] P1 cycle 근무일 + P1 회피/연차 = P1 결원
-                //   cover = 어제 이 그룹 P2 의 「추가 근무」 (1일 연장)
-                //   ★ 시간 겹치는 클러스터 — 옆 그룹 당일 근무자 끌어오기 X
-                //     (부엉 20:30~08:30 ∩ 달빛 19:00~23:00 → 한 사람 둘 다 불가)
-                //   어제 P2 가 없거나 오늘 다른 그룹 근무 중이면 → 그날 쉬는 P2
+                // [분기 2-N71] P1 cycle 근무일 + P1(정동민) 회피/연차 = P1 결원
+                //   cover = 그날 옆그룹에서 일하는 사람 (정동민이든 P2든)
+                //   그 사람이 그날 두 그룹 다 맡음 — 추가 근무 (P2 cycle 안 건드림)
                 precomputedOwnerId = cycleP1Id
-                const prevWorker = precomputed.get(addDays(isoDate, -1)) || null
-                const freeP2 = candidates.filter(w => !workedToday.has(w))
-                if (prevWorker && freeP2.includes(prevWorker)) {
-                  selectedList = [
-                    prevWorker,
-                    ...freeP2.filter(w => w !== prevWorker).slice(0, Math.max(0, need - 1)),
-                  ]
-                } else if (freeP2.length > 0) {
-                  selectedList = freeP2.slice(0, need)
+                const peerWorker = whoWorksClusterPeer(g.id, isoDate)
+                if (peerWorker) {
+                  selectedList = [peerWorker]
                 } else {
-                  selectedList = candidates.slice(0, need)
+                  // 옆그룹 근무자 못 찾음 → 그날 쉬는 P2 fallback
+                  const freeP2 = candidates.filter(w => !workedToday.has(w))
+                  selectedList = freeP2.length > 0 ? freeP2.slice(0, need) : candidates.slice(0, need)
                 }
                 selectedViaCover = true
               } else if (candidates.includes(planned)) {
@@ -2229,16 +2262,18 @@ export async function POST(
                     .slice(0, Math.max(0, need - 1)),
                 ]
               } else {
-                // [분기 4-N70] 사전 계산된 P2 가 회피/연차 → 그날 쉬는 P2 로 대체
-                //   계획 점유자(planned)는 그대로 — 다음 날 자리 안 밀림
-                //   selectedViaCover X → 대체 사유는 whyWorkerOut(planned) 로 정확 표기
+                // [분기 4-N71] 사전 계산된 P2 가 회피/휴가 = P2 결원
+                //   cover = 그날 옆그룹에서 일하는 사람 (추가 근무 — cycle 안 건드림)
+                //   계획 점유자(planned)는 표 그대로 — 다음 날 자리 안 밀림
                 precomputedOwnerId = planned
-                const freeP2 = candidates.filter(w => !workedToday.has(w))
-                if (freeP2.length > 0) {
-                  selectedList = freeP2.slice(0, need)
+                const peerWorker = whoWorksClusterPeer(g.id, isoDate)
+                if (peerWorker) {
+                  selectedList = [peerWorker]
                 } else {
-                  selectedList = candidates.slice(0, need)
+                  const freeP2 = candidates.filter(w => !workedToday.has(w))
+                  selectedList = freeP2.length > 0 ? freeP2.slice(0, need) : candidates.slice(0, need)
                 }
+                selectedViaCover = true
               }
             }
           } else if (p1InCandidates && need > 0) {
