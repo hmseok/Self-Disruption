@@ -1495,24 +1495,31 @@ export async function POST(
         // 정렬: 첫 날 ASC → 그룹 순서
         blocks.sort((a, b) =>
           a.days[0] < b.days[0] ? -1 : a.days[0] > b.days[0] ? 1 : a.order - b.order)
-        // 그리디 배정 — cursor 라운드 로빈 + 같은 날 충돌 회피
+        // N-72 — 그룹별 라운드 로빈 (그룹 멤버 순서 기준) + 같은 날 충돌 회피
+        //   각 그룹은 자기 p2Members 순서대로 cursor → 운영자가 그룹 편집기에서
+        //   멤버 순서로 로테이션 순서를 제어. 충돌 시에만 다음 사람으로 skip (안전망).
         const assignedByDay = new Map<string, Set<string>>()
-        let cursor = 0
+        const groupCursor = new Map<string, number>()
+        const p2ByGroup = new Map<string, string[]>()
+        for (const ci of cluster) p2ByGroup.set(ci.groupId, ci.p2Members)
         for (const blk of blocks) {
+          const gp2 = p2ByGroup.get(blk.groupId) || pool
+          let cur = groupCursor.get(blk.groupId) ?? 0
           let chosen: string | null = null
-          for (let i = 0; i < pool.length; i++) {
-            const cand = pool[(cursor + i) % pool.length]
+          for (let i = 0; i < gp2.length; i++) {
+            const cand = gp2[(cur + i) % gp2.length]
             const conflict = blk.days.some(d => assignedByDay.get(d)?.has(cand))
             if (!conflict) {
               chosen = cand
-              cursor = (cursor + i + 1) % pool.length
+              cur = cur + i + 1
               break
             }
           }
-          if (!chosen) {  // 풀 전원 충돌 (pool ≥ 동시 그룹수 면 발생 X)
-            chosen = pool[cursor % pool.length]
-            cursor = (cursor + 1) % pool.length
+          if (!chosen) {  // 풀 전원 충돌 (이론상 발생 X)
+            chosen = gp2[cur % gp2.length]
+            cur = cur + 1
           }
+          groupCursor.set(blk.groupId, cur)
           const table = p2PrecomputedMap.get(blk.groupId) || new Map<string, string>()
           for (const d of blk.days) {
             table.set(d, chosen)
