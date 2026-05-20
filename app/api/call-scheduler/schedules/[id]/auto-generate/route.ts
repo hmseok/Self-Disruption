@@ -274,6 +274,42 @@ function isWorkDayByCyclePattern(p: WorkCyclePattern, isoDate: string): boolean 
   return false   // 도달 X (방어)
 }
 
+// N-68 — P1 cycle 패턴에서 「P2 자리 일자」의 전역 순번 계산 (cursor 폐기용)
+//   P1 (정동민) cycle 휴무일 = P2 자리. cycle startIso 부터 P2 자리에만 0,1,2,... 순번 부여
+//   반환 null = 이 날은 P1 cycle 근무일 (P2 자리 아님)
+//   반환 number = 이 날의 P2 자리 전역 순번 (날짜 → 순번 순수 함수 — 월 경계 무관 연속)
+function p2SlotOrdinal(p: WorkCyclePattern, isoDate: string): number | null {
+  const start = new Date(p.startIso + 'T00:00:00').getTime()
+  const cur = new Date(isoDate + 'T00:00:00').getTime()
+  const elapsed = Math.floor((cur - start) / (24 * 60 * 60 * 1000))
+  if (elapsed < 0) return null   // cycle 시작 전 — P2 자리 아님
+  // 한 cycle 안 휴무(P2 자리) 일수 = 홀수 idx parts 합
+  let offPerCycle = 0
+  for (let i = 1; i < p.parts.length; i += 2) offPerCycle += p.parts[i]
+  const fullCycles = Math.floor(elapsed / p.total)
+  const r = ((elapsed % p.total) + p.total) % p.total
+  // r 위치가 어느 segment 인지 + 그 전까지 휴무 일수
+  let acc = 0
+  let offBeforeR = 0
+  let isOffDay = false
+  for (let i = 0; i < p.parts.length; i++) {
+    const segEnd = acc + p.parts[i]
+    if (r < segEnd) {
+      if (i % 2 === 1) {           // 홀수 idx = 휴무 segment → P2 자리
+        isOffDay = true
+        offBeforeR += (r - acc)    // 이 segment 안 r 이전 휴무 일수
+      } else {
+        isOffDay = false           // 짝수 idx = 근무 segment → P1 일
+      }
+      break
+    }
+    if (i % 2 === 1) offBeforeR += p.parts[i]  // 지나간 휴무 segment 전체
+    acc = segEnd
+  }
+  if (!isOffDay) return null
+  return fullCycles * offPerCycle + offBeforeR
+}
+
 // PR-2QQ-d-3 — 그룹 × 요일별 min_workers 결정 (디폴트 fallback)
 function lookupMinCoverage(
   coverageByGroup: Map<string, CoverageRow[]>,
@@ -1407,6 +1443,64 @@ export async function POST(
     // group_id → rotation cursor (usePriority=false 일 때만 사용)
     const rotState = new Map<string, { cursor: number; dayInPeriod: number }>()
 
+    // ── N-68 — P2 배정 사전 계산 (cursor 깨짐 원천 차단) ──────────────
+    //  사용자 보고: N-63~67 cursor 8회 fix 후에도 회피일 부근 cursor 어긋남
+    //  원인: 일자 루프 안 실시간 cursor 추적이 회피/cover/cycle 조합에 취약
+    //  해결: 일자 루프 전에 그룹별 P2 배정표를 사전 계산
+    //        P2 자리 = P1(정동민) cycle 휴무일 → period_days 단위 라운드 로빈
+    //        회피/연차는 런타임 가드에서 처리 (사전 계산표는 「고정 패턴」만)
+    //  효과: 어떤 회피/cover 조합도 P2 cycle 안 깨짐 (날짜 → 워커 순수 함수)
+    const p2PrecomputedMap = new Map<string, Map<string, string>>()  // groupId → (isoDate → workerId)
+    const cycleP1ByGroup = new Map<string, string>()                 // groupId → cycle-P1 workerId
+    for (const g of targetGroups) {
+      const gm = membersByGroup.get(g.id) || []
+      if (gm.length === 0) continue
+      // cycle 패턴 보유 멤버 = P1 (정동민) — 첫 번째
+      const cycleP1 = gm.find(wId => memberWorkCycleMap.has(`${g.id}_${wId}`))
+      if (!cycleP1) continue  // cycle-P1 없는 그룹 → 기존 cursor 분기 사용
+      const p1pat = memberWorkCycleMap.get(`${g.id}_${cycleP1}`)!
+      // P2 멤버 = cycle 미보유 + 백업(P3) 아님 — 등록 순서 (priority ASC) 유지
+      const p2Members = gm.filter(wId =>
+        wId !== cycleP1
+        && !memberWorkCycleMap.has(`${g.id}_${wId}`)
+        && (lookupMember(g.id, wId)?.priority_level ?? 2) !== 3)
+      if (p2Members.length === 0) continue
+      const period = Math.max(1, g.rotation_period_days || 1)
+      const table = new Map<string, string>()
+      for (let d = 1; d <= lastDay; d++) {
+        const isoDate = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+        const ord = p2SlotOrdinal(p1pat, isoDate)
+        if (ord == null) continue  // P1 cycle 근무일 — P2 자리 아님
+        const idx = Math.floor(ord / period) % p2Members.length
+        table.set(isoDate, p2Members[idx])
+      }
+      p2PrecomputedMap.set(g.id, table)
+      cycleP1ByGroup.set(g.id, cycleP1)
+    }
+
+    // N-68 — 특정 워커가 isoDate 에 빠진 사유 (없으면 null = 정상 출근 가능)
+    //   사전 계산표 그룹에서 「계획 점유자」가 빠졌을 때 대체 사유 판정용
+    const whyWorkerOut = (g: GroupRow, ownId: string, isoDate: string): SubstitutionReason | null => {
+      const skipsArr = [...(groupSkipMap.get(g.id) || []), ...globalSkipRows]
+      if (skipsArr.find(s => s.worker_id === ownId
+          && isoDate >= s.start_date && isoDate <= s.end_date)) return 'group_skip'
+      const lm = workerLeaveMap.get(ownId)
+      if (lm?.get(isoDate) === 'off') return 'leave'
+      const wcp = memberWorkCycleMap.get(`${g.id}_${ownId}`)
+      if (wcp && !isWorkDayByCyclePattern(wcp, isoDate)) return 'work_cycle_off'
+      const cy = lookupWorkerCycle(ownId)
+      if (cy && !isAvailableOnCycle(cy as any, isoDate)) return 'cycle_external'
+      const cn = counter.get(ownId)
+      const workerMax = workerLimits.get(ownId)?.max_days_per_month
+      if (cn && workerMax != null && workerMax > 0 && cn.total >= workerMax) return 'max_days'
+      const consec = workerConsec.get(ownId) || 0
+      const memberMaxConsec = lookupMember(g.id, ownId)?.max_consecutive_work_days
+      if (memberMaxConsec != null && memberMaxConsec > 0 && consec >= memberMaxConsec) return 'consec'
+      const mc = lookupMember(g.id, ownId)
+      if (mc && mc.blocked_slot_ids.has(g.shift_slot_id)) return 'slot_blocked'
+      return null
+    }
+
     // 일자 우선 루프 (통합 counter 의 시간 순서 일관성)
     for (let d = 1; d <= lastDay; d++) {
       const isoDate = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`
@@ -1900,6 +1994,8 @@ export async function POST(
         // (4) usePriority=true 면 가중치 정렬, false 면 단순 rotation
         let selected: string[]
         let selectedViaCoverGroup = false  // N-67-B — cover 분기 진입 시 true
+        let isPrecomputedGroup = false              // N-68 — P2 사전 계산표 적용 그룹
+        let precomputedOwnerId: string | null = null  // N-68 — 이 일자의 계획된 점유자
         if (usePriority) {
           // max 초과 / 패턴 불일치 워커 제외 — K-3: 멤버 단위
           //   N-58 — 0 은 미설정 동의어로 처리 (> 0 가드)
@@ -2042,10 +2138,63 @@ export async function POST(
           })
           const p1Vacant = p1ShouldWorkToday && !p1InCandidates
 
-          // N-66-algo + N-67 — 알고리즘 분기 (P1 / P1결원 / prev / 새 cursor)
+          // N-68 — 알고리즘 분기 (사전 계산표 우선, 없으면 기존 cursor)
           let selectedList: string[]
           let selectedViaCover = false  // N-67-B — cover 분기 진입 플래그 (지역)
-          if (p1InCandidates && need > 0) {
+          const precomputed = p2PrecomputedMap.get(g.id)
+          if (precomputed) {
+            // ── N-68 사전 계산표 그룹 (cycle-P1 보유) — cursor 추적 폐기 ──
+            isPrecomputedGroup = true
+            const cycleP1Id = cycleP1ByGroup.get(g.id) || null
+            if (need <= 0) {
+              selectedList = []
+            } else if (p1InCandidates) {
+              // [분기 1] P1 cycle 근무일 + P1 후보 있음 → P1 (cycle 정상)
+              precomputedOwnerId = cycleP1Id
+              const p1First = candidates.filter(isP1)
+              selectedList = [
+                ...p1First.slice(0, need),
+                ...candidates.filter(w => !p1First.includes(w))
+                  .slice(0, Math.max(0, need - p1First.length)),
+              ]
+            } else {
+              const planned = precomputed.get(isoDate) || null
+              if (planned == null) {
+                // [분기 2] P1 cycle 근무일인데 P1 후보 없음 = P1 결원 (회피/연차)
+                //   cover 우선, 없으면 임시 채움 — 사전 계산표 영향 X (cursor 폐기)
+                precomputedOwnerId = cycleP1Id
+                if (coverWorkingToday.length > 0) {
+                  selectedList = coverWorkingToday.slice(0, need)
+                  selectedViaCover = true
+                } else {
+                  selectedList = candidates.slice(0, need)
+                }
+              } else if (candidates.includes(planned)) {
+                // [분기 3] P2 자리 — 사전 계산된 워커 정상 출근 (cursor 없음 = 안 깨짐)
+                precomputedOwnerId = planned
+                selectedList = [
+                  planned,
+                  ...candidates.filter(w => w !== planned)
+                    .slice(0, Math.max(0, need - 1)),
+                ]
+              } else {
+                // [분기 4] 사전 계산된 P2 가 회피/연차 → cover 우선, 없으면 다른 후보
+                //   계획 점유자(planned)는 그대로 — 다음 날 자리 안 밀림
+                precomputedOwnerId = planned
+                if (coverWorkingToday.length > 0) {
+                  selectedList = [
+                    ...coverWorkingToday.slice(0, need),
+                    ...candidates.filter(w => !coverWorkingToday.includes(w))
+                      .slice(0, Math.max(0, need - coverWorkingToday.length)),
+                  ]
+                  selectedViaCover = true
+                } else {
+                  selectedList = candidates.slice(0, need)
+                }
+              }
+            }
+          } else if (p1InCandidates && need > 0) {
+            // ── 기존 N-66-algo + N-67 cursor 분기 (cycle-P1 없는 그룹) ──
             // [분기 1] P1 후보 있으면 P1 우선 (cycle 정상)
             //   prev 갱신 X — P2 cursor 위치 유지 (P1 cycle 근무 동안 cursor 정지)
             selectedList = candidates.slice(0, need)
@@ -2168,22 +2317,36 @@ export async function POST(
             })
             byGroup[g.id].skipped++
           } else {
-            // N-61 + N-67-B — 대체 사유 추적
+            // N-61 + N-67-B + N-68 — 대체 사유 추적
             //   selectedViaCoverGroup=true 면 cover 분기 진입 → cover_added 강제
+            //   isPrecomputedGroup 면 사전 계산 점유자 기준 정확 판정
             //   아니면 determineSubstitution (workedToday 인자 X — cover 자동 마킹 방지)
             let sub: { reason: SubstitutionReason | null; forWorkerId: string | null }
             if (selectedViaCoverGroup) {
-              // 이 그룹의 빠진 P1 찾기 (대체 대상)
-              const blockedP1 = gMembers.find(ownId => {
-                if ((lookupMember(g.id, ownId)?.priority_level ?? 2) !== 1) return false
-                const skipsArr = [...(groupSkipMap.get(g.id) || []), ...globalSkipRows]
-                if (skipsArr.find(s => s.worker_id === ownId
-                    && isoDate >= s.start_date && isoDate <= s.end_date)) return true
-                const lm = workerLeaveMap.get(ownId)
-                if (lm?.get(isoDate) === 'off') return true
-                return false
-              })
-              sub = { reason: 'cover_added', forWorkerId: blockedP1 || null }
+              // cover 분기 진입 → cover_added (빠진 점유자 찾기)
+              const blockedOwner = isPrecomputedGroup
+                ? precomputedOwnerId
+                : (gMembers.find(ownId => {
+                    if ((lookupMember(g.id, ownId)?.priority_level ?? 2) !== 1) return false
+                    const skipsArr = [...(groupSkipMap.get(g.id) || []), ...globalSkipRows]
+                    if (skipsArr.find(s => s.worker_id === ownId
+                        && isoDate >= s.start_date && isoDate <= s.end_date)) return true
+                    const lm = workerLeaveMap.get(ownId)
+                    if (lm?.get(isoDate) === 'off') return true
+                    return false
+                  }) || null)
+              sub = { reason: 'cover_added', forWorkerId: blockedOwner }
+            } else if (isPrecomputedGroup) {
+              // N-68 — 사전 계산표 그룹: 계획 점유자와 일치 = 정상 (대체 마킹 X)
+              //   불일치 = 계획 점유자가 빠짐 → 그 사유 + 대상 워커 표시
+              if (precomputedOwnerId == null || wId === precomputedOwnerId) {
+                sub = { reason: null, forWorkerId: null }
+              } else {
+                sub = {
+                  reason: whyWorkerOut(g, precomputedOwnerId, isoDate) ?? 'work_cycle_off',
+                  forWorkerId: precomputedOwnerId,
+                }
+              }
             } else {
               // workedToday 인자 생략 → determineSubstitution 의 cover 자동 마킹 비활성
               sub = determineSubstitution(g, wId, isoDate)
