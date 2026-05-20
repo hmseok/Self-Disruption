@@ -3,6 +3,40 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-19 (Phase N-67) — P1 결원 cursor 정지 + cover 마킹 정확화
+
+### SQL 분석
+부엉 6/2~19 라운드 로빈 완벽 ✓ 그러나:
+- 6/20 정동민 회피일에 P2 cursor 1칸 소비 → 6/22 어긋남
+- 6/19 cover_added 잘못 마킹 (P2 cursor 정상 진입인데)
+
+### 수정 A — P1 결원 = cursor 정지
+```ts
+const p1ShouldWorkToday = p1Members.some(p1Id => {
+  const wcp = memberWorkCycleMap.get(`${g.id}_${p1Id}`)
+  return wcp ? isWorkDayByCyclePattern(wcp, isoDate) : false
+})
+const p1Vacant = p1ShouldWorkToday && !p1InCandidates
+```
+- 정동민 cycle 근무 phase 인데 회피/연차로 빠짐 = P1 결원
+- [분기 2-N67] cover 또는 P2 임시 채움
+- **p2CursorMap / prev 갱신 X** → P2 cursor 정지
+- 정동민 회피일도 「정동민 자리」 로 취급 → P2 흐름 안 깨짐
+
+### 수정 B — cover_added 마킹 정확화
+- `selectedViaCoverGroup` 플래그 — 실제 cover 분기 진입 시만 true
+- plan.push 시 selectedViaCoverGroup=true → cover_added
+- 아니면 determineSubstitution (workedToday 인자 생략 → cover 자동 마킹 비활성)
+- 자기 그룹 P2 cursor 정상 진입은 cover_added 마킹 X
+
+### 알고리즘 분기 (최종 4)
+1. P1 후보 → P1 (cycle 정상)
+2. **P1 결원** (cycle 근무인데 회피) → cover/임시, cursor 정지
+3. prev P2 cursor (period_days 연속)
+4. 새 P2 cursor (라운드 로빈)
+
+---
+
 ## 2026-05-19 (Phase N-66-algo2) — P2 cursor 라운드 로빈 (멤버 등록 순서)
 
 ### 사용자 지적

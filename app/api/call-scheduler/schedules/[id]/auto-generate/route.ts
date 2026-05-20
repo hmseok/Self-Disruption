@@ -1899,6 +1899,7 @@ export async function POST(
 
         // (4) usePriority=true 면 가중치 정렬, false 면 단순 rotation
         let selected: string[]
+        let selectedViaCoverGroup = false  // N-67-B — cover 분기 진입 시 true
         if (usePriority) {
           // max 초과 / 패턴 불일치 워커 제외 — K-3: 멤버 단위
           //   N-58 — 0 은 미설정 동의어로 처리 (> 0 가드)
@@ -2031,18 +2032,44 @@ export async function POST(
           const ownCandidates = candidates.filter(wId => gMembers.includes(wId))
           const ownShort = Math.max(0, need - ownCandidates.length)
 
-          // N-66-algo — 알고리즘 분기 단순화 (5 → 3)
-          //   기존 분기들 (cover / p2Short / prev / else) 이 엇갈리며 cursor 깨짐
-          //   3 분기로 단순화: P1 / prev P2 / 새 cursor
+          // N-67 — P1 (cycle 워커) 이 오늘 cycle 근무 phase 인가?
+          //   근무 phase 인데 candidates 에 없음 = 회피/연차로 빠진 P1 결원
+          //   → cover/임시 채움 + P2 cursor 정지 (cursor 깨짐 방지)
+          const p1MembersOfGroup = gMembers.filter(isP1)
+          const p1ShouldWorkToday = p1MembersOfGroup.some(p1Id => {
+            const wcp = memberWorkCycleMap.get(`${g.id}_${p1Id}`)
+            return wcp ? isWorkDayByCyclePattern(wcp, isoDate) : false
+          })
+          const p1Vacant = p1ShouldWorkToday && !p1InCandidates
+
+          // N-66-algo + N-67 — 알고리즘 분기 (P1 / P1결원 / prev / 새 cursor)
           let selectedList: string[]
+          let selectedViaCover = false  // N-67-B — cover 분기 진입 플래그 (지역)
           if (p1InCandidates && need > 0) {
             // [분기 1] P1 후보 있으면 P1 우선 (cycle 정상)
-            //   기존 가중치 정렬에서 P1 이 위쪽 → slice 로 자연 우선
-            //   prev 갱신 X — P2 cursor 위치 유지 (P1 cycle 근무 phase 동안 P2 dayInPeriod 정지)
+            //   prev 갱신 X — P2 cursor 위치 유지 (P1 cycle 근무 동안 cursor 정지)
             selectedList = candidates.slice(0, need)
+          } else if (p1Vacant && need > 0) {
+            // [분기 2-N67] P1 cycle 근무 phase 인데 회피/연차로 빠짐 = P1 결원
+            //   cover (다른 그룹 근무자) 우선, 없으면 P2 임시
+            //   ★ p2CursorMap / prev 갱신 X — P2 cursor 정지 (정동민 자리 = cursor 영향 X)
+            if (coverWorkingToday.length > 0) {
+              selectedList = coverWorkingToday.slice(0, need)
+              selectedViaCover = true
+            } else {
+              // cover 없음 → P2 임시 (cursor 위치 사람, cursor 갱신 X)
+              const p2Members = gMembers.filter(isP2Strict)
+              let temp: string | null = null
+              const cur = p2CursorMap.get(g.id) ?? 0
+              for (let i = 0; i < p2Members.length; i++) {
+                const wId = p2Members[(cur + i) % p2Members.length]
+                if (candidates.includes(wId)) { temp = wId; break }
+              }
+              selectedList = temp ? [temp] : candidates.slice(0, need)
+            }
           } else if (prev && !prevWorkerIsP1 && prev.dayInPeriod < period
                      && candidates.includes(prev.worker_id) && need > 0) {
-            // [분기 2] 전일 P2 selected + period_days 내 → 그 워커 우선 (연속 근무)
+            // [분기 3] 전일 P2 selected + period_days 내 → 그 워커 우선 (연속 근무)
             const others = candidates.filter(wId => wId !== prev.worker_id)
             selectedList = [prev.worker_id, ...others.slice(0, Math.max(0, need - 1))]
             prevDaySelectedMap.set(g.id, {
@@ -2050,10 +2077,7 @@ export async function POST(
               dayInPeriod: prev.dayInPeriod + 1,
             })
           } else {
-            // [분기 3] 새 P2 cursor — 라운드 로빈 (멤버 등록 순서)
-            //   N-66-algo2 — 사용자 의도: 「로테이션 패턴 = 멤버 등록 순서」
-            //   last_date 정렬 폐기. p2CursorMap 으로 cursor 명시 추적.
-            //   cursor 위치 멤버가 candidates 에 있으면 그 사람, 없으면 다음 cursor.
+            // [분기 4] 새 P2 cursor — 라운드 로빈 (멤버 등록 순서)
             const p2Members = gMembers.filter(isP2Strict)
             let candidate: string | null = null
             let nextCursor: number | null = null
@@ -2080,12 +2104,13 @@ export async function POST(
                 ...candidates.filter(wId => !coverWorkingToday.includes(wId))
                   .slice(0, Math.max(0, need - coverWorkingToday.length)),
               ]
+              selectedViaCover = true
             } else {
-              // fallback
               selectedList = candidates.slice(0, need)
             }
           }
           selected = selectedList
+          selectedViaCoverGroup = selectedViaCover  // 상위 scope 로 전달 (plan.push 단계)
         } else {
           // 단순 rotation (legacy)
           if (g.generation_strategy === 'rotation') {
@@ -2143,8 +2168,26 @@ export async function POST(
             })
             byGroup[g.id].skipped++
           } else {
-            // N-61 — 대체 사유 추적 (원래 P1 이 빠진 자리인지 확인)
-            const sub = determineSubstitution(g, wId, isoDate, workedToday)
+            // N-61 + N-67-B — 대체 사유 추적
+            //   selectedViaCoverGroup=true 면 cover 분기 진입 → cover_added 강제
+            //   아니면 determineSubstitution (workedToday 인자 X — cover 자동 마킹 방지)
+            let sub: { reason: SubstitutionReason | null; forWorkerId: string | null }
+            if (selectedViaCoverGroup) {
+              // 이 그룹의 빠진 P1 찾기 (대체 대상)
+              const blockedP1 = gMembers.find(ownId => {
+                if ((lookupMember(g.id, ownId)?.priority_level ?? 2) !== 1) return false
+                const skipsArr = [...(groupSkipMap.get(g.id) || []), ...globalSkipRows]
+                if (skipsArr.find(s => s.worker_id === ownId
+                    && isoDate >= s.start_date && isoDate <= s.end_date)) return true
+                const lm = workerLeaveMap.get(ownId)
+                if (lm?.get(isoDate) === 'off') return true
+                return false
+              })
+              sub = { reason: 'cover_added', forWorkerId: blockedP1 || null }
+            } else {
+              // workedToday 인자 생략 → determineSubstitution 의 cover 자동 마킹 비활성
+              sub = determineSubstitution(g, wId, isoDate)
+            }
             plan.push({
               work_date: isoDate, shift_slot_id: g.shift_slot_id, worker_id: wId,
               special_code: special,
