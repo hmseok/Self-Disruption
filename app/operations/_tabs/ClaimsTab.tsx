@@ -76,6 +76,14 @@ export default function ClaimsTab() {
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState<string | null>(null)
 
+  // PR-D2 — 청구 작성 모달
+  const [claimModalOpen, setClaimModalOpen] = useState(false)
+  const [selectedClaim, setSelectedClaim] = useState<ClaimRow | null>(null)
+  const [claimAmount, setClaimAmount] = useState('')
+  const [claimNo, setClaimNo] = useState('')
+  const [claimBusy, setClaimBusy] = useState(false)
+  const [claimMsg, setClaimMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
+
   const fetchAll = useCallback(async () => {
     setLoading(true)
     setErr(null)
@@ -107,6 +115,43 @@ export default function ClaimsTab() {
     setRows(null)
     fetchAll()
   }, [fetchAll])
+
+  // PR-D2 — 행 클릭 → 청구 작성 모달 오픈
+  const openClaim = useCallback((r: ClaimRow) => {
+    setSelectedClaim(r)
+    setClaimAmount(r.final_claim_amount != null ? String(r.final_claim_amount) : '')
+    setClaimNo(r.insurance_claim_no || '')
+    setClaimMsg(null)
+    setClaimModalOpen(true)
+  }, [])
+
+  // PR-D2 — 청구 저장 (status 전이: claiming / settled)
+  const saveClaim = useCallback(async (nextStatus: 'claiming' | 'settled') => {
+    if (!selectedClaim) return
+    setClaimBusy(true)
+    setClaimMsg(null)
+    try {
+      const headers = { ...(await getAuthHeader()), 'Content-Type': 'application/json' }
+      const res = await fetch(`/api/fmi-rentals/${selectedClaim.id}`, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({
+          final_claim_amount: claimAmount === '' ? null : Number(claimAmount),
+          insurance_claim_no: claimNo || null,
+          status: nextStatus,
+        }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (json?.error) throw new Error(json.error)
+      setClaimMsg({ type: 'ok', text: nextStatus === 'settled' ? '정산 완료 처리됨' : '청구 확정 저장됨' })
+      setClaimModalOpen(false)
+      refresh()
+    } catch (e: any) {
+      setClaimMsg({ type: 'err', text: e?.message || '저장 실패' })
+    } finally {
+      setClaimBusy(false)
+    }
+  }, [selectedClaim, claimAmount, claimNo, refresh])
 
   // 청구관리 영역 (returned/claiming/settled) 만
   const claimRows = useMemo(
@@ -243,15 +288,133 @@ export default function ClaimsTab() {
         columns={columns}
         data={filtered}
         rowKey={(r) => r.id}
+        onRowClick={openClaim}
         loading={loading}
         emptyIcon="💰"
         emptyMessage="청구 대상 (회차 완료) 건이 없습니다"
         mobileCard={mobileCard}
         defaultSort={{ key: 'actual_return_date', dir: 'desc' }}
       />
-      {/* PR-D1 안내 */}
+      <div style={{ marginTop: 12, fontSize: 12, color: '#64748b' }}>
+        💡 행을 클릭하면 청구 작성 (청구액·보험접수번호 입력 / 청구 확정 / 정산 완료) 화면이 열립니다.
+      </div>
+
+      {/* PR-D2 — 청구 작성 모달 */}
+      {claimModalOpen && selectedClaim && (
+        <div
+          onClick={() => !claimBusy && setClaimModalOpen(false)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 50,
+            background: 'rgba(15,23,42,0.45)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              ...GLASS.L5,
+              backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
+              width: 'min(560px, 96vw)', maxHeight: '86vh',
+              borderRadius: 16, boxShadow: '0 24px 60px rgba(0,0,0,0.25)',
+              display: 'flex', flexDirection: 'column', overflow: 'hidden',
+            }}
+          >
+            {/* 헤더 */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '16px 20px', borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
+              <h3 style={{ fontSize: 15, fontWeight: 900, color: '#0f2440', margin: 0 }}>💰 청구 작성</h3>
+              <span style={{ fontSize: 11, color: '#94a3b8' }}>
+                🚗 {selectedClaim.vehicle_car_number || '-'} · {selectedClaim.customer_name || '-'}
+              </span>
+              <div style={{ flex: 1 }} />
+              <button onClick={() => !claimBusy && setClaimModalOpen(false)}
+                style={{ padding: '5px 10px', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 16, color: '#64748b' }}>✕</button>
+            </div>
+            {/* 본문 */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+              {/* 참고 정보 */}
+              <div style={{ ...GLASS.L3, padding: '10px 12px', borderRadius: 8, fontSize: 12, display: 'grid', gridTemplateColumns: '90px 1fr', gap: '5px 10px' }}>
+                <span style={{ color: '#94a3b8', fontWeight: 700 }}>보험사</span>
+                <span style={{ color: '#1e293b', fontWeight: 600 }}>{selectedClaim.insurance_company || '-'}</span>
+                <span style={{ color: '#94a3b8', fontWeight: 700 }}>대여기간</span>
+                <span style={{ color: '#1e293b', fontWeight: 600 }}>{selectedClaim.rental_days != null ? `${selectedClaim.rental_days}일` : '-'}</span>
+                <span style={{ color: '#94a3b8', fontWeight: 700 }}>일대여료</span>
+                <span style={{ color: '#1e293b', fontWeight: 600 }}>{fmtWon(selectedClaim.daily_rate)}</span>
+                <span style={{ color: '#94a3b8', fontWeight: 700 }}>대여료 합계</span>
+                <span style={{ color: '#1e293b', fontWeight: 600 }}>{fmtWon(selectedClaim.total_rental_fee)}</span>
+              </div>
+              {/* 청구액 */}
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#475569', marginBottom: 5 }}>최종 청구액 (원)</label>
+                <input
+                  type="number"
+                  value={claimAmount}
+                  onChange={(e) => setClaimAmount(e.target.value)}
+                  placeholder="예: 540000"
+                  style={{ ...GLASS.L1, width: '100%', padding: '9px 12px', borderRadius: 8, fontSize: 13, color: '#1e293b' }}
+                />
+                {claimAmount !== '' && (
+                  <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>
+                    = {Number(claimAmount).toLocaleString('ko-KR')}원
+                  </div>
+                )}
+              </div>
+              {/* 보험접수번호 */}
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#475569', marginBottom: 5 }}>보험 접수번호</label>
+                <input
+                  value={claimNo}
+                  onChange={(e) => setClaimNo(e.target.value)}
+                  placeholder="보험사 청구 접수번호"
+                  style={{ ...GLASS.L1, width: '100%', padding: '9px 12px', borderRadius: 8, fontSize: 13, color: '#1e293b' }}
+                />
+              </div>
+              {claimMsg && (
+                <div style={{ fontSize: 12, fontWeight: 700, color: claimMsg.type === 'ok' ? '#15803d' : '#991b1b' }}>
+                  {claimMsg.type === 'ok' ? '✅' : '⚠️'} {claimMsg.text}
+                </div>
+              )}
+            </div>
+            {/* 푸터 — 청구 확정 / 정산 완료 */}
+            <div style={{ display: 'flex', gap: 8, padding: '14px 20px', borderTop: '1px solid rgba(0,0,0,0.06)' }}>
+              <button onClick={() => !claimBusy && setClaimModalOpen(false)}
+                style={{ padding: '9px 16px', background: 'transparent', border: '1px solid rgba(0,0,0,0.12)', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700, color: '#475569' }}>
+                취소
+              </button>
+              <div style={{ flex: 1 }} />
+              <button
+                onClick={() => saveClaim('claiming')}
+                disabled={claimBusy}
+                style={{
+                  padding: '9px 18px',
+                  background: 'linear-gradient(135deg, #6366f1, #4f46e5)',
+                  color: '#fff', border: 'none', borderRadius: 8,
+                  cursor: claimBusy ? 'not-allowed' : 'pointer', fontWeight: 800, fontSize: 12,
+                  opacity: claimBusy ? 0.5 : 1,
+                }}
+              >
+                📤 청구 확정
+              </button>
+              <button
+                onClick={() => saveClaim('settled')}
+                disabled={claimBusy}
+                style={{
+                  padding: '9px 18px',
+                  background: 'linear-gradient(135deg, #10b981, #059669)',
+                  color: '#fff', border: 'none', borderRadius: 8,
+                  cursor: claimBusy ? 'not-allowed' : 'pointer', fontWeight: 800, fontSize: 12,
+                  opacity: claimBusy ? 0.5 : 1,
+                }}
+              >
+                ✅ 정산 완료
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PR-D 안내 */}
       <div style={{ marginTop: 16, padding: '12px 14px', background: 'rgba(99,102,241,0.05)', border: '1px dashed rgba(99,102,241,0.3)', borderRadius: 10, fontSize: 12, color: '#475569' }}>
-        ℹ️ PR-D1: 청구 대상 list (회차 완료 건). 다음 단계 — PR-D2 청구 작성 폼 (청구액·보험접수번호) / PR-D3 입금% 동적 계산.
+        ℹ️ PR-D1+D2: 청구 대상 list + 청구 작성 (청구액·보험접수번호 / 청구 확정 / 정산 완료). 다음 — PR-D3 입금% 동적 계산 (transactions JOIN).
       </div>
     </div>
   )
