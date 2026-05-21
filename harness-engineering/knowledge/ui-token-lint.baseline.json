@@ -914,103 +914,103 @@
     },
     {
       "file": "app/components/auth/ClientLayout.tsx",
-      "line": 101,
+      "line": 103,
       "label": "glass-bg-hardcode",
       "snippet": "boxShadow: '3px 3px 8px rgba(140,170,210,0.19), -1px -1px 4px rgba(255,255,255,0.47)',"
     },
     {
       "file": "app/components/auth/ClientLayout.tsx",
-      "line": 292,
+      "line": 294,
       "label": "glass-bg-hardcode",
       "snippet": "<div className=\"fixed top-0 left-0 right-0 z-30 safe-top\" style={{ background: 'rgba(255,255,255,0.85)', backdropFilter:"
     },
     {
       "file": "app/components/auth/ClientLayout.tsx",
-      "line": 318,
+      "line": 320,
       "label": "glass-bg-hardcode",
       "snippet": "<aside className={`${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} w-60 transition-transform duration-300 overf"
     },
     {
       "file": "app/components/auth/ClientLayout.tsx",
-      "line": 333,
+      "line": 335,
       "label": "glass-bg-hardcode",
       "snippet": "<div className=\"rounded-lg px-3 py-3\" style={{ background: 'rgba(0,0,0,0.02)', border: '1px solid rgba(0,0,0,0.06)', box"
     },
     {
       "file": "app/components/auth/ClientLayout.tsx",
-      "line": 373,
+      "line": 375,
       "label": "glass-bg-hardcode",
       "snippet": "boxShadow: '3px 3px 8px rgba(140,170,210,0.19), -1px -1px 4px rgba(255,255,255,0.47)',"
     },
     {
       "file": "app/components/auth/ClientLayout.tsx",
-      "line": 391,
+      "line": 393,
       "label": "glass-bg-hardcode",
       "snippet": "boxShadow: '3px 3px 8px rgba(16,185,129,0.22), -1px -1px 4px rgba(255,255,255,0.47)',"
     },
     {
       "file": "app/components/auth/ClientLayout.tsx",
-      "line": 398,
+      "line": 400,
       "label": "glass-bg-hardcode",
       "snippet": "'4px 4px 12px rgba(16,185,129,0.30), -1px -1px 4px rgba(255,255,255,0.55)'"
     },
     {
       "file": "app/components/auth/ClientLayout.tsx",
-      "line": 403,
+      "line": 405,
       "label": "glass-bg-hardcode",
       "snippet": "'3px 3px 8px rgba(16,185,129,0.22), -1px -1px 4px rgba(255,255,255,0.47)'"
     },
     {
       "file": "app/components/auth/ClientLayout.tsx",
-      "line": 547,
+      "line": 567,
       "label": "glass-bg-hardcode",
       "snippet": "boxShadow: '12px 12px 30px rgba(140,170,210,0.25), -8px -8px 20px rgba(255,255,255,0.5)',"
     },
     {
       "file": "app/components/auth/ClientLayout.tsx",
-      "line": 640,
+      "line": 660,
       "label": "glass-bg-hardcode",
       "snippet": "<div style={{ width: 14, height: 14, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '5"
     },
     {
       "file": "app/components/auth/ClientLayout.tsx",
-      "line": 658,
+      "line": 678,
       "label": "glass-bg-hardcode",
       "snippet": "background: 'rgba(22,32,54,0.97)', backdropFilter: 'blur(16px)', boxShadow: '0 8px 32px rgba(0,0,0,0.4), 0 0 0 1px rgba("
     },
     {
       "file": "app/components/auth/ClientLayout.tsx",
-      "line": 672,
+      "line": 692,
       "label": "glass-bg-hardcode",
       "snippet": "<div style={{ width: 16, height: 16, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '5"
     },
     {
       "file": "app/components/auth/ClientLayout.tsx",
-      "line": 682,
+      "line": 702,
       "label": "glass-bg-hardcode",
       "snippet": "<span style={{ fontSize: 11, fontWeight: 700, color: '#fff', background: 'rgba(255,255,255,0.2)', padding: '2px 8px', bo"
     },
     {
       "file": "app/components/auth/ClientLayout.tsx",
-      "line": 687,
+      "line": 707,
       "label": "glass-bg-hardcode",
       "snippet": "<span style={{ fontSize: 11, fontWeight: 700, color: '#fff', background: 'rgba(255,255,255,0.25)', padding: '2px 8px', b"
     },
     {
       "file": "app/components/auth/ClientLayout.tsx",
-      "line": 692,
+      "line": 712,
       "label": "glass-bg-hardcode",
       "snippet": "style={{ background: 'rgba(255,255,255,0.15)', border: 'none', cursor: 'pointer', borderRadius: 6, padding: '2px 6px', c"
     },
     {
       "file": "app/components/auth/ClientLayout.tsx",
-      "line": 698,
+      "line": 718,
       "label": "glass-bg-hardcode",
       "snippet": "style={{ background: 'rgba(255,255,255,0.15)', border: 'none', cursor: 'pointer', borderRadius: 6, padding: '2px 6px', c"
     },
     {
       "file": "app/components/auth/ClientLayout.tsx",
-      "line": 710,
+      "line": 730,
       "label": "glass-bg-hardcode",
       "snippet": "<div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 6, height: 5, overflow: 'hidden', marginBottom: 8 }}>"
     },
@@ -3283,6 +3283,6 @@
       "snippet": "boxShadow: '6px 6px 18px rgba(140,170,210,0.14), -6px -6px 18px rgba(255,255,255,0.47)',"
     }
   ],
-  "generatedAt": "2026-05-21T13:21:30.875Z",
+  "generatedAt": "2026-05-21T13:27:43.625Z",
   "note": "UI 토큰 hardcode (inline rgba). 기존 위반 동결, 새 위반만 차단."
 }

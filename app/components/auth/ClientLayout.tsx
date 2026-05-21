@@ -72,6 +72,8 @@ const WORK_ESSENTIALS_MENUS = getMenusByGroup('work-essentials').filter(isSideba
 const CX_TEAM_MENUS = getMenusByGroup('cx-team').filter(isSidebarVisible).map(toMenuItem)
 // PR-6.9.b (2026-05-06) — 관리자 운영 그룹 (Employee of Ride Inc. 하위)
 const ADMIN_OPS_MENUS = getMenusByGroup('admin-ops').filter(isSidebarVisible).map(toMenuItem)
+// PR-MT-OPS-FIX (2026-05-19) — MT팀 그룹 (메인 세션 ClientLayout 렌더링 누락 보완)
+const MT_TEAM_MENUS = getMenusByGroup('mt-team').filter(isSidebarVisible).map(toMenuItem)
 const SETTINGS_MENUS_ALL = getMenusByGroup('settings').filter(isSidebarVisible).map(toMenuItem)
 // 「회사 정보」를 첫 entry 로 분리 (legacy COMPANY_INFO_MENU 호환)
 const COMPANY_INFO_MENU = SETTINGS_MENUS_ALL.find(m => m.path === '/db/codes')
@@ -467,6 +469,24 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
                     </div>
                     <div className="space-y-0.5 ml-2">
                       {visibleAdminOps.map(item => (
+                        <MenuItem key={item.path} item={item} pathname={pathname} allPaths={allMenuPaths} />
+                      ))}
+                    </div>
+                  </>
+                )
+              })()}
+
+              {/* MT팀 sub-section (PR-MT-OPS-FIX) — 권한 있는 사용자만 */}
+              {(() => {
+                const visibleMtTeam = MT_TEAM_MENUS.filter(item => !item.requirePermission || role === 'admin' || hasPageAccess(item.path))
+                if (visibleMtTeam.length === 0) return null
+                return (
+                  <>
+                    <div className="px-4 mt-2 mb-0.5">
+                      <span className="text-[9px] font-semibold text-slate-500 tracking-wider">▸ MT팀</span>
+                    </div>
+                    <div className="space-y-0.5 ml-2">
+                      {visibleMtTeam.map(item => (
                         <MenuItem key={item.path} item={item} pathname={pathname} allPaths={allMenuPaths} />
                       ))}
                     </div>
