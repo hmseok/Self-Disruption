@@ -103,6 +103,8 @@ export default function HRMasterPage() {
     return 'employees' as TopTab
   })()
   const [topTab, setTopTab] = useState<TopTab>(initialTab)
+  // PR-HR-2b — 「외부 인력」 탭 서브탭 (프리랜서 / 라이드 인력)
+  const [externalSubTab, setExternalSubTab] = useState<'freelancer' | 'ride'>('freelancer')
   // querystring 변경 시 탭 동기화 + 탭 변경 시 querystring 반영
   useEffect(() => {
     const q = searchParams?.get('tab') as TopTab | null
@@ -1344,7 +1346,22 @@ export default function HRMasterPage() {
             💡 외부 인력은 직원 (profiles) 과 별개 — 시스템 권한/계정 X. <b>등록/수정은 여기서</b>, <b>월별 지급</b>은 「💼 급여 운영 → 프리랜서 지급」 탭.
           </div>
 
+          {/* 서브탭 — 프리랜서 / 라이드 인력 (PR-HR-2b) */}
+          <div style={{ display: 'flex', gap: 8 }}>
+            {([['freelancer', `🤝 프리랜서 ${freelancers.length}`], ['ride', `🚗 라이드 인력 ${rideEmployees.length}`]] as const).map(([key, label]) => (
+              <button key={key} onClick={() => setExternalSubTab(key)}
+                style={{
+                  padding: '6px 16px', fontSize: 13, fontWeight: 600, borderRadius: 8, cursor: 'pointer', border: 'none',
+                  background: externalSubTab === key ? '#0f2440' : 'transparent',
+                  color: externalSubTab === key ? '#fff' : '#64748b',
+                }}>
+                {label}
+              </button>
+            ))}
+          </div>
+
           {/* 프리랜서 */}
+          {externalSubTab === 'freelancer' && (
           <div style={{ ...glassCard, padding: 20 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
               <h3 style={{ fontSize: 14, fontWeight: 700, color: '#1e293b', margin: 0 }}>🤝 프리랜서 ({freelancers.length})</h3>
@@ -1506,9 +1523,10 @@ export default function HRMasterPage() {
               })}
             </div>
           </div>
+          )}
 
           {/* 라이드케어 인력 부서 관리 — PR-HR-2 (부서 트리/부서장/일괄변경/focus) */}
-          <RideOrgPanel />
+          {externalSubTab === 'ride' && <RideOrgPanel />}
         </div>
       )}
 

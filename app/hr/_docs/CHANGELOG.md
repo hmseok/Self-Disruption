@@ -5,6 +5,9 @@
 
 ## 2026-05-16
 
+- **PR-HR-2b** (hr 세션) — 「외부 인력」 탭 서브탭 분리.
+  - 프리랜서(22명) + 라이드 인력 부서관리가 위아래로 쌓여 스크롤 과도 (사용자 피드백).
+  - 서브탭 2개로 분리: 「🤝 프리랜서」 / 「🚗 라이드 인력」 — `externalSubTab` state, 검정 pill 활성 스타일.
 - **PR-HR-2** (hr 세션) — `/hr` 「외부 인력」 탭 라이드케어 인력 부서 관리 UI.
   - `app/hr/_components/RideOrgPanel.tsx` 신설 — 「조회 only」 → 본격 부서 관리.
   - DcStatStrip 5칸 (활성/부서수/이번달입사/퇴사예정/승진대상) + 좌측 부서 트리 (Glass 5색) + 우측 NeuDataTable.
