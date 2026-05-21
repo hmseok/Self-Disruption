@@ -6,6 +6,48 @@
 
 ## 2026-05-13
 
+### hotfix-V2-Mention-Cleanup — >ERP 멘션 제거 (회의록 독립 운영)
+
+**사용자 명령**:
+> 「멘션은 사용자들 위주로 하는게」
+> 「차량이나 이런것들은 연결하면 복잡해지니 별도로 회의록을 운영하는게 낫지않을까」
+> 「우리등록차량이 아니라 카페24나 별도 고객사관리·사고접수 쪽이랑 연동할껀데 — 그게 맞게 되어있어요?」
+
+**진단**:
+- `>ERP 멘션` (V2-C-3) 의 `/api/meetings/mentions/entities` 가 우리 ERP 자체 테이블 (`cars`/`contracts`/`customers`) 조회
+- 사용자 의도: 차량/고객 데이터는 카페24(skyautosvc) / 사고접수(acrotpth) / 고객사 관리 쪽 — `cars` ≠ 카페24
+- 데이터 소스 자체가 틀림 + 회의록을 ERP와 깊게 엮는 것 자체가 복잡도만 증가
+
+**결정 — `>ERP 멘션` 통째 제거**:
+- 회의록 멘션 = **@직원 + #회의** 두 가지만 (사용자/회의 위주, 회의록 독립 운영)
+- 차량/고객사/사고접수 연동은 회의록 모듈 범위 외 (RideAccidents / cafe24 모듈 — 별도 세션)
+
+**제거 내역**:
+- `app/meetings/_components/extensions/MentionEntity.ts` 삭제
+- `app/api/meetings/mentions/entities/route.ts` 삭제
+- `TiptapEditor.tsx`:
+  - MentionEntity import / extensions 등록 제거
+  - `editorProps.handleClickOn` 의 `mentionEntity` 분기 제거
+  - CSS `.mention-entity` 스타일 제거
+  - footer 안내에서 `>` 항목 제거 → `/ @ #` 만
+- V2-D (ERP 인라인 임베드) 도 함께 폐기 — 동일 사유 (회의록 독립 운영)
+
+**유지**:
+- `@직원 멘션` (MentionEmployee — ride_employees) — 참석자/담당자 필수
+- `#회의 멘션` (MentionMeeting — meetings) — 회의록끼리 연결
+
+**Rule 8**: `>` 입력 시 더 이상 popper 안 뜸. 기존 본문에 저장된 mentionEntity 노드는 unknown node 로 렌더 (TipTap 이 graceful 처리 — 텍스트 fallback). 신규 작성 영향 X.
+**Rule 14**: 멘션 2종 (@직원/#회의) 동형 유지 — MentionList 공용
+**Rule 21**: 자기 모듈 (meetings + api:meetings)
+**Rule 22**: 본 CHANGELOG ✓
+
+**폐기 확정 (회의록 모듈 범위 외)**:
+- V2-D ERP 인라인 임베드 (계약/차량/매출 카드)
+- `>ERP 멘션` (계약/차량/고객)
+- → 회의록은 본문 + 참석자 + 액션 + 개인 메모 + 권한 + @직원/#회의 멘션으로 독립 운영
+
+---
+
 ### PR-MTG-V2-Me — 내 TODO 대시보드 (/meetings/me)
 
 **사용자 명령**: 「3번 (한꺼번에)」 + 「ㄱㄱ」 — Note + Visibility 후 마지막.

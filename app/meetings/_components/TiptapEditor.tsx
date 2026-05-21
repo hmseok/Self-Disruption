@@ -13,7 +13,6 @@ import TableCell from '@tiptap/extension-table-cell'
 import SlashCommand from './extensions/SlashCommand'
 import MentionEmployee from './extensions/MentionEmployee'
 import MentionMeeting from './extensions/MentionMeeting'
-import MentionEntity from './extensions/MentionEntity'
 import { useEffect, useRef } from 'react'
 import { COLORS, GLASS } from '@/app/utils/ui-tokens'
 
@@ -85,7 +84,6 @@ export default function TiptapEditor({
       SlashCommand,
       MentionEmployee,
       MentionMeeting,
-      MentionEntity,
     ],
     editorProps: {
       // PR-V2-C-4 — 멘션 클릭 시 페이지 이동
@@ -105,22 +103,6 @@ export default function TiptapEditor({
           const id = node.attrs?.id
           if (id && typeof window !== 'undefined') {
             window.location.href = `/meetings/${encodeURIComponent(String(id))}`
-          }
-          return true
-        }
-        if (type === 'mentionEntity') {
-          const id = node.attrs?.id
-          const entityType = node.attrs?.entityType
-          if (id && entityType && typeof window !== 'undefined') {
-            const pathMap: Record<string, string> = {
-              contract: '/contracts',
-              car: '/cars',
-              customer: '/customers',
-            }
-            const base = pathMap[entityType]
-            if (base) {
-              window.open(`${base}?focus=${encodeURIComponent(String(id))}`, '_blank', 'noopener')
-            }
           }
           return true
         }
@@ -285,14 +267,6 @@ export default function TiptapEditor({
         .tiptap-meetings .ProseMirror .mention-meeting:hover {
           background: rgba(16,185,129,0.30);
         }
-        /* ERP 멘션 — warning (amber) */
-        .tiptap-meetings .ProseMirror .mention-entity {
-          background: rgba(245,158,11,0.15);
-          color: #b45309;
-        }
-        .tiptap-meetings .ProseMirror .mention-entity:hover {
-          background: rgba(245,158,11,0.30);
-        }
       `}</style>
       <EditorContent editor={editor} className="tiptap-meetings" />
       {!editor && (
@@ -309,7 +283,6 @@ export default function TiptapEditor({
           <kbd style={kbdStyle}>/</kbd> 블록
           <kbd style={kbdStyle}>@</kbd> 직원
           <kbd style={kbdStyle}>#</kbd> 회의
-          <kbd style={kbdStyle}>&gt;</kbd> 계약/차량/고객
           <kbd style={kbdStyle}>Ctrl+B/I</kbd> 굵게/기울임
           <kbd style={kbdStyle}>Ctrl+Alt+1~3</kbd> 제목
           <span style={{ marginLeft: 6, color: COLORS.primary }}>· 멘션 클릭 → 페이지 이동</span>
