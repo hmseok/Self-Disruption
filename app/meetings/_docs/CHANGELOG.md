@@ -6,6 +6,65 @@
 
 ## 2026-05-13
 
+### PR-MTG-V2-Todo-A — 독립 개인 TODO (회의 무관)
+
+**사용자 명령**: 「개인적으로 to do 를 회의 없이 사용 / 개인 스케줄관리 / 별도 커스텀 건들」 → 「ㄱㄱ」
+
+**범위**: `meeting_action_items` (회의 종속) 와 분리된 독립 TODO. `/meetings/me` 에서 회의 액션 + 개인 TODO 통합.
+
+**3 commit 분리**:
+- [공통/DB] migrations/2026-05-16_personal_todos.sql
+- [API] /api/meetings/me/todos (GET/POST/PATCH/DELETE)
+- [UI] /meetings/me 통합 재작성 + CHANGELOG
+
+**신규 테이블** — `personal_todos`:
+- id / user_id / content / due_date / status (open/done/dropped)
+- category VARCHAR(32) — 자유 입력 (개인/업무/스케줄/...)
+- priority (high/normal/low) / memo / done_at / created_at / updated_at
+- INDEX (user_id, status) / (due_date) / (user_id, category)
+
+**신규 API** — `/api/meetings/me/todos`:
+- GET `?status=` → 본인 personal_todos + stats
+- POST `{ content, due_date?, category?, priority?, memo? }`
+- PATCH `{ id, ...patch }` — 본인 것만, status='done' 시 done_at 자동
+- DELETE `?id=` — 본인 것만
+- Rule 23 graceful: personal_todos 미적용 시 _migration_pending
+
+**`/meetings/me` 통합 재작성**:
+- `UnifiedItem` 타입 — `source: 'meeting' | 'personal'` + 공통/전용 필드
+- load: `/me/actions` + `/me/todos` 병렬 호출 → merge
+- 통계 합산 (회의 액션 + 개인 TODO)
+- DcStatStrip actions 에 「+ 개인 TODO 추가」 버튼
+- 추가 폼: 내용 / 마감일 / 분류(datalist) / 우선순위 / 비고
+- DcToolbar trailing: source 필터 (전체 / 📋 회의 액션 / 📌 개인 TODO)
+- NeuDataTable 컬럼: ✓ / 할 일 / 출처 (회의명 or 📌개인·분류) / 마감일 / 상태 / 액션
+- 출처 컬럼: 회의 액션 = 회의 제목 + type 아이콘 / 개인 = 「📌 개인 · {분류}」 보라색
+- 우선순위 high → ❗ 표시
+- 액션: 회의 = 「회의록」 버튼 / 개인 = 「삭제」
+- toggleStatus: source 별 다른 API (actions / todos)
+- 마이그 미적용 시 amber 배너 (회의 액션만 표시)
+
+**Rule 8 시뮬레이션**:
+- /meetings/me 진입 → actions + todos 병렬 GET → merge → 통합 표
+- 「+ 개인 TODO 추가」 → 폼 → POST /todos → load
+- ☑ 토글 → source 따라 PATCH actions or todos
+- 개인 TODO 삭제 → DELETE /todos
+
+**Rule 11**: personal_todos 컬럼 — 본 PR 마이그 / meeting_action_items + meetings — 기존 ✓
+**Rule 14**: NeuDataTable / DcStatStrip / DcToolbar / 토스트 — 메인 페이지 동형
+**Rule 18**: 모든 컬럼 sortBy / **Rule 19**: nowrap / **Rule 20**: 토스트
+**Rule 21**: 3 commit 분리 / **Rule 22**: 본 CHANGELOG / **Rule 23**: graceful
+
+**GATE**:
+- G3 사용자 GO 「ㄱㄱ」 ✓
+- G4 마이그 — CREATE TABLE 멱등
+- G5 tsc PASS / G6 lint:harness 새 위반 0건
+- G7 Designer — 사용자 검수 (개인 TODO 추가 / source 필터 / 통합 표)
+
+**후속**: PR-V2-Todo-B 캘린더 뷰 (표/캘린더 토글)
+
+---
+
 ### hotfix #4 — 제목 저장 후 사이드바 미갱신 + 저장 피드백
 
 **사용자 보고**: 「제목도 썼는데 저장버튼 없나」 (스크린샷 — 헤더 제목 「사고팀 회의」 입력했으나 사이드바는 「제목 없는 회의」 6개 그대로)

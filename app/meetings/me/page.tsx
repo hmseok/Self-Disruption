@@ -9,51 +9,60 @@ import DcToolbar from '@/app/components/DcToolbar'
 import NeuDataTable, { TableColumn } from '@/app/components/NeuDataTable'
 
 // ═══════════════════════════════════════════════════════════════
-// 내 TODO 대시보드 — /meetings/me (PR-MTG-V2-Me)
+// 내 TODO 대시보드 — /meetings/me (PR-MTG-V2-Me → V2-Todo-A)
 //
-// meeting_action_items WHERE assignee_id = user.id
-// DcStatStrip (5 카드) + DcToolbar (검색 + 상태 필터) + NeuDataTable (8 컬럼 sortBy)
-// 인라인 ☑ 토글 (open ↔ done)
+// 회의 액션 (meeting_action_items) + 개인 TODO (personal_todos) 통합.
+// 개인 TODO: 회의 무관 — 「+ 개인 TODO 추가」 로 직접 생성.
 // ═══════════════════════════════════════════════════════════════
 
-const TYPE_META: Record<string, { emoji: string; label: string; color: string }> = {
-  regular:    { emoji: '📅', label: '정기',    color: '#3b82f6' },
-  specific:   { emoji: '📋', label: '특정',    color: '#64748b' },
-  one_on_one: { emoji: '👥', label: '1:1',     color: '#10b981' },
-  department: { emoji: '🏢', label: '부서별',  color: '#f59e0b' },
+const TYPE_EMOJI: Record<string, string> = {
+  regular: '📅', specific: '📋', one_on_one: '👥', department: '🏢',
 }
-
 const STATUS_META: Record<string, { label: string; color: string; bg: string }> = {
   open:    { label: '진행중', color: '#1d4ed8', bg: 'rgba(59,130,246,0.12)' },
   done:    { label: '완료',   color: '#15803d', bg: 'rgba(34,197,94,0.12)' },
   dropped: { label: '취소',   color: '#64748b', bg: 'rgba(100,116,139,0.12)' },
 }
+const PRIORITY_META: Record<string, { label: string; color: string }> = {
+  high:   { label: '높음', color: '#b91c1c' },
+  normal: { label: '보통', color: '#64748b' },
+  low:    { label: '낮음', color: '#94a3b8' },
+}
 
-interface ActionRow {
+interface UnifiedItem {
+  source: 'meeting' | 'personal'
   id: string
   content: string
   due_date: string | null
   status: string
-  done_at: string | null
-  done_note: string | null
-  created_at: string
-  meeting_id: string
-  meeting_title: string
-  meeting_date: any
-  meeting_type: string
-  organizer_name: string | null
+  // meeting 전용
+  meeting_id?: string
+  meeting_title?: string
+  meeting_type?: string
+  organizer_name?: string | null
+  meeting_date?: any
+  // personal 전용
+  category?: string | null
+  priority?: string | null
+  memo?: string | null
 }
 
-type Toast = { id: number; tone: 'success' | 'error' | 'info'; text: string }
+type Toast = { id: number; tone: 'success' | 'error'; text: string }
 let __toastId = 0
 
 export default function MyTodoPage() {
   const router = useRouter()
-  const [rows, setRows] = useState<ActionRow[]>([])
+  const [items, setItems] = useState<UnifiedItem[]>([])
   const [stats, setStats] = useState<any>({})
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<'open' | 'done' | 'dropped' | 'all'>('open')
   const [search, setSearch] = useState('')
+  const [sourceFilter, setSourceFilter] = useState<'all' | 'meeting' | 'personal'>('all')
+  const [migrationPending, setMigrationPending] = useState(false)
+
+  // 개인 TODO 추가 폼
+  const [showAdd, setShowAdd] = useState(false)
+  const [newTodo, setNewTodo] = useState({ content: '', due_date: '', category: '', priority: 'normal', memo: '' })
 
   const [toasts, setToasts] = useState<Toast[]>([])
   const showToast = useCallback((tone: Toast['tone'], text: string) => {
@@ -66,57 +75,120 @@ export default function MyTodoPage() {
     setLoading(true)
     const params = new URLSearchParams()
     if (filter !== 'all') params.set('status', filter)
-    const { json } = await fetchWithAuth(`/api/meetings/me/actions?${params}`)
-    if (json?.data) setRows(json.data)
-    if (json?.stats) setStats(json.stats)
+    const [actionsRes, todosRes] = await Promise.all([
+      fetchWithAuth(`/api/meetings/me/actions?${params}`),
+      fetchWithAuth(`/api/meetings/me/todos?${params}`),
+    ])
+    const actions: UnifiedItem[] = (actionsRes.json?.data || []).map((a: any) => ({
+      source: 'meeting' as const,
+      id: a.id, content: a.content, due_date: a.due_date, status: a.status,
+      meeting_id: a.meeting_id, meeting_title: a.meeting_title,
+      meeting_type: a.meeting_type, organizer_name: a.organizer_name, meeting_date: a.meeting_date,
+    }))
+    const todos: UnifiedItem[] = (todosRes.json?.data || []).map((t: any) => ({
+      source: 'personal' as const,
+      id: t.id, content: t.content, due_date: t.due_date, status: t.status,
+      category: t.category, priority: t.priority, memo: t.memo,
+    }))
+    setMigrationPending(!!todosRes.json?._migration_pending)
+    setItems([...actions, ...todos])
+    // 통계 합산
+    const aS = actionsRes.json?.stats || {}
+    const tS = todosRes.json?.stats || {}
+    setStats({
+      open: Number(aS.open_cnt || 0) + Number(tS.open_cnt || 0),
+      done: Number(aS.done_cnt || 0) + Number(tS.done_cnt || 0),
+      dropped: Number(aS.dropped_cnt || 0) + Number(tS.dropped_cnt || 0),
+      total: Number(aS.total || 0) + Number(tS.total || 0),
+      overdue: Number(aS.overdue_cnt || 0),
+      due_week: Number(aS.due_week_cnt || 0),
+      meeting_cnt: Number(aS.total || 0),
+      personal_cnt: Number(tS.total || 0),
+    })
     setLoading(false)
   }, [filter])
 
   useEffect(() => { load() }, [load])
 
-  // 검색 필터 (client-side)
+  // 검색 + source 필터
   const filtered = useMemo(() => {
-    if (!search.trim()) return rows
-    const q = search.trim().toLowerCase()
-    return rows.filter(r =>
-      (r.content || '').toLowerCase().includes(q)
-      || (r.meeting_title || '').toLowerCase().includes(q)
-      || (r.organizer_name || '').toLowerCase().includes(q)
-    )
-  }, [rows, search])
+    let r = items
+    if (sourceFilter !== 'all') r = r.filter(x => x.source === sourceFilter)
+    if (search.trim()) {
+      const q = search.trim().toLowerCase()
+      r = r.filter(x =>
+        (x.content || '').toLowerCase().includes(q)
+        || (x.meeting_title || '').toLowerCase().includes(q)
+        || (x.category || '').toLowerCase().includes(q)
+        || (x.organizer_name || '').toLowerCase().includes(q)
+      )
+    }
+    return r
+  }, [items, search, sourceFilter])
 
-  const toggleStatus = useCallback(async (action: ActionRow, newStatus: 'open' | 'done' | 'dropped') => {
-    const { ok, json } = await fetchWithAuth(`/api/meetings/me/actions`, {
-      method: 'PATCH',
-      body: { action_id: action.id, status: newStatus },
-    })
+  // 상태 토글 — source 별 다른 API
+  const toggleStatus = useCallback(async (item: UnifiedItem, newStatus: 'open' | 'done' | 'dropped') => {
+    const url = item.source === 'meeting' ? '/api/meetings/me/actions' : '/api/meetings/me/todos'
+    const body = item.source === 'meeting'
+      ? { action_id: item.id, status: newStatus }
+      : { id: item.id, status: newStatus }
+    const { ok, json } = await fetchWithAuth(url, { method: 'PATCH', body })
     if (ok) {
-      showToast('success', newStatus === 'done' ? '✓ 완료 처리' : newStatus === 'open' ? '↺ 진행중으로' : '✗ 취소')
+      showToast('success', newStatus === 'done' ? '✓ 완료' : newStatus === 'open' ? '↺ 진행중' : '✗ 취소')
       await load()
     } else {
-      showToast('error', `실패: ${json?.error || '알 수 없는 오류'}`)
+      showToast('error', `실패: ${json?.error || '오류'}`)
     }
   }, [load, showToast])
 
-  // 통계 카드 5종
+  const deleteTodo = useCallback(async (item: UnifiedItem) => {
+    if (item.source !== 'personal') return
+    if (!confirm(`「${item.content}」 개인 TODO 를 삭제할까요?`)) return
+    const { ok, json } = await fetchWithAuth(`/api/meetings/me/todos?id=${item.id}`, { method: 'DELETE' })
+    if (ok) { showToast('success', '✓ 삭제됨'); await load() }
+    else showToast('error', `삭제 실패: ${json?.error || '오류'}`)
+  }, [load, showToast])
+
+  const submitNewTodo = useCallback(async () => {
+    if (!newTodo.content.trim()) { showToast('error', '내용을 입력하세요'); return }
+    const { ok, json } = await fetchWithAuth('/api/meetings/me/todos', {
+      method: 'POST',
+      body: {
+        content: newTodo.content.trim(),
+        due_date: newTodo.due_date || null,
+        category: newTodo.category.trim() || null,
+        priority: newTodo.priority || null,
+        memo: newTodo.memo.trim() || null,
+      },
+    })
+    if (ok) {
+      showToast('success', '✓ 개인 TODO 추가됨')
+      setNewTodo({ content: '', due_date: '', category: '', priority: 'normal', memo: '' })
+      setShowAdd(false)
+      await load()
+    } else if (json?._migration_pending) {
+      showToast('error', 'DB 마이그 미적용 — 관리자 문의')
+    } else {
+      showToast('error', `추가 실패: ${json?.error || '오류'}`)
+    }
+  }, [newTodo, load, showToast])
+
   const statItems: StatItem[] = useMemo(() => ([
-    { label: '진행중',    value: Number(stats.open_cnt || 0),     icon: '✓', tint: 'blue' },
-    { label: '마감 임박', value: Number(stats.due_week_cnt || 0), icon: '⏱', tint: 'amber' },
-    { label: '지연',      value: Number(stats.overdue_cnt || 0),  icon: '⚠', tint: 'red' },
-    { label: '완료',      value: Number(stats.done_cnt || 0),     icon: '☑', tint: 'green' },
-    { label: '전체',      value: Number(stats.total || 0),        icon: '∑', tint: 'slate' },
+    { label: '진행중',    value: Number(stats.open || 0),     icon: '✓', tint: 'blue' },
+    { label: '마감 임박', value: Number(stats.due_week || 0), icon: '⏱', tint: 'amber' },
+    { label: '지연',      value: Number(stats.overdue || 0),  icon: '⚠', tint: 'red' },
+    { label: '완료',      value: Number(stats.done || 0),     icon: '☑', tint: 'green' },
+    { label: '전체',      value: Number(stats.total || 0),    icon: '∑', tint: 'slate' },
   ]), [stats])
 
-  // 필터 pills
   const filterItems = useMemo(() => ([
-    { key: 'open',    label: '진행중', count: Number(stats.open_cnt || 0) },
-    { key: 'done',    label: '완료',   count: Number(stats.done_cnt || 0) },
-    { key: 'dropped', label: '취소',   count: Number(stats.dropped_cnt || 0) },
+    { key: 'open',    label: '진행중', count: Number(stats.open || 0) },
+    { key: 'done',    label: '완료',   count: Number(stats.done || 0) },
+    { key: 'dropped', label: '취소',   count: Number(stats.dropped || 0) },
     { key: 'all',     label: '전체',   count: Number(stats.total || 0) },
   ]), [stats])
 
-  // 테이블 컬럼 (Rule 18 — 모두 sortBy)
-  const columns: TableColumn<ActionRow>[] = useMemo(() => ([
+  const columns: TableColumn<UnifiedItem>[] = useMemo(() => ([
     {
       key: 'check', label: '✓', width: 36, align: 'center',
       sortBy: (r) => (r.status === 'done' ? 1 : r.status === 'open' ? 0 : 2),
@@ -132,8 +204,7 @@ export default function MyTodoPage() {
               background: done ? '#15803d' : 'transparent',
               border: `2px solid ${done ? '#15803d' : COLORS.borderSubtle}`,
               color: '#fff', fontSize: 14, fontWeight: 800, lineHeight: 1,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              padding: 0,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0,
             }}>
             {done ? '✓' : ''}
           </button>
@@ -148,48 +219,41 @@ export default function MyTodoPage() {
         return (
           <span style={{
             color: done ? COLORS.textMuted : COLORS.textPrimary,
-            textDecoration: done ? 'line-through' : 'none',
-            fontWeight: 600,
-          }}>{r.content || '(내용 없음)'}</span>
-        )
-      },
-    },
-    {
-      key: 'meeting', label: '회의', width: 220,
-      sortBy: (r) => r.meeting_title || '',
-      render: (r) => {
-        const tm = TYPE_META[r.meeting_type] || TYPE_META.specific
-        return (
-          <span style={{
-            display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12,
-            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+            textDecoration: done ? 'line-through' : 'none', fontWeight: 600,
           }}>
-            <span style={{ flexShrink: 0 }}>{tm.emoji}</span>
-            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.meeting_title}</span>
+            {r.source === 'personal' && r.priority === 'high' && (
+              <span style={{ color: '#b91c1c', marginRight: 4 }}>❗</span>
+            )}
+            {r.content || '(내용 없음)'}
           </span>
         )
       },
     },
     {
-      key: 'organizer', label: '주관자', width: 110,
-      sortBy: (r) => r.organizer_name || '',
-      render: (r) => (
-        <span style={{ fontSize: 12, color: COLORS.textSecondary, whiteSpace: 'nowrap' }}>
-          {r.organizer_name || '—'}
-        </span>
-      ),
+      key: 'source', label: '출처', width: 200,
+      sortBy: (r) => r.source === 'meeting' ? `1${r.meeting_title || ''}` : `0${r.category || ''}`,
+      render: (r) => {
+        if (r.source === 'meeting') {
+          return (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              <span style={{ flexShrink: 0 }}>{TYPE_EMOJI[r.meeting_type || ''] || '📋'}</span>
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.meeting_title}</span>
+            </span>
+          )
+        }
+        return (
+          <span style={{
+            display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600,
+            padding: '2px 8px', borderRadius: 6, whiteSpace: 'nowrap',
+            background: 'rgba(124,58,237,0.12)', color: '#7c3aed',
+          }}>
+            📌 개인{r.category ? ` · ${r.category}` : ''}
+          </span>
+        )
+      },
     },
     {
-      key: 'meeting_date', label: '회의일', width: 100,
-      sortBy: (r) => r.meeting_date ? new Date(r.meeting_date).getTime() : 0,
-      render: (r) => (
-        <span style={{ fontSize: 12, color: COLORS.textMuted, whiteSpace: 'nowrap' }}>
-          {r.meeting_date ? fmtDate(r.meeting_date) : '—'}
-        </span>
-      ),
-    },
-    {
-      key: 'due_date', label: '마감일', width: 100,
+      key: 'due_date', label: '마감일', width: 110,
       sortBy: (r) => r.due_date ? new Date(r.due_date).getTime() : Number.MAX_SAFE_INTEGER,
       render: (r) => {
         if (!r.due_date) return <span style={{ color: COLORS.textMuted, fontSize: 11 }}>—</span>
@@ -222,62 +286,126 @@ export default function MyTodoPage() {
       },
     },
     {
-      key: 'actions', label: '액션', width: 100, align: 'right',
+      key: 'actions', label: '액션', width: 110, align: 'right',
       render: (r) => (
         <span style={{ display: 'inline-flex', gap: 4, whiteSpace: 'nowrap' }}>
-          <button onClick={(e) => { e.stopPropagation(); router.push(`/meetings/${r.meeting_id}`) }}
-            title="회의록 열기"
-            style={{
-              padding: '3px 8px', fontSize: 11, fontWeight: 600, borderRadius: 6,
-              background: `${COLORS.primary}1A`, color: COLORS.primary,
-              border: `1px solid ${COLORS.primary}40`, cursor: 'pointer',
-            }}>회의록</button>
-          {r.status !== 'dropped' && (
-            <button onClick={(e) => { e.stopPropagation(); toggleStatus(r, 'dropped') }}
-              title="취소"
+          {r.source === 'meeting' ? (
+            <button onClick={(e) => { e.stopPropagation(); if (r.meeting_id) router.push(`/meetings/${r.meeting_id}`) }}
+              title="회의록 열기"
               style={{
                 padding: '3px 8px', fontSize: 11, fontWeight: 600, borderRadius: 6,
-                background: 'rgba(100,116,139,0.10)', color: '#475569',
-                border: '1px solid rgba(100,116,139,0.30)', cursor: 'pointer',
-              }}>×</button>
+                background: `${COLORS.primary}1A`, color: COLORS.primary,
+                border: `1px solid ${COLORS.primary}40`, cursor: 'pointer',
+              }}>회의록</button>
+          ) : (
+            <button onClick={(e) => { e.stopPropagation(); deleteTodo(r) }}
+              title="개인 TODO 삭제"
+              style={{
+                padding: '3px 8px', fontSize: 11, fontWeight: 600, borderRadius: 6,
+                background: 'rgba(239,68,68,0.10)', color: '#b91c1c',
+                border: '1px solid rgba(239,68,68,0.35)', cursor: 'pointer',
+              }}>삭제</button>
           )}
         </span>
       ),
     },
-  ]), [router, toggleStatus])
+  ]), [router, toggleStatus, deleteTodo])
 
   return (
     <div style={{ padding: '20px 24px', minHeight: '100vh' }}>
-      {/* PageTitle 자동 */}
+      <DcStatStrip
+        stats={statItems}
+        actions={[
+          { label: '+ 개인 TODO 추가', onClick: () => setShowAdd(v => !v), variant: 'primary', icon: '📌' },
+        ]}
+      />
 
-      <DcStatStrip stats={statItems} />
+      {/* 개인 TODO 추가 폼 */}
+      {showAdd && (
+        <div style={{ ...GLASS.L3, padding: 14, borderRadius: 12, marginBottom: 16 }}>
+          <h3 style={{ fontSize: 13, fontWeight: 700, color: COLORS.textPrimary, margin: 0, marginBottom: 10 }}>
+            📌 개인 TODO 추가 — 회의와 무관한 개인 할 일 / 스케줄
+          </h3>
+          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: 8, marginBottom: 8 }}>
+            <input value={newTodo.content} onChange={(e) => setNewTodo(p => ({ ...p, content: e.target.value }))}
+              placeholder="할 일 내용 (필수)"
+              onKeyDown={(e) => { if (e.key === 'Enter') void submitNewTodo() }}
+              style={inputStyle} />
+            <input type="date" value={newTodo.due_date} onChange={(e) => setNewTodo(p => ({ ...p, due_date: e.target.value }))}
+              title="마감일" style={inputStyle} />
+            <input value={newTodo.category} onChange={(e) => setNewTodo(p => ({ ...p, category: e.target.value }))}
+              placeholder="분류 (예: 스케줄/업무)" list="todo-categories" style={inputStyle} />
+            <datalist id="todo-categories">
+              <option value="개인" /><option value="업무" /><option value="스케줄" /><option value="기타" />
+            </datalist>
+            <select value={newTodo.priority} onChange={(e) => setNewTodo(p => ({ ...p, priority: e.target.value }))}
+              style={inputStyle}>
+              <option value="high">❗ 높음</option>
+              <option value="normal">보통</option>
+              <option value="low">낮음</option>
+            </select>
+          </div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <input value={newTodo.memo} onChange={(e) => setNewTodo(p => ({ ...p, memo: e.target.value }))}
+              placeholder="비고 (선택)" style={{ ...inputStyle, flex: 1 }} />
+            <button onClick={() => setShowAdd(false)}
+              style={{ padding: '7px 14px', fontSize: 12, borderRadius: 8, background: '#fff', border: `1px solid ${COLORS.borderSubtle}`, color: COLORS.textSecondary, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+              취소
+            </button>
+            <button onClick={() => void submitNewTodo()}
+              style={{ padding: '7px 16px', fontSize: 12, fontWeight: 700, borderRadius: 8, background: COLORS.primary, color: '#fff', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+              추가
+            </button>
+          </div>
+        </div>
+      )}
+
+      {migrationPending && (
+        <div style={{
+          ...GLASS.L3, border: '1px solid rgba(245,158,11,0.40)', borderRadius: 10,
+          padding: '10px 14px', marginBottom: 14, color: '#b45309', fontSize: 12, fontWeight: 600,
+        }}>
+          ⚠ 개인 TODO DB 마이그 미적용 — 회의 액션만 표시됨. 관리자에게 <code style={{ background: 'rgba(0,0,0,0.06)', padding: '1px 6px', borderRadius: 4 }}>migrations/2026-05-16_personal_todos.sql</code> 적용 요청.
+        </div>
+      )}
 
       <DcToolbar
         search={search}
         onSearchChange={setSearch}
-        placeholder="할 일 / 회의 / 주관자 검색"
+        placeholder="할 일 / 회의 / 분류 검색"
         filters={filterItems}
         activeFilter={filter}
         onFilterChange={(k) => setFilter(k as any)}
         trailing={
-          <span style={{ fontSize: 11, color: COLORS.textMuted, whiteSpace: 'nowrap' }}>
-            💡 ☑ 체크박스 클릭 = 완료 토글 · 회의록 버튼 = 해당 회의로 이동
-          </span>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 12 }}>
+            <select value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value as any)}
+              style={{
+                padding: '6px 10px', fontSize: 12, borderRadius: 8,
+                border: `1px solid ${COLORS.borderSubtle}`, background: GLASS.L1.background,
+                color: COLORS.textPrimary, cursor: 'pointer', whiteSpace: 'nowrap',
+              }}>
+              <option value="all">전체 ({stats.total || 0})</option>
+              <option value="meeting">📋 회의 액션 ({stats.meeting_cnt || 0})</option>
+              <option value="personal">📌 개인 TODO ({stats.personal_cnt || 0})</option>
+            </select>
+          </div>
         }
       />
 
-      <NeuDataTable<ActionRow>
+      <NeuDataTable<UnifiedItem>
         columns={columns}
         data={filtered}
-        rowKey={(r) => r.id}
-        onRowClick={(r) => router.push(`/meetings/${r.meeting_id}`)}
+        rowKey={(r) => `${r.source}-${r.id}`}
+        onRowClick={(r) => { if (r.source === 'meeting' && r.meeting_id) router.push(`/meetings/${r.meeting_id}`) }}
         loading={loading}
         emptyIcon="✓"
-        emptyMessage={filter === 'open' ? '진행중 액션 없음 — 모두 완료!' : '데이터 없음'}
+        emptyMessage={filter === 'open' ? '진행중 할 일 없음 — 모두 완료!' : '데이터 없음'}
         defaultSort={{ key: 'due_date', dir: 'asc' }}
         mobileCard={{
           title: (r) => r.content || '(내용 없음)',
-          subtitle: (r) => `${TYPE_META[r.meeting_type]?.emoji || '📋'} ${r.meeting_title}`,
+          subtitle: (r) => r.source === 'meeting'
+            ? `${TYPE_EMOJI[r.meeting_type || ''] || '📋'} ${r.meeting_title}`
+            : `📌 개인${r.category ? ` · ${r.category}` : ''}`,
           trailing: (r) => {
             const sm = STATUS_META[r.status] || STATUS_META.open
             return (
@@ -294,9 +422,9 @@ export default function MyTodoPage() {
                   ⏱ {fmtDate(r.due_date)}
                 </span>
               )}
-              {r.organizer_name && (
-                <span style={{ fontSize: 11, color: COLORS.textMuted, whiteSpace: 'nowrap' }}>
-                  👤 {r.organizer_name}
+              {r.source === 'personal' && r.priority && PRIORITY_META[r.priority] && (
+                <span style={{ fontSize: 11, color: PRIORITY_META[r.priority].color, whiteSpace: 'nowrap' }}>
+                  {PRIORITY_META[r.priority].label}
                 </span>
               )}
             </>
@@ -312,13 +440,10 @@ export default function MyTodoPage() {
         {toasts.map(t => {
           const tone = t.tone === 'success'
             ? { bg: 'rgba(34,197,94,0.92)',  border: 'rgba(34,197,94,0.5)' }
-            : t.tone === 'error'
-              ? { bg: 'rgba(239,68,68,0.92)', border: 'rgba(239,68,68,0.5)' }
-              : { bg: 'rgba(59,130,246,0.92)', border: 'rgba(59,130,246,0.5)' }
+            : { bg: 'rgba(239,68,68,0.92)', border: 'rgba(239,68,68,0.5)' }
           return (
             <div key={t.id} style={{
-              ...GLASS.L4,
-              background: tone.bg, border: `1px solid ${tone.border}`,
+              ...GLASS.L4, background: tone.bg, border: `1px solid ${tone.border}`,
               borderRadius: 12, padding: '10px 16px',
               boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
               color: '#fff', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap',
@@ -328,4 +453,11 @@ export default function MyTodoPage() {
       </div>
     </div>
   )
+}
+
+const inputStyle: React.CSSProperties = {
+  padding: '7px 10px', fontSize: 12, borderRadius: 8,
+  border: `1px solid ${COLORS.borderSubtle}`,
+  background: GLASS.L1.background, color: COLORS.textPrimary,
+  outline: 'none', fontFamily: 'inherit',
 }
