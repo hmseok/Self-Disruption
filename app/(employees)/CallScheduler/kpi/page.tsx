@@ -16,6 +16,7 @@ import { COLORS, GLASS, BTN } from '@/app/utils/ui-tokens'
 import { getAuthHeader } from '@/app/utils/auth-client'
 import KpiDashboard from './_components/KpiDashboard'
 import KpiStaffing from './_components/KpiStaffing'
+import KpiTargets from './_components/KpiTargets'
 
 export const dynamic = 'force-dynamic'
 
@@ -62,7 +63,7 @@ interface PreviewResult {
   skipped?: number
 }
 
-type KpiTab = 'dashboard' | 'staffing' | 'upload'
+type KpiTab = 'dashboard' | 'staffing' | 'targets' | 'upload'
 
 export default function KpiPage() {
   const [tab, setTab] = useState<KpiTab>('dashboard')
@@ -179,6 +180,7 @@ export default function KpiPage() {
         {([
           { k: 'dashboard' as KpiTab, label: '📊 KPI 대시보드' },
           { k: 'staffing' as KpiTab, label: '🧮 필요인원 (WFM)' },
+          { k: 'targets' as KpiTab, label: '🎯 목표' },
           { k: 'upload' as KpiTab, label: '📤 KT 엑셀 업로드' },
         ]).map(({ k, label }) => {
           const active = k === tab
@@ -200,6 +202,8 @@ export default function KpiPage() {
       {tab === 'dashboard' && <KpiDashboard />}
 
       {tab === 'staffing' && <KpiStaffing />}
+
+      {tab === 'targets' && <KpiTargets />}
 
       {tab === 'upload' && (
        <>

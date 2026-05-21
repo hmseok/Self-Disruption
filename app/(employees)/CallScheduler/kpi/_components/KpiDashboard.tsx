@@ -72,11 +72,42 @@ const todayIso = () => {
 }
 
 const GRAN_LABEL: Record<Granularity, string> = { day: '일', week: '주', month: '월' }
+// granularity → cs_kpi_targets.period_kind
+const GRAN_TO_PERIOD: Record<Granularity, string> = { day: 'daily', week: 'weekly', month: 'monthly' }
+
+// ── 목표 (cs_kpi_targets) ─────────────────────────────────────
+interface TargetRow {
+  scope: string
+  worker_id: string | null
+  metric: string
+  period_kind: string
+  target_value: number
+}
+// 낮을수록 좋은 지표 (AHT) — 달성률 역방향
+const LOWER_IS_BETTER = new Set(['aht'])
+
+// 실측 ÷ 목표 → 달성률 % (역방향 지표는 목표 ÷ 실측)
+function achievePct(metric: string, actual: number, target: number): number | null {
+  if (!target || target <= 0) return null
+  if (LOWER_IS_BETTER.has(metric)) {
+    if (actual <= 0) return null
+    return Math.round((target / actual) * 1000) / 10
+  }
+  return Math.round((actual / target) * 1000) / 10
+}
+// 달성률 → 색상 (달성 녹색 / 근접 노랑 / 미달 빨강)
+function achieveColor(pct: number | null): string {
+  if (pct == null) return COLORS.textMuted
+  if (pct >= 100) return COLORS.success
+  if (pct >= 80) return COLORS.warning
+  return COLORS.danger
+}
 
 export default function KpiDashboard() {
   const [granularity, setGranularity] = useState<Granularity>('month')
   const [date, setDate] = useState<string>(todayIso())
   const [data, setData] = useState<DashboardData | null>(null)
+  const [targets, setTargets] = useState<TargetRow[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [drill, setDrill] = useState<'client' | 'type'>('client')
@@ -85,16 +116,26 @@ export default function KpiDashboard() {
     setLoading(true); setError(null)
     try {
       const auth = await getAuthHeader()
-      const res = await fetch(
-        `/api/call-scheduler/kpi/dashboard?granularity=${granularity}&date=${date}`,
-        { headers: auth },
-      )
-      const json = await res.json()
-      if (!res.ok) throw new Error(json?.error || '조회 실패')
+      // 목표는 기준일의 연·월로 조회
+      const base = new Date(date + 'T00:00:00')
+      const ty = isNaN(base.getTime()) ? new Date().getFullYear() : base.getFullYear()
+      const tm = isNaN(base.getTime()) ? new Date().getMonth() + 1 : base.getMonth() + 1
+      const [dRes, tRes] = await Promise.all([
+        fetch(`/api/call-scheduler/kpi/dashboard?granularity=${granularity}&date=${date}`, { headers: auth }),
+        fetch(`/api/call-scheduler/kpi/targets?year=${ty}&month=${tm}`, { headers: auth }),
+      ])
+      const json = await dRes.json()
+      if (!dRes.ok) throw new Error(json?.error || '조회 실패')
       setData(json.data)
+      // 목표 — 실패해도 대시보드는 표시 (graceful)
+      try {
+        const tJson = await tRes.json()
+        setTargets(tRes.ok ? (tJson?.data?.targets ?? []) : [])
+      } catch { setTargets([]) }
     } catch (e: any) {
       setError(e?.message || '오류')
       setData(null)
+      setTargets([])
     } finally {
       setLoading(false)
     }
@@ -106,10 +147,38 @@ export default function KpiDashboard() {
   const agents = data?.agents ?? []
   const isEmpty = !!data && !s?.has_call_data && !s?.has_prod_data && !s?.has_work_data
 
+  // ── 목표 조회 헬퍼 — granularity 의 period_kind 기준 ──
+  const periodKind = GRAN_TO_PERIOD[granularity]
+  // 팀 목표: metric → target_value
+  const teamTargets = new Map<string, number>()
+  // 상담원 목표: `${worker_id}|${metric}` → target_value
+  const agentTargets = new Map<string, number>()
+  for (const t of targets) {
+    if (t.period_kind !== periodKind) continue
+    if (t.scope === 'team' && !t.worker_id) {
+      teamTargets.set(t.metric, Number(t.target_value || 0))
+    } else if (t.scope === 'agent' && t.worker_id) {
+      agentTargets.set(`${t.worker_id}|${t.metric}`, Number(t.target_value || 0))
+    }
+  }
+  // 상담원별 지표 실측값 (목표와 비교할 키)
+  const agentActual = (r: AgentKpi, metric: string): number => {
+    if (metric === 'call_count') return r.call_count
+    if (metric === 'aht') return r.aht
+    if (metric === 'login_sec') return r.login_sec
+    if (metric === 'work_hours') return r.work_hours
+    return 0
+  }
+  const hasAnyTarget = teamTargets.size > 0 || agentTargets.size > 0
+
   // ── 상단 5 카드 ──
   const ibObRatio = s && s.call_count > 0
     ? `${Math.round((s.ib / s.call_count) * 100)} : ${Math.round((s.ob / s.call_count) * 100)}`
     : '—'
+  // ── 팀 통화량 목표 달성률 (대표 지표 — 카드 표시) ──
+  const teamCallTarget = teamTargets.get('call_count') ?? 0
+  const teamCallPct = s ? achievePct('call_count', s.call_count, teamCallTarget) : null
+
   const stats: StatItem[] = [
     { label: '총 통화량', value: s?.call_count ?? 0, unit: '콜', tint: 'blue', icon: '📞',
       subValue: s ? `IB ${s.ib.toLocaleString()} · OB ${s.ob.toLocaleString()}` : undefined },
@@ -121,8 +190,15 @@ export default function KpiDashboard() {
       value: s?.cafe24_ok ? (s?.intake_count ?? 0) : (s ? fmtDuration(s.login_sec) : '—'),
       unit: s?.cafe24_ok ? '건' : undefined, tint: 'purple', icon: s?.cafe24_ok ? '📥' : '🔓',
       subValue: s?.cafe24_ok && s?.has_prod_data ? `로그인 ${fmtDuration(s.login_sec)}` : undefined },
-    { label: '충원율', value: s ? `${Math.round(s.fill_rate * 1000) / 10}%` : '—', tint: 'red', icon: '🎯',
+    { label: '충원율', value: s ? `${Math.round(s.fill_rate * 1000) / 10}%` : '—', tint: 'red', icon: '🛡',
       subValue: s ? `근무 ${s.work_days}일 · ${Math.round(s.work_hours)}h` : undefined },
+    { label: '통화량 달성률',
+      value: teamCallPct != null ? `${teamCallPct}%` : '—',
+      tint: teamCallPct == null ? 'slate' : teamCallPct >= 100 ? 'green' : teamCallPct >= 80 ? 'amber' : 'red',
+      icon: '🎯',
+      subValue: teamCallTarget > 0
+        ? `목표 ${teamCallTarget.toLocaleString()}콜`
+        : '목표 미설정 — 「🎯 목표」 탭' },
   ]
 
   // ── 상담원 테이블 컬럼 (전 컬럼 sortBy — 규칙 18) ──
@@ -190,6 +266,31 @@ export default function KpiDashboard() {
             : '—'}
         </span>
       ),
+    },
+    {
+      // 통화량 달성률 — 상담원 목표 우선, 없으면 팀 목표 fallback
+      key: 'achieve', label: '목표 달성률', width: 130, align: 'right',
+      sortBy: (r) => {
+        const tgt = (r.worker_id ? agentTargets.get(`${r.worker_id}|call_count`) : 0)
+          || teamTargets.get('call_count') || 0
+        return achievePct('call_count', r.call_count, tgt) ?? -1
+      },
+      render: (r) => {
+        const agentTgt = r.worker_id ? agentTargets.get(`${r.worker_id}|call_count`) : undefined
+        const tgt = agentTgt || teamTargets.get('call_count') || 0
+        const pct = achievePct('call_count', r.call_count, tgt)
+        if (pct == null) {
+          return <span style={{ color: COLORS.textDim, whiteSpace: 'nowrap' }}>—</span>
+        }
+        return (
+          <span style={{ whiteSpace: 'nowrap' }}>
+            <b style={{ color: achieveColor(pct) }}>{pct}%</b>
+            <span style={{ fontSize: 10, color: COLORS.textMuted, marginLeft: 4 }}>
+              {agentTgt ? '개인' : '팀'} {tgt.toLocaleString()}
+            </span>
+          </span>
+        )
+      },
     },
   ]
 
@@ -274,7 +375,8 @@ export default function KpiDashboard() {
           <div style={{ fontSize: 13, fontWeight: 800, color: COLORS.textPrimary, margin: '4px 2px 8px' }}>
             👥 상담원별 KPI
             <span style={{ fontSize: 11, fontWeight: 600, color: COLORS.textMuted, marginLeft: 8 }}>
-              컬럼 클릭으로 정렬 · 목표달성률은 후속 단계
+              컬럼 클릭으로 정렬 · 달성률 = 통화량 실측 ÷ 목표
+              {!hasAnyTarget && ' · 목표 미설정 시 「🎯 목표」 탭에서 입력'}
             </span>
           </div>
           <NeuDataTable

@@ -3,6 +3,21 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-21 (Phase CX-KPI-4) — 목표 설정 + 달성률
+
+- KPI-DESIGN.md §5-3 / §3-3 / §6 의 목표 설정 구현 (CX KPI 마지막 조각).
+- API: `kpi/targets` (GET/POST) — cs_kpi_targets CRUD. GET ?year=&month= 로
+  team+agent scope 행 반환. POST 는 (scope, worker_id, metric, period_kind,
+  year, month) 키로 SELECT 후 UPDATE/INSERT 분기 (테이블 UNIQUE 없음). 빈/0
+  목표치는 해당 행 DELETE. metric 4종 = call_count/aht/login_sec/work_hours.
+  모든 쿼리 graceful try/catch (cs_kpi_targets 미적재 시 빈 결과).
+- 화면: `/CallScheduler/kpi` 에 「🎯 목표」 탭 신설 (KpiTargets.tsx) — 연·월 +
+  일/주/월 단위 선택, 팀 목표 4지표 입력, 상담원별 목표 표(선택). 저장 결과는
+  글래스 패널 메시지 (규칙 20 — alert 금지).
+- KpiDashboard: 로드 시 kpi/targets 동시 fetch. 상단에 「통화량 달성률」 카드
+  추가, 상담원 테이블에 「목표 달성률」 컬럼(개인 목표 우선, 없으면 팀 목표
+  fallback) 추가. 달성 녹색/근접 노랑/미달 빨강, AHT 는 역방향. 목표 미설정 시 「—」.
+
 ## 2026-05-21 (N-58) — 대시보드/월별스케줄 탭 분리 + 설정 단순화
 
 - 대시보드 page.tsx 의 「월별 스케줄」 NeuDataTable 섹션을 신규 탭
