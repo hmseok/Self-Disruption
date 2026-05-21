@@ -43,6 +43,7 @@ const PATH_TO_GROUP: Record<string, string> = {
   '/RideAssets':                'admin-ops',  // PR-ASSETS-1.0 (2026-05-14)
   // ── CX팀 (콜센터 등) — Phase N-12 ──
   '/CallScheduler':                                'cx',
+  '/CallScheduler/schedules':                      'cx',
   '/CallScheduler/new':                            'cx',
   '/CallScheduler/settings':                       'cx',
   '/CallScheduler/requests':                       'cx',
@@ -123,6 +124,7 @@ const PAGE_NAMES: Record<string, string> = {
   '/RideCompliance':       '정보보안',  // PR-COMPLIANCE (2026-05-11)
   // CX팀 (Phase N-12)
   '/CallScheduler':                  '스케줄 및 운영',
+  '/CallScheduler/schedules':        '월별 스케줄',
   '/CallScheduler/new':              '새 월 만들기',
   '/CallScheduler/settings':         '설정',
   '/CallScheduler/requests':         '직원 요청 검토',

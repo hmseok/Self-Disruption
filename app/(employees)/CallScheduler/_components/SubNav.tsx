@@ -9,11 +9,18 @@ import { usePathname } from 'next/navigation'
 import { COLORS } from '@/app/utils/ui-tokens'
 
 // N-14 — 운영 vs 설정 분류 (사용자 의도)
-//   운영 (자주 보는 영역, 상위): 대시보드 / 직원 요청
+//   운영 (자주 보는 영역, 상위): 대시보드 / 월별 스케줄 / 직원 요청 / CX KPI
 //   설정 (모든 셋팅, ⚙ 안): 시간 / 그룹 / 워커 / 공휴일 / 휴가
-const TABS: Array<{ href: string; label: string; matchSettings?: boolean }> = [
+// N-58 — 대시보드 / 월별 스케줄 탭 분리
+const TABS: Array<{
+  href: string; label: string
+  matchSettings?: boolean   // settings 페이지의 어떤 탭이든 활성
+  matchSchedules?: boolean  // /schedules + /[id] 상세 매트릭스 활성
+}> = [
   { href: '/CallScheduler',                          label: '📊 대시보드' },
+  { href: '/CallScheduler/schedules',                label: '📅 월별 스케줄', matchSchedules: true },
   { href: '/CallScheduler/requests',                 label: '📋 직원 요청' },
+  { href: '/CallScheduler/kpi',                      label: '📈 CX KPI' },
   { href: '/CallScheduler/settings?tab=shifts',      label: '⚙ 설정',       matchSettings: true },
 ]
 
@@ -25,8 +32,20 @@ export default function SubNav() {
       // ⚙ 설정 — settings 페이지의 어떤 탭이든 활성
       return pathname === '/CallScheduler/settings'
     }
+    if (tab.matchSchedules) {
+      // 📅 월별 스케줄 — /schedules + /new + /[id] 상세 매트릭스 + /skips
+      return pathname === '/CallScheduler/schedules'
+        || pathname === '/CallScheduler/new'
+        || (!!pathname && pathname.startsWith('/CallScheduler/')
+            && !pathname.startsWith('/CallScheduler/settings')
+            && !pathname.startsWith('/CallScheduler/requests')
+            && !pathname.startsWith('/CallScheduler/kpi')
+            && !pathname.startsWith('/CallScheduler/me')
+            && !pathname.startsWith('/CallScheduler/e/'))
+    }
     if (tab.href === '/CallScheduler') {
-      return pathname === '/CallScheduler' || (pathname?.startsWith('/CallScheduler/') && !pathname.startsWith('/CallScheduler/settings') && !pathname.startsWith('/CallScheduler/requests'))
+      // 📊 대시보드 — 정확히 그 경로일 때만
+      return pathname === '/CallScheduler'
     }
     return pathname === tab.href
   }

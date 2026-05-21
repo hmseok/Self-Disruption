@@ -13,6 +13,7 @@ import { COLORS, GLASS, BTN, pillStyle } from '@/app/utils/ui-tokens'
 import { TONE_BG, TONE_TEXT } from '@/app/(employees)/CallScheduler/utils/palette'
 import { COLOR_TONE_OPTIONS } from '@/app/(employees)/CallScheduler/utils/types'
 import { getAuthHeader } from '@/app/utils/auth-client'
+import InfoLine from './InfoLine'
 import type { Worker, ColorTone, ShiftSlot } from '@/app/(employees)/CallScheduler/utils/types'
 
 const GROUP_OPTIONS: (string | null)[] = [null, '주간', '야간', '저녁', '관리', '기타']
@@ -302,20 +303,10 @@ export default function WorkersTab() {
       </div>
 
       {/* Phase K 안내 — 그룹별 설정은 그룹쪽에서 */}
-      <div style={{
-        ...GLASS.L3, background: COLORS.bgBlue, borderRadius: 10,
-        padding: '10px 14px', marginBottom: 12,
-        border: `1px solid ${COLORS.borderBlue}`,
-        display: 'flex', alignItems: 'center', gap: 10,
-      }}>
-        <span style={{ fontSize: 16 }}>💡</span>
-        <div style={{ flex: 1, fontSize: 12, color: COLORS.textPrimary }}>
-          <strong>본 탭은 워커 정체성만</strong> — 색상 / 그룹 라벨 / 외부 직원 / 외부 근무 cycle.
-          {' '}
-          <strong>우선순위 / 희망요일 / 한도 / 슬롯 거부 / 패턴 메모는 「그룹」 탭의 멤버 카드</strong>에서
-          편집 (그룹마다 다르게 적용 가능).
-        </div>
-      </div>
+      <InfoLine summary="본 탭은 워커 정체성만 (색상 / 그룹 라벨 / 외부 직원 / 외부 cycle)">
+        우선순위 / 희망요일 / 한도 / 슬롯 거부 / 패턴 메모는 「그룹」 탭의 멤버 카드에서
+        편집합니다 (그룹마다 다르게 적용 가능).
+      </InfoLine>
 
       {loading ? (
         <div style={{ padding: 40, textAlign: 'center', color: COLORS.textMuted }}>로딩 중...</div>
@@ -511,15 +502,12 @@ export default function WorkersTab() {
           {/* 미활성화 후보 */}
           {candidates.length > 0 && (
             <div style={{
-              ...GLASS.L4, borderRadius: 12, padding: 12,
+              ...GLASS.L4, borderRadius: 12, padding: 10,
               border: `1px dashed ${COLORS.borderAmber}`,
               background: COLORS.bgAmber,
             }}>
-              <div style={{ fontSize: 13, fontWeight: 800, color: COLORS.warning, marginBottom: 6 }}>
-                💡 라이드 직원 마스터에는 있지만 콜센터 워커가 아님 ({candidates.length}명)
-              </div>
-              <div style={{ fontSize: 11, color: COLORS.textMuted, marginBottom: 8 }}>
-                콜센터 부서로 옮기거나, 별도 부서면 그대로 두세요.
+              <div style={{ fontSize: 12, fontWeight: 800, color: COLORS.warning, marginBottom: 8 }}>
+                💡 라이드 직원 마스터에는 있지만 콜센터 워커 아님 ({candidates.length}명) — 콜센터 부서로 옮기거나 그대로 두세요
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                 {candidates.map(e => (

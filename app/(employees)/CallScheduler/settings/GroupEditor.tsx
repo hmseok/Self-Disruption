@@ -150,6 +150,8 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
   const [coverageMissing, setCoverageMissing] = useState(false)   // 마이그 미적용 시
   // N-5 — 최소 인원 collapsible
   const [coverageExpanded, setCoverageExpanded] = useState(false)
+  // N-58 — 우선순위 정책 안내 접기 (기본 접힘 — 공간 절약)
+  const [policyExpanded, setPolicyExpanded] = useState(false)
   // N-21-a — 버전 timeline (그룹 설정의 기간별 버전)
   interface VersionRow {
     id: string; group_id: string
@@ -1516,25 +1518,32 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
           </Field>
           )}
 
-          {/* PR-2SS-Phase-I — 우선순위 정책 표출 (매니저 판단 도구) */}
+          {/* PR-2SS-Phase-I — 우선순위 정책 표출 (매니저 판단 도구) — N-58 접기 */}
           <div style={{
-            ...GLASS.L1, borderRadius: 10, padding: 14,
+            ...GLASS.L1, borderRadius: 10, padding: policyExpanded ? 14 : '8px 14px',
             border: `1px solid ${COLORS.borderBlue}`,
             background: 'rgba(219,234,254,0.45)',
           }}>
             <div style={{
               fontSize: 13, fontWeight: 800, color: COLORS.textPrimary,
-              marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6,
+              display: 'flex', alignItems: 'center', gap: 6,
+              marginBottom: policyExpanded ? 10 : 0,
             }}>
               🎯 우선순위 정책 <span style={{
                 fontSize: 10, fontWeight: 500, color: COLORS.textMuted,
                 background: 'rgba(255,255,255,0.7)', padding: '1px 6px', borderRadius: 99,
-              }}>자동 생성 시 적용</span>
+              }}>자동 생성 시 7단계 ranking 적용</span>
+              <div style={{ flex: 1 }} />
+              <button type="button" onClick={() => setPolicyExpanded(v => !v)}
+                      style={{
+                        padding: '1px 8px', fontSize: 11, fontWeight: 700, borderRadius: 99,
+                        cursor: 'pointer', background: 'transparent', color: COLORS.textMuted,
+                        border: `1px solid ${COLORS.borderFaint}`,
+                      }}>
+                {policyExpanded ? 'ⓘ 접기' : 'ⓘ 자세히'}
+              </button>
             </div>
-            <div style={{ fontSize: 11, color: COLORS.textMuted, marginBottom: 10 }}>
-              이 그룹의 자동 생성은 다음 7단계 ranking 으로 워커를 결정합니다.
-            </div>
-
+            {policyExpanded && (<>
             <div style={{
               background: 'rgba(255,255,255,0.85)', borderRadius: 8, padding: 10,
               border: `1px solid ${COLORS.borderFaint}`,
@@ -1591,6 +1600,7 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
                 · 정식 휴가 → <strong>직원 휴가 탭</strong>
               </div>
             </div>
+            </>)}
           </div>
         </div>
 

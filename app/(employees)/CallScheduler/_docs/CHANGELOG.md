@@ -3,6 +3,19 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-21 (N-58) — 대시보드/월별스케줄 탭 분리 + 설정 단순화
+
+- 대시보드 page.tsx 의 「월별 스케줄」 NeuDataTable 섹션을 신규 탭
+  `/CallScheduler/schedules` 로 분리 (fetch/컬럼 로직 그대로 이전). 대시보드
+  탭은 KPI/현황 카드 1~7 만 표시.
+- SubNav: 「📅 월별 스케줄」 탭 추가. 대시보드는 정확히 `/CallScheduler` 일
+  때만 활성, `/schedules`·`/new`·`/[id]` 상세는 월별 스케줄 탭 활성.
+- PageTitle: `/CallScheduler/schedules` (이름 「월별 스케줄」) 등록.
+- 설정 단순화: 공통 `InfoLine` 컴포넌트 (한 줄 요약 + ⓘ 펼침) 신설.
+  HolidaysTab·WorkersTab 의 여러 줄 안내 박스를 InfoLine 으로 축소,
+  ShiftsTab 안전가드/가산율 박스 부제·간격 압축, GroupEditor 「우선순위
+  정책」 7단계 explainer 를 기본 접힘으로 전환. 기능·입력 필드 불변.
+
 ## 2026-05-21 (Phase CX-KPI-3) — WFM 필요인원 (Erlang C)
 
 - KPI-DESIGN.md §5-4 의 필요인원 산정 구현 (물량예측 §5-5 는 제외).

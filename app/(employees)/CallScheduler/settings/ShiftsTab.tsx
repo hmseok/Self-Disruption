@@ -278,18 +278,14 @@ export default function ShiftsTab() {
 
           {/* PR-2SS-b — 안전 가드 (야간 슬롯 권장: 16h 휴식 + 연속 3일 한도) */}
           <div style={{
-            ...GLASS.L1, borderRadius: 8, padding: 12, marginTop: 12,
+            ...GLASS.L1, borderRadius: 8, padding: 10, marginTop: 10,
             border: `1px solid ${COLORS.borderAmber}`,
             background: COLORS.bgAmber,
           }}>
             <div style={{
-              fontSize: 12, fontWeight: 800, color: COLORS.warning, marginBottom: 4,
-              display: 'flex', alignItems: 'center', gap: 6,
+              fontSize: 12, fontWeight: 800, color: COLORS.warning, marginBottom: 6,
             }}>
-              🛡 안전 가드
-              <span style={{ fontSize: 10, fontWeight: 500, color: COLORS.textMuted }}>
-                자동 생성 시 적용 — 야간 슬롯에 권장
-              </span>
+              🛡 안전 가드 <span style={{ fontSize: 10, fontWeight: 500, color: COLORS.textMuted }}>자동 생성 시 적용 — 야간 권장</span>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
               <Field label="🌙 종료 후 휴식 (시간)">
@@ -321,18 +317,14 @@ export default function ShiftsTab() {
 
           {/* PR-2SS-e — 시간 분해 + 가산율 (KPI 보조용, 현재 가산율 0) */}
           <div style={{
-            ...GLASS.L1, borderRadius: 8, padding: 12, marginTop: 10,
+            ...GLASS.L1, borderRadius: 8, padding: 10, marginTop: 10,
             border: `1px solid ${COLORS.borderViolet}`,
             background: COLORS.bgViolet,
           }}>
             <div style={{
-              fontSize: 12, fontWeight: 800, color: COLORS.textPrimary, marginBottom: 4,
-              display: 'flex', alignItems: 'center', gap: 6,
+              fontSize: 12, fontWeight: 800, color: COLORS.textPrimary, marginBottom: 6,
             }}>
-              💰 시간 분해 + 가산율 (KPI 보조)
-              <span style={{ fontSize: 10, fontWeight: 500, color: COLORS.textMuted }}>
-                현재 운영: 가산율 없음 (0). 향후 정책 변경 시 매니저가 직접 설정
-              </span>
+              💰 시간 분해 + 가산율 (KPI 보조) <span style={{ fontSize: 10, fontWeight: 500, color: COLORS.textMuted }}>현재 가산율 0 — 필요 시 직접 설정</span>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
               <Field label="🌃 가산 시작 (시간)">

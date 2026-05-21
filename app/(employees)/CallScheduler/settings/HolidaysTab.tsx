@@ -7,6 +7,7 @@ import { COLORS, GLASS, BTN, pillStyle } from '@/app/utils/ui-tokens'
 import { TONE_BG, TONE_TEXT } from '@/app/(employees)/CallScheduler/utils/palette'
 import { COLOR_TONE_OPTIONS } from '@/app/(employees)/CallScheduler/utils/types'
 import { getAuthHeader } from '@/app/utils/auth-client'
+import InfoLine from './InfoLine'
 import type { ColorTone } from '@/app/(employees)/CallScheduler/utils/types'
 
 type HolidayType = 'national' | 'company' | 'family' | 'custom'
@@ -163,18 +164,12 @@ export default function HolidaysTab() {
         }}>❌ {error}</div>
       )}
 
-      {/* 24/365 운영 안내 */}
-      <div style={{
-        ...GLASS.L3,
-        background: COLORS.bgBlue, border: `1px solid ${COLORS.borderBlue}`,
-        borderRadius: 8, padding: '8px 12px', marginBottom: 10,
-        fontSize: 11, color: COLORS.info,
-      }}>
-        💡 <strong>24/365 콜센터 운영</strong> — 공휴일에도 누군가는 근무합니다.
-        본 탭은 <strong>참고용 마스터</strong>이며, "이 직원은 어린이날 쉰다"는
-        <strong>[📋 직원 휴가] 탭에서 종류='공휴일'</strong>로 직원별 등록하세요.
+      {/* 한 줄 설명 — 상세는 ⓘ 펼침 */}
+      <InfoLine summary="공휴일·회사휴무 참고 마스터 — 직원별 휴무는 [직원 휴가] 탭에서 등록">
+        24/365 콜센터 운영이라 공휴일에도 누군가는 근무합니다. 본 탭은 참고용 마스터이며,
+        "이 직원은 어린이날 쉰다"는 [직원 휴가] 탭에서 종류='공휴일'로 등록하세요.
         자동 생성 시 회사 차원 일괄 제외는 기본 OFF.
-      </div>
+      </InfoLine>
 
       {/* 헤더 */}
       <div style={{
