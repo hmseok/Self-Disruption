@@ -13,8 +13,10 @@ function serialize<T>(data: T): T {
   ))
 }
 
+// 2026-05-16 (PR-HR-2) — department_id / promotion_target 컬럼 추가 (JOIN 없음 — V1.5).
+// 부서명은 호출측이 /api/ride-departments/tree 와 department_id 로 매핑.
 const SELECT_COLS = `
-  id, name, profile_id, department, position, employment_type,
+  id, name, profile_id, department, department_id, position, promotion_target, employment_type,
   DATE_FORMAT(hire_date, '%Y-%m-%d')   AS hire_date,
   DATE_FORMAT(resign_date, '%Y-%m-%d') AS resign_date,
   phone, email, color_tone, group_label, memo,
@@ -28,13 +30,15 @@ export async function GET(request: NextRequest) {
   try {
     const sp = request.nextUrl.searchParams
     const q = (sp.get('q') || '').trim()
-    const dept = (sp.get('department') || '').trim()
+    const dept = (sp.get('department') || '').trim()         // free text — backward compat
+    const deptId = (sp.get('department_id') || '').trim()     // FK 기반 필터
     const includeInactive = sp.get('include_inactive') === '1'
 
     const where: string[] = []
     const params: any[] = []
     if (!includeInactive) where.push('is_active = 1')
     if (dept) { where.push('department = ?'); params.push(dept) }
+    if (deptId) { where.push('department_id = ?'); params.push(deptId) }
     if (q) {
       where.push('(name LIKE ? OR phone LIKE ? OR email LIKE ?)')
       const like = `%${q}%`
@@ -62,7 +66,9 @@ export async function POST(request: NextRequest) {
 
     const id = crypto.randomUUID()
     const department: string | null = body?.department ?? null
+    const department_id: string | null = body?.department_id ?? null    // PR-HR-2
     const position: string | null = body?.position ?? null
+    const promotion_target: string | null = body?.promotion_target ?? null  // PR-HR-2
     const employment_type: string | null = body?.employment_type ?? null
     const hire_date: string | null = body?.hire_date ?? null
     const phone: string | null = body?.phone ?? null
@@ -74,15 +80,16 @@ export async function POST(request: NextRequest) {
 
     await prisma.$executeRaw`
       INSERT INTO ride_employees
-        (id, name, profile_id, department, position, employment_type, hire_date,
-         phone, email, color_tone, group_label, memo, is_active, created_at, updated_at)
+        (id, name, profile_id, department, department_id, position, promotion_target,
+         employment_type, hire_date, phone, email, color_tone, group_label, memo,
+         is_active, created_at, updated_at)
       VALUES
-        (${id}, ${name}, ${profile_id}, ${department}, ${position}, ${employment_type},
-         ${hire_date ? new Date(hire_date) : null},
+        (${id}, ${name}, ${profile_id}, ${department}, ${department_id}, ${position}, ${promotion_target},
+         ${employment_type}, ${hire_date ? new Date(hire_date) : null},
          ${phone}, ${email}, ${color_tone}, ${group_label}, ${memo}, 1, NOW(), NOW())
     `
     const rows = await prisma.$queryRaw<any[]>`
-      SELECT id, name, profile_id, department, position, employment_type,
+      SELECT id, name, profile_id, department, department_id, position, promotion_target, employment_type,
              DATE_FORMAT(hire_date, '%Y-%m-%d') AS hire_date,
              DATE_FORMAT(resign_date, '%Y-%m-%d') AS resign_date,
              phone, email, color_tone, group_label, memo,

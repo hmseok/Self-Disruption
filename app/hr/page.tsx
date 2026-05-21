@@ -11,6 +11,7 @@ import DcToolbar, { FilterItem } from '../components/DcToolbar'
 import NeuDataTable, { TableColumn, MobileCardConfig } from '../components/NeuDataTable'
 import { auth } from '@/lib/auth-client'
 import PayrollOps from './_components/PayrollOps'
+import RideOrgPanel from './_components/RideOrgPanel'
 
 // ────────────────────────────────────────────────────────────────
 // Auth Helper
@@ -1506,33 +1507,8 @@ export default function HRMasterPage() {
             </div>
           </div>
 
-          {/* 라이드 직원 (조회 only — 매칭 사전용) */}
-          <div style={{ ...glassCard, padding: 20 }}>
-            <h3 style={{ fontSize: 14, fontWeight: 700, color: '#1e293b', marginBottom: 12 }}>🚗 라이드 인력 ({rideEmployees.length}) — 조회 only</h3>
-            <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 8 }}>
-              ※ 라이드주식회사 직원 — 본 ERP 시스템 계정 X. 매칭 사전 / 근무스케줄 페이지 (CallScheduler) 에서 관리.
-            </div>
-            <div style={{ border: '1px solid rgba(0,0,0,0.06)', borderRadius: 10, overflow: 'hidden' }}>
-              {rideEmployees.length === 0 && (
-                <div style={{ padding: 20, textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>
-                  등록된 라이드 인력 없음
-                </div>
-              )}
-              {rideEmployees.map((r: any) => (
-                <div key={r.id} style={{ padding: '10px 14px', borderBottom: '1px solid rgba(0,0,0,0.04)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: 13, color: '#334155' }}>{r.name}</div>
-                    <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>
-                      {r.department || '-'} · {r.position || '-'} · {r.employment_type || '-'}
-                    </div>
-                  </div>
-                  <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 6px', borderRadius: 4, background: r.is_active ? 'rgba(34,197,94,0.15)' : 'rgba(0,0,0,0.04)', color: r.is_active ? '#16a34a' : '#94a3b8' }}>
-                    {r.is_active ? '활성' : '비활성'}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
+          {/* 라이드케어 인력 부서 관리 — PR-HR-2 (부서 트리/부서장/일괄변경/focus) */}
+          <RideOrgPanel />
         </div>
       )}
 

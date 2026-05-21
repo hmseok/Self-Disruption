@@ -5,6 +5,13 @@
 
 ## 2026-05-16
 
+- **PR-HR-2** (hr 세션) — `/hr` 「외부 인력」 탭 라이드케어 인력 부서 관리 UI.
+  - `app/hr/_components/RideOrgPanel.tsx` 신설 — 「조회 only」 → 본격 부서 관리.
+  - DcStatStrip 5칸 (활성/부서수/이번달입사/퇴사예정/승진대상) + 좌측 부서 트리 (Glass 5색) + 우측 NeuDataTable.
+  - 부서장 인라인 지정 / 일괄 부서 변경 (bulk-assign) / `?focus=<id>` 직원 부서 자동 선택 + 🔗 강조.
+  - NeuDataTable 전 컬럼 sortBy (Rule 18), 셀 nowrap (Rule 19), 결과 글래스 패널 (Rule 20).
+  - `/api/ride-employees` route.ts V1.5 — `department_id`/`promotion_target` 컬럼 SELECT 추가 (JOIN 없음).
+  - 회의록 연동 전제 완성 — meetings 세션이 `ride_departments` 부서 트리/부서장 활용 가능.
 - **스키마 합의** (hr ↔ meetings 세션) — `ride_departments` 부서장 컬럼명 `manager_id` → `leader_employee_id` 통일.
   - meetings 세션이 `_docs` 에 `ride_departments.leader_employee_id` 로 명시 (PR-MTG-V2-Visibility 후속).
   - 마이그에 멱등 RENAME 블록 추가 — 이전 버전(manager_id) 적용분 자동 보정.

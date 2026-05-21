@@ -1855,134 +1855,164 @@
       "snippet": "<div style={{ background: 'rgba(255,255,255,0.72)', borderRadius: 16, border: '1px solid rgba(0,0,0,0.06)', padding: '48"
     },
     {
+      "file": "app/hr/_components/RideOrgPanel.tsx",
+      "line": 72,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.72)',"
+    },
+    {
+      "file": "app/hr/_components/RideOrgPanel.tsx",
+      "line": 515,
+      "label": "glass-bg-hardcode",
+      "snippet": "background: 'rgba(255,255,255,0.6)', minWidth: 180, flex: 1 }} />"
+    },
+    {
       "file": "app/hr/page.tsx",
-      "line": 1147,
+      "line": 1148,
       "label": "glass-bg-hardcode",
       "snippet": "background: 'rgba(255,255,255,0.72)',"
     },
     {
       "file": "app/hr/page.tsx",
-      "line": 1150,
+      "line": 1151,
       "label": "glass-bg-hardcode",
       "snippet": "boxShadow: '6px 6px 18px rgba(140,170,210,0.14), -6px -6px 18px rgba(255,255,255,0.47)',"
     },
     {
       "file": "app/hr/page.tsx",
-      "line": 1157,
+      "line": 1158,
       "label": "glass-bg-hardcode",
       "snippet": "background: 'rgba(255,255,255,0.40)',"
     },
     {
       "file": "app/hr/page.tsx",
-      "line": 1238,
+      "line": 1239,
       "label": "glass-bg-hardcode",
       "snippet": "style={{ width: '100%', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, padding: '8px 12px', fontSize: 13, outli"
     },
     {
       "file": "app/hr/page.tsx",
-      "line": 1244,
+      "line": 1245,
       "label": "glass-bg-hardcode",
       "snippet": "style={{ width: '100%', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, padding: '8px 12px', fontSize: 13, outli"
     },
     {
       "file": "app/hr/page.tsx",
-      "line": 1286,
+      "line": 1287,
       "label": "glass-bg-hardcode",
       "snippet": "style={{ width: '100%', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, padding: '8px 12px', fontSize: 13, outli"
     },
     {
       "file": "app/hr/page.tsx",
-      "line": 1376,
+      "line": 1377,
       "label": "glass-bg-hardcode",
       "snippet": "background: isDragging ? 'rgba(59,130,246,0.05)' : aiParsing ? 'rgba(34,197,94,0.04)' : 'rgba(255,255,255,0.4)',"
     },
     {
       "file": "app/hr/page.tsx",
-      "line": 1400,
+      "line": 1401,
       "label": "glass-bg-hardcode",
       "snippet": "<div style={{ background: 'rgba(255,255,255,0.6)', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 10, padding: 12, "
     },
     {
       "file": "app/hr/page.tsx",
-      "line": 1593,
+      "line": 1569,
       "label": "glass-bg-hardcode",
       "snippet": "style={{ width: '100%', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, padding: '8px 12px', fontSize: 13, outli"
     },
     {
       "file": "app/hr/page.tsx",
-      "line": 1599,
+      "line": 1575,
       "label": "glass-bg-hardcode",
       "snippet": "style={{ width: '100%', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, padding: '8px 12px', fontSize: 13, outli"
     },
     {
       "file": "app/hr/page.tsx",
-      "line": 1605,
+      "line": 1581,
       "label": "glass-bg-hardcode",
       "snippet": "<div style={{ padding: '10px 16px', borderBottom: '1px solid rgba(0,0,0,0.06)', background: 'rgba(255,255,255,0.40)' }}>"
     },
     {
       "file": "app/hr/page.tsx",
-      "line": 1648,
+      "line": 1624,
       "label": "glass-bg-hardcode",
       "snippet": "style={{ width: '100%', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, padding: '8px 12px', fontSize: 13, outli"
     },
     {
       "file": "app/hr/page.tsx",
-      "line": 1654,
+      "line": 1630,
       "label": "glass-bg-hardcode",
       "snippet": "<div style={{ padding: '10px 16px', borderBottom: '1px solid rgba(0,0,0,0.06)', background: 'rgba(255,255,255,0.40)' }}>"
     },
     {
       "file": "app/hr/page.tsx",
-      "line": 1828,
+      "line": 1804,
       "label": "glass-bg-hardcode",
       "snippet": "<div style={{ padding: '10px 16px', background: 'rgba(255,255,255,0.40)', borderBottom: '1px solid rgba(0,0,0,0.06)', po"
     },
     {
       "file": "app/hr/page.tsx",
-      "line": 1862,
+      "line": 1838,
       "label": "glass-bg-hardcode",
       "snippet": "style={{ fontSize: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 6, padding: '2px 6px', background: 'rgba(255,"
     },
     {
       "file": "app/hr/page.tsx",
-      "line": 1906,
+      "line": 1882,
       "label": "glass-bg-hardcode",
       "snippet": "style={{ background: 'rgba(255,255,255,0.92)', borderRadius: 20, width: '100%', maxWidth: 560, boxShadow: '0 25px 50px r"
     },
     {
       "file": "app/hr/page.tsx",
-      "line": 1907,
+      "line": 1883,
       "label": "glass-bg-hardcode",
       "snippet": "<div style={{ padding: '20px 24px', borderBottom: '1px solid rgba(0,0,0,0.06)', background: 'rgba(255,255,255,0.40)', di"
     },
     {
       "file": "app/hr/page.tsx",
-      "line": 1919,
+      "line": 1895,
       "label": "glass-bg-hardcode",
       "snippet": "style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none"
     },
     {
       "file": "app/hr/page.tsx",
-      "line": 1925,
+      "line": 1901,
       "label": "glass-bg-hardcode",
       "snippet": "style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none"
     },
     {
       "file": "app/hr/page.tsx",
-      "line": 1932,
+      "line": 1908,
       "label": "glass-bg-hardcode",
       "snippet": "style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none"
     },
     {
       "file": "app/hr/page.tsx",
-      "line": 1937,
+      "line": 1913,
       "label": "glass-bg-hardcode",
       "snippet": "style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none"
     },
     {
       "file": "app/hr/page.tsx",
-      "line": 1944,
+      "line": 1920,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none"
+    },
+    {
+      "file": "app/hr/page.tsx",
+      "line": 1927,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none"
+    },
+    {
+      "file": "app/hr/page.tsx",
+      "line": 1938,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none"
+    },
+    {
+      "file": "app/hr/page.tsx",
+      "line": 1945,
       "label": "glass-bg-hardcode",
       "snippet": "style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none"
     },
@@ -1994,85 +2024,79 @@
     },
     {
       "file": "app/hr/page.tsx",
-      "line": 1962,
+      "line": 1961,
       "label": "glass-bg-hardcode",
       "snippet": "style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none"
     },
     {
       "file": "app/hr/page.tsx",
-      "line": 1969,
+      "line": 1974,
       "label": "glass-bg-hardcode",
       "snippet": "style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none"
     },
     {
       "file": "app/hr/page.tsx",
-      "line": 1975,
-      "label": "glass-bg-hardcode",
-      "snippet": "style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none"
-    },
-    {
-      "file": "app/hr/page.tsx",
-      "line": 1985,
-      "label": "glass-bg-hardcode",
-      "snippet": "style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none"
-    },
-    {
-      "file": "app/hr/page.tsx",
-      "line": 1998,
-      "label": "glass-bg-hardcode",
-      "snippet": "style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none"
-    },
-    {
-      "file": "app/hr/page.tsx",
-      "line": 2001,
+      "line": 1977,
       "label": "glass-bg-hardcode",
       "snippet": "<div style={{ padding: '14px 20px', borderTop: '1px solid rgba(0,0,0,0.06)', background: 'rgba(255,255,255,0.40)', displ"
     },
     {
       "file": "app/hr/page.tsx",
-      "line": 2003,
+      "line": 1979,
       "label": "glass-bg-hardcode",
       "snippet": "style={{ flex: 1, padding: '10px 0', border: '1px solid rgba(0,0,0,0.08)', background: 'rgba(255,255,255,0.8)', color: '"
     },
     {
       "file": "app/hr/page.tsx",
-      "line": 2020,
+      "line": 1996,
       "label": "glass-bg-hardcode",
       "snippet": "style={{ background: 'rgba(255,255,255,0.92)', borderRadius: 20, width: '100%', maxWidth: 880, boxShadow: '0 25px 50px r"
     },
     {
       "file": "app/hr/page.tsx",
-      "line": 2023,
+      "line": 1999,
       "label": "glass-bg-hardcode",
       "snippet": "<div style={{ padding: '20px 24px', borderBottom: '1px solid rgba(0,0,0,0.06)', background: 'rgba(255,255,255,0.40)', di"
     },
     {
       "file": "app/hr/page.tsx",
-      "line": 2042,
+      "line": 2018,
       "label": "glass-bg-hardcode",
       "snippet": "<div style={{ display: 'flex', borderBottom: '1px solid rgba(0,0,0,0.06)', background: 'rgba(255,255,255,0.30)', flexShr"
     },
     {
       "file": "app/hr/page.tsx",
-      "line": 2069,
+      "line": 2045,
       "label": "glass-bg-hardcode",
       "snippet": "style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, outline: 'non"
     },
     {
       "file": "app/hr/page.tsx",
-      "line": 2074,
+      "line": 2050,
       "label": "glass-bg-hardcode",
       "snippet": "style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, outline: 'non"
     },
     {
       "file": "app/hr/page.tsx",
-      "line": 2080,
+      "line": 2056,
       "label": "glass-bg-hardcode",
       "snippet": "style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, background: '"
     },
     {
       "file": "app/hr/page.tsx",
-      "line": 2089,
+      "line": 2065,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, background: '"
+    },
+    {
+      "file": "app/hr/page.tsx",
+      "line": 2076,
+      "label": "glass-bg-hardcode",
+      "snippet": "style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, background: '"
+    },
+    {
+      "file": "app/hr/page.tsx",
+      "line": 2084,
       "label": "glass-bg-hardcode",
       "snippet": "style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, background: '"
     },
@@ -2080,119 +2104,107 @@
       "file": "app/hr/page.tsx",
       "line": 2100,
       "label": "glass-bg-hardcode",
-      "snippet": "style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, background: '"
-    },
-    {
-      "file": "app/hr/page.tsx",
-      "line": 2108,
-      "label": "glass-bg-hardcode",
-      "snippet": "style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, background: '"
-    },
-    {
-      "file": "app/hr/page.tsx",
-      "line": 2124,
-      "label": "glass-bg-hardcode",
       "snippet": "style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, outline: 'non"
     },
     {
       "file": "app/hr/page.tsx",
-      "line": 2138,
+      "line": 2114,
       "label": "glass-bg-hardcode",
       "snippet": "style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, background: '"
     },
     {
       "file": "app/hr/page.tsx",
-      "line": 2152,
+      "line": 2128,
       "label": "glass-bg-hardcode",
       "snippet": "style={{ width: '100%', padding: 10, border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, fontSize: 13, outline: 'n"
     },
     {
       "file": "app/hr/page.tsx",
-      "line": 2159,
+      "line": 2135,
       "label": "glass-bg-hardcode",
       "snippet": "style={{ width: '100%', padding: 10, border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, fontSize: 13, outline: 'n"
     },
     {
       "file": "app/hr/page.tsx",
-      "line": 2169,
+      "line": 2145,
       "label": "glass-bg-hardcode",
       "snippet": "<div style={{ background: 'rgba(255,255,255,0.40)', borderRadius: 10, padding: 12, border: '1px solid rgba(0,0,0,0.05)',"
     },
     {
       "file": "app/hr/page.tsx",
-      "line": 2194,
+      "line": 2170,
       "label": "glass-bg-hardcode",
       "snippet": "style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, outline: 'non"
     },
     {
       "file": "app/hr/page.tsx",
-      "line": 2209,
+      "line": 2185,
       "label": "glass-bg-hardcode",
       "snippet": "style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, outline: 'non"
     },
     {
       "file": "app/hr/page.tsx",
-      "line": 2235,
+      "line": 2211,
       "label": "glass-bg-hardcode",
       "snippet": "<div key={k} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, padding: 8, background: 'rgba(255,"
     },
     {
       "file": "app/hr/page.tsx",
-      "line": 2243,
+      "line": 2219,
       "label": "glass-bg-hardcode",
       "snippet": "style={{ width: 130, padding: 8, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none', b"
     },
     {
       "file": "app/hr/page.tsx",
-      "line": 2287,
+      "line": 2263,
       "label": "glass-bg-hardcode",
       "snippet": "style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, background: '"
     },
     {
       "file": "app/hr/page.tsx",
-      "line": 2299,
+      "line": 2275,
       "label": "glass-bg-hardcode",
       "snippet": "style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, outline: 'non"
     },
     {
       "file": "app/hr/page.tsx",
-      "line": 2306,
+      "line": 2282,
       "label": "glass-bg-hardcode",
       "snippet": "style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, outline: 'non"
     },
     {
       "file": "app/hr/page.tsx",
-      "line": 2314,
+      "line": 2290,
       "label": "glass-bg-hardcode",
       "snippet": "style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, outline: 'non"
     },
     {
       "file": "app/hr/page.tsx",
-      "line": 2339,
+      "line": 2315,
       "label": "glass-bg-hardcode",
       "snippet": "<div style={{ padding: '8px 14px', background: 'rgba(255,255,255,0.40)', borderBottom: '1px solid rgba(0,0,0,0.06)', pos"
     },
     {
       "file": "app/hr/page.tsx",
-      "line": 2372,
+      "line": 2348,
       "label": "glass-bg-hardcode",
       "snippet": "style={{ fontSize: 11, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 6, padding: '2px 6px', background: 'rgba(255,"
     },
     {
       "file": "app/hr/page.tsx",
-      "line": 2399,
+      "line": 2375,
       "label": "glass-bg-hardcode",
       "snippet": "style={{ padding: '6px 12px', fontSize: 12, fontWeight: 600, color: '#dc2626', border: '1px solid rgba(239,68,68,0.3)', "
     },
     {
       "file": "app/hr/page.tsx",
-      "line": 2412,
+      "line": 2388,
       "label": "glass-bg-hardcode",
       "snippet": "<div style={{ padding: '16px 24px', borderTop: '1px solid rgba(0,0,0,0.06)', background: 'rgba(255,255,255,0.40)', displ"
     },
     {
       "file": "app/hr/page.tsx",
-      "line": 2414,
+      "line": 2390,
       "label": "glass-bg-hardcode",
       "snippet": "style={{ flex: 1, padding: '10px 0', border: '1px solid rgba(0,0,0,0.08)', background: 'rgba(255,255,255,0.8)', color: '"
     },
@@ -3271,6 +3283,6 @@
       "snippet": "boxShadow: '6px 6px 18px rgba(140,170,210,0.14), -6px -6px 18px rgba(255,255,255,0.47)',"
     }
   ],
-  "generatedAt": "2026-05-21T12:37:53.319Z",
+  "generatedAt": "2026-05-21T13:21:30.875Z",
   "note": "UI 토큰 hardcode (inline rgba). 기존 위반 동결, 새 위반만 차단."
 }

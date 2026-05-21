@@ -289,6 +289,6 @@
       "column": "business_doc_url"
     }
   ],
-  "generatedAt": "2026-05-21T12:38:12.372Z",
+  "generatedAt": "2026-05-21T13:21:49.477Z",
   "note": "기존 SQL 컬럼 위반 — known issue 로 처리. 새 위반만 lint fail."
 }
