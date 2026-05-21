@@ -22,6 +22,17 @@ export async function GET(request: NextRequest) {
     const { searchParams } = request.nextUrl
     const id = searchParams.get('id')
 
+    // PR-V2-Visibility hotfix #3 (Rule 23 graceful) —
+    // migrations/2026-05-16_meetings_visibility.sql 미적용 시
+    // visibility 컬럼 + meeting_editors 테이블 없음 → 권한 필터 skip (마이그 전 옛 동작)
+    let v2VisibilitySupported = true
+    try {
+      await prisma.$queryRawUnsafe(`SELECT visibility FROM meetings LIMIT 1`)
+      await prisma.$queryRawUnsafe(`SELECT 1 FROM meeting_editors LIMIT 1`)
+    } catch {
+      v2VisibilitySupported = false
+    }
+
     // 단건 상세
     if (id) {
       const meetings = await prisma.$queryRawUnsafe<any[]>(
@@ -31,9 +42,9 @@ export async function GET(request: NextRequest) {
       const m = meetings[0]
       if (!m) return NextResponse.json({ data: null })
 
-      // PR-V2-Visibility — 단건 조회 권한 체크
+      // PR-V2-Visibility — 단건 조회 권한 체크 (마이그 적용 시만)
       const isAdmin = user.role === 'admin' || user.role === 'master'
-      if (!isAdmin) {
+      if (!isAdmin && v2VisibilitySupported) {
         const visibility = m.visibility || 'attendees'
         let canRead = false
         if (visibility === 'public') canRead = true
@@ -112,10 +123,10 @@ export async function GET(request: NextRequest) {
       params.push(user.id, user.id)
     }
 
-    // PR-V2-Visibility — 권한 체크
+    // PR-V2-Visibility — 권한 체크 (hotfix #3 — 마이그 적용 시만)
     // admin/master 면 모두, 그 외는 visibility 별 필터
     const isAdmin = user.role === 'admin' || user.role === 'master'
-    if (!isAdmin) {
+    if (!isAdmin && v2VisibilitySupported) {
       conditions.push(`(
         m.visibility = 'public'
         OR m.organizer_id = ?
@@ -129,10 +140,12 @@ export async function GET(request: NextRequest) {
       params.push(user.id, user.id, user.id, user.id, user.id)
     }
 
+    // visibility 컬럼 — 마이그 적용 시만 SELECT, 아니면 'attendees' 고정값
+    const visibilityCol = v2VisibilitySupported ? 'm.visibility,' : `'attendees' AS visibility,`
     const list = await prisma.$queryRawUnsafe<any[]>(
       `SELECT m.id, m.title, m.type, m.meeting_date, m.duration_min, m.location,
               m.organizer_id, m.department, m.status, m.created_by, m.created_at,
-              m.visibility,
+              ${visibilityCol}
               p.name AS organizer_name,
               (SELECT COUNT(*) FROM meeting_attendees WHERE meeting_id = m.id) AS attendee_count,
               (SELECT COUNT(*) FROM meeting_action_items WHERE meeting_id = m.id) AS action_count,
