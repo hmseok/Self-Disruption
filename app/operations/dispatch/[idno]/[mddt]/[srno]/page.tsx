@@ -76,6 +76,21 @@ function rideAccidentIdFromIdno(idno: string): number {
   return parseInt(String(idno).replace(/[^0-9]/g, '').slice(0, 9) || '0', 10)
 }
 
+// PR-C2c — 탁송/외부오더 메모는 customer_request 컬럼에 「[탁송]/[외부오더] 본문」 형태로 저장.
+//   사용자 명시 (2026-05-16): 「탁송요청 아니면 외부에 오더를 넘겨 요청」
+function parseDelivery(raw: string | null | undefined): { type: 'self' | 'external' | ''; memo: string } {
+  if (!raw) return { type: '', memo: '' }
+  const m = String(raw).match(/^\[(탁송|외부오더)\]\s*([\s\S]*)$/)
+  if (m) return { type: m[1] === '탁송' ? 'self' : 'external', memo: m[2] }
+  return { type: '', memo: String(raw) }  // prefix 없는 기존 메모는 그대로
+}
+function buildDelivery(type: 'self' | 'external' | '', memo: string): string | null {
+  const tag = type === 'self' ? '탁송' : type === 'external' ? '외부오더' : ''
+  const body = (memo || '').trim()
+  if (!tag && !body) return null
+  return tag ? `[${tag}] ${body}`.trim() : body
+}
+
 // PR-C2b-2 — 대기차량 (cars 테이블, /api/operations/waiting-vehicles 응답)
 type WaitingVehicle = {
   id: string
@@ -139,6 +154,10 @@ export default function DispatchDetailPage({
   const [vehiclesLoading, setVehiclesLoading] = useState(false)
   const [vehicleSearch, setVehicleSearch] = useState('')
   const [selectedVehicle, setSelectedVehicle] = useState<WaitingVehicle | null>(null)
+
+  // ── 탁송/외부오더 (PR-C2c) — operations_dispatch_orders.customer_request 에 저장 ──
+  const [deliveryType, setDeliveryType] = useState<'self' | 'external' | ''>('')
+  const [deliveryMemo, setDeliveryMemo] = useState('')
 
   // PR-B3.3 — 발송 이력 요약 통계 (채널별 / 상태별 / 최근 시각)
   // 사용자 명시 (2026-05-16): 「길어지니까 상단에 전체 내역을 카운드해주고
@@ -323,6 +342,10 @@ export default function DispatchDetailPage({
         setExpDispatch(found.expected_dispatch_date || '')
         setExpReturn(found.expected_return_date || '')
         setStatus(found.status)
+        // PR-C2c — customer_request 에서 탁송/외부오더 파싱
+        const d = parseDelivery(found.customer_request)
+        setDeliveryType(d.type)
+        setDeliveryMemo(d.memo)
       }
     } finally {
       setOrderLoading(false)
@@ -419,6 +442,8 @@ export default function DispatchDetailPage({
             expected_dispatch_date: expDispatch || null,
             expected_return_date: expReturn || null,
             status,
+            // PR-C2c — 탁송/외부오더 메모
+            customer_request: buildDelivery(deliveryType, deliveryMemo),
           }),
         })
         const json = await res.json()
@@ -1187,6 +1212,57 @@ export default function DispatchDetailPage({
                       🚗 대기차량 선택하기 …
                     </button>
                   )}
+                </div>
+                {/* PR-C2c — 탁송 / 외부오더 (사용자 명시: 「탁송요청 아니면 외부에 오더를 넘겨 요청」) */}
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#475569', marginBottom: 4, whiteSpace: 'nowrap' }}>
+                    배차 방식 / 특이사항
+                    <span style={{ marginLeft: 6, fontSize: 10, color: '#94a3b8', fontWeight: 500 }}>
+                      (탁송 = 우리 탁송기사 / 외부오더 = 외주 업체 요청)
+                    </span>
+                  </label>
+                  <div style={{ display: 'flex', gap: 6, marginBottom: 6, flexWrap: 'wrap' }}>
+                    {([
+                      { key: 'self', label: '🚛 탁송요청' },
+                      { key: 'external', label: '📤 외부오더' },
+                    ] as const).map((opt) => {
+                      const active = deliveryType === opt.key
+                      return (
+                        <button
+                          key={opt.key}
+                          onClick={() => setDeliveryType(active ? '' : opt.key)}
+                          style={{
+                            padding: '6px 12px', borderRadius: 8, cursor: 'pointer',
+                            fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap',
+                            border: active ? 'none' : '1px solid rgba(0,0,0,0.12)',
+                            background: active ? '#0f2440' : 'transparent',
+                            color: active ? '#fff' : '#475569',
+                          }}
+                        >
+                          {opt.label}
+                        </button>
+                      )
+                    })}
+                    {deliveryType && (
+                      <span style={{ fontSize: 11, color: '#94a3b8', alignSelf: 'center' }}>
+                        — 다시 누르면 해제
+                      </span>
+                    )}
+                  </div>
+                  <textarea
+                    value={deliveryMemo}
+                    onChange={(e) => setDeliveryMemo(e.target.value)}
+                    placeholder={
+                      deliveryType === 'self' ? '탁송 기사 / 일시 / 픽업 장소 등 메모…'
+                      : deliveryType === 'external' ? '외주 업체명 / 연락처 / 요청 내용 등 메모…'
+                      : '배차 특이사항 메모…'
+                    }
+                    rows={2}
+                    style={{
+                      ...GLASS.L1, width: '100%', padding: '8px 10px', borderRadius: 8, fontSize: 12, color: '#1e293b',
+                      resize: 'vertical', fontFamily: 'inherit',
+                    }}
+                  />
                 </div>
               </div>
             )}
