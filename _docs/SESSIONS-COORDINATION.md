@@ -34,10 +34,28 @@
 | `app/api/ride-departments/*` | **hr 세션 (신설 2026-05-11)** | ✅ |
 | `app/RideCompliance/*` | **compliance 세션 (신설 2026-05-11)** | ✅ |
 | `app/api/ride-compliance/*` | **compliance 세션 (신설 2026-05-11)** | ✅ |
-| `app/RideMTOps/*` | MT팀 세션 (위탁: 메뉴 등록 메인 세션) | ✅ |
-| `app/api/cafe24/maintenance-tours,legal-inspections,chargers/*` | MT팀 세션 | ✅ |
+| `app/RideMTOps/*` | MT팀 세션 (cowork 표시: 「4) 카페24 연동」) | ✅ |
+| `app/api/cafe24/maintenance-tours,legal-inspections,chargers/*` | MT팀 세션 (「4) 카페24 연동」) | ✅ |
 | `app/loans*/*` | 본 도메인 세션 (자율) | ✅ |
 | `app/insurance*/*` | 본 도메인 세션 (자율) | ✅ |
+
+### 1.2.a cowork 세션 표시명 매핑 (혼동 방지 — 2026-05-19 신설)
+
+> cowork UI 의 세션 표시명 (번호+이름) 과 본 문서의 모듈 세션명이 달라 혼동.
+> 확인된 매핑만 기록 — 미확인은 각 세션 채팅에서 최근 작업 모듈로 식별.
+
+| cowork 표시명 | 모듈 세션 | 담당 영역 |
+|--------------|----------|----------|
+| (메인) | sweet-amazing-galileo | app/finance/* + 공통 파일 + 마이그 |
+| 「4) 카페24 연동」 | MT팀 세션 | app/RideMTOps/* (순회정비/법정검사/충전기) |
+| (확인 필요) | CallScheduler 세션 | app/(employees)/CallScheduler/* |
+| (확인 필요) | compliance 세션 | app/(employees)/RideCompliance/* |
+| (확인 필요) | hr 세션 | app/hr/* |
+| (확인 필요) | meetings 세션 | app/meetings/* |
+| (확인 필요) | operations 세션 | app/operations/* (또는 메인 직접) |
+| (확인 필요) | Ride* 세션 | app/(employees)/RideAccidents 등 |
+
+→ 미확인 항목은 사용자가 각 세션 채팅 확인 후 채움.
 
 → 새 모듈 추가 시 본 표에 등록 + 사용자 합의
 
