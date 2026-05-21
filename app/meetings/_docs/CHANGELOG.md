@@ -6,6 +6,43 @@
 
 ## 2026-05-13
 
+### hotfix #4 — 제목 저장 후 사이드바 미갱신 + 저장 피드백
+
+**사용자 보고**: 「제목도 썼는데 저장버튼 없나」 (스크린샷 — 헤더 제목 「사고팀 회의」 입력했으나 사이드바는 「제목 없는 회의」 6개 그대로)
+
+**진단**:
+- 제목은 헤더 input `onBlur` 시 자동 저장 (저장 버튼 없는 자동 저장 방식)
+- `MeetingSidebar` 는 페이지 진입 시 1회만 목록 로드 → 제목 변경 후 refetch 안 함
+- → 제목이 DB에 저장돼도 사이드바가 「제목 없는 회의」 그대로 → 사용자가 「저장 안 됨」 으로 착각
+- + 자동 저장 피드백 부재로 불안
+
+**수정 (3건)**:
+
+1. **메타 저장 시 사이드바 즉시 refetch**:
+   - `MeetingsLayoutV2` 에 `sidebarReloadKey` state — `saveMeta` 성공 시 +1
+   - `MeetingSidebar` 에 `reloadKey` prop 추가 — useEffect 의존성 → reloadKey 변경 시 `load()` 재호출
+   - → 제목/유형/상태 변경 즉시 사이드바 반영
+
+2. **제목 저장 피드백** (`MeetingHeaderBar`):
+   - 제목 input 옆에 `metaSaveStatus` 표시 — `⟳ 저장 중` / `✓ 저장됨` / `⚠ 저장 실패` / `자동 저장`
+   - `MeetingsLayoutV2` 가 기존 `metaSaveStatus` state 를 prop 전달
+
+3. **제목 입력 안내 강화**:
+   - placeholder: 「회의 제목 (필수)」 → 「회의 제목 입력 — 이 칸이 목록에 표시됩니다」
+   - title 툴팁: 「입력 후 다른 곳 클릭(또는 Enter) 시 자동 저장」
+   - → 본문 H1 (큰 글씨) ≠ 회의 제목 혼동 방지
+
+**Rule 8 시뮬레이션**:
+- 제목 input 입력 → blur → commitTitle → onMetaChange → saveMeta → PATCH meetings
+- saveMeta 성공 → metaSaveStatus 'saved' (제목 옆 ✓ 표시) + sidebarReloadKey +1
+- MeetingSidebar reloadKey 변경 감지 → load() → 목록 refetch → 새 제목 반영
+
+**Rule 9 회귀 케이스**: 「자동저장됨인데 목록에 없음」 — hotfix #3 (visibility) + hotfix #4 (사이드바 미갱신) 두 원인
+**Rule 21**: 자기 모듈 (meetings)
+**Rule 22**: 본 CHANGELOG ✓
+
+---
+
 ### hotfix-V2-Mention-Cleanup — >ERP 멘션 제거 (회의록 독립 운영)
 
 **사용자 명령**:

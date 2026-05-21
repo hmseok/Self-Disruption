@@ -54,9 +54,11 @@ interface Props {
   editable?: boolean
   /** organizer 선택용 직원 목록 (ride_employees) */
   employees?: EmployeeOption[]
+  /** hotfix #4 — 제목/메타 저장 상태 (제목 옆 표시) — idle/saving/saved/error 외 값은 idle 처리 */
+  metaSaveStatus?: string
 }
 
-export default function MeetingHeaderBar({ meta, onMetaChange, trailing, editable = true, employees = [] }: Props) {
+export default function MeetingHeaderBar({ meta, onMetaChange, trailing, editable = true, employees = [], metaSaveStatus = 'idle' }: Props) {
   const [title, setTitle] = useState(meta.title)
   const [addressOpen, setAddressOpen] = useState(false)
   useEffect(() => { setTitle(meta.title) }, [meta.title])
@@ -86,20 +88,38 @@ export default function MeetingHeaderBar({ meta, onMetaChange, trailing, editabl
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           {editable ? (
-            <input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              onBlur={commitTitle}
-              onKeyDown={(e) => { if (e.key === 'Enter') { e.currentTarget.blur() } }}
-              placeholder="회의 제목 (필수)"
-              style={{
-                width: '100%', fontSize: 26, fontWeight: 800,
-                color: COLORS.textPrimary, background: 'transparent',
-                border: 'none', outline: 'none', padding: '4px 0',
-                whiteSpace: 'nowrap', textOverflow: 'ellipsis',
-                fontFamily: 'inherit',
-              }}
-            />
+            <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <input
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                onBlur={commitTitle}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.currentTarget.blur() } }}
+                placeholder="회의 제목 입력 — 이 칸이 목록에 표시됩니다"
+                title="회의 제목 — 입력 후 다른 곳 클릭(또는 Enter) 시 자동 저장"
+                style={{
+                  flex: 1, minWidth: 0, fontSize: 26, fontWeight: 800,
+                  color: COLORS.textPrimary, background: 'transparent',
+                  border: 'none', outline: 'none', padding: '4px 0',
+                  whiteSpace: 'nowrap', textOverflow: 'ellipsis',
+                  fontFamily: 'inherit',
+                }}
+              />
+              {/* 제목/메타 저장 상태 — hotfix #4 */}
+              <span style={{
+                fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0,
+                padding: '3px 8px', borderRadius: 6,
+                color: metaSaveStatus === 'saving' ? '#1d4ed8'
+                  : metaSaveStatus === 'saved' ? '#15803d'
+                  : metaSaveStatus === 'error' ? '#b91c1c' : COLORS.textMuted,
+                background: metaSaveStatus === 'saving' ? 'rgba(59,130,246,0.10)'
+                  : metaSaveStatus === 'saved' ? 'rgba(34,197,94,0.10)'
+                  : metaSaveStatus === 'error' ? 'rgba(239,68,68,0.10)' : 'transparent',
+              }}>
+                {metaSaveStatus === 'saving' ? '⟳ 저장 중'
+                  : metaSaveStatus === 'saved' ? '✓ 저장됨'
+                  : metaSaveStatus === 'error' ? '⚠ 저장 실패' : '자동 저장'}
+              </span>
+            </span>
           ) : (
             <h1 style={{ fontSize: 26, fontWeight: 800, color: COLORS.textPrimary, margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               {meta.title || '(제목 없음)'}

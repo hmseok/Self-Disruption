@@ -48,13 +48,15 @@ interface Props {
   onToggleCollapsed?: () => void
   /** 새 회의 만들기 클릭 */
   onNewClick?: () => void
+  /** hotfix #4 — 값이 바뀌면 목록 refetch (제목/메타 변경 즉시 반영) */
+  reloadKey?: number
 }
 
 // localStorage key — 사이드바 그룹/접힘 상태 보존
 const LS_KEY_GROUP = 'meetings.sidebar.groupBy'
 const LS_KEY_COLLAPSED = 'meetings.sidebar.collapsedGroups'
 
-export default function MeetingSidebar({ activeId, collapsed, onToggleCollapsed, onNewClick }: Props) {
+export default function MeetingSidebar({ activeId, collapsed, onToggleCollapsed, onNewClick, reloadKey }: Props) {
   const router = useRouter()
   const [list, setList] = useState<Meeting[]>([])
   const [loading, setLoading] = useState(true)
@@ -101,6 +103,12 @@ export default function MeetingSidebar({ activeId, collapsed, onToggleCollapsed,
   }, [filter, search])
 
   useEffect(() => { load() }, [load])
+
+  // hotfix #4 — 부모(MeetingsLayoutV2)에서 메타 저장 시 reloadKey 증가 → 목록 refetch
+  useEffect(() => {
+    if (reloadKey === undefined || reloadKey === 0) return
+    void load()
+  }, [reloadKey, load])
 
   const items = useMemo(() => list, [list])
 

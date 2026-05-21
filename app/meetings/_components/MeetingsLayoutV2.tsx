@@ -210,6 +210,8 @@ export default function MeetingsLayoutV2({ meetingId, initialTab = 'body' }: Pro
   }, [])
 
   // ── 자동 저장: meta (즉시) ───────────────────────────────────
+  // hotfix #4 — meta 저장 성공 시 사이드바 refetch (제목 변경 즉시 반영)
+  const [sidebarReloadKey, setSidebarReloadKey] = useState(0)
   const saveMeta = useCallback(async (patch: Partial<MeetingMeta>) => {
     if (!canEdit) return
     setMetaSaveStatus('saving')
@@ -220,6 +222,8 @@ export default function MeetingsLayoutV2({ meetingId, initialTab = 'body' }: Pro
       })
       if (ok) {
         setMetaSaveStatus('saved')
+        // 제목/유형/상태 등 사이드바 표시 항목 변경 시 사이드바 갱신
+        setSidebarReloadKey(k => k + 1)
       } else {
         setMetaSaveStatus('error')
         console.warn('[saveMeta] 실패:', json?.error)
@@ -429,6 +433,7 @@ export default function MeetingsLayoutV2({ meetingId, initialTab = 'body' }: Pro
         activeId={meetingId}
         collapsed={sidebarCollapsed}
         onToggleCollapsed={() => setSidebarCollapsed(v => !v)}
+        reloadKey={sidebarReloadKey}
       />
       <main style={{ flex: 1, padding: '20px 32px 60px', minWidth: 0, maxWidth: 1080 }}>
         {/* 마이그 미적용 배너 (Rule 23) */}
@@ -488,6 +493,7 @@ export default function MeetingsLayoutV2({ meetingId, initialTab = 'body' }: Pro
           onMetaChange={onMetaChange}
           editable={canEdit}
           employees={employees}
+          metaSaveStatus={metaSaveStatus}
           trailing={
             <>
               <AutoSaveIndicator
