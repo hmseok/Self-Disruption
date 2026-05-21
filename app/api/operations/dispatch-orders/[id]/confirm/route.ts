@@ -37,7 +37,7 @@ export async function POST(
 
     const body = await request.json().catch(() => ({}))
     const {
-      vehicle_id,                   // fmi_vehicles.id (UUID, optional)
+      vehicle_id,                   // cars.id (UUID, optional) — PR-E 차량 통합 후 cars 정본
       customer_name,
       customer_phone,
       customer_car_number,
@@ -140,7 +140,20 @@ export async function POST(
       id,
     )
 
-    // 5. (TODO) ride_accidents.workflow_stage = 'dispatched' 동기화
+    // 5. PR-C2b-3 (2026-05-16) — 선택한 대기차량 cars.status = 'rented' (대기→배차중)
+    //    차량 테이블 통합 (PR-E) 완료 후 vehicle_id 는 cars.id 정합.
+    if (vehicle_id) {
+      try {
+        await prisma.$executeRawUnsafe(
+          `UPDATE cars SET status = 'rented', updated_at = NOW() WHERE id = ?`,
+          vehicle_id,
+        )
+      } catch (e) {
+        console.warn('[dispatch confirm] cars status update skipped:', (e as Error)?.message)
+      }
+    }
+
+    // 6. (TODO) ride_accidents.workflow_stage = 'dispatched' 동기화
     //    Ride* 세션 책임 영역이라 직접 SQL 자제 — 별도 PATCH 호출이 안전
     //    현재는 dispatch_order.status 만으로 추적 가능 (LEFT JOIN 으로)
 
@@ -149,6 +162,7 @@ export async function POST(
       dispatch_order_id: id,
       fmi_rental_id: fmiRentalId,
       ride_accident_id: order.ride_accident_id,
+      vehicle_id: vehicle_id || null,
       mode: order.fmi_rental_id ? 'update' : 'create',
       message: `배차 확정 완료 — fmi_rental ${order.fmi_rental_id ? '갱신' : '신설'}`,
     })

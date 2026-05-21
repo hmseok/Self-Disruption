@@ -454,7 +454,11 @@ export default function DispatchDetailPage({
 
   const confirmDispatch = async () => {
     if (!dispatchOrder || !row) return
-    if (!window.confirm('배차 확정 시 fmi_rentals 신규 row 가 생성됩니다. 진행할까요?')) return
+    // PR-C2b-3 (2026-05-16) — 선택한 대기차량을 fmi_rentals 에 연결 + cars.status='rented'
+    const vehicleMsg = selectedVehicle
+      ? `\n배차 차량: ${selectedVehicle.number || '-'} (${[selectedVehicle.brand, selectedVehicle.model].filter(Boolean).join(' ')})`
+      : '\n⚠ 배차 차량 미선택 — 차량 없이 확정됩니다 (나중에 선택 가능)'
+    if (!window.confirm(`배차 확정 시 fmi_rentals row 가 생성/갱신됩니다.${vehicleMsg}\n진행할까요?`)) return
     setBusy(true)
     try {
       const headers = { ...(await getAuthHeader()), 'Content-Type': 'application/json' }
@@ -462,6 +466,7 @@ export default function DispatchDetailPage({
         method: 'POST',
         headers,
         body: JSON.stringify({
+          vehicle_id: selectedVehicle?.id || null,
           customer_name: row.cars_user || row.otptcanm,
           customer_phone: row.otptcahp,
           customer_car_number: row.cars_no,
@@ -473,7 +478,11 @@ export default function DispatchDetailPage({
       })
       const json = await res.json()
       if (json.error) throw new Error(json.error)
-      showResult({ type: 'ok', text: `배차 확정 완료 — fmi_rental ${json.mode === 'create' ? '신설' : '갱신'}` })
+      showResult({
+        type: 'ok',
+        text: `배차 확정 완료 — fmi_rental ${json.mode === 'create' ? '신설' : '갱신'}`
+          + (selectedVehicle ? ` / ${selectedVehicle.number} 배차중 전환` : ''),
+      })
       await fetchOrder()
     } catch (e: any) {
       showResult({ type: 'err', text: e?.message || '배차 확정 실패' })
