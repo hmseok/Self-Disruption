@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import AccidentIntakeTab from './_tabs/AccidentIntakeTab'
 import ScheduleTab from './_tabs/ScheduleTab'
+import ClaimsTab from './_tabs/ClaimsTab'
 import PlaceholderTab from './_tabs/PlaceholderTab'
 
 // ═══════════════════════════════════════════════════════════════════
@@ -75,19 +76,7 @@ export default function OperationsPage() {
 
         {tab === 'schedule' && <ScheduleTab />}
 
-        {tab === 'claims' && (
-          <PlaceholderTab
-            icon="💰"
-            title="청구관리"
-            description="회차 확정 + 청구 작성 + 입금% 관리"
-            upcoming={[
-              '차량 기본셋팅 (출고/반납 주행거리, 사진)',
-              '청구 작성 (final_claim_amount, insurance_claim_no)',
-              '청구 vs 입금% 동적 계산 (transactions JOIN)',
-              '출고 후 정비/세차 완료 처리',
-            ]}
-          />
-        )}
+        {tab === 'claims' && <ClaimsTab />}
 
         {tab === 'waiting' && (
           <PlaceholderTab
