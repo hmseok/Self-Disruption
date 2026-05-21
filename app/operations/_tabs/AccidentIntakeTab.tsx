@@ -6,7 +6,7 @@ import DcStatStrip, { StatItem, ActionButton } from '@/app/components/DcStatStri
 import DcToolbar, { FilterItem } from '@/app/components/DcToolbar'
 import NeuDataTable, { TableColumn, MobileCardConfig } from '@/app/components/NeuDataTable'
 import { GLASS } from '@/app/utils/ui-tokens'
-import type { DispatchRequestRow } from '@/app/operations/intake/types'
+import type { DispatchRequestRow, DispatchOrder } from '@/app/operations/intake/types'
 import { fmtCafe24DateTime } from '@/app/operations/intake/types'
 
 // ═══════════════════════════════════════════════════════════════════
@@ -24,6 +24,21 @@ async function getAuthHeader(): Promise<Record<string, string>> {
 
 type FilterKey = 'all' | 'dcyn_y' | 'dcyn_n' | 'closed'
 
+// PR-F (2026-05-16) — 우리 진행 상태 배지 (operations_dispatch_orders.status)
+const ORDER_STATUS_META: Record<string, { label: string; bg: string; fg: string }> = {
+  new:        { label: '🆕 신규',     bg: 'rgba(148,163,184,0.15)', fg: '#475569' },
+  consulting: { label: '📞 상담중',   bg: 'rgba(245,158,11,0.12)',  fg: '#b45309' },
+  scheduled:  { label: '📅 배차예정', bg: 'rgba(99,102,241,0.12)',  fg: '#4338ca' },
+  dispatched: { label: '🚐 배차완료', bg: 'rgba(34,197,94,0.12)',   fg: '#15803d' },
+  done:       { label: '✅ 회차완료', bg: 'rgba(148,163,184,0.15)', fg: '#475569' },
+  cancelled:  { label: '✗ 취소',      bg: 'rgba(239,68,68,0.12)',   fg: '#991b1b' },
+}
+
+// cafe24 사고 idno → 내부 ride_accident_id (dispatch 상세 페이지와 동일 로직)
+function rideAccidentIdFromIdno(idno: string): number {
+  return parseInt(String(idno).replace(/[^0-9]/g, '').slice(0, 9) || '0', 10)
+}
+
 // 사용자 명시 (2026-05-16): 「리스트 조회 로딩이 좀 있네」 「사고전체 리스트가 좀 더디네」
 // 원인: 4 fetch (all=R / Y=R / N=R / all=C) × 7일 = 무거움
 // 개선: 단일 fetch (dcyn=all, rgst=all) + client side filter
@@ -33,9 +48,11 @@ export default function AccidentIntakeTab() {
   const [filter, setFilter] = useState<FilterKey>('all')
 
   const [allRows, setAllRows] = useState<DispatchRequestRow[] | null>(null)
+  const [orders, setOrders] = useState<DispatchOrder[]>([])  // PR-F — 우리 진행 dispatch_orders
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [search, setSearch] = useState('')
+  const [startingKey, setStartingKey] = useState<string | null>(null)  // PR-F — 진행 버튼 중복 클릭 방지
 
   const todayYmd = useMemo(() => {
     const d = new Date()
@@ -69,14 +86,18 @@ export default function AccidentIntakeTab() {
         from: dateRange.from, to: dateRange.to, limit: '2000',
         dcyn: 'all', rgst: 'all',
       })
-      const res = await fetch(`/api/operations/cafe24-dispatch-requests?${params}`, { headers })
-      const json = await res.json().catch(() => ({}))
-      if (json?.success && Array.isArray(json.data)) {
-        setAllRows(json.data as DispatchRequestRow[])
+      // PR-F — cafe24 사고 + 우리 dispatch_orders 동시 fetch
+      const [r1, r2] = await Promise.all([
+        fetch(`/api/operations/cafe24-dispatch-requests?${params}`, { headers }).then((r) => r.json()).catch(() => ({})),
+        fetch('/api/operations/dispatch-orders?limit=500', { headers }).then((r) => r.json()).catch(() => ({})),
+      ])
+      if (r1?.success && Array.isArray(r1.data)) {
+        setAllRows(r1.data as DispatchRequestRow[])
       } else {
         setAllRows([])
-        setErr(json?.error || 'cafe24 미연결')
+        setErr(r1?.error || 'cafe24 미연결')
       }
+      setOrders(Array.isArray(r2?.data) ? r2.data : [])
     } catch (e: any) {
       setAllRows([])
       setErr(e?.message || 'fetch 실패')
@@ -113,6 +134,51 @@ export default function AccidentIntakeTab() {
   const activeData = data[filter]
   const activeLoading = loading
   const activeErr = err
+
+  // PR-F — cafe24 사고 키 → 우리 dispatch_order 매칭 맵
+  const orderMap = useMemo(() => {
+    const m = new Map<string, DispatchOrder>()
+    for (const o of orders) {
+      if (o.cafe24_otpt_idno && o.cafe24_otpt_mddt && o.cafe24_otpt_srno != null) {
+        m.set(`${o.cafe24_otpt_idno}|${o.cafe24_otpt_mddt}|${o.cafe24_otpt_srno}`, o)
+      }
+    }
+    return m
+  }, [orders])
+
+  // PR-F — 진행 버튼: dispatch_order 없으면 생성 후, 배차 모드로 상세 진입
+  const startDispatch = useCallback(async (r: DispatchRequestRow, e: React.MouseEvent) => {
+    e.stopPropagation()
+    const key = `${r.otptidno}|${r.otptmddt}|${r.otptsrno}`
+    const detailUrl = `/operations/dispatch/${r.otptidno}/${r.otptmddt}/${r.otptsrno}?mode=schedule`
+    // 이미 dispatch_order 있으면 바로 상세
+    if (orderMap.has(key)) {
+      router.push(detailUrl)
+      return
+    }
+    setStartingKey(key)
+    try {
+      const headers = { ...(await getAuthHeader()), 'Content-Type': 'application/json' }
+      const res = await fetch('/api/operations/dispatch-orders', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          ride_accident_id: rideAccidentIdFromIdno(r.otptidno),
+          status: 'consulting',
+          cafe24_otpt_idno: r.otptidno,
+          cafe24_otpt_mddt: r.otptmddt,
+          cafe24_otpt_srno: typeof r.otptsrno === 'string' ? parseInt(r.otptsrno, 10) : r.otptsrno,
+        }),
+      })
+      await res.json().catch(() => ({}))
+      // 성공/실패 무관 — 상세 페이지에서 dispatch_order 재조회/생성 가능
+      router.push(detailUrl)
+    } catch {
+      router.push(detailUrl)
+    } finally {
+      setStartingKey(null)
+    }
+  }, [orderMap, router])
 
   const filtered = useMemo(() => {
     if (!search.trim()) return activeData
@@ -196,6 +262,44 @@ export default function AccidentIntakeTab() {
             background: isY ? 'rgba(239,68,68,0.12)' : 'rgba(148,163,184,0.15)',
             color: isY ? '#991b1b' : '#475569',
           }}>{isY ? '🚗 사용' : '🚙 미사용'}</span>
+        )
+      },
+    },
+    {
+      // PR-F — 우리 진행 상태 / 진행 버튼
+      key: 'progress', label: '진행', width: 130, align: 'center',
+      sortBy: (r) => {
+        const o = orderMap.get(`${r.otptidno}|${r.otptmddt}|${r.otptsrno}`)
+        return o ? o.status : 'zzz'  // 미진행을 뒤로
+      },
+      render: (r) => {
+        const key = `${r.otptidno}|${r.otptmddt}|${r.otptsrno}`
+        const o = orderMap.get(key)
+        if (o) {
+          const meta = ORDER_STATUS_META[o.status] || { label: o.status, bg: 'rgba(148,163,184,0.15)', fg: '#475569' }
+          return (
+            <span style={{
+              display: 'inline-block', padding: '3px 10px', borderRadius: 8, fontSize: 11, fontWeight: 800,
+              whiteSpace: 'nowrap', background: meta.bg, color: meta.fg,
+            }}>{meta.label}</span>
+          )
+        }
+        // 미진행 — 진행 버튼 (대차사용/미사용 따라 라벨)
+        const isY = r.otptdcyn === 'Y'
+        const busy = startingKey === key
+        return (
+          <button
+            onClick={(e) => startDispatch(r, e)}
+            disabled={busy}
+            style={{
+              padding: '4px 10px', borderRadius: 7, border: 'none', cursor: busy ? 'wait' : 'pointer',
+              fontSize: 11, fontWeight: 800, whiteSpace: 'nowrap',
+              background: isY ? 'linear-gradient(135deg, #ef4444, #dc2626)' : 'linear-gradient(135deg, #6366f1, #4f46e5)',
+              color: '#fff', opacity: busy ? 0.5 : 1,
+            }}
+          >
+            {busy ? '⏳' : isY ? '🚗 대차 진행' : '→ 대차 전환'}
+          </button>
         )
       },
     },
