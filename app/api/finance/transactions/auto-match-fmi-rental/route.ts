@@ -376,11 +376,11 @@ export async function POST(request: NextRequest) {
       let vehicleId: string | null = pick.vehicle_id ? String(pick.vehicle_id).trim() : null
       let vehicleLookupFailed = false
 
-      // PR-UX13 hotfix: cars → fmi_vehicles (FK 대상)
+      // PR-E3 (2026-05-16) 차량 통합: 차량 lookup 대상 fmi_vehicles → cars 정본
       if (vehicleId) {
         try {
           const check = await prisma.$queryRawUnsafe<Array<any>>(
-            `SELECT id FROM fmi_vehicles WHERE id = ? LIMIT 1`, vehicleId,
+            `SELECT id FROM cars WHERE id = ? LIMIT 1`, vehicleId,
           )
           if (!check[0]) vehicleId = null  // orphan — fallback 으로 진입
         } catch {}
@@ -391,23 +391,23 @@ export async function POST(request: NextRequest) {
         const normalized = rawCarNum.replace(/\s+/g, '')
         const last4 = rawCarNum.match(/\d{3,4}$/)?.[0] || ''
         try {
-          // PR-UX13 hotfix: cars → fmi_vehicles (FK 대상)
-          // 1) 정확 일치 — fmi_vehicles.car_number
+          // PR-E3 차량 통합: cars.number 로 lookup (fmi_vehicles.car_number 폐기)
+          // 1) 정확 일치 — cars.number
           let carRows = await prisma.$queryRawUnsafe<Array<any>>(
-            `SELECT id FROM fmi_vehicles WHERE car_number = ? LIMIT 1`,
+            `SELECT id FROM cars WHERE number = ? LIMIT 1`,
             rawCarNum,
           )
           // 2) 공백 제거 후 비교
           if (!carRows[0] && normalized !== rawCarNum) {
             carRows = await prisma.$queryRawUnsafe<Array<any>>(
-              `SELECT id FROM fmi_vehicles WHERE REPLACE(car_number, ' ', '') = ? LIMIT 1`,
+              `SELECT id FROM cars WHERE REPLACE(number, ' ', '') = ? LIMIT 1`,
               normalized,
             )
           }
           // 3) last4 매칭 — 1대일 때만
           if (!carRows[0] && last4) {
             const last4Rows = await prisma.$queryRawUnsafe<Array<any>>(
-              `SELECT id FROM fmi_vehicles WHERE car_number LIKE ? LIMIT 2`,
+              `SELECT id FROM cars WHERE number LIKE ? LIMIT 2`,
               `%${last4}`,
             )
             if (last4Rows.length === 1) carRows = last4Rows

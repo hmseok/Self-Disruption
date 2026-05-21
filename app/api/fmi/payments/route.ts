@@ -144,8 +144,9 @@ export async function GET(req: NextRequest) {
     const [payments, total] = await prisma.$transaction([
       prisma.fmiPayment.findMany({
         where,
+        // PR-E3 (2026-05-16) 차량 통합: vehicle relation → Car (cars 컬럼 number/brand)
         include: {
-          vehicle: { select: { car_number: true, car_type: true } },
+          vehicle: { select: { number: true, brand: true } },
         },
         orderBy: { created_at: 'desc' },
       }),

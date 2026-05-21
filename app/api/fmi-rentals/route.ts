@@ -38,7 +38,8 @@ export async function GET(request: NextRequest) {
     if (status) { wheres.push('r.status = ?'); params.push(status) }
     if (from) { wheres.push('r.dispatch_date >= ?'); params.push(from + ' 00:00:00') }
     if (to) { wheres.push('r.dispatch_date <= ?'); params.push(to + ' 23:59:59') }
-    if (fleetGroup) { wheres.push('v.rental_company = ?'); params.push(fleetGroup) }
+    // PR-E3 (2026-05-16) 차량 통합: fmi_vehicles.rental_company → cars.ownership_type
+    if (fleetGroup) { wheres.push('v.ownership_type = ?'); params.push(fleetGroup) }
     if (q) {
       wheres.push('(r.customer_name LIKE ? OR r.customer_car_number LIKE ? OR r.vehicle_car_number LIKE ?)')
       params.push(`%${q}%`, `%${q}%`, `%${q}%`)
@@ -56,10 +57,10 @@ export async function GET(request: NextRequest) {
          r.rental_days, r.daily_rate, r.total_rental_fee, r.final_claim_amount,
          r.status, r.handler_name, r.dispatcher_name, r.notes,
          r.created_at, r.updated_at,
-         v.rental_company AS fleet_group,
+         v.ownership_type AS fleet_group,
          v.status AS vehicle_status
        FROM fmi_rentals r
-       LEFT JOIN fmi_vehicles v ON v.id = r.vehicle_id
+       LEFT JOIN cars v ON v.id = r.vehicle_id
        ${whereClause}
        ORDER BY r.dispatch_date DESC
        LIMIT ${limit}`,
@@ -79,10 +80,10 @@ export async function GET(request: NextRequest) {
         'SELECT status, COUNT(*) as cnt FROM fmi_rentals GROUP BY status'
       )
       const fleetCounts = await prisma.$queryRawUnsafe<any[]>(
-        `SELECT v.rental_company, COUNT(*) as cnt
+        `SELECT v.ownership_type AS rental_company, COUNT(*) as cnt
          FROM fmi_rentals r
-         LEFT JOIN fmi_vehicles v ON v.id = r.vehicle_id
-         GROUP BY v.rental_company`
+         LEFT JOIN cars v ON v.id = r.vehicle_id
+         GROUP BY v.ownership_type`
       )
       const today = new Date().toISOString().slice(0, 10)
       const activeRentals = await prisma.$queryRawUnsafe<any[]>(
@@ -180,10 +181,10 @@ export async function POST(request: NextRequest) {
       )
     `
 
-    // 배차중이면 차량 상태 동기화 (best-effort)
+    // PR-E3 (2026-05-16) 차량 통합: 배차중이면 차량 cars.status='rented' 동기화
     if (body.vehicle_id && (status === 'dispatched' || status === 'claiming')) {
       try {
-        await prisma.$executeRaw`UPDATE fmi_vehicles SET status = 'rented' WHERE id = ${body.vehicle_id}`
+        await prisma.$executeRaw`UPDATE cars SET status = 'rented' WHERE id = ${body.vehicle_id}`
       } catch {}
     }
 

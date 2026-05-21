@@ -175,28 +175,18 @@ export async function POST(req: NextRequest) {
           continue
         }
 
-        // 1) fmi_vehicles upsert (car_number unique)
-        let vehicle = await prisma.fmiVehicle.findUnique({ where: { car_number: ourCarNo } })
+        // 1) cars upsert (number 매칭) — PR-E3 (2026-05-16) 차량 통합: fmi_vehicles → cars 정본
+        //    cars.number 는 unique 아님 → findFirst. car_type/rental_company 는 cars 에 없어 제외.
+        let vehicle = await prisma.car.findFirst({ where: { number: ourCarNo } })
         if (!vehicle) {
-          vehicle = await prisma.fmiVehicle.create({
+          vehicle = await prisma.car.create({
             data: {
-              car_number: ourCarNo,
-              car_type: r.vehicle_car_type || undefined,
-              ownership_type: 'owned',
-              rental_company: fleet_group,
-              status: 'available',
+              number: ourCarNo,
+              ownership_type: 'company',
+              status: 'active',
             },
           })
           result.created.vehicles++
-        } else if (!vehicle.rental_company || !vehicle.car_type) {
-          vehicle = await prisma.fmiVehicle.update({
-            where: { id: vehicle.id },
-            data: {
-              rental_company: vehicle.rental_company || fleet_group,
-              car_type: vehicle.car_type || r.vehicle_car_type || undefined,
-            },
-          })
-          result.updated.vehicles++
         }
 
         // 2) fmi_accidents upsert (by customer_car_number + receipt_no)

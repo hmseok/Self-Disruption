@@ -80,8 +80,10 @@ export async function GET(req: NextRequest) {
     const [rentals, total] = await prisma.$transaction([
       prisma.fmiRental.findMany({
         where,
+        // PR-E3 (2026-05-16) 차량 통합: vehicle relation 이 Car 로 전환됨
+        // cars 컬럼: number/brand/model (car_number/car_brand/car_type → cars 엔 없음)
         include: {
-          vehicle: { select: { car_number: true, car_type: true, car_brand: true } },
+          vehicle: { select: { number: true, brand: true, model: true } },
         },
         orderBy: { created_at: 'desc' },
         skip: (page - 1) * limit,
@@ -122,10 +124,10 @@ export async function POST(req: NextRequest) {
           accidentData = await prisma.fmiAccident.findUnique({ where: { id: accident_id } });
         }
 
-        // 차량정보
+        // 차량정보 — PR-E3 (2026-05-16) 차량 통합: fmi_vehicles → cars
         let vehicleData: any = null;
         if (vehicle_id) {
-          vehicleData = await prisma.fmiVehicle.findUnique({ where: { id: vehicle_id } });
+          vehicleData = await prisma.car.findUnique({ where: { id: vehicle_id } });
         }
 
         const rentalData = {
@@ -135,8 +137,8 @@ export async function POST(req: NextRequest) {
           customer_car_number: accidentData?.customer_car_number || payload.customer_car_number,
           customer_car_type: accidentData?.customer_car_type || payload.customer_car_type,
           vehicle_id,
-          vehicle_car_number: vehicleData?.car_number,
-          vehicle_car_type: vehicleData?.car_type,
+          vehicle_car_number: vehicleData?.number,
+          vehicle_car_type: vehicleData?.trim || undefined,  // cars 엔 car_type 없음 — trim 대용
           insurance_company: accidentData?.insurance_company || payload.insurance_company,
           insurance_claim_no: accidentData?.insurance_claim_no || payload.insurance_claim_no,
           adjuster_name: accidentData?.adjuster_name || payload.adjuster_name,
@@ -154,11 +156,11 @@ export async function POST(req: NextRequest) {
 
         const rental = await prisma.fmiRental.create({ data: rentalData });
 
-        // 차량 상태 업데이트
+        // 차량 상태 업데이트 — PR-E3 차량 통합: cars.status (active/rented/accident)
         if (vehicle_id) {
-          await prisma.fmiVehicle.update({
+          await prisma.car.update({
             where: { id: vehicle_id },
-            data: { status: 'dispatched' },
+            data: { status: 'rented' },
           });
         }
 
@@ -181,7 +183,7 @@ export async function POST(req: NextRequest) {
             event_type: 'status_change',
             event_title: vehicle_id ? '대차 배차 완료' : '대차 요청 등록',
             event_detail: vehicle_id
-              ? `${vehicleData?.car_number} (${vehicleData?.car_type}) 배차`
+              ? `${vehicleData?.number || ''} ${vehicleData?.brand || ''} ${vehicleData?.model || ''} 배차`.trim()
               : '대차 배차 대기중',
             new_status: rental.status,
             created_by_name: handler_name,
@@ -198,16 +200,17 @@ export async function POST(req: NextRequest) {
         const { rental_id, vehicle_id, dispatch_date, dispatch_location,
           dispatch_mileage, dispatcher_name } = payload;
 
-        const vehicle = await prisma.fmiVehicle.findUnique({ where: { id: vehicle_id } });
+        // PR-E3 (2026-05-16) 차량 통합: fmi_vehicles → cars
+        const vehicle = await prisma.car.findUnique({ where: { id: vehicle_id } });
         if (!vehicle) throw new Error('차량을 찾을 수 없습니다');
-        if (vehicle.status !== 'available') throw new Error('배차 불가능한 차량입니다');
+        if (vehicle.status !== 'active') throw new Error('배차 불가능한 차량입니다');
 
         const rental = await prisma.fmiRental.update({
           where: { id: rental_id },
           data: {
             vehicle_id,
-            vehicle_car_number: vehicle.car_number,
-            vehicle_car_type: vehicle.car_type,
+            vehicle_car_number: vehicle.number,
+            vehicle_car_type: vehicle.trim || undefined,
             dispatch_date: dispatch_date ? new Date(dispatch_date) : new Date(),
             dispatch_location,
             dispatch_mileage: dispatch_mileage ?? vehicle.mileage,
@@ -216,9 +219,9 @@ export async function POST(req: NextRequest) {
           },
         });
 
-        await prisma.fmiVehicle.update({
+        await prisma.car.update({
           where: { id: vehicle_id },
-          data: { status: 'dispatched', current_location: dispatch_location },
+          data: { status: 'rented', location: dispatch_location },
         });
 
         if (rental.accident_id) {
@@ -234,7 +237,7 @@ export async function POST(req: NextRequest) {
             accident_id: rental.accident_id,
             event_type: 'status_change',
             event_title: '배차 완료',
-            event_detail: `${vehicle.car_number} (${vehicle.car_type}) → ${rental.customer_name}`,
+            event_detail: `${vehicle.number || ''} ${vehicle.brand || ''} ${vehicle.model || ''} → ${rental.customer_name}`.trim(),
             old_status: 'pending',
             new_status: 'dispatched',
             created_by_name: dispatcher_name,
@@ -267,10 +270,11 @@ export async function POST(req: NextRequest) {
         });
 
         if (rental.vehicle_id) {
-          await prisma.fmiVehicle.update({
+          // PR-E3 차량 통합: cars.status — 손상 시 accident(정비), 정상 시 active(대기)
+          await prisma.car.update({
             where: { id: rental.vehicle_id },
             data: {
-              status: return_damage_yn ? 'maintenance' : 'available',
+              status: return_damage_yn ? 'accident' : 'active',
               ...(return_mileage ? { mileage: return_mileage } : {}),
             },
           });

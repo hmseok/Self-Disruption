@@ -83,10 +83,10 @@ export async function POST(
       WHERE id = ${id}
     `
 
-    // 차량 반납 — fmi_vehicles.status = 'available'
+    // PR-E3 (2026-05-16) 차량 통합: 반납 시 차량 상태 cars.status = 'active' (대기)
     if (rental.vehicle_id) {
       try {
-        await prisma.$executeRaw`UPDATE fmi_vehicles SET status = 'available' WHERE id = ${rental.vehicle_id}`
+        await prisma.$executeRaw`UPDATE cars SET status = 'active' WHERE id = ${rental.vehicle_id}`
       } catch {}
     }
 

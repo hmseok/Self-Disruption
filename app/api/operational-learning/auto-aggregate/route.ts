@@ -70,10 +70,10 @@ export async function POST(request: NextRequest) {
     }
 
     // 4. 월별 사고비용 집계 (fmi_accidents)
-    //    차량번호로 매칭 — vehicle 테이블에서 plate_number 조회 후 사고 매칭
+    //    PR-E3 (2026-05-16) 차량 통합: cars.number 로 차량번호 조회
     let plateNumber: string | null = null
     const vehRows = await prisma.$queryRaw<any[]>`
-      SELECT plate_number FROM fmi_vehicles WHERE id = ${vehicleId} LIMIT 1
+      SELECT number AS plate_number FROM cars WHERE id = ${vehicleId} LIMIT 1
     `
     if (vehRows.length > 0) plateNumber = vehRows[0].plate_number
 

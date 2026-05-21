@@ -37,15 +37,15 @@ export async function GET(request: NextRequest) {
       FROM fmi_rentals
     `).catch(() => [{ total: 0, missing_vehicle_id: 0 }])
 
-    // 매핑 후보 샘플 — PR-UX13 hotfix: cars → fmi_vehicles (FK 대상)
+    // PR-E3 (2026-05-16) 차량 통합: 매핑 대상 fmi_vehicles → cars (정본)
     const candidates = await prisma.$queryRawUnsafe<Array<any>>(`
       SELECT
         fr.id, fr.customer_car_number, fr.vehicle_car_number, fr.insurance_company,
         fr.dispatch_date,
-        fv.id AS car_id, fv.car_number AS car_number, fv.car_brand AS brand, fv.car_model AS model
+        fv.id AS car_id, fv.number AS car_number, fv.brand AS brand, fv.model AS model
       FROM fmi_rentals fr
-      LEFT JOIN fmi_vehicles fv ON fv.car_number = fr.vehicle_car_number
-                                OR REPLACE(fv.car_number, ' ', '') = REPLACE(fr.vehicle_car_number, ' ', '')
+      LEFT JOIN cars fv ON fv.number = fr.vehicle_car_number
+                        OR REPLACE(fv.number, ' ', '') = REPLACE(fr.vehicle_car_number, ' ', '')
       WHERE (fr.vehicle_id IS NULL OR fr.vehicle_id = '')
         AND fr.vehicle_car_number IS NOT NULL AND fr.vehicle_car_number != ''
       ORDER BY fr.dispatch_date DESC
@@ -91,14 +91,14 @@ export async function POST(request: NextRequest) {
     const body = await request.json().catch(() => ({}))
     const dryRun = body.dryRun === true
 
-    // ── 일괄 매핑 — PR-UX13 hotfix: cars → fmi_vehicles (FK 대상) ──
+    // ── 일괄 매핑 — PR-E3 (2026-05-16) 차량 통합: cars (정본) 로 매핑 ──
     // 1대 hit 만 매핑 (다대 hit 면 사용자 수동 결정)
     const candidates = await prisma.$queryRawUnsafe<Array<any>>(`
       SELECT
         fr.id, fr.vehicle_car_number,
-        (SELECT GROUP_CONCAT(fv.id) FROM fmi_vehicles fv
-          WHERE fv.car_number = fr.vehicle_car_number
-             OR REPLACE(fv.car_number, ' ', '') = REPLACE(fr.vehicle_car_number, ' ', '')
+        (SELECT GROUP_CONCAT(fv.id) FROM cars fv
+          WHERE fv.number = fr.vehicle_car_number
+             OR REPLACE(fv.number, ' ', '') = REPLACE(fr.vehicle_car_number, ' ', '')
         ) AS car_ids
       FROM fmi_rentals fr
       WHERE (fr.vehicle_id IS NULL OR fr.vehicle_id = '')
@@ -137,16 +137,16 @@ export async function POST(request: NextRequest) {
       }
       if (!dryRun) {
         try {
-          // FK 안전 검증 — UPDATE 직전 fmi_vehicles 존재 재확인 (PR-UX13 hotfix)
+          // PR-E3 (2026-05-16) 차량 통합: UPDATE 직전 cars 존재 재확인
           const checkCar = await prisma.$queryRawUnsafe<Array<any>>(
-            `SELECT id FROM fmi_vehicles WHERE id = ? LIMIT 1`, carId,
+            `SELECT id FROM cars WHERE id = ? LIMIT 1`, carId,
           )
           if (!checkCar[0]) {
             updateErrors++
             if (errors.length < 20) {
               errors.push({
                 fmi_id: r.id, car_id: carId,
-                reason: 'fmi_vehicles 테이블에 없음 (삭제됐거나 collation 충돌)',
+                reason: 'cars 테이블에 없음 (삭제됐거나 collation 충돌)',
               })
             }
             continue

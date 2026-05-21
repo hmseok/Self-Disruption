@@ -46,10 +46,11 @@ export async function GET(
     if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
 
     const { id } = await params
+    // PR-E3 (2026-05-16) 차량 통합: fmi_vehicles → cars
     const rows = await prisma.$queryRaw<any[]>`
-      SELECT r.*, v.rental_company AS fleet_group, v.status AS vehicle_status
+      SELECT r.*, v.ownership_type AS fleet_group, v.status AS vehicle_status
       FROM fmi_rentals r
-      LEFT JOIN fmi_vehicles v ON v.id = r.vehicle_id
+      LEFT JOIN cars v ON v.id = r.vehicle_id
       WHERE r.id = ${id}
       LIMIT 1
     `
@@ -107,11 +108,13 @@ export async function PATCH(
     // 차량 상태 동기화 (best-effort)
     const newStatus = body.status ?? prev.status
     const newVehicleId = body.vehicle_id ?? prev.vehicle_id
+    // PR-E3 (2026-05-16) 차량 통합: 차량 상태 동기화 대상 fmi_vehicles → cars
+    // cars.status 값 체계: active(대기) / rented(배차중) / accident
     try {
       if (newVehicleId && (newStatus === 'dispatched' || newStatus === 'claiming')) {
-        await prisma.$executeRaw`UPDATE fmi_vehicles SET status = 'rented' WHERE id = ${newVehicleId}`
+        await prisma.$executeRaw`UPDATE cars SET status = 'rented' WHERE id = ${newVehicleId}`
       } else if (newVehicleId && (newStatus === 'returned' || newStatus === 'settled')) {
-        await prisma.$executeRaw`UPDATE fmi_vehicles SET status = 'available' WHERE id = ${newVehicleId}`
+        await prisma.$executeRaw`UPDATE cars SET status = 'active' WHERE id = ${newVehicleId}`
       }
     } catch {}
 
@@ -146,7 +149,8 @@ export async function DELETE(
 
     if (vehicleId) {
       try {
-        await prisma.$executeRaw`UPDATE fmi_vehicles SET status = 'available' WHERE id = ${vehicleId}`
+        // PR-E3 (2026-05-16) 차량 통합: 대차건 삭제 시 차량 cars.status='active' (대기)
+        await prisma.$executeRaw`UPDATE cars SET status = 'active' WHERE id = ${vehicleId}`
       } catch {}
     }
 

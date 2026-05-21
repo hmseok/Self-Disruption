@@ -78,8 +78,8 @@ model FmiVehicle {
   created_at             DateTime  @default(now())
   updated_at             DateTime  @default(now()) @updatedAt
 
-  rentals  FmiRental[]
-  payments FmiPayment[]
+  // PR-E3 (2026-05-16) — 차량 테이블 통합: rentals/payments relation 은 Car 로 이전.
+  // fmi_vehicles 는 PR-E4 에서 폐기 예정 (현재 빈 껍데기).
 
   @@index([status])
   @@index([ownership_type])
@@ -184,7 +184,8 @@ model FmiRental {
   updated_at           DateTime  @default(now()) @updatedAt
 
   accident    FmiAccident?        @relation(fields: [accident_id], references: [id])
-  vehicle     FmiVehicle?         @relation(fields: [vehicle_id], references: [id])
+  // PR-E3 (2026-05-16) — 차량 테이블 통합: vehicle_id 는 이제 cars.id 참조 (PR-E2 리포인트 완료)
+  vehicle     Car?                @relation(fields: [vehicle_id], references: [id])
   claims      FmiClaim[]
   settlements FmiSettlement[]
   payments    FmiPayment[]
@@ -295,8 +296,9 @@ model FmiPayment {
   created_at        DateTime  @default(now())
   updated_at        DateTime  @default(now()) @updatedAt
 
-  vehicle FmiVehicle? @relation(fields: [vehicle_id], references: [id])
-  rental  FmiRental?  @relation(fields: [rental_id], references: [id])
+  // PR-E3 (2026-05-16) — 차량 테이블 통합: vehicle_id → cars.id 참조
+  vehicle Car?       @relation(fields: [vehicle_id], references: [id])
+  rental  FmiRental? @relation(fields: [rental_id], references: [id])
 
   @@index([payment_category])
   @@index([payment_status])
@@ -714,6 +716,10 @@ model Car {
   notes                    String?   @db.Text
   created_at               DateTime  @default(now())
   updated_at               DateTime  @default(now()) @updatedAt
+
+  // PR-E3 (2026-05-16) — 차량 테이블 통합: fmi_rentals/fmi_payments 역 relation 이전
+  fmi_rentals  FmiRental[]
+  fmi_payments FmiPayment[]
 
   @@index([vin])
   @@index([location_code])
