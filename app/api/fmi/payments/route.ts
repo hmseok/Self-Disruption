@@ -85,45 +85,22 @@ export async function GET(req: NextRequest) {
     }
 
     // 투자자별 수익 현황
+    // PR-E4 (2026-05-16) 차량 테이블 통합: fmi_vehicles 폐기 — 투자 차량 정보는
+    //   general_investments 가 본체. 현재는 지급(payments) 기준 집계만.
     if (action === 'investor_summary') {
-      const [vehicles, payments] = await prisma.$transaction([
-        prisma.fmiVehicle.findMany({
-          where: { investor: { not: null } },
-          select: {
-            investor: true,
-            investment_amount: true,
-            investment_return_rate: true,
-            car_number: true,
-            car_type: true,
-            status: true,
-          },
-        }),
-        prisma.fmiPayment.findMany({
-          where: { payment_category: 'investor_return' },
-          select: { payee_name: true, amount: true, payment_date: true, payment_status: true },
-        }),
-      ]);
-
-      const investors: Record<string, any> = {};
-      vehicles.forEach(v => {
-        const inv = v.investor!;
-        if (!investors[inv]) {
-          investors[inv] = { vehicles: [], total_investment: 0, total_paid: 0 };
-        }
-        investors[inv].vehicles.push({
-          car_number: v.car_number,
-          car_type: v.car_type,
-          status: v.status,
-        });
-        investors[inv].total_investment += Number(v.investment_amount ?? 0);
+      const payments = await prisma.fmiPayment.findMany({
+        where: { payment_category: 'investor_return' },
+        select: { payee_name: true, amount: true, payment_date: true, payment_status: true },
       });
 
+      const investors: Record<string, any> = {};
       payments
         .filter(p => p.payment_status === 'paid')
         .forEach(p => {
-          if (investors[p.payee_name]) {
-            investors[p.payee_name].total_paid += Number(p.amount ?? 0);
+          if (!investors[p.payee_name]) {
+            investors[p.payee_name] = { vehicles: [], total_investment: 0, total_paid: 0 };
           }
+          investors[p.payee_name].total_paid += Number(p.amount ?? 0);
         });
 
       return NextResponse.json({ data: serialize(investors) });
@@ -203,37 +180,14 @@ export async function POST(req: NextRequest) {
       }
 
       // 월 렌트비 일괄 생성
+      // PR-E4 (2026-05-16) 차량 테이블 통합: fmi_vehicles 폐기로 비활성.
+      //   cars 에 rental_monthly_cost 미존재 — 임차차량 관리 모델 필요 시 별도 재구현.
       case 'generate_monthly_rent': {
-        const { month } = payload; // 'YYYY-MM'
-
-        const vehicles = await prisma.fmiVehicle.findMany({
-          where: { ownership_type: 'external_rent', NOT: { status: 'inactive' } },
+        return NextResponse.json({
+          success: true,
+          count: 0,
+          message: '외부렌트 월렌트비 기능은 차량 테이블 통합(PR-E)으로 비활성화되었습니다',
         });
-
-        if (!vehicles.length) {
-          return NextResponse.json({
-            success: true,
-            message: '외부렌트 차량이 없습니다',
-            count: 0,
-          });
-        }
-
-        const paymentsData = vehicles.map(v => ({
-          payment_category: 'external_rent',
-          payee_name: v.rental_company || '미지정',
-          vehicle_id: v.id,
-          amount: v.rental_monthly_cost ?? 0,
-          tax_amount: new Prisma.Decimal(0),
-          total_amount: v.rental_monthly_cost ?? 0,
-          due_date: new Date(`${month}-25`),
-          is_recurring: true,
-          recurring_period: 'monthly',
-          notes: `${month} ${v.car_number} 월 렌트비`,
-        }));
-
-        await prisma.fmiPayment.createMany({ data: paymentsData });
-
-        return NextResponse.json({ success: true, count: paymentsData.length });
       }
 
       default:
