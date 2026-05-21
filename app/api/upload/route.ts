@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyUser } from '@/lib/auth-server'
+import { getUserIdFromToken } from '@/lib/auth-server'
 import { uploadToGCS } from '@/lib/gcs'
 
 const ALLOWED_TYPES = [

@@ -159,6 +159,14 @@ export default function DispatchDetailPage({
   const [deliveryType, setDeliveryType] = useState<'self' | 'external' | ''>('')
   const [deliveryMemo, setDeliveryMemo] = useState('')
 
+  // ── 출고 처리 (PR-C3) — fmi_rentals dispatch_mileage/dispatch_photos/dispatch_memo ──
+  const [releaseModalOpen, setReleaseModalOpen] = useState(false)
+  const [releaseMileage, setReleaseMileage] = useState('')
+  const [releasePhotos, setReleasePhotos] = useState<string[]>([])
+  const [releaseMemo, setReleaseMemo] = useState('')
+  const [releaseUploading, setReleaseUploading] = useState(false)
+  const [releaseBusy, setReleaseBusy] = useState(false)
+
   // PR-B3.3 — 발송 이력 요약 통계 (채널별 / 상태별 / 최근 시각)
   // 사용자 명시 (2026-05-16): 「길어지니까 상단에 전체 내역을 카운드해주고
   //                              볼수있게 정보좀 주면 보기 편할것같은데요」
@@ -513,6 +521,63 @@ export default function DispatchDetailPage({
       showResult({ type: 'err', text: e?.message || '배차 확정 실패' })
     } finally {
       setBusy(false)
+    }
+  }
+
+  // PR-C3 — 출고 사진 업로드 (GCS /api/upload 재사용)
+  const uploadReleasePhotos = async (files: FileList | null) => {
+    if (!files || files.length === 0) return
+    setReleaseUploading(true)
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('fmi_token') : null
+      const headers = token ? { Authorization: `Bearer ${token}` } : undefined
+      const uploaded: string[] = []
+      for (const file of Array.from(files)) {
+        const fd = new FormData()
+        fd.append('file', file)
+        fd.append('folder', 'operations/dispatch-photos')
+        const res = await fetch('/api/upload', { method: 'POST', headers, body: fd })
+        const json = await res.json().catch(() => ({}))
+        if (json?.url) uploaded.push(json.url)
+        else if (json?.error) throw new Error(json.error)
+      }
+      setReleasePhotos((prev) => [...prev, ...uploaded])
+      if (uploaded.length > 0) showResult({ type: 'ok', text: `사진 ${uploaded.length}장 업로드 완료` })
+    } catch (e: any) {
+      showResult({ type: 'err', text: e?.message || '사진 업로드 실패' })
+    } finally {
+      setReleaseUploading(false)
+    }
+  }
+
+  // PR-C3 — 출고 처리 (fmi_rentals dispatch 정보 + status='dispatched')
+  const submitRelease = async () => {
+    if (!dispatchOrder) return
+    if (!dispatchOrder.fmi_rental_id) {
+      showResult({ type: 'err', text: '배차 확정(차량 연결)을 먼저 해주세요' })
+      return
+    }
+    setReleaseBusy(true)
+    try {
+      const headers = { ...(await getAuthHeader()), 'Content-Type': 'application/json' }
+      const res = await fetch(`/api/operations/dispatch-orders/${dispatchOrder.id}/release`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          dispatch_mileage: releaseMileage || null,
+          dispatch_photos: releasePhotos,
+          dispatch_memo: releaseMemo || null,
+        }),
+      })
+      const json = await res.json()
+      if (json.error) throw new Error(json.error)
+      showResult({ type: 'ok', text: `출고 처리 완료 — 사진 ${json.photo_count ?? releasePhotos.length}장` })
+      setReleaseModalOpen(false)
+      await fetchOrder()
+    } catch (e: any) {
+      showResult({ type: 'err', text: e?.message || '출고 처리 실패' })
+    } finally {
+      setReleaseBusy(false)
     }
   }
 
@@ -1147,6 +1212,25 @@ export default function DispatchDetailPage({
                   🚀 배차 확정
                 </button>
               )}
+              {/* PR-C3 — 출고 처리 (배차 확정 = fmi_rental 연결 후 활성) */}
+              {dispatchOrder?.fmi_rental_id && dispatchOrder.status !== 'done' && (
+                <button
+                  onClick={() => setReleaseModalOpen(true)}
+                  style={{
+                    padding: '8px 16px',
+                    background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: 8,
+                    cursor: 'pointer',
+                    fontWeight: 800,
+                    fontSize: 12,
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  🚚 출고 처리
+                </button>
+              )}
             </div>
             {/* 펼침 영역 — 폼 */}
             {panelOpen && (
@@ -1348,6 +1432,129 @@ export default function DispatchDetailPage({
                   ))}
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PR-C3 — 출고 처리 모달 (사진 업로드 + 주행거리 + 특이사항) */}
+      {releaseModalOpen && (
+        <div
+          onClick={() => !releaseBusy && setReleaseModalOpen(false)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 50,
+            background: 'rgba(15,23,42,0.45)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: 20,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              ...GLASS.L5,
+              backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
+              width: 'min(640px, 96vw)', maxHeight: '86vh',
+              borderRadius: 16, boxShadow: '0 24px 60px rgba(0,0,0,0.25)',
+              display: 'flex', flexDirection: 'column', overflow: 'hidden',
+            }}
+          >
+            {/* 헤더 */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '16px 20px', borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
+              <h3 style={{ fontSize: 15, fontWeight: 900, color: '#0f2440', margin: 0 }}>🚚 출고 처리</h3>
+              <span style={{ fontSize: 11, color: '#94a3b8' }}>차량 사진 + 주행거리 + 특이사항</span>
+              <div style={{ flex: 1 }} />
+              <button onClick={() => !releaseBusy && setReleaseModalOpen(false)}
+                style={{ padding: '5px 10px', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 16, color: '#64748b' }}>✕</button>
+            </div>
+            {/* 본문 */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+              {/* 출고 주행거리 */}
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#475569', marginBottom: 5 }}>출고 주행거리 (km)</label>
+                <input
+                  type="number"
+                  value={releaseMileage}
+                  onChange={(e) => setReleaseMileage(e.target.value)}
+                  placeholder="예: 45200"
+                  style={{ ...GLASS.L1, width: '100%', padding: '9px 12px', borderRadius: 8, fontSize: 13, color: '#1e293b' }}
+                />
+              </div>
+              {/* 차량 사진 */}
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#475569', marginBottom: 5 }}>
+                  차량 사진 <span style={{ fontSize: 10, color: '#94a3b8', fontWeight: 500 }}>(여러 장 선택 가능 — GCS 업로드)</span>
+                </label>
+                <label style={{
+                  ...GLASS.L1,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                  padding: '12px', borderRadius: 10, cursor: releaseUploading ? 'wait' : 'pointer',
+                  border: '1px dashed rgba(99,102,241,0.4)',
+                  fontSize: 12, fontWeight: 700, color: '#4338ca',
+                }}>
+                  {releaseUploading ? '⏳ 업로드 중…' : '📷 사진 추가 (클릭하여 선택)'}
+                  <input
+                    type="file" accept="image/*" multiple
+                    disabled={releaseUploading}
+                    onChange={(e) => { uploadReleasePhotos(e.target.files); e.target.value = '' }}
+                    style={{ display: 'none' }}
+                  />
+                </label>
+                {releasePhotos.length > 0 && (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))', gap: 8, marginTop: 8 }}>
+                    {releasePhotos.map((url, i) => (
+                      <div key={url} style={{ position: 'relative' }}>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={url} alt={`출고사진${i + 1}`} style={{ width: '100%', height: 70, objectFit: 'cover', borderRadius: 8, border: '1px solid rgba(0,0,0,0.06)' }} />
+                        <button
+                          onClick={() => setReleasePhotos((prev) => prev.filter((u) => u !== url))}
+                          style={{
+                            position: 'absolute', top: 2, right: 2,
+                            width: 18, height: 18, borderRadius: '50%', border: 'none',
+                            background: 'rgba(15,23,42,0.7)', color: '#fff', cursor: 'pointer',
+                            fontSize: 11, lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          }}
+                        >×</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {releasePhotos.length === 0 && (
+                  <div style={{ fontSize: 11, color: '#cbd5e1', marginTop: 6 }}>아직 업로드된 사진이 없습니다</div>
+                )}
+              </div>
+              {/* 특이사항 메모 */}
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#475569', marginBottom: 5 }}>출고 특이사항 메모</label>
+                <textarea
+                  value={releaseMemo}
+                  onChange={(e) => setReleaseMemo(e.target.value)}
+                  placeholder="외관 흠집 / 연료 상태 / 인수자 / 기타 특이사항…"
+                  rows={3}
+                  style={{ ...GLASS.L1, width: '100%', padding: '9px 12px', borderRadius: 8, fontSize: 13, color: '#1e293b', resize: 'vertical', fontFamily: 'inherit' }}
+                />
+              </div>
+            </div>
+            {/* 푸터 */}
+            <div style={{ display: 'flex', gap: 8, padding: '14px 20px', borderTop: '1px solid rgba(0,0,0,0.06)' }}>
+              <button onClick={() => !releaseBusy && setReleaseModalOpen(false)}
+                style={{ padding: '9px 16px', background: 'transparent', border: '1px solid rgba(0,0,0,0.12)', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700, color: '#475569' }}>
+                취소
+              </button>
+              <div style={{ flex: 1 }} />
+              <button
+                onClick={submitRelease}
+                disabled={releaseBusy || releaseUploading}
+                style={{
+                  padding: '9px 20px',
+                  background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                  color: '#fff', border: 'none', borderRadius: 8,
+                  cursor: (releaseBusy || releaseUploading) ? 'not-allowed' : 'pointer',
+                  fontWeight: 800, fontSize: 13,
+                  opacity: (releaseBusy || releaseUploading) ? 0.5 : 1,
+                }}
+              >
+                🚚 {releaseBusy ? '처리 중…' : '출고 완료'}
+              </button>
             </div>
           </div>
         </div>
