@@ -3,6 +3,41 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-21 (Phase CX-KPI-3) — WFM 필요인원 (Erlang C)
+
+- KPI-DESIGN.md §5-4 의 필요인원 산정 구현 (물량예측 §5-5 는 제외).
+- `lib/erlang-c.ts` — Erlang C 순수 함수 엔진 (erlangC / serviceLevel /
+  requiredAgents). 검증: 100콜/시간·AHT 180초·목표 80/20 → 8명 (업계 표준 일치).
+- API: `kpi/staffing` (GET) — 시간대별 콜 인입량 λ + AHT → Erlang C →
+  시간대별 필요인원. 배정(커버) 인원 = cs_assignments × cs_shift_slots
+  (긴 시프트가 커버하는 모든 시간대 +1 — 가변 근무시간 반영). 시프트별
+  과부족(🔴부족/🟢적정/🟡과잉). `kpi/wfm-config` (GET/POST) — 산정 기준 CRUD.
+- 화면: `/CallScheduler/kpi` 에 「🧮 필요인원 (WFM)」 탭 — 시간대별 필요 vs
+  배정 막대 표 + 시프트 과부족 카드 + 기준 인라인 편집.
+
+## 2026-05-21 (Phase CX-KPI-2) — CX KPI 대시보드
+
+- KPI-DESIGN.md §5-2 / §6 의 통합 KPI 대시보드 구현 (WFM·물량예측은 후속).
+- API: `kpi/dashboard` (GET) — granularity(day/week/month)+date 로 통화
+  (cs_call_records) · 생산성 (cs_agent_productivity is_active=1) · 근무
+  (cs_assignments JOIN cs_workers) 를 상담원 단위로 통합. summary +
+  byClient(캐피탈사) + byType(유형) 드릴다운 동봉. 모든 소스 graceful try/catch.
+  Cafe24 접수건수는 선택 — `cafe24Db.count` aceesosh 조회, 실패 시 0.
+- 화면: `/CallScheduler/kpi` 에 「📊 KPI 대시보드」 탭 추가 (기존 업로드 탭 유지).
+  일/주/월 토글 + 날짜 선택, DcStatStrip 5카드, NeuDataTable 상담원별
+  (전 컬럼 sortBy — 규칙 18), 캐피탈사/유형 분포 막대, 빈 상태 안내.
+- 신규 컴포넌트: `kpi/_components/KpiDashboard.tsx`.
+
+## 2026-05-21 (Phase CX-KPI-1) — KT 통화 데이터 엑셀 업로드
+
+- KPI-DESIGN.md §5-1 / §6 의 업로드 기능 구현 (대시보드·WFM 은 후속).
+- API: `kpi/upload-call-records` (KT 상담이력 → cs_call_records, INSERT IGNORE),
+  `kpi/upload-productivity` (KT 생산성 → cs_agent_productivity, ON DUPLICATE UPDATE),
+  `kpi/template` (업로드 양식 안내 다운로드).
+- 화면: `/CallScheduler/kpi` 신규 — 파일 종류 선택 → 클라이언트 xlsx 파싱 →
+  preview(매칭/기간/중복 요약) → apply. SubNav 에 「📈 CX KPI」 탭 추가.
+- 상담원 매핑: agent_kt_id → cs_workers.kt_id → 실패 시 name 매칭 (graceful).
+
 ## 2026-05-20 (Phase N-72) — P2 로테이션 = 그룹 멤버 순서
 
 ### 배경

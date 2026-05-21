@@ -1,16 +1,21 @@
 'use client'
 // ═══════════════════════════════════════════════════════════════════
 // /CallScheduler/kpi — CX KPI (KPI-DESIGN.md §5)
-//   현재 단계: KT 엑셀 업로드 섹션만 (대시보드/WFM 은 후속 단계).
+//   · 대시보드 탭: 통합 KPI (통화·생산성·근무) — KPI-DESIGN.md §5-2
+//   · 필요인원 탭: WFM Erlang C 산정 (시간대별 필요 vs 배정) — KPI-DESIGN.md §5-4
+//   · 업로드 탭: KT 엑셀 업로드 (상담이력 / 생산성)
 //   · 상담이력조회  → cs_call_records      (INSERT IGNORE)
 //   · 생산성(상담사) → cs_agent_productivity (ON DUPLICATE UPDATE)
 //   클라이언트 xlsx 파싱 → {mode:'preview'|'apply', rows} POST 패턴
 //   (leaves/bulk-upload 패턴 재사용)
+//   물량예측은 후속 단계 (KPI-DESIGN.md §5-5).
 // ═══════════════════════════════════════════════════════════════════
 import { useState, useRef } from 'react'
 import * as XLSX from 'xlsx'
 import { COLORS, GLASS, BTN } from '@/app/utils/ui-tokens'
 import { getAuthHeader } from '@/app/utils/auth-client'
+import KpiDashboard from './_components/KpiDashboard'
+import KpiStaffing from './_components/KpiStaffing'
 
 export const dynamic = 'force-dynamic'
 
@@ -57,7 +62,10 @@ interface PreviewResult {
   skipped?: number
 }
 
+type KpiTab = 'dashboard' | 'staffing' | 'upload'
+
 export default function KpiPage() {
+  const [tab, setTab] = useState<KpiTab>('dashboard')
   const [kind, setKind] = useState<FileKind>('call-records')
   const [busy, setBusy] = useState(false)
   const [parsedRows, setParsedRows] = useState<any[]>([])
@@ -166,6 +174,35 @@ export default function KpiPage() {
     <div style={{ padding: '16px 24px', maxWidth: 1100, margin: '0 auto' }}>
       {/* PageTitle 자동 헤더 — 자체 헤더 없음 */}
 
+      {/* ── 탭 (대시보드 / 업로드) ──────────────────────────── */}
+      <div style={{ display: 'flex', gap: 4, marginBottom: 14 }}>
+        {([
+          { k: 'dashboard' as KpiTab, label: '📊 KPI 대시보드' },
+          { k: 'staffing' as KpiTab, label: '🧮 필요인원 (WFM)' },
+          { k: 'upload' as KpiTab, label: '📤 KT 엑셀 업로드' },
+        ]).map(({ k, label }) => {
+          const active = k === tab
+          return (
+            <button key={k} type="button" onClick={() => setTab(k)}
+              style={{
+                padding: '8px 18px', borderRadius: 10, cursor: 'pointer',
+                fontSize: 13, fontWeight: 800,
+                background: active ? COLORS.primary : 'transparent',
+                color: active ? '#fff' : COLORS.textSecondary,
+                border: `1px solid ${active ? COLORS.primary : COLORS.borderFaint}`,
+              }}>
+              {label}
+            </button>
+          )
+        })}
+      </div>
+
+      {tab === 'dashboard' && <KpiDashboard />}
+
+      {tab === 'staffing' && <KpiStaffing />}
+
+      {tab === 'upload' && (
+       <>
       {/* ── 파일 종류 선택 ──────────────────────────────────── */}
       <div style={{
         ...GLASS.L4, borderRadius: 12, padding: 16, marginBottom: 14,
@@ -301,8 +338,11 @@ export default function KpiPage() {
         background: COLORS.bgGray, border: `1px solid ${COLORS.borderFaint}`,
         fontSize: 11, color: COLORS.textMuted,
       }}>
-        ℹ KPI 대시보드 · 필요인원 산정(WFM) 은 후속 단계에서 추가됩니다. (KPI-DESIGN.md §5-2~5-4)
+        ℹ 적재한 상담이력으로 「필요인원(WFM)」 탭에서 Erlang C 산정이 가능합니다.
+        물량 예측은 후속 단계에서 추가됩니다. (KPI-DESIGN.md §5-5)
       </div>
+       </>
+      )}
     </div>
   )
 }
