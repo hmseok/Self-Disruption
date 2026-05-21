@@ -118,7 +118,9 @@ export const MENUS: MenuEntry[] = [
   { id: 'mod-ride-settlements',   name: '고객사 마감자료',    displayName: '💰 마감자료',          path: '/RideSettlements',       iconKey: 'Money',     group: 'admin-ops', sortOrder: 82, requirePermission: true, sidebarHidden: true },
   // PR-COMPLIANCE (2026-05-11) — 정보보안 (개인정보 + 정보자산 + 보안사고 + 규정준수 + 직원교육)
   { id: 'mod-ride-compliance',    name: '정보보안',           displayName: '🔒 정보보안',           path: '/RideCompliance',        iconKey: 'Shield',    group: 'admin-ops', sortOrder: 83, requirePermission: true },
-  { id: 'mod-call-scheduler',  name: '근무시간표 분석 & 배포', displayName: '📅 근무시간표 분석 & 배포', path: '/CallScheduler', iconKey: 'Setting', group: 'cx-team', sortOrder: 60, requirePermission: true },
+  // PR-ASSETS-1.0 (2026-05-14) — 라이드 자산 관리 (QR 스티커 자산 대장 — 차량/사무비품/IT장비/법인카드)
+  { id: 'mod-ride-assets',        name: '라이드 자산',        displayName: '📦 라이드 자산',        path: '/RideAssets',            iconKey: 'Clipboard', group: 'admin-ops', sortOrder: 84, requirePermission: true },
+  { id: 'mod-call-scheduler',  name: '스케줄 및 운영', displayName: '📅 스케줄 및 운영', path: '/CallScheduler', iconKey: 'Setting', group: 'cx-team', sortOrder: 60, requirePermission: true },
   // 직원 마스터 — 사이드바 숨김. 근무스케줄 페이지 안에서 sub-nav 로 접근 (권한 페이지에는 노출 유지)
   { id: 'mod-ride-employees',  name: '직원 마스터',   path: '/RideEmployees',  iconKey: 'Users',   group: 'cx-team', sortOrder: 61, requirePermission: true, sidebarHidden: true },
   // 협력공장 추천 — 사고 발생 시 가까운 공장 추천이 메인. 서브: /factory-search/{map,mgmt,groups} (SubNav 진입)

@@ -40,6 +40,7 @@ const PATH_TO_GROUP: Record<string, string> = {
   '/RideAccidents':             'admin-ops',
   '/RideAccidentReports':       'admin-ops',
   '/RideCompliance':            'admin-ops',  // PR-COMPLIANCE (2026-05-11)
+  '/RideAssets':                'admin-ops',  // PR-ASSETS-1.0 (2026-05-14)
   // ── CX팀 (콜센터 등) — Phase N-12 ──
   '/CallScheduler':                                'cx',
   '/CallScheduler/new':                            'cx',
@@ -47,6 +48,7 @@ const PATH_TO_GROUP: Record<string, string> = {
   '/CallScheduler/requests':                       'cx',
   '/CallScheduler/skips':                          'cx',
   '/CallScheduler/me':                             'cx',
+  '/CallScheduler/kpi':                            'cx',
   // ── MT팀 운영 — PR-MT-OPS (2026-05-11) ──
   '/RideMTOps/maintenance-tours':                  'mt-team',
   '/RideMTOps/legal-inspections':                  'mt-team',
@@ -117,14 +119,16 @@ const PAGE_NAMES: Record<string, string> = {
   '/RideSettlements':      '고객사 마감자료',
   '/RideAccidents':        '라이드 긴급출동',
   '/RideAccidentReports':  '라이드 사고접수',
+  '/RideAssets':           '라이드 자산',
   '/RideCompliance':       '정보보안',  // PR-COMPLIANCE (2026-05-11)
   // CX팀 (Phase N-12)
-  '/CallScheduler':                  '근무시간표 분석 & 배포',
+  '/CallScheduler':                  '스케줄 및 운영',
   '/CallScheduler/new':              '새 월 만들기',
   '/CallScheduler/settings':         '설정',
   '/CallScheduler/requests':         '직원 요청 검토',
   '/CallScheduler/skips':            '회피일 검토',
   '/CallScheduler/me':               '내 시간표',
+  '/CallScheduler/kpi':              'CX KPI',
   // MT팀 운영 (PR-MT-OPS — 2026-05-11)
   '/RideMTOps/maintenance-tours':    '순회정비',
   '/RideMTOps/legal-inspections':    '법정검사',
