@@ -76,6 +76,18 @@ function rideAccidentIdFromIdno(idno: string): number {
   return parseInt(String(idno).replace(/[^0-9]/g, '').slice(0, 9) || '0', 10)
 }
 
+// PR-C2b-2 — 대기차량 (cars 테이블, /api/operations/waiting-vehicles 응답)
+type WaitingVehicle = {
+  id: string
+  number: string | null
+  brand: string | null
+  model: string | null
+  trim: string | null
+  year: number | null
+  image_url: string | null
+  status: string
+}
+
 const DISPATCH_STATUS_LABEL: Record<DispatchOrder['status'], string> = {
   new: '🆕 신규',
   consulting: '📞 상담중',
@@ -120,6 +132,13 @@ export default function DispatchDetailPage({
   // ── 문자 발송 이력 (crmsendh + crmsmsgh — PR-B3) ──
   const [sms, setSms] = useState<Cafe24SmsRow[]>([])
   const [smsLoading, setSmsLoading] = useState(true)
+
+  // ── 대기차량 선택 (PR-C2b-2) ──
+  const [vehicleModalOpen, setVehicleModalOpen] = useState(false)
+  const [waitingVehicles, setWaitingVehicles] = useState<WaitingVehicle[]>([])
+  const [vehiclesLoading, setVehiclesLoading] = useState(false)
+  const [vehicleSearch, setVehicleSearch] = useState('')
+  const [selectedVehicle, setSelectedVehicle] = useState<WaitingVehicle | null>(null)
 
   // PR-B3.3 — 발송 이력 요약 통계 (채널별 / 상태별 / 최근 시각)
   // 사용자 명시 (2026-05-16): 「길어지니까 상단에 전체 내역을 카운드해주고
@@ -267,6 +286,29 @@ export default function DispatchDetailPage({
       setSmsLoading(false)
     }
   }, [idno, mddt, srno])
+
+  // PR-C2b-2 — 대기차량 조회 (cars status=active)
+  const fetchWaitingVehicles = useCallback(async (q?: string) => {
+    setVehiclesLoading(true)
+    try {
+      const headers = await getAuthHeader()
+      const params = new URLSearchParams({ status: 'active' })
+      if (q && q.trim()) params.set('q', q.trim())
+      const res = await fetch(`/api/operations/waiting-vehicles?${params}`, { headers })
+      const json = await res.json().catch(() => ({}))
+      setWaitingVehicles((json?.success && Array.isArray(json.data)) ? json.data : [])
+    } catch {
+      setWaitingVehicles([])
+    } finally {
+      setVehiclesLoading(false)
+    }
+  }, [])
+
+  // 모달 열릴 때 대기차량 로드
+  useEffect(() => {
+    if (vehicleModalOpen) fetchWaitingVehicles(vehicleSearch)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vehicleModalOpen])
 
   const fetchOrder = useCallback(async () => {
     setOrderLoading(true)
@@ -1097,28 +1139,131 @@ export default function DispatchDetailPage({
                   <input type="date" value={expReturn} onChange={(e) => setExpReturn(e.target.value)}
                     style={{ ...GLASS.L1, width: '100%', padding: '8px 10px', borderRadius: 8, fontSize: 12, color: '#1e293b' }} />
                 </div>
-                {/* 특이사항 메모 — full width */}
+                {/* 대기차량 선택 (PR-C2b-2) — full width */}
                 <div style={{ gridColumn: '1 / -1' }}>
                   <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#475569', marginBottom: 4, whiteSpace: 'nowrap' }}>
-                    특이사항 메모
+                    배차 차량 (대기차량 선택)
                     <span style={{ marginLeft: 6, fontSize: 10, color: '#94a3b8', fontWeight: 500 }}>
-                      (탁송/외부오더/주의사항 등 — 본 메모는 상담 히스토리와 별개로 dispatch_order 에 저장)
+                      cars 「사용가능(대기)」 차량 중 선택 — 실제 DB 연결은 PR-C2b-3
                     </span>
                   </label>
-                  <textarea
-                    value={dispatchOrder?.customer_request || ''}
-                    onChange={() => { /* PR-C2b 에서 활성화 — 현재 readonly */ }}
-                    placeholder="PR-C2b 에서 활성화 예정 — 대기차량 선택 + 탁송/외부오더 통합"
-                    rows={2}
-                    readOnly
-                    style={{
-                      ...GLASS.L1, width: '100%', padding: '8px 10px', borderRadius: 8, fontSize: 12, color: '#1e293b',
-                      resize: 'vertical', fontFamily: 'inherit', opacity: 0.6,
-                    }}
-                  />
+                  {selectedVehicle ? (
+                    <div style={{
+                      display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
+                      ...GLASS.L3, padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(34,197,94,0.25)',
+                    }}>
+                      <span style={{ fontWeight: 800, color: '#0f2440', fontSize: 13 }}>🚗 {selectedVehicle.number || '-'}</span>
+                      <span style={{ fontSize: 12, color: '#475569' }}>
+                        {[selectedVehicle.brand, selectedVehicle.model, selectedVehicle.trim].filter(Boolean).join(' ') || '-'}
+                        {selectedVehicle.year ? ` (${selectedVehicle.year})` : ''}
+                      </span>
+                      <div style={{ flex: 1 }} />
+                      <button onClick={() => setVehicleModalOpen(true)}
+                        style={{ padding: '5px 12px', background: 'transparent', border: '1px solid rgba(0,0,0,0.12)', borderRadius: 7, cursor: 'pointer', fontSize: 11, fontWeight: 700, color: '#475569', whiteSpace: 'nowrap' }}>
+                        🔄 변경
+                      </button>
+                      <button onClick={() => setSelectedVehicle(null)}
+                        style={{ padding: '5px 10px', background: 'transparent', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 7, cursor: 'pointer', fontSize: 11, fontWeight: 700, color: '#991b1b', whiteSpace: 'nowrap' }}>
+                        × 해제
+                      </button>
+                    </div>
+                  ) : (
+                    <button onClick={() => setVehicleModalOpen(true)}
+                      style={{
+                        width: '100%', padding: '10px 12px', textAlign: 'left',
+                        ...GLASS.L1, borderRadius: 8, cursor: 'pointer',
+                        fontSize: 12, fontWeight: 700, color: '#4338ca',
+                        border: '1px dashed rgba(99,102,241,0.4)',
+                      }}>
+                      🚗 대기차량 선택하기 …
+                    </button>
+                  )}
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* PR-C2b-2 — 대기차량 선택 모달 */}
+      {vehicleModalOpen && (
+        <div
+          onClick={() => setVehicleModalOpen(false)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 50,
+            background: 'rgba(15,23,42,0.45)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: 20,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              ...GLASS.L5,
+              backdropFilter: 'blur(16px)',
+              WebkitBackdropFilter: 'blur(16px)',
+              width: 'min(720px, 96vw)',
+              maxHeight: '82vh',
+              borderRadius: 16,
+              boxShadow: '0 24px 60px rgba(0,0,0,0.25)',
+              display: 'flex', flexDirection: 'column',
+              overflow: 'hidden',
+            }}
+          >
+            {/* 모달 헤더 */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '16px 20px', borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
+              <h3 style={{ fontSize: 15, fontWeight: 900, color: '#0f2440', margin: 0 }}>🚗 대기차량 선택</h3>
+              <span style={{ fontSize: 11, color: '#94a3b8' }}>cars 「사용가능」 차량</span>
+              <div style={{ flex: 1 }} />
+              <button onClick={() => setVehicleModalOpen(false)}
+                style={{ padding: '5px 10px', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 16, color: '#64748b' }}>✕</button>
+            </div>
+            {/* 검색 */}
+            <div style={{ padding: '12px 20px', borderBottom: '1px solid rgba(0,0,0,0.04)' }}>
+              <input
+                value={vehicleSearch}
+                onChange={(e) => setVehicleSearch(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') fetchWaitingVehicles(vehicleSearch) }}
+                placeholder="차량번호 / 브랜드 / 모델 검색 후 Enter…"
+                style={{ ...GLASS.L1, width: '100%', padding: '9px 12px', borderRadius: 8, fontSize: 12, color: '#1e293b' }}
+              />
+            </div>
+            {/* 차량 list */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '12px 20px' }}>
+              {vehiclesLoading ? (
+                <div style={{ fontSize: 12, color: '#94a3b8', padding: 12 }}>대기차량 조회 중…</div>
+              ) : waitingVehicles.length === 0 ? (
+                <div style={{ fontSize: 12, color: '#94a3b8', padding: 12 }}>사용가능한 대기차량이 없습니다</div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {waitingVehicles.map((v) => (
+                    <button
+                      key={v.id}
+                      onClick={() => { setSelectedVehicle(v); setVehicleModalOpen(false) }}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left',
+                        ...GLASS.L3, padding: '10px 12px', borderRadius: 10,
+                        border: selectedVehicle?.id === v.id ? '1px solid rgba(99,102,241,0.5)' : '1px solid rgba(0,0,0,0.05)',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {v.image_url
+                        // eslint-disable-next-line @next/next/no-img-element
+                        ? <img src={v.image_url} alt="" style={{ width: 52, height: 38, objectFit: 'cover', borderRadius: 6, flexShrink: 0 }} />
+                        : <div style={{ width: 52, height: 38, borderRadius: 6, background: 'rgba(148,163,184,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}>🚗</div>}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 800, color: '#0f2440', fontSize: 13, whiteSpace: 'nowrap' }}>{v.number || '-'}</div>
+                        <div style={{ fontSize: 11, color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {[v.brand, v.model, v.trim].filter(Boolean).join(' ') || '-'}
+                          {v.year ? ` · ${v.year}년` : ''}
+                        </div>
+                      </div>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: '#15803d', whiteSpace: 'nowrap' }}>선택 →</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
