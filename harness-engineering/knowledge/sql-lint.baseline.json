@@ -86,33 +86,15 @@
     },
     {
       "file": "app/api/cost-standards/rollup/route.ts",
-      "ref": "cars.fuel_type",
-      "table": "cars",
-      "column": "fuel_type"
-    },
-    {
-      "file": "app/api/cost-standards/rollup/route.ts",
       "ref": "cars.vehicle_class",
       "table": "cars",
       "column": "vehicle_class"
     },
     {
       "file": "app/api/cost-standards/rollup/route.ts",
-      "ref": "cars.fuel_type",
-      "table": "cars",
-      "column": "fuel_type"
-    },
-    {
-      "file": "app/api/cost-standards/rollup/route.ts",
       "ref": "cars.vehicle_class",
       "table": "cars",
       "column": "vehicle_class"
-    },
-    {
-      "file": "app/api/cost-standards/rollup/route.ts",
-      "ref": "cars.fuel_type",
-      "table": "cars",
-      "column": "fuel_type"
     },
     {
       "file": "app/api/finance/auto-classify/dry-run/route.ts",
@@ -253,18 +235,6 @@
       "column": "employee_name"
     },
     {
-      "file": "app/api/operations/fleet/route.ts",
-      "ref": "c.location",
-      "table": "cars",
-      "column": "location"
-    },
-    {
-      "file": "app/api/operations/fleet/route.ts",
-      "ref": "c.mileage",
-      "table": "cars",
-      "column": "mileage"
-    },
-    {
       "file": "app/api/payroll/[id]/route.ts",
       "ref": "pr.employee_name",
       "table": "profiles",
@@ -317,20 +287,8 @@
       "ref": "business_doc_url (unprefixed)",
       "table": "profiles",
       "column": "business_doc_url"
-    },
-    {
-      "file": "app/api/vehicle-market-prices/route.ts",
-      "ref": "ownership_type (unprefixed)",
-      "table": "cars",
-      "column": "ownership_type"
-    },
-    {
-      "file": "app/api/vehicle-market-prices/route.ts",
-      "ref": "purchase_price (unprefixed)",
-      "table": "cars",
-      "column": "purchase_price"
     }
   ],
-  "generatedAt": "2026-05-19T10:05:17.750Z",
+  "generatedAt": "2026-05-21T12:38:12.372Z",
   "note": "기존 SQL 컬럼 위반 — known issue 로 처리. 새 위반만 lint fail."
 }

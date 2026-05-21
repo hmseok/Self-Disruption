@@ -14,7 +14,7 @@ hr 세션이 시작하면 사용자에게 다음 질문 후 본 문서 보강:
 ### [A] 부서 구조
 1. 현재 부서 종류? (예: 콜센터 / 운영 / 정비 / MT팀 / 영업 / 관리)
 2. 부서 트리 (parent_id) 필요? (예: 운영 > 정비팀 > MT팀)
-3. 부서장 (manager_id) 지정 필요?
+3. 부서장 (leader_employee_id) 지정 필요?
 4. 부서별 색상 (color_tone) 표시?
 
 ### [B] 직원 관리 흐름
@@ -66,7 +66,7 @@ hr 세션이 시작하면 사용자에게 다음 질문 후 본 문서 보강:
 - /hr/org 에서 부서 신설:
   - name (예: '콜센터')
   - parent_id (계층 구조)
-  - manager_id (부서장)
+  - leader_employee_id (부서장)
   - color_tone (UI 표시 색상)
 - ride_departments 신규 row
 

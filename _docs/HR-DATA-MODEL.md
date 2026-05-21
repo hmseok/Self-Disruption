@@ -14,7 +14,7 @@
 │   (인증 마스터) │ ──FK──> │   (인사 마스터)    │ ──참조──>│  (부서 마스터)  │
 │   PK: id UUID  │         │   PK: id UUID     │         │ PK: id UUID     │
 │   email/role   │         │   profile_id FK   │         │ name / parent_id│
-└────────────────┘         │   department_id   │         │ manager_id      │
+└────────────────┘         │   department_id   │         │ leader_employee_id│
                             │   (신설 FK 예정)   │         │ color_tone      │
                             └────────┬──────────┘         └────────────────┘
                                      │ 1:N
@@ -80,7 +80,7 @@ CREATE TABLE IF NOT EXISTS ride_departments (
   id              CHAR(36)     NOT NULL PRIMARY KEY,
   name            VARCHAR(64)  NOT NULL UNIQUE,
   parent_id       CHAR(36)     NULL,            -- 트리 구조
-  manager_id      CHAR(36)     NULL,            -- ride_employees.id 부서장
+  leader_employee_id CHAR(36)  NULL,            -- ride_employees.id 부서장 (meetings 와 컬럼명 통일)
   color_tone      VARCHAR(16)  NOT NULL DEFAULT 'slate',
   sort_order      INT          NOT NULL DEFAULT 0,
   description     VARCHAR(255) NULL,
@@ -88,7 +88,7 @@ CREATE TABLE IF NOT EXISTS ride_departments (
   created_at      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   KEY idx_ride_dept_parent (parent_id),
-  KEY idx_ride_dept_manager (manager_id),
+  KEY idx_ride_dept_leader (leader_employee_id),
   KEY idx_ride_dept_active (is_active)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 ```

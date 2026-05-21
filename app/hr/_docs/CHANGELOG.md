@@ -1,0 +1,36 @@
+# /hr 모듈 — CHANGELOG
+
+> Rule 22 (_docs 의무) — 매 PR 한 줄 이상.
+> 세션: peaceful-laughing-volta (hr 세션, 2026-05-16~)
+
+## 2026-05-16
+
+- **스키마 합의** (hr ↔ meetings 세션) — `ride_departments` 부서장 컬럼명 `manager_id` → `leader_employee_id` 통일.
+  - meetings 세션이 `_docs` 에 `ride_departments.leader_employee_id` 로 명시 (PR-MTG-V2-Visibility 후속).
+  - 마이그에 멱등 RENAME 블록 추가 — 이전 버전(manager_id) 적용분 자동 보정.
+  - API POST 는 `body.manager_id` 하위호환 fallback 유지.
+- **PR-HR-1** (hr 세션) — 라이드케어 부서 마스터 신설.
+  - 마이그 3개: `ride_departments` (17 entry 시드) / `ride_employees.department_id`+`promotion_target` / `ride_employee_assignments` (다대다 겸업).
+  - API 6개: `/api/ride-departments/*` × 3 신설 (GET/POST/tree, [id] PATCH/DELETE) + `/api/ride-employees/*` 보강 (route, [id] LEFT JOIN ride_departments) + bulk-assign 신설.
+  - graceful fallback (Rule 23): 마이그 미적용 시 V1 schema 로 자동 fallback + `_migration_pending: true` 반환.
+  - 운영 사실 인터뷰 완료: `_docs/HR-OPERATIONS.md` 신설 / `HR-DATA-MODEL.md` + `HR-PERSONAS.md` 보강.
+  - 도메인 사실: 「메인=FMI, 라이드=외주」 — 두 회사 부서 시스템 분리.
+
+## 2026-05-11
+
+- (메인 세션 sweet-amazing-galileo) — PR-HR-PREP. hr 세션 인계 자료 작성:
+  - `_docs/HR-PERSONAS.md` (페르소나 1차 초안)
+  - `_docs/HR-DATA-MODEL.md` (테이블 도식 + V2-Dept-FK 설계)
+  - `_docs/SESSIONS-COORDINATION.md` § 1.1 모듈 등록 (`app/hr/*` / `app/api/ride-employees/*` / `app/api/ride-departments/*`)
+
+## 2026-05-06
+
+- (메인 세션) PR-B4: 「급여 운영」 admin → settings 그룹 이동. `mod-payroll-ops` 사이드바 숨김 (`sidebarHidden: true`). `/hr/payroll` 페이지 잔존 (deprecated, HIDDEN_PATHS X — 통합 페이지 5번째 탭 진입).
+
+## 2026-05-05
+
+- (메인 세션) PR-B1: 「인사 마스터」 통합 1 페이지 5 탭 구조 신설. `/hr/people`, `/hr/org` 별도 페이지 HIDDEN_PATHS 흡수. `hr` 메뉴 그룹 폐기 → `settings` 그룹 안 `mod-hr-master` (path: `/hr`).
+
+## 2026-05-03
+
+- (메인 세션) `ride_employees` 마이그 신설 (`migrations/2026-05-03_ride_employees_init.sql`). cs_workers 16명 → ride_employees 이전 (UUID 동일 매핑). `cs_workers.employee_id` FK 추가.
