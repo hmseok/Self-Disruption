@@ -654,18 +654,69 @@ model Company {
   @@map("companies")
 }
 
+// PR-E1 (2026-05-16) — 차량 테이블 통합 정본.
+// 실제 DB 52컬럼과 schema 동기화 (이전엔 10컬럼만 정의 — "45.7% 커버리지" 이슈).
+// fmi_vehicles 는 빈 껍데기 → 통합 후 폐기 (PR-E4).
 model Car {
-  id         String   @id @default(uuid()) @db.Char(36)
-  brand      String?
-  model      String?
-  trim       String?
-  number     String?
-  year       Int?
-  image_url  String?
-  status     String   @default("active") // active, rented, accident
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now()) @updatedAt
+  id                       String    @id @default(uuid()) @db.Char(36)
+  number                   String?
+  brand                    String?
+  model                    String?
+  trim                     String?
+  year                     Int?
+  status                   String    @default("active") // active, rented, accident
+  image_url                String?
+  // 기본 제원
+  fuel                     String?   @db.VarChar(30)
+  fuel_type                String?   @db.VarChar(30)
+  vin                      String?   @db.VarChar(50)
+  mileage                  Int?      @default(0)
+  color                    String?   @db.VarChar(30)
+  mission                  String?   @db.VarChar(20)
+  displacement             Int?
+  capacity                 Int?
+  is_used                  Boolean?  @default(false)
+  is_commercial            Boolean?  @default(false)
+  purchase_mileage         Int?      @default(0)
+  ownership_type           String?   @default("company") @db.VarChar(30)
+  company_id               String?   @db.Char(36)
+  // 등록/검사
+  registration_date        DateTime? @db.Date
+  registration_image_url   String?   @db.Text
+  inspection_end_date      DateTime? @db.Date
+  vehicle_age_expiry       DateTime? @db.Date
+  acq_date                 DateTime? @db.Date
+  // 위치
+  location                 String?   @db.VarChar(200)
+  location_code            String?   @db.VarChar(32)
+  // 취득 원가
+  purchase_price           Decimal?  @default(0) @db.Decimal(12, 0)
+  total_cost               Decimal?  @default(0) @db.Decimal(12, 0)
+  registration_tax         Decimal?  @default(0) @db.Decimal(12, 0)
+  bond_amount              Decimal?  @default(0) @db.Decimal(12, 0)
+  delivery_fee             Decimal?  @default(0) @db.Decimal(12, 0)
+  plate_fee                Decimal?  @default(0) @db.Decimal(12, 0)
+  agency_fee               Decimal?  @default(0) @db.Decimal(12, 0)
+  other_initial_cost       Decimal?  @default(0) @db.Decimal(12, 0)
+  initial_cost_memo        String?   @db.Text
+  // 지입 (consignment)
+  owner_name               String?   @db.VarChar(50)
+  owner_phone              String?   @db.VarChar(20)
+  owner_bank               String?   @db.VarChar(50)
+  owner_account            String?   @db.VarChar(50)
+  owner_account_holder     String?   @db.VarChar(50)
+  consignment_fee          Decimal?  @default(0) @db.Decimal(12, 0)
+  consignment_start        DateTime? @db.Date
+  consignment_end          DateTime? @db.Date
+  consignment_contract_url String?   @db.Text
+  insurance_by             String?   @default("company") @db.VarChar(20)
+  owner_memo               String?   @db.Text
+  notes                    String?   @db.Text
+  created_at               DateTime  @default(now())
+  updated_at               DateTime  @default(now()) @updatedAt
 
+  @@index([vin])
+  @@index([location_code])
   @@map("cars")
 }
 
