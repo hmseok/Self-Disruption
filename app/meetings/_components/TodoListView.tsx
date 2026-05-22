@@ -229,15 +229,23 @@ function TodoRow({ item, onToggleStatus, onMeetingOpen, onEdit, onDelete }: {
         </div>
       </div>
 
-      {/* 상태 배지 */}
-      <span style={{
-        flexShrink: 0, padding: '2px 8px', borderRadius: 6,
-        fontSize: 10, fontWeight: 600, whiteSpace: 'nowrap',
-        background: (STATUS_META[item.status] || STATUS_META.open).bg,
-        color: (STATUS_META[item.status] || STATUS_META.open).color,
-      }}>
-        {(STATUS_META[item.status] || STATUS_META.open).label}
-      </span>
+      {/* 상태 select — 진행중 / 완료 / 취소 직접 변경 */}
+      <select
+        value={item.status}
+        onChange={(e) => onToggleStatus(item, e.target.value as 'open' | 'done' | 'dropped')}
+        title="상태 변경"
+        style={{
+          flexShrink: 0, padding: '3px 6px', borderRadius: 6,
+          fontSize: 10, fontWeight: 700, whiteSpace: 'nowrap', cursor: 'pointer',
+          background: (STATUS_META[item.status] || STATUS_META.open).bg,
+          color: (STATUS_META[item.status] || STATUS_META.open).color,
+          border: `1px solid ${(STATUS_META[item.status] || STATUS_META.open).color}33`,
+          outline: 'none', fontFamily: 'inherit',
+        }}>
+        <option value="open">진행중</option>
+        <option value="done">완료</option>
+        <option value="dropped">취소</option>
+      </select>
 
       {/* 액션 (hover) */}
       <div style={{ display: 'flex', gap: 4, flexShrink: 0, visibility: hover ? 'visible' : 'hidden' }}>

@@ -6,6 +6,22 @@
 
 ## 2026-05-13
 
+### hotfix #6 — TODO 상태 select (진행중/완료/취소 직접 변경)
+
+**사용자 보고**: 「상태값은 못바꾸나요? 투두에서」
+
+**진단**: PR-V2-Todo-C 의 TodoListView 에서 상태를 읽기 전용 배지로만 표시 — ☑ 체크박스(open↔done)만 가능하고 「취소(dropped)」 상태 변경 UI 누락.
+
+**수정** (`TodoListView.tsx` TodoRow):
+- 읽기 전용 상태 배지 → **`<select>`** (진행중 / 완료 / 취소)
+- onChange → `onToggleStatus(item, newStatus)` — 회의 액션은 actions API / 개인 TODO 는 todos API PATCH
+- 배지 색상 유지 (status 별 bg/color) — select 형태로 클릭 가능
+- ☑ 체크박스는 done 빠른 토글로 유지 (병행)
+
+**Rule 21**: 자기 모듈 / **Rule 22**: 본 CHANGELOG
+
+---
+
 ### PR-MTG-V2-Todo-C — TODO 리스트 UI 전환 (표 → 체크리스트 + 인라인 편집)
 
 **사용자 보고**:
