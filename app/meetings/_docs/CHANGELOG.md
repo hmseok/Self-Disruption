@@ -6,6 +6,42 @@
 
 ## 2026-05-13
 
+### hotfix #5 — 개인 TODO 편집 UI + 카테고리 강화
+
+**사용자 보고**:
+> 「to do 수정이나 이런것들이 불가하네요?」
+> 「카테고리도 좀 있어야할것같고」
+
+**진단**: PR-V2-Todo-A 에서 개인 TODO 를 추가/완료토글/삭제만 만들고 **편집 UI 누락**. API (`PATCH /api/meetings/me/todos`) 는 수정 지원했으나 버튼 없음.
+
+**수정**:
+
+1. **개인 TODO 편집 UI**:
+   - 행 액션에 「편집」 버튼 추가 (기존 「삭제」 → 「×」 로 축약)
+   - `editingId` state — null 신규 / id 편집
+   - `startEdit(item)` — 폼에 값 채우고 열기 + 상단 스크롤
+   - `submitNewTodo` — editingId 분기: PATCH (편집) / POST (신규)
+   - 폼 제목: 「✏️ 개인 TODO 수정」 / 「📌 개인 TODO 추가」
+   - `resetForm` — 폼 초기화 + editingId 해제
+
+2. **카테고리 강화**:
+   - `TODO_CATEGORIES` 상수 — 개인/업무/스케줄/회의준비/학습/약속/건강/거래처/기타 (9종)
+   - datalist 자동완성 9종 (기존 4종 → 9종)
+   - **카테고리 빠른 선택 칩** — 폼에 9개 칩 버튼 (클릭 시 category 설정, 보라색 선택 강조)
+   - **카테고리 필터** — DcToolbar trailing 에 「📂 분류」 select (사용 중인 카테고리만 동적 표시)
+   - `usedCategories` — items 에서 unique category 추출
+   - `categoryFilter` state — filtered useMemo 에 적용 (개인 TODO 한정)
+
+**Rule 8 시뮬레이션**:
+- 개인 TODO 「편집」 클릭 → startEdit → 폼에 값 + editingId 설정 → 상단 스크롤
+- 수정 후 「수정」 → PATCH /api/meetings/me/todos → load → 토스트
+- 카테고리 칩 클릭 → category 즉시 설정
+- 카테고리 필터 → 해당 분류 개인 TODO 만 표시
+
+**Rule 21**: 자기 모듈 (meetings) / **Rule 22**: 본 CHANGELOG
+
+---
+
 ### PR-MTG-V2-Todo-A — 독립 개인 TODO (회의 무관)
 
 **사용자 명령**: 「개인적으로 to do 를 회의 없이 사용 / 개인 스케줄관리 / 별도 커스텀 건들」 → 「ㄱㄱ」

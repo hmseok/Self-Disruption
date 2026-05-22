@@ -29,6 +29,9 @@ const PRIORITY_META: Record<string, { label: string; color: string }> = {
   low:    { label: '낮음', color: '#94a3b8' },
 }
 
+// 개인 TODO 기본 카테고리 (자유 입력 — datalist 제안)
+const TODO_CATEGORIES = ['개인', '업무', '스케줄', '회의준비', '학습', '약속', '건강', '거래처', '기타']
+
 interface UnifiedItem {
   source: 'meeting' | 'personal'
   id: string
@@ -58,10 +61,12 @@ export default function MyTodoPage() {
   const [filter, setFilter] = useState<'open' | 'done' | 'dropped' | 'all'>('open')
   const [search, setSearch] = useState('')
   const [sourceFilter, setSourceFilter] = useState<'all' | 'meeting' | 'personal'>('all')
+  const [categoryFilter, setCategoryFilter] = useState<string>('all')
   const [migrationPending, setMigrationPending] = useState(false)
 
-  // 개인 TODO 추가 폼
+  // 개인 TODO 추가/편집 폼 — editingId null = 신규, id = 편집
   const [showAdd, setShowAdd] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [newTodo, setNewTodo] = useState({ content: '', due_date: '', category: '', priority: 'normal', memo: '' })
 
   const [toasts, setToasts] = useState<Toast[]>([])
@@ -110,10 +115,22 @@ export default function MyTodoPage() {
 
   useEffect(() => { load() }, [load])
 
-  // 검색 + source 필터
+  // 사용 중인 카테고리 목록 (개인 TODO 의 unique category)
+  const usedCategories = useMemo(() => {
+    const set = new Set<string>()
+    for (const it of items) {
+      if (it.source === 'personal' && it.category && it.category.trim()) set.add(it.category.trim())
+    }
+    return Array.from(set).sort()
+  }, [items])
+
+  // 검색 + source + category 필터
   const filtered = useMemo(() => {
     let r = items
     if (sourceFilter !== 'all') r = r.filter(x => x.source === sourceFilter)
+    if (categoryFilter !== 'all') {
+      r = r.filter(x => x.source === 'personal' && (x.category || '') === categoryFilter)
+    }
     if (search.trim()) {
       const q = search.trim().toLowerCase()
       r = r.filter(x =>
@@ -124,7 +141,7 @@ export default function MyTodoPage() {
       )
     }
     return r
-  }, [items, search, sourceFilter])
+  }, [items, search, sourceFilter, categoryFilter])
 
   // 상태 토글 — source 별 다른 API
   const toggleStatus = useCallback(async (item: UnifiedItem, newStatus: 'open' | 'done' | 'dropped') => {
@@ -149,29 +166,54 @@ export default function MyTodoPage() {
     else showToast('error', `삭제 실패: ${json?.error || '오류'}`)
   }, [load, showToast])
 
+  const resetForm = useCallback(() => {
+    setNewTodo({ content: '', due_date: '', category: '', priority: 'normal', memo: '' })
+    setEditingId(null)
+    setShowAdd(false)
+  }, [])
+
+  // 개인 TODO 편집 시작 — 폼에 값 채우고 열기
+  const startEdit = useCallback((item: UnifiedItem) => {
+    if (item.source !== 'personal') return
+    setNewTodo({
+      content: item.content || '',
+      due_date: item.due_date || '',
+      category: item.category || '',
+      priority: item.priority || 'normal',
+      memo: item.memo || '',
+    })
+    setEditingId(item.id)
+    setShowAdd(true)
+    if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' })
+  }, [])
+
   const submitNewTodo = useCallback(async () => {
     if (!newTodo.content.trim()) { showToast('error', '내용을 입력하세요'); return }
-    const { ok, json } = await fetchWithAuth('/api/meetings/me/todos', {
-      method: 'POST',
-      body: {
-        content: newTodo.content.trim(),
-        due_date: newTodo.due_date || null,
-        category: newTodo.category.trim() || null,
-        priority: newTodo.priority || null,
-        memo: newTodo.memo.trim() || null,
-      },
-    })
+    const payload = {
+      content: newTodo.content.trim(),
+      due_date: newTodo.due_date || null,
+      category: newTodo.category.trim() || null,
+      priority: newTodo.priority || null,
+      memo: newTodo.memo.trim() || null,
+    }
+    // editingId 있으면 PATCH, 없으면 POST
+    const { ok, json } = editingId
+      ? await fetchWithAuth('/api/meetings/me/todos', {
+          method: 'PATCH', body: { id: editingId, ...payload },
+        })
+      : await fetchWithAuth('/api/meetings/me/todos', {
+          method: 'POST', body: payload,
+        })
     if (ok) {
-      showToast('success', '✓ 개인 TODO 추가됨')
-      setNewTodo({ content: '', due_date: '', category: '', priority: 'normal', memo: '' })
-      setShowAdd(false)
+      showToast('success', editingId ? '✓ 개인 TODO 수정됨' : '✓ 개인 TODO 추가됨')
+      resetForm()
       await load()
     } else if (json?._migration_pending) {
       showToast('error', 'DB 마이그 미적용 — 관리자 문의')
     } else {
-      showToast('error', `추가 실패: ${json?.error || '오류'}`)
+      showToast('error', `${editingId ? '수정' : '추가'} 실패: ${json?.error || '오류'}`)
     }
-  }, [newTodo, load, showToast])
+  }, [newTodo, editingId, load, showToast, resetForm])
 
   const statItems: StatItem[] = useMemo(() => ([
     { label: '진행중',    value: Number(stats.open || 0),     icon: '✓', tint: 'blue' },
@@ -298,18 +340,27 @@ export default function MyTodoPage() {
                 border: `1px solid ${COLORS.primary}40`, cursor: 'pointer',
               }}>회의록</button>
           ) : (
-            <button onClick={(e) => { e.stopPropagation(); deleteTodo(r) }}
-              title="개인 TODO 삭제"
-              style={{
-                padding: '3px 8px', fontSize: 11, fontWeight: 600, borderRadius: 6,
-                background: 'rgba(239,68,68,0.10)', color: '#b91c1c',
-                border: '1px solid rgba(239,68,68,0.35)', cursor: 'pointer',
-              }}>삭제</button>
+            <>
+              <button onClick={(e) => { e.stopPropagation(); startEdit(r) }}
+                title="개인 TODO 수정"
+                style={{
+                  padding: '3px 8px', fontSize: 11, fontWeight: 600, borderRadius: 6,
+                  background: 'rgba(59,130,246,0.10)', color: '#1d4ed8',
+                  border: '1px solid rgba(59,130,246,0.35)', cursor: 'pointer',
+                }}>편집</button>
+              <button onClick={(e) => { e.stopPropagation(); deleteTodo(r) }}
+                title="개인 TODO 삭제"
+                style={{
+                  padding: '3px 8px', fontSize: 11, fontWeight: 600, borderRadius: 6,
+                  background: 'rgba(239,68,68,0.10)', color: '#b91c1c',
+                  border: '1px solid rgba(239,68,68,0.35)', cursor: 'pointer',
+                }}>×</button>
+            </>
           )}
         </span>
       ),
     },
-  ]), [router, toggleStatus, deleteTodo])
+  ]), [router, toggleStatus, deleteTodo, startEdit])
 
   return (
     <div style={{ padding: '20px 24px', minHeight: '100vh' }}>
@@ -320,11 +371,11 @@ export default function MyTodoPage() {
         ]}
       />
 
-      {/* 개인 TODO 추가 폼 */}
+      {/* 개인 TODO 추가/편집 폼 */}
       {showAdd && (
         <div style={{ ...GLASS.L3, padding: 14, borderRadius: 12, marginBottom: 16 }}>
           <h3 style={{ fontSize: 13, fontWeight: 700, color: COLORS.textPrimary, margin: 0, marginBottom: 10 }}>
-            📌 개인 TODO 추가 — 회의와 무관한 개인 할 일 / 스케줄
+            {editingId ? '✏️ 개인 TODO 수정' : '📌 개인 TODO 추가 — 회의와 무관한 개인 할 일 / 스케줄'}
           </h3>
           <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: 8, marginBottom: 8 }}>
             <input value={newTodo.content} onChange={(e) => setNewTodo(p => ({ ...p, content: e.target.value }))}
@@ -334,9 +385,9 @@ export default function MyTodoPage() {
             <input type="date" value={newTodo.due_date} onChange={(e) => setNewTodo(p => ({ ...p, due_date: e.target.value }))}
               title="마감일" style={inputStyle} />
             <input value={newTodo.category} onChange={(e) => setNewTodo(p => ({ ...p, category: e.target.value }))}
-              placeholder="분류 (예: 스케줄/업무)" list="todo-categories" style={inputStyle} />
+              placeholder="분류 (자유 입력)" list="todo-categories" style={inputStyle} />
             <datalist id="todo-categories">
-              <option value="개인" /><option value="업무" /><option value="스케줄" /><option value="기타" />
+              {TODO_CATEGORIES.map(c => <option key={c} value={c} />)}
             </datalist>
             <select value={newTodo.priority} onChange={(e) => setNewTodo(p => ({ ...p, priority: e.target.value }))}
               style={inputStyle}>
@@ -345,16 +396,31 @@ export default function MyTodoPage() {
               <option value="low">낮음</option>
             </select>
           </div>
+          {/* 카테고리 빠른 선택 칩 */}
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 8 }}>
+            {TODO_CATEGORIES.map(c => (
+              <button key={c} onClick={() => setNewTodo(p => ({ ...p, category: c }))}
+                style={{
+                  padding: '3px 10px', fontSize: 11, fontWeight: 600, borderRadius: 99,
+                  cursor: 'pointer', whiteSpace: 'nowrap',
+                  background: newTodo.category === c ? '#7c3aed' : 'rgba(124,58,237,0.10)',
+                  color: newTodo.category === c ? '#fff' : '#7c3aed',
+                  border: 'none',
+                }}>
+                {c}
+              </button>
+            ))}
+          </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <input value={newTodo.memo} onChange={(e) => setNewTodo(p => ({ ...p, memo: e.target.value }))}
               placeholder="비고 (선택)" style={{ ...inputStyle, flex: 1 }} />
-            <button onClick={() => setShowAdd(false)}
+            <button onClick={resetForm}
               style={{ padding: '7px 14px', fontSize: 12, borderRadius: 8, background: '#fff', border: `1px solid ${COLORS.borderSubtle}`, color: COLORS.textSecondary, cursor: 'pointer', whiteSpace: 'nowrap' }}>
               취소
             </button>
             <button onClick={() => void submitNewTodo()}
               style={{ padding: '7px 16px', fontSize: 12, fontWeight: 700, borderRadius: 8, background: COLORS.primary, color: '#fff', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-              추가
+              {editingId ? '수정' : '추가'}
             </button>
           </div>
         </div>
@@ -388,6 +454,18 @@ export default function MyTodoPage() {
               <option value="meeting">📋 회의 액션 ({stats.meeting_cnt || 0})</option>
               <option value="personal">📌 개인 TODO ({stats.personal_cnt || 0})</option>
             </select>
+            {usedCategories.length > 0 && (
+              <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}
+                title="개인 TODO 카테고리 필터"
+                style={{
+                  padding: '6px 10px', fontSize: 12, borderRadius: 8,
+                  border: `1px solid ${COLORS.borderSubtle}`, background: GLASS.L1.background,
+                  color: COLORS.textPrimary, cursor: 'pointer', whiteSpace: 'nowrap',
+                }}>
+                <option value="all">📂 분류: 전체</option>
+                {usedCategories.map(c => <option key={c} value={c}>📂 {c}</option>)}
+              </select>
+            )}
           </div>
         }
       />
