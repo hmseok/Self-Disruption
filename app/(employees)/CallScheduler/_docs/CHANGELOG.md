@@ -3,6 +3,12 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-22 (Phase CX-KPI-8) — 법정검사 제외 + WFM 기준 명확화 + 부족 사유
+
+- KT 계정 공용으로 섞이던 「법정검사」 데이터를 CX KPI 집계 SQL 단계에서 완전 제외. `kpi/dashboard`·`kpi/staffing` route 의 모든 관련 쿼리에 `LEGAL_KEYWORD='%법정검사%'` LIKE 필터 일관 적용 — cs_call_records(department/center/type1/type2), cs_agent_productivity(department), cs_response_queue(skill), cs_response_ivr(scenario). CX 데이터(메리츠캐피탈·사고접수 등)는 보존.
+- `KpiStaffing` 상단에 WFM 산정 기준 요약 줄 상시 표시 — 목표 응대율·목표 응대시간·부재율·평균 AHT·산정 단위 (펼치지 않아도 보임). `SummaryChip` 신규.
+- `kpi/staffing` route 의 `shifts[]` 에 `shortage`(부족 인원)·`reason`(사유) 필드 추가. 사유 분류: 시프트 피크 필요가 평균 대비 20%+ 높으면 「인입량 과다」, 아니면 「배정 부족」. 승인된 회피(cs_group_member_skip_dates)·휴가(cs_leaves) 건수를 graceful 조인으로 동반 표시. `KpiStaffing` 시프트 카드에 🔴부족 시 사유 한 줄 노출.
+
 ## 2026-05-22 (Phase CX-KPI-7) — KT 엑셀 다중 업로드 + 자동 종류 판별
 
 - `kpi/page.tsx` 업로드 탭 개편 — 「종류 선택 → 파일 1개」 단일 업로드를 다중 업로드로 대체. `<input multiple>` + 드래그앤드롭으로 4종 엑셀을 한 번에 업로드.

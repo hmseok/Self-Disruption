@@ -38,6 +38,8 @@ interface ShiftRow {
   required_peak: number
   scheduled: number
   status: 'short' | 'ok' | 'over'
+  shortage: number          // 부족 인원수 (short 일 때 > 0)
+  reason: string            // 부족 사유 텍스트 (short 가 아니면 '')
 }
 interface StaffingSummary {
   granularity: string; from: string; to: string; days: number
@@ -225,6 +227,30 @@ export default function KpiStaffing() {
           {loading ? '조회 중...' : '↻ 새로고침'}
         </button>
       </div>
+
+      {/* ── WFM 산정 기준 요약 줄 (상시 표시 — 펼치지 않아도 보임) ──── */}
+      {editCfg && (
+        <div style={{
+          ...GLASS.L3, background: COLORS.bgBlue, border: `1px solid ${COLORS.borderBlue}`,
+          borderRadius: 10, padding: '8px 14px', marginBottom: 12,
+          display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
+        }}>
+          <span style={{ fontSize: 12, fontWeight: 800, color: COLORS.primary, whiteSpace: 'nowrap' }}>
+            🧮 산정 기준
+          </span>
+          <SummaryChip label="목표 응대율" value={`${editCfg.target_service_level_pct}%`} />
+          <SummaryChip label="목표 응대시간" value={`${editCfg.target_answer_sec}초 내`} />
+          <SummaryChip label="부재율" value={`${editCfg.shrinkage_pct}%`} />
+          <SummaryChip
+            label="평균 AHT"
+            value={s && s.avg_aht > 0 ? fmtMS(s.avg_aht) : '—'} />
+          <SummaryChip label="산정 단위" value={`${editCfg.interval_minutes}분`} />
+          <span style={{ flex: 1 }} />
+          <span style={{ fontSize: 10, color: COLORS.textMuted, whiteSpace: 'nowrap' }}>
+            Erlang C — 이 기준으로 필요인원 산정 (편집은 ⚙ 산정 기준)
+          </span>
+        </div>
+      )}
 
       {/* ── 산정 기준 인라인 편집 ──────────────────────────────── */}
       {cfgOpen && editCfg && (
@@ -421,6 +447,17 @@ export default function KpiStaffing() {
                       / 필요 {sh.required_peak}명
                     </span>
                   </div>
+                  {/* 🔴 부족 시프트 — 사유 한 줄 표시 */}
+                  {sh.status === 'short' && sh.reason && (
+                    <div style={{
+                      marginTop: 8, padding: '5px 8px', borderRadius: 7,
+                      background: '#fff', border: `1px solid ${COLORS.borderRed}`,
+                      fontSize: 11, fontWeight: 700, color: COLORS.danger,
+                      whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                    }} title={sh.reason}>
+                      ⚠ {sh.reason}
+                    </div>
+                  )}
                 </div>
               )
             })}
@@ -510,6 +547,20 @@ export default function KpiStaffing() {
         </div>
       )}
     </div>
+  )
+}
+
+// ── 산정 기준 요약 칩 (label 약 / value 강) ─────────────────────
+function SummaryChip({ label, value }: { label: string; value: string }) {
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'baseline', gap: 4,
+      padding: '3px 9px', borderRadius: 7, whiteSpace: 'nowrap',
+      background: '#fff', border: `1px solid ${COLORS.borderBlue}`,
+    }}>
+      <span style={{ fontSize: 10, color: COLORS.textSecondary, fontWeight: 600 }}>{label}</span>
+      <span style={{ fontSize: 12, color: COLORS.textPrimary, fontWeight: 800 }}>{value}</span>
+    </span>
   )
 }
 

@@ -41,6 +41,16 @@ function channelKind(raw: string | null | undefined): 'ib' | 'ob' | 'etc' {
 
 type Granularity = 'day' | 'week' | 'month'
 
+// ── 법정검사 데이터 제외 (KT 계정 공용 — CX 콜센터 KPI 에서 법정검사 분리) ──
+// KT 엑셀 실측 (2026-05 데이터):
+//   · cs_call_records       — department 'CX 컨택센터' vs '법정검사팀' / type1·center '법정검사'
+//   · cs_agent_productivity — department 'CX 컨택센터' vs '법정검사팀' (공란 '' 은 CX 로 유지)
+//   · cs_response_queue     — skill '법정검사' / '법정검사아웃콜'
+//   · cs_response_ivr       — scenario '법정검사 대표번호'
+// '법정검사' 문자열 LIKE 매칭 기준 — CX 데이터(메리츠캐피탈·사고접수 등)는 보존.
+const CX_TEAM_LABEL = 'CX 컨택센터'      // 정상 CX 콜센터 부서명
+const LEGAL_KEYWORD = '%법정검사%'        // 법정검사 LIKE 패턴
+
 // granularity + 기준일 → { from, to } (YYYY-MM-DD), 생산성 period_label
 function resolveRange(granularity: Granularity, base: Date): {
   from: string; to: string; prodLabel: string; prodKind: 'daily' | 'monthly'
@@ -167,6 +177,11 @@ export async function GET(request: NextRequest) {
           COALESCE(SUM(duration_sec), 0) AS dur
         FROM cs_call_records
         WHERE call_date BETWEEN ${from} AND ${to}
+          -- 법정검사 제외: 법정검사팀 부서 / 법정검사 센터 / 법정검사 상담유형
+          AND COALESCE(department, '') NOT LIKE ${LEGAL_KEYWORD}
+          AND COALESCE(center, '')     NOT LIKE ${LEGAL_KEYWORD}
+          AND COALESCE(type1, '')      NOT LIKE ${LEGAL_KEYWORD}
+          AND COALESCE(type2, '')      NOT LIKE ${LEGAL_KEYWORD}
         GROUP BY worker_id, agent_kt_id, agent_name, channel, type1, type2
       `
       for (const r of callRows) {
@@ -228,6 +243,8 @@ export async function GET(request: NextRequest) {
         FROM cs_agent_productivity
         WHERE period_label = ${prodLabel}
           AND is_active = 1
+          -- 법정검사 제외: 법정검사팀 부서 (CX 컨택센터·공란 부서는 유지)
+          AND COALESCE(department, '') NOT LIKE ${LEGAL_KEYWORD}
         GROUP BY worker_id, agent_kt_id, agent_name
       `
       for (const r of prodRows) {
@@ -344,6 +361,8 @@ export async function GET(request: NextRequest) {
           COALESCE(SUM(avg_wait_sec * inbound), 0) AS wait_weighted
         FROM cs_response_queue
         WHERE stat_date BETWEEN ${from} AND ${to}
+          -- 법정검사 스킬 제외 (법정검사 / 법정검사아웃콜 등)
+          AND COALESCE(skill, '') NOT LIKE ${LEGAL_KEYWORD}
         GROUP BY skill
       `
       let totInbound = 0, totAnswered = 0, totAbandoned = 0, totIn20s = 0, totWaitWeighted = 0
@@ -391,6 +410,8 @@ export async function GET(request: NextRequest) {
           COALESCE(SUM(abandoned), 0)     AS abandoned
         FROM cs_response_ivr
         WHERE stat_date BETWEEN ${from} AND ${to}
+          -- 법정검사 시나리오 제외 (법정검사 대표번호 등)
+          AND COALESCE(scenario, '') NOT LIKE ${LEGAL_KEYWORD}
         GROUP BY scenario, callee_number
       `
       for (const r of iRows) {

@@ -35,6 +35,10 @@ const isoOf = (d: Date) =>
 
 type Granularity = 'day' | 'week' | 'month'
 
+// ── 법정검사 데이터 제외 (KT 계정 공용 — CX WFM 산정에서 법정검사 분리) ──
+// dashboard route 와 동일 기준. '법정검사' 문자열 LIKE 매칭.
+const LEGAL_KEYWORD = '%법정검사%'
+
 // granularity + 기준일 → { from, to } (YYYY-MM-DD) — dashboard route 패턴 재사용
 function resolveRange(granularity: Granularity, base: Date): { from: string; to: string } {
   if (granularity === 'day') {
@@ -150,6 +154,11 @@ export async function GET(request: NextRequest) {
         FROM cs_call_records
         WHERE call_date BETWEEN ${from} AND ${to}
           AND start_time IS NOT NULL
+          -- 법정검사 제외 (dashboard route 와 동일 기준)
+          AND COALESCE(department, '') NOT LIKE ${LEGAL_KEYWORD}
+          AND COALESCE(center, '')     NOT LIKE ${LEGAL_KEYWORD}
+          AND COALESCE(type1, '')      NOT LIKE ${LEGAL_KEYWORD}
+          AND COALESCE(type2, '')      NOT LIKE ${LEGAL_KEYWORD}
         GROUP BY HOUR(start_time)
       `
       for (const r of callRows) {
@@ -174,6 +183,7 @@ export async function GET(request: NextRequest) {
     // 시프트별 커버 시간대도 함께 수집 (시프트 과부족 카드용).
     const hourCover = new Map<number, number>()   // hour → 커버 셀 수 (기간 평균)
     type ShiftAgg = {
+      slotId: string                               // cs_shift_slots.id
       code: string; label: string
       startH: number; endH: number; overnight: boolean
       hours: number[]                              // 커버하는 시간대 목록
@@ -221,6 +231,7 @@ export async function GET(request: NextRequest) {
         if (coverHours.length === 0) coverHours.push(startH)
 
         shiftAgg.set(String(r.code || r.slot_id), {
+          slotId: String(r.slot_id || ''),
           code: String(r.code || ''),
           label: String(r.label || ''),
           startH, endH, overnight,
@@ -248,6 +259,8 @@ export async function GET(request: NextRequest) {
           COALESCE(SUM(answered_in_20s), 0) AS answered_in_20s
         FROM cs_response_queue
         WHERE stat_date BETWEEN ${from} AND ${to}
+          -- 법정검사 스킬 제외 (dashboard route 와 동일 기준)
+          AND COALESCE(skill, '') NOT LIKE ${LEGAL_KEYWORD}
       `
       const inbound = Number(slRows[0]?.inbound || 0)
       const in20s = Number(slRows[0]?.answered_in_20s || 0)
@@ -256,6 +269,48 @@ export async function GET(request: NextRequest) {
         hasResponseData = true
       }
     } catch { /* graceful — cs_response_queue 미적재 */ }
+
+    // ════ ⑤ 시프트별 회피·휴가 건수 (부족 사유 보조 — graceful) ════
+    // 기간 내 해당 슬롯에 배정된 워커들의 승인된 회피일/휴가 건수.
+    // 테이블·조인 실패 시 빈 맵 → 사유 텍스트에서 회피·휴가 부분만 생략.
+    const skipBySlot = new Map<string, number>()   // slot_id → 승인 회피 건수
+    const leaveBySlot = new Map<string, number>()  // slot_id → 승인 휴가 건수
+    try {
+      const skipRows = await prisma.$queryRaw<any[]>`
+        SELECT a.shift_slot_id AS slot_id, COUNT(DISTINCT k.id) AS cnt
+        FROM cs_assignments a
+        JOIN cs_group_member_skip_dates k
+          ON k.worker_id = a.worker_id
+         AND k.status = 'approved'
+         AND k.start_date <= ${to}
+         AND k.end_date   >= ${from}
+        WHERE a.work_date BETWEEN ${from} AND ${to}
+          AND a.worker_id IS NOT NULL
+          AND a.shift_slot_id IS NOT NULL
+        GROUP BY a.shift_slot_id
+      `
+      for (const r of skipRows) {
+        skipBySlot.set(String(r.slot_id || ''), Number(r.cnt || 0))
+      }
+    } catch { /* graceful — cs_group_member_skip_dates 미적재/조인 실패 */ }
+    try {
+      const leaveRows = await prisma.$queryRaw<any[]>`
+        SELECT a.shift_slot_id AS slot_id, COUNT(DISTINCT l.id) AS cnt
+        FROM cs_assignments a
+        JOIN cs_leaves l
+          ON l.worker_id = a.worker_id
+         AND l.status = 'approved'
+         AND l.start_date <= ${to}
+         AND l.end_date   >= ${from}
+        WHERE a.work_date BETWEEN ${from} AND ${to}
+          AND a.worker_id IS NOT NULL
+          AND a.shift_slot_id IS NOT NULL
+        GROUP BY a.shift_slot_id
+      `
+      for (const r of leaveRows) {
+        leaveBySlot.set(String(r.slot_id || ''), Number(r.cnt || 0))
+      }
+    } catch { /* graceful — cs_leaves 미적재/status 컬럼 부재 */ }
 
     // ════ 시간대별 필요인원 산정 (Erlang C) ════
     type HourResult = {
@@ -307,7 +362,23 @@ export async function GET(request: NextRequest) {
       required_peak: number         // 시프트 커버 시간대 중 최대 필요 인원
       scheduled: number             // 시프트 기간 평균 배정 인원
       status: 'short' | 'ok' | 'over'
+      shortage: number              // 부족 인원수 (required_peak − scheduled, 양수, short 일 때만 > 0)
+      reason: string                // 부족 사유 텍스트 (short 가 아니면 '')
     }
+    // 사유 분류용 — 콜 발생 시프트들의 평균 피크 필요 인원 (인입량 과다 판정 기준)
+    const shiftPeaks: number[] = []
+    for (const sa of shiftAgg.values()) {
+      let p = 0
+      for (const h of sa.hours) {
+        const hr = hourly[h]
+        if (hr && hr.required > p) p = hr.required
+      }
+      if (p > 0) shiftPeaks.push(p)
+    }
+    const avgShiftPeak = shiftPeaks.length > 0
+      ? shiftPeaks.reduce((s, v) => s + v, 0) / shiftPeaks.length
+      : 0
+
     const shifts: ShiftResult[] = []
     for (const sa of shiftAgg.values()) {
       // 시프트 커버 시간대들의 필요 인원 중 피크
@@ -323,6 +394,25 @@ export async function GET(request: NextRequest) {
       if (sched < reqPeak) status = 'short'
       else if (sched > reqPeak + Math.max(1, reqPeak * 0.25)) status = 'over'
 
+      // ── 부족 사유 산출 ──
+      let shortage = 0
+      let reason = ''
+      if (status === 'short') {
+        shortage = Math.round((reqPeak - sched) * 10) / 10
+        // 인입량 과다: 이 시프트 피크 필요가 시프트 평균 대비 20%+ 높음
+        // 배정 부족: 그 외 (배정 인원 자체가 적음)
+        const isHighInflow = avgShiftPeak > 0 && reqPeak > avgShiftPeak * 1.2
+        const base = isHighInflow ? '인입량 과다' : '배정 부족'
+        // 회피·휴가 건수 동반 표시 (graceful — 0 이면 생략)
+        const skip = skipBySlot.get(sa.slotId) || 0
+        const leave = leaveBySlot.get(sa.slotId) || 0
+        const extra: string[] = []
+        if (skip > 0) extra.push(`회피 ${skip}`)
+        if (leave > 0) extra.push(`휴가 ${leave}`)
+        reason = `${base} (${shortage}명 부족)`
+          + (extra.length > 0 ? ` · ${extra.join(' · ')}` : '')
+      }
+
       const hh = (n: number) => `${pad(n)}`
       shifts.push({
         shift_name: sa.label || sa.code,
@@ -330,6 +420,8 @@ export async function GET(request: NextRequest) {
         required_peak: reqPeak,
         scheduled: sched,
         status,
+        shortage,
+        reason,
       })
     }
     // 시작 시간 순 정렬
