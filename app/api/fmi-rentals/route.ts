@@ -39,7 +39,8 @@ export async function GET(request: NextRequest) {
     if (from) { wheres.push('r.dispatch_date >= ?'); params.push(from + ' 00:00:00') }
     if (to) { wheres.push('r.dispatch_date <= ?'); params.push(to + ' 23:59:59') }
     // PR-E3 (2026-05-16) 차량 통합: fmi_vehicles.rental_company → cars.ownership_type
-    if (fleetGroup) { wheres.push('v.ownership_type = ?'); params.push(fleetGroup) }
+    // PR-N3b (2026-05-22) fleet_group 실컬럼 우선, 없으면 차량 ownership_type 폴백
+    if (fleetGroup) { wheres.push('COALESCE(r.fleet_group, v.ownership_type) = ?'); params.push(fleetGroup) }
     if (q) {
       wheres.push('(r.customer_name LIKE ? OR r.customer_car_number LIKE ? OR r.vehicle_car_number LIKE ?)')
       params.push(`%${q}%`, `%${q}%`, `%${q}%`)
@@ -57,7 +58,7 @@ export async function GET(request: NextRequest) {
          r.rental_days, r.daily_rate, r.total_rental_fee, r.final_claim_amount,
          r.status, r.handler_name, r.dispatcher_name, r.notes,
          r.created_at, r.updated_at,
-         v.ownership_type AS fleet_group,
+         COALESCE(r.fleet_group, v.ownership_type) AS fleet_group,
          v.status AS vehicle_status
        FROM fmi_rentals r
        LEFT JOIN cars v ON v.id = r.vehicle_id
@@ -80,10 +81,10 @@ export async function GET(request: NextRequest) {
         'SELECT status, COUNT(*) as cnt FROM fmi_rentals GROUP BY status'
       )
       const fleetCounts = await prisma.$queryRawUnsafe<any[]>(
-        `SELECT v.ownership_type AS rental_company, COUNT(*) as cnt
+        `SELECT COALESCE(r.fleet_group, v.ownership_type) AS rental_company, COUNT(*) as cnt
          FROM fmi_rentals r
          LEFT JOIN cars v ON v.id = r.vehicle_id
-         GROUP BY v.ownership_type`
+         GROUP BY COALESCE(r.fleet_group, v.ownership_type)`
       )
       const today = new Date().toISOString().slice(0, 10)
       const activeRentals = await prisma.$queryRawUnsafe<any[]>(

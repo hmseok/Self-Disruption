@@ -47,8 +47,9 @@ export async function GET(
 
     const { id } = await params
     // PR-E3 (2026-05-16) 차량 통합: fmi_vehicles → cars
+    // PR-N3b (2026-05-22) fleet_group 실컬럼 우선 (r.* 뒤 별칭이 우선 적용), 폴백 차량 ownership_type
     const rows = await prisma.$queryRaw<any[]>`
-      SELECT r.*, v.ownership_type AS fleet_group, v.status AS vehicle_status
+      SELECT r.*, COALESCE(r.fleet_group, v.ownership_type) AS fleet_group, v.status AS vehicle_status
       FROM fmi_rentals r
       LEFT JOIN cars v ON v.id = r.vehicle_id
       WHERE r.id = ${id}
