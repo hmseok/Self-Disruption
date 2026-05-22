@@ -20,6 +20,7 @@ import DcStatStrip, { StatItem } from '@/app/components/DcStatStrip'
 import DcToolbar from '@/app/components/DcToolbar'
 import NeuDataTable, { type TableColumn } from '@/app/components/NeuDataTable'
 import AssetRegisterModal, { AssetForModal } from './components/AssetRegisterModal'
+import BulkRegisterPanel from './components/BulkRegisterPanel'
 import { jsPDF } from 'jspdf'
 
 interface Asset {
@@ -33,7 +34,8 @@ interface Asset {
   acquired_at: string | null
   acquired_cost: string | null
   status: string
-  assigned_user_id: string | null
+  assigned_to_kind: string | null
+  assigned_to_id: string | null
   assigned_user_name: string | null
   location: string | null
   notes: string | null
@@ -55,11 +57,11 @@ interface Category {
   is_active: number
 }
 
-interface RideEmployee {
+interface Assignee {
+  kind: 'employee' | 'freelancer'
   id: string
   name: string
-  profile_id: string | null
-  department: string | null
+  sub: string | null
 }
 
 interface AssetAdmin {
@@ -110,7 +112,7 @@ export default function RideAssetsPage() {
   const [migrationPending, setMigrationPending] = useState(false)
 
   const [categories, setCategories] = useState<Category[]>([])
-  const [employees, setEmployees] = useState<RideEmployee[]>([])
+  const [assignees, setAssignees] = useState<Assignee[]>([])
   const [assetAdmins, setAssetAdmins] = useState<AssetAdmin[]>([])
 
   // 탭/필터
@@ -147,16 +149,15 @@ export default function RideAssetsPage() {
     } catch { /* noop */ }
   }, [])
 
-  const fetchEmployees = useCallback(async () => {
+  const fetchAssignees = useCallback(async () => {
     const token = getStoredToken()
     try {
-      const res = await fetch('/api/ride-employees?limit=500', {
+      const res = await fetch('/api/ride-assets/assignee-options', {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
         cache: 'no-store',
       })
       const json = await res.json()
-      const list: RideEmployee[] = (json.data || []).filter((e: RideEmployee) => e.profile_id)
-      setEmployees(list)
+      setAssignees(json.data || [])
     } catch { /* noop */ }
   }, [])
 
@@ -209,12 +210,12 @@ export default function RideAssetsPage() {
   useEffect(() => {
     if (!authChecked || !canAccessPage) return
     fetchCategories()
-    fetchEmployees()
-  }, [authChecked, canAccessPage, fetchCategories, fetchEmployees])
+    fetchAssignees()
+  }, [authChecked, canAccessPage, fetchCategories, fetchAssignees])
 
   useEffect(() => {
     if (!authChecked || !canAccessPage) return
-    if (activeTab === 'print' || activeTab === 'admins' || activeTab === 'categories') return
+    if (activeTab === 'print' || activeTab === 'admins' || activeTab === 'categories' || activeTab === 'bulk') return
     fetchAssets()
   }, [authChecked, canAccessPage, activeTab, statusFilter, search, fetchAssets])
 
@@ -243,7 +244,7 @@ export default function RideAssetsPage() {
       setStatsCounts({
         total: all.length,
         active: all.filter(a => a.status === 'active').length,
-        common: all.filter(a => a.status === 'active' && !a.assigned_user_id).length,
+        common: all.filter(a => a.status === 'active' && !a.assigned_to_id).length,
         disposed: all.filter(a => a.status === 'disposed').length,
       })
     }).catch(() => {})
@@ -371,7 +372,7 @@ export default function RideAssetsPage() {
   ], [])
 
   function openEdit(a: Asset) {
-    if (!isAssetAdmin && a.assigned_user_id !== me?.id) return
+    if (!isAssetAdmin) return  // 편집은 권한자만 (일반 사용자는 QR 스캔 페이지에서)
     setEditingAsset({
       id: a.id,
       asset_code: a.asset_code,
@@ -380,7 +381,8 @@ export default function RideAssetsPage() {
       acquired_at: a.acquired_at,
       acquired_cost: a.acquired_cost,
       status: a.status,
-      assigned_user_id: a.assigned_user_id,
+      assigned_to_kind: a.assigned_to_kind,
+      assigned_to_id: a.assigned_to_id,
       location: a.location,
       notes: a.notes,
       disposed_reason: a.disposed_reason,
@@ -561,6 +563,7 @@ export default function RideAssetsPage() {
     })),
     ...(isAssetAdmin ? [{ key: 'common', label: '📦 공통 자산', adminOnly: true }] : []),
     { key: 'mine', label: '👤 내 자산', adminOnly: false },
+    ...(isAssetAdmin ? [{ key: 'bulk', label: '➕ 대량 등록', adminOnly: true }] : []),
     ...(isAssetAdmin ? [{ key: 'print', label: '🖨️ QR 인쇄', adminOnly: true }] : []),
     ...(isAssetAdmin ? [{ key: 'categories', label: '🏷️ 카테고리 관리', adminOnly: true }] : []),
     ...(isSysAdmin ? [{ key: 'admins', label: '⚙ 권한자', adminOnly: true }] : []),
@@ -569,6 +572,7 @@ export default function RideAssetsPage() {
   const isAdminTab = activeTab === 'admins'
   const isCategoryMgmtTab = activeTab === 'categories'
   const isPrintTab = activeTab === 'print'
+  const isBulkTab = activeTab === 'bulk'
 
   return (
     <div style={{ padding: '0 16px 32px', maxWidth: 1400, margin: '0 auto' }}>
@@ -657,6 +661,20 @@ export default function RideAssetsPage() {
           setSelected={setSelectedForPrint}
           onPrint={handlePrintQr}
         />
+      ) : isBulkTab ? (
+        <BulkRegisterPanel
+          categories={categories}
+          assignees={assignees}
+          onDone={(result) => {
+            setActiveTab('all')
+            setResultPanel({
+              tone: result.failed > 0 ? 'danger' : 'success',
+              msg: result.failed > 0
+                ? `✅ ${result.created}건 등록 / ⚠ ${result.failed}건 실패`
+                : `✅ ${result.created}건 일괄 등록 완료`,
+            })
+          }}
+        />
       ) : (
         <>
           {/* 검색/필터 툴바 */}
@@ -724,7 +742,7 @@ export default function RideAssetsPage() {
         open={registerOpen}
         asset={editingAsset}
         categories={categories}
-        users={employees.map(e => ({ id: e.profile_id || '', name: e.name })).filter(u => u.id)}
+        assignees={assignees}
         onClose={() => { setRegisterOpen(false); setEditingAsset(null) }}
         onSaved={() => { fetchAssets(); setResultPanel({ tone: 'success', msg: '✅ 저장 완료' }) }}
       />

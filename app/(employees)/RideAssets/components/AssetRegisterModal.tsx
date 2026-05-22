@@ -4,9 +4,10 @@
  * AssetRegisterModal — 자산 등록/편집 모달
  *
  * 등록(create): asset 없이 진입 → POST /api/ride-assets
- * 편집(edit):   asset 받아서 진입 → PATCH /api/ride-assets/[id]
+ * 편집(edit):   asset 받아서 진입 → PATCH /api/ride-assets/[id] + 매칭 변경 시 /assign
  *
- * 자산코드는 등록 시 서버가 자동 생성 (트랜잭션 — 카테고리 next_seq 증가).
+ * 매칭 (PR-ASSETS-2.0): assigned_to_kind + assigned_to_id
+ *   드롭다운 value = 'employee:uuid' | 'freelancer:uuid' | ''
  */
 import { useEffect, useState } from 'react'
 import { getStoredToken } from '@/lib/auth-client'
@@ -20,7 +21,8 @@ export interface AssetForModal {
   acquired_at: string | null
   acquired_cost: string | null
   status: string
-  assigned_user_id: string | null
+  assigned_to_kind: string | null
+  assigned_to_id: string | null
   location: string | null
   notes: string | null
   disposed_reason?: string | null
@@ -33,24 +35,29 @@ interface Category {
   emoji: string | null
 }
 
-interface UserOption { id: string; name: string }
+export interface Assignee {
+  kind: 'employee' | 'freelancer'
+  id: string
+  name: string
+  sub: string | null
+}
 
 interface Props {
   open: boolean
   asset?: AssetForModal | null
   categories: Category[]
-  users: UserOption[]
+  assignees: Assignee[]
   onClose: () => void
   onSaved: () => void
 }
 
-export default function AssetRegisterModal({ open, asset, categories, users, onClose, onSaved }: Props) {
+export default function AssetRegisterModal({ open, asset, categories, assignees, onClose, onSaved }: Props) {
   const isEdit = !!asset
   const [categoryId, setCategoryId] = useState('')
   const [name, setName] = useState('')
   const [acquiredAt, setAcquiredAt] = useState('')
   const [acquiredCost, setAcquiredCost] = useState('')
-  const [assignedUserId, setAssignedUserId] = useState('')
+  const [assigneeKey, setAssigneeKey] = useState('')   // 'kind:id' | ''
   const [location, setLocation] = useState('')
   const [notes, setNotes] = useState('')
   const [status, setStatus] = useState('active')
@@ -65,21 +72,16 @@ export default function AssetRegisterModal({ open, asset, categories, users, onC
       setName(asset.name)
       setAcquiredAt(asset.acquired_at ? String(asset.acquired_at).slice(0, 10) : '')
       setAcquiredCost(asset.acquired_cost || '')
-      setAssignedUserId(asset.assigned_user_id || '')
+      setAssigneeKey(asset.assigned_to_kind && asset.assigned_to_id ? `${asset.assigned_to_kind}:${asset.assigned_to_id}` : '')
       setLocation(asset.location || '')
       setNotes(asset.notes || '')
       setStatus(asset.status || 'active')
       setDisposedReason(asset.disposed_reason || '')
     } else {
       setCategoryId(categories[0]?.id || '')
-      setName('')
-      setAcquiredAt('')
-      setAcquiredCost('')
-      setAssignedUserId('')
-      setLocation('')
-      setNotes('')
-      setStatus('active')
-      setDisposedReason('')
+      setName(''); setAcquiredAt(''); setAcquiredCost('')
+      setAssigneeKey(''); setLocation(''); setNotes('')
+      setStatus('active'); setDisposedReason('')
     }
     setErr(null)
   }, [open, asset, categories])
@@ -91,45 +93,55 @@ export default function AssetRegisterModal({ open, asset, categories, users, onC
     setSaving(true)
     try {
       const token = getStoredToken()
-      const url = isEdit ? `/api/ride-assets/${asset!.id}` : '/api/ride-assets'
-      const method = isEdit ? 'PATCH' : 'POST'
-      const body: Record<string, unknown> = {
-        category_id: categoryId || null,
-        name: name.trim(),
-        acquired_at: acquiredAt || null,
-        acquired_cost: acquiredCost ? acquiredCost.replace(/,/g, '') : null,
-        location: location.trim() || null,
-        notes: notes || null,
-      }
+      const [kind, id] = assigneeKey ? assigneeKey.split(':') : ['', '']
+
       if (isEdit) {
-        body.status = status
-        if (status === 'disposed') body.disposed_reason = disposedReason.trim() || null
-        // assigned_user_id 는 /assign 엔드포인트로 처리 — 등록 모달에서는 신규 등록만
+        // 1) 기본 필드 PATCH
+        const res = await fetch(`/api/ride-assets/${asset!.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+          body: JSON.stringify({
+            category_id: categoryId || null,
+            name: name.trim(),
+            acquired_at: acquiredAt || null,
+            acquired_cost: acquiredCost ? acquiredCost.replace(/,/g, '') : null,
+            location: location.trim() || null,
+            notes: notes || null,
+            status,
+            ...(status === 'disposed' ? { disposed_reason: disposedReason.trim() || null } : {}),
+          }),
+        })
+        const json = await res.json()
+        if (!res.ok || !json.success) { setErr(json.error || `HTTP ${res.status}`); return }
+
+        // 2) 매칭 변경 시 /assign
+        const prevKey = asset!.assigned_to_kind && asset!.assigned_to_id
+          ? `${asset!.assigned_to_kind}:${asset!.assigned_to_id}` : ''
+        if (prevKey !== assigneeKey) {
+          await fetch(`/api/ride-assets/${asset!.id}/assign`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+            body: JSON.stringify({ kind: kind || null, to_id: id || null }),
+          })
+        }
       } else {
-        if (assignedUserId) body.assigned_user_id = assignedUserId
-      }
-
-      const res = await fetch(url, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify(body),
-      })
-      const json = await res.json()
-      if (!res.ok || !json.success) {
-        setErr(json.error || `HTTP ${res.status}`)
-        return
-      }
-
-      // 편집 모드 — 매칭 사용자 변경됐다면 별도 호출
-      if (isEdit && asset && (asset.assigned_user_id || '') !== assignedUserId) {
-        await fetch(`/api/ride-assets/${asset.id}/assign`, {
+        // 신규 등록
+        const res = await fetch('/api/ride-assets', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-          body: JSON.stringify({ user_id: assignedUserId || null }),
+          body: JSON.stringify({
+            category_id: categoryId || null,
+            name: name.trim(),
+            acquired_at: acquiredAt || null,
+            acquired_cost: acquiredCost ? acquiredCost.replace(/,/g, '') : null,
+            assigned_to_kind: kind || null,
+            assigned_to_id: id || null,
+            location: location.trim() || null,
+            notes: notes || null,
+          }),
         })
+        const json = await res.json()
+        if (!res.ok || !json.success) { setErr(json.error || `HTTP ${res.status}`); return }
       }
 
       onSaved()
@@ -142,44 +154,32 @@ export default function AssetRegisterModal({ open, asset, categories, users, onC
   }
 
   return (
-    <div
-      onClick={onClose}
-      style={{
-        position: 'fixed', inset: 0, background: 'rgba(15, 36, 64, 0.45)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        zIndex: 1000, padding: 16,
-      }}
-    >
-      <div
-        onClick={e => e.stopPropagation()}
-        style={{
-          ...GLASS.L4, borderRadius: 16,
-          width: '100%', maxWidth: 560, maxHeight: '90vh', overflow: 'auto',
-          padding: 24,
-        }}
-      >
+    <div onClick={onClose}
+      style={{ position: 'fixed', inset: 0, background: 'rgba(15, 36, 64, 0.45)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}>
+      <div onClick={e => e.stopPropagation()}
+        style={{ ...GLASS.L4, borderRadius: 16, width: '100%', maxWidth: 560,
+          maxHeight: '90vh', overflow: 'auto', padding: 24 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
           <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: COLORS.textPrimary }}>
             {isEdit ? `📝 자산 편집 — ${asset?.asset_code}` : '➕ 자산 등록'}
           </h3>
-          <button onClick={onClose} style={{ ...BTN.sm, background: 'transparent', color: COLORS.textSecondary, border: 'none', cursor: 'pointer' }}>× 닫기</button>
+          <button onClick={onClose}
+            style={{ ...BTN.sm, background: 'transparent', color: COLORS.textSecondary, border: 'none', cursor: 'pointer' }}>
+            × 닫기
+          </button>
         </div>
 
         {err && (
-          <div style={{
-            padding: 10, borderRadius: 8, marginBottom: 12,
-            background: 'rgba(239,68,68,0.08)', color: COLORS.danger, fontSize: 12,
-          }}>
+          <div style={{ padding: 10, borderRadius: 8, marginBottom: 12,
+            background: 'rgba(239,68,68,0.08)', color: COLORS.danger, fontSize: 12 }}>
             ❗ {err}
           </div>
         )}
 
         <div style={{ display: 'grid', gap: 12 }}>
           <Field label="카테고리 *">
-            <select
-              value={categoryId} onChange={e => setCategoryId(e.target.value)}
-              style={inputStyle}
-            >
+            <select value={categoryId} onChange={e => setCategoryId(e.target.value)} style={inputStyle}>
               <option value="">선택...</option>
               {categories.map(c => (
                 <option key={c.id} value={c.id}>{c.emoji} {c.name} ({c.code})</option>
@@ -188,11 +188,8 @@ export default function AssetRegisterModal({ open, asset, categories, users, onC
           </Field>
 
           <Field label="자산명 *">
-            <input
-              type="text" value={name} onChange={e => setName(e.target.value)}
-              placeholder="예: ThinkPad X1 Carbon Gen11"
-              style={inputStyle}
-            />
+            <input type="text" value={name} onChange={e => setName(e.target.value)}
+              placeholder="예: ThinkPad X1 Carbon Gen11" style={inputStyle} />
           </Field>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -200,39 +197,30 @@ export default function AssetRegisterModal({ open, asset, categories, users, onC
               <input type="date" value={acquiredAt} onChange={e => setAcquiredAt(e.target.value)} style={inputStyle} />
             </Field>
             <Field label="취득가 (원)">
-              <input
-                type="text" value={acquiredCost} onChange={e => setAcquiredCost(e.target.value)}
-                placeholder="예: 2,500,000"
-                style={inputStyle}
-              />
+              <input type="text" value={acquiredCost} onChange={e => setAcquiredCost(e.target.value)}
+                placeholder="예: 2,500,000" style={inputStyle} />
             </Field>
           </div>
 
-          <Field label="매칭 사용자">
-            <select
-              value={assignedUserId}
-              onChange={e => setAssignedUserId(e.target.value)}
-              style={inputStyle}
-            >
+          <Field label="매칭 사용자 (라이드 직원 / 외부인력)">
+            <select value={assigneeKey} onChange={e => setAssigneeKey(e.target.value)} style={inputStyle}>
               <option value="">— 공통 자산 (미할당) —</option>
-              {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+              {assignees.map(a => (
+                <option key={`${a.kind}:${a.id}`} value={`${a.kind}:${a.id}`}>
+                  {a.kind === 'employee' ? '[직원]' : '[외부]'} {a.name}{a.sub ? ` · ${a.sub}` : ''}
+                </option>
+              ))}
             </select>
           </Field>
 
           <Field label="위치">
-            <input
-              type="text" value={location} onChange={e => setLocation(e.target.value)}
-              placeholder="예: 3F 개발팀 / 본사 차고지"
-              style={inputStyle}
-            />
+            <input type="text" value={location} onChange={e => setLocation(e.target.value)}
+              placeholder="예: 3F 개발팀 / 본사 차고지" style={inputStyle} />
           </Field>
 
           <Field label="메모">
-            <textarea
-              value={notes} onChange={e => setNotes(e.target.value)}
-              rows={3} placeholder="자유 메모"
-              style={{ ...inputStyle, fontFamily: 'inherit', resize: 'vertical' }}
-            />
+            <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3} placeholder="자유 메모"
+              style={{ ...inputStyle, fontFamily: 'inherit', resize: 'vertical' }} />
           </Field>
 
           {isEdit && (
@@ -247,11 +235,8 @@ export default function AssetRegisterModal({ open, asset, categories, users, onC
               </Field>
               {status === 'disposed' && (
                 <Field label="처분 사유">
-                  <input
-                    type="text" value={disposedReason} onChange={e => setDisposedReason(e.target.value)}
-                    placeholder="예: 매각 / 폐기 / 분실"
-                    style={inputStyle}
-                  />
+                  <input type="text" value={disposedReason} onChange={e => setDisposedReason(e.target.value)}
+                    placeholder="예: 매각 / 폐기 / 분실" style={inputStyle} />
                 </Field>
               )}
             </>
@@ -260,13 +245,13 @@ export default function AssetRegisterModal({ open, asset, categories, users, onC
 
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 20 }}>
           <button onClick={onClose}
-            style={{ ...BTN.md, background: 'transparent', color: COLORS.textSecondary, border: `1px solid ${COLORS.borderSubtle}`, cursor: 'pointer' }}
-            disabled={saving}
-          >취소</button>
+            style={{ ...BTN.md, background: 'transparent', color: COLORS.textSecondary,
+              border: `1px solid ${COLORS.borderSubtle}`, cursor: 'pointer' }}
+            disabled={saving}>취소</button>
           <button onClick={handleSave}
-            style={{ ...BTN.md, background: COLORS.primary, color: '#fff', border: 'none', cursor: saving ? 'wait' : 'pointer', opacity: (saving || !name.trim() || !categoryId) ? 0.5 : 1 }}
-            disabled={saving || !name.trim() || !categoryId}
-          >
+            style={{ ...BTN.md, background: COLORS.primary, color: '#fff', border: 'none',
+              cursor: saving ? 'wait' : 'pointer', opacity: (saving || !name.trim() || !categoryId) ? 0.5 : 1 }}
+            disabled={saving || !name.trim() || !categoryId}>
             {saving ? '저장 중...' : (isEdit ? '저장' : '등록')}
           </button>
         </div>
@@ -285,12 +270,6 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 const inputStyle: React.CSSProperties = {
-  ...GLASS.L1,
-  borderRadius: 8,
-  padding: '8px 10px',
-  fontSize: 13,
-  color: COLORS.textPrimary,
-  outline: 'none',
-  width: '100%',
-  boxSizing: 'border-box',
+  ...GLASS.L1, borderRadius: 8, padding: '8px 10px', fontSize: 13,
+  color: COLORS.textPrimary, outline: 'none', width: '100%', boxSizing: 'border-box',
 }

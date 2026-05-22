@@ -4,6 +4,17 @@
 
 ## 2026-05-16
 
+- **PR-ASSETS-2.0** — 대량 등록(인라인 리스트 + 엑셀) + 매칭 대상 확장
+  - 매칭 모델 전환: `assigned_user_id`(profiles) → `assigned_to_kind` + `assigned_to_id`
+    · 'employee' = `ride_employees` (라이드 직원 16명) / 'freelancer' = `freelancers` (외부인력 22명)
+    · 마이그 `2026-05-16_ride_assets_assign_v2.sql` — ALTER 멱등, collation 일치 확인
+  - 신규 API: `assignee-options`(매칭 대상 통합 목록), `bulk`(대량 일괄 등록, 최대 200건/트랜잭션)
+  - 신규 UI: NavTabs 「➕ 대량 등록」 탭 — 인라인 리스트 입력 그리드 + 엑셀 업로드
+    · 엑셀 파싱·템플릿은 클라이언트사이드 xlsx 라이브러리 (표준 7컬럼)
+    · 엑셀 카테고리·사용자는 이름으로 입력 → 자동 매핑, 동명이인·미존재 행 빨강 경고
+  - 기존 API 5종(route/[id]/assign/qr/perm) 매칭 모델 동형 반영 (Rule 14)
+  - 일반 사용자 편집 동선은 QR 스캔 페이지로 일원화 (외부인력 로그인 = freelancer.linked_profile_id)
+
 - **PR-ASSETS-1.0-hotfix** — `users` → `profiles` 테이블명 수정 (긴급 버그픽스)
   - 사고: 코드 전체가 `LEFT JOIN users` 사용 → 실제 테이블은 `profiles` (users 미존재)
   - 증상: `Table 'fmi_op.users' doesn't exist` (코드 1146) → graceful fallback 이
