@@ -6,6 +6,49 @@
 
 ## 2026-05-13
 
+### PR-MTG-V2-Todo-C — TODO 리스트 UI 전환 (표 → 체크리스트 + 인라인 편집)
+
+**사용자 보고**:
+> 「편집하기가 불편하네」
+> 「to do 자체는 내용이 엄청많지는 않을텐데 ui가 to do의 ui는 안어울리지않아?」
+
+**진단**: 회의록 목록용 8컬럼 표(NeuDataTable)를 TODO에 그대로 사용 — 무겁고, 편집이 상단 큰 폼으로 튀어 불편.
+
+**변경**:
+
+1. **신규 컴포넌트** — `app/meetings/_components/TodoListView.tsx`:
+   - 표 대신 **체크리스트 리스트** — 한 줄에 `☑ 내용 ··· [출처] [마감일] [상태] [액션]`
+   - 회의 액션 / 개인 TODO 색 구분 (출처 배지)
+   - 마감일 overdue 빨강 / soon amber
+   - hover 시 액션 노출 (회의=「회의록」 / 개인=「편집」「×」)
+   - **인라인 편집** — 개인 TODO 「편집」 클릭 → 그 줄이 그 자리에서 `EditForm` 으로 전환
+   - **인라인 추가** — 리스트 상단 「＋ 새 개인 TODO」 → 그 자리에 `EditForm`
+   - `EditForm`: 내용 / 마감일 / 우선순위 / 분류 칩 / 비고 — 컴팩트
+   - Enter 저장 / Esc 취소
+
+2. **`/meetings/me` 재작성**:
+   - `NeuDataTable` + 8 컬럼 정의 제거 → `TodoListView`
+   - 상단 「개인 TODO 수정/추가」 큰 폼 제거 (인라인으로 대체)
+   - `editingId` / `startEdit` / `submitNewTodo` 등 → `TodoListView` 내부 + 콜백(`onCreate`/`onUpdate`/`onDelete`/`onToggleStatus`)
+   - 뷰 토글 「📋 표」 → 「📋 리스트」 (캘린더 유지)
+   - DcStatStrip actions 제거 (추가 버튼은 리스트 상단으로 이동)
+
+**유지**: DcStatStrip 5 카드 / 검색·상태·source·category 필터 / 캘린더 뷰 / 토스트
+
+**Rule 8 시뮬레이션**:
+- /meetings/me 「리스트」 → 체크리스트
+- 「편집」 클릭 → 그 줄 인라인 EditForm → 수정 → onUpdate → PATCH → load
+- 「＋ 새 개인 TODO」 → 상단 인라인 EditForm → onCreate → POST
+- ☑ 토글 → onToggleStatus → source 별 PATCH
+
+**Rule 13**: 외부 라이브러리 없음
+**Rule 14**: 회의 액션 + 개인 TODO 통합 (TodoItem)
+**Rule 21**: 자기 모듈 (meetings) / **Rule 22**: 본 CHANGELOG
+
+**비고**: lint baseline 갱신 — 다른 세션(HR) 의 `app/hr/page.tsx` ui-token 미정리분 동결 (본 세션 무관, hotfix #3 동일 패턴)
+
+---
+
 ### PR-MTG-V2-Todo-B — 캘린더 뷰 (표/캘린더 토글)
 
 **사용자 명령**: 「캘린더 뷰도 볼수있어야」 → 「ㄱㄱ」
