@@ -15,10 +15,10 @@ import { prisma } from '@/lib/prisma'
  *    대기를 못하는 내용」
  *
  * 데이터 소스 (사용자 확정 — cars 페이지 기준):
- *   cars 테이블 — status 컬럼
- *     active    배차 가능 (대기) ← 배차 매칭 대상
- *     rented    배차 중
- *     accident  사고/정비 운영 불가 (대기 풀에서 제외)
+ *   cars 테이블 — status 컬럼 (실데이터 확인 2026-05-16):
+ *     available  배차 가능 (대기) ← 배차 매칭 대상
+ *     rented     배차 중
+ *     returned   반납됨 (점검·정비 대기)
  *
  *   /cars 페이지 (app/cars/CarList.tsx) 가 사용하는 GET /api/cars 와 동일 테이블.
  *
@@ -26,13 +26,13 @@ import { prisma } from '@/lib/prisma'
  * 읽기 전용 — DB write 없음.
  *
  * Query:
- *   ?status=active|rented|accident|all   (default: active = 대기)
+ *   ?status=available|rented|returned|all   (default: available = 대기)
  *   ?q=검색어 (차량번호/브랜드/모델/트림)
  */
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
-const ALLOWED_STATUS = ['active', 'rented', 'accident']
+const ALLOWED_STATUS = ['available', 'rented', 'returned']
 
 export async function GET(request: NextRequest) {
   try {
@@ -42,14 +42,14 @@ export async function GET(request: NextRequest) {
     }
 
     const url = new URL(request.url)
-    const statusInput = url.searchParams.get('status') || 'active'
+    const statusInput = url.searchParams.get('status') || 'available'
     const q = (url.searchParams.get('q') || '').trim()
 
     // status 화이트리스트 — 'all' 또는 허용값만
     const statusFilter =
       statusInput === 'all' ? null
       : ALLOWED_STATUS.includes(statusInput) ? statusInput
-      : 'active'
+      : 'available'
 
     const where: Record<string, unknown> = {}
     if (statusFilter) where.status = statusFilter

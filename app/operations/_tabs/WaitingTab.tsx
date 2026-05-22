@@ -12,11 +12,12 @@ import { GLASS } from '@/app/utils/ui-tokens'
 // 사용자 명시: 「대기차량 — 정비/세차 완료 후 가용 상태」
 //
 // 데이터: cars 테이블 (PR-E 차량 통합 정본) — /api/operations/waiting-vehicles
-//   status: active (사용가능·대기) / rented (배차중) / accident (정비·사고)
+//   status (실데이터 확인 2026-05-16):
+//     available (사용가능·대기) / rented (배차중) / returned (반납·점검대기)
 //
 // 기능:
 //   - 상태별 list + 필터
-//   - 정비·사고 → 사용가능 전환 / 사용가능 → 정비 전환 (cars.status PATCH)
+//   - 반납·점검 → 사용가능 전환 (cars.status PATCH)
 // ═══════════════════════════════════════════════════════════════════
 
 async function getAuthHeader(): Promise<Record<string, string>> {
@@ -39,12 +40,12 @@ type WaitingVehicle = {
   mileage: number | null
 }
 
-type FilterKey = 'all' | 'active' | 'rented' | 'accident'
+type FilterKey = 'all' | 'available' | 'rented' | 'returned'
 
 const STATUS_META: Record<string, { label: string; bg: string; fg: string }> = {
-  active:   { label: '🟢 사용가능', bg: 'rgba(34,197,94,0.12)',   fg: '#15803d' },
-  rented:   { label: '🚗 배차중',   bg: 'rgba(239,68,68,0.12)',   fg: '#991b1b' },
-  accident: { label: '🔧 정비·사고', bg: 'rgba(245,158,11,0.12)', fg: '#b45309' },
+  available: { label: '🟢 사용가능',  bg: 'rgba(34,197,94,0.12)',   fg: '#15803d' },
+  rented:    { label: '🚗 배차중',    bg: 'rgba(239,68,68,0.12)',   fg: '#991b1b' },
+  returned:  { label: '🔧 반납·점검', bg: 'rgba(245,158,11,0.12)',  fg: '#b45309' },
 }
 
 export default function WaitingTab() {
@@ -111,9 +112,9 @@ export default function WaitingTab() {
   const allRows = rows || []
   const data = useMemo(() => ({
     all: allRows,
-    active: allRows.filter((r) => r.status === 'active'),
+    available: allRows.filter((r) => r.status === 'available'),
     rented: allRows.filter((r) => r.status === 'rented'),
-    accident: allRows.filter((r) => r.status === 'accident'),
+    returned: allRows.filter((r) => r.status === 'returned'),
   }), [allRows])
 
   const activeData = data[filter]
@@ -130,16 +131,16 @@ export default function WaitingTab() {
 
   const counts = {
     all: allRows.length,
-    active: data.active.length,
+    available: data.available.length,
     rented: data.rented.length,
-    accident: data.accident.length,
+    returned: data.returned.length,
   }
 
   const statItems: StatItem[] = [
     { label: '🚙 보유 차량 전체', value: counts.all, unit: '대', tint: 'blue' },
-    { label: '🟢 사용가능 (대기)', value: counts.active, unit: '대', tint: 'green' },
+    { label: '🟢 사용가능 (대기)', value: counts.available, unit: '대', tint: 'green' },
     { label: '🚗 배차중', value: counts.rented, unit: '대', tint: 'red' },
-    { label: '🔧 정비·사고', value: counts.accident, unit: '대', tint: 'amber' },
+    { label: '🔧 반납·점검', value: counts.returned, unit: '대', tint: 'amber' },
     { label: '🔍 검색결과', value: filtered.length, unit: '대', tint: 'purple' },
   ]
   const statActions: ActionButton[] = [
@@ -147,9 +148,9 @@ export default function WaitingTab() {
   ]
   const filterItems: FilterItem[] = [
     { key: 'all', label: '🚙 전체', count: counts.all },
-    { key: 'active', label: '🟢 사용가능', count: counts.active },
+    { key: 'available', label: '🟢 사용가능', count: counts.available },
     { key: 'rented', label: '🚗 배차중', count: counts.rented },
-    { key: 'accident', label: '🔧 정비·사고', count: counts.accident },
+    { key: 'returned', label: '🔧 반납·점검', count: counts.returned },
   ]
 
   const columns: TableColumn<WaitingVehicle>[] = [
@@ -196,10 +197,10 @@ export default function WaitingTab() {
         if (r.status === 'rented') {
           return <span style={{ fontSize: 11, color: '#cbd5e1', whiteSpace: 'nowrap' }}>회차 시 자동</span>
         }
-        if (r.status === 'accident') {
+        if (r.status === 'returned') {
           return (
             <button
-              onClick={(e) => changeStatus(r, 'active', e)}
+              onClick={(e) => changeStatus(r, 'available', e)}
               disabled={busy}
               style={{
                 padding: '4px 10px', borderRadius: 7, border: 'none', cursor: busy ? 'wait' : 'pointer',
@@ -207,14 +208,14 @@ export default function WaitingTab() {
                 background: 'linear-gradient(135deg, #10b981, #059669)', color: '#fff', opacity: busy ? 0.5 : 1,
               }}
             >
-              {busy ? '⏳' : '✅ 사용가능 처리'}
+              {busy ? '⏳' : '✅ 점검완료 → 사용가능'}
             </button>
           )
         }
-        // active — 정비/세차 보내기
+        // available — 점검/정비 보내기
         return (
           <button
-            onClick={(e) => changeStatus(r, 'accident', e)}
+            onClick={(e) => changeStatus(r, 'returned', e)}
             disabled={busy}
             style={{
               padding: '4px 10px', borderRadius: 7, cursor: busy ? 'wait' : 'pointer',
@@ -223,7 +224,7 @@ export default function WaitingTab() {
               opacity: busy ? 0.5 : 1,
             }}
           >
-            {busy ? '⏳' : '🔧 정비·세차'}
+            {busy ? '⏳' : '🔧 점검·정비'}
           </button>
         )
       },
@@ -262,7 +263,7 @@ export default function WaitingTab() {
         defaultSort={{ key: 'status', dir: 'asc' }}
       />
       <div style={{ marginTop: 12, fontSize: 12, color: '#64748b' }}>
-        💡 「정비·세차」 / 「사용가능 처리」 버튼으로 차량 상태를 전환합니다. 배차중 차량은 회차 처리 시 자동으로 사용가능 복귀됩니다.
+        💡 「점검·정비」 / 「점검완료」 버튼으로 차량 상태를 전환합니다. 배차중 차량은 회차 처리 시 자동으로 반납·점검 상태가 됩니다.
       </div>
     </div>
   )

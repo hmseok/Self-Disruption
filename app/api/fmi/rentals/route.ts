@@ -203,7 +203,8 @@ export async function POST(req: NextRequest) {
         // PR-E3 (2026-05-16) 차량 통합: fmi_vehicles → cars
         const vehicle = await prisma.car.findUnique({ where: { id: vehicle_id } });
         if (!vehicle) throw new Error('차량을 찾을 수 없습니다');
-        if (vehicle.status !== 'active') throw new Error('배차 불가능한 차량입니다');
+        // PR-K (2026-05-16) cars.status 실제값: available 만 배차 가능
+        if (vehicle.status !== 'available') throw new Error('배차 불가능한 차량입니다 (사용가능 상태만 배차)');
 
         const rental = await prisma.fmiRental.update({
           where: { id: rental_id },
@@ -270,11 +271,12 @@ export async function POST(req: NextRequest) {
         });
 
         if (rental.vehicle_id) {
-          // PR-E3 차량 통합: cars.status — 손상 시 accident(정비), 정상 시 active(대기)
+          // PR-K (2026-05-16) 차량 통합: 반납 시 cars.status='returned' (반납·점검대기)
+          //   손상 여부는 return_damage_yn 컬럼에 별도 기록
           await prisma.car.update({
             where: { id: rental.vehicle_id },
             data: {
-              status: return_damage_yn ? 'accident' : 'active',
+              status: 'returned',
               ...(return_mileage ? { mileage: return_mileage } : {}),
             },
           });

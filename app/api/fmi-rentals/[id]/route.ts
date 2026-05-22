@@ -108,13 +108,12 @@ export async function PATCH(
     // 차량 상태 동기화 (best-effort)
     const newStatus = body.status ?? prev.status
     const newVehicleId = body.vehicle_id ?? prev.vehicle_id
-    // PR-E3 (2026-05-16) 차량 통합: 차량 상태 동기화 대상 fmi_vehicles → cars
-    // cars.status 값 체계: active(대기) / rented(배차중) / accident
+    // PR-K (2026-05-16) 차량 통합: cars.status 실제값 = available / rented / returned
     try {
       if (newVehicleId && (newStatus === 'dispatched' || newStatus === 'claiming')) {
         await prisma.$executeRaw`UPDATE cars SET status = 'rented' WHERE id = ${newVehicleId}`
       } else if (newVehicleId && (newStatus === 'returned' || newStatus === 'settled')) {
-        await prisma.$executeRaw`UPDATE cars SET status = 'active' WHERE id = ${newVehicleId}`
+        await prisma.$executeRaw`UPDATE cars SET status = 'returned' WHERE id = ${newVehicleId}`
       }
     } catch {}
 
@@ -149,8 +148,8 @@ export async function DELETE(
 
     if (vehicleId) {
       try {
-        // PR-E3 (2026-05-16) 차량 통합: 대차건 삭제 시 차량 cars.status='active' (대기)
-        await prisma.$executeRaw`UPDATE cars SET status = 'active' WHERE id = ${vehicleId}`
+        // PR-K (2026-05-16) 차량 통합: 대차건 삭제(배차 취소) 시 차량 cars.status='available' (대기 복귀)
+        await prisma.$executeRaw`UPDATE cars SET status = 'available' WHERE id = ${vehicleId}`
       } catch {}
     }
 

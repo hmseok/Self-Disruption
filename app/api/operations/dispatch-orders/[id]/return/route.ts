@@ -108,11 +108,12 @@ export async function POST(
       id,
     )
 
-    // 4. cars.status = 'active' (배차중 → 대기 복귀)
+    // 4. cars.status = 'returned' (배차중 → 반납·점검대기)
+    //    회차 직후엔 점검 필요 — WaitingTab 에서 점검완료 시 available 전환
     if (rental.vehicle_id) {
       try {
         await prisma.$executeRawUnsafe(
-          `UPDATE cars SET status = 'active', updated_at = NOW() WHERE id = ?`,
+          `UPDATE cars SET status = 'returned', updated_at = NOW() WHERE id = ?`,
           rental.vehicle_id,
         )
       } catch (e) {
