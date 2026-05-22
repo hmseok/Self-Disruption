@@ -21,7 +21,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ success: true, data: rows, meta: null })
   } catch (e) {
     const err = e as { code?: string; message?: string }
-    if (err.code === 'P2010' || err.message?.includes("doesn't exist")) {
+    if (err.message?.includes("doesn't exist") && err.message.includes('ride_asset')) {
       return NextResponse.json({
         success: true, data: [],
         meta: { _migration_pending: true, migration: '2026-05-14_ride_assets.sql' },

@@ -52,7 +52,7 @@ export async function GET(request: Request, ctx: Ctx) {
              a.location, a.notes, a.acquired_at
         FROM ride_assets a
         LEFT JOIN ride_asset_categories c ON c.id = a.category_id
-        LEFT JOIN users u ON u.id = a.assigned_user_id
+        LEFT JOIN profiles u ON u.id = a.assigned_user_id
        WHERE a.qr_token = ${token}
        LIMIT 1
     `
@@ -80,7 +80,7 @@ export async function GET(request: Request, ctx: Ctx) {
     })
   } catch (e) {
     const err = e as { code?: string; message?: string }
-    if (err.code === 'P2010' || err.message?.includes("doesn't exist")) {
+    if (err.message?.includes("doesn't exist") && err.message.includes('ride_asset')) {
       return NextResponse.json({
         success: false, error: '마이그레이션 미적용', meta: { _migration_pending: true },
       }, { status: 503 })

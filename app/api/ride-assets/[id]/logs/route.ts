@@ -58,9 +58,9 @@ export async function GET(request: Request, ctx: Ctx) {
              uby.name AS by_user_name,
              l.note, l.created_at
         FROM ride_asset_logs l
-        LEFT JOIN users ufrom ON ufrom.id = l.from_user_id
-        LEFT JOIN users uto ON uto.id = l.to_user_id
-        LEFT JOIN users uby ON uby.id = l.by_user_id
+        LEFT JOIN profiles ufrom ON ufrom.id = l.from_user_id
+        LEFT JOIN profiles uto ON uto.id = l.to_user_id
+        LEFT JOIN profiles uby ON uby.id = l.by_user_id
        WHERE l.asset_id = ${id}
        ORDER BY l.created_at DESC, l.id DESC
        LIMIT 200
@@ -72,7 +72,7 @@ export async function GET(request: Request, ctx: Ctx) {
     return NextResponse.json({ success: true, data: serialized, meta: { count: serialized.length } })
   } catch (e) {
     const err = e as { code?: string; message?: string }
-    if (err.code === 'P2010' || err.message?.includes("doesn't exist")) {
+    if (err.message?.includes("doesn't exist") && err.message.includes('ride_asset')) {
       return NextResponse.json({
         success: true, data: [],
         meta: { _migration_pending: true, migration: '2026-05-14_ride_assets.sql' },

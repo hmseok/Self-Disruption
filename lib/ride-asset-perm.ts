@@ -65,7 +65,7 @@ export async function listAssetAdmins(): Promise<Array<{
       SELECT a.user_id, a.granted_by, a.granted_at, a.note,
              u.name AS user_name
         FROM ride_asset_admins a
-        LEFT JOIN users u ON u.id = a.user_id
+        LEFT JOIN profiles u ON u.id = a.user_id
        ORDER BY a.granted_at DESC
     `
     return rows

@@ -77,7 +77,7 @@ export async function GET(request: Request) {
                a.created_by, a.created_at, a.updated_at
           FROM ride_assets a
           LEFT JOIN ride_asset_categories c ON c.id = a.category_id
-          LEFT JOIN users u ON u.id = a.assigned_user_id
+          LEFT JOIN profiles u ON u.id = a.assigned_user_id
          WHERE a.assigned_user_id = ${user.id}
            AND a.status <> 'disposed'
            AND (${category} = '' OR c.code = ${category})
@@ -106,7 +106,7 @@ export async function GET(request: Request) {
                a.created_by, a.created_at, a.updated_at
           FROM ride_assets a
           LEFT JOIN ride_asset_categories c ON c.id = a.category_id
-          LEFT JOIN users u ON u.id = a.assigned_user_id
+          LEFT JOIN profiles u ON u.id = a.assigned_user_id
          WHERE (${category} = '' OR c.code = ${category})
            AND (${status} = '' OR a.status = ${status})
            AND (${assignedFilter} = '__ANY__'
@@ -129,7 +129,7 @@ export async function GET(request: Request) {
     })
   } catch (e) {
     const err = e as { code?: string; message?: string }
-    if (err.code === 'P2010' || err.message?.includes("doesn't exist")) {
+    if (err.message?.includes("doesn't exist") && err.message.includes('ride_asset')) {
       return NextResponse.json({
         success: true, data: [],
         meta: { _migration_pending: true, migration: '2026-05-14_ride_assets.sql' },
@@ -216,7 +216,7 @@ export async function POST(request: Request) {
              a.created_by, a.created_at, a.updated_at
         FROM ride_assets a
         LEFT JOIN ride_asset_categories c ON c.id = a.category_id
-        LEFT JOIN users u ON u.id = a.assigned_user_id
+        LEFT JOIN profiles u ON u.id = a.assigned_user_id
        WHERE a.id = ${result.id}
        LIMIT 1
     `

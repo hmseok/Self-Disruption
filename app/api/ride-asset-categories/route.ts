@@ -50,7 +50,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ success: true, data: rows, meta: null })
   } catch (e) {
     const err = e as { code?: string; message?: string }
-    if (err.code === 'P2010' || err.message?.includes("doesn't exist")) {
+    if (err.message?.includes("doesn't exist") && err.message.includes('ride_asset')) {
       return NextResponse.json({
         success: true,
         data: [],

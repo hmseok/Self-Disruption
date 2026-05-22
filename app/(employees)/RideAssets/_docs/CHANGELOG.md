@@ -2,6 +2,18 @@
 
 > Rule 22 — 모듈 _docs 갱신 의무. 매 PR 한 줄 (날짜 + PR 코드 + 한 줄 요약).
 
+## 2026-05-16
+
+- **PR-ASSETS-1.0-hotfix** — `users` → `profiles` 테이블명 수정 (긴급 버그픽스)
+  - 사고: 코드 전체가 `LEFT JOIN users` 사용 → 실제 테이블은 `profiles` (users 미존재)
+  - 증상: `Table 'fmi_op.users' doesn't exist` (코드 1146) → graceful fallback 이
+    이 메시지의 `"doesn't exist"` 를 보고 「마이그레이션 미적용」으로 오인 → 배너 오표시
+  - 수정 1: 8곳 `LEFT JOIN users` → `LEFT JOIN profiles` (5개 파일)
+  - 수정 2: fallback 조건 정밀화 — `P2010` 단독 조건 제거, 메시지에 `ride_asset`
+    테이블명 포함 시에만 `_migration_pending` 판정 (다른 테이블 에러 오인 방지)
+  - 원인: Rule 11 위반 — `users` 테이블명을 schema 검증 없이 가정
+  - 검증: profiles JOIN SQL 실DB 실행 성공, collation 일치 (utf8mb4_unicode_ci)
+
 ## 2026-05-14
 
 - **PR-ASSETS-1.0** — 라이드 자산 관리 모듈 신설 (assets 세션 첫 PR)
