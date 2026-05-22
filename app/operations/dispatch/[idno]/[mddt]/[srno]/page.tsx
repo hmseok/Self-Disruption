@@ -718,21 +718,48 @@ export default function DispatchDetailPage({
           </p>
         </div>
 
-        {/* Toast */}
+        {/* Toast — PR-M (2026-05-22): 사용자 명시 「배차저장하면 반응이없음」
+           원인: 결과 토스트가 본문 최상단에 렌더 → 하단 고정 패널에서 저장 시
+                 스크롤 위치상 화면 밖이라 안 보임 → 「반응 없음」으로 느껴짐.
+           수정: position:fixed 글래스 토스트 — 스크롤 무관 항상 시야 노출 (규칙 20). */}
         {resultMsg && (
           <div
+            role="status"
             style={{
-              marginBottom: 16,
-              padding: 14,
-              background: resultMsg.type === 'ok' ? 'rgba(16,185,129,0.08)' : 'rgba(239,68,68,0.08)',
-              border: `1px solid ${resultMsg.type === 'ok' ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)'}`,
+              position: 'fixed',
+              top: 72,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              zIndex: 60,
+              maxWidth: 'min(560px, 92vw)',
+              padding: '13px 16px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              background: resultMsg.type === 'ok' ? 'rgba(236,253,245,0.97)' : 'rgba(254,242,242,0.97)',
+              backdropFilter: 'blur(12px)',
+              WebkitBackdropFilter: 'blur(12px)',
+              border: `1px solid ${resultMsg.type === 'ok' ? 'rgba(16,185,129,0.45)' : 'rgba(239,68,68,0.45)'}`,
               borderRadius: 12,
+              boxShadow: '0 14px 36px rgba(15,23,42,0.18)',
               fontSize: 13,
               fontWeight: 700,
               color: resultMsg.type === 'ok' ? '#065f46' : '#991b1b',
             }}
           >
-            {resultMsg.type === 'ok' ? '✅' : '⚠️'} {resultMsg.text}
+            <span style={{ fontSize: 16, lineHeight: 1 }}>{resultMsg.type === 'ok' ? '✅' : '⚠️'}</span>
+            <span style={{ flex: 1, lineHeight: 1.45 }}>{resultMsg.text}</span>
+            <button
+              onClick={() => setResultMsg(null)}
+              aria-label="닫기"
+              style={{
+                background: 'transparent', border: 'none', cursor: 'pointer',
+                fontSize: 15, lineHeight: 1, padding: 2, flexShrink: 0,
+                color: resultMsg.type === 'ok' ? '#047857' : '#b91c1c',
+              }}
+            >
+              ×
+            </button>
           </div>
         )}
 
