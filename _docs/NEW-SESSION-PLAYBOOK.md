@@ -96,7 +96,7 @@
 2. 정독 순서 (반드시 이 순서):
    - CLAUDE.md (전체 규칙)
    - _docs/NEW-SESSION-PLAYBOOK.md (세션 운영 표준)
-   - _docs/SESSIONS-COORDINATION.md (모듈 매핑 + 합의 프로토콜)
+   - _docs/SESSIONS-COORDINATION.md (모듈 매핑 + 합의 프로토콜 + ★ § 7 commit/push 엉킴 방지 — 필독)
    - _docs/<MODULE>-PERSONAS.md (페르소나/시나리오)
    - _docs/<MODULE>-DATA-MODEL.md (데이터 구조)
    - _docs/UI-DESIGN-STANDARD.md (디자인 표준 — 의무)
@@ -175,7 +175,7 @@ git status --short             # 다른 세션 잔재 확인
 | 순서 | 파일 | 핵심 |
 |------|------|------|
 | 1 | `CLAUDE.md` | Rule 21 cowork / Rule 22 _docs / Rule 26 페르소나 / Rule 27 GATE |
-| 2 | `_docs/SESSIONS-COORDINATION.md` | 자기 모듈 영역 + 공통 파일 합의 프로토콜 |
+| 2 | `_docs/SESSIONS-COORDINATION.md` | 자기 모듈 영역 + 공통 파일 합의 + **§ 7 commit/push 엉킴 방지 (필독)** |
 | 3 | `_docs/<MODULE>-PERSONAS.md` | 주 페르소나 + 시나리오 (없으면 사용자에게 작성 요청) |
 | 4 | `_docs/<MODULE>-DATA-MODEL.md` | 데이터 구조 (없으면 사용자에게 작성 요청) |
 | 5 | `_docs/UI-DESIGN-STANDARD.md` | DcStatStrip / DcToolbar / NeuDataTable 의무 + PageTitle 자동 |
