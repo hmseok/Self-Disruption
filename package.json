@@ -28,7 +28,9 @@
     "cowork:check": "node harness-engineering/scripts/cowork-health-check.js",
     "cowork:fix": "node harness-engineering/scripts/cowork-health-check.js --fix",
     "cowork:init": "node harness-engineering/scripts/cowork-init.js",
-    "seed:compliance-manuals": "node harness-engineering/scripts/seed-compliance-manuals.js"
+    "seed:compliance-manuals": "node harness-engineering/scripts/seed-compliance-manuals.js",
+    "seed:compliance-pdfs": "node harness-engineering/scripts/seed-compliance-pdfs.js",
+    "seed:compliance-content-md": "node harness-engineering/scripts/seed-compliance-content-md.js"
   },
   "dependencies": {
     "@fontsource/nanum-gothic": "^5.2.7",
@@ -63,6 +65,7 @@
     "officecrypto-tool": "^0.0.19",
     "openai": "^6.17.0",
     "pdf-lib": "^1.17.1",
+    "pdf-parse": "^1.1.1",
     "pg": "^8.20.0",
     "react": "19.2.3",
     "react-daum-postcode": "^3.2.0",

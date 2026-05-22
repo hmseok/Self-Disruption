@@ -207,6 +207,20 @@ export default function ManualDetailPage() {
   const isAdminOrMgr = user?.role === 'admin'
   // 실제 manager 권한 확인은 server-side. 본 페이지 편집 버튼은 admin/anyone 노출, server 에서 게이트.
 
+  // Phase 1.4-fix12 — 부모 scope 의 scrollToSection — SectionTOC + 다른 곳에서 공용
+  const scrollToSection = (id: string) => {
+    const container = document.getElementById('manual-body-scroll')
+    const el = document.getElementById(id)
+    if (!el || !container) {
+      el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      return
+    }
+    const cRect = container.getBoundingClientRect()
+    const eRect = el.getBoundingClientRect()
+    const top = eRect.top - cRect.top + container.scrollTop - 16
+    container.scrollTo({ top, behavior: 'smooth' })
+  }
+
   if (loading) return <div style={{ padding: 40, fontSize: 14, color: COLORS.textSecondary }}>로딩 중…</div>
 
   if (error) return (
@@ -297,8 +311,26 @@ export default function ManualDetailPage() {
           </div>
 
           {/* Phase 1.4-fix2 — 본문 자동 섹션 목차 (사용자 통찰 — 별첨/일반규정/서식 자동 분리) */}
+          {/* Phase 1.4-fix12 — PDF 모드 + 마크다운 모드 풀세트 통합. 목차 클릭 시 PDF→md 자동 전환. */}
           {detail?.content_md && (
-            <SectionTOC content={detail.content_md} />
+            <SectionTOC
+              content={detail.content_md}
+              currentMode={viewMode}
+              onSelectSection={(id) => {
+                // PDF 모드 면 mode 전환 + 다음 frame 에 scroll (DOM mount 대기)
+                if (viewMode === 'pdf') {
+                  setViewMode('md')
+                  // requestAnimationFrame x2 — md 본문 DOM mount 후 scroll
+                  requestAnimationFrame(() => {
+                    requestAnimationFrame(() => {
+                      scrollToSection(id)
+                    })
+                  })
+                } else {
+                  scrollToSection(id)
+                }
+              }}
+            />
           )}
 
           {/* 장 목차 (해당 시 — 매뉴얼 description 의 static chapters fallback) */}
@@ -526,7 +558,12 @@ interface ReviewData {
 
 // ────────── Phase 1.4-fix2 섹션 목차 (사용자 통찰 — 별첨/일반규정/서식 자동 분리) ──────────
 // 본문 마크다운에서 H1·H2 자동 추출 → 타입별 색상 + 클릭 시 anchor scroll
-function SectionTOC(props: { content: string }) {
+// Phase 1.4-fix12 — onSelectSection prop 으로 부모 scope 의 mode 전환 + scroll 위임
+function SectionTOC(props: {
+  content: string
+  currentMode?: 'md' | 'pdf'
+  onSelectSection?: (id: string) => void
+}) {
   // Phase 1.4-fix5 — 중복 제거 (같은 title 첫 번째만 유지). PDF 추출 시 페이지 헤더 반복 발생 회피.
   const sections = useMemo<MarkdownSection[]>(() => {
     const all = extractSections(props.content, 2)
@@ -565,8 +602,13 @@ function SectionTOC(props: { content: string }) {
     other:      { label: '기타',     color: COLORS.textMuted,  emoji: '·' },
   }
 
+  // Phase 1.4-fix12 — 부모 scope 의 scrollToSection 사용 (PDF 모드 전환 처리 포함).
+  // 후방 호환: onSelectSection 미전달 시 자체 scroll (기존 동작).
   const scrollTo = (id: string) => {
-    // Phase 1.4-fix6 — getBoundingClientRect 기반 정확 계산 (offsetTop 은 offsetParent 기준이라 부정확)
+    if (props.onSelectSection) {
+      props.onSelectSection(id)
+      return
+    }
     const container = document.getElementById('manual-body-scroll')
     const el = document.getElementById(id)
     if (!el || !container) {
@@ -631,6 +673,11 @@ function SectionTOC(props: { content: string }) {
       </div>
       <p style={{ marginTop: 8, marginBottom: 0, fontSize: 10, color: COLORS.textMuted, lineHeight: 1.5 }}>
         클릭 시 본문에서 해당 위치로 스크롤. 검수 시 본문/별첨/서식 단위로 확인 가능.
+        {props.currentMode === 'pdf' && (
+          <span style={{ display: 'block', marginTop: 4, color: COLORS.primary }}>
+            ℹ PDF 모드에서 클릭 시 마크다운 모드로 자동 전환됩니다.
+          </span>
+        )}
       </p>
     </div>
   )
