@@ -211,3 +211,96 @@ CLAUDE.md 정독 후:
 - Phase 2.3: `/operations/rentals` 리뉴얼 — 진행 모니터 + 검색/필터 강화
 
 자세한 시나리오는 `_docs/OPERATIONS-PERSONAS.md` § 7 참고.
+
+---
+
+## 7. commit / push 엉킴 방지 — 강화 규정 (2026-05-21 신설)
+
+> **사용자 명령** (2026-05-21): 「각 세션들 커밋 푸시가 좀 엉키는것같은데 하네스 규정 강화」
+> 동시 다발 세션 운영 중 commit 유실 / 공통 파일 변경 섞임 / .git lock 빈발.
+> 본 § 7 은 Rule 21 의 강화 조항 — 모든 cowork 세션 의무.
+
+### 7.1 표준 작업 사이클 (모든 세션 — 매 작업 의무)
+
+```
+1. 작업 시작:  git pull --rebase origin main      # 다른 세션 commit 먼저 받기
+2. 코드 작업
+3. commit 직전: git fetch origin                   # 최신 확인
+                git add <자기 영역만 명시>          # git add . / -A 절대 금지
+4. git commit                                      # pre-commit hook 통과
+5. push 직전:  git pull --rebase origin main       # 또 받기
+6. git push origin main
+7. push 실패 (non-fast-forward / fetch first):
+                git pull --rebase origin main → git push  재시도 (루프)
+```
+
+### 7.1.a 순차 push — 「한 번에 한 세션만」 원칙
+
+> origin/main 은 git 이 자체적으로 순차성 보장 (동시 push 시 뒤가 reject).
+> 진짜 위험은 **local commit 을 push 안 한 채 방치** → 다른 세션 rebase 에 유실.
+
+- **commit → push 사이에 다른 작업 끼우지 X** (7.3 참조)
+- push reject (`fetch first`) = 다른 세션이 먼저 push 함 → `pull --rebase` → push 재시도.
+  **이것이 정상 순차 동작** — 에러 아님
+- push 재시도 루프 3회 초과 = 다른 세션 연속 push 중 → 1~3분 대기 후 재개
+- 큰 변경은 작은 commit 으로 쪼개 push (rebase 충돌 표면적 ↓)
+
+### 7.1.b 새 멀티 세션 국면 진입 전 — 선행 강화 (사고 예방)
+
+> 2026-05-21 회고: 멀티 세션 동시 운영을 **시작한 뒤** 엉킴이 터지고 나서야 본 § 7 을
+> 신설 — 선행 강화 실패. 이후 새 다세션 국면 진입 전 다음을 먼저 점검:
+
+- [ ] 모든 세션이 `npm run cowork:init` 실행 (hooksPath + lock 자동정리)
+- [ ] 공통 파일 (menu-registry / PageTitle / ClientLayout / schema.prisma) working
+      tree clean 확인 — 미commit 잔재 먼저 정리
+- [ ] 각 세션 모듈 영역 § 1.1 에 등록 확인
+- [ ] 본 § 7 을 각 세션 정독 (NEW-SESSION-PLAYBOOK 정독 순서 포함)
+
+### 7.2 공통 파일 — 즉시 단독 commit 원칙 (엉킴 1순위 원인)
+
+공통 파일 (`lib/menu-registry.ts` / `app/components/PageTitle.tsx` /
+`app/components/auth/ClientLayout.tsx` / `prisma/schema.prisma` / `.gitignore` 등):
+
+- ❌ **working tree 에 방치 절대 금지** — 여러 세션 변경이 누적되면 누가 commit 하든 섞임
+- ✅ 변경 **즉시 그 파일만 단독 commit + push** (1분 이내)
+- ✅ 모듈 파일과 같은 commit 에 섞지 X (Rule 21 § 2.2)
+
+> 2026-05-19 사고: menu-registry.ts + PageTitle.tsx 에 3개 세션 (call-scheduler /
+> PR-ASSETS / CX-KPI) 변경이 commit 안 된 채 누적 → 한 세션이 commit 시 전부 섞임.
+
+### 7.3 commit 유실 방지 — "commit + push 는 한 동작"
+
+- commit 만 하고 push 안 하면 다른 세션 rebase/reset 으로 **유실 가능**
+- commit 직후 **즉시 push** — 사이에 다른 작업 X
+- push 안 된 local commit 을 신뢰하지 말 것
+
+> 2026-05-19 사고: PR-MT-OPS-FIX commit 이 push 전 다른 세션 작업에 묻혀 유실 →
+> 동일 내용 재commit (7a9dc0b) 필요했음.
+
+### 7.4 staging 침범 차단 (재강조)
+
+- `git add .` / `git add -A` / `git add *` **절대 금지**
+- 항상 `git add <폴더/파일 명시>` — 자기 모듈 영역만
+- commit 직전 `git status --short` 로 staged 목록 자기 영역인지 확인
+- 다른 세션 파일이 staged 면 `git reset HEAD <그 파일>` 로 unstage
+- cowork-staging-lint (pre-commit) 가 모듈 ≥ 2 자동 차단
+
+### 7.5 임시 파일 누적 방지
+
+- `.commit-msg-*.txt` / `backup_*.sql` 등 임시 파일 → `.gitignore` 등록 (본 PR)
+- commit 메시지는 heredoc 으로 인라인 — 임시 파일 생성 X 권장
+
+### 7.6 .git lock
+
+- pre-commit hook 이 3분+ stale `.lock` 자동 정리 (PR-COWORK-LOCK 2d8a461)
+- 수동 정리: `rm -f .git/*.lock .git/refs/remotes/origin/*.lock` (본인 세션 작업 중일 때만)
+- lock 빈발 = 다른 세션 commit 진행 중 신호 → 1~3분 대기 후 재시도
+
+### 7.7 위반 시
+
+- commit 유실 / 공통 파일 섞임 / staging 침범 발생 → `harness-engineering/regression-cases/` 기록
+- 같은 부류 3회+ → 자동화 hook 신설 (Rule 15)
+
+---
+
+본 § 7 은 운영 중 엉킴 패턴 발생 시 갱신.

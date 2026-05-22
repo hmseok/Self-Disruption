@@ -65,3 +65,8 @@ UI-Pattern-Analysis.xlsx
 # harness-engineering — runtime-generated indices (regenerated each lint run)
 harness-engineering/knowledge/ui-coverage.json
 harness-engineering/knowledge/api-trace.json
+
+# cowork 멀티 세션 — 임시/백업 파일 (SESSIONS-COORDINATION § 7.5)
+.commit-msg-*.txt
+backup_*.sql
+backup_phase_*.sql
