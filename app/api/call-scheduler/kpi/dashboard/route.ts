@@ -49,7 +49,9 @@ type Granularity = 'day' | 'week' | 'month'
 //   · cs_response_ivr       — scenario '법정검사 대표번호'
 // '법정검사' 문자열 LIKE 매칭 기준 — CX 데이터(메리츠캐피탈·사고접수 등)는 보존.
 const CX_TEAM_LABEL = 'CX 컨택센터'      // 정상 CX 콜센터 부서명
-const LEGAL_KEYWORD = '%법정검사%'        // 법정검사 LIKE 패턴
+// 검사 업무(법정검사·검사대행·직검검사소·법정검사아웃콜 등) 전부 제외 — CX 콜센터만.
+// CX 스킬(사고접수·긴급출동)·캐피탈사엔 「검사」 글자가 없어 안전.
+const LEGAL_KEYWORD = '%검사%'
 
 // granularity + 기준일 → { from, to } (YYYY-MM-DD), 생산성 period_label
 function resolveRange(granularity: Granularity, base: Date): {

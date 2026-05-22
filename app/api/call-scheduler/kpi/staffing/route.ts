@@ -36,8 +36,8 @@ const isoOf = (d: Date) =>
 type Granularity = 'day' | 'week' | 'month'
 
 // ── 법정검사 데이터 제외 (KT 계정 공용 — CX WFM 산정에서 법정검사 분리) ──
-// dashboard route 와 동일 기준. '법정검사' 문자열 LIKE 매칭.
-const LEGAL_KEYWORD = '%법정검사%'
+// dashboard route 와 동일 기준. 검사 업무(법정검사·검사대행·직검검사소 등) LIKE 매칭.
+const LEGAL_KEYWORD = '%검사%'
 
 // granularity + 기준일 → { from, to } (YYYY-MM-DD) — dashboard route 패턴 재사용
 function resolveRange(granularity: Granularity, base: Date): { from: string; to: string } {
