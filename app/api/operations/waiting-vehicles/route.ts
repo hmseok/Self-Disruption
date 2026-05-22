@@ -3,34 +3,36 @@ import { verifyUser } from '@/lib/auth-server'
 import { prisma } from '@/lib/prisma'
 
 /**
- * GET /api/operations/waiting-vehicles — PR-C2b-1 (2026-05-16)
+ * GET /api/operations/waiting-vehicles — PR-C2b-1 (2026-05-16, C2b-1.1 cars 기준 수정)
  *
  * 「대기차량」 조회 — 사고 대차로 배차 가능한 보유 차량.
  *
  * 사용자 명시 (2026-05-16):
  *   「배차 시에는 대기차량을 선택하여 대차요청건과 연결되어야 하고」
- *   「배차 운영이 들어가면 대기차량도 확인되겠죠」
+ *   「cars 페이지 기준으로 하면 되는데」
+ *   「카페24 사고의 오더로 대기차량을 매칭하여 배차를 진행하는 것이고
+ *    fmi 차량 사고는 사고대차운영차량의 사고나 정비로 운영을 못하고
+ *    대기를 못하는 내용」
  *
- * 데이터 소스 (Researcher 조사 확정):
- *   fmi_vehicles 테이블 — status 컬럼
- *     available    사용 가능 (대기) — 배차 가능
- *     rented       대여 중 (fmi_rentals 배정됨)
- *     maintenance  정비 중
- *     washing      세차 중
- *     repair       수리 중
- *     inspection   검사 중
+ * 데이터 소스 (사용자 확정 — cars 페이지 기준):
+ *   cars 테이블 — status 컬럼
+ *     active    배차 가능 (대기) ← 배차 매칭 대상
+ *     rented    배차 중
+ *     accident  사고/정비 운영 불가 (대기 풀에서 제외)
+ *
+ *   /cars 페이지 (app/cars/CarList.tsx) 가 사용하는 GET /api/cars 와 동일 테이블.
  *
  * 모듈 책임 (CLAUDE.md Rule 21): operations 자기 모듈.
  * 읽기 전용 — DB write 없음.
  *
  * Query:
- *   ?status=available|rented|...|all   (default: available)
- *   ?q=검색어 (차량번호/차종/브랜드)
+ *   ?status=active|rented|accident|all   (default: active = 대기)
+ *   ?q=검색어 (차량번호/브랜드/모델/트림)
  */
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
-const ALLOWED_STATUS = ['available', 'rented', 'maintenance', 'washing', 'repair', 'inspection']
+const ALLOWED_STATUS = ['active', 'rented', 'accident']
 
 export async function GET(request: NextRequest) {
   try {
@@ -40,47 +42,44 @@ export async function GET(request: NextRequest) {
     }
 
     const url = new URL(request.url)
-    const statusInput = url.searchParams.get('status') || 'available'
+    const statusInput = url.searchParams.get('status') || 'active'
     const q = (url.searchParams.get('q') || '').trim()
 
     // status 화이트리스트 — 'all' 또는 허용값만
     const statusFilter =
       statusInput === 'all' ? null
       : ALLOWED_STATUS.includes(statusInput) ? statusInput
-      : 'available'
+      : 'active'
 
     const where: Record<string, unknown> = {}
     if (statusFilter) where.status = statusFilter
     if (q) {
       where.OR = [
-        { car_number: { contains: q } },
-        { car_type: { contains: q } },
-        { car_brand: { contains: q } },
-        { car_model: { contains: q } },
+        { number: { contains: q } },
+        { brand: { contains: q } },
+        { model: { contains: q } },
+        { trim: { contains: q } },
       ]
     }
 
-    const rows = await prisma.fmiVehicle.findMany({
+    const rows = await prisma.car.findMany({
       where,
       select: {
         id: true,
-        car_number: true,
-        car_type: true,
-        car_brand: true,
-        car_model: true,
-        car_year: true,
-        car_color: true,
+        number: true,
+        brand: true,
+        model: true,
+        trim: true,
+        year: true,
+        image_url: true,
         status: true,
-        ownership_type: true,
-        rental_company: true,
-        current_location: true,
+        location: true,
         mileage: true,
-        notes: true,
       },
-      orderBy: [{ status: 'asc' }, { car_number: 'asc' }],
+      orderBy: [{ status: 'asc' }, { created_at: 'desc' }],
       take: 500,
     }).catch((e: unknown) => {
-      // Rule 23 graceful fallback — 테이블 미적용 / 조회 실패
+      // Rule 23 graceful fallback — 조회 실패 시 빈 배열
       console.warn('[waiting-vehicles GET] query failed:', (e as Error)?.message?.slice(0, 200))
       return []
     })
@@ -88,7 +87,8 @@ export async function GET(request: NextRequest) {
     // 상태별 카운트 (UI 요약 strip 용)
     const counts: Record<string, number> = {}
     for (const r of rows) {
-      counts[r.status] = (counts[r.status] || 0) + 1
+      const s = r.status || 'unknown'
+      counts[s] = (counts[s] || 0) + 1
     }
 
     return NextResponse.json({
@@ -99,6 +99,7 @@ export async function GET(request: NextRequest) {
         total: rows.length,
         counts,
         filter: { status: statusInput, q },
+        source: 'cars 테이블 (/cars 페이지와 동일 — 사용자 확정 2026-05-16)',
       },
     })
   } catch (e: unknown) {

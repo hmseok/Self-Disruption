@@ -4,7 +4,7 @@ import { useState } from 'react'
 import AccidentIntakeTab from './_tabs/AccidentIntakeTab'
 import ScheduleTab from './_tabs/ScheduleTab'
 import ClaimsTab from './_tabs/ClaimsTab'
-import PlaceholderTab from './_tabs/PlaceholderTab'
+import WaitingTab from './_tabs/WaitingTab'
 
 // ═══════════════════════════════════════════════════════════════════
 // /operations — Phase 2 통합 페이지 (P2.1a)
@@ -78,19 +78,7 @@ export default function OperationsPage() {
 
         {tab === 'claims' && <ClaimsTab />}
 
-        {tab === 'waiting' && (
-          <PlaceholderTab
-            icon="🛠"
-            title="대기차량"
-            description="다음 사고 대기 차량 — 정비/세차 완료 후 가용 상태"
-            upcoming={[
-              'fmi_vehicles 상태별 list (사용가능/정비중/세차중)',
-              '정비/세차 완료 처리 → 사용가능',
-              '차량 가용성 일정 표 (예약 vs 가능)',
-              '간단 등록 (수동 추가)',
-            ]}
-          />
-        )}
+        {tab === 'waiting' && <WaitingTab />}
       </div>
     </div>
   )
