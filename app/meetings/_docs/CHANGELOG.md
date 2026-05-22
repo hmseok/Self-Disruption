@@ -6,6 +6,44 @@
 
 ## 2026-05-13
 
+### PR-MTG-V2-Todo-B — 캘린더 뷰 (표/캘린더 토글)
+
+**사용자 명령**: 「캘린더 뷰도 볼수있어야」 → 「ㄱㄱ」
+
+**범위**: `/meetings/me` 에 「📋 표 / 📅 캘린더」 토글. 캘린더는 회의 액션 + 개인 TODO 를 마감일(due_date) 기준 월 그리드에 표시.
+
+**신규 컴포넌트** — `app/meetings/_components/TodoCalendarView.tsx`:
+- 외부 라이브러리 없이 자체 date 계산 (6주 × 7일 그리드)
+- 이전/다음 달 + 「오늘」 버튼
+- 각 날짜 셀: 그 날 due_date 인 항목 (최대 4개 + 「+N건 더」)
+- 항목 색상: 회의 액션(파랑) / 개인 TODO(보라) / 지연(빨강)
+- 완료 항목 line-through + opacity
+- 항목 클릭 → onItemClick
+- 오늘 셀 강조 (primary border)
+- 일요일 빨강 / 토요일 파랑
+- 범례 + 「마감일 미정 N건」 표시
+
+**`/meetings/me` 통합**:
+- `viewMode` state ('table' | 'calendar')
+- DcToolbar trailing 에 표/캘린더 토글 (segmented control)
+- viewMode 분기: table → NeuDataTable / calendar → TodoCalendarView
+- 캘린더 항목 클릭: 회의 액션 → /meetings/[id] / 개인 TODO → startEdit (편집 폼)
+- 검색 / source / category 필터는 캘린더에도 적용 (filtered 공용)
+
+**Rule 8 시뮬레이션**:
+- /meetings/me → 「📅 캘린더」 토글 → 월 그리드
+- 마감일 있는 항목이 해당 날짜 셀에 표시
+- 항목 클릭 → 회의록 이동 또는 개인 TODO 편집
+- 이전/다음 달 네비 → 다른 월 표시
+
+**Rule 13**: 외부 라이브러리 없음 (자체 구현)
+**Rule 14**: 회의 액션 + 개인 TODO 통합 (V2-Todo-A 와 동일 UnifiedItem)
+**Rule 21**: 자기 모듈 (meetings) / **Rule 22**: 본 CHANGELOG
+
+**GATE**: G3 GO ✓ / G5 tsc PASS / G6 lint 새 위반 0건 (토큰화 후)
+
+---
+
 ### hotfix #5 — 개인 TODO 편집 UI + 카테고리 강화
 
 **사용자 보고**:

@@ -7,6 +7,7 @@ import { fmtDate } from '@/lib/format'
 import DcStatStrip, { StatItem } from '@/app/components/DcStatStrip'
 import DcToolbar from '@/app/components/DcToolbar'
 import NeuDataTable, { TableColumn } from '@/app/components/NeuDataTable'
+import TodoCalendarView from '../_components/TodoCalendarView'
 
 // ═══════════════════════════════════════════════════════════════
 // 내 TODO 대시보드 — /meetings/me (PR-MTG-V2-Me → V2-Todo-A)
@@ -63,6 +64,7 @@ export default function MyTodoPage() {
   const [sourceFilter, setSourceFilter] = useState<'all' | 'meeting' | 'personal'>('all')
   const [categoryFilter, setCategoryFilter] = useState<string>('all')
   const [migrationPending, setMigrationPending] = useState(false)
+  const [viewMode, setViewMode] = useState<'table' | 'calendar'>('table')
 
   // 개인 TODO 추가/편집 폼 — editingId null = 신규, id = 편집
   const [showAdd, setShowAdd] = useState(false)
@@ -466,10 +468,38 @@ export default function MyTodoPage() {
                 {usedCategories.map(c => <option key={c} value={c}>📂 {c}</option>)}
               </select>
             )}
+            {/* 표 / 캘린더 토글 (PR-V2-Todo-B) */}
+            <div style={{ display: 'flex', gap: 2, padding: 2, borderRadius: 8, background: 'rgba(0,0,0,0.04)' }}>
+              {([['table', '📋 표'], ['calendar', '📅 캘린더']] as const).map(([v, label]) => (
+                <button key={v} onClick={() => setViewMode(v)}
+                  style={{
+                    padding: '5px 12px', fontSize: 11, fontWeight: 700, borderRadius: 6,
+                    border: 'none', cursor: 'pointer', whiteSpace: 'nowrap',
+                    background: viewMode === v ? '#fff' : 'transparent',
+                    color: viewMode === v ? COLORS.primary : COLORS.textMuted,
+                    boxShadow: viewMode === v ? '0 1px 3px rgba(0,0,0,0.10)' : 'none',
+                  }}>
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
         }
       />
 
+      {viewMode === 'calendar' ? (
+        <TodoCalendarView
+          items={filtered}
+          onItemClick={(it) => {
+            if (it.source === 'meeting' && it.meeting_id) {
+              router.push(`/meetings/${it.meeting_id}`)
+            } else if (it.source === 'personal') {
+              const full = items.find(x => x.source === 'personal' && x.id === it.id)
+              if (full) startEdit(full)
+            }
+          }}
+        />
+      ) : (
       <NeuDataTable<UnifiedItem>
         columns={columns}
         data={filtered}
@@ -509,6 +539,7 @@ export default function MyTodoPage() {
           ),
         }}
       />
+      )}
 
       {/* 토스트 */}
       <div style={{
