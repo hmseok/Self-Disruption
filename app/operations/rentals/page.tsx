@@ -193,7 +193,7 @@ export default function RentalsDashboardPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-xl font-bold text-slate-800">배반차 스케줄</h1>
-            <p className="text-xs text-slate-500 mt-1">fmi_rentals — 배차·반차·청구·정산 통합 현황</p>
+            <p className="text-xs text-slate-500 mt-1">배차 · 반차 · 청구 · 정산 통합 현황</p>
           </div>
           <div className="flex gap-2">
             <a href="/operations?dispatch_type=replacement&new=1"
@@ -374,7 +374,7 @@ export default function RentalsDashboardPage() {
         </div>
 
         <div className="text-[10px] text-slate-400 text-center pt-2">
-          fmi_rentals {rentals.length}건 표시 · 상태/플릿/검색 필터 적용 결과
+          대차 {rentals.length}건 표시 · 상태/그룹/검색 필터 적용 결과
         </div>
       </div>
 

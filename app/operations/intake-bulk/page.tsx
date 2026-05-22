@@ -205,7 +205,7 @@ export default function IntakeBulkPage() {
           <div>
             <h1 className="text-2xl font-bold text-slate-800">배차·대차 엑셀 일괄 인테이크</h1>
             <p className="text-sm text-slate-600 mt-1">
-              마춤카 / 빌려타 / 부가세(캐피탈) / 따봉 시트를 업로드하면 <span className="font-semibold">fmi_vehicles + fmi_accidents + fmi_rentals</span>로 자동 인테이크됩니다.
+              마춤카 / 빌려타 / 부가세(캐피탈) / 따봉 시트를 업로드하면 <span className="font-semibold">차량 · 사고 · 대차 정보</span>가 자동으로 등록됩니다.
             </p>
           </div>
           <a href="/operations" className="text-sm text-blue-600 hover:underline">← 운영 대시보드</a>
@@ -253,7 +253,7 @@ export default function IntakeBulkPage() {
                 </select>
               </div>
               <div>
-                <label className="text-xs text-slate-600">Fleet (fmi_vehicles.rental_company)</label>
+                <label className="text-xs text-slate-600">차량 그룹 (소속)</label>
                 <select
                   value={fleet}
                   onChange={(e) => setFleet(e.target.value as FleetGroup)}
