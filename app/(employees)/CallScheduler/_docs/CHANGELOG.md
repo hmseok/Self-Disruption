@@ -3,6 +3,13 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-22 (Phase CX-KPI-7) — KT 엑셀 다중 업로드 + 자동 종류 판별
+
+- `kpi/page.tsx` 업로드 탭 개편 — 「종류 선택 → 파일 1개」 단일 업로드를 다중 업로드로 대체. `<input multiple>` + 드래그앤드롭으로 4종 엑셀을 한 번에 업로드.
+- 자동 종류 판별 2단계: 1차 파일명 패턴(상담이력/생산성/응대현황+IVR/큐), 2차 헤더 컬럼(콜키·상담사명(ID)·착신전화번호+시나리오명·스킬+서비스레벨(%)). 판별 실패 시 파일별 「종류 직접 선택」 드롭다운.
+- 파일별 미리보기 카드 — 파일명·자동 판별 종류 배지(판별 방식 표기)·행수·기간·매칭 요약. 「전체 적용」 버튼 1개로 각 파일을 맞는 API(`upload-call-records`/`upload-productivity`/`upload-response`)에 mode:'apply' POST(Promise.all). 결과는 글래스 패널(규칙 20).
+- 4종 업로드 API 는 수정 없이 재사용. response API 만 body 에 `kind` 분기.
+
 ## 2026-05-22 (Phase CX-KPI-6) — 응대현황 (IVR + 큐)
 
 - KT 응대현황(IVR)·응대현황(큐) 2종 엑셀 업로드 추가 (migrations: 2026-05-22_cs_response.sql — cs_response_ivr / cs_response_queue).
