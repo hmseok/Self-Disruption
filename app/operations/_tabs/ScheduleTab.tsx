@@ -285,7 +285,7 @@ export default function ScheduleTab() {
       />
       {err && (
         <div style={{ ...GLASS.L3, marginBottom: 12, padding: 12, borderRadius: 10, border: '1px solid rgba(245,158,11,0.3)', fontSize: 12, color: '#b45309' }}>
-          ⚠ 부분 데이터: {err} (dispatch_order 은 표시됩니다)
+          ⚠ 일부 정보 표시 제한: {err} (배차 진행 건은 정상 표시됩니다)
         </div>
       )}
       <NeuDataTable
@@ -308,11 +308,8 @@ export default function ScheduleTab() {
         mobileCard={mobileCard}
         defaultSort={{ key: 'created', dir: 'desc' }}
       />
-      {/* PR-C1 안내 (사용자가 다음 단계 작업 인지하도록) */}
-      <div style={{ marginTop: 16, padding: '12px 14px', background: 'rgba(99,102,241,0.05)', border: '1px dashed rgba(99,102,241,0.3)', borderRadius: 10, fontSize: 12, color: '#475569' }}>
-        ℹ️ PR-C1: 배차 모니터링 list. 행 클릭 시 사고 상세로 이동합니다.
-        <br />
-        다음 단계 (PR-C2): 대기차량 선택 → 대차요청 연결 + 사고요약·고객상담·일정폼 통합 화면 (사용자 검수 후 진행)
+      <div style={{ marginTop: 12, fontSize: 12, color: '#64748b' }}>
+        💡 행을 클릭하면 사고 상세 화면이 열리고, 하단 배차 처리 패널에서 대기차량 배정·상담·일정을 이어서 진행할 수 있습니다.
       </div>
     </div>
   )

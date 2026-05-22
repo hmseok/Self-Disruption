@@ -424,7 +424,7 @@ export default function DispatchDetailPage({
 
   // ── 새 상담 POST ──
   const submitConsultation = useCallback(async () => {
-    if (!dispatchOrder?.id) return showResult({ type: 'err', text: '먼저 dispatch_order 저장 후 상담 추가' })
+    if (!dispatchOrder?.id) return showResult({ type: 'err', text: '먼저 배차 정보를 저장한 후 상담을 추가하세요' })
     const note = newNote.trim()
     if (!note) return showResult({ type: 'err', text: '상담 내용을 입력하세요' })
     if (note.length > 5000) return showResult({ type: 'err', text: '5000자 이내' })
@@ -439,7 +439,7 @@ export default function DispatchDetailPage({
       const json = await res.json().catch(() => ({}))
       if (json?._migration_pending) {
         setMigrationPending(true)
-        return showResult({ type: 'err', text: 'consultations 테이블 미적용' })
+        return showResult({ type: 'err', text: '상담 기능이 아직 준비되지 않았습니다 (관리자 문의)' })
       }
       if (json?.error) return showResult({ type: 'err', text: json.error })
       const newRow: Consultation = {
@@ -480,7 +480,7 @@ export default function DispatchDetailPage({
         })
         const json = await res.json()
         if (json.error) throw new Error(json.error)
-        showResult({ type: 'ok', text: 'dispatch_order 수정 완료' })
+        showResult({ type: 'ok', text: '배차 정보 수정 완료' })
         await fetchOrder()
       } else {
         const res = await fetch('/api/operations/dispatch-orders', {
@@ -499,7 +499,7 @@ export default function DispatchDetailPage({
         })
         const json = await res.json()
         if (json.error) throw new Error(json.error)
-        showResult({ type: 'ok', text: 'dispatch_order 신설 완료 — 이제 상담 추가 가능' })
+        showResult({ type: 'ok', text: '배차 정보 등록 완료 — 이제 상담을 추가할 수 있습니다' })
         await fetchOrder()
       }
     } catch (e: any) {
@@ -515,7 +515,7 @@ export default function DispatchDetailPage({
     const vehicleMsg = selectedVehicle
       ? `\n배차 차량: ${selectedVehicle.number || '-'} (${[selectedVehicle.brand, selectedVehicle.model].filter(Boolean).join(' ')})`
       : '\n⚠ 배차 차량 미선택 — 차량 없이 확정됩니다 (나중에 선택 가능)'
-    if (!window.confirm(`배차 확정 시 fmi_rentals row 가 생성/갱신됩니다.${vehicleMsg}\n진행할까요?`)) return
+    if (!window.confirm(`배차 확정 시 대차 기록이 생성/갱신됩니다.${vehicleMsg}\n진행할까요?`)) return
     setBusy(true)
     try {
       const headers = { ...(await getAuthHeader()), 'Content-Type': 'application/json' }
@@ -537,7 +537,7 @@ export default function DispatchDetailPage({
       if (json.error) throw new Error(json.error)
       showResult({
         type: 'ok',
-        text: `배차 확정 완료 — fmi_rental ${json.mode === 'create' ? '신설' : '갱신'}`
+        text: `배차 확정 완료 — 대차 기록 ${json.mode === 'create' ? '신설' : '갱신'}`
           + (selectedVehicle ? ` / ${selectedVehicle.number} 배차중 전환` : ''),
       })
       await fetchOrder()
@@ -1246,7 +1246,7 @@ export default function DispatchDetailPage({
               )}
               {!dispatchOrder && (
                 <span style={{ fontSize: 11, color: '#94a3b8' }}>
-                  ※ 대차요청 dispatch_order 미생성 — 저장 시 새로 생성됩니다
+                  ※ 아직 배차 정보가 없습니다 — 저장 시 새로 등록됩니다
                 </span>
               )}
               {/* 요약 — 접혔을 때 한 줄로 보임 */}

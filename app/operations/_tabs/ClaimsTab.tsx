@@ -412,10 +412,6 @@ export default function ClaimsTab() {
         </div>
       )}
 
-      {/* PR-D 안내 */}
-      <div style={{ marginTop: 16, padding: '12px 14px', background: 'rgba(99,102,241,0.05)', border: '1px dashed rgba(99,102,241,0.3)', borderRadius: 10, fontSize: 12, color: '#475569' }}>
-        ℹ️ PR-D1+D2: 청구 대상 list + 청구 작성 (청구액·보험접수번호 / 청구 확정 / 정산 완료). 다음 — PR-D3 입금% 동적 계산 (transactions JOIN).
-      </div>
     </div>
   )
 }
