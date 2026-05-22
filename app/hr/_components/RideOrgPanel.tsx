@@ -66,6 +66,22 @@ const TONE: Record<string, { dot: string; bg: string; bd: string; tx: string }> 
 const tone = (t: string | null | undefined) => TONE[t || 'slate'] || TONE.slate
 const TONE_KEYS = ['blue', 'green', 'red', 'amber', 'violet', 'slate'] as const
 
+// ride_employees.color_tone 옵션 (API COLOR_TONES 와 일치)
+const EMP_TONE_KEYS = ['none', 'blue', 'gray', 'green', 'amber', 'violet', 'red'] as const
+const EMPLOYMENT_TYPES = ['정규', '계약', '파트', '용역', '프리'] as const
+
+// ─── 직원 편집/등록 폼 (PR-HR-4) ───────────────────────────────────
+type EmpForm = {
+  name: string; position: string; promotion_target: string; employment_type: string
+  hire_date: string; resign_date: string; phone: string; email: string
+  department_id: string; color_tone: string; memo: string; is_active: boolean
+}
+const EMP_FORM_EMPTY: EmpForm = {
+  name: '', position: '', promotion_target: '', employment_type: '',
+  hire_date: '', resign_date: '', phone: '', email: '',
+  department_id: '', color_tone: 'none', memo: '', is_active: true,
+}
+
 async function authHeader(): Promise<Record<string, string>> {
   const token = auth.currentUser ? await auth.currentUser.getIdToken() : null
   return token ? { Authorization: `Bearer ${token}` } : {}
@@ -127,6 +143,11 @@ export default function RideOrgPanel() {
     { name: '', parent_id: '', color_tone: 'slate' }
   )
   const [savingDept, setSavingDept] = useState(false)
+
+  // ─── 직원 편집/등록 모달 상태 (PR-HR-4) ──────────────────────────
+  const [empModal, setEmpModal] = useState<RideEmp | 'new' | null>(null)
+  const [empForm, setEmpForm] = useState<EmpForm>(EMP_FORM_EMPTY)
+  const [savingEmp, setSavingEmp] = useState(false)
 
   // ─── 데이터 로드 ──────────────────────────────────────────────────
   const load = useCallback(async () => {
@@ -353,6 +374,80 @@ export default function RideOrgPanel() {
     }
   }
 
+  // ─── 직원 편집/등록 (PR-HR-4) ────────────────────────────────────
+  const openEmpModal = (target: RideEmp | 'new') => {
+    if (target === 'new') {
+      setEmpForm({ ...EMP_FORM_EMPTY, department_id: selectedDeptId || '' })
+    } else {
+      setEmpForm({
+        name: target.name || '', position: target.position || '',
+        promotion_target: target.promotion_target || '',
+        employment_type: target.employment_type || '',
+        hire_date: target.hire_date || '', resign_date: target.resign_date || '',
+        phone: target.phone || '', email: target.email || '',
+        department_id: target.department_id || '', color_tone: target.color_tone || 'none',
+        memo: '', is_active: target.is_active,
+      })
+    }
+    setEmpModal(target)
+  }
+  const saveEmp = async () => {
+    if (!empForm.name.trim()) { setResult({ ok: false, title: '이름 필수', lines: ['직원 이름을 입력해주세요.'] }); return }
+    setSavingEmp(true)
+    try {
+      const h = await authHeader()
+      const isNew = empModal === 'new'
+      const body: Record<string, any> = {
+        name: empForm.name.trim(),
+        position: empForm.position || null,
+        promotion_target: empForm.promotion_target || null,
+        employment_type: empForm.employment_type || null,
+        hire_date: empForm.hire_date || null,
+        resign_date: empForm.resign_date || null,
+        phone: empForm.phone || null,
+        email: empForm.email || null,
+        department_id: empForm.department_id || null,
+        color_tone: empForm.color_tone,
+      }
+      if (!isNew) body.is_active = empForm.is_active
+      const url = isNew ? '/api/ride-employees' : `/api/ride-employees/${(empModal as RideEmp).id}`
+      const res = await fetch(url, {
+        method: isNew ? 'POST' : 'PATCH',
+        headers: { ...h, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const json = await res.json()
+      if (json.error) {
+        setResult({ ok: false, title: isNew ? '직원 등록 실패' : '직원 수정 실패', lines: [json.error] })
+        return
+      }
+      setResult({ ok: true, title: isNew ? '✅ 직원 등록' : '✅ 직원 수정',
+        lines: [`「${empForm.name.trim()}」 ${isNew ? '등록' : '수정'} 완료`] })
+      setEmpModal(null)
+      await load()
+    } catch (e: any) {
+      setResult({ ok: false, title: '저장 오류', lines: [e?.message || '네트워크 오류'] })
+    } finally {
+      setSavingEmp(false)
+    }
+  }
+  const deleteEmp = async () => {
+    if (empModal === 'new' || !empModal) return
+    const emp = empModal as RideEmp
+    if (!confirm(`「${emp.name}」 직원을 퇴사 처리(비활성)하시겠습니까?`)) return
+    try {
+      const h = await authHeader()
+      const res = await fetch(`/api/ride-employees/${emp.id}`, { method: 'DELETE', headers: h })
+      const json = await res.json()
+      if (json.error) { setResult({ ok: false, title: '퇴사 처리 실패', lines: [json.error] }); return }
+      setResult({ ok: true, title: '✅ 퇴사 처리', lines: [`「${emp.name}」 비활성 처리됨 (resign_date 기록)`] })
+      setEmpModal(null)
+      await load()
+    } catch (e: any) {
+      setResult({ ok: false, title: '퇴사 처리 오류', lines: [e?.message || '네트워크 오류'] })
+    }
+  }
+
   // ─── NeuDataTable 컬럼 (Rule 18 — 모든 컬럼 sortBy) ────────────────
   const columns: TableColumn<RideEmp>[] = [
     {
@@ -452,6 +547,14 @@ export default function RideOrgPanel() {
     </select>
   )
 
+  const labelStyle: React.CSSProperties = {
+    fontSize: 11, fontWeight: 600, color: '#64748b', display: 'block', marginBottom: 3,
+  }
+  const fieldInput: React.CSSProperties = {
+    width: '100%', fontSize: 12, padding: '6px 9px', borderRadius: 7,
+    border: '1px solid rgba(0,0,0,0.12)', boxSizing: 'border-box',
+  }
+
   // ─── 렌더 ─────────────────────────────────────────────────────────
   if (loading) {
     return (
@@ -503,7 +606,8 @@ export default function RideOrgPanel() {
         <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 10 }}>
           라이드케어(외주) 직원 — 본 ERP 계정 X. 부서/조직 마스터는 여기서 관리, 회의록·근무스케줄과 연동.
         </div>
-        <DcStatStrip stats={stats} />
+        <DcStatStrip stats={stats}
+          actions={[{ label: '신규 직원', icon: '+', onClick: () => openEmpModal('new') }]} />
       </div>
 
       {/* 본문 — 좌측 트리 + 우측 테이블 */}
@@ -710,6 +814,7 @@ export default function RideOrgPanel() {
             columns={columns}
             data={filteredEmps}
             rowKey={(r) => r.id}
+            onRowClick={(r) => openEmpModal(r)}
             emptyIcon="🚗"
             emptyMessage={selectedDept ? `${selectedDept.name} 부서에 직원이 없습니다` : '등록된 라이드 인력이 없습니다'}
             defaultSort={{ key: 'name', dir: 'asc' }}
@@ -717,6 +822,119 @@ export default function RideOrgPanel() {
           />
         </div>
       </div>
+
+      {/* 직원 편집/등록 모달 (PR-HR-4) */}
+      {empModal && (
+        <div onClick={() => setEmpModal(null)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.45)', zIndex: 1000,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+          <div onClick={(e) => e.stopPropagation()}
+            style={{ background: '#fff', borderRadius: 14, padding: 22, width: 520, maxWidth: '100%',
+              maxHeight: '88vh', overflowY: 'auto', boxShadow: '0 12px 40px rgba(0,0,0,0.2)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <h3 style={{ fontSize: 15, fontWeight: 700, color: '#1e293b', margin: 0 }}>
+                {empModal === 'new' ? '🚗 라이드 인력 등록' : `✏️ ${(empModal as RideEmp).name} 정보 수정`}
+              </h3>
+              <button onClick={() => setEmpModal(null)}
+                style={{ fontSize: 16, color: '#94a3b8', background: 'none', border: 'none', cursor: 'pointer' }}>✕</button>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label style={labelStyle}>이름 *</label>
+                <input value={empForm.name} autoFocus
+                  onChange={(e) => setEmpForm({ ...empForm, name: e.target.value })} style={fieldInput} />
+              </div>
+              <div>
+                <label style={labelStyle}>부서</label>
+                <select value={empForm.department_id} style={fieldInput}
+                  onChange={(e) => setEmpForm({ ...empForm, department_id: e.target.value })}>
+                  <option value="">— 미배정 —</option>
+                  {flatTree.map(({ node, depth }) => (
+                    <option key={node.id} value={node.id}>{' '.repeat(depth * 2)}{node.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label style={labelStyle}>직급</label>
+                <input value={empForm.position} placeholder="과장 / 대리 / 사원 등"
+                  onChange={(e) => setEmpForm({ ...empForm, position: e.target.value })} style={fieldInput} />
+              </div>
+              <div>
+                <label style={labelStyle}>승진 대상 (선택)</label>
+                <input value={empForm.promotion_target} placeholder="예: 주임 / 과장"
+                  onChange={(e) => setEmpForm({ ...empForm, promotion_target: e.target.value })} style={fieldInput} />
+              </div>
+              <div>
+                <label style={labelStyle}>고용형태</label>
+                <select value={empForm.employment_type} style={fieldInput}
+                  onChange={(e) => setEmpForm({ ...empForm, employment_type: e.target.value })}>
+                  <option value="">— 선택 —</option>
+                  {EMPLOYMENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={labelStyle}>입사일</label>
+                <input type="date" value={empForm.hire_date}
+                  onChange={(e) => setEmpForm({ ...empForm, hire_date: e.target.value })} style={fieldInput} />
+              </div>
+              <div>
+                <label style={labelStyle}>퇴사일</label>
+                <input type="date" value={empForm.resign_date}
+                  onChange={(e) => setEmpForm({ ...empForm, resign_date: e.target.value })} style={fieldInput} />
+              </div>
+              <div>
+                <label style={labelStyle}>연락처</label>
+                <input value={empForm.phone}
+                  onChange={(e) => setEmpForm({ ...empForm, phone: e.target.value })} style={fieldInput} />
+              </div>
+              <div>
+                <label style={labelStyle}>이메일</label>
+                <input value={empForm.email}
+                  onChange={(e) => setEmpForm({ ...empForm, email: e.target.value })} style={fieldInput} />
+              </div>
+              <div>
+                <label style={labelStyle}>색상 태그</label>
+                <select value={empForm.color_tone} style={fieldInput}
+                  onChange={(e) => setEmpForm({ ...empForm, color_tone: e.target.value })}>
+                  {EMP_TONE_KEYS.map(k => <option key={k} value={k}>{k}</option>)}
+                </select>
+              </div>
+              {empModal !== 'new' && (
+                <div style={{ display: 'flex', alignItems: 'flex-end', paddingBottom: 6 }}>
+                  <label style={{ fontSize: 12, color: '#475569', display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                    <input type="checkbox" checked={empForm.is_active}
+                      onChange={(e) => setEmpForm({ ...empForm, is_active: e.target.checked })} />
+                    재직 중 (활성)
+                  </label>
+                </div>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', gap: 8, marginTop: 18, alignItems: 'center' }}>
+              {empModal !== 'new' && (
+                <button onClick={deleteEmp}
+                  style={{ fontSize: 12, fontWeight: 600, color: '#dc2626', background: 'rgba(239,68,68,0.08)',
+                    border: '1px solid rgba(239,68,68,0.25)', borderRadius: 8, padding: '7px 14px', cursor: 'pointer' }}>
+                  퇴사 처리
+                </button>
+              )}
+              <div style={{ display: 'flex', gap: 8, marginLeft: 'auto' }}>
+                <button onClick={() => setEmpModal(null)}
+                  style={{ fontSize: 12, fontWeight: 600, color: '#64748b', background: '#fff',
+                    border: '1px solid rgba(0,0,0,0.10)', borderRadius: 8, padding: '7px 16px', cursor: 'pointer' }}>
+                  취소
+                </button>
+                <button onClick={saveEmp} disabled={savingEmp}
+                  style={{ fontSize: 12, fontWeight: 600, color: '#fff', background: savingEmp ? '#94a3b8' : '#0f2440',
+                    border: 'none', borderRadius: 8, padding: '7px 18px', cursor: savingEmp ? 'not-allowed' : 'pointer' }}>
+                  {savingEmp ? '저장 중...' : (empModal === 'new' ? '등록' : '저장')}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

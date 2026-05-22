@@ -448,8 +448,9 @@ export default function HRMasterPage() {
   useEffect(() => {
     if (topTab === 'invitations' && ['admin', 'master'].includes(role || '')) loadInvitations()
   }, [topTab, role])
+  // PR-HR-3b — 마운트 시부터 로드 (탭 클릭 전에도 「외부 인력」 + 서브탭 카운트 즉시 표시)
   useEffect(() => {
-    if (topTab === 'external') loadExternal()
+    loadExternal()
   }, [topTab])
   // 모달의 § 페이지 권한 섹션이 처음 활성화되면 권한 데이터 prefetch
   useEffect(() => {
