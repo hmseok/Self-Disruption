@@ -48,7 +48,15 @@ export async function POST(
       daily_rate,
       adjuster_name,
       adjuster_phone,
+      mode,                         // PR-L — 'reserve'(예약) | 'now'(바로 배차)
     } = body || {}
+
+    // PR-L (2026-05-16) — 예약 vs 바로 배차 분기
+    //   reserve : 미래 일정 예약 → dispatch_order=scheduled / fmi_rental=pending
+    //   now     : 즉시 배차      → dispatch_order=dispatched / fmi_rental=dispatched
+    const isReserve = mode === 'reserve'
+    const orderStatus = isReserve ? 'scheduled' : 'dispatched'
+    const rentalStatus = isReserve ? 'pending' : 'dispatched'
 
     // 1. dispatch_order 조회
     const orders = await prisma.$queryRawUnsafe<Array<any>>(
@@ -85,7 +93,7 @@ export async function POST(
       fmiRentalId = order.fmi_rental_id
       await prisma.$executeRawUnsafe(
         `UPDATE fmi_rentals
-            SET status = 'dispatched',
+            SET status = ?,
                 customer_name = COALESCE(?, customer_name),
                 customer_phone = COALESCE(?, customer_phone),
                 customer_car_number = COALESCE(?, customer_car_number),
@@ -99,6 +107,7 @@ export async function POST(
                 vehicle_id = COALESCE(?, vehicle_id),
                 updated_at = NOW()
           WHERE id = ?`,
+        rentalStatus,
         finalCustomerName, finalCustomerPhone, customer_car_number || null,
         finalInsuranceCo, finalClaimNo,
         finalDispatchDate, finalReturnDate,
@@ -118,24 +127,26 @@ export async function POST(
          VALUES (?, ?, ?, ?, ?,
                  ?, ?, ?, ?,
                  ?, ?, ?,
-                 'dispatched', NOW(), NOW())`,
+                 ?, NOW(), NOW())`,
         fmiRentalId,
         vehicle_id || null,
         finalCustomerName, finalCustomerPhone, customer_car_number || null,
         finalInsuranceCo, finalClaimNo,
         adjuster_name || null, adjuster_phone || null,
         finalDispatchDate, finalReturnDate, daily_rate || null,
+        rentalStatus,
       )
     }
 
-    // 4. dispatch_order 연결 + status='dispatched'
+    // 4. dispatch_order 연결 + status (예약=scheduled / 바로=dispatched)
     await prisma.$executeRawUnsafe(
       `UPDATE operations_dispatch_orders
           SET fmi_rental_id = ?,
-              status = 'dispatched',
+              status = ?,
               updated_by = ?
         WHERE id = ?`,
       fmiRentalId,
+      orderStatus,
       user.id || null,
       id,
     )
@@ -164,7 +175,8 @@ export async function POST(
       ride_accident_id: order.ride_accident_id,
       vehicle_id: vehicle_id || null,
       mode: order.fmi_rental_id ? 'update' : 'create',
-      message: `배차 확정 완료 — fmi_rental ${order.fmi_rental_id ? '갱신' : '신설'}`,
+      dispatch_mode: isReserve ? 'reserve' : 'now',
+      message: isReserve ? '예약 배차 완료 — 배차예정 상태' : '바로 배차 완료 — 배차완료 상태',
     })
   } catch (e: any) {
     console.error('[dispatch-orders confirm]', e)

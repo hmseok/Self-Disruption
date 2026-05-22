@@ -509,13 +509,21 @@ export default function DispatchDetailPage({
     }
   }
 
-  const confirmDispatch = async () => {
+  // PR-L (2026-05-16) — 예약(reserve) / 바로 배차(now) 분기
+  const confirmDispatch = async (dispatchMode: 'reserve' | 'now') => {
     if (!dispatchOrder || !row) return
-    // PR-C2b-3 (2026-05-16) — 선택한 대기차량을 fmi_rentals 에 연결 + cars.status='rented'
+    // 예약은 예상 배차일 필수
+    if (dispatchMode === 'reserve' && !expDispatch) {
+      showResult({ type: 'err', text: '예약 배차는 예상 배차일을 먼저 입력하세요' })
+      return
+    }
     const vehicleMsg = selectedVehicle
       ? `\n배차 차량: ${selectedVehicle.number || '-'} (${[selectedVehicle.brand, selectedVehicle.model].filter(Boolean).join(' ')})`
-      : '\n⚠ 배차 차량 미선택 — 차량 없이 확정됩니다 (나중에 선택 가능)'
-    if (!window.confirm(`배차 확정 시 대차 기록이 생성/갱신됩니다.${vehicleMsg}\n진행할까요?`)) return
+      : '\n⚠ 배차 차량 미선택 — 차량 없이 진행됩니다 (나중에 선택 가능)'
+    const modeMsg = dispatchMode === 'reserve'
+      ? `📅 예약 배차 (예상일 ${expDispatch})`
+      : '🚀 바로 배차 (오늘 출고)'
+    if (!window.confirm(`${modeMsg}${vehicleMsg}\n진행할까요?`)) return
     setBusy(true)
     try {
       const headers = { ...(await getAuthHeader()), 'Content-Type': 'application/json' }
@@ -523,13 +531,16 @@ export default function DispatchDetailPage({
         method: 'POST',
         headers,
         body: JSON.stringify({
+          mode: dispatchMode,
           vehicle_id: selectedVehicle?.id || null,
           customer_name: row.cars_user || row.otptcanm,
           customer_phone: row.otptcahp,
           customer_car_number: row.cars_no,
           insurance_company: row.otpttobm,
           insurance_claim_no: row.otpttobn || row.otptacbn,
-          dispatch_date: expDispatch || new Date().toISOString().slice(0, 10),
+          dispatch_date: dispatchMode === 'reserve'
+            ? expDispatch
+            : new Date().toISOString().slice(0, 10),
           expected_return_date: expReturn || null,
         }),
       })
@@ -537,12 +548,12 @@ export default function DispatchDetailPage({
       if (json.error) throw new Error(json.error)
       showResult({
         type: 'ok',
-        text: `배차 확정 완료 — 대차 기록 ${json.mode === 'create' ? '신설' : '갱신'}`
-          + (selectedVehicle ? ` / ${selectedVehicle.number} 배차중 전환` : ''),
+        text: (json.message || '배차 처리 완료')
+          + (selectedVehicle ? ` / ${selectedVehicle.number}` : ''),
       })
       await fetchOrder()
     } catch (e: any) {
-      showResult({ type: 'err', text: e?.message || '배차 확정 실패' })
+      showResult({ type: 'err', text: e?.message || '배차 처리 실패' })
     } finally {
       setBusy(false)
     }
@@ -1281,24 +1292,37 @@ export default function DispatchDetailPage({
                 💾 {dispatchOrder ? '수정' : '저장'}
               </button>
               {dispatchOrder && dispatchOrder.status !== 'dispatched' && dispatchOrder.status !== 'done' && (
-                <button
-                  onClick={confirmDispatch}
-                  disabled={busy}
-                  style={{
-                    padding: '8px 16px',
-                    background: 'linear-gradient(135deg, #10b981, #059669)',
-                    color: '#fff',
-                    border: 'none',
-                    borderRadius: 8,
-                    cursor: busy ? 'not-allowed' : 'pointer',
-                    fontWeight: 800,
-                    fontSize: 12,
-                    whiteSpace: 'nowrap',
-                    opacity: busy ? 0.5 : 1,
-                  }}
-                >
-                  🚀 배차 확정
-                </button>
+                <>
+                  {/* PR-L — 예약 / 바로 배차 분리 */}
+                  <button
+                    onClick={() => confirmDispatch('reserve')}
+                    disabled={busy}
+                    style={{
+                      padding: '8px 14px',
+                      background: 'linear-gradient(135deg, #6366f1, #4f46e5)',
+                      color: '#fff', border: 'none', borderRadius: 8,
+                      cursor: busy ? 'not-allowed' : 'pointer',
+                      fontWeight: 800, fontSize: 12, whiteSpace: 'nowrap',
+                      opacity: busy ? 0.5 : 1,
+                    }}
+                  >
+                    📅 예약 배차
+                  </button>
+                  <button
+                    onClick={() => confirmDispatch('now')}
+                    disabled={busy}
+                    style={{
+                      padding: '8px 14px',
+                      background: 'linear-gradient(135deg, #10b981, #059669)',
+                      color: '#fff', border: 'none', borderRadius: 8,
+                      cursor: busy ? 'not-allowed' : 'pointer',
+                      fontWeight: 800, fontSize: 12, whiteSpace: 'nowrap',
+                      opacity: busy ? 0.5 : 1,
+                    }}
+                  >
+                    🚀 바로 배차
+                  </button>
+                </>
               )}
               {/* PR-C3 — 출고 처리 (배차 확정 = fmi_rental 연결 후 활성) */}
               {dispatchOrder?.fmi_rental_id && dispatchOrder.status !== 'done' && (
