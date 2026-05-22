@@ -1206,17 +1206,20 @@ export default function DispatchDetailPage({
          - mode=schedule URL 쿼리 시 자동 펼침 (배차스케줄 list 진입)
          - 접힘 시 최소 높이 (요약만), 펼침 시 폼 영역 */}
       {row && !rowLoading && (
-        <div style={{
-          position: 'fixed',
-          left: 0, right: 0, bottom: 0,
-          ...GLASS.L5,
-          backdropFilter: 'blur(12px)',
-          WebkitBackdropFilter: 'blur(12px)',
-          borderTop: '1px solid rgba(0,0,0,0.08)',
-          boxShadow: '0 -8px 24px rgba(0,0,0,0.06)',
-          zIndex: 30,
-          transition: 'all 0.2s',
-        }}>
+        // PR-J (2026-05-16) — 사이드바(w-60=240px) 영역 비켜가기:
+        //   left-0 (모바일) / lg:left-60 (데스크톱 — 사이드바 폭만큼)
+        //   이전엔 left:0 fixed 라 사이드바를 덮어 메뉴 클릭이 막혔음
+        <div
+          className="fixed bottom-0 left-0 right-0 lg:left-60"
+          style={{
+            ...GLASS.L5,
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+            borderTop: '1px solid rgba(0,0,0,0.08)',
+            boxShadow: '0 -8px 24px rgba(0,0,0,0.06)',
+            zIndex: 30,
+            transition: 'all 0.2s',
+          }}>
           <div style={{ maxWidth: 1400, margin: '0 auto', padding: panelOpen ? '14px 24px 18px' : '8px 24px' }}>
             {/* Header row — 항상 노출 */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>

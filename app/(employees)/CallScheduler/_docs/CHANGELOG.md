@@ -3,6 +3,12 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-22 (Phase CX-KPI-9) — 상담원 종합 평가 탭
+
+- `kpi/page.tsx` 에 「🏅 평가」 탭 신설. 상담원별 종합 점수·팀 내 순위·강점/약점을 한 화면에서 확인.
+- API `kpi/evaluation` (GET) 신규 — `?granularity=day|week|month&date=`. dashboard route 와 동일 소스(cs_call_records / cs_agent_productivity / cs_assignments) + 동일 법정검사 제외 필터. 평가 지표 4개(통화량·AHT·후처리이석비율·근무시간)를 팀 내 min~max 0~100 정규화(AHT·이석은 역방향) 후 가중 평균(35/30/15/20). 데이터 없는 지표는 평가 제외·가중치 비례 재분배. 팀 평균 대비 ±10% 편차로 강·약점 산출, 종합 점수 desc 순위.
+- `KpiEvaluation` 컴포넌트 신규 — 일/주/월 토글, DcStatStrip 5카드(팀 평균/인원/최고·최저/편차), NeuDataTable 평가 표(전 컬럼 sortBy, 종합점수 색상 우수/보통/미흡, 강·약점 배지). 가중치 공개 안내·빈 상태·부분 데이터 안내 포함.
+
 ## 2026-05-22 (Phase CX-KPI-8) — 법정검사 제외 + WFM 기준 명확화 + 부족 사유
 
 - KT 계정 공용으로 섞이던 「법정검사」 데이터를 CX KPI 집계 SQL 단계에서 완전 제외. `kpi/dashboard`·`kpi/staffing` route 의 모든 관련 쿼리에 `LEGAL_KEYWORD='%법정검사%'` LIKE 필터 일관 적용 — cs_call_records(department/center/type1/type2), cs_agent_productivity(department), cs_response_queue(skill), cs_response_ivr(scenario). CX 데이터(메리츠캐피탈·사고접수 등)는 보존.
