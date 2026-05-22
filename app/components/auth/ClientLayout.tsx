@@ -83,6 +83,13 @@ const SETTINGS_MENUS_BASE = SETTINGS_MENUS_ALL.filter(m => m.path !== '/db/codes
 // ============================================
 // 메뉴 아이템 렌더링 헬퍼
 // ============================================
+// PR-COORD-6 (2026-05-21) — 사이드바 아이콘 통일:
+// displayName 에 이모지가 있는 entry 는 lucide 아이콘 + 이모지 = 2개로 보임.
+// 선행 이모지/기호 제거 → lucide iconKey 아이콘 1개로 통일.
+function stripLeadingEmoji(s: string): string {
+  return s.replace(/^[\s\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2190}-\u{21FF}\u{2B00}-\u{2BFF}️]+/u, '').trim() || s
+}
+
 function MenuItem({ item, pathname, accent, allPaths }: { item: { name: string; path: string; iconKey: string }; pathname: string; accent?: boolean; allPaths?: string[] }) {
   const Icon = Icons[item.iconKey] || Icons.Doc
   // "longest match wins" — 더 긴 경로의 메뉴가 있으면 상위 경로는 비활성
@@ -106,7 +113,7 @@ function MenuItem({ item, pathname, accent, allPaths }: { item: { name: string; 
       onMouseLeave={e => { if (!isActive) (e.currentTarget as HTMLElement).style.background = 'transparent' }}
     >
       <Icon />
-      <span>{item.name}</span>
+      <span>{stripLeadingEmoji(item.name)}</span>
     </Link>
   )
 }
