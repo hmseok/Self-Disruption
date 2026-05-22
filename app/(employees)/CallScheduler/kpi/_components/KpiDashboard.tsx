@@ -181,10 +181,10 @@ export default function KpiDashboard() {
 
   const stats: StatItem[] = [
     { label: '총 통화량', value: s?.call_count ?? 0, unit: '콜', tint: 'blue', icon: '📞',
-      subValue: s ? `IB ${s.ib.toLocaleString()} · OB ${s.ob.toLocaleString()}` : undefined },
-    { label: '평균 AHT', value: s ? fmtMS(s.aht) : '—', tint: 'green', icon: '⏱',
+      subValue: s ? `수신 ${s.ib.toLocaleString()} · 발신 ${s.ob.toLocaleString()}` : undefined },
+    { label: '평균 처리시간', value: s ? fmtMS(s.aht) : '—', tint: 'green', icon: '⏱',
       subValue: s && s.avg_duration_sec > 0 ? '통화시간 실측' : (s?.has_prod_data ? '생산성 기준' : undefined) },
-    { label: 'IB/OB 비율', value: ibObRatio, tint: 'amber', icon: '🔀',
+    { label: '수신/발신 비율', value: ibObRatio, tint: 'amber', icon: '🔀',
       subValue: s && s.etc > 0 ? `기타 ${s.etc.toLocaleString()}` : undefined },
     { label: s?.cafe24_ok ? '접수 건수' : '로그인 시간',
       value: s?.cafe24_ok ? (s?.intake_count ?? 0) : (s ? fmtDuration(s.login_sec) : '—'),
@@ -218,7 +218,7 @@ export default function KpiDashboard() {
       ),
     },
     {
-      key: 'call_count', label: '통화량 (IB/OB)', width: 150, align: 'right',
+      key: 'call_count', label: '통화량 (수신/발신)', width: 150, align: 'right',
       sortBy: (r) => r.call_count,
       render: (r) => (
         <span style={{ whiteSpace: 'nowrap' }}>
@@ -230,7 +230,7 @@ export default function KpiDashboard() {
       ),
     },
     {
-      key: 'aht', label: 'AHT', width: 80, align: 'right',
+      key: 'aht', label: '평균처리시간', width: 92, align: 'right',
       sortBy: (r) => r.aht,
       render: (r) => <span style={{ whiteSpace: 'nowrap', color: COLORS.success, fontWeight: 700 }}>{fmtMS(r.aht)}</span>,
     },
@@ -388,8 +388,8 @@ export default function KpiDashboard() {
             emptyMessage="집계된 상담원이 없습니다"
             mobileCard={{
               title: (r) => r.name,
-              subtitle: (r) => `통화 ${r.call_count.toLocaleString()} (IB ${r.ib}/OB ${r.ob})`,
-              trailing: (r) => `AHT ${fmtMS(r.aht)}`,
+              subtitle: (r) => `통화 ${r.call_count.toLocaleString()} (수신 ${r.ib}/발신 ${r.ob})`,
+              trailing: (r) => `평균처리 ${fmtMS(r.aht)}`,
               badges: (r) => (
                 <span style={{ fontSize: 11, color: COLORS.textMuted }}>
                   로그인 {fmtDuration(r.login_sec)} · 근무 {Math.round(r.work_hours)}h

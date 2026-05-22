@@ -400,7 +400,7 @@ export default function KpiStaffing() {
                 fontSize: 10, fontWeight: 700, color: COLORS.textMuted,
               }}>
                 <span style={{ minWidth: 52 }}>시간</span>
-                <span style={{ minWidth: 56, textAlign: 'right' }}>콜/AHT</span>
+                <span style={{ minWidth: 64, textAlign: 'right' }}>콜/처리시간</span>
                 <span style={{ flex: 1 }}>필요 / 배정</span>
                 <span style={{ minWidth: 70, textAlign: 'right' }}>과부족</span>
               </div>
