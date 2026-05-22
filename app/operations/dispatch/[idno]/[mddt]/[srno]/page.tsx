@@ -363,6 +363,21 @@ export default function DispatchDetailPage({
         const d = parseDelivery(found.customer_request)
         setDeliveryType(d.type)
         setDeliveryMemo(d.memo)
+        // PR-H (2026-05-16) — 재진입 시 배차된 차량 복원
+        //   fmi_rental_id → fmi_rentals.vehicle_id (cars.id) → cars 정보
+        if (found.fmi_rental_id) {
+          try {
+            const rRes = await fetch(`/api/fmi-rentals/${found.fmi_rental_id}`, { headers })
+            const rJson = await rRes.json().catch(() => ({}))
+            const vid: string | null = rJson?.data?.vehicle_id || null
+            if (vid) {
+              const cRes = await fetch('/api/operations/waiting-vehicles?status=all', { headers })
+              const cJson = await cRes.json().catch(() => ({}))
+              const car = (Array.isArray(cJson?.data) ? cJson.data : []).find((c: WaitingVehicle) => c.id === vid)
+              if (car) setSelectedVehicle(car)
+            }
+          } catch { /* 복원 실패 — 무시 (수동 재선택 가능) */ }
+        }
       }
     } finally {
       setOrderLoading(false)
