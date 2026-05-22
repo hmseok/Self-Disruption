@@ -220,9 +220,12 @@ function main() {
   if (coworkR.skip) {
     console.log(`  staged 0 files, skip (working tree 검사 모드)`)
   } else {
-    console.log(`  ${coworkR.stagedCount} staged, modules=${Object.keys(coworkR.realModules).length}, whitelist=${Object.keys(coworkR.whitelist).length}`)
-    for (const [mod, list] of Object.entries(coworkR.realModules)) {
-      console.log(`  · [${mod}] ${list.length} files`)
+    // PR-COORD-8 — canonical 그룹 기준 (UI ↔ 전용 API 는 한 모듈)
+    const coworkGroups = coworkR.canonicalGroups || {}
+    console.log(`  ${coworkR.stagedCount} staged, modules=${Object.keys(coworkGroups).length}, whitelist=${Object.keys(coworkR.whitelist).length}`)
+    for (const g of Object.values(coworkGroups)) {
+      const merged = g.labels.length > 1 ? `  (${g.labels.join(' + ')})` : ''
+      console.log(`  · [${g.canonical}] ${g.files.length} files${merged}`)
     }
     for (const v of coworkR.violations) {
       if (process.env.COWORK_ALLOW_MULTI_MODULE === '1') {

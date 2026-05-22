@@ -13,7 +13,18 @@
  *   1. git diff --cached --name-only 로 staged 파일 추출
  *   2. 각 파일을 「모듈 라벨」로 매핑
  *   3. 화이트리스트 라벨 (_common / _harness / _db / _root) 는 카운트 X
- *   4. 실제 모듈 라벨 set 의 size > 1 → 위반 (commit 차단)
+ *   4. 실제 모듈 라벨을 canonical 키로 묶음 — 서로 다른 canonical 이 ≥ 2 면 위반
+ *
+ * PR-COORD-8 (2026-05-22) — UI ↔ 전용 API 오탐 보완
+ *   문제: 한 기능의 UI(`app/(employees)/RideAssets/`) 와 그 전용
+ *         API(`app/api/ride-assets/`) 가 각각 `RideAssets` / `api:ride-assets`
+ *         라벨로 잡혀 "multi-module" 오탐 → 정상적인 기능 커밋이 차단됨.
+ *   사실: SESSIONS-COORDINATION 기준 "기능 = UI + 전용 API + 전용 lib" 가
+ *         한 세션 소유 단위 (FINANCE-MATCHING-HANDOVER § 0 등에 명시).
+ *   보완: 모듈 라벨을 canonical 키로 정규화 — `api:`/`lib:` prefix 제거 +
+ *         소문자화 + 영숫자 외 제거. `RideAssets` 와 `api:ride-assets` 가
+ *         같은 `rideassets` 로 묶여 단일 모듈로 인정.
+ *         `RideAccidents` vs `CallScheduler` 같은 진짜 다른 기능은 그대로 차단.
  *
  * 우회 (의도적 cross-module commit):
  *   - 환경변수: COWORK_ALLOW_MULTI_MODULE=1 git commit ...
@@ -69,7 +80,7 @@ function getCommitFiles(sha) {
 // _root    : repo 루트 설정 / 문서
 // 그 외    : 실제 모듈명 (e.g. 'RideAccidents', 'CallScheduler', 'cars', 'finance', 'admin')
 //
-// 한 commit 안에 실제 모듈 라벨이 ≥ 2 면 위반.
+// 한 commit 안에 실제 모듈이 ≥ 2 (canonical 기준) 면 위반.
 function moduleOf(file) {
   // ── 화이트리스트: 공통 영역 ──
   if (file.startsWith('app/components/')) return '_common'
@@ -146,6 +157,20 @@ function moduleOf(file) {
   return '_common'
 }
 
+// ─── canonical 모듈 키 (PR-COORD-8) ───────────────────────────────
+// 한 기능의 UI(`RideAssets`) / 전용 API(`api:ride-assets`) / 전용 lib(`lib:ride-assets`)
+// 를 같은 모듈로 묶기 위한 정규화 키.
+//   1. `api:` / `lib:` prefix 제거
+//   2. 소문자화 + 영숫자 외(하이픈·언더스코어 등) 제거
+// → 'RideAssets', 'api:ride-assets', 'lib:ride_assets' 모두 'rideassets'.
+// 서로 다른 기능('RideAccidents' vs 'CallScheduler') 은 다른 키로 남아 계속 차단.
+function canonicalModule(label) {
+  return label
+    .replace(/^(api|lib):/, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '')
+}
+
 // ─── 분류 ──────────────────────────────────────────────────────────
 function classify(files) {
   const byModule = {}
@@ -164,32 +189,42 @@ function classify(files) {
       realModules[mod] = list
     }
   }
-  return { realModules, whitelist }
+  // canonical 그룹핑 — UI ↔ api: ↔ lib: 같은 기능을 한 모듈로 병합
+  const canonicalGroups = {}
+  for (const [mod, list] of Object.entries(realModules)) {
+    const key = canonicalModule(mod)
+    if (!canonicalGroups[key]) canonicalGroups[key] = { canonical: key, labels: [], files: [] }
+    canonicalGroups[key].labels.push(mod)
+    canonicalGroups[key].files.push(...list)
+  }
+  return { realModules, whitelist, canonicalGroups }
+}
+
+// ─── 위반 판정 (canonical 기준) ───────────────────────────────────
+// 서로 다른 canonical 모듈이 2개 이상이면 multi-module 위반.
+function buildViolations(canonicalGroups, type) {
+  const keys = Object.keys(canonicalGroups)
+  if (keys.length <= 1) return []
+  // 표시용 — canonical 그룹별로 라벨을 '+' 로 묶음
+  const modules = keys.map((k) => canonicalGroups[k].labels.join('+'))
+  return [{ type, modules, groups: keys.map((k) => canonicalGroups[k]) }]
 }
 
 // ─── lint 실행 (staged 파일 검사) ─────────────────────────────────
 function lint() {
   const files = getStagedFiles()
   if (files.length === 0) {
-    return { stagedCount: 0, realModules: {}, whitelist: {}, violations: [], skip: true }
+    return { stagedCount: 0, realModules: {}, whitelist: {}, canonicalGroups: {}, violations: [], skip: true }
   }
 
-  const { realModules, whitelist } = classify(files)
-  const moduleNames = Object.keys(realModules)
-  const violations = []
-
-  if (moduleNames.length > 1) {
-    violations.push({
-      type: 'multi-module',
-      modules: moduleNames,
-      detail: realModules,
-    })
-  }
+  const { realModules, whitelist, canonicalGroups } = classify(files)
+  const violations = buildViolations(canonicalGroups, 'multi-module')
 
   return {
     stagedCount: files.length,
     realModules,
     whitelist,
+    canonicalGroups,
     violations,
     skip: false,
   }
@@ -200,25 +235,26 @@ function lint() {
 function lintCommit(sha) {
   const files = getCommitFiles(sha)
   if (files.length === 0) {
-    return { sha, stagedCount: 0, realModules: {}, whitelist: {}, violations: [], skip: true }
+    return { sha, stagedCount: 0, realModules: {}, whitelist: {}, canonicalGroups: {}, violations: [], skip: true }
   }
-  const { realModules, whitelist } = classify(files)
-  const moduleNames = Object.keys(realModules)
-  const violations = []
-  if (moduleNames.length > 1) {
-    violations.push({
-      type: 'multi-module-commit',
-      modules: moduleNames,
-      detail: realModules,
-    })
-  }
+  const { realModules, whitelist, canonicalGroups } = classify(files)
+  const violations = buildViolations(canonicalGroups, 'multi-module-commit')
   return {
     sha,
     stagedCount: files.length,
     realModules,
     whitelist,
+    canonicalGroups,
     violations,
     skip: false,
+  }
+}
+
+// ─── canonical 그룹 출력 헬퍼 ─────────────────────────────────────
+function printCanonicalGroups(groups) {
+  for (const g of Object.values(groups)) {
+    const merged = g.labels.length > 1 ? `   (${g.labels.join(' + ')} — 동일 기능)` : ''
+    console.log(`  · [${g.canonical}] ${g.files.length} files${merged}`)
   }
 }
 
@@ -239,11 +275,9 @@ if (require.main === module) {
       process.exit(0)
     }
     console.log(
-      `cowork-staging-lint --check-commit ${sha.slice(0, 8)}: ${r.stagedCount} files, modules=${Object.keys(r.realModules).length}, whitelist=${Object.keys(r.whitelist).length}`
+      `cowork-staging-lint --check-commit ${sha.slice(0, 8)}: ${r.stagedCount} files, modules=${Object.keys(r.canonicalGroups).length}, whitelist=${Object.keys(r.whitelist).length}`
     )
-    for (const [mod, list] of Object.entries(r.realModules)) {
-      console.log(`  · [${mod}] ${list.length} files`)
-    }
+    printCanonicalGroups(r.canonicalGroups)
     if (r.violations.length > 0) {
       if (process.env.COWORK_ALLOW_MULTI_MODULE === '1') {
         console.warn(`\n⚠ multi-module commit allowed (COWORK_ALLOW_MULTI_MODULE=1): ${r.violations[0].modules.join(', ')}`)
@@ -274,15 +308,9 @@ if (require.main === module) {
   }
 
   console.log(
-    `cowork-staging-lint: ${r.stagedCount} staged files, modules=${Object.keys(r.realModules).length}, whitelist=${Object.keys(r.whitelist).length}`
+    `cowork-staging-lint: ${r.stagedCount} staged files, modules=${Object.keys(r.canonicalGroups).length}, whitelist=${Object.keys(r.whitelist).length}`
   )
-  for (const [mod, list] of Object.entries(r.realModules)) {
-    console.log(`  · [${mod}] ${list.length} files`)
-    for (const f of list.slice(0, 3)) {
-      console.log(`      ${f}`)
-    }
-    if (list.length > 3) console.log(`      ... (${list.length - 3} more)`)
-  }
+  printCanonicalGroups(r.canonicalGroups)
   for (const [mod, list] of Object.entries(r.whitelist)) {
     console.log(`  · [${mod} whitelist] ${list.length} files`)
   }
@@ -298,7 +326,7 @@ if (require.main === module) {
     console.error('   다른 세션 작업물을 흡수했을 가능성.')
     console.error('')
     console.error('   감지된 모듈:')
-    for (const mod of Object.keys(r.realModules)) {
+    for (const mod of r.violations[0].modules) {
       console.error(`     · ${mod}`)
     }
     console.error('')
@@ -318,4 +346,4 @@ if (require.main === module) {
   process.exit(0)
 }
 
-module.exports = { lint, lintCommit, moduleOf, classify, getStagedFiles, getCommitFiles }
+module.exports = { lint, lintCommit, moduleOf, canonicalModule, classify, getStagedFiles, getCommitFiles }
