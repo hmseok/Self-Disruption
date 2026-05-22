@@ -5,6 +5,7 @@ import AccidentIntakeTab from './_tabs/AccidentIntakeTab'
 import ScheduleTab from './_tabs/ScheduleTab'
 import ClaimsTab from './_tabs/ClaimsTab'
 import WaitingTab from './_tabs/WaitingTab'
+import RentalListTab from './_tabs/RentalListTab'
 
 // ═══════════════════════════════════════════════════════════════════
 // /operations — Phase 2 통합 페이지 (P2.1a)
@@ -19,16 +20,20 @@ import WaitingTab from './_tabs/WaitingTab'
 // 기존 OperationsMain (1247줄, Calendar+FleetBoard+DispatchModal) 폐기.
 // ═══════════════════════════════════════════════════════════════════
 
-type SubTab = 'waiting' | 'accident' | 'schedule' | 'claims'
+type SubTab = 'waiting' | 'accident' | 'schedule' | 'claims' | 'rentals'
 
 // 사용자 명시 (2026-05-16):
 //   「사고접수를 살리고 그안에 대차쪽에 일부를 갖다붙히고 대차접수를 없애는게」
 //   → 대차접수 탭 폐기, 사고접수 탭이 대차요청 처리까지 통합 담당
 //   탭 순서: 대기차량(앞) → 사고접수(default) → 배차스케줄 → 청구관리
+// PR-N1 (2026-05-22) — 「대차리스트」 5번째 탭 추가
+//   사용자 명시: 「배차 한건 리스트 탭 따로 나와야 하죠」
+//   배차 1건 = 1행 원장 (fmi_rentals). 엑셀 빌려타/마춤카/부가세/따봉 = 플릿.
 const TAB_LIST: Array<{ key: SubTab; label: string; icon: string }> = [
   { key: 'waiting',  label: '대기차량',    icon: '🛠' },
   { key: 'accident', label: '사고접수',    icon: '📋' },
   { key: 'schedule', label: '배차스케줄',  icon: '📅' },
+  { key: 'rentals',  label: '대차리스트',  icon: '🚗' },
   { key: 'claims',   label: '청구관리',    icon: '💰' },
 ]
 
@@ -75,6 +80,8 @@ export default function OperationsPage() {
         {tab === 'accident' && <AccidentIntakeTab />}
 
         {tab === 'schedule' && <ScheduleTab />}
+
+        {tab === 'rentals' && <RentalListTab />}
 
         {tab === 'claims' && <ClaimsTab />}
 
