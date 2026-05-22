@@ -47,6 +47,9 @@ interface StaffingSummary {
   avg_required: number; sum_required: number; sum_scheduled: number
   short_hours: number
   has_call_data: boolean; has_work_data: boolean
+  target_service_level: number
+  actual_service_level: number | null
+  has_response_data: boolean
 }
 interface StaffingData {
   config: WfmConfig
@@ -324,6 +327,56 @@ export default function KpiStaffing() {
 
       {/* ── 5 스탯 카드 ───────────────────────────────────────── */}
       {data && !isEmpty && <DcStatStrip stats={stats} fullWidth />}
+
+      {/* ── 목표 SL vs 실제 SL (cs_response_queue) ────────────── */}
+      {data && !isEmpty && s && (() => {
+        const target = s.target_service_level
+        const actual = s.actual_service_level
+        const hasActual = s.has_response_data && actual != null
+        const below = hasActual && actual! < target
+        const tone = !hasActual
+          ? { bg: COLORS.bgGray, border: COLORS.borderFaint, color: COLORS.textMuted }
+          : below
+            ? { bg: COLORS.bgRed, border: COLORS.borderRed, color: COLORS.danger }
+            : { bg: COLORS.bgGreen, border: COLORS.borderGreen, color: COLORS.success }
+        return (
+          <div style={{
+            ...GLASS.L3, background: tone.bg, border: `1px solid ${tone.border}`,
+            borderRadius: 12, padding: 14, marginBottom: 14,
+            display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap',
+          }}>
+            <div style={{ fontSize: 13, fontWeight: 800, color: COLORS.textPrimary, whiteSpace: 'nowrap' }}>
+              🎯 목표 SL vs 실제 SL
+            </div>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, whiteSpace: 'nowrap' }}>
+              <span style={{ fontSize: 11, color: COLORS.textSecondary, fontWeight: 700 }}>목표</span>
+              <span style={{ fontSize: 22, fontWeight: 800, color: COLORS.textPrimary, lineHeight: 1 }}>
+                {target}%
+              </span>
+            </div>
+            <span style={{ fontSize: 16, color: COLORS.textMuted }}>→</span>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, whiteSpace: 'nowrap' }}>
+              <span style={{ fontSize: 11, color: COLORS.textSecondary, fontWeight: 700 }}>실제</span>
+              <span style={{ fontSize: 22, fontWeight: 800, color: tone.color, lineHeight: 1 }}>
+                {hasActual ? `${actual}%` : '—'}
+              </span>
+            </div>
+            <span style={{
+              fontSize: 12, fontWeight: 800, color: tone.color, whiteSpace: 'nowrap',
+            }}>
+              {!hasActual
+                ? '응대현황(큐) 미적재 — 업로드 탭에서 적재'
+                : below
+                  ? `🔴 목표 미달 (${Math.round((actual! - target) * 10) / 10}%p)`
+                  : `🟢 목표 달성 (+${Math.round((actual! - target) * 10) / 10}%p)`}
+            </span>
+            <div style={{ flex: 1 }} />
+            <span style={{ fontSize: 11, color: COLORS.textMuted, whiteSpace: 'nowrap' }}>
+              실제 = cs_response_queue 가중평균 (20초내 응대 ÷ 인입)
+            </span>
+          </div>
+        )
+      })()}
 
       {/* ── 시프트별 과부족 카드 ──────────────────────────────── */}
       {data && !isEmpty && shifts.length > 0 && (

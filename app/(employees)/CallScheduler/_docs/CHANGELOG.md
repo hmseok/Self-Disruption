@@ -3,6 +3,15 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-22 (Phase CX-KPI-6) — 응대현황 (IVR + 큐)
+
+- KT 응대현황(IVR)·응대현황(큐) 2종 엑셀 업로드 추가 (migrations: 2026-05-22_cs_response.sql — cs_response_ivr / cs_response_queue).
+- API `kpi/upload-response` (POST) — `{kind:'ivr'|'queue', mode, rows}`. preview/apply + INSERT ON DUPLICATE KEY UPDATE (멱등). 「합계」·날짜 파싱 실패 행 skip.
+- `kpi/page.tsx` 업로드 탭에 「응대현황(IVR)」·「응대현황(큐)」 종류 추가 + ResponsePreview.
+- `kpi/dashboard` — cs_response_queue/ivr 집계 추가 (응대율·포기율·서비스레벨·평균대기). KpiDashboard 응대현황 3카드 + 스킬별/시나리오별 드릴다운 표.
+- `kpi/staffing` — 실제 서비스레벨(cs_response_queue 가중평균) 추가. KpiStaffing 「목표 SL vs 실제 SL」 비교 패널 (미달 시 빨강).
+- 응대현황 미적재 시 graceful — 기존 화면 유지, 새 지표만 「—」.
+
 ## 2026-05-21 (Phase CX-KPI-5) — KPI 화면 영어 라벨 한글화
 
 - KpiDashboard/KpiStaffing 의 영어 콜센터 약어 라벨 한글화:

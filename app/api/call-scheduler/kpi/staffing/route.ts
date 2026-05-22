@@ -237,6 +237,26 @@ export async function GET(request: NextRequest) {
       }
     } catch { /* graceful — cs_assignments / cs_shift_slots 미적재 */ }
 
+    // ════ ④ cs_response_queue — 실제 서비스레벨 (graceful) ════
+    // 기간 내 큐 데이터의 가중평균 service_level (20초내 응대호 / 총인입)
+    let actualServiceLevel: number | null = null
+    let hasResponseData = false
+    try {
+      const slRows = await prisma.$queryRaw<any[]>`
+        SELECT
+          COALESCE(SUM(inbound), 0)         AS inbound,
+          COALESCE(SUM(answered_in_20s), 0) AS answered_in_20s
+        FROM cs_response_queue
+        WHERE stat_date BETWEEN ${from} AND ${to}
+      `
+      const inbound = Number(slRows[0]?.inbound || 0)
+      const in20s = Number(slRows[0]?.answered_in_20s || 0)
+      if (inbound > 0) {
+        actualServiceLevel = Math.round((in20s / inbound) * 1000) / 10
+        hasResponseData = true
+      }
+    } catch { /* graceful — cs_response_queue 미적재 */ }
+
     // ════ 시간대별 필요인원 산정 (Erlang C) ════
     type HourResult = {
       hour: number
@@ -339,6 +359,10 @@ export async function GET(request: NextRequest) {
       short_hours: shortHours,
       has_call_data: hasCallData,
       has_work_data: hasWorkData,
+      // 목표 SL vs 실제 SL (cs_response_queue 가중평균)
+      target_service_level: config.target_service_level_pct,
+      actual_service_level: actualServiceLevel,
+      has_response_data: hasResponseData,
     }
 
     return NextResponse.json({

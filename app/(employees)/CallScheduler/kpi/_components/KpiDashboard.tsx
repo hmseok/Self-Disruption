@@ -40,12 +40,34 @@ interface Summary {
 }
 interface ByClient { client: string; count: number; ib: number; ob: number; duration_sec: number }
 interface ByType { type: string; count: number; ib: number; ob: number; duration_sec: number }
+interface ResponseAgg {
+  has_queue_data: boolean
+  has_ivr_data: boolean
+  queue_inbound: number
+  queue_answered: number
+  queue_abandoned: number
+  answer_rate: number | null
+  abandon_rate: number | null
+  service_level: number | null
+  avg_wait_sec: number | null
+}
+interface BySkill {
+  skill: string; inbound: number; answered: number; abandoned: number
+  answer_rate: number; service_level: number
+}
+interface ByScenario {
+  scenario: string; callee_number: string
+  total_inbound: number; answered: number; abandoned: number
+}
 interface DashboardData {
   meta: { granularity: string; from: string; to: string; prod_label: string; prod_kind: string; agent_count: number }
   summary: Summary
   agents: AgentKpi[]
   byClient: ByClient[]
   byType: ByType[]
+  response?: ResponseAgg
+  bySkill?: BySkill[]
+  byScenario?: ByScenario[]
 }
 
 // 초 → "1시간 23분" / "5분 12초" / "42초"
@@ -146,6 +168,7 @@ export default function KpiDashboard() {
   const s = data?.summary
   const agents = data?.agents ?? []
   const isEmpty = !!data && !s?.has_call_data && !s?.has_prod_data && !s?.has_work_data
+    && !data?.response?.has_queue_data && !data?.response?.has_ivr_data
 
   // ── 목표 조회 헬퍼 — granularity 의 period_kind 기준 ──
   const periodKind = GRAN_TO_PERIOD[granularity]
@@ -199,6 +222,24 @@ export default function KpiDashboard() {
       subValue: teamCallTarget > 0
         ? `목표 ${teamCallTarget.toLocaleString()}콜`
         : '목표 미설정 — 「🎯 목표」 탭' },
+  ]
+
+  // ── 응대현황 카드 (cs_response_queue — 큐 데이터 있을 때만 실측) ──
+  const resp = data?.response
+  const hasQueue = !!resp?.has_queue_data
+  const responseStats: StatItem[] = [
+    { label: '응대율', value: hasQueue && resp?.answer_rate != null ? `${resp.answer_rate}%` : '—',
+      tint: !hasQueue ? 'slate' : (resp!.answer_rate ?? 0) >= 90 ? 'green' : (resp!.answer_rate ?? 0) >= 80 ? 'amber' : 'red',
+      icon: '✅',
+      subValue: hasQueue ? `인입 ${resp!.queue_inbound.toLocaleString()} · 응대 ${resp!.queue_answered.toLocaleString()}` : '응대현황(큐) 미적재' },
+    { label: '포기율', value: hasQueue && resp?.abandon_rate != null ? `${resp.abandon_rate}%` : '—',
+      tint: !hasQueue ? 'slate' : (resp!.abandon_rate ?? 0) <= 5 ? 'green' : (resp!.abandon_rate ?? 0) <= 10 ? 'amber' : 'red',
+      icon: '📉',
+      subValue: hasQueue ? `포기호 ${resp!.queue_abandoned.toLocaleString()}` : undefined },
+    { label: '서비스레벨', value: hasQueue && resp?.service_level != null ? `${resp.service_level}%` : '—',
+      tint: !hasQueue ? 'slate' : (resp!.service_level ?? 0) >= 80 ? 'green' : (resp!.service_level ?? 0) >= 70 ? 'amber' : 'red',
+      icon: '⚡',
+      subValue: hasQueue ? `평균대기 ${fmtMS(resp!.avg_wait_sec ?? 0)} · 20초내` : undefined },
   ]
 
   // ── 상담원 테이블 컬럼 (전 컬럼 sortBy — 규칙 18) ──
@@ -369,6 +410,96 @@ export default function KpiDashboard() {
       {/* ── 5 스탯 카드 ───────────────────────────────────────── */}
       {data && !isEmpty && <DcStatStrip stats={stats} fullWidth />}
 
+      {/* ── 응대현황 카드 (응대율·포기율·서비스레벨) ───────────── */}
+      {data && !isEmpty && (
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ fontSize: 13, fontWeight: 800, color: COLORS.textPrimary, margin: '8px 2px 8px' }}>
+            ☎ 응대현황 (IVR + 큐)
+            <span style={{ fontSize: 11, fontWeight: 600, color: COLORS.textMuted, marginLeft: 8 }}>
+              {hasQueue ? 'cs_response_queue 가중평균 (인입 기준)' : '응대현황(큐) 미적재 — 업로드 탭에서 적재'}
+            </span>
+          </div>
+          <DcStatStrip stats={responseStats} fullWidth />
+        </div>
+      )}
+
+      {/* ── 응대현황 드릴다운 — 스킬별 / 시나리오별 ─────────────── */}
+      {data && !isEmpty && ((data.bySkill && data.bySkill.length > 0) || (data.byScenario && data.byScenario.length > 0)) && (
+        <div style={{ ...GLASS.L4, borderRadius: 12, padding: 14, marginBottom: 14 }}>
+          <div style={{ fontSize: 13, fontWeight: 800, color: COLORS.textPrimary, marginBottom: 10 }}>
+            ☎ 응대현황 드릴다운
+          </div>
+          {/* 스킬별 (큐) */}
+          {data.bySkill && data.bySkill.length > 0 && (
+            <div style={{ marginBottom: data.byScenario && data.byScenario.length > 0 ? 14 : 0 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: COLORS.textSecondary, marginBottom: 6 }}>
+                📡 스킬별 (큐)
+              </div>
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
+                  <thead>
+                    <tr style={{ borderBottom: `1px solid ${COLORS.borderFaint}` }}>
+                      <th style={dth}>스킬</th>
+                      <th style={{ ...dth, textAlign: 'right' }}>인입</th>
+                      <th style={{ ...dth, textAlign: 'right' }}>응대</th>
+                      <th style={{ ...dth, textAlign: 'right' }}>포기</th>
+                      <th style={{ ...dth, textAlign: 'right' }}>응대율</th>
+                      <th style={{ ...dth, textAlign: 'right' }}>서비스레벨</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.bySkill.map((sk) => (
+                      <tr key={sk.skill} style={{ borderBottom: `1px solid ${COLORS.borderFaint}` }}>
+                        <td style={{ ...dtd, fontWeight: 700, color: COLORS.textPrimary, whiteSpace: 'nowrap' }}>{sk.skill}</td>
+                        <td style={{ ...dtd, textAlign: 'right' }}>{sk.inbound.toLocaleString()}</td>
+                        <td style={{ ...dtd, textAlign: 'right' }}>{sk.answered.toLocaleString()}</td>
+                        <td style={{ ...dtd, textAlign: 'right', color: sk.abandoned > 0 ? COLORS.danger : COLORS.textMuted }}>{sk.abandoned.toLocaleString()}</td>
+                        <td style={{ ...dtd, textAlign: 'right', fontWeight: 700,
+                          color: sk.answer_rate >= 90 ? COLORS.success : sk.answer_rate >= 80 ? COLORS.warning : COLORS.danger }}>{sk.answer_rate}%</td>
+                        <td style={{ ...dtd, textAlign: 'right', fontWeight: 700,
+                          color: sk.service_level >= 80 ? COLORS.success : sk.service_level >= 70 ? COLORS.warning : COLORS.danger }}>{sk.service_level}%</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+          {/* 시나리오별 (IVR) */}
+          {data.byScenario && data.byScenario.length > 0 && (
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: COLORS.textSecondary, marginBottom: 6 }}>
+                📲 시나리오별 (IVR)
+              </div>
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
+                  <thead>
+                    <tr style={{ borderBottom: `1px solid ${COLORS.borderFaint}` }}>
+                      <th style={dth}>시나리오</th>
+                      <th style={dth}>착신번호</th>
+                      <th style={{ ...dth, textAlign: 'right' }}>총인입</th>
+                      <th style={{ ...dth, textAlign: 'right' }}>응대</th>
+                      <th style={{ ...dth, textAlign: 'right' }}>포기</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.byScenario.map((sc) => (
+                      <tr key={`${sc.scenario}-${sc.callee_number}`} style={{ borderBottom: `1px solid ${COLORS.borderFaint}` }}>
+                        <td style={{ ...dtd, fontWeight: 700, color: COLORS.textPrimary, whiteSpace: 'nowrap' }}>{sc.scenario}</td>
+                        <td style={{ ...dtd, color: COLORS.textMuted, whiteSpace: 'nowrap' }}>{sc.callee_number}</td>
+                        <td style={{ ...dtd, textAlign: 'right' }}>{sc.total_inbound.toLocaleString()}</td>
+                        <td style={{ ...dtd, textAlign: 'right' }}>{sc.answered.toLocaleString()}</td>
+                        <td style={{ ...dtd, textAlign: 'right', color: sc.abandoned > 0 ? COLORS.danger : COLORS.textMuted }}>{sc.abandoned.toLocaleString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ── 상담원별 테이블 ───────────────────────────────────── */}
       {data && !isEmpty && (
         <div style={{ marginBottom: 14 }}>
@@ -499,4 +630,13 @@ function DistBars({ rows }: { rows: { label: string; count: number; ib: number; 
       })}
     </div>
   )
+}
+
+// ── 응대현황 드릴다운 표 셀 스타일 ─────────────────────────────
+const dth: React.CSSProperties = {
+  padding: '5px 8px', textAlign: 'left',
+  color: COLORS.textMuted, fontWeight: 700, fontSize: 10, whiteSpace: 'nowrap',
+}
+const dtd: React.CSSProperties = {
+  padding: '5px 8px', fontSize: 11, color: COLORS.textSecondary,
 }

@@ -20,13 +20,15 @@ import KpiTargets from './_components/KpiTargets'
 
 export const dynamic = 'force-dynamic'
 
-type FileKind = 'call-records' | 'productivity'
+type FileKind = 'call-records' | 'productivity' | 'response-ivr' | 'response-queue'
 
 const KIND_META: Record<FileKind, {
   label: string
   emoji: string
   uploadApi: string
   desc: string
+  // upload-response 처럼 body 에 kind 가 필요한 경우 지정
+  responseKind?: 'ivr' | 'queue'
 }> = {
   'call-records': {
     label: '상담이력조회',
@@ -39,6 +41,20 @@ const KIND_META: Record<FileKind, {
     emoji: '📊',
     uploadApi: '/api/call-scheduler/kpi/upload-productivity',
     desc: 'KT 포털 생산성(상담사) 엑셀 — 상담원 × 기간 종합 실적',
+  },
+  'response-ivr': {
+    label: '응대현황(IVR)',
+    emoji: '📲',
+    uploadApi: '/api/call-scheduler/kpi/upload-response',
+    desc: 'KT 응대현황(IVR) 엑셀 — 일자 × 착신번호/시나리오',
+    responseKind: 'ivr',
+  },
+  'response-queue': {
+    label: '응대현황(큐)',
+    emoji: '📡',
+    uploadApi: '/api/call-scheduler/kpi/upload-response',
+    desc: 'KT 응대현황(큐) 엑셀 — 일자 × 스킬 (응대율·서비스레벨)',
+    responseKind: 'queue',
   },
 }
 
@@ -53,6 +69,12 @@ interface ProdSummary {
   active: number; inactive: number
   matched: number; unmatched: number; unmatchedAgents: string[]
   periods: string[]
+}
+interface ResponseSummary {
+  kind: 'ivr' | 'queue'
+  total: number; usable: number; newRows: number; duplicate: number
+  skippedTotal: number; skippedEmpty: number
+  periodFrom: string | null; periodTo: string | null
 }
 
 interface PreviewResult {
@@ -134,6 +156,12 @@ export default function KpiPage() {
     }
   }
 
+  // upload-response 등 kind 가 필요한 API 는 body 에 kind 포함
+  const buildBody = (mode: 'preview' | 'apply', rows: any[]) =>
+    meta.responseKind
+      ? { kind: meta.responseKind, mode, rows }
+      : { mode, rows }
+
   const runPreview = async (rowsToCheck = parsedRows) => {
     if (rowsToCheck.length === 0) return
     setBusy(true); setError(null)
@@ -142,7 +170,7 @@ export default function KpiPage() {
       const res = await fetch(meta.uploadApi, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...auth },
-        body: JSON.stringify({ mode: 'preview', rows: rowsToCheck }),
+        body: JSON.stringify(buildBody('preview', rowsToCheck)),
       })
       const json = await res.json()
       if (!res.ok) throw new Error(json?.error || '검증 실패')
@@ -160,7 +188,7 @@ export default function KpiPage() {
       const res = await fetch(meta.uploadApi, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...auth },
-        body: JSON.stringify({ mode: 'apply', rows: parsedRows }),
+        body: JSON.stringify(buildBody('apply', parsedRows)),
       })
       const json = await res.json()
       if (!res.ok) throw new Error(json?.error || '적용 실패')
@@ -320,7 +348,9 @@ export default function KpiPage() {
       {preview && (
         kind === 'call-records'
           ? <CallPreview preview={preview} applied={applied} />
-          : <ProdPreview preview={preview} applied={applied} />
+          : kind === 'productivity'
+            ? <ProdPreview preview={preview} applied={applied} />
+            : <ResponsePreview preview={preview} applied={applied} />
       )}
 
       {/* ── 적용 버튼 ───────────────────────────────────────── */}
@@ -422,6 +452,37 @@ function ProdPreview({ preview, applied }: { preview: PreviewResult; applied: bo
           </table>
         </div>
       )}
+    </div>
+  )
+}
+
+// ── 응대현황(IVR / 큐) 미리보기 ───────────────────────────────
+function ResponsePreview({ preview, applied }: { preview: PreviewResult; applied: boolean }) {
+  const s = preview.summary as ResponseSummary
+  const isIvr = s.kind === 'ivr'
+  const unitLabel = isIvr ? '착신번호' : '스킬'
+  return (
+    <div>
+      <ResultBanner applied={applied}
+        appliedText={`✅ 적용 완료 — ${preview.inserted ?? 0}건 저장 (재업로드 시 덮어쓰기)`}
+        previewText={`🔍 검증 결과 — 응대현황(${isIvr ? 'IVR' : '큐'})`} />
+      <div style={{
+        ...GLASS.L4, borderRadius: 12, padding: 12, marginTop: 10,
+        display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 8,
+      }}>
+        <Stat label="전체 행" value={s.total} tone="neutral" />
+        <Stat label={`유효 행 (${unitLabel})`} value={s.usable} tone="info" />
+        <Stat label="신규" value={s.newRows} tone="success" />
+        <Stat label="중복(덮어씀)" value={s.duplicate} tone={s.duplicate > 0 ? 'warning' : 'neutral'} />
+        <Stat label="합계 행(제외)" value={s.skippedTotal} tone="neutral" />
+        <Stat label="빈 행(제외)" value={s.skippedEmpty} tone={s.skippedEmpty > 0 ? 'warning' : 'neutral'} />
+      </div>
+      <PeriodLine from={s.periodFrom} to={s.periodTo} />
+      <div style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 6 }}>
+        ℹ {isIvr
+          ? '일자 × 착신전화번호 단위로 저장됩니다 (UNIQUE = 일자+착신번호).'
+          : '일자 × 스킬 단위로 저장됩니다 (UNIQUE = 일자+스킬). 대시보드·WFM 의 응대율·서비스레벨에 반영됩니다.'}
+      </div>
     </div>
   )
 }

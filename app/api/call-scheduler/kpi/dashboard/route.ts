@@ -316,6 +316,98 @@ export async function GET(request: NextRequest) {
       summary.required_workers = Number(cRow[0]?.c || 0)
     } catch { /* graceful */ }
 
+    // ════ ④' 응대현황 — cs_response_queue / cs_response_ivr (graceful) ════
+    // 큐: 총인입·응대·총포기호·가중평균 응대율/SL·평균 고객대기시간
+    // IVR: 시나리오별 총인입/포기
+    const response = {
+      has_queue_data: false,
+      has_ivr_data: false,
+      queue_inbound: 0,
+      queue_answered: 0,
+      queue_abandoned: 0,
+      answer_rate: null as number | null,      // 가중평균 응대율 (%)
+      abandon_rate: null as number | null,     // 포기율 (%)
+      service_level: null as number | null,    // 가중평균 서비스레벨 (%)
+      avg_wait_sec: null as number | null,     // 평균 고객대기시간 (초)
+    }
+    const bySkill: { skill: string; inbound: number; answered: number; abandoned: number; answer_rate: number; service_level: number }[] = []
+    const byScenario: { scenario: string; callee_number: string; total_inbound: number; answered: number; abandoned: number }[] = []
+
+    try {
+      const qRows = await prisma.$queryRaw<any[]>`
+        SELECT
+          skill,
+          COALESCE(SUM(inbound), 0)          AS inbound,
+          COALESCE(SUM(answered), 0)         AS answered,
+          COALESCE(SUM(abandoned), 0)        AS abandoned,
+          COALESCE(SUM(answered_in_20s), 0)  AS answered_in_20s,
+          COALESCE(SUM(avg_wait_sec * inbound), 0) AS wait_weighted
+        FROM cs_response_queue
+        WHERE stat_date BETWEEN ${from} AND ${to}
+        GROUP BY skill
+      `
+      let totInbound = 0, totAnswered = 0, totAbandoned = 0, totIn20s = 0, totWaitWeighted = 0
+      for (const r of qRows) {
+        const inbound = Number(r.inbound || 0)
+        const answered = Number(r.answered || 0)
+        const abandoned = Number(r.abandoned || 0)
+        const in20s = Number(r.answered_in_20s || 0)
+        totInbound += inbound
+        totAnswered += answered
+        totAbandoned += abandoned
+        totIn20s += in20s
+        totWaitWeighted += Number(r.wait_weighted || 0)
+        bySkill.push({
+          skill: String(r.skill || '미지정'),
+          inbound, answered, abandoned,
+          answer_rate: inbound > 0 ? Math.round((answered / inbound) * 1000) / 10 : 0,
+          service_level: inbound > 0 ? Math.round((in20s / inbound) * 1000) / 10 : 0,
+        })
+      }
+      if (qRows.length > 0) {
+        response.has_queue_data = true
+        response.queue_inbound = totInbound
+        response.queue_answered = totAnswered
+        response.queue_abandoned = totAbandoned
+        // 가중평균 — 인입 기준
+        response.answer_rate = totInbound > 0
+          ? Math.round((totAnswered / totInbound) * 1000) / 10 : 0
+        response.abandon_rate = totInbound > 0
+          ? Math.round((totAbandoned / totInbound) * 1000) / 10 : 0
+        // 서비스레벨 = 20초내 응대호 / 총인입
+        response.service_level = totInbound > 0
+          ? Math.round((totIn20s / totInbound) * 1000) / 10 : 0
+        response.avg_wait_sec = totInbound > 0
+          ? Math.round(totWaitWeighted / totInbound) : 0
+      }
+    } catch { /* graceful — cs_response_queue 미적재 */ }
+
+    try {
+      const iRows = await prisma.$queryRaw<any[]>`
+        SELECT
+          scenario, callee_number,
+          COALESCE(SUM(total_inbound), 0) AS total_inbound,
+          COALESCE(SUM(answered), 0)      AS answered,
+          COALESCE(SUM(abandoned), 0)     AS abandoned
+        FROM cs_response_ivr
+        WHERE stat_date BETWEEN ${from} AND ${to}
+        GROUP BY scenario, callee_number
+      `
+      for (const r of iRows) {
+        byScenario.push({
+          scenario: String(r.scenario || '미지정'),
+          callee_number: String(r.callee_number || ''),
+          total_inbound: Number(r.total_inbound || 0),
+          answered: Number(r.answered || 0),
+          abandoned: Number(r.abandoned || 0),
+        })
+      }
+      response.has_ivr_data = iRows.length > 0
+    } catch { /* graceful — cs_response_ivr 미적재 */ }
+
+    bySkill.sort((a, b) => b.inbound - a.inbound)
+    byScenario.sort((a, b) => b.total_inbound - a.total_inbound)
+
     // ════ ④ Cafe24 접수 건수 (선택 — graceful) ════
     try {
       const { cafe24Db } = await import('@/lib/cafe24-db')
@@ -373,6 +465,9 @@ export async function GET(request: NextRequest) {
         agents: agentList,
         byClient,
         byType,
+        response,
+        bySkill,
+        byScenario,
       }),
       error: null,
     })
