@@ -2,16 +2,17 @@
 
 // ═══════════════════════════════════════════════════════════════════
 // RideOrgPanel — 라이드케어 (외주) 인력 부서 관리 패널
-// PR-HR-2 (2026-05-16, hr 세션)
+// PR-HR-2 (2026-05-16) + PR-HR-3 보강 (부서 CRUD + 직원 활성 필터)
 //
-// /hr 통합 페이지 「외부 인력」 탭 안에서 라이드 인력 영역을 렌더.
-// 「조회 only」 → 본격 부서 마스터 관리:
+// /hr 통합 페이지 「외부 인력」 탭 → 「라이드 인력」 서브탭에서 렌더.
 //   · DcStatStrip 5칸 (활성/부서수/이번달입사/퇴사예정/승진대상)
-//   · 좌측 부서 트리 (Glass 5색) + 우측 NeuDataTable
-//   · 부서장 지정 / 일괄 부서 변경 / focus=<id> highlight
+//   · 좌측 부서 트리 (Glass 5색, CRUD) + 우측 NeuDataTable
+//   · 부서 추가/이름변경/상위이동/삭제 / 부서장 지정 / 일괄 부서 변경
+//   · 직원 테이블 기본 활성만 + 「비활성 포함」 토글 (중복 정리 잔재 숨김)
+//   · focus=<id> highlight
 //
-// 데이터: /api/ride-departments/tree + /api/ride-employees
-// 회의록(meetings) 연동 전제 — ride_departments.leader_employee_id 공유.
+// 데이터: /api/ride-departments(/tree) + /api/ride-employees
+// 회의록(meetings) 연동 — ride_departments.leader_employee_id 공유.
 // ═══════════════════════════════════════════════════════════════════
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
@@ -19,6 +20,7 @@ import { useSearchParams } from 'next/navigation'
 import DcStatStrip, { StatItem } from '../../components/DcStatStrip'
 import NeuDataTable, { TableColumn } from '../../components/NeuDataTable'
 import { auth } from '@/lib/auth-client'
+import { GLASS } from '@/app/utils/ui-tokens'
 
 // ─── 타입 ───────────────────────────────────────────────────────────
 type RideDept = {
@@ -62,6 +64,7 @@ const TONE: Record<string, { dot: string; bg: string; bd: string; tx: string }> 
   slate:  { dot: '#94a3b8', bg: 'rgba(148,163,184,0.10)', bd: 'rgba(148,163,184,0.30)', tx: '#64748b' },
 }
 const tone = (t: string | null | undefined) => TONE[t || 'slate'] || TONE.slate
+const TONE_KEYS = ['blue', 'green', 'red', 'amber', 'violet', 'slate'] as const
 
 async function authHeader(): Promise<Record<string, string>> {
   const token = auth.currentUser ? await auth.currentUser.getIdToken() : null
@@ -69,8 +72,7 @@ async function authHeader(): Promise<Record<string, string>> {
 }
 
 const glassCard: React.CSSProperties = {
-  background: 'rgba(255,255,255,0.72)',
-  border: '1px solid rgba(0,0,0,0.06)',
+  ...GLASS.L4,           // Soft Ice Glass L4 (테이블/모달 — white/0.72)
   borderRadius: 14,
   boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
 }
@@ -83,8 +85,6 @@ function flatten(nodes: RideDept[], depth = 0, out: { node: RideDept; depth: num
   }
   return out
 }
-
-// 선택 부서 + 모든 자손 id 수집
 function descendantIds(node: RideDept): string[] {
   const ids = [node.id]
   for (const c of node.children || []) ids.push(...descendantIds(c))
@@ -109,14 +109,24 @@ export default function RideOrgPanel() {
   const [migrationPending, setMigrationPending] = useState(false)
   const [selectedDeptId, setSelectedDeptId] = useState<string | null>(null)
   const [includeSub, setIncludeSub] = useState(true)
+  const [showInactive, setShowInactive] = useState(false)
   const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set())
   const [search, setSearch] = useState('')
   const [result, setResult] = useState<{ ok: boolean; title: string; lines: string[] } | null>(null)
 
-  // 부서장 지정 인라인 상태
   const [assigningLeader, setAssigningLeader] = useState(false)
-  // 일괄 변경 대상 부서
   const [bulkTargetDept, setBulkTargetDept] = useState<string>('')
+
+  // ─── 부서 CRUD 상태 ──────────────────────────────────────────────
+  const [showNewDept, setShowNewDept] = useState(false)
+  const [newDept, setNewDept] = useState<{ name: string; parent_id: string; color_tone: string }>(
+    { name: '', parent_id: '', color_tone: 'slate' }
+  )
+  const [editingDeptId, setEditingDeptId] = useState<string | null>(null)
+  const [editDept, setEditDept] = useState<{ name: string; parent_id: string; color_tone: string }>(
+    { name: '', parent_id: '', color_tone: 'slate' }
+  )
+  const [savingDept, setSavingDept] = useState(false)
 
   // ─── 데이터 로드 ──────────────────────────────────────────────────
   const load = useCallback(async () => {
@@ -141,14 +151,12 @@ export default function RideOrgPanel() {
 
   useEffect(() => { load() }, [load])
 
-  // ─── focus=<id> — 해당 직원의 부서 자동 선택 ──────────────────────
   useEffect(() => {
     if (!focusId || employees.length === 0) return
     const emp = employees.find(e => e.id === focusId)
     if (emp?.department_id) setSelectedDeptId(emp.department_id)
   }, [focusId, employees])
 
-  // ─── 평탄 트리 + 부서 맵 ──────────────────────────────────────────
   const flatTree = useMemo(() => flatten(tree), [tree])
   const deptById = useMemo(() => {
     const m = new Map<string, RideDept>()
@@ -156,17 +164,17 @@ export default function RideOrgPanel() {
     return m
   }, [flatTree])
 
-  // 선택 부서 — 표시 대상 department_id 집합
   const visibleDeptIds = useMemo(() => {
-    if (!selectedDeptId) return null // null = 전체
+    if (!selectedDeptId) return null
     const node = findNode(tree, selectedDeptId)
     if (!node) return new Set<string>([selectedDeptId])
     return new Set<string>(includeSub ? descendantIds(node) : [selectedDeptId])
   }, [selectedDeptId, includeSub, tree])
 
-  // ─── 직원 필터 ────────────────────────────────────────────────────
+  // ─── 직원 필터 (활성 기본 + 비활성 토글 — 중복 정리 잔재 숨김) ──────
   const filteredEmps = useMemo(() => {
     let list = employees
+    if (!showInactive) list = list.filter(e => e.is_active)
     if (visibleDeptIds) {
       list = list.filter(e => e.department_id && visibleDeptIds.has(e.department_id))
     }
@@ -179,7 +187,9 @@ export default function RideOrgPanel() {
       )
     }
     return list
-  }, [employees, visibleDeptIds, search])
+  }, [employees, visibleDeptIds, search, showInactive])
+
+  const inactiveCount = useMemo(() => employees.filter(e => !e.is_active).length, [employees])
 
   // ─── DcStatStrip 5칸 ──────────────────────────────────────────────
   const stats: StatItem[] = useMemo(() => {
@@ -187,7 +197,6 @@ export default function RideOrgPanel() {
     const now = new Date()
     const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
     const newThisMonth = active.filter(e => (e.hire_date || '').startsWith(thisMonth)).length
-    // 퇴사 예정 — resign_date 가 미래
     const todayStr = now.toISOString().slice(0, 10)
     const resignSoon = employees.filter(e => e.resign_date && e.resign_date >= todayStr && e.is_active).length
     const promoTargets = active.filter(e => e.promotion_target).length
@@ -211,13 +220,9 @@ export default function RideOrgPanel() {
   const allChecked = filteredEmps.length > 0 && filteredEmps.every(e => checkedIds.has(e.id))
   const toggleCheckAll = () => {
     setCheckedIds(prev => {
-      if (allChecked) {
-        const next = new Set(prev)
-        filteredEmps.forEach(e => next.delete(e.id))
-        return next
-      }
       const next = new Set(prev)
-      filteredEmps.forEach(e => next.add(e.id))
+      if (allChecked) filteredEmps.forEach(e => next.delete(e.id))
+      else filteredEmps.forEach(e => next.add(e.id))
       return next
     })
   }
@@ -235,10 +240,7 @@ export default function RideOrgPanel() {
         body: JSON.stringify({ employee_ids: ids, department_id: bulkTargetDept }),
       })
       const json = await res.json()
-      if (json.error) {
-        setResult({ ok: false, title: '일괄 변경 실패', lines: [json.error] })
-        return
-      }
+      if (json.error) { setResult({ ok: false, title: '일괄 변경 실패', lines: [json.error] }); return }
       const d = json.data || {}
       const deptName = deptById.get(bulkTargetDept)?.name || '(부서)'
       setResult({
@@ -269,16 +271,85 @@ export default function RideOrgPanel() {
         body: JSON.stringify({ leader_employee_id: employeeId }),
       })
       const json = await res.json()
-      if (json.error) {
-        setResult({ ok: false, title: '부서장 지정 실패', lines: [json.error] })
-        return
-      }
+      if (json.error) { setResult({ ok: false, title: '부서장 지정 실패', lines: [json.error] }); return }
       const empName = employeeId ? (employees.find(e => e.id === employeeId)?.name || '(직원)') : '(미지정)'
       setResult({ ok: true, title: `✅ 부서장 지정 — ${selectedDept.name}`, lines: [`부서장: ${empName}`] })
       setAssigningLeader(false)
       await load()
     } catch (e: any) {
       setResult({ ok: false, title: '부서장 지정 오류', lines: [e?.message || '네트워크 오류'] })
+    }
+  }
+
+  // ─── 부서 CRUD ────────────────────────────────────────────────────
+  const createDept = async () => {
+    if (!newDept.name.trim()) { setResult({ ok: false, title: '부서명 필수', lines: ['부서 이름을 입력해주세요.'] }); return }
+    setSavingDept(true)
+    try {
+      const h = await authHeader()
+      const res = await fetch('/api/ride-departments', {
+        method: 'POST',
+        headers: { ...h, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: newDept.name.trim(),
+          parent_id: newDept.parent_id || null,
+          color_tone: newDept.color_tone,
+        }),
+      })
+      const json = await res.json()
+      if (json.error) { setResult({ ok: false, title: '부서 추가 실패', lines: [json.error] }); return }
+      setResult({ ok: true, title: '✅ 부서 추가', lines: [`「${newDept.name.trim()}」 부서가 추가됐습니다.`] })
+      setShowNewDept(false)
+      setNewDept({ name: '', parent_id: '', color_tone: 'slate' })
+      await load()
+    } catch (e: any) {
+      setResult({ ok: false, title: '부서 추가 오류', lines: [e?.message || '네트워크 오류'] })
+    } finally {
+      setSavingDept(false)
+    }
+  }
+
+  const startEditDept = (d: RideDept) => {
+    setEditingDeptId(d.id)
+    setEditDept({ name: d.name, parent_id: d.parent_id || '', color_tone: d.color_tone })
+  }
+  const saveEditDept = async () => {
+    if (!editingDeptId || !editDept.name.trim()) return
+    setSavingDept(true)
+    try {
+      const h = await authHeader()
+      const res = await fetch(`/api/ride-departments/${editingDeptId}`, {
+        method: 'PATCH',
+        headers: { ...h, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: editDept.name.trim(),
+          parent_id: editDept.parent_id || null,
+          color_tone: editDept.color_tone,
+        }),
+      })
+      const json = await res.json()
+      if (json.error) { setResult({ ok: false, title: '부서 수정 실패', lines: [json.error] }); return }
+      setResult({ ok: true, title: '✅ 부서 수정', lines: [`「${editDept.name.trim()}」 으로 갱신됐습니다.`] })
+      setEditingDeptId(null)
+      await load()
+    } catch (e: any) {
+      setResult({ ok: false, title: '부서 수정 오류', lines: [e?.message || '네트워크 오류'] })
+    } finally {
+      setSavingDept(false)
+    }
+  }
+  const deleteDept = async (d: RideDept) => {
+    if (!confirm(`「${d.name}」 부서를 삭제하시겠습니까?\n(직원·하위부서가 남아있으면 차단됩니다)`)) return
+    try {
+      const h = await authHeader()
+      const res = await fetch(`/api/ride-departments/${d.id}`, { method: 'DELETE', headers: h })
+      const json = await res.json()
+      if (json.error) { setResult({ ok: false, title: '부서 삭제 불가', lines: [json.error] }); return }
+      setResult({ ok: true, title: '✅ 부서 삭제', lines: [`「${d.name}」 부서가 삭제(비활성)됐습니다.`] })
+      if (selectedDeptId === d.id) setSelectedDeptId(null)
+      await load()
+    } catch (e: any) {
+      setResult({ ok: false, title: '부서 삭제 오류', lines: [e?.message || '네트워크 오류'] })
     }
   }
 
@@ -363,6 +434,24 @@ export default function RideOrgPanel() {
     },
   ]
 
+  // ─── 색상 select (재사용) ──────────────────────────────────────────
+  const colorSelect = (value: string, onChange: (v: string) => void) => (
+    <select value={value} onChange={(e) => onChange(e.target.value)}
+      style={{ fontSize: 11, padding: '3px 6px', borderRadius: 6, border: '1px solid rgba(0,0,0,0.12)' }}>
+      {TONE_KEYS.map(k => <option key={k} value={k}>{k}</option>)}
+    </select>
+  )
+  // 상위부서 select (재사용) — 자기 자신 제외
+  const parentSelect = (value: string, onChange: (v: string) => void, excludeId?: string) => (
+    <select value={value} onChange={(e) => onChange(e.target.value)}
+      style={{ fontSize: 11, padding: '3px 6px', borderRadius: 6, border: '1px solid rgba(0,0,0,0.12)' }}>
+      <option value="">— 최상위 (본부) —</option>
+      {flatTree.filter(({ node }) => node.id !== excludeId).map(({ node, depth }) => (
+        <option key={node.id} value={node.id}>{' '.repeat(depth * 2)}{node.name}</option>
+      ))}
+    </select>
+  )
+
   // ─── 렌더 ─────────────────────────────────────────────────────────
   if (loading) {
     return (
@@ -396,9 +485,7 @@ export default function RideOrgPanel() {
               <div style={{ fontSize: 13, fontWeight: 700, color: result.ok ? '#16a34a' : '#dc2626', marginBottom: 4 }}>
                 {result.title}
               </div>
-              {result.lines.map((l, i) => (
-                <div key={i} style={{ fontSize: 12, color: '#475569' }}>{l}</div>
-              ))}
+              {result.lines.map((l, i) => <div key={i} style={{ fontSize: 12, color: '#475569' }}>{l}</div>)}
             </div>
             <button onClick={() => setResult(null)}
               style={{ fontSize: 11, color: '#94a3b8', background: 'none', border: 'none', cursor: 'pointer' }}>
@@ -421,11 +508,38 @@ export default function RideOrgPanel() {
 
       {/* 본문 — 좌측 트리 + 우측 테이블 */}
       <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start', flexWrap: 'wrap' }}>
-        {/* 좌측 — 부서 트리 */}
-        <div style={{ ...glassCard, padding: 14, width: 280, flexShrink: 0 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: '#1e293b', marginBottom: 8 }}>
-            부서 트리 ({flatTree.length})
+        {/* 좌측 — 부서 트리 (CRUD) */}
+        <div style={{ ...glassCard, padding: 14, width: 300, flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: '#1e293b' }}>부서 트리 ({flatTree.length})</span>
+            <button onClick={() => { setShowNewDept(v => !v); setNewDept({ name: '', parent_id: selectedDeptId || '', color_tone: 'slate' }) }}
+              style={{ fontSize: 11, fontWeight: 600, color: showNewDept ? '#94a3b8' : '#2563eb',
+                background: showNewDept ? 'transparent' : 'rgba(59,130,246,0.10)',
+                border: showNewDept ? 'none' : '1px solid rgba(59,130,246,0.25)',
+                borderRadius: 6, padding: '3px 9px', cursor: 'pointer' }}>
+              {showNewDept ? '취소' : '+ 부서'}
+            </button>
           </div>
+
+          {/* 새 부서 폼 */}
+          {showNewDept && (
+            <div style={{ background: 'rgba(59,130,246,0.05)', border: '1px solid rgba(59,130,246,0.2)',
+              borderRadius: 8, padding: 10, marginBottom: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <input value={newDept.name} onChange={(e) => setNewDept({ ...newDept, name: e.target.value })}
+                placeholder="부서명" autoFocus
+                style={{ fontSize: 12, padding: '5px 8px', borderRadius: 6, border: '1px solid rgba(0,0,0,0.12)' }} />
+              <div style={{ display: 'flex', gap: 4 }}>
+                {parentSelect(newDept.parent_id, (v) => setNewDept({ ...newDept, parent_id: v }))}
+                {colorSelect(newDept.color_tone, (v) => setNewDept({ ...newDept, color_tone: v }))}
+              </div>
+              <button onClick={createDept} disabled={savingDept}
+                style={{ fontSize: 11, fontWeight: 600, color: '#fff', background: savingDept ? '#94a3b8' : '#0f2440',
+                  border: 'none', borderRadius: 6, padding: '5px 0', cursor: savingDept ? 'not-allowed' : 'pointer' }}>
+                {savingDept ? '추가 중...' : '부서 추가'}
+              </button>
+            </div>
+          )}
+
           {/* 전체 */}
           <button onClick={() => setSelectedDeptId(null)}
             style={{
@@ -436,29 +550,67 @@ export default function RideOrgPanel() {
             }}>
             전체 직원 ({employees.filter(e => e.is_active).length})
           </button>
+
+          {/* 부서 행 */}
           {flatTree.map(({ node, depth }) => {
             const t = tone(node.color_tone)
             const sel = selectedDeptId === node.id
+            const editing = editingDeptId === node.id
+            if (editing) {
+              return (
+                <div key={node.id} style={{ background: 'rgba(59,130,246,0.05)', border: '1px solid rgba(59,130,246,0.2)',
+                  borderRadius: 8, padding: 8, marginBottom: 4, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <input value={editDept.name} onChange={(e) => setEditDept({ ...editDept, name: e.target.value })}
+                    style={{ fontSize: 12, padding: '4px 7px', borderRadius: 6, border: '1px solid rgba(0,0,0,0.12)' }} />
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    {parentSelect(editDept.parent_id, (v) => setEditDept({ ...editDept, parent_id: v }), node.id)}
+                    {colorSelect(editDept.color_tone, (v) => setEditDept({ ...editDept, color_tone: v }))}
+                  </div>
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    <button onClick={saveEditDept} disabled={savingDept}
+                      style={{ flex: 1, fontSize: 11, fontWeight: 600, color: '#fff', background: '#0f2440',
+                        border: 'none', borderRadius: 6, padding: '4px 0', cursor: 'pointer' }}>저장</button>
+                    <button onClick={() => setEditingDeptId(null)}
+                      style={{ fontSize: 11, color: '#94a3b8', background: 'none', border: 'none', cursor: 'pointer' }}>취소</button>
+                  </div>
+                </div>
+              )
+            }
             return (
-              <button key={node.id} onClick={() => setSelectedDeptId(node.id)}
+              <div key={node.id} className="ride-dept-row"
                 style={{
-                  display: 'flex', alignItems: 'center', gap: 6, width: '100%', textAlign: 'left',
-                  cursor: 'pointer', padding: '6px 8px', paddingLeft: 8 + depth * 14, borderRadius: 6,
-                  marginBottom: 2, fontSize: 12, border: 'none',
+                  display: 'flex', alignItems: 'center', gap: 4, borderRadius: 6, marginBottom: 2,
+                  paddingLeft: depth * 14,
                   background: sel ? t.bg : 'transparent',
                   borderLeft: sel ? `3px solid ${t.dot}` : '3px solid transparent',
-                  color: sel ? t.tx : '#475569', fontWeight: sel ? 700 : 500,
                 }}>
-                <span style={{ width: 7, height: 7, borderRadius: '50%', background: t.dot, flexShrink: 0 }} />
-                <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }}>
-                  {node.name}
+                <button onClick={() => setSelectedDeptId(node.id)}
+                  style={{
+                    flex: 1, display: 'flex', alignItems: 'center', gap: 6, textAlign: 'left',
+                    cursor: 'pointer', padding: '6px 4px', fontSize: 12, border: 'none', background: 'transparent',
+                    color: sel ? t.tx : '#475569', fontWeight: sel ? 700 : 500,
+                  }}>
+                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: t.dot, flexShrink: 0 }} />
+                  <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }}>
+                    {node.name}
+                  </span>
+                  <span style={{ fontSize: 10, color: sel ? t.tx : '#94a3b8', fontWeight: 600 }}>{node.total_count}</span>
+                </button>
+                {/* hover 액션 */}
+                <span className="ride-dept-actions" style={{ display: 'flex', gap: 2, paddingRight: 4 }}>
+                  <button onClick={() => startEditDept(node)} title="이름·상위·색상 변경"
+                    style={{ fontSize: 11, background: 'none', border: 'none', cursor: 'pointer', opacity: 0.5 }}>✏️</button>
+                  <button onClick={() => deleteDept(node)} title="부서 삭제"
+                    style={{ fontSize: 11, background: 'none', border: 'none', cursor: 'pointer', opacity: 0.5 }}>🗑</button>
                 </span>
-                <span style={{ fontSize: 10, color: sel ? t.tx : '#94a3b8', fontWeight: 600 }}>
-                  {node.total_count}
-                </span>
-              </button>
+              </div>
             )
           })}
+          <style>{`
+            .ride-dept-actions { transition: opacity 0.15s; }
+            .ride-dept-row .ride-dept-actions button { opacity: 0.25; }
+            .ride-dept-row:hover .ride-dept-actions button { opacity: 0.7; }
+          `}</style>
         </div>
 
         {/* 우측 — 직원 테이블 */}
@@ -506,20 +658,23 @@ export default function RideOrgPanel() {
             </div>
           )}
 
-          {/* 툴바 — 검색 + 하위포함 + 일괄변경 */}
-          <div style={{ ...glassCard, padding: '8px 12px', display: 'flex', alignItems: 'center',
-            gap: 10, flexWrap: 'wrap' }}>
+          {/* 툴바 */}
+          <div style={{ ...glassCard, padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             <input value={search} onChange={(e) => setSearch(e.target.value)}
               placeholder="🔍 이름·직급·연락처 검색"
               style={{ fontSize: 12, padding: '5px 10px', borderRadius: 7, border: '1px solid rgba(0,0,0,0.10)',
-                background: 'rgba(255,255,255,0.6)', minWidth: 180, flex: 1 }} />
+                background: GLASS.L1.background, minWidth: 160, flex: 1 }} />
             {selectedDept && (
               <label style={{ fontSize: 11, color: '#64748b', display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}>
                 <input type="checkbox" checked={includeSub} onChange={() => setIncludeSub(v => !v)} />
-                하위 부서 포함
+                하위 포함
               </label>
             )}
-            {/* 일괄 부서 변경 */}
+            <label style={{ fontSize: 11, color: inactiveCount > 0 ? '#64748b' : '#cbd5e1',
+              display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}>
+              <input type="checkbox" checked={showInactive} onChange={() => setShowInactive(v => !v)} />
+              비활성 포함 ({inactiveCount})
+            </label>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <span style={{ fontSize: 11, color: checkedIds.size > 0 ? '#2563eb' : '#cbd5e1', fontWeight: 600 }}>
                 {checkedIds.size}명 선택
@@ -543,7 +698,6 @@ export default function RideOrgPanel() {
             </div>
           </div>
 
-          {/* 전체 선택 */}
           {filteredEmps.length > 0 && (
             <label style={{ fontSize: 11, color: '#64748b', display: 'flex', alignItems: 'center',
               gap: 5, cursor: 'pointer', paddingLeft: 4 }}>
@@ -552,7 +706,6 @@ export default function RideOrgPanel() {
             </label>
           )}
 
-          {/* 직원 테이블 */}
           <NeuDataTable<RideEmp>
             columns={columns}
             data={filteredEmps}
