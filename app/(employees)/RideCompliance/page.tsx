@@ -4,7 +4,7 @@
  * /RideCompliance — 라이드 정보보안 메인 대시보드
  *
  * Phase 1.1 (코어 운영 데이터): 대시보드 / 정보자산 / 침해사고 / 조직 매핑
- * Phase 1.2 (자료·운영 + 추가 통찰): 자료실 / 연간 운영 / 서식 작성 + 대시보드 위젯 3개
+ * Phase 1.2 (자료·운영 + 추가 통찰): 규정 문서 관리 / 연간 운영 / 서식 작성 + 대시보드 위젯 3개
  *
  * 단일 진실 원본: 라이드케어 「개인정보보호 내부관리계획서 (통합본)」 V1.0
  *                 RIDE-PMP-2026-001 (시행 2026.05.20).
@@ -12,7 +12,7 @@
  * 사용자 통찰 (2026-05-18):
  *   추가-A: 운영자가 매뉴얼대로 진행 체크 (전사 진행률)
  *   추가-B: D-7/D-3/D-day 임박 알림 (다가오는 일정 위젯 + 색상)
- *   추가-C: 원본 검수 단계 분리 (자료실의 is_master_verified 플래그 + CPO 검수 UI)
+ *   추가-C: 원본 검수 단계 분리 (규정 문서 관리의 is_master_verified 플래그 + CPO 검수 UI)
  *
  * 디자인 규칙:
  *  · Rule 14 — RideVehicleRegistry 동형 (NavTabs + DcStatStrip + NeuDataTable)
@@ -92,7 +92,7 @@ const PLAYBOOK_STEPS: PlaybookStep[] = [
     responsible: '관리자(URL 입력) → CPO(검수 완료)',
     output: 'documents.is_master_verified = 1 + document_versions row',
     detail: '매뉴얼 7건 + 서식 18건 + 정책 1건 = 26건 모두 file_url 입력 후 CPO 검수 완료해야 운영 task 의 related_form 으로 연결 가능. 미검수 서식은 작성 차단.',
-    links: [{ label: '자료실 탭', href: '#', tab: 'documents' }],
+    links: [{ label: '규정 문서 관리 탭', href: '#', tab: 'documents' }],
     months: [],
     statusKey: 'documents',
   },
@@ -541,6 +541,8 @@ export default function RideCompliancePage() {
   const [verifyModal, setVerifyModal] = useState<ComplianceDocument | null>(null)
   const [taskActionModal, setTaskActionModal] = useState<ComplianceTask | null>(null)
   const [submitFormModal, setSubmitFormModal] = useState<{ doc: ComplianceDocument; task?: ComplianceTask } | null>(null)
+  // Phase 1.4-fix13 — 규정 문서 관리 신규 등록 모달
+  const [newDocModalOpen, setNewDocModalOpen] = useState(false)
 
   useEffect(() => {
     setUser(getStoredUser())
@@ -721,7 +723,7 @@ export default function RideCompliancePage() {
           ...GLASS.L3, padding: '12px 16px', borderRadius: 10, marginBottom: 16,
           borderLeft: `4px solid ${COLORS.warning}`, color: COLORS.textPrimary, fontSize: 13,
         }}>
-          ⚠ Phase 1.2 마이그레이션 미적용 — <code style={{ fontSize: 12 }}>migrations/2026-05-18_ride_compliance_phase12.sql</code> 적용 후 새로고침. 자료실·연간운영·서식작성 탭은 마이그 적용 후 활성화됩니다.
+          ⚠ Phase 1.2 마이그레이션 미적용 — <code style={{ fontSize: 12 }}>migrations/2026-05-18_ride_compliance_phase12.sql</code> 적용 후 새로고침. 규정 문서 관리·연간운영·서식작성 탭은 마이그 적용 후 활성화됩니다.
         </div>
       )}
       {loadError && (
@@ -739,7 +741,7 @@ export default function RideCompliancePage() {
             { key: 'assets',     label: '정보자산',     emoji: '📦' },
             { key: 'incidents',  label: '침해사고',     emoji: '🚨' },
             { key: 'officers',   label: '조직 매핑',    emoji: '👔' },
-            { key: 'documents',  label: '자료실',       emoji: '📚' },
+            { key: 'documents',  label: '규정 문서 관리',       emoji: '📚' },
             { key: 'annual_ops', label: '연간 운영',    emoji: '📅' },
             { key: 'submissions', label: '서식 작성',   emoji: '📝' },
           ] as { key: TabKey; label: string; emoji: string }[]).map(t => {
@@ -882,7 +884,7 @@ export default function RideCompliancePage() {
             <h3 style={{ margin: '0 0 8px', fontSize: 14 }}>📋 운영 안내 (매뉴얼 통합본 5.17)</h3>
             <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12, lineHeight: 1.8, color: COLORS.textSecondary }}>
               <li>침해사고: 발견 즉시 「침해사고」 탭 신고 — 매뉴얼 제27조. 정보주체 통지는 24h 이내 (제25조 ①).</li>
-              <li>매뉴얼·서식: 「자료실」 탭에서 원본 등록 → CPO 검수 → 활성화. 검수 미완료 서식은 작성 불가.</li>
+              <li>매뉴얼·서식: 「규정 문서 관리」 탭에서 원본 등록 → CPO 검수 → 활성화. 검수 미완료 서식은 작성 불가.</li>
               <li>연간 운영: 「연간 운영」 탭에서 월별 task 진행 추적. D-7/D-3/D-day 임박 시 색상 변경.</li>
               <li>서식 작성: 「서식 작성」 탭에서 인스턴스 list + 보존만료 추적 (3년).</li>
             </ul>
@@ -934,6 +936,8 @@ export default function RideCompliancePage() {
           verifiedFilter={docVerifiedFilter} setVerifiedFilter={setDocVerifiedFilter}
           onFileUrlClick={(d) => setDocFileUrlModal(d)}
           onVerifyClick={(d) => setVerifyModal(d)}
+          onCreate={() => setNewDocModalOpen(true)}
+          onChanged={fetchAll}
           isCpo={isCpoLike} isMgr={isMgrLike}
         />
       )}
@@ -965,6 +969,8 @@ export default function RideCompliancePage() {
       {officerModalOpen && <OfficerModal onClose={() => setOfficerModalOpen(false)} onSaved={() => { setOfficerModalOpen(false); fetchAll() }} />}
       {/* 모달들 — Phase 1.2 */}
       {docFileUrlModal && <DocFileUrlModal doc={docFileUrlModal} onClose={() => setDocFileUrlModal(null)} onSaved={() => { setDocFileUrlModal(null); fetchAll() }} />}
+      {/* Phase 1.4-fix13 — 규정 문서 신규 등록 */}
+      {newDocModalOpen && <NewDocumentModal onClose={() => setNewDocModalOpen(false)} onSaved={() => { setNewDocModalOpen(false); fetchAll() }} />}
       {verifyModal && <VerifyModal doc={verifyModal} onClose={() => setVerifyModal(null)} onSaved={() => { setVerifyModal(null); fetchAll() }} />}
       {taskActionModal && <TaskActionModal task={taskActionModal} canCpoReview={isCpoLike} canManager={isMgrLike} onClose={() => setTaskActionModal(null)} onSaved={() => { setTaskActionModal(null); fetchAll() }} />}
       {submitFormModal && <SubmitFormModal doc={submitFormModal.doc} task={submitFormModal.task} onClose={() => setSubmitFormModal(null)} onSaved={() => { setSubmitFormModal(null); fetchAll() }} />}
@@ -1107,7 +1113,7 @@ function OperationGuideTabContent(props: {
       {/* 매뉴얼 인용 안내 */}
       <div style={{ ...GLASS.L3, padding: 14, borderRadius: 10, fontSize: 11, color: COLORS.textMuted, lineHeight: 1.6 }}>
         💡 본 가이드는 「개인정보보호 내부관리계획서」 V1.0 (RIDE-PMP-2026-001) 및 별첨 7 RIDE-PLAN-2026 의 모든 조항을 9 step 으로 재구성한 것입니다.
-        원본 매뉴얼 내용은 「자료실」 탭의 각 매뉴얼 페이지에서 확인할 수 있습니다.
+        원본 매뉴얼 내용은 「규정 문서 관리」 탭의 각 매뉴얼 페이지에서 확인할 수 있습니다.
       </div>
     </div>
   )
@@ -1563,8 +1569,52 @@ function DocumentsTabContent(props: {
   verifiedFilter: string; setVerifiedFilter: (v: string) => void
   onFileUrlClick: (d: ComplianceDocument) => void
   onVerifyClick: (d: ComplianceDocument) => void
+  onCreate: () => void
+  onChanged: () => void
   isCpo: boolean; isMgr: boolean
 }) {
+  // Phase 1.4-fix13 — 검수 리셋 / 삭제 (CRUD 완성)
+  const [busyId, setBusyId] = useState<string | null>(null)
+
+  // 시드 문서 판별 — 통합본 5.17 「파생서류 목차」 25건 (RIDE-* / F-*)
+  const isSeedDoc = (code: string) => /^(RIDE-|F-)/.test(code)
+
+  const handleReset = async (d: ComplianceDocument) => {
+    if (!confirm(`「${d.doc_code} ${d.title}」 검수 상태를 리셋할까요?\n\n검수 완료 → 검수 대기(pending) 로 되돌립니다. 본문·PDF·버전은 유지됩니다. 재검토 → 승인 흐름을 다시 실행할 수 있습니다.`)) return
+    setBusyId(d.id)
+    try {
+      const token = getStoredToken()
+      const res = await fetch(`/api/ride-compliance/documents/${d.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ action: 'reset' }),
+      })
+      const json = await res.json()
+      if (!res.ok || !json.success) { alert(`리셋 실패: ${json.error || res.status}`); return }
+      props.onChanged()
+    } catch (e) { alert(`리셋 오류: ${e}`) } finally { setBusyId(null) }
+  }
+
+  const handleDelete = async (d: ComplianceDocument) => {
+    const seedWarn = isSeedDoc(d.doc_code)
+      ? '\n\n⚠ 이 문서는 통합본 5.17 「파생서류 목차」 근거 문서입니다. 삭제 대신 「🔄 리셋」 을 권장합니다.'
+      : ''
+    if (!confirm(`「${d.doc_code} ${d.title}」 을(를) 삭제할까요?\n\n· 버전 이력 + 서식 제출 인스턴스 함께 삭제\n· GCS 원본 파일도 삭제\n· 연결된 task 는 보존 (출처만 분리)${seedWarn}\n\n되돌릴 수 없습니다.`)) return
+    setBusyId(d.id)
+    try {
+      const token = getStoredToken()
+      const res = await fetch(`/api/ride-compliance/documents/${d.id}`, {
+        method: 'DELETE',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      })
+      const json = await res.json()
+      if (!res.ok || !json.success) { alert(`삭제 실패: ${json.error || res.status}`); return }
+      const c = json.data?.cascade
+      alert(`✅ 삭제 완료 — ${d.doc_code}\n버전 ${c?.versions ?? 0} · 서식제출 ${c?.submissions ?? 0} · task 분리 ${c?.detached_tasks ?? 0}${json.data?.gcs?.deleted ? ' · GCS 파일 삭제' : ''}`)
+      props.onChanged()
+    } catch (e) { alert(`삭제 오류: ${e}`) } finally { setBusyId(null) }
+  }
+
   const cols: TableColumn<ComplianceDocument>[] = [
     { key: 'doc_code', label: '코드', sortBy: r => r.doc_code, render: r => {
       // Phase 1.3 — 매뉴얼·서식별 페이지로 deep-link
@@ -1597,19 +1647,38 @@ function DocumentsTabContent(props: {
       return <span style={{ color: s?.color, fontWeight: 600 }}>{verified ? '✓ ' : ''}{s?.label || r.status}</span>
     } },
     { key: 'actions', label: '액션', render: r => (
-      <div style={{ display: 'flex', gap: 4 }}>
+      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
         {props.isMgr && !r.file_url && <button onClick={() => props.onFileUrlClick(r)} style={{ ...BTN.sm, border: 'none', background: COLORS.bgAmber, color: COLORS.warning, cursor: 'pointer' }}>📎 URL입력</button>}
         {props.isMgr && r.file_url && r.is_master_verified === 0 && !props.isCpo && <span style={{ fontSize: 11, color: COLORS.warning }}>CPO 검수 대기</span>}
         {props.isCpo && r.file_url && r.is_master_verified === 0 && <button onClick={() => props.onVerifyClick(r)} style={{ ...BTN.sm, border: 'none', background: COLORS.bgGreen, color: COLORS.success, cursor: 'pointer' }}>✓ 검수</button>}
         {props.isCpo && r.is_master_verified === 1 && <button onClick={() => props.onVerifyClick(r)} style={{ ...BTN.sm, border: 'none', background: COLORS.bgGray, color: COLORS.textSecondary, cursor: 'pointer' }}>↩ 재검수</button>}
         {props.isMgr && r.file_url && <button onClick={() => props.onFileUrlClick(r)} style={{ ...BTN.sm, border: 'none', background: COLORS.bgGray, color: COLORS.textSecondary, cursor: 'pointer' }}>✎</button>}
+        {/* Phase 1.4-fix13 — 검수 리셋 (검수 완료 문서만) + 삭제 */}
+        {props.isMgr && r.is_master_verified === 1 && (
+          <button onClick={() => handleReset(r)} disabled={busyId === r.id}
+            title="검수 상태를 pending 으로 리셋 — 재검토·승인 흐름 재실행"
+            style={{ ...BTN.sm, border: 'none', background: COLORS.bgBlue, color: COLORS.primary, cursor: 'pointer' }}>🔄 리셋</button>
+        )}
+        {props.isMgr && (
+          <button onClick={() => handleDelete(r)} disabled={busyId === r.id}
+            title="문서 삭제 (버전·서식제출·GCS 함께)"
+            style={{ ...BTN.sm, border: 'none', background: COLORS.bgRed, color: COLORS.danger, cursor: 'pointer' }}>🗑 삭제</button>
+        )}
       </div>
     ) },
   ]
   return (
     <div style={{ ...GLASS.L3, padding: 20, borderRadius: 12 }}>
-      <div style={{ marginBottom: 12, padding: '10px 14px', borderRadius: 8, background: COLORS.bgBlue, fontSize: 12, color: COLORS.textSecondary, borderLeft: `4px solid ${COLORS.info}` }}>
-        💡 매뉴얼·서식 카탈로그 — 관리자가 file_url 입력 → CPO가 검수 완료 → 활성화. 검수 미완료 서식은 「서식 작성」 탭에서 사용 불가.
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+        <div style={{ flex: 1, padding: '10px 14px', borderRadius: 8, background: COLORS.bgBlue, fontSize: 12, color: COLORS.textSecondary, borderLeft: `4px solid ${COLORS.info}` }}>
+          💡 매뉴얼·서식 카탈로그 — 관리자가 원본 등록 → CPO 검수 완료 → 활성화. 「🔄 리셋」 으로 검수 흐름 재실행, 「🗑 삭제」 로 문서 제거.
+        </div>
+        {props.isMgr && (
+          <button onClick={props.onCreate}
+            style={{ ...BTN.md, border: 'none', background: COLORS.primary, color: '#fff', cursor: 'pointer', fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0 }}>
+            + 신규 문서 등록
+          </button>
+        )}
       </div>
       <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginBottom: 16 }}>
         <input placeholder="제목·코드·설명 검색" value={props.query} onChange={e => props.setQuery(e.target.value)}
@@ -1669,7 +1738,7 @@ function AnnualOpsTabContent(props: {
             return (
               <button key={code} onClick={() => doc && props.onSubmitForm(doc, r)}
                 disabled={!verified}
-                title={verified ? `${doc?.title} 작성` : `${code} 원본 미검수 — 자료실에서 검수 필요`}
+                title={verified ? `${doc?.title} 작성` : `${code} 원본 미검수 — 규정 문서 관리에서 검수 필요`}
                 style={{ ...BTN.sm, border: 'none',
                   background: verified ? COLORS.bgGreen : COLORS.bgRed,
                   color: verified ? COLORS.success : COLORS.danger,
@@ -1749,7 +1818,7 @@ function SubmissionsTabContent(props: {
   return (
     <div style={{ ...GLASS.L3, padding: 20, borderRadius: 12 }}>
       <div style={{ marginBottom: 12, padding: '10px 14px', borderRadius: 8, background: COLORS.bgAmber, fontSize: 12, color: COLORS.textSecondary, borderLeft: `4px solid ${COLORS.warning}` }}>
-        💡 서식 작성 인스턴스 — 매뉴얼 보존 기간 (3년) 자동 추적. 검수 완료된 서식만 작성 가능 (검수 미완료는 자료실에서 먼저 처리).
+        💡 서식 작성 인스턴스 — 매뉴얼 보존 기간 (3년) 자동 추적. 검수 완료된 서식만 작성 가능 (검수 미완료는 규정 문서 관리에서 먼저 처리).
       </div>
       <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginBottom: 16 }}>
         <select value={props.docFilter} onChange={e => props.setDocFilter(e.target.value)} style={selStyle()}>
@@ -1952,6 +2021,80 @@ function DocFileUrlModal(props: { doc: ComplianceDocument; onClose: () => void; 
   )
 }
 
+// Phase 1.4-fix13 — 규정 문서 신규 등록 모달
+function NewDocumentModal(props: { onClose: () => void; onSaved: () => void }) {
+  const [docCode, setDocCode] = useState('')
+  const [docType, setDocType] = useState<'manual' | 'form' | 'policy'>('manual')
+  const [title, setTitle] = useState('')
+  const [parentCode, setParentCode] = useState('')
+  const [retentionYears, setRetentionYears] = useState('3')
+  const [classification, setClassification] = useState('internal')
+  const [description, setDescription] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const save = async () => {
+    if (!docCode.trim()) { setError('문서 코드 필수'); return }
+    if (!title.trim()) { setError('제목 필수'); return }
+    setSaving(true); setError(null)
+    try {
+      const token = getStoredToken()
+      const res = await fetch('/api/ride-compliance/documents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({
+          doc_code: docCode.trim(),
+          doc_type: docType,
+          title: title.trim(),
+          parent_manual_code: parentCode.trim() || null,
+          retention_years: parseInt(retentionYears, 10) || 3,
+          classification,
+          description: description.trim() || null,
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok || !json.success) { setError(json.error || `HTTP ${res.status}`); return }
+      props.onSaved()
+    } catch (e) { setError(String(e)) } finally { setSaving(false) }
+  }
+
+  return (
+    <Modal title="+ 규정 문서 신규 등록" onClose={props.onClose}>
+      <NoticeBox color={COLORS.info} text="신규 문서를 등록합니다. 등록 직후 status=pending (검수 대기) — 원본 파일 등록 → CPO 검수 → 활성화 흐름을 따릅니다." />
+      <Field label="문서 코드 * (예: RIDE-M07, F-M01-07, TEST-01)">
+        <input value={docCode} onChange={e => setDocCode(e.target.value)} placeholder="고유 코드" style={inpStyle()} />
+      </Field>
+      <Field label="유형 *">
+        <select value={docType} onChange={e => setDocType(e.target.value as 'manual' | 'form' | 'policy')} style={selStyle()}>
+          {Object.entries(DOC_TYPE_LABEL).map(([k, v]) => <option key={k} value={k}>{v.emoji} {v.label}</option>)}
+        </select>
+      </Field>
+      <Field label="제목 *">
+        <input value={title} onChange={e => setTitle(e.target.value)} placeholder="문서 제목" style={inpStyle()} />
+      </Field>
+      <Field label="소속 매뉴얼 코드 (서식인 경우 — 옵션)">
+        <input value={parentCode} onChange={e => setParentCode(e.target.value)} placeholder="예: RIDE-M01 (없으면 비움)" style={inpStyle()} />
+      </Field>
+      <div style={{ display: 'flex', gap: 10 }}>
+        <Field label="보존 연수">
+          <input type="number" value={retentionYears} onChange={e => setRetentionYears(e.target.value)} min={1} max={30} style={inpStyle()} />
+        </Field>
+        <Field label="분류 등급">
+          <select value={classification} onChange={e => setClassification(e.target.value)} style={selStyle()}>
+            {Object.entries(CLASSIFICATION_LABEL).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+          </select>
+        </Field>
+      </div>
+      <Field label="설명 (옵션)">
+        <textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="문서 설명"
+          style={{ ...inpStyle(), height: 60, resize: 'vertical', fontFamily: 'inherit' }} />
+      </Field>
+      {error && <ErrorBox text={error} />}
+      <ModalActions onClose={props.onClose} onSave={save} saving={saving} saveLabel="등록" />
+    </Modal>
+  )
+}
+
 function VerifyModal(props: { doc: ComplianceDocument; onClose: () => void; onSaved: () => void }) {
   const [note, setNote] = useState('')
   const [saving, setSaving] = useState(false); const [error, setError] = useState<string | null>(null)
@@ -2092,7 +2235,7 @@ function SubmitFormModal(props: { doc: ComplianceDocument; task?: ComplianceTask
   return (
     <Modal title={`📝 서식 작성 — ${props.doc.doc_code} ${props.doc.title}`} onClose={props.onClose}>
       {props.doc.is_master_verified !== 1 && (
-        <ErrorBox text="원본 미검수 서식 — 자료실 탭에서 CPO 검수 완료 후 작성 가능합니다 (추가-C 통찰)" />
+        <ErrorBox text="원본 미검수 서식 — 규정 문서 관리 탭에서 CPO 검수 완료 후 작성 가능합니다 (추가-C 통찰)" />
       )}
       <NoticeBox color={COLORS.success}
         text={`보존기간 ${props.doc.retention_years}년 자동 설정 (작성일 + ${props.doc.retention_years}년 후 보존만료). ${props.task ? `연계 task: ${props.task.task_code}` : '연계 task 없음 (수시 작성)'}.`} />

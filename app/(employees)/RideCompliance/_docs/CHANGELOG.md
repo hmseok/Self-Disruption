@@ -6,6 +6,37 @@
 
 ---
 
+## v1.4-fix10~13 — PDF 풀세트 + 규정 문서 관리 CRUD (2026-05-19~22)
+
+**사용자 통찰**:
+- "마크다운도 실제처럼 구성 안 됨, 최대한 가깝게" / "pdf 원본 보여주고 pdf 수정기능"
+- "원본이면 섹션목차하고, 검토 llm은 어떻게 사용할수있나요?" / "제대로 보고 제대로 사용하고싶은데"
+- "「자료실」 명칭이 검수→승인→관리 흐름과 안 어울림 / 기존 자료 삭제 후 새로 업로드 플로우 검증하려는데 구조와 안 맞음"
+
+**fix10 — PDF 모드 기본화**: 매뉴얼 페이지 진입 시 PDF 자동 표시 (viewMode 기본 'pdf' + 자동 로딩, PDF 없으면 'md' fallback)
+
+**fix11 — PDF 새 버전 업로드 워크플로우**:
+- 매뉴얼 PDF 모드 헤더에 「📥 PDF 다운로드」 + 「📤 새 버전 업로드」
+- `NewVersionUploadModal` — version_no 자동 증가 (V1.0→V1.1), signed URL → GCS PUT → POST document-versions
+- `document-versions` POST 확장 — `gcs_object_path` + `reset_master_verification` (활성 시 기존 active→superseded, 검수 자동 reset)
+
+**fix12 — PDF 풀세트 통합**:
+- `harness-engineering/scripts/seed-compliance-content-md.js` 신규 — PDF→마크다운 batch 추출 (pdf-parse, 휴리스틱 헤더 변환) → content_md UPDATE 4건
+- `package.json` — pdf-parse 의존성 + seed:compliance-content-md / seed:compliance-pdfs npm scripts
+- 매뉴얼 페이지 — 좌측 섹션 목차 클릭 시 PDF→마크다운 자동 전환 + anchor scroll (`SectionTOC.onSelectSection`)
+
+**fix13 — 규정 문서 관리 CRUD 완성**:
+- 탭 명칭 「자료실」 → 「규정 문서 관리」 (검수→승인→버전관리 흐름 반영)
+- `app/api/ride-compliance/documents/[id]/route.ts` 신규:
+  - DELETE — manager+, $transaction cascade (versions + form_submissions 삭제, tasks.source_document_id→NULL, GCS object best-effort 삭제)
+  - PATCH `{action:'reset'}` — 검수 상태 리셋 (is_master_verified=0 / status=pending / verified_by_* NULL, 본문·PDF·버전 유지)
+- DocumentsTabContent — 「+ 신규 문서 등록」 버튼 + 행별 「🔄 리셋」/「🗑 삭제」 (manager+), 시드 문서(RIDE-*/F-*) 삭제 시 경고
+- `NewDocumentModal` 신규 — doc_code/type/title/parent/retention/classification 입력 → POST documents
+
+**Rule 준수**: Rule 14 동형(4 매뉴얼 batch) / Rule 22 _docs / Rule 23 graceful(gcs_object_path·source_document_id 컬럼 미적용 try/catch) / Rule 27 lint:harness 새 위반 0 / SESSIONS-COORDINATION § 7 (heredoc commit, 명시적 add, commit+push 한 동작)
+
+---
+
 ## v1.4 — 자동 검토·정합성·승인·스케줄 자동화 (2026-05-19)
 
 **사용자 비전 (2026-05-19)**:
