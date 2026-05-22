@@ -50,28 +50,38 @@ async function main() {
     process.exit(1)
   }
 
-  // 매뉴얼 → 파일 매핑 (5.17 기준)
+  // 매뉴얼 → 파일 매핑 — 패턴은 날짜·"(초안)" 유무 무관, 키워드만 매칭.
+  // 여러 후보 시 mtime 최신 선택 (사용자가 정상 PDF 를 다시 받으면 자동 인식).
   const MANUALS = [
-    { code: 'RIDE-PMP', pattern: /개인정보보호.*내부계획서.*통합본.*2026\.05\.17\.pdf/, title: '개인정보보호 내부관리계획서 통합본' },
-    { code: 'RIDE-M01', pattern: /개인정보\s*유출대응.*2026\.05\.17\.pdf/, title: '개인정보 유출 대응 매뉴얼' },
-    { code: 'RIDE-M05', pattern: /개인정보\s*파기관리.*2026\.05\.17\.pdf/, title: '개인정보 파기 절차·확인 매뉴얼' },
-    { code: 'RIDE-M06', pattern: /개인정보\s*취급단말기.*반출관리.*2026\.05\.17\.pdf/, title: '개인정보 취급 단말기 반출관리 매뉴얼' },
+    { code: 'RIDE-PMP', pattern: /개인정보보호.*내부계획서.*통합본/, title: '개인정보보호 내부관리계획서 통합본' },
+    { code: 'RIDE-M01', pattern: /개인정보\s*유출대응/, title: '개인정보 유출 대응 매뉴얼' },
+    { code: 'RIDE-M05', pattern: /개인정보\s*파기관리/, title: '개인정보 파기 절차·확인 매뉴얼' },
+    { code: 'RIDE-M06', pattern: /개인정보\s*취급단말기.*반출관리/, title: '개인정보 취급 단말기 반출관리 매뉴얼' },
   ]
 
   // 폴더의 모든 PDF 파일
   const allFiles = fs.readdirSync(pdfDir).filter(f => f.endsWith('.pdf'))
 
-  // 매뉴얼 → 실제 파일 매칭
+  // 매뉴얼 → 실제 파일 매칭 — 패턴 일치 후보 중 mtime 최신 선택
   const targets = []
   for (const m of MANUALS) {
-    const match = allFiles.find(f => m.pattern.test(f))
-    if (!match) {
+    const candidates = allFiles
+      .filter(f => m.pattern.test(f))
+      .map(f => {
+        const p = path.join(pdfDir, f)
+        const st = fs.statSync(p)
+        return { f, p, mtime: st.mtimeMs, size: st.size }
+      })
+      .sort((a, b) => b.mtime - a.mtime)  // 최신 우선
+    if (candidates.length === 0) {
       console.log(`  ⚠ 미발견: ${m.code} (${m.title}) — pattern ${m.pattern}`)
       continue
     }
-    const srcPath = path.join(pdfDir, match)
-    const size = fs.statSync(srcPath).size
-    targets.push({ ...m, srcFile: match, srcPath, size })
+    const picked = candidates[0]
+    if (candidates.length > 1) {
+      console.log(`  ℹ ${m.code}: 후보 ${candidates.length}건 → 최신 선택 "${picked.f}"`)
+    }
+    targets.push({ ...m, srcFile: picked.f, srcPath: picked.p, size: picked.size })
   }
 
   if (targets.length === 0) {

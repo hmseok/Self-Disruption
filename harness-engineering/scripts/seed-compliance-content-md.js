@@ -36,25 +36,27 @@ const path = require('path')
 const os = require('os')
 
 // 매뉴얼 → PDF 파일 패턴 + 메타
+// 패턴은 날짜·"(초안)" 유무 무관 — 키워드만 매칭. 여러 후보 시 mtime 최신 선택.
+// (사용자가 PDF 를 다시 받아 폴더에 넣으면 파일명 신경 안 써도 자동 인식)
 const MANUALS = [
   {
     code: 'RIDE-PMP',
-    pattern: /개인정보보호.*내부계획서.*통합본.*2026\.05\.17\.pdf/,
+    pattern: /개인정보보호.*내부계획서.*통합본/,
     title: '개인정보보호 내부관리계획서 통합본',
   },
   {
     code: 'RIDE-M01',
-    pattern: /개인정보\s*유출대응.*2026\.05\.17\.pdf/,
+    pattern: /개인정보\s*유출대응/,
     title: '개인정보 유출 대응 매뉴얼',
   },
   {
     code: 'RIDE-M05',
-    pattern: /개인정보\s*파기관리.*2026\.05\.17\.pdf/,
+    pattern: /개인정보\s*파기관리/,
     title: '개인정보 파기 절차·확인 매뉴얼',
   },
   {
     code: 'RIDE-M06',
-    pattern: /개인정보\s*취급단말기.*반출관리.*2026\.05\.17\.pdf/,
+    pattern: /개인정보\s*취급단말기.*반출관리/,
     title: '개인정보 취급 단말기 반출관리 매뉴얼',
   },
 ]
@@ -192,17 +194,27 @@ async function main() {
   console.log(`\n📂 PDF 폴더: ${pdfDir}`)
   console.log(`   파일 ${allFiles.length}개 발견`)
 
-  // 매뉴얼 → 실제 파일 매칭
+  // 매뉴얼 → 실제 파일 매칭 — 패턴 일치 후보 중 mtime 최신 선택
+  // (사용자가 정상 PDF 를 다시 받아 넣으면 기존 파일과 무관하게 새 것 자동 선택)
   const targets = []
   for (const m of MANUALS) {
-    const match = allFiles.find(f => m.pattern.test(f))
-    if (!match) {
+    const candidates = allFiles
+      .filter(f => m.pattern.test(f))
+      .map(f => {
+        const p = path.join(pdfDir, f)
+        const st = fs.statSync(p)
+        return { f, p, mtime: st.mtimeMs, size: st.size }
+      })
+      .sort((a, b) => b.mtime - a.mtime)  // 최신 우선
+    if (candidates.length === 0) {
       console.log(`  ⚠ 미발견: ${m.code} (${m.title}) — pattern ${m.pattern}`)
       continue
     }
-    const srcPath = path.join(pdfDir, match)
-    const size = fs.statSync(srcPath).size
-    targets.push({ ...m, srcFile: match, srcPath, size })
+    const picked = candidates[0]
+    if (candidates.length > 1) {
+      console.log(`  ℹ ${m.code}: 후보 ${candidates.length}건 → 최신 선택 "${picked.f}"`)
+    }
+    targets.push({ ...m, srcFile: picked.f, srcPath: picked.p, size: picked.size })
   }
 
   if (targets.length === 0) {
