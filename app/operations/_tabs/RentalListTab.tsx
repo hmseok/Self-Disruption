@@ -8,14 +8,18 @@ import NeuDataTable, { TableColumn, MobileCardConfig } from '@/app/components/Ne
 import { GLASS } from '@/app/utils/ui-tokens'
 
 // ═══════════════════════════════════════════════════════════════════
-// RentalListTab — 대차리스트 (진행 중 배차 = 상담중·배차예정·배차완료)
+// RentalListTab — 대차리스트 (대차 업무 전 구간: 상담미진행 → 배차완료)
 //
-// PR-N1 (2026-05-22) — fmi_rentals 리스트 탭 신설
-// PR-N5 (2026-05-22) — 배차스케줄 탭 폐기·흡수 (상담중 dispatch_order 통합)
-// PR-O1 (2026-05-22) — 라이프사이클 분담
-//   사용자 명시: 「배차완료·반납된 차량은 청구관리로. 대차에서 정산까지 갈 필요 없다」
-//   → 대차리스트 = 상담중 / 배차예정 / 배차완료 (지금 나가 있는/나갈 차)
-//     반납(회차완료)되는 순간 청구관리 탭으로 인계 — 여기선 안 보임.
+// PR-N1/N5/O/Q (2026-05-22) — fmi_rentals 리스트 + 상담중 흡수 + 범위 정리
+// PR-T (2026-05-23) — cafe24 대차요청건 흡수
+//   사용자 명시: 「대차요청건에 매칭해서 대차리스트에 상담미진행으로 들어와야」
+//   → 대차사용(otptdcyn=Y) 사고 중 아직 dispatch_order 없는 건 = 「상담미진행」
+//     사고접수는 대차 미사용 건 수동 처리용으로 분리.
+//
+//   3개 소스 통합:
+//     상담미진행 — cafe24 대차요청건 (otptdcyn=Y, rgst=R, dispatch_order 없음)
+//     상담중     — dispatch_order (fmi_rental 미생성)
+//     배차예정/완료 — fmi_rentals (pending/dispatched)
 // ═══════════════════════════════════════════════════════════════════
 
 async function getAuthHeader(): Promise<Record<string, string>> {
@@ -25,9 +29,8 @@ async function getAuthHeader(): Promise<Record<string, string>> {
   } catch { return {} }
 }
 
-// 통합 행 — fmi_rental(배차예정/배차완료) + dispatch_order 상담중
 type Row = {
-  kind: 'rental' | 'order'
+  kind: 'request' | 'order' | 'rental'
   id: string
   customer_name: string | null
   customer_phone: string | null
@@ -41,23 +44,23 @@ type Row = {
   dispatch_date: string | null
   expected_return_date: string | null
   actual_return_date: string | null
-  status: string
+  status: string                       // request / new / consulting / pending / dispatched
   notes: string | null
   fleet_group: string | null
-  // order(상담중) 전용
   order_id?: string
   cafe24_idno?: string | null
   cafe24_mddt?: string | null
   cafe24_srno?: string | number | null
 }
 
-type FilterKey = 'all' | 'consulting' | 'pending' | 'dispatched'
+type FilterKey = 'all' | 'request' | 'consulting' | 'pending' | 'dispatched'
 
 const STATUS_META: Record<string, { label: string; bg: string; fg: string }> = {
-  new:        { label: '상담중',   bg: 'rgba(245,158,11,0.12)',  fg: '#b45309' },
-  consulting: { label: '상담중',   bg: 'rgba(245,158,11,0.12)',  fg: '#b45309' },
-  pending:    { label: '배차예정', bg: 'rgba(99,102,241,0.12)',  fg: '#4338ca' },
-  dispatched: { label: '배차완료', bg: 'rgba(59,130,246,0.12)',  fg: '#1d4ed8' },
+  request:    { label: '상담미진행', bg: 'rgba(239,68,68,0.12)',   fg: '#b91c1c' },
+  new:        { label: '상담중',     bg: 'rgba(245,158,11,0.12)',  fg: '#b45309' },
+  consulting: { label: '상담중',     bg: 'rgba(245,158,11,0.12)',  fg: '#b45309' },
+  pending:    { label: '배차예정',   bg: 'rgba(99,102,241,0.12)',  fg: '#4338ca' },
+  dispatched: { label: '배차완료',   bg: 'rgba(59,130,246,0.12)',  fg: '#1d4ed8' },
 }
 
 function fmtDt(d: string | null | undefined): string {
@@ -66,6 +69,17 @@ function fmtDt(d: string | null | undefined): string {
   if (s.includes('T')) return s.slice(0, 16).replace('T', ' ')
   if (s.length >= 16) return s.slice(0, 16)
   return s
+}
+// cafe24 'YYYYMMDD' + 'HHMM(SS)' → 'YYYY-MM-DD HH:MM:SS'
+function cafe24ToIso(acdt: any, actm: any): string | null {
+  const d = String(acdt || '').replace(/[^0-9]/g, '')
+  if (d.length < 8) return null
+  const t = String(actm || '').replace(/[^0-9]/g, '').padEnd(6, '0')
+  return `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)} ${t.slice(0, 2)}:${t.slice(2, 4)}:${t.slice(4, 6)}`
+}
+function ymd(daysAgo: number): string {
+  const d = new Date(Date.now() - daysAgo * 24 * 3600 * 1000)
+  return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`
 }
 
 export default function RentalListTab() {
@@ -91,7 +105,7 @@ export default function RentalListTab() {
   const [returnNotes, setReturnNotes] = useState('')
   const [returnSaving, setReturnSaving] = useState(false)
 
-  // 삭제/취소 인앱 확인 모달 (PR-Q — native confirm 제거, 규칙 20)
+  // 삭제/취소 인앱 확인 모달 (PR-Q)
   const [confirmTarget, setConfirmTarget] = useState<{ action: 'delete' | 'cancel'; row: Row } | null>(null)
   const [confirmBusy, setConfirmBusy] = useState(false)
 
@@ -100,12 +114,15 @@ export default function RentalListTab() {
     setErr(null)
     try {
       const headers = await getAuthHeader()
-      const [rRes, oRes] = await Promise.all([
+      // 3개 소스 동시 조회: fmi_rentals / dispatch_orders / cafe24 대차요청건(최근 30일)
+      const [rRes, oRes, cRes] = await Promise.all([
         fetch('/api/fmi-rentals?include_stats=1&limit=2000', { headers }).then((r) => r.json()).catch(() => ({})),
         fetch('/api/operations/dispatch-orders?limit=500', { headers }).then((r) => r.json()).catch(() => ({})),
+        fetch(`/api/operations/cafe24-dispatch-requests?from=${ymd(30)}&to=${ymd(0)}&dcyn=Y&rgst=R&limit=2000`, { headers }).then((r) => r.json()).catch(() => ({})),
       ])
       if (rRes?.error) throw new Error(rRes.error)
-      // PR-O1 — 대차리스트는 배차예정/배차완료만. 회차완료~정산은 청구관리 탭.
+
+      // 대차리스트 = 배차예정/배차완료 (회차완료~정산은 청구관리)
       const rentals: Row[] = (Array.isArray(rRes?.data) ? rRes.data : [])
         .filter((r: any) => ['pending', 'dispatched'].includes(r.status))
         .map((r: any) => ({
@@ -127,8 +144,10 @@ export default function RentalListTab() {
           notes: r.notes ?? null,
           fleet_group: r.fleet_group ?? null,
         }))
+
       // 상담중 = fmi_rental 아직 없고 done/cancelled 아닌 dispatch_order
-      const orders: Row[] = (Array.isArray(oRes?.data) ? oRes.data : [])
+      const orderList = Array.isArray(oRes?.data) ? oRes.data : []
+      const orders: Row[] = orderList
         .filter((o: any) => !o.fmi_rental_id && !['done', 'cancelled'].includes(o.status))
         .map((o: any) => ({
           kind: 'order' as const,
@@ -153,7 +172,44 @@ export default function RentalListTab() {
           cafe24_mddt: o.cafe24_otpt_mddt ?? null,
           cafe24_srno: o.cafe24_otpt_srno ?? null,
         }))
-      setRows([...orders, ...rentals])
+
+      // dispatch_order 가 이미 있는 cafe24 키 집합 (상담미진행에서 제외용)
+      const orderedKeys = new Set<string>()
+      for (const o of orderList) {
+        if (o.cafe24_otpt_idno && o.cafe24_otpt_mddt && o.cafe24_otpt_srno != null) {
+          orderedKeys.add(`${o.cafe24_otpt_idno}|${o.cafe24_otpt_mddt}|${o.cafe24_otpt_srno}`)
+        }
+      }
+      // 상담미진행 = cafe24 대차요청건 중 dispatch_order 없는 것
+      const requests: Row[] = (Array.isArray(cRes?.data) ? cRes.data : [])
+        .filter((c: any) => {
+          const k = `${c.otptidno}|${c.otptmddt}|${c.otptsrno}`
+          return !orderedKeys.has(k)
+        })
+        .map((c: any) => ({
+          kind: 'request' as const,
+          id: 'req:' + `${c.otptidno}|${c.otptmddt}|${c.otptsrno}`,
+          customer_name: c.cars_user ?? c.otptcanm ?? null,
+          customer_phone: c.otptcahp ?? null,
+          customer_car_number: c.cars_no ?? null,
+          customer_car_type: c.cars_model ?? null,
+          vehicle_car_number: null,
+          vehicle_car_type: null,
+          insurance_company: c.capital_co_name ?? null,
+          insurance_claim_no: null,
+          adjuster_name: c.rental_vendor ?? null,
+          dispatch_date: cafe24ToIso(c.otptacdt, c.otptactm),
+          expected_return_date: null,
+          actual_return_date: null,
+          status: 'request',
+          notes: c.otptacmo ?? null,
+          fleet_group: null,
+          cafe24_idno: c.otptidno ?? null,
+          cafe24_mddt: c.otptmddt ?? null,
+          cafe24_srno: c.otptsrno ?? null,
+        }))
+
+      setRows([...requests, ...orders, ...rentals])
     } catch (e: any) {
       setErr(e?.message || 'fetch 실패')
       setRows([])
@@ -175,7 +231,6 @@ export default function RentalListTab() {
     return new Date(r.expected_return_date) < new Date() && r.status === 'dispatched'
   }, [])
 
-  // 플릿 옵션 — 데이터에서 동적 추출
   const fleetOptions = useMemo(() => {
     const set = new Set<string>()
     for (const r of rows || []) if (r.fleet_group) set.add(r.fleet_group)
@@ -190,6 +245,7 @@ export default function RentalListTab() {
 
   const data = useMemo(() => ({
     all: fleetScoped,
+    request: fleetScoped.filter((r) => r.status === 'request'),
     consulting: fleetScoped.filter((r) => r.status === 'consulting' || r.status === 'new'),
     pending: fleetScoped.filter((r) => r.status === 'pending'),
     dispatched: fleetScoped.filter((r) => r.status === 'dispatched'),
@@ -205,7 +261,6 @@ export default function RentalListTab() {
       (r.customer_car_number || '').toLowerCase().includes(q) ||
       (r.vehicle_car_number || '').toLowerCase().includes(q) ||
       (r.insurance_company || '').toLowerCase().includes(q) ||
-      (r.insurance_claim_no || '').toLowerCase().includes(q) ||
       (r.adjuster_name || '').toLowerCase().includes(q) ||
       (r.fleet_group || '').toLowerCase().includes(q),
     )
@@ -213,6 +268,7 @@ export default function RentalListTab() {
 
   const counts = useMemo(() => ({
     all: fleetScoped.length,
+    request: data.request.length,
     consulting: data.consulting.length,
     pending: data.pending.length,
     dispatched: data.dispatched.length,
@@ -220,8 +276,8 @@ export default function RentalListTab() {
 
   const statItems: StatItem[] = [
     { label: '📋 전체', value: counts.all, unit: '건', tint: 'blue' },
+    { label: '🔔 상담미진행', value: counts.request, unit: '건', tint: 'red' },
     { label: '📞 상담중', value: counts.consulting, unit: '건', tint: 'amber' },
-    { label: '📅 배차예정', value: counts.pending, unit: '건', tint: 'purple' },
     { label: '🚐 배차완료', value: counts.dispatched, unit: '건', tint: 'green' },
     { label: '🔍 검색결과', value: filtered.length, unit: '건', tint: 'blue' },
   ]
@@ -230,12 +286,13 @@ export default function RentalListTab() {
   ]
   const filterItems: FilterItem[] = [
     { key: 'all', label: '📋 전체', count: counts.all },
+    { key: 'request', label: '🔔 상담미진행', count: counts.request },
     { key: 'consulting', label: '📞 상담중', count: counts.consulting },
     { key: 'pending', label: '📅 배차예정', count: counts.pending },
     { key: 'dispatched', label: '🚐 배차완료', count: counts.dispatched },
   ]
 
-  // 반납 처리 (배차완료 건) — 반납하면 청구관리로 넘어감
+  // 반납 처리 (배차완료 건)
   const openReturn = useCallback((r: Row) => {
     setReturnModal(r); setReturnMileage(''); setReturnNotes('')
   }, [])
@@ -264,7 +321,7 @@ export default function RentalListTab() {
     }
   }, [returnModal, returnMileage, returnNotes, refresh, showResult])
 
-  // 삭제/취소 실행 — 확인 모달에서 호출 (PR-Q)
+  // 삭제/취소 실행 (확인 모달에서 호출)
   const runConfirmed = useCallback(async () => {
     if (!confirmTarget) return
     const { action, row } = confirmTarget
@@ -294,25 +351,25 @@ export default function RentalListTab() {
     }
   }, [confirmTarget, refresh, showResult])
 
-  // 행 클릭 — 상담중(order) 건은 배차 상세로 진입
+  // 행 클릭 — 상담미진행/상담중 건은 배차 상세로 진입
   const onRowClick = useCallback((r: Row) => {
-    if (r.kind === 'order' && r.cafe24_idno && r.cafe24_mddt && r.cafe24_srno != null) {
+    if ((r.kind === 'request' || r.kind === 'order') && r.cafe24_idno && r.cafe24_mddt && r.cafe24_srno != null) {
       router.push(`/operations/dispatch/${r.cafe24_idno}/${r.cafe24_mddt}/${r.cafe24_srno}?mode=schedule`)
     }
   }, [router])
 
   const columns: TableColumn<Row>[] = [
     {
-      key: 'dispatch', label: '출고일시', width: 132,
+      key: 'dispatch', label: '출고/접수일시', width: 138,
       sortBy: (r) => r.dispatch_date || '',
       render: (r) => r.dispatch_date
         ? <span style={{ whiteSpace: 'nowrap', fontWeight: 700, color: '#1e293b', fontSize: 12 }}>
-            {r.kind === 'order' ? '예상 ' : ''}{fmtDt(r.dispatch_date)}
+            {r.kind === 'request' ? '접수 ' : r.kind === 'order' ? '예상 ' : ''}{fmtDt(r.dispatch_date)}
           </span>
         : <span style={{ fontSize: 11, color: '#cbd5e1' }}>미정</span>,
     },
     {
-      key: 'return', label: '반납예정', width: 128,
+      key: 'return', label: '반납예정', width: 122,
       sortBy: (r) => r.expected_return_date || '9999',
       render: (r) => {
         const overdue = isOverdue(r)
@@ -321,16 +378,17 @@ export default function RentalListTab() {
       },
     },
     {
-      key: 'fleet', label: '플릿', width: 88,
+      key: 'fleet', label: '플릿', width: 84,
       sortBy: (r) => r.fleet_group || '',
       render: (r) => <span style={{ whiteSpace: 'nowrap', fontSize: 11, fontWeight: 700, color: '#4338ca' }}>{r.fleet_group || '-'}</span>,
     },
     {
-      key: 'vehicle', label: '대차차량', width: 184,
+      key: 'vehicle', label: '대차차량', width: 176,
       sortBy: (r) => r.vehicle_car_number || '',
-      render: (r) => <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: 184, fontSize: 12 }}>
-        <span style={{ fontWeight: 800, color: '#0f2440' }}>🚗 {r.vehicle_car_number || '미지정'}</span>
-        {r.vehicle_car_type ? <span style={{ color: '#94a3b8' }}> · {r.vehicle_car_type}</span> : null}
+      render: (r) => <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: 176, fontSize: 12 }}>
+        {r.vehicle_car_number
+          ? <><span style={{ fontWeight: 800, color: '#0f2440' }}>🚗 {r.vehicle_car_number}</span>{r.vehicle_car_type ? <span style={{ color: '#94a3b8' }}> · {r.vehicle_car_type}</span> : null}</>
+          : <span style={{ color: '#cbd5e1' }}>미배정</span>}
       </span>,
     },
     {
@@ -341,22 +399,22 @@ export default function RentalListTab() {
       </span>,
     },
     {
-      key: 'customer', label: '고객', width: 152,
+      key: 'customer', label: '고객', width: 150,
       sortBy: (r) => r.customer_name || '',
-      render: (r) => <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: 152, fontSize: 12 }}>
+      render: (r) => <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: 150, fontSize: 12 }}>
         <span style={{ fontWeight: 700, color: '#1e293b' }}>{r.customer_name || '-'}</span>
         {r.customer_phone ? <span style={{ color: '#94a3b8' }}> · {r.customer_phone}</span> : null}
       </span>,
     },
     {
-      key: 'insurance', label: '보험사 / 접수번호', width: 180,
+      key: 'insurance', label: '보험사 / 업체', width: 160,
       sortBy: (r) => r.insurance_company || '',
-      render: (r) => <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: 180, fontSize: 12, color: '#475569' }}>
+      render: (r) => <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: 160, fontSize: 12, color: '#475569' }}>
         {r.insurance_company || '-'}{r.insurance_claim_no ? ` · #${r.insurance_claim_no}` : ''}
       </span>,
     },
     {
-      key: 'status', label: '상태', width: 92, align: 'center',
+      key: 'status', label: '상태', width: 100, align: 'center',
       sortBy: (r) => r.status || '',
       render: (r) => {
         const m = STATUS_META[r.status] || { label: r.status, bg: 'rgba(148,163,184,0.15)', fg: '#475569' }
@@ -364,10 +422,15 @@ export default function RentalListTab() {
       },
     },
     {
-      key: 'actions', label: '액션', width: 132, align: 'center',
+      key: 'actions', label: '액션', width: 138, align: 'center',
       render: (r) => (
         <span style={{ display: 'inline-flex', gap: 4, whiteSpace: 'nowrap' }}>
-          {r.kind === 'order' ? (
+          {r.kind === 'request' ? (
+            <button
+              onClick={(e) => { e.stopPropagation(); onRowClick(r) }}
+              style={{ padding: '4px 9px', borderRadius: 7, border: 'none', background: 'linear-gradient(135deg,#ef4444,#dc2626)', color: '#fff', cursor: 'pointer', fontSize: 11, fontWeight: 800 }}
+            >→ 상담 시작</button>
+          ) : r.kind === 'order' ? (
             <button
               onClick={(e) => { e.stopPropagation(); setConfirmTarget({ action: 'cancel', row: r }) }}
               style={{ padding: '4px 9px', borderRadius: 7, border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.08)', color: '#991b1b', cursor: 'pointer', fontSize: 11, fontWeight: 700 }}
@@ -392,7 +455,7 @@ export default function RentalListTab() {
   ]
 
   const mobileCard: MobileCardConfig<Row> = {
-    title: (r) => <span style={{ whiteSpace: 'nowrap' }}>🚗 {r.vehicle_car_number || r.customer_name || r.id.slice(0, 12)}</span>,
+    title: (r) => <span style={{ whiteSpace: 'nowrap' }}>🚗 {r.vehicle_car_number || r.customer_car_number || r.customer_name || r.id.slice(0, 12)}</span>,
     subtitle: (r) => `${(STATUS_META[r.status]?.label) || r.status} · ${r.customer_name || ''}`,
   }
 
@@ -424,7 +487,7 @@ export default function RentalListTab() {
       <DcToolbar
         search={search}
         onSearchChange={setSearch}
-        placeholder="고객 / 차량번호 / 보험사 / 접수번호 / 담당자 / 플릿 검색…"
+        placeholder="고객 / 차량번호 / 보험사·업체 / 담당 / 플릿 검색…"
         filters={filterItems}
         activeFilter={filter}
         onFilterChange={(k) => setFilter(k as FilterKey)}
@@ -451,12 +514,12 @@ export default function RentalListTab() {
         onRowClick={onRowClick}
         loading={loading}
         emptyIcon="🚗"
-        emptyMessage="진행 중인 배차가 없습니다"
+        emptyMessage="진행 중인 대차가 없습니다"
         mobileCard={mobileCard}
         defaultSort={{ key: 'dispatch', dir: 'desc' }}
       />
       <div style={{ marginTop: 12, fontSize: 12, color: '#64748b' }}>
-        💡 상담중 → 배차예정 → 배차완료까지 — 반납 처리하면 청구관리 탭으로 넘어갑니다. 상담중 행을 클릭하면 배차 상세로 이동합니다.
+        💡 대차요청건은 「상담미진행」으로 자동 표시됩니다 — 행을 클릭하면 배차 상세에서 상담·배차를 진행합니다. 반납하면 청구관리 탭으로 넘어갑니다.
       </div>
 
       {/* 반납 처리 모달 */}
@@ -505,7 +568,7 @@ export default function RentalListTab() {
         </div>
       )}
 
-      {/* 삭제/취소 확인 모달 — PR-Q (native confirm 대체, 규칙 20) */}
+      {/* 삭제/취소 확인 모달 — PR-Q */}
       {confirmTarget && (
         <div
           onClick={() => !confirmBusy && setConfirmTarget(null)}
