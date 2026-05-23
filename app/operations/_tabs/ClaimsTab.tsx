@@ -7,18 +7,14 @@ import NeuDataTable, { TableColumn, MobileCardConfig } from '@/app/components/Ne
 import { GLASS } from '@/app/utils/ui-tokens'
 
 // ═══════════════════════════════════════════════════════════════════
-// ClaimsTab — PR-D1 (2026-05-16) 청구관리 list
+// ClaimsTab — 청구관리 (회차완료 → 청구 → 정산)
 //
-// 운영 라이프사이클 마지막 단계: 회차 완료 → 청구 작성 → 입금 추적
-//
-// 데이터: fmi_rentals (청구 데이터 본체) — /api/fmi-rentals
-//   status: returned (반납·청구전) / claiming (청구중) / settled (정산완료)
-//
-// PR-D1 범위 — list + 화면 골격:
-//   - 반납일 / 차량 / 고객 / 보험사 / 대여기간 / 청구액 / 상태
-//   - 상태별 필터
-// PR-D2 (다음): 청구 작성 폼 (final_claim_amount / insurance_claim_no)
-// PR-D3 (이후): 입금% 동적 계산 (transactions JOIN)
+// PR-D1/D2 (2026-05-16) — 청구관리 list + 청구 작성
+// PR-O (2026-05-22) — 라이프사이클 분담 + 보강
+//   사용자 명시: 「배차완료·반납된 차량은 청구관리로」
+//   → 청구관리 = 회차완료(반납) / 청구중 / 정산완료 의 청구·정산 원장.
+//   추가: 청구유형 컬럼, 부가세 추가청구 배지/필터, 청구 모달 청구유형 선택.
+//   입금 확인은 재무(통장) 영역 — 여기선 '정산완료' 상태로만 반영.
 // ═══════════════════════════════════════════════════════════════════
 
 async function getAuthHeader(): Promise<Record<string, string>> {
@@ -47,17 +43,21 @@ type ClaimRow = {
   final_claim_amount: number | null
   status: string | null
   handler_name: string | null
+  claim_type: string | null
+  vat_extra_billing: string | null
+  capital_company: string | null
 }
 
 type FilterKey = 'all' | 'returned' | 'claiming' | 'settled'
 
 // 청구관리 영역 = 회차 후 단계
 const VISIBLE_STATUS = ['returned', 'claiming', 'settled']
+const CLAIM_TYPES = ['보험', '라이드', '고객유상', '유상대차', '정비대차', '사고대차']
 
 const STATUS_META: Record<string, { label: string; bg: string; fg: string }> = {
-  returned: { label: '📥 반납·청구전', bg: 'rgba(245,158,11,0.12)', fg: '#b45309' },
-  claiming: { label: '📤 청구중',      bg: 'rgba(99,102,241,0.12)', fg: '#4338ca' },
-  settled:  { label: '✅ 정산완료',    bg: 'rgba(34,197,94,0.12)',  fg: '#15803d' },
+  returned: { label: '📥 회차완료', bg: 'rgba(245,158,11,0.12)', fg: '#b45309' },
+  claiming: { label: '📤 청구중',   bg: 'rgba(99,102,241,0.12)', fg: '#4338ca' },
+  settled:  { label: '✅ 정산완료', bg: 'rgba(34,197,94,0.12)',  fg: '#15803d' },
 }
 
 function fmtWon(n: number | null | undefined): string {
@@ -72,15 +72,17 @@ function fmtDate(s: string | null | undefined): string {
 export default function ClaimsTab() {
   const [filter, setFilter] = useState<FilterKey>('all')
   const [search, setSearch] = useState('')
+  const [vatOnly, setVatOnly] = useState(false)
   const [rows, setRows] = useState<ClaimRow[] | null>(null)
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState<string | null>(null)
 
-  // PR-D2 — 청구 작성 모달
+  // 청구 작성 모달
   const [claimModalOpen, setClaimModalOpen] = useState(false)
   const [selectedClaim, setSelectedClaim] = useState<ClaimRow | null>(null)
   const [claimAmount, setClaimAmount] = useState('')
   const [claimNo, setClaimNo] = useState('')
+  const [claimType, setClaimType] = useState('')
   const [claimBusy, setClaimBusy] = useState(false)
   const [claimMsg, setClaimMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
 
@@ -89,8 +91,7 @@ export default function ClaimsTab() {
     setErr(null)
     try {
       const headers = await getAuthHeader()
-      // fmi-rentals 전체 받아 client filter (status 별 — returned/claiming/settled)
-      const res = await fetch('/api/fmi-rentals?limit=1000', { headers })
+      const res = await fetch('/api/fmi-rentals?limit=2000', { headers })
       const json = await res.json().catch(() => ({}))
       if (Array.isArray(json?.data)) {
         setRows(json.data as ClaimRow[])
@@ -116,16 +117,17 @@ export default function ClaimsTab() {
     fetchAll()
   }, [fetchAll])
 
-  // PR-D2 — 행 클릭 → 청구 작성 모달 오픈
+  // 행 클릭 → 청구 작성 모달 오픈
   const openClaim = useCallback((r: ClaimRow) => {
     setSelectedClaim(r)
     setClaimAmount(r.final_claim_amount != null ? String(r.final_claim_amount) : '')
     setClaimNo(r.insurance_claim_no || '')
+    setClaimType(r.claim_type || '')
     setClaimMsg(null)
     setClaimModalOpen(true)
   }, [])
 
-  // PR-D2 — 청구 저장 (status 전이: claiming / settled)
+  // 청구 저장 (status 전이: claiming / settled)
   const saveClaim = useCallback(async (nextStatus: 'claiming' | 'settled') => {
     if (!selectedClaim) return
     setClaimBusy(true)
@@ -138,6 +140,7 @@ export default function ClaimsTab() {
         body: JSON.stringify({
           final_claim_amount: claimAmount === '' ? null : Number(claimAmount),
           insurance_claim_no: claimNo || null,
+          claim_type: claimType || null,
           status: nextStatus,
         }),
       })
@@ -151,13 +154,14 @@ export default function ClaimsTab() {
     } finally {
       setClaimBusy(false)
     }
-  }, [selectedClaim, claimAmount, claimNo, refresh])
+  }, [selectedClaim, claimAmount, claimNo, claimType, refresh])
 
-  // 청구관리 영역 (returned/claiming/settled) 만
-  const claimRows = useMemo(
-    () => (rows || []).filter((r) => VISIBLE_STATUS.includes(r.status || '')),
-    [rows],
-  )
+  // 청구관리 영역 (returned/claiming/settled) — 부가세 필터 적용
+  const claimRows = useMemo(() => {
+    let list = (rows || []).filter((r) => VISIBLE_STATUS.includes(r.status || ''))
+    if (vatOnly) list = list.filter((r) => r.vat_extra_billing === 'Y')
+    return list
+  }, [rows, vatOnly])
 
   const data = useMemo(() => ({
     all: claimRows,
@@ -175,6 +179,7 @@ export default function ClaimsTab() {
       (r.customer_name || '').toLowerCase().includes(q) ||
       (r.insurance_company || '').toLowerCase().includes(q) ||
       (r.insurance_claim_no || '').toLowerCase().includes(q) ||
+      (r.claim_type || '').toLowerCase().includes(q) ||
       (r.rental_no || '').toLowerCase().includes(q),
     )
   }, [activeData, search])
@@ -185,6 +190,10 @@ export default function ClaimsTab() {
     claiming: data.claiming.length,
     settled: data.settled.length,
   }
+  const vatCount = useMemo(
+    () => (rows || []).filter((r) => VISIBLE_STATUS.includes(r.status || '') && r.vat_extra_billing === 'Y').length,
+    [rows],
+  )
   // 청구액 합계 (정보성)
   const totalClaim = useMemo(
     () => filtered.reduce((s, r) => s + Number(r.final_claim_amount || 0), 0),
@@ -193,29 +202,29 @@ export default function ClaimsTab() {
 
   const statItems: StatItem[] = [
     { label: '💰 청구 대상 전체', value: counts.all, unit: '건', tint: 'blue' },
-    { label: '📥 반납·청구전', value: counts.returned, unit: '건', tint: 'amber' },
+    { label: '📥 회차완료', value: counts.returned, unit: '건', tint: 'amber' },
     { label: '📤 청구중', value: counts.claiming, unit: '건', tint: 'purple' },
-    { label: '✅ 정산완료', value: counts.settled, unit: '건', tint: 'green' },
-    { label: '🧮 청구액 합계', value: Math.round(totalClaim / 10000), unit: '만원', tint: 'blue' },
+    { label: '🧾 부가세 추가청구', value: vatCount, unit: '건', tint: 'amber' },
+    { label: '🧮 청구액 합계', value: Math.round(totalClaim / 10000), unit: '만원', tint: 'green' },
   ]
   const statActions: ActionButton[] = [
     { label: '새로고침', onClick: refresh, variant: 'secondary', icon: '🔄' },
   ]
   const filterItems: FilterItem[] = [
     { key: 'all', label: '💰 전체', count: counts.all },
-    { key: 'returned', label: '📥 청구전', count: counts.returned },
+    { key: 'returned', label: '📥 회차완료', count: counts.returned },
     { key: 'claiming', label: '📤 청구중', count: counts.claiming },
     { key: 'settled', label: '✅ 정산완료', count: counts.settled },
   ]
 
   const columns: TableColumn<ClaimRow>[] = [
     {
-      key: 'actual_return_date', label: '반납일', width: 110,
+      key: 'actual_return_date', label: '반납일', width: 108,
       sortBy: (r) => r.actual_return_date || '',
       render: (r) => <span style={{ whiteSpace: 'nowrap', fontWeight: 700, color: '#1e293b', fontSize: 12 }}>{fmtDate(r.actual_return_date)}</span>,
     },
     {
-      key: 'status', label: '상태', width: 120, align: 'center',
+      key: 'status', label: '상태', width: 116, align: 'center',
       sortBy: (r) => r.status || '',
       render: (r) => {
         const meta = STATUS_META[r.status || ''] || { label: r.status || '-', bg: 'rgba(148,163,184,0.15)', fg: '#475569' }
@@ -223,17 +232,33 @@ export default function ClaimsTab() {
       },
     },
     {
+      key: 'claim_type', label: '청구유형', width: 158,
+      sortBy: (r) => r.claim_type || '',
+      render: (r) => (
+        <span style={{ whiteSpace: 'nowrap', fontSize: 12 }}>
+          {r.claim_type
+            ? <span style={{ fontWeight: 700, color: '#4338ca' }}>{r.claim_type}</span>
+            : <span style={{ color: '#cbd5e1' }}>-</span>}
+          {r.vat_extra_billing === 'Y' && (
+            <span style={{ marginLeft: 5, padding: '2px 6px', borderRadius: 6, fontSize: 10, fontWeight: 800, background: 'rgba(245,158,11,0.16)', color: '#b45309' }}>
+              부가세{r.capital_company ? ` ${r.capital_company}` : ''}
+            </span>
+          )}
+        </span>
+      ),
+    },
+    {
       key: 'vehicle_car_number', label: '대차차량', width: 110,
       sortBy: (r) => r.vehicle_car_number || '',
       render: (r) => <span style={{ fontWeight: 700, color: '#0f2440', whiteSpace: 'nowrap' }}>🚗 {r.vehicle_car_number || '-'}</span>,
     },
     {
-      key: 'customer_name', label: '고객', width: 130,
+      key: 'customer_name', label: '고객', width: 128,
       sortBy: (r) => r.customer_name || '',
-      render: (r) => <span style={{ fontWeight: 600, color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: 130 }}>{r.customer_name || '-'}</span>,
+      render: (r) => <span style={{ fontWeight: 600, color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: 128 }}>{r.customer_name || '-'}</span>,
     },
     {
-      key: 'insurance_company', label: '보험사', width: 120,
+      key: 'insurance_company', label: '보험사', width: 116,
       sortBy: (r) => r.insurance_company || '',
       render: (r) => <span style={{ fontSize: 12, color: '#475569', whiteSpace: 'nowrap' }}>{r.insurance_company || '-'}</span>,
     },
@@ -245,19 +270,19 @@ export default function ClaimsTab() {
         : <span style={{ fontSize: 11, color: '#cbd5e1' }}>미입력</span>,
     },
     {
-      key: 'period', label: '대여기간', width: 90, align: 'center',
+      key: 'period', label: '대여기간', width: 86, align: 'center',
       sortBy: (r) => r.rental_days ?? 0,
       render: (r) => <span style={{ fontSize: 12, color: '#475569', whiteSpace: 'nowrap' }}>{r.rental_days != null ? `${r.rental_days}일` : '-'}</span>,
     },
     {
-      key: 'final_claim_amount', label: '청구액', width: 130, align: 'right',
+      key: 'final_claim_amount', label: '청구액', width: 124, align: 'right',
       sortBy: (r) => Number(r.final_claim_amount || 0),
       render: (r) => r.final_claim_amount != null
         ? <span style={{ fontWeight: 800, color: '#0f2440', whiteSpace: 'nowrap' }}>{fmtWon(r.final_claim_amount)}</span>
         : <span style={{ fontSize: 11, color: '#cbd5e1', whiteSpace: 'nowrap' }}>미작성</span>,
     },
     {
-      key: 'handler_name', label: '담당자', width: 90,
+      key: 'handler_name', label: '담당자', width: 88,
       sortBy: (r) => r.handler_name || '',
       render: (r) => <span style={{ fontSize: 11, color: '#64748b', whiteSpace: 'nowrap' }}>{r.handler_name || '-'}</span>,
     },
@@ -265,7 +290,7 @@ export default function ClaimsTab() {
 
   const mobileCard: MobileCardConfig<ClaimRow> = {
     title: (r) => <span style={{ whiteSpace: 'nowrap' }}>🚗 {r.vehicle_car_number || r.customer_name || r.rental_no}</span>,
-    subtitle: (r) => `${(STATUS_META[r.status || '']?.label) || r.status || ''} · ${fmtWon(r.final_claim_amount)}`,
+    subtitle: (r) => `${(STATUS_META[r.status || '']?.label) || r.status || ''} · ${r.claim_type || '유형미정'} · ${fmtWon(r.final_claim_amount)}`,
   }
 
   return (
@@ -274,10 +299,20 @@ export default function ClaimsTab() {
       <DcToolbar
         search={search}
         onSearchChange={setSearch}
-        placeholder="대차차량 / 고객 / 보험사 / 보험접수번호 / 대차번호 검색…"
+        placeholder="대차차량 / 고객 / 보험사 / 보험접수번호 / 청구유형 검색…"
         filters={filterItems}
         activeFilter={filter}
         onFilterChange={(k) => setFilter(k as FilterKey)}
+        trailing={
+          <select
+            value={vatOnly ? 'vat' : 'all'}
+            onChange={(e) => setVatOnly(e.target.value === 'vat')}
+            style={{ ...GLASS.L1, padding: '7px 10px', borderRadius: 8, fontSize: 12, color: '#1e293b', fontWeight: 700 }}
+          >
+            <option value="all">🧾 부가세 전체</option>
+            <option value="vat">🧾 부가세 추가청구만</option>
+          </select>
+        }
       />
       {err && (
         <div style={{ ...GLASS.L3, marginBottom: 12, padding: 12, borderRadius: 10, border: '1px solid rgba(239,68,68,0.3)', fontSize: 12, color: '#991b1b' }}>
@@ -296,10 +331,10 @@ export default function ClaimsTab() {
         defaultSort={{ key: 'actual_return_date', dir: 'desc' }}
       />
       <div style={{ marginTop: 12, fontSize: 12, color: '#64748b' }}>
-        💡 행을 클릭하면 청구 작성 (청구액·보험접수번호 입력 / 청구 확정 / 정산 완료) 화면이 열립니다.
+        💡 행을 클릭하면 청구 작성(청구유형·청구액·보험접수번호 / 청구 확정 / 정산 완료)이 열립니다. 입금 확인은 재무(통장)에서 — 여기선 정산완료로 반영됩니다.
       </div>
 
-      {/* PR-D2 — 청구 작성 모달 */}
+      {/* 청구 작성 모달 */}
       {claimModalOpen && selectedClaim && (
         <div
           onClick={() => !claimBusy && setClaimModalOpen(false)}
@@ -341,6 +376,24 @@ export default function ClaimsTab() {
                 <span style={{ color: '#1e293b', fontWeight: 600 }}>{fmtWon(selectedClaim.daily_rate)}</span>
                 <span style={{ color: '#94a3b8', fontWeight: 700 }}>대여료 합계</span>
                 <span style={{ color: '#1e293b', fontWeight: 600 }}>{fmtWon(selectedClaim.total_rental_fee)}</span>
+                {selectedClaim.vat_extra_billing === 'Y' && (
+                  <>
+                    <span style={{ color: '#b45309', fontWeight: 700 }}>부가세</span>
+                    <span style={{ color: '#b45309', fontWeight: 700 }}>추가청구 대상{selectedClaim.capital_company ? ` · ${selectedClaim.capital_company}` : ''}</span>
+                  </>
+                )}
+              </div>
+              {/* 청구유형 */}
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#475569', marginBottom: 5 }}>청구유형</label>
+                <select
+                  value={claimType}
+                  onChange={(e) => setClaimType(e.target.value)}
+                  style={{ ...GLASS.L1, width: '100%', padding: '9px 12px', borderRadius: 8, fontSize: 13, color: '#1e293b' }}
+                >
+                  <option value="">— 선택 —</option>
+                  {CLAIM_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                </select>
               </div>
               {/* 청구액 */}
               <div>
@@ -378,7 +431,7 @@ export default function ClaimsTab() {
             <div style={{ display: 'flex', gap: 8, padding: '14px 20px', borderTop: '1px solid rgba(0,0,0,0.06)' }}>
               <button onClick={() => !claimBusy && setClaimModalOpen(false)}
                 style={{ padding: '9px 16px', background: 'transparent', border: '1px solid rgba(0,0,0,0.12)', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700, color: '#475569' }}>
-                취소
+                닫기
               </button>
               <div style={{ flex: 1 }} />
               <button

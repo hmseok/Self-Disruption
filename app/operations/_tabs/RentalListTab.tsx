@@ -8,14 +8,14 @@ import NeuDataTable, { TableColumn, MobileCardConfig } from '@/app/components/Ne
 import { GLASS } from '@/app/utils/ui-tokens'
 
 // ═══════════════════════════════════════════════════════════════════
-// RentalListTab — 대차리스트 (배차 1건 = 1행, 상담~회차~청구 통합 원장)
+// RentalListTab — 대차리스트 (진행 중 배차 = 상담중·배차예정·배차완료)
 //
 // PR-N1 (2026-05-22) — fmi_rentals 리스트 탭 신설
-// PR-N5 (2026-05-22) — 배차스케줄 탭 폐기·흡수
-//   사용자 명시: 「리스트가 많으니 상담도 대차로 넘기고, 거기서 배차예약·배차
-//                진행하고, 상담 후 취소되면 취소 처리」
-//   → 상담중 dispatch_order(아직 fmi_rental 없는 건) + fmi_rentals 를 한 리스트로.
-//     상담중 행 클릭 → 배차 상세(상담·배차·회차). 상담중 행에 「취소」 액션.
+// PR-N5 (2026-05-22) — 배차스케줄 탭 폐기·흡수 (상담중 dispatch_order 통합)
+// PR-O1 (2026-05-22) — 라이프사이클 분담
+//   사용자 명시: 「배차완료·반납된 차량은 청구관리로. 대차에서 정산까지 갈 필요 없다」
+//   → 대차리스트 = 상담중 / 배차예정 / 배차완료 (지금 나가 있는/나갈 차)
+//     반납(회차완료)되는 순간 청구관리 탭으로 인계 — 여기선 안 보임.
 // ═══════════════════════════════════════════════════════════════════
 
 async function getAuthHeader(): Promise<Record<string, string>> {
@@ -25,10 +25,10 @@ async function getAuthHeader(): Promise<Record<string, string>> {
   } catch { return {} }
 }
 
-// 통합 행 — fmi_rental(확정 후) + dispatch_order 상담중(확정 전)
+// 통합 행 — fmi_rental(배차예정/배차완료) + dispatch_order 상담중
 type Row = {
   kind: 'rental' | 'order'
-  id: string                       // 행 고유 키 (order 는 'order:' prefix)
+  id: string
   customer_name: string | null
   customer_phone: string | null
   customer_car_number: string | null
@@ -41,7 +41,6 @@ type Row = {
   dispatch_date: string | null
   expected_return_date: string | null
   actual_return_date: string | null
-  final_claim_amount: number | null
   status: string
   notes: string | null
   fleet_group: string | null
@@ -52,17 +51,13 @@ type Row = {
   cafe24_srno?: string | number | null
 }
 
-type FilterKey = 'all' | 'consulting' | 'active' | 'returned' | 'settled'
+type FilterKey = 'all' | 'consulting' | 'pending' | 'dispatched'
 
 const STATUS_META: Record<string, { label: string; bg: string; fg: string }> = {
   new:        { label: '상담중',   bg: 'rgba(245,158,11,0.12)',  fg: '#b45309' },
   consulting: { label: '상담중',   bg: 'rgba(245,158,11,0.12)',  fg: '#b45309' },
   pending:    { label: '배차예정', bg: 'rgba(99,102,241,0.12)',  fg: '#4338ca' },
   dispatched: { label: '배차완료', bg: 'rgba(59,130,246,0.12)',  fg: '#1d4ed8' },
-  returned:   { label: '회차완료', bg: 'rgba(100,116,139,0.16)', fg: '#475569' },
-  claiming:   { label: '청구중',   bg: 'rgba(124,58,237,0.12)',  fg: '#6d28d9' },
-  settled:    { label: '정산완료', bg: 'rgba(34,197,94,0.12)',   fg: '#15803d' },
-  cancelled:  { label: '취소',     bg: 'rgba(239,68,68,0.12)',   fg: '#991b1b' },
 }
 
 function fmtDt(d: string | null | undefined): string {
@@ -71,12 +66,6 @@ function fmtDt(d: string | null | undefined): string {
   if (s.includes('T')) return s.slice(0, 16).replace('T', ' ')
   if (s.length >= 16) return s.slice(0, 16)
   return s
-}
-function fmtMoney(v: number | null | undefined): string {
-  if (v === null || v === undefined) return '-'
-  const n = Number(v)
-  if (Number.isNaN(n)) return '-'
-  return n.toLocaleString('ko-KR')
 }
 
 export default function RentalListTab() {
@@ -107,32 +96,33 @@ export default function RentalListTab() {
     setErr(null)
     try {
       const headers = await getAuthHeader()
-      // 확정 후(fmi_rentals) + 상담중(dispatch_orders, fmi_rental 미생성) 동시 조회
       const [rRes, oRes] = await Promise.all([
         fetch('/api/fmi-rentals?include_stats=1&limit=2000', { headers }).then((r) => r.json()).catch(() => ({})),
         fetch('/api/operations/dispatch-orders?limit=500', { headers }).then((r) => r.json()).catch(() => ({})),
       ])
       if (rRes?.error) throw new Error(rRes.error)
-      const rentals: Row[] = (Array.isArray(rRes?.data) ? rRes.data : []).map((r: any) => ({
-        kind: 'rental' as const,
-        id: String(r.id),
-        customer_name: r.customer_name ?? null,
-        customer_phone: r.customer_phone ?? null,
-        customer_car_number: r.customer_car_number ?? null,
-        customer_car_type: r.customer_car_type ?? null,
-        vehicle_car_number: r.vehicle_car_number ?? null,
-        vehicle_car_type: r.vehicle_car_type ?? null,
-        insurance_company: r.insurance_company ?? null,
-        insurance_claim_no: r.insurance_claim_no ?? null,
-        adjuster_name: r.adjuster_name ?? null,
-        dispatch_date: r.dispatch_date ?? null,
-        expected_return_date: r.expected_return_date ?? null,
-        actual_return_date: r.actual_return_date ?? null,
-        final_claim_amount: r.final_claim_amount ?? null,
-        status: r.status || 'pending',
-        notes: r.notes ?? null,
-        fleet_group: r.fleet_group ?? null,
-      }))
+      // PR-O1 — 대차리스트는 배차예정/배차완료만. 회차완료~정산은 청구관리 탭.
+      const rentals: Row[] = (Array.isArray(rRes?.data) ? rRes.data : [])
+        .filter((r: any) => ['pending', 'dispatched'].includes(r.status))
+        .map((r: any) => ({
+          kind: 'rental' as const,
+          id: String(r.id),
+          customer_name: r.customer_name ?? null,
+          customer_phone: r.customer_phone ?? null,
+          customer_car_number: r.customer_car_number ?? null,
+          customer_car_type: r.customer_car_type ?? null,
+          vehicle_car_number: r.vehicle_car_number ?? null,
+          vehicle_car_type: r.vehicle_car_type ?? null,
+          insurance_company: r.insurance_company ?? null,
+          insurance_claim_no: r.insurance_claim_no ?? null,
+          adjuster_name: r.adjuster_name ?? null,
+          dispatch_date: r.dispatch_date ?? null,
+          expected_return_date: r.expected_return_date ?? null,
+          actual_return_date: r.actual_return_date ?? null,
+          status: r.status || 'pending',
+          notes: r.notes ?? null,
+          fleet_group: r.fleet_group ?? null,
+        }))
       // 상담중 = fmi_rental 아직 없고 done/cancelled 아닌 dispatch_order
       const orders: Row[] = (Array.isArray(oRes?.data) ? oRes.data : [])
         .filter((o: any) => !o.fmi_rental_id && !['done', 'cancelled'].includes(o.status))
@@ -151,7 +141,6 @@ export default function RentalListTab() {
           dispatch_date: o.expected_dispatch_date ?? null,
           expected_return_date: o.expected_return_date ?? null,
           actual_return_date: null,
-          final_claim_amount: null,
           status: o.status || 'consulting',
           notes: o.consultation_note ?? null,
           fleet_group: null,
@@ -179,7 +168,7 @@ export default function RentalListTab() {
   const isOverdue = useCallback((r: Row) => {
     if (r.actual_return_date) return false
     if (!r.expected_return_date) return false
-    return new Date(r.expected_return_date) < new Date() && ['dispatched', 'claiming'].includes(r.status)
+    return new Date(r.expected_return_date) < new Date() && r.status === 'dispatched'
   }, [])
 
   // 플릿 옵션 — 데이터에서 동적 추출
@@ -189,20 +178,17 @@ export default function RentalListTab() {
     return Array.from(set).sort()
   }, [rows])
 
-  // 플릿 필터 1차 적용
   const fleetScoped = useMemo(() => {
     if (!rows) return []
     if (fleet === 'all') return rows
     return rows.filter((r) => (r.fleet_group || '') === fleet)
   }, [rows, fleet])
 
-  // 상태별 분류
   const data = useMemo(() => ({
     all: fleetScoped,
     consulting: fleetScoped.filter((r) => r.status === 'consulting' || r.status === 'new'),
-    active: fleetScoped.filter((r) => ['pending', 'dispatched', 'claiming'].includes(r.status)),
-    returned: fleetScoped.filter((r) => r.status === 'returned'),
-    settled: fleetScoped.filter((r) => r.status === 'settled'),
+    pending: fleetScoped.filter((r) => r.status === 'pending'),
+    dispatched: fleetScoped.filter((r) => r.status === 'dispatched'),
   }), [fleetScoped])
 
   const activeData = data[filter]
@@ -224,17 +210,15 @@ export default function RentalListTab() {
   const counts = useMemo(() => ({
     all: fleetScoped.length,
     consulting: data.consulting.length,
-    active: data.active.length,
-    returned: data.returned.length,
-    settled: data.settled.length,
-    overdue: fleetScoped.filter(isOverdue).length,
-  }), [fleetScoped, data, isOverdue])
+    pending: data.pending.length,
+    dispatched: data.dispatched.length,
+  }), [fleetScoped, data])
 
   const statItems: StatItem[] = [
     { label: '📋 전체', value: counts.all, unit: '건', tint: 'blue' },
     { label: '📞 상담중', value: counts.consulting, unit: '건', tint: 'amber' },
-    { label: '🚐 진행 중', value: counts.active, unit: '건', tint: 'green' },
-    { label: '✅ 정산완료', value: counts.settled, unit: '건', tint: 'purple' },
+    { label: '📅 배차예정', value: counts.pending, unit: '건', tint: 'purple' },
+    { label: '🚐 배차완료', value: counts.dispatched, unit: '건', tint: 'green' },
     { label: '🔍 검색결과', value: filtered.length, unit: '건', tint: 'blue' },
   ]
   const statActions: ActionButton[] = [
@@ -243,12 +227,11 @@ export default function RentalListTab() {
   const filterItems: FilterItem[] = [
     { key: 'all', label: '📋 전체', count: counts.all },
     { key: 'consulting', label: '📞 상담중', count: counts.consulting },
-    { key: 'active', label: '🚐 진행중', count: counts.active },
-    { key: 'returned', label: '🏁 회차완료', count: counts.returned },
-    { key: 'settled', label: '✅ 정산완료', count: counts.settled },
+    { key: 'pending', label: '📅 배차예정', count: counts.pending },
+    { key: 'dispatched', label: '🚐 배차완료', count: counts.dispatched },
   ]
 
-  // 반납 처리 (확정 건)
+  // 반납 처리 (배차완료 건) — 반납하면 청구관리로 넘어감
   const openReturn = useCallback((r: Row) => {
     setReturnModal(r); setReturnMileage(''); setReturnNotes('')
   }, [])
@@ -268,7 +251,7 @@ export default function RentalListTab() {
       const j = await res.json().catch(() => ({}))
       if (!res.ok || j?.error) throw new Error(j?.error || '반납 처리 실패')
       setReturnModal(null)
-      showResult({ type: 'ok', text: '반납 처리 완료' })
+      showResult({ type: 'ok', text: '반납 처리 완료 — 청구관리 탭으로 넘어갑니다' })
       refresh()
     } catch (e: any) {
       showResult({ type: 'err', text: e?.message || '반납 처리 오류' })
@@ -277,7 +260,7 @@ export default function RentalListTab() {
     }
   }, [returnModal, returnMileage, returnNotes, refresh, showResult])
 
-  // 삭제 (확정 건)
+  // 삭제 (배차 건)
   const handleDelete = useCallback(async (r: Row) => {
     if (!confirm(`${r.customer_name || '고객'}님 배차를 삭제할까요?\n(${r.vehicle_car_number || '차량 미지정'})`)) return
     try {
@@ -292,7 +275,7 @@ export default function RentalListTab() {
     }
   }, [refresh, showResult])
 
-  // 취소 처리 (상담중 dispatch_order) — PR-N5
+  // 취소 처리 (상담중 dispatch_order)
   const cancelOrder = useCallback(async (r: Row) => {
     if (!r.order_id) return
     if (!confirm(`${r.customer_name || '고객'}님 상담 건을 취소 처리할까요?`)) return
@@ -330,12 +313,11 @@ export default function RentalListTab() {
         : <span style={{ fontSize: 11, color: '#cbd5e1' }}>미정</span>,
     },
     {
-      key: 'return', label: '반납', width: 132,
-      sortBy: (r) => r.actual_return_date || r.expected_return_date || '9999',
+      key: 'return', label: '반납예정', width: 128,
+      sortBy: (r) => r.expected_return_date || '9999',
       render: (r) => {
         const overdue = isOverdue(r)
-        if (r.actual_return_date) return <span style={{ whiteSpace: 'nowrap', fontSize: 12, color: '#15803d', fontWeight: 600 }}>{fmtDt(r.actual_return_date)}</span>
-        if (r.expected_return_date) return <span style={{ whiteSpace: 'nowrap', fontSize: 12, color: overdue ? '#dc2626' : '#64748b', fontWeight: overdue ? 800 : 600 }}>{overdue ? '⚠ ' : '예정 '}{fmtDt(r.expected_return_date)}</span>
+        if (r.expected_return_date) return <span style={{ whiteSpace: 'nowrap', fontSize: 12, color: overdue ? '#dc2626' : '#64748b', fontWeight: overdue ? 800 : 600 }}>{overdue ? '⚠ ' : ''}{fmtDt(r.expected_return_date)}</span>
         return <span style={{ fontSize: 11, color: '#cbd5e1' }}>미정</span>
       },
     },
@@ -345,9 +327,9 @@ export default function RentalListTab() {
       render: (r) => <span style={{ whiteSpace: 'nowrap', fontSize: 11, fontWeight: 700, color: '#4338ca' }}>{r.fleet_group || '-'}</span>,
     },
     {
-      key: 'vehicle', label: '대차차량', width: 180,
+      key: 'vehicle', label: '대차차량', width: 184,
       sortBy: (r) => r.vehicle_car_number || '',
-      render: (r) => <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: 180, fontSize: 12 }}>
+      render: (r) => <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: 184, fontSize: 12 }}>
         <span style={{ fontWeight: 800, color: '#0f2440' }}>🚗 {r.vehicle_car_number || '미지정'}</span>
         {r.vehicle_car_type ? <span style={{ color: '#94a3b8' }}> · {r.vehicle_car_type}</span> : null}
       </span>,
@@ -360,24 +342,19 @@ export default function RentalListTab() {
       </span>,
     },
     {
-      key: 'customer', label: '고객', width: 150,
+      key: 'customer', label: '고객', width: 152,
       sortBy: (r) => r.customer_name || '',
-      render: (r) => <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: 150, fontSize: 12 }}>
+      render: (r) => <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: 152, fontSize: 12 }}>
         <span style={{ fontWeight: 700, color: '#1e293b' }}>{r.customer_name || '-'}</span>
         {r.customer_phone ? <span style={{ color: '#94a3b8' }}> · {r.customer_phone}</span> : null}
       </span>,
     },
     {
-      key: 'insurance', label: '보험사 / 접수번호', width: 168,
+      key: 'insurance', label: '보험사 / 접수번호', width: 180,
       sortBy: (r) => r.insurance_company || '',
-      render: (r) => <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: 168, fontSize: 12, color: '#475569' }}>
+      render: (r) => <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: 180, fontSize: 12, color: '#475569' }}>
         {r.insurance_company || '-'}{r.insurance_claim_no ? ` · #${r.insurance_claim_no}` : ''}
       </span>,
-    },
-    {
-      key: 'claim', label: '청구금액', width: 104, align: 'right',
-      sortBy: (r) => Number(r.final_claim_amount || 0),
-      render: (r) => <span style={{ whiteSpace: 'nowrap', fontSize: 12, fontWeight: 700, color: r.final_claim_amount ? '#0f2440' : '#cbd5e1' }}>{fmtMoney(r.final_claim_amount)}</span>,
     },
     {
       key: 'status', label: '상태', width: 92, align: 'center',
@@ -398,7 +375,7 @@ export default function RentalListTab() {
             >✕ 취소</button>
           ) : (
             <>
-              {!r.actual_return_date && ['dispatched', 'claiming', 'pending'].includes(r.status) && (
+              {r.status === 'dispatched' && !r.actual_return_date && (
                 <button
                   onClick={(e) => { e.stopPropagation(); openReturn(r) }}
                   style={{ padding: '4px 9px', borderRadius: 7, border: '1px solid rgba(245,158,11,0.3)', background: 'rgba(245,158,11,0.1)', color: '#b45309', cursor: 'pointer', fontSize: 11, fontWeight: 700 }}
@@ -418,7 +395,6 @@ export default function RentalListTab() {
   const mobileCard: MobileCardConfig<Row> = {
     title: (r) => <span style={{ whiteSpace: 'nowrap' }}>🚗 {r.vehicle_car_number || r.customer_name || r.id.slice(0, 12)}</span>,
     subtitle: (r) => `${(STATUS_META[r.status]?.label) || r.status} · ${r.customer_name || ''}`,
-    trailing: (r) => <span style={{ fontWeight: 700, fontSize: 12 }}>{fmtMoney(r.final_claim_amount)}</span>,
   }
 
   return (
@@ -476,12 +452,12 @@ export default function RentalListTab() {
         onRowClick={onRowClick}
         loading={loading}
         emptyIcon="🚗"
-        emptyMessage="대차·상담 내역이 없습니다"
+        emptyMessage="진행 중인 배차가 없습니다"
         mobileCard={mobileCard}
         defaultSort={{ key: 'dispatch', dir: 'desc' }}
       />
       <div style={{ marginTop: 12, fontSize: 12, color: '#64748b' }}>
-        💡 한 줄 = 배차 1건 — 상담중부터 회차·정산까지 한 곳에서. 상담중 행을 클릭하면 배차 상세(상담·배차·회차)로 이동합니다.
+        💡 상담중 → 배차예정 → 배차완료까지 — 반납 처리하면 청구관리 탭으로 넘어갑니다. 상담중 행을 클릭하면 배차 상세로 이동합니다.
       </div>
 
       {/* 반납 처리 모달 */}
@@ -515,6 +491,7 @@ export default function RentalListTab() {
                 <textarea value={returnNotes} onChange={(e) => setReturnNotes(e.target.value)} rows={3} placeholder="반납 상태, 파손 여부 등"
                   style={{ ...GLASS.L1, width: '100%', padding: '9px 12px', borderRadius: 8, fontSize: 13, color: '#1e293b', resize: 'vertical', fontFamily: 'inherit' }} />
               </div>
+              <div style={{ fontSize: 11, color: '#94a3b8' }}>※ 반납 처리하면 이 건은 청구관리 탭으로 이동합니다.</div>
             </div>
             <div style={{ display: 'flex', gap: 8, padding: '14px 20px', borderTop: '1px solid rgba(0,0,0,0.06)' }}>
               <button onClick={() => !returnSaving && setReturnModal(null)}
