@@ -91,6 +91,10 @@ export default function RentalListTab() {
   const [returnNotes, setReturnNotes] = useState('')
   const [returnSaving, setReturnSaving] = useState(false)
 
+  // 삭제/취소 인앱 확인 모달 (PR-Q — native confirm 제거, 규칙 20)
+  const [confirmTarget, setConfirmTarget] = useState<{ action: 'delete' | 'cancel'; row: Row } | null>(null)
+  const [confirmBusy, setConfirmBusy] = useState(false)
+
   const fetchAll = useCallback(async () => {
     setLoading(true)
     setErr(null)
@@ -260,40 +264,35 @@ export default function RentalListTab() {
     }
   }, [returnModal, returnMileage, returnNotes, refresh, showResult])
 
-  // 삭제 (배차 건)
-  const handleDelete = useCallback(async (r: Row) => {
-    if (!confirm(`${r.customer_name || '고객'}님 배차를 삭제할까요?\n(${r.vehicle_car_number || '차량 미지정'})`)) return
-    try {
-      const headers = await getAuthHeader()
-      const res = await fetch(`/api/fmi-rentals/${r.id}`, { method: 'DELETE', headers })
-      const j = await res.json().catch(() => ({}))
-      if (!res.ok || j?.error) throw new Error(j?.error || '삭제 실패')
-      showResult({ type: 'ok', text: '배차 삭제 완료' })
-      refresh()
-    } catch (e: any) {
-      showResult({ type: 'err', text: e?.message || '삭제 오류' })
-    }
-  }, [refresh, showResult])
-
-  // 취소 처리 (상담중 dispatch_order)
-  const cancelOrder = useCallback(async (r: Row) => {
-    if (!r.order_id) return
-    if (!confirm(`${r.customer_name || '고객'}님 상담 건을 취소 처리할까요?`)) return
+  // 삭제/취소 실행 — 확인 모달에서 호출 (PR-Q)
+  const runConfirmed = useCallback(async () => {
+    if (!confirmTarget) return
+    const { action, row } = confirmTarget
+    setConfirmBusy(true)
     try {
       const headers = { ...(await getAuthHeader()), 'Content-Type': 'application/json' }
-      const res = await fetch(`/api/operations/dispatch-orders/${r.order_id}`, {
-        method: 'PATCH',
-        headers,
-        body: JSON.stringify({ status: 'cancelled' }),
-      })
-      const j = await res.json().catch(() => ({}))
-      if (!res.ok || j?.error) throw new Error(j?.error || '취소 실패')
-      showResult({ type: 'ok', text: '상담 건 취소 처리 완료' })
+      if (action === 'delete') {
+        const res = await fetch(`/api/fmi-rentals/${row.id}`, { method: 'DELETE', headers })
+        const j = await res.json().catch(() => ({}))
+        if (!res.ok || j?.error) throw new Error(j?.error || '삭제 실패')
+        showResult({ type: 'ok', text: '배차 삭제 완료' })
+      } else {
+        if (!row.order_id) throw new Error('상담 건 정보가 없습니다')
+        const res = await fetch(`/api/operations/dispatch-orders/${row.order_id}`, {
+          method: 'PATCH', headers, body: JSON.stringify({ status: 'cancelled' }),
+        })
+        const j = await res.json().catch(() => ({}))
+        if (!res.ok || j?.error) throw new Error(j?.error || '취소 실패')
+        showResult({ type: 'ok', text: '상담 건 취소 처리 완료' })
+      }
+      setConfirmTarget(null)
       refresh()
     } catch (e: any) {
-      showResult({ type: 'err', text: e?.message || '취소 오류' })
+      showResult({ type: 'err', text: e?.message || '처리 오류' })
+    } finally {
+      setConfirmBusy(false)
     }
-  }, [refresh, showResult])
+  }, [confirmTarget, refresh, showResult])
 
   // 행 클릭 — 상담중(order) 건은 배차 상세로 진입
   const onRowClick = useCallback((r: Row) => {
@@ -370,7 +369,7 @@ export default function RentalListTab() {
         <span style={{ display: 'inline-flex', gap: 4, whiteSpace: 'nowrap' }}>
           {r.kind === 'order' ? (
             <button
-              onClick={(e) => { e.stopPropagation(); cancelOrder(r) }}
+              onClick={(e) => { e.stopPropagation(); setConfirmTarget({ action: 'cancel', row: r }) }}
               style={{ padding: '4px 9px', borderRadius: 7, border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.08)', color: '#991b1b', cursor: 'pointer', fontSize: 11, fontWeight: 700 }}
             >✕ 취소</button>
           ) : (
@@ -382,9 +381,9 @@ export default function RentalListTab() {
                 >🏁 반납</button>
               )}
               <button
-                onClick={(e) => { e.stopPropagation(); handleDelete(r) }}
-                style={{ padding: '4px 9px', borderRadius: 7, border: '1px solid rgba(0,0,0,0.1)', background: 'transparent', color: '#94a3b8', cursor: 'pointer', fontSize: 11, fontWeight: 700 }}
-              >삭제</button>
+                onClick={(e) => { e.stopPropagation(); setConfirmTarget({ action: 'delete', row: r }) }}
+                style={{ padding: '4px 9px', borderRadius: 7, border: '1px solid rgba(239,68,68,0.25)', background: 'transparent', color: '#991b1b', cursor: 'pointer', fontSize: 11, fontWeight: 700 }}
+              >🗑 삭제</button>
             </>
           )}
         </span>
@@ -500,6 +499,53 @@ export default function RentalListTab() {
               <button onClick={confirmReturn} disabled={returnSaving}
                 style={{ padding: '9px 20px', background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: '#fff', border: 'none', borderRadius: 8, cursor: returnSaving ? 'not-allowed' : 'pointer', fontWeight: 800, fontSize: 13, opacity: returnSaving ? 0.5 : 1 }}>
                 🏁 {returnSaving ? '처리 중…' : '반납 확정'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 삭제/취소 확인 모달 — PR-Q (native confirm 대체, 규칙 20) */}
+      {confirmTarget && (
+        <div
+          onClick={() => !confirmBusy && setConfirmTarget(null)}
+          style={{ position: 'fixed', inset: 0, zIndex: 55, background: 'rgba(15,23,42,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ ...GLASS.L5, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', width: 'min(420px, 96vw)', borderRadius: 16, boxShadow: '0 24px 60px rgba(0,0,0,0.25)', overflow: 'hidden' }}
+          >
+            <div style={{ padding: '18px 20px 14px' }}>
+              <h3 style={{ fontSize: 15, fontWeight: 900, color: '#0f2440', margin: 0 }}>
+                {confirmTarget.action === 'delete' ? '🗑 배차 삭제' : '✕ 상담 건 취소'}
+              </h3>
+              <div style={{ ...GLASS.L1, marginTop: 12, padding: '10px 12px', borderRadius: 8, fontSize: 12, color: '#1e293b', display: 'flex', flexDirection: 'column', gap: 3 }}>
+                <div><span style={{ color: '#94a3b8', fontWeight: 700 }}>차량 </span>🚗 {confirmTarget.row.vehicle_car_number || '미지정'}</div>
+                <div><span style={{ color: '#94a3b8', fontWeight: 700 }}>고객 </span>{confirmTarget.row.customer_name || '-'}</div>
+                <div><span style={{ color: '#94a3b8', fontWeight: 700 }}>출고 </span>{fmtDt(confirmTarget.row.dispatch_date)}</div>
+                <div><span style={{ color: '#94a3b8', fontWeight: 700 }}>사고차량 </span>{confirmTarget.row.customer_car_number || '-'}</div>
+              </div>
+              <div style={{ marginTop: 10, fontSize: 12, fontWeight: 700, color: confirmTarget.action === 'delete' ? '#991b1b' : '#b45309' }}>
+                {confirmTarget.action === 'delete'
+                  ? '이 배차 기록을 삭제합니다. 되돌릴 수 없습니다.'
+                  : '이 상담 건을 취소 처리합니다 (상태 → 취소).'}
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 8, padding: '12px 20px 16px' }}>
+              <button onClick={() => !confirmBusy && setConfirmTarget(null)}
+                style={{ flex: 1, padding: '10px', background: 'transparent', border: '1px solid rgba(0,0,0,0.12)', borderRadius: 9, cursor: 'pointer', fontSize: 13, fontWeight: 700, color: '#475569' }}>
+                닫기
+              </button>
+              <button onClick={runConfirmed} disabled={confirmBusy}
+                style={{
+                  flex: 1, padding: '10px', color: '#fff', border: 'none', borderRadius: 9,
+                  cursor: confirmBusy ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 800,
+                  opacity: confirmBusy ? 0.5 : 1,
+                  background: confirmTarget.action === 'delete'
+                    ? 'linear-gradient(135deg,#ef4444,#dc2626)'
+                    : 'linear-gradient(135deg,#f59e0b,#d97706)',
+                }}>
+                {confirmBusy ? '처리 중…' : (confirmTarget.action === 'delete' ? '🗑 삭제하기' : '✕ 취소 처리')}
               </button>
             </div>
           </div>
