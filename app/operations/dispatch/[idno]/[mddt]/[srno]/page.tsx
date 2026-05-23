@@ -693,9 +693,9 @@ export default function DispatchDetailPage({
       <div className="max-w-[1400px] mx-auto py-4 px-4 md:py-5 md:px-6" style={{ paddingBottom: panelOpen ? 320 : 80 }}>
         {/* Header — 사용자 명시 (2026-05-16): 「목록 새로고침은 좌측이 편한데」 */}
         <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-          {/* PR-N4 (2026-05-22) — 사고접수 「대차전환」 → 상세 처리 후 배차스케줄 탭으로 복귀
-             (router.back() 은 사고접수로 돌아가 흐름이 끊김) */}
-          <button onClick={() => router.push('/operations?tab=schedule')} style={ghostBtn}>← 배차스케줄</button>
+          {/* PR-N4/N5 (2026-05-22) — 상세 처리 후 대차리스트 탭으로 복귀
+             (router.back() 은 사고접수로 돌아가 흐름이 끊김 / 배차스케줄 탭은 N5에서 폐기) */}
+          <button onClick={() => router.push('/operations?tab=rentals')} style={ghostBtn}>← 대차리스트</button>
           <button onClick={() => { fetchRow(); fetchMemos(); fetchOrder(); fetchConsultations(); fetchAcrMemos(); fetchFactories(); fetchSms() }} disabled={rowLoading} style={subtleBtn}>↻ 새로고침</button>
         </div>
         <div style={{ marginBottom: 16 }}>
