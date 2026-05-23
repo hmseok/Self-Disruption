@@ -36,7 +36,7 @@ SELECT f.vehicle_car_number, DATE(f.dispatch_date) AS 출고일,
              PARTITION BY vehicle_car_number ORDER BY dispatch_date
            ) AS next_dispatch
       FROM fmi_rentals
-     WHERE fleet_group = '빌려타'
+     WHERE fleet_group = '빌려타' AND status <> 'cancelled'
   ) seq ON seq.id = f.id
  WHERE seq.next_dispatch IS NOT NULL
    AND f.status IN ('pending', 'dispatched')
@@ -64,7 +64,7 @@ UPDATE fmi_rentals f
              PARTITION BY vehicle_car_number ORDER BY dispatch_date
            ) AS next_dispatch
       FROM fmi_rentals
-     WHERE fleet_group = '빌려타'
+     WHERE fleet_group = '빌려타' AND status <> 'cancelled'
   ) seq ON seq.id = f.id
    SET f.status = 'returned',
        f.actual_return_date = DATE_SUB(seq.next_dispatch, INTERVAL 1 DAY),

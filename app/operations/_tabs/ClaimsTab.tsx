@@ -48,7 +48,7 @@ type ClaimRow = {
   capital_company: string | null
 }
 
-type FilterKey = 'all' | 'returned' | 'claiming' | 'settled'
+type FilterKey = 'active' | 'all' | 'returned' | 'claiming' | 'settled'
 
 // 청구관리 영역 = 회차 후 단계
 const VISIBLE_STATUS = ['returned', 'claiming', 'settled']
@@ -70,7 +70,7 @@ function fmtDate(s: string | null | undefined): string {
 }
 
 export default function ClaimsTab() {
-  const [filter, setFilter] = useState<FilterKey>('all')
+  const [filter, setFilter] = useState<FilterKey>('active')  // PR-S: 기본 = 처리 대상(회차완료+청구중)
   const [search, setSearch] = useState('')
   const [vatOnly, setVatOnly] = useState(false)
   const [rows, setRows] = useState<ClaimRow[] | null>(null)
@@ -165,6 +165,7 @@ export default function ClaimsTab() {
 
   const data = useMemo(() => ({
     all: claimRows,
+    active: claimRows.filter((r) => r.status === 'returned' || r.status === 'claiming'),
     returned: claimRows.filter((r) => r.status === 'returned'),
     claiming: claimRows.filter((r) => r.status === 'claiming'),
     settled: claimRows.filter((r) => r.status === 'settled'),
@@ -186,6 +187,7 @@ export default function ClaimsTab() {
 
   const counts = {
     all: claimRows.length,
+    active: data.active.length,
     returned: data.returned.length,
     claiming: data.claiming.length,
     settled: data.settled.length,
@@ -211,10 +213,11 @@ export default function ClaimsTab() {
     { label: '새로고침', onClick: refresh, variant: 'secondary', icon: '🔄' },
   ]
   const filterItems: FilterItem[] = [
-    { key: 'all', label: '💰 전체', count: counts.all },
+    { key: 'active', label: '🔔 처리 대상', count: counts.active },
     { key: 'returned', label: '📥 회차완료', count: counts.returned },
     { key: 'claiming', label: '📤 청구중', count: counts.claiming },
     { key: 'settled', label: '✅ 정산완료', count: counts.settled },
+    { key: 'all', label: '💰 전체', count: counts.all },
   ]
 
   const columns: TableColumn<ClaimRow>[] = [

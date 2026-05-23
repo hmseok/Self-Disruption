@@ -22,7 +22,7 @@ async function getAuthHeader(): Promise<Record<string, string>> {
   } catch { return {} }
 }
 
-type FilterKey = 'all' | 'dcyn_y' | 'dcyn_n' | 'closed'
+type FilterKey = 'todo' | 'all' | 'dcyn_y' | 'dcyn_n' | 'closed'
 
 // PR-F (2026-05-16) — 우리 진행 상태 배지 (operations_dispatch_orders.status)
 const ORDER_STATUS_META: Record<string, { label: string; bg: string; fg: string }> = {
@@ -45,7 +45,7 @@ function rideAccidentIdFromIdno(idno: string): number {
 //        디폴트 기간 7일 → 3일 (당일 + 어제 + 그저께)
 export default function AccidentIntakeTab() {
   const router = useRouter()
-  const [filter, setFilter] = useState<FilterKey>('all')
+  const [filter, setFilter] = useState<FilterKey>('todo')  // PR-S: 기본 = 미진행(대차전환 안 한 사고)
 
   const [allRows, setAllRows] = useState<DispatchRequestRow[] | null>(null)
   const [orders, setOrders] = useState<DispatchOrder[]>([])  // PR-F — 우리 진행 dispatch_orders
@@ -119,22 +119,6 @@ export default function AccidentIntakeTab() {
     setAllRows(null)
   }, [])
 
-  // client-side 4-way filter (사용자 명시: 4 fetch → 1 fetch + memo filter)
-  const data = useMemo(() => {
-    if (!allRows) return { all: [], dcyn_y: [], dcyn_n: [], closed: [] }
-    const active = allRows.filter((r) => r.otptrgst === 'R')
-    return {
-      all: active,
-      dcyn_y: active.filter((r) => r.otptdcyn === 'Y'),
-      dcyn_n: active.filter((r) => r.otptdcyn === 'N'),
-      closed: allRows.filter((r) => r.otptrgst === 'C'),
-    }
-  }, [allRows])
-
-  const activeData = data[filter]
-  const activeLoading = loading
-  const activeErr = err
-
   // PR-F — cafe24 사고 키 → 우리 dispatch_order 매칭 맵
   const orderMap = useMemo(() => {
     const m = new Map<string, DispatchOrder>()
@@ -145,6 +129,23 @@ export default function AccidentIntakeTab() {
     }
     return m
   }, [orders])
+
+  // client-side filter — PR-S: 기본 'todo' = 미진행 (대차전환 안 한 사고)
+  const data = useMemo(() => {
+    if (!allRows) return { todo: [], all: [], dcyn_y: [], dcyn_n: [], closed: [] }
+    const active = allRows.filter((r) => r.otptrgst === 'R')
+    return {
+      todo: active.filter((r) => !orderMap.has(`${r.otptidno}|${r.otptmddt}|${r.otptsrno}`)),
+      all: active,
+      dcyn_y: active.filter((r) => r.otptdcyn === 'Y'),
+      dcyn_n: active.filter((r) => r.otptdcyn === 'N'),
+      closed: allRows.filter((r) => r.otptrgst === 'C'),
+    }
+  }, [allRows, orderMap])
+
+  const activeData = data[filter]
+  const activeLoading = loading
+  const activeErr = err
 
   // PR-F — 진행 버튼: dispatch_order 없으면 생성 후, 배차 모드로 상세 진입
   const startDispatch = useCallback(async (r: DispatchRequestRow, e: React.MouseEvent) => {
@@ -197,6 +198,7 @@ export default function AccidentIntakeTab() {
   }, [activeData, search])
 
   const counts = {
+    todo: data.todo.length,
     all: data.all.length,
     dcyn_y: data.dcyn_y.length,
     dcyn_n: data.dcyn_n.length,
@@ -204,9 +206,9 @@ export default function AccidentIntakeTab() {
   }
 
   const statItems: StatItem[] = [
+    { label: '🔔 미진행', value: counts.todo, unit: '건', tint: 'red' },
     { label: '📋 전체 (활성)', value: counts.all, unit: '건', tint: 'blue' },
-    { label: '🚗 대차 사용', value: counts.dcyn_y, unit: '건', tint: 'red' },
-    { label: '🚙 대차 미사용', value: counts.dcyn_n, unit: '건', tint: 'amber' },
+    { label: '🚗 대차 사용', value: counts.dcyn_y, unit: '건', tint: 'amber' },
     { label: '✅ 종결', value: counts.closed, unit: '건', tint: 'green' },
     { label: '🔍 검색결과', value: filtered.length, unit: '건', tint: 'purple' },
   ]
@@ -214,6 +216,7 @@ export default function AccidentIntakeTab() {
     { label: '새로고침', onClick: refresh, variant: 'secondary', icon: '🔄' },
   ]
   const filterItems: FilterItem[] = [
+    { key: 'todo', label: '🔔 미진행', count: counts.todo },
     { key: 'all', label: '📋 전체', count: counts.all },
     { key: 'dcyn_y', label: '🚗 대차사용', count: counts.dcyn_y },
     { key: 'dcyn_n', label: '🚙 대차미사용', count: counts.dcyn_n },
