@@ -58,6 +58,7 @@ export async function GET(request: NextRequest) {
          r.rental_days, r.daily_rate, r.total_rental_fee, r.final_claim_amount,
          r.status, r.handler_name, r.dispatcher_name, r.notes,
          r.created_at, r.updated_at,
+         r.claim_type, r.vat_extra_billing, r.capital_company,
          COALESCE(r.fleet_group, v.ownership_type) AS fleet_group,
          v.status AS vehicle_status
        FROM fmi_rentals r

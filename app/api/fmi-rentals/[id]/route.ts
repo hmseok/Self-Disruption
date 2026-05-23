@@ -30,6 +30,8 @@ const ALLOWED_FIELDS = new Set([
   'daily_rate', 'total_rental_fee', 'additional_charges', 'deduction_amount', 'final_claim_amount',
   'return_condition', 'return_fuel_level', 'return_damage_yn', 'return_damage_memo',
   'status', 'handler_id', 'handler_name', 'dispatcher_name', 'notes', 'accident_id',
+  // PR-O (2026-05-22) — 청구유형 / 부가세 추가청구
+  'claim_type', 'vat_extra_billing', 'capital_company', 'fleet_group',
 ])
 const DATE_FIELDS = new Set(['dispatch_date', 'expected_return_date', 'actual_return_date'])
 const NUMBER_FIELDS = new Set([
