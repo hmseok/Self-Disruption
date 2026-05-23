@@ -28,6 +28,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyUser } from '@/lib/auth-server'
 import { prisma } from '@/lib/prisma'
+import { timeToMinutes, slotInterval, unionIntervals } from '@/lib/cs-shift-hours'
 
 export const dynamic = 'force-dynamic'
 
@@ -55,50 +56,12 @@ function resolveRange(g: Granularity, base: Date): { from: string; to: string } 
   return { from: `${y}-${pad(m)}-01`, to: `${y}-${pad(m)}-${pad(last)}` }
 }
 
-// 'HH:MM[:SS]' → 분(0~1439). 실패 시 null
-function timeToMin(t: string | null | undefined): number | null {
-  if (!t) return null
-  const m = String(t).match(/^(\d{1,2}):(\d{2})/)
-  if (!m) return null
-  const h = Number(m[1])
-  const mi = Number(m[2])
-  if (!Number.isFinite(h) || !Number.isFinite(mi)) return null
-  return h * 60 + mi
-}
+// 분(0~1439) → 'HH:MM' (표시용)
 const minToHHMM = (min: number): string =>
   `${pad(Math.floor((min % 1440) / 60))}:${pad((min % 1440) % 60)}`
 
-// 슬롯 1개 구간 [startMin, endMin] — overnight(또는 end<=start)이면 endMin += 1440
-function slotInterval(
-  startMin: number, endMin: number, overnight: boolean,
-): [number, number] {
-  let e = endMin
-  if (overnight || e <= startMin) e += 1440
-  return [startMin, e]
-}
-// 구간 배열 union — { minutes(겹침 제거 총분), start(최소), end(최대) }
-function unionIntervals(intervals: [number, number][]): {
-  minutes: number; start: number; end: number
-} {
-  if (intervals.length === 0) return { minutes: 0, start: 0, end: 0 }
-  const sorted = [...intervals].sort((a, b) => a[0] - b[0])
-  let minutes = 0
-  let [curS, curE] = sorted[0]
-  const start = curS
-  let maxEnd = curE
-  for (let i = 1; i < sorted.length; i++) {
-    const [s, e] = sorted[i]
-    if (s <= curE) {
-      curE = Math.max(curE, e)
-    } else {
-      minutes += curE - curS
-      curS = s; curE = e
-    }
-    if (e > maxEnd) maxEnd = e
-  }
-  minutes += curE - curS
-  return { minutes, start, end: maxEnd }
-}
+// timeToMinutes / slotInterval / unionIntervals 는 lib/cs-shift-hours 공용 —
+// 근무시간 union 계산이 dashboard/evaluation/attendance 단일 소스 (규칙 14).
 
 interface DayResult {
   date: string
@@ -237,8 +200,8 @@ export async function GET(request: NextRequest) {
         }
         buckets.set(key, b)
       }
-      const sMin = timeToMin(r.start_time)
-      const eMin = timeToMin(r.end_time)
+      const sMin = timeToMinutes(r.start_time)
+      const eMin = timeToMinutes(r.end_time)
       const overnight = Number(r.is_overnight) === 1
       if (sMin != null && eMin != null) {
         b.intervals.push(slotInterval(sMin, eMin, overnight))
@@ -278,8 +241,8 @@ export async function GET(request: NextRequest) {
       const prod = b.kt_id ? prodMap.get(`${b.date}|${b.kt_id}`) : undefined
       const loginFirst = prod?.first ?? null
       const loginLast = prod?.last ?? null
-      const lfMin = timeToMin(loginFirst)
-      const llMin = timeToMin(loginLast)
+      const lfMin = timeToMinutes(loginFirst)
+      const llMin = timeToMinutes(loginLast)
 
       let lateMin = 0
       let earlyMin = 0

@@ -18,6 +18,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyUser } from '@/lib/auth-server'
 import { prisma } from '@/lib/prisma'
+import { workHoursByWorker } from '@/lib/cs-shift-hours'
 
 export const dynamic = 'force-dynamic'
 
@@ -284,27 +285,43 @@ export async function GET(request: NextRequest) {
         : 0
     }
 
-    // ════ ③ 근무 지표 — cs_assignments JOIN cs_workers ════
+    // ════ ③ 근무 지표 — cs_assignments JOIN cs_shift_slots ════
+    // work_hours 는 슬롯 구간 union — 같은 날 여러 슬롯(부엉+달빛) 겹침 중복 제거.
     try {
       const workRows = await prisma.$queryRaw<any[]>`
         SELECT
-          a.worker_id,
-          w.name,
-          COUNT(DISTINCT a.work_date) AS work_days,
-          COALESCE(SUM(a.computed_hours), 0) AS work_hours
+          a.worker_id                            AS worker_id,
+          w.name                                 AS worker_name,
+          DATE_FORMAT(a.work_date, '%Y-%m-%d')   AS work_date,
+          TIME_FORMAT(s.start_time, '%H:%i')     AS start_time,
+          TIME_FORMAT(s.end_time, '%H:%i')       AS end_time,
+          s.is_overnight                         AS is_overnight
         FROM cs_assignments a
-        JOIN cs_workers w ON w.id = a.worker_id
+        JOIN cs_workers w     ON w.id = a.worker_id
+        JOIN cs_shift_slots s ON s.id = a.shift_slot_id
         WHERE a.work_date BETWEEN ${from} AND ${to}
           AND a.worker_id IS NOT NULL
           AND a.special_code = 'none'
-        GROUP BY a.worker_id, w.name
       `
-      for (const r of workRows) {
-        const a = getAgent(String(r.worker_id), null, String(r.name || ''))
-        a.work_days += Number(r.work_days || 0)
-        a.work_hours += Number(r.work_hours || 0)
-        summary.work_days += Number(r.work_days || 0)
-        summary.work_hours += Number(r.work_hours || 0)
+      const nameByWorker = new Map<string, string>()
+      const shiftRows = workRows.map((r) => {
+        const wid = String(r.worker_id)
+        nameByWorker.set(wid, String(r.worker_name || ''))
+        return {
+          worker_id: wid,
+          work_date: String(r.work_date),
+          start_time: r.start_time ? String(r.start_time) : null,
+          end_time: r.end_time ? String(r.end_time) : null,
+          is_overnight: Number(r.is_overnight) === 1,
+        }
+      })
+      const byWorker = workHoursByWorker(shiftRows)
+      for (const [workerId, agg] of byWorker) {
+        const a = getAgent(workerId, null, nameByWorker.get(workerId) || '')
+        a.work_days += agg.work_days
+        a.work_hours += agg.work_hours
+        summary.work_days += agg.work_days
+        summary.work_hours += agg.work_hours
       }
       summary.has_work_data = workRows.length > 0
     } catch { /* graceful */ }

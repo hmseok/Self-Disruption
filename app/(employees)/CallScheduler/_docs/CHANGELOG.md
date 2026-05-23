@@ -3,6 +3,13 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-23 (Phase CX-KPI-15) — 근무시간 그룹 시간겹침 중복 합산 수정
+
+- `lib/cs-shift-hours.ts` 신규 — 근무시간 union 계산 공용 모듈(`timeToMinutes`/`slotInterval`/`unionIntervals`/`workHoursByWorker`). 한 사람이 하루 여러 시프트(부엉 20:30~08:30 + 달빛 19:00~23:00)를 맡으면 시간이 겹치는데, `SUM(computed_hours)` 는 겹친 시간을 중복 합산(부엉12h+달빛4h=16h, 실제 19:00~08:30 13.5h). 슬롯 구간을 합집합으로 계산해 겹친 시간 1회만 집계.
+- `kpi/dashboard` route ③ 근무 지표 — `SUM(computed_hours)` → `cs_shift_slots` JOIN 후 `workHoursByWorker` union 계산으로 교체. work_days 는 distinct (worker,date) 수 유지.
+- `kpi/evaluation` route ③ 근무시간 — 동일 union 방식으로 교체. 평가 종합점수의 `work_hours` 지표가 겹침 미반영 정확값.
+- `kpi/attendance` route — 직전 PR(CX-KPI-14)의 인라인 union 함수를 `lib/cs-shift-hours` 공용 모듈로 이관 — 3개 route 단일 소스(규칙 14).
+
 ## 2026-05-23 (Phase CX-KPI-14) — 근태 (지각·조퇴) 체크
 
 - 마이그레이션 `2026-05-23_cs_kpi_attendance_config.sql` — 근태 판정 유예시간 1행 설정 테이블(`grace_minutes`, 기본 0분). 멱등(NOT EXISTS 가드).
