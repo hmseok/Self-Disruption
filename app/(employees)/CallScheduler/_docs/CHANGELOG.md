@@ -3,6 +3,12 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-23 (Phase CX-KPI-11) — 데이터 검수·관리 탭
+
+- `kpi/page.tsx` 에 「📁 데이터」 탭 신설(KpiTab 'data'). 업로드된 KT 베이스 데이터(4개 소스: cs_call_records / cs_agent_productivity / cs_response_ivr / cs_response_queue)가 「전체 다 들어왔는지 / 중복은 없는지 / 며칠치 기준인지」 를 검수·관리.
+- API `kpi/data-status` (GET/DELETE) 신규 — GET: `?granularity=day|week|month&date=` 기준 소스별 총 행수·충족율(데이터 있는 날짜÷기간 일수)·빠진 날짜(최대 31)·날짜별 행수·전체 데이터 범위(min~max)·중복 안전(COUNT(*) vs COUNT(DISTINCT UNIQUE키)) 반환. 생산성은 daily 기준 충족율 + monthly 행수 별도. 전 소스 graceful try/catch(미적재 시 available:false). DELETE: `?source=&from=&to=` — source 화이트리스트 검증 후 소스별 고정 쿼리(테이블명 보간 X)로 날짜 BETWEEN 행 삭제, 삭제 건수 반환.
+- `KpiData` 컴포넌트 신규 — 일/주/월 토글, 상단 DcStatStrip 5카드(평균 충족율·적재 소스·총 행수·중복 의심·빠진 날짜), 소스 4개 카드(충족율 막대 90%녹/50%노랑/미만빨강·중복 안전 배지·데이터 기간). 카드 펼침 시 날짜별 행수 표(중앙값 대비 급감 이상치 빨강 강조) + 빠진 날짜 목록. 「기간 데이터 삭제」 는 글래스 확인 모달(confirm() 금지 — 규칙 20) → DELETE → 새로고침. 빈 상태 안내 포함.
+
 ## 2026-05-23 (Phase CX-KPI-10) — KPI 설정 통합 + 페이지 좌측정렬
 
 - KPI 페이지(`kpi/page.tsx`) 공통 래퍼의 `maxWidth:1100`·`margin:'0 auto'` 제거 → 좌측정렬·전체 폭 사용. 탭 바 `flexWrap` 추가로 좁은 폭 반응형. 내부 컴포넌트 grid 는 `minmax()` auto-fit/fill 유지로 그대로 반응형.

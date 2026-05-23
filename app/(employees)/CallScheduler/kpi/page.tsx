@@ -17,6 +17,7 @@ import { getAuthHeader } from '@/app/utils/auth-client'
 import KpiDashboard from './_components/KpiDashboard'
 import KpiStaffing from './_components/KpiStaffing'
 import KpiEvaluation from './_components/KpiEvaluation'
+import KpiData from './_components/KpiData'
 import KpiSettings from './_components/KpiSettings'
 
 export const dynamic = 'force-dynamic'
@@ -86,7 +87,7 @@ interface PreviewResult {
   skipped?: number
 }
 
-type KpiTab = 'dashboard' | 'staffing' | 'settings' | 'evaluation' | 'upload'
+type KpiTab = 'dashboard' | 'staffing' | 'settings' | 'evaluation' | 'data' | 'upload'
 
 // ── 자동 종류 판별 ────────────────────────────────────────────────
 // 1차 — 파일명 패턴 / 2차 — 헤더 컬럼. 둘 다 실패 시 null (수동 선택).
@@ -324,6 +325,7 @@ export default function KpiPage() {
           { k: 'dashboard' as KpiTab, label: '📊 KPI 대시보드' },
           { k: 'staffing' as KpiTab, label: '🧮 필요인원 (WFM)' },
           { k: 'evaluation' as KpiTab, label: '🏅 평가' },
+          { k: 'data' as KpiTab, label: '📁 데이터' },
           { k: 'upload' as KpiTab, label: '📤 KT 엑셀 업로드' },
           { k: 'settings' as KpiTab, label: '⚙ 설정' },
         ]).map(({ k, label }) => {
@@ -350,6 +352,8 @@ export default function KpiPage() {
       {tab === 'evaluation' && <KpiEvaluation />}
 
       {tab === 'settings' && <KpiSettings />}
+
+      {tab === 'data' && <KpiData />}
 
       {tab === 'upload' && (
        <>
