@@ -86,6 +86,40 @@ export async function POST(
     const finalDispatchDate  = dispatch_date      || order.expected_dispatch_date || new Date().toISOString().slice(0, 10)
     const finalReturnDate    = expected_return_date || order.expected_return_date || null
 
+    // PR-P (2026-05-23) — 배차 일정 겹침 방지
+    //   ① 날짜 순서 검증  ② 같은 차량 동일 기간 중복 배차 차단
+    if (vehicle_id) {
+      if (finalReturnDate && finalDispatchDate && String(finalReturnDate) <= String(finalDispatchDate)) {
+        return NextResponse.json({
+          error: `반납예정일(${String(finalReturnDate).slice(0, 10)})이 출고일(${String(finalDispatchDate).slice(0, 10)})보다 빠르거나 같습니다. 날짜를 확인하세요.`,
+        }, { status: 400 })
+      }
+      const newEnd = finalReturnDate || '2099-12-31 00:00:00'
+      const conflicts = await prisma.$queryRawUnsafe<Array<any>>(
+        `SELECT id, customer_name, dispatch_date, expected_return_date, actual_return_date
+           FROM fmi_rentals
+          WHERE vehicle_id = ?
+            AND status <> 'cancelled'
+            AND id <> ?
+            AND dispatch_date < ?
+            AND COALESCE(actual_return_date, expected_return_date, '2099-12-31 00:00:00') > ?
+          LIMIT 1`,
+        vehicle_id,
+        order.fmi_rental_id || '',
+        newEnd,
+        finalDispatchDate,
+      ).catch(() => [] as Array<any>)
+      if (conflicts.length > 0) {
+        const c = conflicts[0]
+        const cStart = String(c.dispatch_date || '').slice(0, 10)
+        const cEnd = String(c.actual_return_date || c.expected_return_date || '미정').slice(0, 10)
+        return NextResponse.json({
+          error: `🚫 이 차량은 이미 배차되어 있습니다 — ${cStart} ~ ${cEnd} (고객: ${c.customer_name || '미상'}). 기간을 조정하거나 다른 차량을 선택하세요.`,
+          conflict: c,
+        }, { status: 409 })
+      }
+    }
+
     let fmiRentalId: string
 
     if (order.fmi_rental_id) {
