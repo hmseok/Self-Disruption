@@ -11,13 +11,16 @@ import { GLASS } from '@/app/utils/ui-tokens'
 //
 // 사용자 명시: 「대기차량 — 정비/세차 완료 후 가용 상태」
 //
-// 데이터: cars 테이블 (PR-E 차량 통합 정본) — /api/operations/waiting-vehicles
-//   status (실데이터 확인 2026-05-16):
-//     available (사용가능·대기) / rented (배차중) / returned (반납·점검대기)
+// 데이터: /api/operations/waiting-vehicles (cars 마스터 + fmi_rentals)
+//   status — PR-X (2026-05-23) 단일 출처화. API 가 도출해서 내려줌:
+//     rented   배차중   = 진행 중(dispatched) fmi_rental 보유 ← 단일 출처
+//     returned 반납·점검 = cars.status='returned' 이며 배차중 아님
+//     available 사용가능 = 그 외 (배차 가능)
+//   → import / 대량작업으로 cars.status 가 어긋나도 다시 틀어지지 않음.
 //
 // 기능:
 //   - 상태별 list + 필터
-//   - 반납·점검 → 사용가능 전환 (cars.status PATCH)
+//   - 정비·점검 ↔ 사용가능 전환 (cars.status PATCH — 배차중은 회차 시 자동)
 // ═══════════════════════════════════════════════════════════════════
 
 async function getAuthHeader(): Promise<Record<string, string>> {
@@ -263,7 +266,7 @@ export default function WaitingTab() {
         defaultSort={{ key: 'status', dir: 'asc' }}
       />
       <div style={{ marginTop: 12, fontSize: 12, color: '#64748b' }}>
-        💡 「점검·정비」 / 「점검완료」 버튼으로 차량 상태를 전환합니다. 배차중 차량은 회차 처리 시 자동으로 반납·점검 상태가 됩니다.
+        💡 「배차중」은 대차업무의 진행 중 배차(배차완료)에서 자동 도출됩니다 — 출고하면 배차중, 반납하면 자동 해제. · 「점검·정비」 / 「점검완료」 버튼은 정비 상태만 전환합니다.
       </div>
     </div>
   )
