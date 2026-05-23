@@ -695,7 +695,7 @@ export default function DispatchDetailPage({
         <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
           {/* PR-N4/N5 (2026-05-22) — 상세 처리 후 대차리스트 탭으로 복귀
              (router.back() 은 사고접수로 돌아가 흐름이 끊김 / 배차스케줄 탭은 N5에서 폐기) */}
-          <button onClick={() => router.push('/operations?tab=rentals')} style={ghostBtn}>← 대차리스트</button>
+          <button onClick={() => router.push('/operations?tab=rentals')} style={ghostBtn}>← 대차업무</button>
           <button onClick={() => { fetchRow(); fetchMemos(); fetchOrder(); fetchConsultations(); fetchAcrMemos(); fetchFactories(); fetchSms() }} disabled={rowLoading} style={subtleBtn}>↻ 새로고침</button>
         </div>
         <div style={{ marginBottom: 16 }}>

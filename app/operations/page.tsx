@@ -1,51 +1,44 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import AccidentIntakeTab from './_tabs/AccidentIntakeTab'
 import ClaimsTab from './_tabs/ClaimsTab'
 import WaitingTab from './_tabs/WaitingTab'
-import RentalListTab from './_tabs/RentalListTab'
+import RentalWorkTab, { RentalWorkView } from './_tabs/RentalWorkTab'
 
 // ═══════════════════════════════════════════════════════════════════
 // /operations — Phase 2 통합 페이지 (P2.1a)
 //
-// 사용자 명시 (2026-05-13):
-//   「사고접수, 대차접수, 배차스케줄, 청구관리, 대기차량 — 한 페이지 통합」
-//   「배차관리 / 회차관리 / 청구관리 / 대기차량관리 등등」
-//
 // 운영 라이프사이클:
 //   사고접수 → 대차접수(상담/스케줄) → 배차관리 → 회차/청구 → 대기차량
 //
-// 기존 OperationsMain (1247줄, Calendar+FleetBoard+DispatchModal) 폐기.
+// PR-N1 (2026-05-22) — 「대차리스트」 탭 추가 (fmi_rentals 원장)
+// PR-N5 (2026-05-22) — 「배차스케줄」 탭 폐기 → 대차리스트가 상담중까지 흡수
+// PR-W  (2026-05-23) — 사용자 명시: 「사고접수를 없애고 대차업무 안에
+//   사고접수리스트를 넣는게」 → 「사고접수」 독립탭 폐기.
+//   대차리스트 → 「대차업무」 로 격상, 서브탭(대차진행/사고접수) 보유.
+//   탭 3개로 단순화: 대기차량 → 대차업무(default) → 청구관리
 // ═══════════════════════════════════════════════════════════════════
 
-type SubTab = 'waiting' | 'accident' | 'claims' | 'rentals'
+type SubTab = 'waiting' | 'claims' | 'rentals'
 
-// 사용자 명시 (2026-05-16):
-//   「사고접수를 살리고 그안에 대차쪽에 일부를 갖다붙히고 대차접수를 없애는게」
-//   → 대차접수 탭 폐기, 사고접수 탭이 대차요청 처리까지 통합 담당
-//   탭 순서: 대기차량(앞) → 사고접수(default) → 배차스케줄 → 청구관리
-// PR-N1 (2026-05-22) — 「대차리스트」 탭 추가 (fmi_rentals 원장)
-// PR-N5 (2026-05-22) — 「배차스케줄」 탭 폐기
-//   사용자 명시: 「리스트가 많으니 상담도 대차로 넘기고 거기서 진행」
-//   → 상담중 dispatch_order 까지 대차리스트가 흡수. 탭 4개로 단순화.
 const TAB_LIST: Array<{ key: SubTab; label: string; icon: string }> = [
-  { key: 'waiting',  label: '대기차량',    icon: '🛠' },
-  { key: 'accident', label: '사고접수',    icon: '📋' },
-  { key: 'rentals',  label: '대차리스트',  icon: '🚗' },
-  { key: 'claims',   label: '청구관리',    icon: '💰' },
+  { key: 'waiting', label: '대기차량', icon: '🛠' },
+  { key: 'rentals', label: '대차업무', icon: '🚗' },
+  { key: 'claims',  label: '청구관리', icon: '💰' },
 ]
 
-const TAB_KEYS: SubTab[] = ['waiting', 'accident', 'claims', 'rentals']
+const TAB_KEYS: SubTab[] = ['waiting', 'claims', 'rentals']
 
 export default function OperationsPage() {
-  const [tab, setTab] = useState<SubTab>('accident')  // default: 사고접수 (대차요청 진행처리 통합)
+  const [tab, setTab] = useState<SubTab>('rentals')  // default: 대차업무
+  const [rentalView, setRentalView] = useState<RentalWorkView>('rental')
 
-  // PR-N4/N5 (2026-05-22) — ?tab= 쿼리로 초기 탭 지정 (배차 상세 「← 대차리스트」 복귀 등)
-  //   legacy ?tab=schedule 링크는 대차리스트로 매핑 (배차스케줄 탭 폐기)
+  // ?tab= 쿼리로 초기 탭 지정 (배차 상세 「← 대차리스트」 복귀 등)
+  //   legacy: ?tab=schedule → 대차업무, ?tab=accident → 대차업무 > 사고접수 서브탭
   useEffect(() => {
     let t = new URLSearchParams(window.location.search).get('tab')
     if (t === 'schedule') t = 'rentals'
+    if (t === 'accident') { setTab('rentals'); setRentalView('accident'); return }
     if (t && (TAB_KEYS as string[]).includes(t)) setTab(t as SubTab)
   }, [])
 
@@ -86,9 +79,7 @@ export default function OperationsPage() {
         </div>
 
         {/* Tab content */}
-        {tab === 'accident' && <AccidentIntakeTab />}
-
-        {tab === 'rentals' && <RentalListTab />}
+        {tab === 'rentals' && <RentalWorkTab view={rentalView} onViewChange={setRentalView} />}
 
         {tab === 'claims' && <ClaimsTab />}
 
