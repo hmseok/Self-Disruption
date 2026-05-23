@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import AccidentIntakeTab from './_tabs/AccidentIntakeTab'
 import ScheduleTab from './_tabs/ScheduleTab'
 import ClaimsTab from './_tabs/ClaimsTab'
@@ -37,8 +37,17 @@ const TAB_LIST: Array<{ key: SubTab; label: string; icon: string }> = [
   { key: 'claims',   label: '청구관리',    icon: '💰' },
 ]
 
+const TAB_KEYS: SubTab[] = ['waiting', 'accident', 'schedule', 'claims', 'rentals']
+
 export default function OperationsPage() {
   const [tab, setTab] = useState<SubTab>('accident')  // default: 사고접수 (대차요청 진행처리 통합)
+
+  // PR-N4 (2026-05-22) — ?tab= 쿼리로 초기 탭 지정
+  //   사고접수 「대차전환」 → 상세 처리 후 「← 배차스케줄」 복귀 시 schedule 탭으로 진입
+  useEffect(() => {
+    const t = new URLSearchParams(window.location.search).get('tab')
+    if (t && (TAB_KEYS as string[]).includes(t)) setTab(t as SubTab)
+  }, [])
 
   return (
     <div className="page-bg">

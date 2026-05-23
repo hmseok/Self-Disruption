@@ -1608,8 +1608,8 @@ INSERT INTO fmi_rentals (id, fleet_group, vehicle_car_number, vehicle_car_type, 
 SELECT UUID(), '빌려타', '125하4239', 'G80 2.5(G)', '2026-05-22 17:30:00', NULL, NULL, '황인우', '010-4232-3733', '232하2390', '그랜저 1.6', '한화', '202605-31320', NULL, NULL, '서울시', NULL, 'dispatched', '[엑셀 빌려타 import] 원본: 232하2390/아임 / 그랜저 1.6 / 한화 / 202605-31320 / 생년월일 961231 / 황인우 / 010-4232-3733 / 서울시 / 루이모터스 / 작성중', NOW(), NOW() FROM dual
 WHERE NOT EXISTS (SELECT 1 FROM fmi_rentals WHERE vehicle_car_number='125하4239' AND dispatch_date='2026-05-22 17:30:00' AND COALESCE(customer_car_number,'')='232하2390');
 
--- ── 대차차량 vehicle_id 연결 (cars.car_number 매칭) ──
-UPDATE fmi_rentals r JOIN cars c ON c.car_number = r.vehicle_car_number
+-- ── 대차차량 vehicle_id 연결 (cars.number 매칭) ──
+UPDATE fmi_rentals r JOIN cars c ON c.`number` = r.vehicle_car_number
   SET r.vehicle_id = c.id
   WHERE r.fleet_group = '빌려타' AND r.vehicle_id IS NULL;
 
