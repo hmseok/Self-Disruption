@@ -70,6 +70,16 @@ interface DashboardData {
   byScenario?: ByScenario[]
 }
 
+// ── Cafe24 접수 업무량 (kpi/cafe24-intake — 독립 호출) ──────────
+interface Cafe24Daily { date: string; accident: number; dispatch: number }
+interface Cafe24Intake {
+  from: string; to: string
+  daily: Cafe24Daily[]
+  accident_total: number
+  dispatch_total: number
+  cafe24_ok: boolean
+}
+
 // 초 → "1시간 23분" / "5분 12초" / "42초"
 function fmtDuration(sec: number): string {
   if (!sec || sec <= 0) return '0초'
@@ -133,6 +143,9 @@ export default function KpiDashboard() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [drill, setDrill] = useState<'client' | 'type'>('client')
+  // Cafe24 접수 업무량 — 외부 DB 지연이 대시보드 본체를 막지 않도록 독립 로딩
+  const [cafe24, setCafe24] = useState<Cafe24Intake | null>(null)
+  const [cafe24Loading, setCafe24Loading] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true); setError(null)
@@ -164,6 +177,26 @@ export default function KpiDashboard() {
   }, [granularity, date])
 
   useEffect(() => { load() }, [load])
+
+  // Cafe24 접수 업무량 — 대시보드와 별개로 호출 (느린 외부 DB 격리)
+  const loadCafe24 = useCallback(async () => {
+    setCafe24Loading(true)
+    try {
+      const auth = await getAuthHeader()
+      const res = await fetch(
+        `/api/call-scheduler/kpi/cafe24-intake?granularity=${granularity}&date=${date}`,
+        { headers: auth },
+      )
+      const json = await res.json()
+      setCafe24(res.ok ? json.data : null)
+    } catch {
+      setCafe24(null)
+    } finally {
+      setCafe24Loading(false)
+    }
+  }, [granularity, date])
+
+  useEffect(() => { loadCafe24() }, [loadCafe24])
 
   const s = data?.summary
   const agents = data?.agents ?? []
@@ -209,10 +242,10 @@ export default function KpiDashboard() {
       subValue: s && s.avg_duration_sec > 0 ? '통화시간 실측' : (s?.has_prod_data ? '생산성 기준' : undefined) },
     { label: '수신/발신 비율', value: ibObRatio, tint: 'amber', icon: '🔀',
       subValue: s && s.etc > 0 ? `기타 ${s.etc.toLocaleString()}` : undefined },
-    { label: s?.cafe24_ok ? '접수 건수' : '로그인 시간',
-      value: s?.cafe24_ok ? (s?.intake_count ?? 0) : (s ? fmtDuration(s.login_sec) : '—'),
-      unit: s?.cafe24_ok ? '건' : undefined, tint: 'purple', icon: s?.cafe24_ok ? '📥' : '🔓',
-      subValue: s?.cafe24_ok && s?.has_prod_data ? `로그인 ${fmtDuration(s.login_sec)}` : undefined },
+    { label: '로그인 시간',
+      value: s ? fmtDuration(s.login_sec) : '—',
+      tint: 'purple', icon: '🔓',
+      subValue: s && s.has_prod_data ? '생산성 기준' : undefined },
     { label: '충원율', value: s ? `${Math.round(s.fill_rate * 1000) / 10}%` : '—', tint: 'red', icon: '🛡',
       subValue: s ? `근무 ${s.work_days}일 · ${Math.round(s.work_hours)}h` : undefined },
     { label: '통화량 달성률',
@@ -372,7 +405,7 @@ export default function KpiDashboard() {
           </span>
         )}
         <div style={{ flex: 1 }} />
-        <button type="button" onClick={load} disabled={loading}
+        <button type="button" onClick={() => { load(); loadCafe24() }} disabled={loading}
           style={{
             padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700,
             background: COLORS.bgGray, border: `1px solid ${COLORS.borderFaint}`,
@@ -421,6 +454,11 @@ export default function KpiDashboard() {
           </div>
           <DcStatStrip stats={responseStats} fullWidth />
         </div>
+      )}
+
+      {/* ── Cafe24 접수 업무량 (사고 / 긴급출동 일별) ───────────── */}
+      {(cafe24 || cafe24Loading) && (
+        <Cafe24IntakePanel data={cafe24} loading={cafe24Loading} />
       )}
 
       {/* ── 응대현황 드릴다운 — 스킬별 / 시나리오별 ─────────────── */}
@@ -575,6 +613,141 @@ export default function KpiDashboard() {
           {' '}· 누락 소스의 지표는 0 으로 표시됩니다.
         </div>
       )}
+    </div>
+  )
+}
+
+// ── Cafe24 접수 업무량 패널 (사고 / 긴급출동 일별 시계열) ──────
+function Cafe24IntakePanel({ data, loading }: {
+  data: Cafe24Intake | null; loading: boolean
+}) {
+  const panelStyle: React.CSSProperties = {
+    ...GLASS.L4, borderRadius: 12, padding: 14, marginBottom: 14,
+  }
+  const titleRow = (
+    <span style={{ fontSize: 13, fontWeight: 800, color: COLORS.textPrimary }}>
+      📥 Cafe24 접수 업무량
+    </span>
+  )
+
+  // 첫 로딩 — 자리만 표시 (이후엔 직전 데이터 유지)
+  if (loading && !data) {
+    return (
+      <div style={panelStyle}>
+        <div style={{ marginBottom: 6 }}>{titleRow}</div>
+        <div style={{ fontSize: 12, color: COLORS.textMuted }}>Cafe24 조회 중...</div>
+      </div>
+    )
+  }
+  if (!data) return null
+
+  // Cafe24 미연결 — graceful 안내
+  if (!data.cafe24_ok) {
+    return (
+      <div style={panelStyle}>
+        <div style={{ marginBottom: 6 }}>{titleRow}</div>
+        <div style={{
+          padding: '8px 12px', borderRadius: 8,
+          background: COLORS.bgAmber, border: `1px solid ${COLORS.borderAmber}`,
+          fontSize: 11, color: COLORS.warning,
+        }}>
+          ⚠ Cafe24 ERP 에 연결하지 못했습니다 — 접수량을 표시할 수 없습니다.
+        </div>
+      </div>
+    )
+  }
+
+  const daily = data.daily
+  const total = data.accident_total + data.dispatch_total
+  const maxDay = Math.max(...daily.map((d) => d.accident + d.dispatch), 1)
+
+  return (
+    <div style={panelStyle}>
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, flexWrap: 'wrap',
+      }}>
+        {titleRow}
+        <span style={{ fontSize: 11, fontWeight: 600, color: COLORS.textMuted }}>
+          유효 접수만 (취소 제외) · 일별
+        </span>
+        <div style={{ flex: 1 }} />
+        <span style={{ display: 'flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap' }}>
+          <span style={{ width: 9, height: 9, borderRadius: 2, background: COLORS.primary }} />
+          <span style={{ fontSize: 12, color: COLORS.textSecondary }}>사고</span>
+          <b style={{ fontSize: 13, color: COLORS.textPrimary }}>
+            {data.accident_total.toLocaleString()}
+          </b>
+        </span>
+        <span style={{
+          display: 'flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap', marginLeft: 6,
+        }}>
+          <span style={{ width: 9, height: 9, borderRadius: 2, background: COLORS.warning }} />
+          <span style={{ fontSize: 12, color: COLORS.textSecondary }}>긴급출동</span>
+          <b style={{ fontSize: 13, color: COLORS.textPrimary }}>
+            {data.dispatch_total.toLocaleString()}
+          </b>
+        </span>
+      </div>
+
+      {total === 0 ? (
+        <div style={{
+          padding: 16, textAlign: 'center', fontSize: 12, color: COLORS.textMuted,
+          background: 'rgba(0,0,0,0.02)', borderRadius: 8,
+        }}>이 기간에 Cafe24 접수 건이 없습니다</div>
+      ) : (
+        <DayColumns daily={daily} maxDay={maxDay} />
+      )}
+    </div>
+  )
+}
+
+// ── 일별 컬럼 차트 (사고 아래 / 긴급출동 위 — 스택) ────────────
+function DayColumns({ daily, maxDay }: { daily: Cafe24Daily[]; maxDay: number }) {
+  const H = 92 // 차트 높이 px
+  return (
+    <div>
+      <div style={{
+        display: 'flex', alignItems: 'flex-end', gap: 3, height: H, padding: '0 2px',
+      }}>
+        {daily.map((d) => {
+          const tot = d.accident + d.dispatch
+          const accH = (d.accident / maxDay) * H
+          const dispH = (d.dispatch / maxDay) * H
+          return (
+            <div key={d.date}
+              title={`${d.date}\n사고 ${d.accident}건 · 긴급출동 ${d.dispatch}건 · 합계 ${tot}건`}
+              style={{
+                flex: 1, minWidth: 6, display: 'flex', flexDirection: 'column',
+                justifyContent: 'flex-end', height: '100%',
+              }}>
+              <div style={{
+                height: dispH, background: COLORS.warning,
+                borderRadius: '2px 2px 0 0',
+              }} />
+              <div style={{
+                height: accH, background: COLORS.primary,
+                borderRadius: dispH > 0 ? 0 : '2px 2px 0 0',
+              }} />
+            </div>
+          )
+        })}
+      </div>
+      {/* x축 날짜 — 1일·5의배수만 (혼잡 방지), 14일 이하면 전부 */}
+      <div style={{
+        display: 'flex', gap: 3, padding: '4px 2px 0',
+        borderTop: `1px solid ${COLORS.borderFaint}`,
+      }}>
+        {daily.map((d) => {
+          const dayNum = Number(d.date.slice(8, 10))
+          const show = daily.length <= 14 || dayNum === 1 || dayNum % 5 === 0
+          return (
+            <div key={d.date} style={{
+              flex: 1, minWidth: 6, textAlign: 'center', fontSize: 9,
+              color: COLORS.textMuted, whiteSpace: 'nowrap', overflow: 'hidden',
+            }}>{show ? dayNum : ''}</div>
+          )
+        })}
+      </div>
     </div>
   )
 }

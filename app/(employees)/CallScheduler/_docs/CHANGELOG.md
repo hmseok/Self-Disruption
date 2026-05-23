@@ -3,6 +3,13 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-23 (Phase CX-KPI-13) — Cafe24 사고·긴급출동 접수량 통합
+
+- API `kpi/cafe24-intake` (GET) 신규 — Cafe24 ERP(read-only) 에서 일별 접수 건수 시계열. 사고 접수(`acrotpth`, `otptmddt`, `otptrgst='R'`) / 긴급출동 접수(`aceesosh`, `esosmddt`, `esosrgst='R'`) 각각 별도 `GROUP BY` 집계. 취소건('C') 제외 — 유효 접수만(사용자 명시). granularity(일/주/월)·date·from/to 로 범위 산정, 빈 날(0건)도 시계열 포함. 대시보드 본체와 분리된 독립 엔드포인트 — 느린 외부 DB 가 KPI 대시보드 로딩을 막지 않도록. graceful try/catch(Cafe24 미연결 시 `cafe24_ok:false`). MariaDB 10.1 호환 — COUNT/CHAR_LENGTH/BETWEEN/GROUP BY 만.
+- `KpiDashboard` 에 「📥 Cafe24 접수 업무량」 패널 추가 — `kpi/cafe24-intake` 독립 호출(외부 DB 격리), 사고/긴급출동 합계 + 범례, 일별 스택 컬럼 차트(`DayColumns` — 사고 아래/긴급출동 위, 호버 시 날짜·건수). Cafe24 미연결·빈 기간 안내 포함. 새로고침 버튼이 본체와 함께 재호출.
+- 상단 5번째 스탯 카드 — 기존 `cafe24_ok` 분기('접수 건수' vs '로그인 시간')를 항상 '로그인 시간' 으로 단순화. Cafe24 접수량은 전용 패널이 사고/긴급출동 분리·일별로 표시 → 카드 중복·라벨 혼선 제거(규칙 12 정합성).
+- 테이블 매핑(사고=`acrotpth`, 긴급출동=`aceesosh`) 은 cafe24-dispatch-requests 진단 조사 결론 기반. 배포 후 실데이터 일별 숫자로 검증 — 어긋나면 두 쿼리 테이블만 교체.
+
 ## 2026-05-23 (Phase CX-KPI-12) — 상담원 매칭 설정
 
 - `KpiSettings` 에 4번째 접이식 섹션 「🔗 상담원 매칭」 추가 — KT 엑셀 상담사 ID(`agent_kt_id`) ↔ 콜센터 워커(`cs_workers`) 직접 연결. 워커별 KT ID 드롭다운(표기: `이름(kt_id)·데이터 N건·활성`), 이름 일치 활성 ID 자동 추천 배지·「전체 자동 매칭」, 미매칭 워커/미사용 KT ID 빨강 강조 + 상단 "미매칭 N건" 요약. 같은 kt_id 화면상 단일 배정 보장.
