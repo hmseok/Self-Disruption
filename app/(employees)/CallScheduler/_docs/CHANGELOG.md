@@ -3,6 +3,12 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-23 (Phase CX-KPI-16) — KPI 기간 선택 개선 (프리셋+이전/다음+직접범위)
+
+- `kpi/_components/KpiPeriodPicker.tsx` 신규 — CX KPI 5개 탭이 공유하는 공용 기간 선택 컴포넌트. 프리셋(일/주/월) + ◀ 이전/다음 ▶ 네비게이션(일=±1일·주=±7일·월=±1개월) + 「직접」 모드(시작~종료 범위 입력, ◀▶ 는 범위 길이만큼 함께 이동, 시작>종료 자동 보정). `KpiPeriod` 타입 + `periodQuery()` 헬퍼 export — 프리셋이면 `?granularity=&date=`, 직접범위면 `?from=&to=`. 주는 월요일 시작. `COLORS`/`GLASS` 토큰만 사용.
+- `KpiDashboard`/`KpiStaffing`/`KpiEvaluation`/`KpiAttendance`/`KpiData` — 각자의 인라인 기간 토글 바를 `<KpiPeriodPicker>` 로 교체. `granularity`/`date` 개별 state → `KpiPeriod` 단일 state. fetch URL 의 `?granularity=X&date=Y` → `?${periodQuery(period)}`. KpiDashboard 의 Cafe24 패널(`loadCafe24`)도 동일 period 반영.
+- `kpi/evaluation` route — `from/to` 쿼리 지원 추가(`resolveRange` 후 `if (fromParam && toParam)` override, `prodLabel` 은 `from` 의 YYYY-MM). `kpi/staffing`·`kpi/data-status` route — `from/to` override 분기 추가. `dashboard`/`attendance`/`cafe24-intake` 는 이미 지원(확인).
+
 ## 2026-05-23 (Phase CX-KPI-15) — 근무시간 그룹 시간겹침 중복 합산 수정
 
 - `lib/cs-shift-hours.ts` 신규 — 근무시간 union 계산 공용 모듈(`timeToMinutes`/`slotInterval`/`unionIntervals`/`workHoursByWorker`). 한 사람이 하루 여러 시프트(부엉 20:30~08:30 + 달빛 19:00~23:00)를 맡으면 시간이 겹치는데, `SUM(computed_hours)` 는 겹친 시간을 중복 합산(부엉12h+달빛4h=16h, 실제 19:00~08:30 13.5h). 슬롯 구간을 합집합으로 계산해 겹친 시간 1회만 집계.

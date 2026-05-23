@@ -12,6 +12,7 @@
 //     ④ cs_response_queue     — stat_date
 //
 //   GET   ?granularity=day|week|month&date=YYYY-MM-DD
+//         (또는 ?from=YYYY-MM-DD&to=YYYY-MM-DD — 직접 범위, date 보다 우선)
 //     → 각 소스별 충족율·중복 안전·빠진 날짜·날짜별 행수 등
 //   DELETE ?source=call_records|productivity|response_ivr|response_queue
 //          &from=YYYY-MM-DD&to=YYYY-MM-DD
@@ -122,9 +123,16 @@ export async function GET(request: NextRequest) {
     const granularity: Granularity =
       (['day', 'week', 'month'].includes(granRaw) ? granRaw : 'month') as Granularity
     const dateParam = url.searchParams.get('date')
+    const fromParam = url.searchParams.get('from')
+    const toParam = url.searchParams.get('to')
 
     const base = dateParam ? new Date(dateParam + 'T00:00:00') : new Date()
-    const { from, to } = resolveRange(granularity, isNaN(base.getTime()) ? new Date() : base)
+    let { from, to } = resolveRange(granularity, isNaN(base.getTime()) ? new Date() : base)
+    // from/to 직접 지정 시 범위 override (dashboard route 와 동일 패턴)
+    if (fromParam && toParam) {
+      from = fromParam
+      to = toParam
+    }
     const days = periodDays(from, to)
     const spanIso = dateSpan(from, to)
 

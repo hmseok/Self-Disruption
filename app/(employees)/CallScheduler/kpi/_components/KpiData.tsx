@@ -15,6 +15,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { COLORS, GLASS, BTN } from '@/app/utils/ui-tokens'
 import { getAuthHeader } from '@/app/utils/auth-client'
 import DcStatStrip, { type StatItem } from '@/app/components/DcStatStrip'
+import KpiPeriodPicker, { type KpiPeriod, periodQuery } from './KpiPeriodPicker'
 
 type Granularity = 'day' | 'week' | 'month'
 
@@ -79,8 +80,9 @@ interface DeleteState {
 }
 
 export default function KpiData() {
-  const [granularity, setGranularity] = useState<Granularity>('month')
-  const [date, setDate] = useState<string>(todayIso())
+  const [period, setPeriod] = useState<KpiPeriod>(
+    { granularity: 'month', date: todayIso(), from: null, to: null })
+  const granularity = period.granularity
   const [data, setData] = useState<DataStatus | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -96,7 +98,7 @@ export default function KpiData() {
     try {
       const auth = await getAuthHeader()
       const res = await fetch(
-        `/api/call-scheduler/kpi/data-status?granularity=${granularity}&date=${date}`,
+        `/api/call-scheduler/kpi/data-status?${periodQuery(period)}`,
         { headers: auth },
       )
       const json = await res.json()
@@ -108,7 +110,7 @@ export default function KpiData() {
     } finally {
       setLoading(false)
     }
-  }, [granularity, date])
+  }, [period])
 
   useEffect(() => { load() }, [load])
 
@@ -194,34 +196,11 @@ export default function KpiData() {
 
   return (
     <div>
-      {/* ── 기간 토글 + 날짜 ──────────────────────────────────── */}
+      {/* ── 기간 선택 (프리셋·이전/다음·직접범위) + 새로고침 ─────── */}
       <div style={{
-        ...GLASS.L1, borderRadius: 10, padding: '10px 14px', marginBottom: 12,
-        display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
+        display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap',
       }}>
-        <div style={{ display: 'flex', gap: 4 }}>
-          {(['day', 'week', 'month'] as Granularity[]).map((g) => {
-            const active = g === granularity
-            return (
-              <button key={g} type="button" onClick={() => setGranularity(g)}
-                style={{
-                  padding: '6px 16px', borderRadius: 8, cursor: 'pointer',
-                  fontSize: 13, fontWeight: 700,
-                  background: active ? COLORS.primary : 'transparent',
-                  color: active ? '#fff' : COLORS.textSecondary,
-                  border: `1px solid ${active ? COLORS.primary : COLORS.borderFaint}`,
-                }}>
-                {GRAN_LABEL[g]}
-              </button>
-            )
-          })}
-        </div>
-        <input type="date" value={date} onChange={(e) => setDate(e.target.value)}
-          style={{
-            padding: '6px 10px', borderRadius: 8, fontSize: 13,
-            border: `1px solid ${COLORS.borderFaint}`, color: COLORS.textPrimary,
-            background: '#fff', fontFamily: 'inherit',
-          }} />
+        <KpiPeriodPicker value={period} onChange={setPeriod} />
         {data && (
           <span style={{ fontSize: 11, color: COLORS.textMuted }}>
             📅 {data.meta.from}{data.meta.from !== data.meta.to ? ` ~ ${data.meta.to}` : ''}

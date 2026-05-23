@@ -12,6 +12,7 @@ import { COLORS, GLASS } from '@/app/utils/ui-tokens'
 import { getAuthHeader } from '@/app/utils/auth-client'
 import DcStatStrip, { type StatItem } from '@/app/components/DcStatStrip'
 import NeuDataTable, { type TableColumn } from '@/app/components/NeuDataTable'
+import KpiPeriodPicker, { type KpiPeriod, periodQuery } from './KpiPeriodPicker'
 
 type Granularity = 'day' | 'week' | 'month'
 
@@ -136,8 +137,10 @@ function achieveColor(pct: number | null): string {
 }
 
 export default function KpiDashboard() {
-  const [granularity, setGranularity] = useState<Granularity>('month')
-  const [date, setDate] = useState<string>(todayIso())
+  const [period, setPeriod] = useState<KpiPeriod>(
+    { granularity: 'month', date: todayIso(), from: null, to: null })
+  // 빈 상태 안내 등에서 쓰는 표시용 granularity (직접범위면 'day' fallback)
+  const granularity = period.granularity
   const [data, setData] = useState<DashboardData | null>(null)
   const [targets, setTargets] = useState<TargetRow[]>([])
   const [loading, setLoading] = useState(false)
@@ -151,12 +154,12 @@ export default function KpiDashboard() {
     setLoading(true); setError(null)
     try {
       const auth = await getAuthHeader()
-      // 목표는 기준일의 연·월로 조회
-      const base = new Date(date + 'T00:00:00')
+      // 목표는 기준일(직접범위면 시작일)의 연·월로 조회
+      const base = new Date(period.date + 'T00:00:00')
       const ty = isNaN(base.getTime()) ? new Date().getFullYear() : base.getFullYear()
       const tm = isNaN(base.getTime()) ? new Date().getMonth() + 1 : base.getMonth() + 1
       const [dRes, tRes] = await Promise.all([
-        fetch(`/api/call-scheduler/kpi/dashboard?granularity=${granularity}&date=${date}`, { headers: auth }),
+        fetch(`/api/call-scheduler/kpi/dashboard?${periodQuery(period)}`, { headers: auth }),
         fetch(`/api/call-scheduler/kpi/targets?year=${ty}&month=${tm}`, { headers: auth }),
       ])
       const json = await dRes.json()
@@ -174,7 +177,7 @@ export default function KpiDashboard() {
     } finally {
       setLoading(false)
     }
-  }, [granularity, date])
+  }, [period])
 
   useEffect(() => { load() }, [load])
 
@@ -184,7 +187,7 @@ export default function KpiDashboard() {
     try {
       const auth = await getAuthHeader()
       const res = await fetch(
-        `/api/call-scheduler/kpi/cafe24-intake?granularity=${granularity}&date=${date}`,
+        `/api/call-scheduler/kpi/cafe24-intake?${periodQuery(period)}`,
         { headers: auth },
       )
       const json = await res.json()
@@ -194,7 +197,7 @@ export default function KpiDashboard() {
     } finally {
       setCafe24Loading(false)
     }
-  }, [granularity, date])
+  }, [period])
 
   useEffect(() => { loadCafe24() }, [loadCafe24])
 
@@ -370,34 +373,11 @@ export default function KpiDashboard() {
 
   return (
     <div>
-      {/* ── 기간 토글 + 날짜 ─────────────────────────────────── */}
+      {/* ── 기간 선택 (프리셋·이전/다음·직접범위) + 새로고침 ─────── */}
       <div style={{
-        ...GLASS.L1, borderRadius: 10, padding: '10px 14px', marginBottom: 12,
-        display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
+        display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap',
       }}>
-        <div style={{ display: 'flex', gap: 4 }}>
-          {(['day', 'week', 'month'] as Granularity[]).map((g) => {
-            const active = g === granularity
-            return (
-              <button key={g} type="button" onClick={() => setGranularity(g)}
-                style={{
-                  padding: '6px 16px', borderRadius: 8, cursor: 'pointer',
-                  fontSize: 13, fontWeight: 700,
-                  background: active ? COLORS.primary : 'transparent',
-                  color: active ? '#fff' : COLORS.textSecondary,
-                  border: `1px solid ${active ? COLORS.primary : COLORS.borderFaint}`,
-                }}>
-                {GRAN_LABEL[g]}
-              </button>
-            )
-          })}
-        </div>
-        <input type="date" value={date} onChange={(e) => setDate(e.target.value)}
-          style={{
-            padding: '6px 10px', borderRadius: 8, fontSize: 13,
-            border: `1px solid ${COLORS.borderFaint}`, color: COLORS.textPrimary,
-            background: '#fff', fontFamily: 'inherit',
-          }} />
+        <KpiPeriodPicker value={period} onChange={setPeriod} />
         {data && (
           <span style={{ fontSize: 11, color: COLORS.textMuted }}>
             📅 {data.meta.from}{data.meta.from !== data.meta.to ? ` ~ ${data.meta.to}` : ''}

@@ -5,6 +5,7 @@
 //   query:
 //     · granularity = day | week | month   (기본 month — dashboard 와 동일)
 //     · date        = YYYY-MM-DD           (granularity 의 기준일)
+//     · from / to   = YYYY-MM-DD           (직접 범위 지정 — date 보다 우선)
 //
 //   데이터 소스 (dashboard route 와 동일 — 법정검사 제외 필터 동일 적용):
 //     ① cs_call_records      — 통화량 (통화 1건 = 1행)
@@ -128,10 +129,18 @@ export async function GET(request: NextRequest) {
       url.searchParams.get('granularity') || '',
     ) ? url.searchParams.get('granularity') : 'month') as Granularity
     const dateParam = url.searchParams.get('date')
+    const fromParam = url.searchParams.get('from')
+    const toParam = url.searchParams.get('to')
     const base = dateParam ? new Date(dateParam + 'T00:00:00') : new Date()
-    const { from, to, prodLabel } = resolveRange(
+    let { from, to, prodLabel } = resolveRange(
       granularity, isNaN(base.getTime()) ? new Date() : base,
     )
+    // from/to 직접 지정 시 범위 override (생산성 라벨은 from 기준 월 — dashboard route 동일)
+    if (fromParam && toParam) {
+      from = fromParam
+      to = toParam
+      prodLabel = `${fromParam.substring(0, 7)}`
+    }
 
     // ── 평가 가중치 (DB 설정 — cs_kpi_eval_weights, 미적재 시 기본값) ──
     const WEIGHTS = await loadWeights()

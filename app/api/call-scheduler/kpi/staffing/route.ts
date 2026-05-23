@@ -5,6 +5,7 @@
 //   query:
 //     · granularity = day | week | month   (기본 month — dashboard 와 동일)
 //     · date        = YYYY-MM-DD           (granularity 의 기준일)
+//     · from / to   = YYYY-MM-DD           (직접 범위 지정 — date 보다 우선)
 //
 //   처리:
 //     ① cs_wfm_config        — 산정 기준 (목표 SL·응대시간·부재율·점유율·인터벌)
@@ -102,10 +103,17 @@ export async function GET(request: NextRequest) {
     const granularity: Granularity =
       (['day', 'week', 'month'].includes(granRaw) ? granRaw : 'month') as Granularity
     const dateParam = url.searchParams.get('date')
+    const fromParam = url.searchParams.get('from')
+    const toParam = url.searchParams.get('to')
     const base = dateParam ? new Date(dateParam + 'T00:00:00') : new Date()
-    const { from, to } = resolveRange(
+    let { from, to } = resolveRange(
       granularity, isNaN(base.getTime()) ? new Date() : base,
     )
+    // from/to 직접 지정 시 범위 override (dashboard route 와 동일 패턴)
+    if (fromParam && toParam) {
+      from = fromParam
+      to = toParam
+    }
     const days = dayCount(from, to)
 
     // ════ ① cs_wfm_config — 산정 기준 (1행) ════
