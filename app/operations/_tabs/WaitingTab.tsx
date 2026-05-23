@@ -51,8 +51,12 @@ const STATUS_META: Record<string, { label: string; bg: string; fg: string }> = {
   returned:  { label: '🔧 반납·점검', bg: 'rgba(245,158,11,0.12)',  fg: '#b45309' },
 }
 
-export default function WaitingTab() {
-  const [filter, setFilter] = useState<FilterKey>('all')
+// PR-Y1 (2026-05-23) — lockStatus prop:
+//   미지정    = 전체 (사용가능/배차중/반납점검 필터칩)
+//   'available' = 「사용가능」 탭 전용 — 사용가능 차량만, 필터칩 숨김
+//   'returned'  = 「반납점검」 탭 전용 — 정비 중 차량만, 필터칩 숨김
+export default function WaitingTab({ lockStatus }: { lockStatus?: 'available' | 'returned' }) {
+  const [filter, setFilter] = useState<FilterKey>(lockStatus || 'all')
   const [search, setSearch] = useState('')
   const [rows, setRows] = useState<WaitingVehicle[] | null>(null)
   const [loading, setLoading] = useState(false)
@@ -149,12 +153,15 @@ export default function WaitingTab() {
   const statActions: ActionButton[] = [
     { label: '새로고침', onClick: refresh, variant: 'secondary', icon: '🔄' },
   ]
-  const filterItems: FilterItem[] = [
-    { key: 'all', label: '🚙 전체', count: counts.all },
-    { key: 'available', label: '🟢 사용가능', count: counts.available },
-    { key: 'rented', label: '🚗 배차중', count: counts.rented },
-    { key: 'returned', label: '🔧 반납·점검', count: counts.returned },
-  ]
+  // PR-Y1 — lockStatus 면 필터칩 숨김 (해당 상태 한 뷰만)
+  const filterItems: FilterItem[] = lockStatus
+    ? []
+    : [
+        { key: 'all', label: '🚙 전체', count: counts.all },
+        { key: 'available', label: '🟢 사용가능', count: counts.available },
+        { key: 'rented', label: '🚗 배차중', count: counts.rented },
+        { key: 'returned', label: '🔧 반납·점검', count: counts.returned },
+      ]
 
   const columns: TableColumn<WaitingVehicle>[] = [
     {

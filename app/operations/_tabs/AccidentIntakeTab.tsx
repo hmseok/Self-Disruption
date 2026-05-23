@@ -42,7 +42,8 @@ function rideAccidentIdFromIdno(idno: string): number {
 // 사용자 명시 (2026-05-16): 「리스트 조회 로딩이 좀 있네」 「사고전체 리스트가 좀 더디네」
 // 원인: 4 fetch (all=R / Y=R / N=R / all=C) × 7일 = 무거움
 // 개선: 단일 fetch (dcyn=all, rgst=all) + client side filter
-//        디폴트 기간 7일 → 3일 (당일 + 어제 + 그저께)
+//        디폴트 기간 7일 → 3일 → PR-Y1: 「오늘」 (조회 딜레이 해소)
+//        기간 넓힐 땐 오늘/3일/7일/30일/1년 퀵버튼 사용
 export default function AccidentIntakeTab() {
   const router = useRouter()
   const [filter, setFilter] = useState<FilterKey>('all')  // PR-U: 사고접수는 「전체」 한 뷰만 (대차사용 건은 대차리스트로)
@@ -70,7 +71,7 @@ export default function AccidentIntakeTab() {
     const d = new Date(Date.now() - 30 * 24 * 3600 * 1000)
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
   }, [])
-  const [fromDate, setFromDate] = useState<string>(threeDaysAgoYmd)  // 사용자 명시: 기본 3일 (성능 우선)
+  const [fromDate, setFromDate] = useState<string>(todayYmd)  // PR-Y1: 기본 「오늘」 (조회 딜레이 해소 — 사용자 명시)
   const [toDate, setToDate] = useState<string>(todayYmd)
   const dateRange = useMemo(() => {
     const fmt = (s: string) => s.replace(/-/g, '')
@@ -350,6 +351,9 @@ export default function AccidentIntakeTab() {
             <span style={{ color: '#94a3b8' }}>~</span>
             <input type="date" value={toDate} onChange={(e) => applyDate(fromDate, e.target.value)}
               style={{ ...GLASS.L1, padding: '6px 8px', borderRadius: 8, fontSize: 12, color: '#1e293b' }} />
+            <button onClick={() => applyDate(todayYmd, todayYmd)}
+              style={{ padding: '6px 10px', background: 'transparent', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, cursor: 'pointer', color: '#64748b', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap' }}
+            >오늘</button>
             <button onClick={() => applyDate(threeDaysAgoYmd, todayYmd)}
               style={{ padding: '6px 10px', background: 'transparent', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, cursor: 'pointer', color: '#64748b', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap' }}
             >3일</button>

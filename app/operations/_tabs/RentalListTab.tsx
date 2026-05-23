@@ -82,8 +82,13 @@ function dateStr(daysAgo: number): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
-export default function RentalListTab() {
+// PR-Y1 (2026-05-23) — scope prop:
+//   'all'      = 상담미진행 + 상담중 + 배차예정 + 배차완료 (구 통합 뷰)
+//   'dispatch' = 배차예정 + 배차완료 만 (「배차중」 탭 전용 — cafe24/dispatch_order
+//                fetch skip → 빠름, 상담미진행 날짜필터 숨김)
+export default function RentalListTab({ scope = 'all' }: { scope?: 'all' | 'dispatch' }) {
   const router = useRouter()
+  const isDispatch = scope === 'dispatch'
   const [filter, setFilter] = useState<FilterKey>('all')
   const [search, setSearch] = useState('')
   const [fleet, setFleet] = useState<string>('all')
@@ -118,10 +123,15 @@ export default function RentalListTab() {
     try {
       const headers = await getAuthHeader()
       // 3개 소스 동시 조회: fmi_rentals / dispatch_orders / cafe24 대차요청건(최근 30일)
+      // scope='dispatch' 면 fmi_rentals 만 — 상담미진행(cafe24)·상담중(dispatch_order) skip
       const [rRes, oRes, cRes] = await Promise.all([
         fetch('/api/fmi-rentals?include_stats=1&limit=2000', { headers }).then((r) => r.json()).catch(() => ({})),
-        fetch('/api/operations/dispatch-orders?limit=500', { headers }).then((r) => r.json()).catch(() => ({})),
-        fetch(`/api/operations/cafe24-dispatch-requests?from=${fromDate.replace(/-/g, '')}&to=${toDate.replace(/-/g, '')}&dcyn=Y&rgst=R&limit=2000`, { headers }).then((r) => r.json()).catch(() => ({})),
+        isDispatch
+          ? Promise.resolve({})
+          : fetch('/api/operations/dispatch-orders?limit=500', { headers }).then((r) => r.json()).catch(() => ({})),
+        isDispatch
+          ? Promise.resolve({})
+          : fetch(`/api/operations/cafe24-dispatch-requests?from=${fromDate.replace(/-/g, '')}&to=${toDate.replace(/-/g, '')}&dcyn=Y&rgst=R&limit=2000`, { headers }).then((r) => r.json()).catch(() => ({})),
       ])
       if (rRes?.error) throw new Error(rRes.error)
 
@@ -219,7 +229,7 @@ export default function RentalListTab() {
     } finally {
       setLoading(false)
     }
-  }, [fromDate, toDate])
+  }, [fromDate, toDate, isDispatch])
 
   useEffect(() => {
     if (rows === null && !loading) fetchAll()
@@ -281,23 +291,36 @@ export default function RentalListTab() {
     dispatched: data.dispatched.length,
   }), [fleetScoped, data])
 
-  const statItems: StatItem[] = [
-    { label: '📋 전체', value: counts.all, unit: '건', tint: 'blue' },
-    { label: '🔔 상담미진행', value: counts.request, unit: '건', tint: 'red' },
-    { label: '📞 상담중', value: counts.consulting, unit: '건', tint: 'amber' },
-    { label: '🚐 배차완료', value: counts.dispatched, unit: '건', tint: 'green' },
-    { label: '🔍 검색결과', value: filtered.length, unit: '건', tint: 'blue' },
-  ]
+  const statItems: StatItem[] = isDispatch
+    ? [
+        { label: '📋 전체', value: counts.all, unit: '건', tint: 'blue' },
+        { label: '📅 배차예정', value: counts.pending, unit: '건', tint: 'amber' },
+        { label: '🚐 배차완료', value: counts.dispatched, unit: '건', tint: 'green' },
+        { label: '🔍 검색결과', value: filtered.length, unit: '건', tint: 'blue' },
+      ]
+    : [
+        { label: '📋 전체', value: counts.all, unit: '건', tint: 'blue' },
+        { label: '🔔 상담미진행', value: counts.request, unit: '건', tint: 'red' },
+        { label: '📞 상담중', value: counts.consulting, unit: '건', tint: 'amber' },
+        { label: '🚐 배차완료', value: counts.dispatched, unit: '건', tint: 'green' },
+        { label: '🔍 검색결과', value: filtered.length, unit: '건', tint: 'blue' },
+      ]
   const statActions: ActionButton[] = [
     { label: '새로고침', onClick: refresh, variant: 'secondary', icon: '🔄' },
   ]
-  const filterItems: FilterItem[] = [
-    { key: 'all', label: '📋 전체', count: counts.all },
-    { key: 'request', label: '🔔 상담미진행', count: counts.request },
-    { key: 'consulting', label: '📞 상담중', count: counts.consulting },
-    { key: 'pending', label: '📅 배차예정', count: counts.pending },
-    { key: 'dispatched', label: '🚐 배차완료', count: counts.dispatched },
-  ]
+  const filterItems: FilterItem[] = isDispatch
+    ? [
+        { key: 'all', label: '📋 전체', count: counts.all },
+        { key: 'pending', label: '📅 배차예정', count: counts.pending },
+        { key: 'dispatched', label: '🚐 배차완료', count: counts.dispatched },
+      ]
+    : [
+        { key: 'all', label: '📋 전체', count: counts.all },
+        { key: 'request', label: '🔔 상담미진행', count: counts.request },
+        { key: 'consulting', label: '📞 상담중', count: counts.consulting },
+        { key: 'pending', label: '📅 배차예정', count: counts.pending },
+        { key: 'dispatched', label: '🚐 배차완료', count: counts.dispatched },
+      ]
 
   // 반납 처리 (배차완료 건)
   const openReturn = useCallback((r: Row) => {
@@ -508,40 +531,44 @@ export default function RentalListTab() {
               <option value="all">🚙 플릿 전체</option>
               {fleetOptions.map((f) => <option key={f} value={f}>{f}</option>)}
             </select>
-            {/* PR-V: 「상담미진행」 조회 기간 — 기본 오늘 */}
-            <div style={{ ...GLASS.L1, display: 'flex', alignItems: 'center', gap: 5, padding: '5px 8px', borderRadius: 8 }}>
-              <span style={{ fontSize: 12, flexShrink: 0 }}>📅</span>
-              <input
-                type="date" value={fromDate}
-                onChange={(e) => applyDate(e.target.value, toDate < e.target.value ? e.target.value : toDate)}
-                style={{ border: 'none', background: 'transparent', fontSize: 12, color: '#1e293b', fontWeight: 700, outline: 'none', width: 116 }}
-              />
-              <span style={{ fontSize: 11, color: '#94a3b8' }}>~</span>
-              <input
-                type="date" value={toDate}
-                onChange={(e) => applyDate(fromDate > e.target.value ? e.target.value : fromDate, e.target.value)}
-                style={{ border: 'none', background: 'transparent', fontSize: 12, color: '#1e293b', fontWeight: 700, outline: 'none', width: 116 }}
-              />
-            </div>
-            {([
-              { label: '오늘', from: 0, to: 0 },
-              { label: '7일', from: 7, to: 0 },
-              { label: '30일', from: 30, to: 0 },
-            ] as const).map((q) => {
-              const active = fromDate === dateStr(q.from) && toDate === dateStr(q.to)
-              return (
-                <button
-                  key={q.label}
-                  onClick={() => applyDate(dateStr(q.from), dateStr(q.to))}
-                  style={{
-                    padding: '6px 11px', borderRadius: 8, fontSize: 11, fontWeight: 800, cursor: 'pointer',
-                    border: active ? '1px solid rgba(99,102,241,0.45)' : '1px solid rgba(0,0,0,0.08)',
-                    background: active ? 'rgba(99,102,241,0.12)' : 'transparent',
-                    color: active ? '#4338ca' : '#64748b',
-                  }}
-                >{q.label}</button>
-              )
-            })}
+            {/* PR-V: 「상담미진행」 조회 기간 — 기본 오늘 (배차중 탭에서는 숨김) */}
+            {!isDispatch && (
+              <>
+                <div style={{ ...GLASS.L1, display: 'flex', alignItems: 'center', gap: 5, padding: '5px 8px', borderRadius: 8 }}>
+                  <span style={{ fontSize: 12, flexShrink: 0 }}>📅</span>
+                  <input
+                    type="date" value={fromDate}
+                    onChange={(e) => applyDate(e.target.value, toDate < e.target.value ? e.target.value : toDate)}
+                    style={{ border: 'none', background: 'transparent', fontSize: 12, color: '#1e293b', fontWeight: 700, outline: 'none', width: 116 }}
+                  />
+                  <span style={{ fontSize: 11, color: '#94a3b8' }}>~</span>
+                  <input
+                    type="date" value={toDate}
+                    onChange={(e) => applyDate(fromDate > e.target.value ? e.target.value : fromDate, e.target.value)}
+                    style={{ border: 'none', background: 'transparent', fontSize: 12, color: '#1e293b', fontWeight: 700, outline: 'none', width: 116 }}
+                  />
+                </div>
+                {([
+                  { label: '오늘', from: 0, to: 0 },
+                  { label: '7일', from: 7, to: 0 },
+                  { label: '30일', from: 30, to: 0 },
+                ] as const).map((q) => {
+                  const active = fromDate === dateStr(q.from) && toDate === dateStr(q.to)
+                  return (
+                    <button
+                      key={q.label}
+                      onClick={() => applyDate(dateStr(q.from), dateStr(q.to))}
+                      style={{
+                        padding: '6px 11px', borderRadius: 8, fontSize: 11, fontWeight: 800, cursor: 'pointer',
+                        border: active ? '1px solid rgba(99,102,241,0.45)' : '1px solid rgba(0,0,0,0.08)',
+                        background: active ? 'rgba(99,102,241,0.12)' : 'transparent',
+                        color: active ? '#4338ca' : '#64748b',
+                      }}
+                    >{q.label}</button>
+                  )
+                })}
+              </>
+            )}
           </div>
         }
       />
@@ -562,7 +589,9 @@ export default function RentalListTab() {
         defaultSort={{ key: 'dispatch', dir: 'desc' }}
       />
       <div style={{ marginTop: 12, fontSize: 12, color: '#64748b' }}>
-        💡 「상담미진행」(대차요청건)은 위 📅 기간에 해당하는 건만 표시됩니다 — 기본 오늘. · 상담중·배차예정·배차완료는 기간과 무관하게 항상 표시됩니다. · 행을 클릭하면 배차 상세에서 상담·배차를 진행하고, 반납하면 청구관리 탭으로 넘어갑니다.
+        {isDispatch
+          ? '💡 현재 배차 나가 있는 대차입니다 (배차예정 + 배차완료). 반납하면 「반납·청구」 탭으로 넘어갑니다.'
+          : '💡 「상담미진행」(대차요청건)은 위 📅 기간에 해당하는 건만 표시됩니다 — 기본 오늘. · 상담중·배차예정·배차완료는 기간과 무관하게 항상 표시됩니다. · 행을 클릭하면 배차 상세에서 상담·배차를 진행하고, 반납하면 청구관리 탭으로 넘어갑니다.'}
       </div>
 
       {/* 반납 처리 모달 */}
