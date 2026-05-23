@@ -45,7 +45,7 @@ function rideAccidentIdFromIdno(idno: string): number {
 //        디폴트 기간 7일 → 3일 (당일 + 어제 + 그저께)
 export default function AccidentIntakeTab() {
   const router = useRouter()
-  const [filter, setFilter] = useState<FilterKey>('todo')  // PR-S: 기본 = 미진행(대차전환 안 한 사고)
+  const [filter, setFilter] = useState<FilterKey>('all')  // PR-U: 사고접수는 「전체」 한 뷰만 (대차사용 건은 대차리스트로)
 
   const [allRows, setAllRows] = useState<DispatchRequestRow[] | null>(null)
   const [orders, setOrders] = useState<DispatchOrder[]>([])  // PR-F — 우리 진행 dispatch_orders
@@ -215,12 +215,9 @@ export default function AccidentIntakeTab() {
   const statActions: ActionButton[] = [
     { label: '새로고침', onClick: refresh, variant: 'secondary', icon: '🔄' },
   ]
+  // PR-U (2026-05-23) — 사고접수는 필터 탭 없이 「전체」 한 뷰만
   const filterItems: FilterItem[] = [
-    { key: 'todo', label: '🔔 미진행', count: counts.todo },
     { key: 'all', label: '📋 전체', count: counts.all },
-    { key: 'dcyn_y', label: '🚗 대차사용', count: counts.dcyn_y },
-    { key: 'dcyn_n', label: '🚙 대차미사용', count: counts.dcyn_n },
-    { key: 'closed', label: '✅ 종결', count: counts.closed },
   ]
 
   const columns: TableColumn<DispatchRequestRow>[] = [

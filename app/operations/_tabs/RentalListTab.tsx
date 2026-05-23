@@ -77,9 +77,9 @@ function cafe24ToIso(acdt: any, actm: any): string | null {
   const t = String(actm || '').replace(/[^0-9]/g, '').padEnd(6, '0')
   return `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)} ${t.slice(0, 2)}:${t.slice(2, 4)}:${t.slice(4, 6)}`
 }
-function ymd(daysAgo: number): string {
+function dateStr(daysAgo: number): string {
   const d = new Date(Date.now() - daysAgo * 24 * 3600 * 1000)
-  return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
 export default function RentalListTab() {
@@ -87,6 +87,9 @@ export default function RentalListTab() {
   const [filter, setFilter] = useState<FilterKey>('all')
   const [search, setSearch] = useState('')
   const [fleet, setFleet] = useState<string>('all')
+  // PR-V: 「상담미진행」(cafe24 대차요청건) 조회 기간 — 기본 오늘
+  const [fromDate, setFromDate] = useState<string>(() => dateStr(0))
+  const [toDate, setToDate] = useState<string>(() => dateStr(0))
 
   const [rows, setRows] = useState<Row[] | null>(null)
   const [loading, setLoading] = useState(false)
@@ -118,7 +121,7 @@ export default function RentalListTab() {
       const [rRes, oRes, cRes] = await Promise.all([
         fetch('/api/fmi-rentals?include_stats=1&limit=2000', { headers }).then((r) => r.json()).catch(() => ({})),
         fetch('/api/operations/dispatch-orders?limit=500', { headers }).then((r) => r.json()).catch(() => ({})),
-        fetch(`/api/operations/cafe24-dispatch-requests?from=${ymd(30)}&to=${ymd(0)}&dcyn=Y&rgst=R&limit=2000`, { headers }).then((r) => r.json()).catch(() => ({})),
+        fetch(`/api/operations/cafe24-dispatch-requests?from=${fromDate.replace(/-/g, '')}&to=${toDate.replace(/-/g, '')}&dcyn=Y&rgst=R&limit=2000`, { headers }).then((r) => r.json()).catch(() => ({})),
       ])
       if (rRes?.error) throw new Error(rRes.error)
 
@@ -216,14 +219,18 @@ export default function RentalListTab() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [fromDate, toDate])
 
   useEffect(() => {
     if (rows === null && !loading) fetchAll()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [fromDate, toDate])
 
   const refresh = useCallback(() => { setRows(null); fetchAll() }, [fetchAll])
+  // PR-V: 기간 변경 — rows 를 null 로 비우면 위 useEffect 가 재조회
+  const applyDate = useCallback((from: string, to: string) => {
+    setFromDate(from); setToDate(to); setRows(null)
+  }, [])
 
   const isOverdue = useCallback((r: Row) => {
     if (r.actual_return_date) return false
@@ -492,14 +499,50 @@ export default function RentalListTab() {
         activeFilter={filter}
         onFilterChange={(k) => setFilter(k as FilterKey)}
         trailing={
-          <select
-            value={fleet}
-            onChange={(e) => setFleet(e.target.value)}
-            style={{ ...GLASS.L1, padding: '7px 10px', borderRadius: 8, fontSize: 12, color: '#1e293b', fontWeight: 700 }}
-          >
-            <option value="all">🚙 플릿 전체</option>
-            {fleetOptions.map((f) => <option key={f} value={f}>{f}</option>)}
-          </select>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <select
+              value={fleet}
+              onChange={(e) => setFleet(e.target.value)}
+              style={{ ...GLASS.L1, padding: '7px 10px', borderRadius: 8, fontSize: 12, color: '#1e293b', fontWeight: 700 }}
+            >
+              <option value="all">🚙 플릿 전체</option>
+              {fleetOptions.map((f) => <option key={f} value={f}>{f}</option>)}
+            </select>
+            {/* PR-V: 「상담미진행」 조회 기간 — 기본 오늘 */}
+            <div style={{ ...GLASS.L1, display: 'flex', alignItems: 'center', gap: 5, padding: '5px 8px', borderRadius: 8 }}>
+              <span style={{ fontSize: 12, flexShrink: 0 }}>📅</span>
+              <input
+                type="date" value={fromDate}
+                onChange={(e) => applyDate(e.target.value, toDate < e.target.value ? e.target.value : toDate)}
+                style={{ border: 'none', background: 'transparent', fontSize: 12, color: '#1e293b', fontWeight: 700, outline: 'none', width: 116 }}
+              />
+              <span style={{ fontSize: 11, color: '#94a3b8' }}>~</span>
+              <input
+                type="date" value={toDate}
+                onChange={(e) => applyDate(fromDate > e.target.value ? e.target.value : fromDate, e.target.value)}
+                style={{ border: 'none', background: 'transparent', fontSize: 12, color: '#1e293b', fontWeight: 700, outline: 'none', width: 116 }}
+              />
+            </div>
+            {([
+              { label: '오늘', from: 0, to: 0 },
+              { label: '7일', from: 7, to: 0 },
+              { label: '30일', from: 30, to: 0 },
+            ] as const).map((q) => {
+              const active = fromDate === dateStr(q.from) && toDate === dateStr(q.to)
+              return (
+                <button
+                  key={q.label}
+                  onClick={() => applyDate(dateStr(q.from), dateStr(q.to))}
+                  style={{
+                    padding: '6px 11px', borderRadius: 8, fontSize: 11, fontWeight: 800, cursor: 'pointer',
+                    border: active ? '1px solid rgba(99,102,241,0.45)' : '1px solid rgba(0,0,0,0.08)',
+                    background: active ? 'rgba(99,102,241,0.12)' : 'transparent',
+                    color: active ? '#4338ca' : '#64748b',
+                  }}
+                >{q.label}</button>
+              )
+            })}
+          </div>
         }
       />
       {err && (
@@ -519,7 +562,7 @@ export default function RentalListTab() {
         defaultSort={{ key: 'dispatch', dir: 'desc' }}
       />
       <div style={{ marginTop: 12, fontSize: 12, color: '#64748b' }}>
-        💡 대차요청건은 「상담미진행」으로 자동 표시됩니다 — 행을 클릭하면 배차 상세에서 상담·배차를 진행합니다. 반납하면 청구관리 탭으로 넘어갑니다.
+        💡 「상담미진행」(대차요청건)은 위 📅 기간에 해당하는 건만 표시됩니다 — 기본 오늘. · 상담중·배차예정·배차완료는 기간과 무관하게 항상 표시됩니다. · 행을 클릭하면 배차 상세에서 상담·배차를 진행하고, 반납하면 청구관리 탭으로 넘어갑니다.
       </div>
 
       {/* 반납 처리 모달 */}
