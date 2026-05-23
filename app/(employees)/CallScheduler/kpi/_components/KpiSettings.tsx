@@ -869,8 +869,10 @@ function ItemForm({ draft, saving, onChange, onCancel, onSubmit }: {
 
 // ════════════════════════════════════════════════════════════════
 // ④ 상담원 매칭 — kpi/agent-mapping
-//   KT 상담사 ID(agent_kt_id) ↔ 콜센터 워커(cs_workers) 직접 연결.
-//   워커별 KT ID 드롭다운 + 이름 일치 자동 추천 + 미매칭 강조.
+//   콜센터 워커(cs_workers) ↔ 외부 식별자 2종 직접 연결:
+//     · KT 상담사 ID(agent_kt_id)        — 생산성·상담이력 매핑
+//     · Cafe24 접수자(cafe24_user_id)    — 사고·긴급출동 접수 귀속
+//   워커별 KT/Cafe24 드롭다운 + 이름 일치 자동 추천 + 미매칭 강조.
 // ════════════════════════════════════════════════════════════════
 interface KtAgent {
   kt_id: string
@@ -880,17 +882,26 @@ interface KtAgent {
   total_rows: number
   active: boolean
 }
+interface Cafe24User {
+  user_id: string
+  name: string
+  intake_count: number
+}
 interface MappingWorker {
   id: string
   name: string
   kt_id: string | null
+  cafe24_user_id: string | null
 }
 
 function AgentMappingSection() {
   const [ktAgents, setKtAgents] = useState<KtAgent[]>([])
+  const [cafe24Users, setCafe24Users] = useState<Cafe24User[]>([])
+  const [cafe24Ok, setCafe24Ok] = useState(true)
   const [workers, setWorkers] = useState<MappingWorker[]>([])
-  // 편집 중 매핑 — worker_id → kt_id ('' = 매칭 해제)
-  const [draft, setDraft] = useState<Record<string, string>>({})
+  // 편집 중 매핑 — worker_id → 식별자 ('' = 매칭 해제). KT·Cafe24 각각 별도 draft.
+  const [draftKt, setDraftKt] = useState<Record<string, string>>({})
+  const [draftCafe24, setDraftCafe24] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [result, setResult] = useState<SaveResult | null>(null)
@@ -904,13 +915,21 @@ function AgentMappingSection() {
       if (!res.ok) throw new Error(json?.error || '조회 실패')
       const d = json?.data || {}
       const agents: KtAgent[] = Array.isArray(d.kt_agents) ? d.kt_agents : []
+      const cafe: Cafe24User[] = Array.isArray(d.cafe24_users) ? d.cafe24_users : []
       const wks: MappingWorker[] = Array.isArray(d.workers) ? d.workers : []
       setKtAgents(agents)
+      setCafe24Users(cafe)
+      setCafe24Ok(d.cafe24_ok !== false)
       setWorkers(wks)
-      // draft 초기화 — 현재 저장된 kt_id 로
-      const init: Record<string, string> = {}
-      for (const w of wks) init[w.id] = w.kt_id || ''
-      setDraft(init)
+      // draft 초기화 — 현재 저장된 식별자로
+      const initKt: Record<string, string> = {}
+      const initCafe: Record<string, string> = {}
+      for (const w of wks) {
+        initKt[w.id] = w.kt_id || ''
+        initCafe[w.id] = w.cafe24_user_id || ''
+      }
+      setDraftKt(initKt)
+      setDraftCafe24(initCafe)
     } catch (e: any) {
       setResult({ ok: false, text: '❌ 상담원 매칭 조회 실패', detail: e?.message, at: nowLabel() })
     } finally {
@@ -920,8 +939,8 @@ function AgentMappingSection() {
 
   useEffect(() => { load() }, [load])
 
-  // ── 자동 추천: 워커 이름 == agent_name 이고 데이터 최다 활성 ID ──
-  const recommendFor = useCallback((workerName: string): KtAgent | null => {
+  // ── KT 자동 추천: 워커 이름 == agent_name 이고 데이터 최다 활성 ID ──
+  const recommendKtFor = useCallback((workerName: string): KtAgent | null => {
     const name = (workerName || '').trim()
     if (!name) return null
     const cands = ktAgents.filter(a => (a.agent_name || '').trim() === name)
@@ -934,9 +953,19 @@ function AgentMappingSection() {
     return sorted[0] || null
   }, [ktAgents])
 
-  // 한 워커에 KT ID 배정 — 같은 kt_id 쓰던 다른 워커는 화면에서도 비움
-  const assign = (workerId: string, ktId: string) => {
-    setDraft(prev => {
+  // ── Cafe24 자동 추천: 워커 이름 == user name, 접수건수 최다 우선 ──
+  const recommendCafe24For = useCallback((workerName: string): Cafe24User | null => {
+    const name = (workerName || '').trim()
+    if (!name) return null
+    const cands = cafe24Users.filter(u => (u.name || '').trim() === name)
+    if (cands.length === 0) return null
+    const sorted = [...cands].sort((a, b) => b.intake_count - a.intake_count)
+    return sorted[0] || null
+  }, [cafe24Users])
+
+  // 한 워커에 식별자 배정 — 같은 값 쓰던 다른 워커는 화면에서도 비움 (1:1 보장)
+  const assignKt = (workerId: string, ktId: string) => {
+    setDraftKt(prev => {
       const next = { ...prev }
       if (ktId) {
         for (const wid of Object.keys(next)) {
@@ -947,30 +976,60 @@ function AgentMappingSection() {
       return next
     })
   }
+  const assignCafe24 = (workerId: string, userId: string) => {
+    setDraftCafe24(prev => {
+      const next = { ...prev }
+      if (userId) {
+        for (const wid of Object.keys(next)) {
+          if (wid !== workerId && next[wid] === userId) next[wid] = ''
+        }
+      }
+      next[workerId] = userId
+      return next
+    })
+  }
 
-  // 전체 자동 매칭 — 이름 일치 + 활성 ID 일괄 적용 (중복 시 데이터 최다 우선)
+  // 전체 자동 매칭 — 이름 일치 식별자 일괄 적용 (중복 시 데이터 최다 우선)
   const autoMatchAll = () => {
-    const next: Record<string, string> = {}
-    for (const w of workers) next[w.id] = draft[w.id] || ''
-    // kt_id → 가장 적합한 worker 후보 수집 후 충돌 해소
-    const claims: { workerId: string; agent: KtAgent }[] = []
+    // ── KT ──
+    const nextKt: Record<string, string> = {}
+    for (const w of workers) nextKt[w.id] = draftKt[w.id] || ''
+    const ktByKey = new Map<string, { workerId: string; rows: number }>()
     for (const w of workers) {
-      const rec = recommendFor(w.name)
-      if (rec) claims.push({ workerId: w.id, agent: rec })
-    }
-    // 같은 kt_id 를 여러 워커가 추천받으면 데이터 최다 행이 차지 (1:1 보장)
-    const byKt = new Map<string, { workerId: string; rows: number }>()
-    for (const c of claims) {
-      const cur = byKt.get(c.agent.kt_id)
-      if (!cur || c.agent.total_rows > cur.rows) {
-        byKt.set(c.agent.kt_id, { workerId: c.workerId, rows: c.agent.total_rows })
+      const rec = recommendKtFor(w.name)
+      if (!rec) continue
+      const cur = ktByKey.get(rec.kt_id)
+      if (!cur || rec.total_rows > cur.rows) {
+        ktByKey.set(rec.kt_id, { workerId: w.id, rows: rec.total_rows })
       }
     }
-    for (const [ktId, owner] of byKt) next[owner.workerId] = ktId
-    setDraft(next)
+    for (const [ktId, owner] of ktByKey) nextKt[owner.workerId] = ktId
+    setDraftKt(nextKt)
+
+    // ── Cafe24 (연결됐을 때만) ──
+    let cafeMatched = 0
+    if (cafe24Ok) {
+      const nextCafe: Record<string, string> = {}
+      for (const w of workers) nextCafe[w.id] = draftCafe24[w.id] || ''
+      const cafeByKey = new Map<string, { workerId: string; rows: number }>()
+      for (const w of workers) {
+        const rec = recommendCafe24For(w.name)
+        if (!rec) continue
+        const cur = cafeByKey.get(rec.user_id)
+        if (!cur || rec.intake_count > cur.rows) {
+          cafeByKey.set(rec.user_id, { workerId: w.id, rows: rec.intake_count })
+        }
+      }
+      for (const [userId, owner] of cafeByKey) nextCafe[owner.workerId] = userId
+      setDraftCafe24(nextCafe)
+      cafeMatched = cafeByKey.size
+    }
+
     setResult({
       ok: true, text: '🔗 전체 자동 매칭 적용',
-      detail: `이름 일치 ${byKt.size}건 — 활성 KT ID 를 워커에 임시 배정했습니다. 저장 버튼으로 확정하세요.`,
+      detail: `KT ${ktByKey.size}건` +
+        (cafe24Ok ? ` · Cafe24 ${cafeMatched}건` : ' · Cafe24 미연결 (제외)') +
+        ' — 이름 일치 식별자를 워커에 임시 배정했습니다. 저장 버튼으로 확정하세요.',
       at: nowLabel(),
     })
   }
@@ -983,18 +1042,25 @@ function AgentMappingSection() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...auth },
         body: JSON.stringify({
-          mappings: workers.map(w => ({ worker_id: w.id, kt_id: draft[w.id] || '' })),
+          mappings: workers.map(w => ({
+            worker_id: w.id,
+            kt_id: draftKt[w.id] || '',
+            cafe24_user_id: draftCafe24[w.id] || '',
+          })),
         }),
       })
       const json = await res.json()
       if (!res.ok) throw new Error(json?.error || '저장 실패')
       const d = json.data || {}
       const errs: string[] = Array.isArray(d.errors) ? d.errors : []
+      const ktLinked = Object.values(draftKt).filter(Boolean).length
+      const cafeLinked = Object.values(draftCafe24).filter(Boolean).length
       setResult({
         ok: errs.length === 0,
         text: errs.length === 0 ? '🔗 상담원 매칭 저장 완료' : '⚠ 상담원 매칭 일부 저장',
-        detail: `연결 ${Number(d.updated || 0)}건 · 해제 ${Number(d.cleared || 0)}건` +
+        detail: `갱신 ${Number(d.updated || 0)}건 · 해제 ${Number(d.cleared || 0)}건` +
           (Number(d.released || 0) > 0 ? ` · 중복 해제 ${Number(d.released)}건` : '') +
+          ` · KT 연결 ${ktLinked}명 · Cafe24 연결 ${cafeLinked}명` +
           (errs.length > 0 ? ` · 실패 ${errs.length}건 (${errs.slice(0, 3).join(' / ')})` : '') +
           ' — KPI 집계에 이 매칭이 반영됩니다.',
         at: nowLabel(),
@@ -1008,9 +1074,16 @@ function AgentMappingSection() {
   }
 
   // ── 미매칭 집계 (draft 기준 실시간) ────────────────────────────
-  const usedKtIds = new Set(Object.values(draft).filter(Boolean))
-  const unmatchedWorkers = workers.filter(w => !draft[w.id])
+  const usedKtIds = new Set(Object.values(draftKt).filter(Boolean))
+  const usedCafe24 = new Set(Object.values(draftCafe24).filter(Boolean))
+  const unmatchedWorkersKt = workers.filter(w => !draftKt[w.id])
   const unmatchedKt = ktAgents.filter(a => !usedKtIds.has(a.kt_id))
+  const unmatchedWorkersCafe24 = workers.filter(w => !draftCafe24[w.id])
+  const unmatchedCafe24 = cafe24Users.filter(u => !usedCafe24.has(u.user_id))
+  // 요약 색상 — KT 미매칭은 항상, Cafe24 미매칭은 연결됐을 때만 경고
+  const anyUnmatched =
+    unmatchedWorkersKt.length > 0 || unmatchedKt.length > 0 ||
+    (cafe24Ok && (unmatchedWorkersCafe24.length > 0 || unmatchedCafe24.length > 0))
 
   if (loading && workers.length === 0 && ktAgents.length === 0) {
     return <div style={{ fontSize: 12, color: COLORS.textMuted }}>조회 중...</div>
@@ -1019,40 +1092,55 @@ function AgentMappingSection() {
   return (
     <div>
       <div style={{ fontSize: 11, color: COLORS.textMuted, marginBottom: 12 }}>
-        KT 엑셀의 상담사 ID 를 콜센터 워커에 직접 연결합니다 — 한 사람당 KT ID 가 여러 개일 수 있어,
-        데이터가 있는 활성 ID 를 선택하세요. 이름 매칭은 동명이인·표기차로 깨질 수 있습니다.
+        콜센터 워커를 KT 상담사 ID(생산성·상담이력) 와 Cafe24 접수자(사고·긴급출동 접수 귀속) 에
+        각각 연결합니다 — 한 사람당 식별자가 여러 개일 수 있어, 데이터가 많은 활성 식별자를 선택하세요.
       </div>
 
       <ResultPanel result={result} onClose={() => setResult(null)} />
 
+      {/* Cafe24 미연결 안내 */}
+      {!cafe24Ok && (
+        <div style={{
+          padding: '8px 12px', borderRadius: 8, marginBottom: 12,
+          background: COLORS.bgAmber, border: `1px solid ${COLORS.borderAmber}`,
+          fontSize: 11, color: COLORS.warning, fontWeight: 700,
+        }}>
+          ⚠ Cafe24 ERP 에 연결하지 못했습니다 — 접수자 매칭을 표시할 수 없습니다.
+          KT 상담사 매칭은 정상 동작합니다.
+        </div>
+      )}
+
       {/* 미매칭 요약 + 전체 자동 매칭 */}
       <div style={{
         ...GLASS.L3,
-        background: (unmatchedWorkers.length > 0 || unmatchedKt.length > 0)
-          ? COLORS.bgRed : COLORS.bgGreen,
-        border: `1px solid ${(unmatchedWorkers.length > 0 || unmatchedKt.length > 0)
-          ? COLORS.borderRed : COLORS.borderGreen}`,
+        background: anyUnmatched ? COLORS.bgRed : COLORS.bgGreen,
+        border: `1px solid ${anyUnmatched ? COLORS.borderRed : COLORS.borderGreen}`,
         borderRadius: 10, padding: '8px 14px', marginBottom: 12,
         display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
       }}>
         <span style={{
           fontSize: 12, fontWeight: 800,
-          color: (unmatchedWorkers.length > 0 || unmatchedKt.length > 0)
-            ? COLORS.danger : COLORS.success,
+          color: anyUnmatched ? COLORS.danger : COLORS.success,
         }}>
-          {(unmatchedWorkers.length > 0 || unmatchedKt.length > 0)
-            ? `미매칭 ${unmatchedWorkers.length + unmatchedKt.length}건`
-            : '모든 워커·KT ID 가 매칭됨'}
+          {anyUnmatched ? '미매칭 항목 있음' : '모든 워커·식별자가 매칭됨'}
         </span>
-        <span style={{ fontSize: 11, color: COLORS.textSecondary }}>
-          {`워커 미매칭 ${unmatchedWorkers.length}명 · 미사용 KT ID ${unmatchedKt.length}개 · KT 상담사 ${ktAgents.length}명`}
+        <span style={{ fontSize: 11, color: COLORS.textSecondary, whiteSpace: 'nowrap' }}>
+          {`KT — 워커 미매칭 ${unmatchedWorkersKt.length}명 · 미사용 ID ${unmatchedKt.length}개`}
+        </span>
+        <span style={{ fontSize: 11, color: COLORS.textSecondary, whiteSpace: 'nowrap' }}>
+          {cafe24Ok
+            ? `Cafe24 — 워커 미매칭 ${unmatchedWorkersCafe24.length}명 · 미사용 접수자 ${unmatchedCafe24.length}명`
+            : 'Cafe24 — 미연결'}
         </span>
         <span style={{ flex: 1 }} />
-        <button type="button" onClick={autoMatchAll} disabled={ktAgents.length === 0}
+        <button type="button" onClick={autoMatchAll}
+          disabled={ktAgents.length === 0 && cafe24Users.length === 0}
           style={{
             ...BTN.sm, background: COLORS.primary, color: '#fff', border: 'none',
-            cursor: ktAgents.length === 0 ? 'not-allowed' : 'pointer',
-            opacity: ktAgents.length === 0 ? 0.5 : 1,
+            cursor: (ktAgents.length === 0 && cafe24Users.length === 0)
+              ? 'not-allowed' : 'pointer',
+            opacity: (ktAgents.length === 0 && cafe24Users.length === 0) ? 0.5 : 1,
+            whiteSpace: 'nowrap',
           }}>
           ✨ 전체 자동 매칭
         </button>
@@ -1076,82 +1164,183 @@ function AgentMappingSection() {
           </div>
         )}
         {workers.map((w) => {
-          const cur = draft[w.id] || ''
-          const rec = recommendFor(w.name)
-          const isRecommended = !!rec && cur === rec.kt_id
-          const unmatched = !cur
-          const matchedAgent = ktAgents.find(a => a.kt_id === cur)
+          const curKt = draftKt[w.id] || ''
+          const curCafe = draftCafe24[w.id] || ''
+          const recKt = recommendKtFor(w.name)
+          const recCafe = recommendCafe24For(w.name)
+          const isRecKt = !!recKt && curKt === recKt.kt_id
+          const isRecCafe = !!recCafe && curCafe === recCafe.user_id
+          const ktUnmatched = !curKt
+          const cafeUnmatched = !curCafe
+          const matchedAgent = ktAgents.find(a => a.kt_id === curKt)
+          const matchedCafe = cafe24Users.find(u => u.user_id === curCafe)
+          // 행 강조 — KT 미매칭 또는 (Cafe24 연결됐는데) Cafe24 미매칭
+          const rowUnmatched = ktUnmatched || (cafe24Ok && cafeUnmatched)
           return (
             <div key={w.id} style={{
               ...GLASS.L1, borderRadius: 8, padding: '10px 12px',
-              display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
-              border: unmatched ? `1px solid ${COLORS.borderRed}` : undefined,
+              display: 'flex', flexDirection: 'column', gap: 8,
+              border: rowUnmatched ? `1px solid ${COLORS.borderRed}` : undefined,
             }}>
-              {/* 워커 이름 */}
+              {/* ── KT 매칭 행 ── */}
               <div style={{
-                minWidth: 130, display: 'flex', alignItems: 'center', gap: 6,
-                whiteSpace: 'nowrap',
+                display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
               }}>
+                {/* 워커 이름 */}
+                <div style={{
+                  minWidth: 130, display: 'flex', alignItems: 'center', gap: 6,
+                  whiteSpace: 'nowrap',
+                }}>
+                  <span style={{
+                    width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
+                    background: ktUnmatched ? COLORS.danger : COLORS.success,
+                  }} />
+                  <span style={{ fontSize: 13, fontWeight: 800, color: COLORS.textPrimary }}>
+                    {w.name}
+                  </span>
+                </div>
                 <span style={{
-                  width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
-                  background: unmatched ? COLORS.danger : COLORS.success,
-                }} />
-                <span style={{ fontSize: 13, fontWeight: 800, color: COLORS.textPrimary }}>
-                  {w.name}
+                  fontSize: 10, fontWeight: 800, color: COLORS.primary, whiteSpace: 'nowrap',
+                  background: COLORS.bgBlue, border: `1px solid ${COLORS.borderBlue}`,
+                  borderRadius: 6, padding: '3px 7px', width: 48, textAlign: 'center',
+                }}>
+                  KT
+                </span>
+                {/* KT ID 드롭다운 */}
+                <select
+                  value={curKt}
+                  onChange={(e) => assignKt(w.id, e.target.value)}
+                  style={{
+                    ...GLASS.L1, flex: 1, minWidth: 220, boxSizing: 'border-box',
+                    padding: '6px 10px', borderRadius: 6, fontSize: 12, fontWeight: 700,
+                    color: curKt ? COLORS.textPrimary : COLORS.textMuted,
+                    fontFamily: 'inherit', cursor: 'pointer',
+                  }}>
+                  <option value="">— 매칭 해제 (KT ID 없음) —</option>
+                  {ktAgents.map((a) => (
+                    <option key={a.kt_id} value={a.kt_id}>
+                      {`${a.agent_name || '?'}(${a.kt_id}) · 데이터 ${a.total_rows}건`}
+                      {a.active ? ' · 활성' : ''}
+                    </option>
+                  ))}
+                </select>
+                {/* KT 추천 배지 / 추천 적용 버튼 */}
+                {recKt && !isRecKt && (
+                  <button type="button" onClick={() => assignKt(w.id, recKt.kt_id)}
+                    style={{
+                      ...BTN.sm, background: 'transparent', color: COLORS.primary,
+                      border: `1px solid ${COLORS.borderBlue}`, cursor: 'pointer',
+                      whiteSpace: 'nowrap',
+                    }}>
+                    💡 추천 {recKt.kt_id}
+                  </button>
+                )}
+                {isRecKt && (
+                  <span style={{
+                    fontSize: 10, fontWeight: 800, color: COLORS.success,
+                    background: COLORS.bgGreen, border: `1px solid ${COLORS.borderGreen}`,
+                    borderRadius: 6, padding: '3px 7px', whiteSpace: 'nowrap',
+                  }}>
+                    ✓ 추천 일치
+                  </span>
+                )}
+                {/* KT 매칭 상태 */}
+                <span style={{
+                  fontSize: 10, fontWeight: 700, whiteSpace: 'nowrap', width: 88,
+                  textAlign: 'right',
+                  color: ktUnmatched ? COLORS.danger : COLORS.textMuted,
+                }}>
+                  {ktUnmatched
+                    ? '미매칭'
+                    : matchedAgent
+                      ? `${matchedAgent.total_rows}건`
+                      : 'KT 데이터 없음'}
                 </span>
               </div>
 
-              {/* KT ID 드롭다운 */}
-              <select
-                value={cur}
-                onChange={(e) => assign(w.id, e.target.value)}
-                style={{
-                  ...GLASS.L1, flex: 1, minWidth: 220, boxSizing: 'border-box',
-                  padding: '6px 10px', borderRadius: 6, fontSize: 12, fontWeight: 700,
-                  color: cur ? COLORS.textPrimary : COLORS.textMuted,
-                  fontFamily: 'inherit', cursor: 'pointer',
-                }}>
-                <option value="">— 매칭 해제 (KT ID 없음) —</option>
-                {ktAgents.map((a) => (
-                  <option key={a.kt_id} value={a.kt_id}>
-                    {`${a.agent_name || '?'}(${a.kt_id}) · 데이터 ${a.total_rows}건`}
-                    {a.active ? ' · 활성' : ''}
-                  </option>
-                ))}
-              </select>
-
-              {/* 추천 배지 / 추천 적용 버튼 */}
-              {rec && !isRecommended && (
-                <button type="button" onClick={() => assign(w.id, rec.kt_id)}
-                  style={{
-                    ...BTN.sm, background: 'transparent', color: COLORS.primary,
-                    border: `1px solid ${COLORS.borderBlue}`, cursor: 'pointer',
-                    whiteSpace: 'nowrap',
-                  }}>
-                  💡 추천 {rec.kt_id}
-                </button>
-              )}
-              {isRecommended && (
-                <span style={{
-                  fontSize: 10, fontWeight: 800, color: COLORS.success,
-                  background: COLORS.bgGreen, border: `1px solid ${COLORS.borderGreen}`,
-                  borderRadius: 6, padding: '3px 7px', whiteSpace: 'nowrap',
-                }}>
-                  ✓ 추천 일치
-                </span>
-              )}
-
-              {/* 매칭 상태 */}
-              <span style={{
-                fontSize: 10, fontWeight: 700, whiteSpace: 'nowrap',
-                color: unmatched ? COLORS.danger : COLORS.textMuted,
+              {/* ── Cafe24 매칭 행 ── */}
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
               }}>
-                {unmatched
-                  ? '미매칭'
-                  : matchedAgent
-                    ? `${matchedAgent.total_rows}건`
-                    : 'KT 데이터 없음'}
-              </span>
+                {/* 좌측 정렬용 빈 칸 (이름 폭 맞춤) */}
+                <div style={{
+                  minWidth: 130, display: 'flex', alignItems: 'center', gap: 6,
+                  whiteSpace: 'nowrap',
+                }}>
+                  <span style={{
+                    width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
+                    background: !cafe24Ok
+                      ? COLORS.textMuted
+                      : cafeUnmatched ? COLORS.danger : COLORS.success,
+                  }} />
+                  <span style={{ fontSize: 11, fontWeight: 600, color: COLORS.textMuted }}>
+                    접수자
+                  </span>
+                </div>
+                <span style={{
+                  fontSize: 10, fontWeight: 800, color: COLORS.primaryDark, whiteSpace: 'nowrap',
+                  background: COLORS.bgViolet, border: `1px solid ${COLORS.borderViolet}`,
+                  borderRadius: 6, padding: '3px 7px', width: 48, textAlign: 'center',
+                }}>
+                  Cafe24
+                </span>
+                {/* Cafe24 사용자 드롭다운 */}
+                <select
+                  value={curCafe}
+                  disabled={!cafe24Ok}
+                  onChange={(e) => assignCafe24(w.id, e.target.value)}
+                  style={{
+                    ...GLASS.L1, flex: 1, minWidth: 220, boxSizing: 'border-box',
+                    padding: '6px 10px', borderRadius: 6, fontSize: 12, fontWeight: 700,
+                    color: curCafe ? COLORS.textPrimary : COLORS.textMuted,
+                    fontFamily: 'inherit',
+                    cursor: cafe24Ok ? 'pointer' : 'not-allowed',
+                    opacity: cafe24Ok ? 1 : 0.5,
+                  }}>
+                  <option value="">— 매칭 해제 —</option>
+                  {cafe24Users.map((u) => (
+                    <option key={u.user_id} value={u.user_id}>
+                      {`${u.name || '?'}(${u.user_id}) · 접수 ${u.intake_count}건`}
+                    </option>
+                  ))}
+                </select>
+                {/* Cafe24 추천 배지 / 추천 적용 버튼 */}
+                {cafe24Ok && recCafe && !isRecCafe && (
+                  <button type="button" onClick={() => assignCafe24(w.id, recCafe.user_id)}
+                    style={{
+                      ...BTN.sm, background: 'transparent', color: COLORS.primaryDark,
+                      border: `1px solid ${COLORS.borderViolet}`, cursor: 'pointer',
+                      whiteSpace: 'nowrap',
+                    }}>
+                    💡 추천 {recCafe.user_id}
+                  </button>
+                )}
+                {cafe24Ok && isRecCafe && (
+                  <span style={{
+                    fontSize: 10, fontWeight: 800, color: COLORS.success,
+                    background: COLORS.bgGreen, border: `1px solid ${COLORS.borderGreen}`,
+                    borderRadius: 6, padding: '3px 7px', whiteSpace: 'nowrap',
+                  }}>
+                    ✓ 추천 일치
+                  </span>
+                )}
+                {/* Cafe24 매칭 상태 */}
+                <span style={{
+                  fontSize: 10, fontWeight: 700, whiteSpace: 'nowrap', width: 88,
+                  textAlign: 'right',
+                  color: !cafe24Ok
+                    ? COLORS.textMuted
+                    : cafeUnmatched ? COLORS.danger : COLORS.textMuted,
+                }}>
+                  {!cafe24Ok
+                    ? '미연결'
+                    : cafeUnmatched
+                      ? '미매칭'
+                      : matchedCafe
+                        ? `${matchedCafe.intake_count}건`
+                        : '접수 데이터 없음'}
+                </span>
+              </div>
             </div>
           )
         })}
@@ -1172,6 +1361,25 @@ function AgentMappingSection() {
               .map(a => `${a.agent_name || '?'}(${a.kt_id})·${a.total_rows}건`)
               .join('  /  ')}
             {unmatchedKt.length > 20 && `  …외 ${unmatchedKt.length - 20}개`}
+          </div>
+        </div>
+      )}
+
+      {/* 미사용 Cafe24 접수자 안내 */}
+      {cafe24Ok && unmatchedCafe24.length > 0 && (
+        <div style={{
+          ...GLASS.L1, borderRadius: 8, padding: '8px 12px', marginTop: 10,
+          border: `1px solid ${COLORS.borderRed}`,
+        }}>
+          <div style={{ fontSize: 11, fontWeight: 800, color: COLORS.danger, marginBottom: 4 }}>
+            어떤 워커에도 안 묶인 Cafe24 접수자 {unmatchedCafe24.length}명
+          </div>
+          <div style={{ fontSize: 11, color: COLORS.textSecondary, lineHeight: 1.6 }}>
+            {unmatchedCafe24
+              .slice(0, 20)
+              .map(u => `${u.name || '?'}(${u.user_id})·${u.intake_count}건`)
+              .join('  /  ')}
+            {unmatchedCafe24.length > 20 && `  …외 ${unmatchedCafe24.length - 20}명`}
           </div>
         </div>
       )}

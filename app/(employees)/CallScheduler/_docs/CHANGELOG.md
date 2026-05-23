@@ -3,6 +3,12 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-23 (Phase CX-KPI-19) — 상담원 ↔ Cafe24 접수자 3자 연동
+
+- 마이그레이션 `cs_workers.cafe24_user_id` 추가 — 콜센터 워커 ↔ Cafe24 접수자 코드 연결(사고·긴급출동 접수 귀속용). KT ID(`kt_id`) 와 별개 축.
+- `kpi/agent-mapping` route 확장 — GET 응답에 `cafe24_users[]`(aceesosh∪acrotpth 최근 180일 접수자 코드별 건수 + picuserm 이름)·`cafe24_ok`·`workers[].cafe24_user_id`·`cafe24_matched_count`·`unmatched_cafe24[]` 추가. POST body 의 각 mapping 이 `kt_id`+`cafe24_user_id` 양쪽 처리(컬럼별 중복 배정 차단). Cafe24 미연결 시 graceful 빈 배열.
+- `KpiSettings.tsx` 「상담원 매칭」 섹션(`AgentMappingSection`) UI 확장 — draft 를 `draftKt`/`draftCafe24` 둘로 분리. 워커 행을 2줄 구성(KT 행 + Cafe24 행)으로 바꿔 식별자 드롭다운·이름 일치 추천 배지·매칭 상태를 각 축마다 표시(KT=블루 배지, Cafe24=바이올렛 배지). 「전체 자동 매칭」을 KT·Cafe24 양쪽에 동일 로직(이름 일치 + 데이터 최다 우선) 적용, 저장 시 `kt_id`+`cafe24_user_id` 둘 다 전송하고 결과 패널에 KT·Cafe24 연결 건수 함께 표기. 미매칭 요약 줄·미사용 식별자 안내를 KT/Cafe24 각각 표시. `cafe24_ok===false` 면 Cafe24 드롭다운 disabled + 상단 amber 안내(KT 매칭은 정상 유지). 색상 전부 `COLORS`/`GLASS`/`BTN` 토큰.
+
 ## 2026-05-23 (Phase CX-KPI-18) — WFM 필요인원 재설계 (요일×인터벌 히트맵)
 
 - `kpi/staffing` route 재작성 — 24시간 일렬 배열(`hourly[]`) 대신 **(요일 × 30/60분 인터벌) 격자**(`grid[]`, 7×`buckets_per_day` 셀)를 반환. `cs_call_records` 를 `WEEKDAY()`+`start_time` 의 실제 시·분으로 집계(가짜 균등분할 제거), `(요일,버킷) 평균 콜 = 합 ÷ 해당 요일 일수`. overnight 시프트는 다음날 요일로 spill. 응답에 `dow_days[]`(요일별 일수)·`buckets_per_day`·`peak_dow`/`peak_bucket`/`short_cells`/`active_cells` 추가.
