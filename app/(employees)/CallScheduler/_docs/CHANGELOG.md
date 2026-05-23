@@ -3,6 +3,11 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-23 (Phase CX-KPI-12) — 상담원 매칭 설정
+
+- `KpiSettings` 에 4번째 접이식 섹션 「🔗 상담원 매칭」 추가 — KT 엑셀 상담사 ID(`agent_kt_id`) ↔ 콜센터 워커(`cs_workers`) 직접 연결. 워커별 KT ID 드롭다운(표기: `이름(kt_id)·데이터 N건·활성`), 이름 일치 활성 ID 자동 추천 배지·「전체 자동 매칭」, 미매칭 워커/미사용 KT ID 빨강 강조 + 상단 "미매칭 N건" 요약. 같은 kt_id 화면상 단일 배정 보장.
+- API `kpi/agent-mapping` (GET/POST) 신규 — GET: `cs_call_records` ∪ `cs_agent_productivity` distinct `agent_kt_id` 별 행수·대표이름·활성여부 + `cs_workers`(is_active=1) 현재 매칭 + matched_count/unmatched_kt. POST: `{mappings:[{worker_id,kt_id}]}` → `cs_workers.kt_id` UPDATE, 같은 kt_id 중복 배정 차단(입력 검증 + 새 배정 시 그 kt_id 쓰던 다른 워커 자동 해제). 전 쿼리 graceful try/catch.
+
 ## 2026-05-23 (Phase CX-KPI-11) — 데이터 검수·관리 탭
 
 - `kpi/page.tsx` 에 「📁 데이터」 탭 신설(KpiTab 'data'). 업로드된 KT 베이스 데이터(4개 소스: cs_call_records / cs_agent_productivity / cs_response_ivr / cs_response_queue)가 「전체 다 들어왔는지 / 중복은 없는지 / 며칠치 기준인지」 를 검수·관리.
