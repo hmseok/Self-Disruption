@@ -3,6 +3,15 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-23 (Phase CX-KPI-10) — KPI 설정 통합 + 페이지 좌측정렬
+
+- KPI 페이지(`kpi/page.tsx`) 공통 래퍼의 `maxWidth:1100`·`margin:'0 auto'` 제거 → 좌측정렬·전체 폭 사용. 탭 바 `flexWrap` 추가로 좁은 폭 반응형. 내부 컴포넌트 grid 는 `minmax()` auto-fit/fill 유지로 그대로 반응형.
+- 흩어져 있던 KPI 설정성 항목(목표치·WFM 산정기준·평가 가중치)을 「⚙ 설정」 탭 한 곳에 통합. 기존 「🎯 목표」 탭 제거 — 목표치는 설정 탭 1섹션으로 흡수.
+- `KpiSettings` 컴포넌트 신규 — 접이식 3섹션: ① 목표치(`KpiTargets` 그대로 렌더) ② WFM 산정 기준(`kpi/wfm-config` 폼 — KpiStaffing 인라인 패널 이식) ③ 평가 항목·가중치(`kpi/eval-weights` 편집 — 지표별 사용 체크박스 + 가중치% 입력, 사용항목 합 표시). 저장 결과는 글래스 패널(규칙 20).
+- API `kpi/eval-weights` (GET/POST) 신규 — `cs_kpi_eval_weights` 전체 행 반환(미적재 시 기본 4지표 + `_migration_pending`). POST 는 metric 단위 UPDATE(UNIQUE metric).
+- `kpi/evaluation` route — 하드코딩 `WEIGHTS` 상수를 `cs_kpi_eval_weights` DB 조회(`loadWeights()`)로 교체. 테이블 미적재/빈 경우 기본 상수 graceful fallback. `enabled=0` 지표는 가중치 0 → 평가 제외(가중치 비례 재분배 로직 유지).
+- `KpiStaffing` — 인라인 `⚙ 산정 기준` 편집 패널 제거(요약 줄은 유지). 편집은 「⚙ 설정」 탭으로 안내.
+
 ## 2026-05-22 (Phase CX-KPI-9) — 상담원 종합 평가 탭
 
 - `kpi/page.tsx` 에 「🏅 평가」 탭 신설. 상담원별 종합 점수·팀 내 순위·강점/약점을 한 화면에서 확인.

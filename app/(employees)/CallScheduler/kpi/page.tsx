@@ -16,8 +16,8 @@ import { COLORS, GLASS, BTN } from '@/app/utils/ui-tokens'
 import { getAuthHeader } from '@/app/utils/auth-client'
 import KpiDashboard from './_components/KpiDashboard'
 import KpiStaffing from './_components/KpiStaffing'
-import KpiTargets from './_components/KpiTargets'
 import KpiEvaluation from './_components/KpiEvaluation'
+import KpiSettings from './_components/KpiSettings'
 
 export const dynamic = 'force-dynamic'
 
@@ -86,7 +86,7 @@ interface PreviewResult {
   skipped?: number
 }
 
-type KpiTab = 'dashboard' | 'staffing' | 'targets' | 'evaluation' | 'upload'
+type KpiTab = 'dashboard' | 'staffing' | 'settings' | 'evaluation' | 'upload'
 
 // ── 자동 종류 판별 ────────────────────────────────────────────────
 // 1차 — 파일명 패턴 / 2차 — 헤더 컬럼. 둘 다 실패 시 null (수동 선택).
@@ -315,17 +315,17 @@ export default function KpiPage() {
   const failCount = items.filter((it) => it.status === 'error').length
 
   return (
-    <div style={{ padding: '16px 24px', maxWidth: 1100, margin: '0 auto' }}>
+    <div style={{ padding: '16px 24px' }}>
       {/* PageTitle 자동 헤더 — 자체 헤더 없음 */}
 
       {/* ── 탭 (대시보드 / 업로드) ──────────────────────────── */}
-      <div style={{ display: 'flex', gap: 4, marginBottom: 14 }}>
+      <div style={{ display: 'flex', gap: 4, marginBottom: 14, flexWrap: 'wrap' }}>
         {([
           { k: 'dashboard' as KpiTab, label: '📊 KPI 대시보드' },
           { k: 'staffing' as KpiTab, label: '🧮 필요인원 (WFM)' },
-          { k: 'targets' as KpiTab, label: '🎯 목표' },
           { k: 'evaluation' as KpiTab, label: '🏅 평가' },
           { k: 'upload' as KpiTab, label: '📤 KT 엑셀 업로드' },
+          { k: 'settings' as KpiTab, label: '⚙ 설정' },
         ]).map(({ k, label }) => {
           const active = k === tab
           return (
@@ -347,9 +347,9 @@ export default function KpiPage() {
 
       {tab === 'staffing' && <KpiStaffing />}
 
-      {tab === 'targets' && <KpiTargets />}
-
       {tab === 'evaluation' && <KpiEvaluation />}
+
+      {tab === 'settings' && <KpiSettings />}
 
       {tab === 'upload' && (
        <>

@@ -71,21 +71,51 @@ function resolveRange(granularity: Granularity, base: Date): {
   }
 }
 
-// ── 평가 지표 가중치 (코드 상수 — 투명하게 공개) ──────────────────
+// ── 평가 지표 가중치 ──────────────────────────────────────────────
+//   설정 항목 — cs_kpi_eval_weights 테이블에서 로드 (KPI 설정 탭에서 편집).
+//   테이블 미적재 / 빈 경우 아래 기본 상수로 graceful fallback.
 //   통화량 35 : 핵심 생산성 지표 — 가장 직접적인 처리 실적
-//   AHT    30 : 통화 효율 — 빠른 처리(낮을수록 우수). 통화량과 함께 처리 능력 핵심
+//   AHT    30 : 통화 효율 — 빠른 처리(낮을수록 우수)
 //   후처리·이석 15 : 로그인시간 대비 비통화 시간 비율 — 가동 집중도(낮을수록 우수)
 //   근무시간 20 : 근무 기여(충원) — 많을수록 팀 부담 분담
-const WEIGHTS = {
+const DEFAULT_WEIGHTS = {
   call_count: 35,  // 많을수록 ↑
   aht: 30,         // 낮을수록 ↑ (역방향)
   acw_away_ratio: 15, // 낮을수록 ↑ (역방향)
   work_hours: 20,  // 많을수록 ↑
 } as const
 // 역방향 지표 (낮을수록 우수) — 정규화 시 점수 반전
-const LOWER_IS_BETTER = new Set<keyof typeof WEIGHTS>(['aht', 'acw_away_ratio'])
+const LOWER_IS_BETTER = new Set<MetricKey>(['aht', 'acw_away_ratio'])
 
-type MetricKey = keyof typeof WEIGHTS
+type MetricKey = keyof typeof DEFAULT_WEIGHTS
+
+// cs_kpi_eval_weights 에서 enabled=1 인 지표·가중치 로드.
+// 테이블 미적재 / 빈 경우 DEFAULT_WEIGHTS 반환 (graceful).
+async function loadWeights(): Promise<Record<MetricKey, number>> {
+  try {
+    const rows = await prisma.$queryRaw<any[]>`
+      SELECT metric, enabled, weight FROM cs_kpi_eval_weights
+    `
+    if (rows.length === 0) return { ...DEFAULT_WEIGHTS }
+    const out: Partial<Record<MetricKey, number>> = {}
+    for (const r of rows) {
+      const metric = String(r.metric || '') as MetricKey
+      if (!(metric in DEFAULT_WEIGHTS)) continue
+      // enabled=0 → 가중치 0 (평가에서 제외 — activeMetrics 필터로 빠짐)
+      out[metric] = Number(r.enabled ?? 1)
+        ? Math.max(0, Number(r.weight) || 0)
+        : 0
+    }
+    // 누락 지표는 기본값 보완
+    for (const k of Object.keys(DEFAULT_WEIGHTS) as MetricKey[]) {
+      if (out[k] === undefined) out[k] = DEFAULT_WEIGHTS[k]
+    }
+    return out as Record<MetricKey, number>
+  } catch {
+    // cs_kpi_eval_weights 미적재 — graceful fallback
+    return { ...DEFAULT_WEIGHTS }
+  }
+}
 
 export async function GET(request: NextRequest) {
   const user = await verifyUser(request)
@@ -101,6 +131,9 @@ export async function GET(request: NextRequest) {
     const { from, to, prodLabel } = resolveRange(
       granularity, isNaN(base.getTime()) ? new Date() : base,
     )
+
+    // ── 평가 가중치 (DB 설정 — cs_kpi_eval_weights, 미적재 시 기본값) ──
+    const WEIGHTS = await loadWeights()
 
     // ── 상담원 집계 맵 (worker_id > kt_id > name 우선) ──
     type AgentRow = {
@@ -277,7 +310,7 @@ export async function GET(request: NextRequest) {
       work_hours: { min: Infinity, max: -Infinity, n: 0 },
     }
     for (const m of metricList) {
-      for (const k of Object.keys(WEIGHTS) as MetricKey[]) {
+      for (const k of Object.keys(DEFAULT_WEIGHTS) as MetricKey[]) {
         const v = rawOf(m, k)
         if (!isValidRaw(k, v)) continue
         const r = range[k]
@@ -286,13 +319,14 @@ export async function GET(request: NextRequest) {
         r.n++
       }
     }
-    // 팀 전체에서 1명이라도 유효값이 있는 지표만 평가에 사용
-    const activeMetrics = (Object.keys(WEIGHTS) as MetricKey[])
-      .filter((k) => range[k].n > 0)
+    // 평가 대상 지표 — 가중치 > 0 (enabled) + 팀에 유효값 1명 이상
+    //   enabled=0 인 지표는 WEIGHTS[k]=0 → 평가에서 제외 (가중치 재분배)
+    const activeMetrics = (Object.keys(DEFAULT_WEIGHTS) as MetricKey[])
+      .filter((k) => WEIGHTS[k] > 0 && range[k].n > 0)
 
     // ── 팀 평균 (유효값 기준) ──────────────────────────────────
     const teamAvg: Record<string, number> = {}
-    for (const k of Object.keys(WEIGHTS) as MetricKey[]) {
+    for (const k of Object.keys(DEFAULT_WEIGHTS) as MetricKey[]) {
       const vals = metricList.map((m) => rawOf(m, k)).filter((v) => isValidRaw(k, v))
       teamAvg[k] = vals.length > 0
         ? vals.reduce((s, v) => s + v, 0) / vals.length

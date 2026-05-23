@@ -4,12 +4,12 @@
 //   · 일/주/월 토글 + 날짜 (KpiDashboard 와 동일 UX)
 //   · 시간대별 필요 vs 배정(커버) 인원 — 글래스 막대 표
 //   · 시프트별 과부족 카드 (🔴 부족 / 🟢 적정 / 🟡 과잉)
-//   · cs_wfm_config 기준 인라인 편집 → 저장 → 재계산
+//   · cs_wfm_config 기준 요약 줄 표시 (편집은 KPI 설정 탭으로 이관)
 //   데이터: GET /api/call-scheduler/kpi/staffing
-//           GET/POST /api/call-scheduler/kpi/wfm-config
+//           (산정 기준은 staffing 응답의 config 로 표시만)
 // ═══════════════════════════════════════════════════════════════════
 import { useState, useEffect, useCallback } from 'react'
-import { COLORS, GLASS, BTN } from '@/app/utils/ui-tokens'
+import { COLORS, GLASS } from '@/app/utils/ui-tokens'
 import { getAuthHeader } from '@/app/utils/auth-client'
 import DcStatStrip, { type StatItem } from '@/app/components/DcStatStrip'
 
@@ -88,12 +88,6 @@ export default function KpiStaffing() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // ── 기준(cs_wfm_config) 편집 상태 ──
-  const [editCfg, setEditCfg] = useState<WfmConfig | null>(null)
-  const [cfgOpen, setCfgOpen] = useState(false)
-  const [savingCfg, setSavingCfg] = useState(false)
-  const [cfgMsg, setCfgMsg] = useState<string | null>(null)
-
   const load = useCallback(async () => {
     setLoading(true); setError(null)
     try {
@@ -105,47 +99,18 @@ export default function KpiStaffing() {
       const json = await res.json()
       if (!res.ok) throw new Error(json?.error || '조회 실패')
       setData(json.data)
-      if (!editCfg) setEditCfg(json.data.config)
     } catch (e: any) {
       setError(e?.message || '오류')
       setData(null)
     } finally {
       setLoading(false)
     }
-  }, [granularity, date, editCfg])
+  }, [granularity, date])
 
   useEffect(() => { load() }, [granularity, date]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── 기준 저장 → 재계산 ──
-  const saveConfig = async () => {
-    if (!editCfg) return
-    setSavingCfg(true); setCfgMsg(null)
-    try {
-      const auth = await getAuthHeader()
-      const res = await fetch('/api/call-scheduler/kpi/wfm-config', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...auth },
-        body: JSON.stringify({
-          target_service_level_pct: editCfg.target_service_level_pct,
-          target_answer_sec: editCfg.target_answer_sec,
-          shrinkage_pct: editCfg.shrinkage_pct,
-          interval_minutes: editCfg.interval_minutes,
-          max_occupancy_pct: editCfg.max_occupancy_pct,
-        }),
-      })
-      const json = await res.json()
-      if (!res.ok) throw new Error(json?.error || '저장 실패')
-      setEditCfg(json.data)
-      setCfgMsg('✓ 기준 저장됨 — 재계산 완료')
-      await load()
-      setTimeout(() => setCfgMsg(null), 4000)
-    } catch (e: any) {
-      setCfgMsg(`❌ ${e?.message || '오류'}`)
-    } finally {
-      setSavingCfg(false)
-    }
-  }
-
+  // 산정 기준 — staffing 응답의 config (표시 전용, 편집은 KPI 설정 탭)
+  const cfg = data?.config ?? null
   const s = data?.summary
   const hourly = data?.hourly ?? []
   const shifts = data?.shifts ?? []
@@ -209,15 +174,6 @@ export default function KpiStaffing() {
           </span>
         )}
         <div style={{ flex: 1 }} />
-        <button type="button" onClick={() => setCfgOpen(o => !o)}
-          style={{
-            padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700,
-            background: cfgOpen ? COLORS.bgBlue : COLORS.bgGray,
-            border: `1px solid ${cfgOpen ? COLORS.borderBlue : COLORS.borderFaint}`,
-            color: cfgOpen ? COLORS.primary : COLORS.textSecondary, cursor: 'pointer',
-          }}>
-          ⚙ 산정 기준
-        </button>
         <button type="button" onClick={load} disabled={loading}
           style={{
             padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700,
@@ -228,8 +184,8 @@ export default function KpiStaffing() {
         </button>
       </div>
 
-      {/* ── WFM 산정 기준 요약 줄 (상시 표시 — 펼치지 않아도 보임) ──── */}
-      {editCfg && (
+      {/* ── WFM 산정 기준 요약 줄 (상시 표시 — 편집은 KPI 설정 탭) ──── */}
+      {cfg && (
         <div style={{
           ...GLASS.L3, background: COLORS.bgBlue, border: `1px solid ${COLORS.borderBlue}`,
           borderRadius: 10, padding: '8px 14px', marginBottom: 12,
@@ -238,92 +194,17 @@ export default function KpiStaffing() {
           <span style={{ fontSize: 12, fontWeight: 800, color: COLORS.primary, whiteSpace: 'nowrap' }}>
             🧮 산정 기준
           </span>
-          <SummaryChip label="목표 응대율" value={`${editCfg.target_service_level_pct}%`} />
-          <SummaryChip label="목표 응대시간" value={`${editCfg.target_answer_sec}초 내`} />
-          <SummaryChip label="부재율" value={`${editCfg.shrinkage_pct}%`} />
+          <SummaryChip label="목표 응대율" value={`${cfg.target_service_level_pct}%`} />
+          <SummaryChip label="목표 응대시간" value={`${cfg.target_answer_sec}초 내`} />
+          <SummaryChip label="부재율" value={`${cfg.shrinkage_pct}%`} />
           <SummaryChip
             label="평균 AHT"
             value={s && s.avg_aht > 0 ? fmtMS(s.avg_aht) : '—'} />
-          <SummaryChip label="산정 단위" value={`${editCfg.interval_minutes}분`} />
+          <SummaryChip label="산정 단위" value={`${cfg.interval_minutes}분`} />
           <span style={{ flex: 1 }} />
           <span style={{ fontSize: 10, color: COLORS.textMuted, whiteSpace: 'nowrap' }}>
-            Erlang C — 이 기준으로 필요인원 산정 (편집은 ⚙ 산정 기준)
+            Erlang C — 산정 기준 편집은 「⚙ 설정」 탭에서
           </span>
-        </div>
-      )}
-
-      {/* ── 산정 기준 인라인 편집 ──────────────────────────────── */}
-      {cfgOpen && editCfg && (
-        <div style={{
-          ...GLASS.L4, borderRadius: 12, padding: 14, marginBottom: 12,
-          border: `1px solid ${COLORS.borderBlue}`,
-        }}>
-          <div style={{ fontSize: 13, fontWeight: 800, color: COLORS.primary, marginBottom: 4 }}>
-            ⚙ Erlang C 산정 기준 (cs_wfm_config)
-          </div>
-          <div style={{ fontSize: 11, color: COLORS.textMuted, marginBottom: 10 }}>
-            목표 응대율·응대시간·부재율·점유율 — 저장 시 시간대별 필요인원이 재계산됩니다.
-          </div>
-          <div style={{
-            display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10,
-          }}>
-            <CfgField label="목표 응대율 (%)" hint="예: 80 → 80%"
-              value={editCfg.target_service_level_pct} min={1} max={100}
-              onChange={(v) => setEditCfg({ ...editCfg, target_service_level_pct: v })} />
-            <CfgField label="목표 응대시간 (초)" hint="예: 20 → 20초 내"
-              value={editCfg.target_answer_sec} min={1} max={600}
-              onChange={(v) => setEditCfg({ ...editCfg, target_answer_sec: v })} />
-            <CfgField label="부재율 (%)" hint="휴식·후처리·교육"
-              value={editCfg.shrinkage_pct} min={0} max={90}
-              onChange={(v) => setEditCfg({ ...editCfg, shrinkage_pct: v })} />
-            <CfgField label="최대 점유율 (%)" hint="상한 가드"
-              value={editCfg.max_occupancy_pct} min={1} max={100}
-              onChange={(v) => setEditCfg({ ...editCfg, max_occupancy_pct: v })} />
-            <div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSecondary, marginBottom: 4 }}>
-                산정 단위
-              </div>
-              <div style={{ display: 'flex', gap: 4 }}>
-                {[30, 60].map((iv) => {
-                  const active = editCfg.interval_minutes === iv
-                  return (
-                    <button key={iv} type="button"
-                      onClick={() => setEditCfg({ ...editCfg, interval_minutes: iv })}
-                      style={{
-                        flex: 1, padding: '6px 8px', borderRadius: 8, cursor: 'pointer',
-                        fontSize: 12, fontWeight: 700,
-                        background: active ? COLORS.primary : 'transparent',
-                        color: active ? '#fff' : COLORS.textSecondary,
-                        border: `1px solid ${active ? COLORS.primary : COLORS.borderFaint}`,
-                      }}>
-                      {iv}분
-                    </button>
-                  )
-                })}
-              </div>
-              <div style={{ fontSize: 10, color: COLORS.textMuted, marginTop: 3 }}>
-                30분 또는 60분
-              </div>
-            </div>
-          </div>
-          <div style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
-            gap: 10, marginTop: 12,
-          }}>
-            {cfgMsg && (
-              <span style={{
-                fontSize: 12, fontWeight: 700,
-                color: cfgMsg.startsWith('❌') ? COLORS.danger : COLORS.success,
-              }}>{cfgMsg}</span>
-            )}
-            <button type="button" onClick={saveConfig} disabled={savingCfg}
-              style={{
-                ...BTN.md, background: COLORS.success, color: '#fff', border: 'none',
-                cursor: savingCfg ? 'not-allowed' : 'pointer', opacity: savingCfg ? 0.6 : 1,
-              }}>
-              {savingCfg ? '저장 중...' : '✓ 기준 저장 & 재계산'}
-            </button>
-          </div>
         </div>
       )}
 
@@ -561,31 +442,6 @@ function SummaryChip({ label, value }: { label: string; value: string }) {
       <span style={{ fontSize: 10, color: COLORS.textSecondary, fontWeight: 600 }}>{label}</span>
       <span style={{ fontSize: 12, color: COLORS.textPrimary, fontWeight: 800 }}>{value}</span>
     </span>
-  )
-}
-
-// ── 산정 기준 입력 필드 ────────────────────────────────────────
-function CfgField({ label, hint, value, min, max, onChange }: {
-  label: string; hint: string; value: number
-  min: number; max: number; onChange: (v: number) => void
-}) {
-  return (
-    <div>
-      <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSecondary, marginBottom: 4 }}>
-        {label}
-      </div>
-      <input type="number" value={value} min={min} max={max}
-        onChange={(e) => {
-          const n = Number(e.target.value)
-          onChange(Number.isFinite(n) ? n : value)
-        }}
-        style={{
-          ...GLASS.L1, width: '100%', boxSizing: 'border-box',
-          padding: '6px 10px', borderRadius: 8, fontSize: 13, fontWeight: 700,
-          color: COLORS.textPrimary, fontFamily: 'inherit',
-        }} />
-      <div style={{ fontSize: 10, color: COLORS.textMuted, marginTop: 3 }}>{hint}</div>
-    </div>
   )
 }
 
