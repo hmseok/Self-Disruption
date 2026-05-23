@@ -80,6 +80,10 @@ export default function KpiSettings() {
         desc="상담원 종합점수의 평가 지표 사용여부·가중치 — 평가 탭에 반영"
         open={openWeights} onToggle={() => setOpenWeights(o => !o)}>
         <EvalWeightsSection />
+        <div style={{
+          height: 1, background: COLORS.borderSubtle, margin: '20px 0 4px',
+        }} />
+        <CustomItemsManager />
       </Section>
 
       {/* ── ④ 상담원 매칭 ────────────────────────────────────── */}
@@ -451,6 +455,412 @@ function EvalWeightsSection() {
             opacity: (saving || !anyEnabled) ? 0.6 : 1,
           }}>
           {saving ? '저장 중...' : '✓ 평가 항목 저장'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ════════════════════════════════════════════════════════════════
+// ③-b 커스텀 평가 항목 — kpi/eval-items (cs_kpi_eval_items)
+//   매니저가 직접 만드는 평가 항목(예: 친절도·모니터링 점수).
+//   계산지표(EvalWeightsSection)와 별개 — 평가 탭에서 상담원별 점수 입력.
+// ════════════════════════════════════════════════════════════════
+interface EvalItem {
+  id: string
+  name: string
+  description: string | null
+  max_score: number
+  weight: number
+  sort_order: number
+  is_active: number
+}
+// 추가/수정 폼 입력값
+interface ItemDraft {
+  id: string | null
+  name: string
+  description: string
+  max_score: number
+  weight: number
+}
+const emptyDraft: ItemDraft = { id: null, name: '', description: '', max_score: 100, weight: 0 }
+
+function CustomItemsManager() {
+  const [items, setItems] = useState<EvalItem[]>([])
+  const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [migrationPending, setMigrationPending] = useState(false)
+  const [result, setResult] = useState<SaveResult | null>(null)
+  // 폼 — null 이면 닫힘, 값 있으면 추가/수정 패널 열림
+  const [draft, setDraft] = useState<ItemDraft | null>(null)
+  // 삭제 인라인 확인 — 대상 item id ('' = 없음)
+  const [confirmDelId, setConfirmDelId] = useState<string>('')
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const auth = await getAuthHeader()
+      const res = await fetch('/api/call-scheduler/kpi/eval-items', { headers: auth })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json?.error || '조회 실패')
+      const list: EvalItem[] = Array.isArray(json?.data?.items) ? json.data.items : []
+      setItems(list.map(it => ({
+        id: String(it.id),
+        name: String(it.name || ''),
+        description: it.description ?? null,
+        max_score: Number(it.max_score) || 0,
+        weight: Number(it.weight) || 0,
+        sort_order: Number(it.sort_order) || 0,
+        is_active: Number(it.is_active) ? 1 : 0,
+      })))
+      setMigrationPending(!!json?.data?._migration_pending)
+    } catch (e: any) {
+      setResult({ ok: false, text: '❌ 커스텀 평가 항목 조회 실패', detail: e?.message, at: nowLabel() })
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  // ── 항목 저장 (생성/수정 공용) — id 있으면 수정, 없으면 생성 ──
+  const saveItem = async (payload: {
+    id?: string; name: string; description?: string
+    max_score?: number; weight?: number; sort_order?: number; is_active?: number
+  }) => {
+    setSaving(true); setResult(null)
+    try {
+      const auth = await getAuthHeader()
+      const res = await fetch('/api/call-scheduler/kpi/eval-items', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...auth },
+        body: JSON.stringify(payload),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json?.error || '저장 실패')
+      setResult({
+        ok: true,
+        text: payload.id ? '🏅 평가 항목 수정 완료' : '🏅 평가 항목 추가 완료',
+        detail: `「${payload.name}」 — 평가 탭의 커스텀 점수 입력에 반영됩니다.`,
+        at: nowLabel(),
+      })
+      setDraft(null)
+      await load()
+    } catch (e: any) {
+      setResult({
+        ok: false, text: '❌ 평가 항목 저장 실패',
+        detail: (e?.message || '') +
+          (migrationPending ? ' — 마이그레이션(cs_kpi_eval_items) 미적용으로 보입니다.' : ''),
+        at: nowLabel(),
+      })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // ── 사용 여부 토글 — 행 체크박스 (즉시 저장) ──
+  const toggleActive = (it: EvalItem) => {
+    saveItem({
+      id: it.id, name: it.name, description: it.description ?? '',
+      max_score: it.max_score, weight: it.weight, sort_order: it.sort_order,
+      is_active: it.is_active ? 0 : 1,
+    })
+  }
+
+  // ── 삭제 — 인라인 확인 후 DELETE ──
+  const deleteItem = async (id: string) => {
+    setSaving(true); setResult(null); setConfirmDelId('')
+    try {
+      const auth = await getAuthHeader()
+      const res = await fetch(`/api/call-scheduler/kpi/eval-items?id=${encodeURIComponent(id)}`, {
+        method: 'DELETE', headers: auth,
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json?.error || '삭제 실패')
+      setResult({
+        ok: true, text: '🗑 평가 항목 삭제 완료',
+        detail: json?.data?.deleted
+          ? '항목과 입력된 점수가 함께 제거되었습니다.'
+          : '이미 삭제된 항목입니다.',
+        at: nowLabel(),
+      })
+      await load()
+    } catch (e: any) {
+      setResult({ ok: false, text: '❌ 평가 항목 삭제 실패', detail: e?.message, at: nowLabel() })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (loading && items.length === 0) {
+    return <div style={{ fontSize: 12, color: COLORS.textMuted }}>조회 중...</div>
+  }
+
+  return (
+    <div>
+      <div style={{
+        fontSize: 13, fontWeight: 800, color: COLORS.textPrimary, marginBottom: 4,
+      }}>
+        ✏ 커스텀 평가 항목
+      </div>
+      <div style={{ fontSize: 11, color: COLORS.textMuted, marginBottom: 12 }}>
+        친절도·모니터링 점수 등 매니저가 직접 만드는 평가 항목입니다 — 위 계산 지표와 별개로,
+        평가 탭에서 상담원별 점수를 입력하면 종합점수에 가중 반영됩니다.
+      </div>
+
+      {migrationPending && (
+        <div style={{
+          padding: '8px 12px', borderRadius: 8, marginBottom: 12,
+          background: COLORS.bgAmber, border: `1px solid ${COLORS.borderAmber}`,
+          fontSize: 11, color: COLORS.warning,
+        }}>
+          ⚠ cs_kpi_eval_items 테이블이 아직 적용되지 않은 것으로 보입니다 —
+          마이그레이션 적용 전에는 추가·수정·삭제가 반영되지 않습니다.
+        </div>
+      )}
+
+      <ResultPanel result={result} onClose={() => setResult(null)} />
+
+      {/* ── 항목 목록 ─────────────────────────────────────────── */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {items.length === 0 && (
+          <div style={{
+            ...GLASS.L1, borderRadius: 8, padding: '12px',
+            fontSize: 12, color: COLORS.textMuted, textAlign: 'center',
+          }}>
+            등록된 커스텀 평가 항목이 없습니다 — 「+ 항목 추가」로 만드세요.
+          </div>
+        )}
+        {items.map((it) => {
+          const confirming = confirmDelId === it.id
+          return (
+            <div key={it.id} style={{
+              ...GLASS.L1, borderRadius: 8, padding: '10px 12px',
+              display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
+              opacity: it.is_active ? 1 : 0.55,
+            }}>
+              {/* 사용 여부 + 이름 + 설명 */}
+              <label style={{
+                display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer',
+                minWidth: 200,
+              }}>
+                <input type="checkbox" checked={!!it.is_active}
+                  onChange={() => toggleActive(it)} disabled={saving}
+                  style={{ width: 15, height: 15, cursor: 'pointer' }} />
+                <span style={{ fontSize: 13, fontWeight: 800, color: COLORS.textPrimary }}>
+                  {it.name}
+                </span>
+              </label>
+              <span style={{
+                flex: 1, minWidth: 120, fontSize: 11, color: COLORS.textMuted,
+                fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+              }}>
+                {it.description || '— 설명 없음'}
+              </span>
+              {/* 만점 / 가중치 */}
+              <span style={{
+                fontSize: 11, fontWeight: 700, color: COLORS.textSecondary, whiteSpace: 'nowrap',
+              }}>
+                만점 {it.max_score}
+              </span>
+              <span style={{
+                fontSize: 11, fontWeight: 700, color: COLORS.primary, whiteSpace: 'nowrap',
+              }}>
+                가중치 {it.weight}%
+              </span>
+              {/* 액션 — 수정 / 삭제 (삭제는 인라인 확인) */}
+              {!confirming ? (
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button type="button" disabled={saving}
+                    onClick={() => setDraft({
+                      id: it.id, name: it.name, description: it.description ?? '',
+                      max_score: it.max_score, weight: it.weight,
+                    })}
+                    style={{
+                      ...BTN.sm, background: 'transparent', color: COLORS.primary,
+                      border: `1px solid ${COLORS.borderBlue}`, cursor: 'pointer',
+                      whiteSpace: 'nowrap',
+                    }}>
+                    수정
+                  </button>
+                  <button type="button" disabled={saving}
+                    onClick={() => setConfirmDelId(it.id)}
+                    style={{
+                      ...BTN.sm, background: 'transparent', color: COLORS.danger,
+                      border: `1px solid ${COLORS.borderRed}`, cursor: 'pointer',
+                      whiteSpace: 'nowrap',
+                    }}>
+                    삭제
+                  </button>
+                </div>
+              ) : (
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap',
+                  background: COLORS.bgRed, border: `1px solid ${COLORS.borderRed}`,
+                  borderRadius: 8, padding: '4px 8px',
+                }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: COLORS.danger }}>
+                    「{it.name}」 삭제할까요?
+                  </span>
+                  <button type="button" disabled={saving}
+                    onClick={() => deleteItem(it.id)}
+                    style={{
+                      ...BTN.sm, background: COLORS.danger, color: '#fff', border: 'none',
+                      cursor: 'pointer', whiteSpace: 'nowrap',
+                    }}>
+                    삭제
+                  </button>
+                  <button type="button" disabled={saving}
+                    onClick={() => setConfirmDelId('')}
+                    style={{
+                      ...BTN.sm, background: 'transparent', color: COLORS.textSecondary,
+                      border: `1px solid ${COLORS.borderFaint}`, cursor: 'pointer',
+                      whiteSpace: 'nowrap',
+                    }}>
+                    취소
+                  </button>
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+
+      {/* ── 추가/수정 폼 ──────────────────────────────────────── */}
+      {draft ? (
+        <ItemForm
+          draft={draft} saving={saving}
+          onChange={setDraft}
+          onCancel={() => setDraft(null)}
+          onSubmit={() => {
+            const name = draft.name.trim()
+            if (!name) {
+              setResult({ ok: false, text: '❌ 항목 이름을 입력하세요', at: nowLabel() })
+              return
+            }
+            saveItem({
+              ...(draft.id ? { id: draft.id } : {}),
+              name,
+              description: draft.description.trim(),
+              max_score: draft.max_score,
+              weight: draft.weight,
+            })
+          }}
+        />
+      ) : (
+        <div style={{ marginTop: 12 }}>
+          <button type="button" disabled={saving || loading}
+            onClick={() => setDraft({ ...emptyDraft })}
+            style={{
+              ...BTN.md, background: COLORS.primary, color: '#fff', border: 'none',
+              cursor: (saving || loading) ? 'not-allowed' : 'pointer',
+              opacity: (saving || loading) ? 0.6 : 1,
+            }}>
+            + 항목 추가
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── 커스텀 항목 추가/수정 폼 (글래스 패널) ────────────────────────
+function ItemForm({ draft, saving, onChange, onCancel, onSubmit }: {
+  draft: ItemDraft; saving: boolean
+  onChange: (d: ItemDraft) => void
+  onCancel: () => void
+  onSubmit: () => void
+}) {
+  return (
+    <div style={{
+      ...GLASS.L3, background: COLORS.bgBlue,
+      border: `1px solid ${COLORS.borderBlue}`,
+      borderRadius: 10, padding: 14, marginTop: 12,
+    }}>
+      <div style={{
+        fontSize: 12, fontWeight: 800, color: COLORS.textPrimary, marginBottom: 10,
+      }}>
+        {draft.id ? '✏ 평가 항목 수정' : '＋ 새 평가 항목'}
+      </div>
+      <div style={{
+        display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10,
+      }}>
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSecondary, marginBottom: 4 }}>
+            항목 이름 *
+          </div>
+          <input type="text" value={draft.name} maxLength={60}
+            placeholder="예: 친절도"
+            onChange={(e) => onChange({ ...draft, name: e.target.value })}
+            style={{
+              ...GLASS.L1, width: '100%', boxSizing: 'border-box',
+              padding: '6px 10px', borderRadius: 8, fontSize: 13, fontWeight: 700,
+              color: COLORS.textPrimary, fontFamily: 'inherit',
+            }} />
+        </div>
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSecondary, marginBottom: 4 }}>
+            설명
+          </div>
+          <input type="text" value={draft.description} maxLength={200}
+            placeholder="예: 모니터링 청취 평가"
+            onChange={(e) => onChange({ ...draft, description: e.target.value })}
+            style={{
+              ...GLASS.L1, width: '100%', boxSizing: 'border-box',
+              padding: '6px 10px', borderRadius: 8, fontSize: 13, fontWeight: 700,
+              color: COLORS.textPrimary, fontFamily: 'inherit',
+            }} />
+        </div>
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSecondary, marginBottom: 4 }}>
+            만점
+          </div>
+          <input type="number" value={draft.max_score} min={1} max={10000}
+            onChange={(e) => {
+              const n = Number(e.target.value)
+              onChange({ ...draft, max_score: Number.isFinite(n) && n > 0 ? n : draft.max_score })
+            }}
+            style={{
+              ...GLASS.L1, width: '100%', boxSizing: 'border-box',
+              padding: '6px 10px', borderRadius: 8, fontSize: 13, fontWeight: 700,
+              color: COLORS.textPrimary, fontFamily: 'inherit', textAlign: 'right',
+            }} />
+          <div style={{ fontSize: 10, color: COLORS.textMuted, marginTop: 3 }}>기본 100</div>
+        </div>
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSecondary, marginBottom: 4 }}>
+            가중치 (%)
+          </div>
+          <input type="number" value={draft.weight} min={0} max={1000}
+            onChange={(e) => {
+              const n = Number(e.target.value)
+              onChange({ ...draft, weight: Number.isFinite(n) && n >= 0 ? n : 0 })
+            }}
+            style={{
+              ...GLASS.L1, width: '100%', boxSizing: 'border-box',
+              padding: '6px 10px', borderRadius: 8, fontSize: 13, fontWeight: 700,
+              color: COLORS.textPrimary, fontFamily: 'inherit', textAlign: 'right',
+            }} />
+          <div style={{ fontSize: 10, color: COLORS.textMuted, marginTop: 3 }}>
+            종합점수 반영 비율
+          </div>
+        </div>
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
+        <button type="button" onClick={onCancel} disabled={saving}
+          style={{
+            ...BTN.md, background: 'transparent', color: COLORS.textSecondary,
+            border: `1px solid ${COLORS.borderFaint}`,
+            cursor: saving ? 'not-allowed' : 'pointer',
+          }}>
+          취소
+        </button>
+        <button type="button" onClick={onSubmit} disabled={saving}
+          style={{
+            ...BTN.md, background: COLORS.success, color: '#fff', border: 'none',
+            cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.6 : 1,
+          }}>
+          {saving ? '저장 중...' : (draft.id ? '✓ 수정 저장' : '✓ 항목 추가')}
         </button>
       </div>
     </div>

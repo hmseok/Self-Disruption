@@ -3,6 +3,12 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-23 (Phase CX-KPI-17) — 커스텀 평가 항목
+
+- 마이그레이션 2종 — `cs_kpi_eval_items`(매니저가 만드는 평가 항목: 이름·설명·만점·가중치·정렬·사용여부) + `cs_kpi_eval_scores`(상담원×항목×기간 점수). 계산지표(`cs_kpi_eval_weights`)와 별개의 정성 평가 축.
+- API 3종 — `kpi/eval-items`(GET 목록 / POST 생성·수정 / DELETE), `kpi/eval-scores`(GET 기간별 항목·워커·점수 / POST 점수 일괄 저장). `kpi/evaluation` route 확장 — 응답에 `custom_items[]` + 각 agent 의 `custom_scores{item_id: {score,norm}|null}` 추가, 종합점수에 커스텀 항목 가중 반영.
+- UI 2곳 — ① `KpiSettings`「🏅 평가 항목·가중치」섹션에 `CustomItemsManager` 추가: 커스텀 항목 목록·추가/수정 폼·인라인 삭제 확인·사용여부 토글, `_migration_pending` amber 배너, `ResultPanel` 글래스 결과. ② `KpiEvaluation` 에 `CustomScorePanel`(L4 접이식 글래스) 추가: 행=상담원·열=항목 점수 입력표, `eval-scores` GET 으로 초기값 채움 → POST 저장 → `evaluation` 재조회로 종합점수 갱신. 직접범위 모드는 입력 비활성+안내, 평가 테이블에 항목별 `✏` 점수 컬럼(전 컬럼 sortBy), `custom_items` 0개면 「⚙ 설정」 유도 안내.
+
 ## 2026-05-23 (Phase CX-KPI-16) — KPI 기간 선택 개선 (프리셋+이전/다음+직접범위)
 
 - `kpi/_components/KpiPeriodPicker.tsx` 신규 — CX KPI 5개 탭이 공유하는 공용 기간 선택 컴포넌트. 프리셋(일/주/월) + ◀ 이전/다음 ▶ 네비게이션(일=±1일·주=±7일·월=±1개월) + 「직접」 모드(시작~종료 범위 입력, ◀▶ 는 범위 길이만큼 함께 이동, 시작>종료 자동 보정). `KpiPeriod` 타입 + `periodQuery()` 헬퍼 export — 프리셋이면 `?granularity=&date=`, 직접범위면 `?from=&to=`. 주는 월요일 시작. `COLORS`/`GLASS` 토큰만 사용.

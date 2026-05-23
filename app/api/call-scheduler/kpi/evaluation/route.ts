@@ -27,6 +27,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { verifyUser } from '@/lib/auth-server'
 import { prisma } from '@/lib/prisma'
 import { workHoursByWorker } from '@/lib/cs-shift-hours'
+import { evalPeriodKey } from '@/lib/cs-kpi-period'
 
 export const dynamic = 'force-dynamic'
 
@@ -144,6 +145,47 @@ export async function GET(request: NextRequest) {
 
     // ── 평가 가중치 (DB 설정 — cs_kpi_eval_weights, 미적재 시 기본값) ──
     const WEIGHTS = await loadWeights()
+
+    // ── 커스텀 평가 항목 + 점수 (cs_kpi_eval_items / cs_kpi_eval_scores) ──
+    // 매니저가 만든 정성 항목(친절도·모니터링 등) — 종합점수에 가중 합산.
+    // 점수는 score/max_score×100 절대 정규화 (계산지표의 팀 min~max 와 별개).
+    type CustomItem = { id: string; name: string; max_score: number; weight: number }
+    let customItems: CustomItem[] = []
+    const customScoreMap = new Map<string, number>() // `${itemId}|${workerId}` → score
+    try {
+      const itemRows = await prisma.$queryRaw<any[]>`
+        SELECT id, name, max_score, weight
+        FROM cs_kpi_eval_items
+        WHERE is_active = 1 AND weight > 0
+        ORDER BY sort_order ASC, name ASC
+      `
+      customItems = itemRows.map((r) => ({
+        id: String(r.id),
+        name: String(r.name || ''),
+        max_score: Number(r.max_score) > 0 ? Number(r.max_score) : 100,
+        weight: Math.max(0, Number(r.weight) || 0),
+      }))
+    } catch {
+      customItems = [] // cs_kpi_eval_items 미적재 — graceful
+    }
+    if (customItems.length > 0) {
+      try {
+        const { period_kind, period_label } = evalPeriodKey(
+          granularity, dateParam || '',
+        )
+        const scoreRows = await prisma.$queryRaw<any[]>`
+          SELECT item_id, worker_id, score
+          FROM cs_kpi_eval_scores
+          WHERE period_kind = ${period_kind} AND period_label = ${period_label}
+        `
+        for (const r of scoreRows) {
+          customScoreMap.set(
+            `${String(r.item_id)}|${String(r.worker_id)}`,
+            Number(r.score) || 0,
+          )
+        }
+      } catch { /* graceful — cs_kpi_eval_scores 미적재 */ }
+    }
 
     // ── 상담원 집계 맵 (worker_id > kt_id > name 우선) ──
     type AgentRow = {
@@ -391,7 +433,23 @@ export async function GET(request: NextRequest) {
         weightedTotal += sc * WEIGHTS[k]
         weightSum += WEIGHTS[k]
       }
-      // 가중치 재분배 — 본인이 가진 지표 가중치 합으로 나눔
+      // ── 커스텀 항목 점수 (매니저 입력 — score/max×100 절대 정규화) ──
+      // worker_id 매칭 + 입력 점수 존재 시에만 합산 (없으면 가중치 재분배에서 제외).
+      const customScores: Record<string, { score: number; norm: number } | null> = {}
+      for (const it of customItems) {
+        const raw = m.worker_id
+          ? customScoreMap.get(`${it.id}|${m.worker_id}`)
+          : undefined
+        if (raw != null && it.weight > 0) {
+          const norm = Math.max(0, Math.min(100, (raw / it.max_score) * 100))
+          customScores[it.id] = { score: raw, norm: Math.round(norm * 10) / 10 }
+          weightedTotal += norm * it.weight
+          weightSum += it.weight
+        } else {
+          customScores[it.id] = null
+        }
+      }
+      // 가중치 재분배 — 본인이 가진 지표(계산+커스텀) 가중치 합으로 나눔
       const totalScore = weightSum > 0
         ? Math.round((weightedTotal / weightSum) * 10) / 10
         : 0
@@ -430,6 +488,8 @@ export async function GET(request: NextRequest) {
           acw_away_score: scores.acw_away_ratio ?? null,
           work_hours_score: scores.work_hours ?? null,
         },
+        // 커스텀 항목 점수 — { [item_id]: { score(원점수), norm(0~100) } | null }
+        custom_scores: customScores,
         strengths,
         weaknesses,
       }
@@ -460,6 +520,7 @@ export async function GET(request: NextRequest) {
           active_metrics: activeMetrics, // 실제 평가에 쓰인 지표 키
         },
         weights: WEIGHTS,           // UI 에 가중치 공개 (투명)
+        custom_items: customItems,  // 커스텀 평가 항목 (id·name·max_score·weight)
         team_avg: {
           score: teamAvgScore,
           call_count: Math.round(teamAvg.call_count * 10) / 10,

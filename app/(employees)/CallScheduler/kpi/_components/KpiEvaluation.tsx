@@ -8,7 +8,7 @@
 //   데이터: GET /api/call-scheduler/kpi/evaluation
 // ═══════════════════════════════════════════════════════════════════
 import { useState, useEffect, useCallback } from 'react'
-import { COLORS, GLASS } from '@/app/utils/ui-tokens'
+import { COLORS, GLASS, BTN } from '@/app/utils/ui-tokens'
 import { getAuthHeader } from '@/app/utils/auth-client'
 import DcStatStrip, { type StatItem } from '@/app/components/DcStatStrip'
 import NeuDataTable, { type TableColumn } from '@/app/components/NeuDataTable'
@@ -29,6 +29,15 @@ interface AgentMetrics {
   acw_away_score: number | null
   work_hours_score: number | null
 }
+// 커스텀 평가 항목 (cs_kpi_eval_items) — evaluation 응답에 포함
+interface CustomItem {
+  id: string
+  name: string
+  max_score: number
+  weight: number
+}
+// 상담원별 커스텀 점수 — { score(원점수), norm(0~100 정규화) } 또는 null(미입력)
+type CustomScore = { score: number; norm: number } | null
 interface AgentEval {
   worker_id: string | null
   kt_id: string | null
@@ -38,6 +47,7 @@ interface AgentEval {
   metrics: AgentMetrics
   strengths: string[]
   weaknesses: string[]
+  custom_scores?: Record<string, CustomScore>
 }
 interface EvalData {
   meta: {
@@ -53,7 +63,25 @@ interface EvalData {
     best_score: number; worst_score: number
   }
   agents: AgentEval[]
+  custom_items?: CustomItem[]
 }
+
+// ── 커스텀 점수 입력 패널 — kpi/eval-scores ──────────────────────
+interface EvalScoresItem { id: string; name: string; max_score: number; weight: number; sort_order: number }
+interface EvalScoresWorker { id: string; name: string }
+interface EvalScoreRow { item_id: string; worker_id: string; score: number; note: string | null }
+interface EvalScoresData {
+  period_kind: string
+  period_label: string
+  items: EvalScoresItem[]
+  workers: EvalScoresWorker[]
+  scores: EvalScoreRow[]
+  _migration_pending?: boolean
+}
+// 점수 저장 결과 글래스 패널
+interface ScoreResult { ok: boolean; text: string; detail?: string; at: string }
+const scoreNowLabel = () =>
+  new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
 
 // 초 → "MM:SS" (AHT 표시용)
 function fmtMS(sec: number): string {
@@ -120,6 +148,8 @@ export default function KpiEvaluation() {
 
   const agents = data?.agents ?? []
   const isEmpty = !!data && agents.length === 0
+  const customItems: CustomItem[] = data?.custom_items ?? []
+  const hasCustomItems = customItems.length > 0
 
   // ── 상단 요약 카드 ──
   const ta = data?.team_avg
@@ -261,6 +291,26 @@ export default function KpiEvaluation() {
         ) : <span style={{ color: COLORS.textDim }}>—</span>
       ),
     },
+    // ── 커스텀 항목별 점수 (item 당 1컬럼, custom_items 있을 때만) ──
+    ...customItems.map<TableColumn<AgentEval>>((it) => ({
+      key: `custom_${it.id}`,
+      label: `✏ ${it.name}`,
+      width: 100,
+      align: 'right' as const,
+      sortBy: (r: AgentEval) => r.custom_scores?.[it.id]?.score ?? -1,
+      render: (r: AgentEval) => {
+        const cs = r.custom_scores?.[it.id]
+        if (!cs) return <span style={{ color: COLORS.textDim, whiteSpace: 'nowrap' }}>—</span>
+        return (
+          <span style={{ whiteSpace: 'nowrap' }}>
+            <b style={{ color: scoreColor(cs.norm) }}>{cs.score}</b>
+            <span style={{ fontSize: 10, color: COLORS.textMuted, marginLeft: 4 }}>
+              /{it.max_score}
+            </span>
+          </span>
+        )
+      },
+    })),
   ]
 
   const w = data?.weights
@@ -348,6 +398,21 @@ export default function KpiEvaluation() {
         </div>
       )}
 
+      {/* ── 커스텀 평가 항목 점수 입력 ─────────────────────────── */}
+      {data && !isEmpty && (
+        hasCustomItems ? (
+          <CustomScorePanel period={period} onSaved={load} />
+        ) : (
+          <div style={{
+            ...GLASS.L1, borderRadius: 8, padding: '8px 12px', marginBottom: 12,
+            fontSize: 11, color: COLORS.textSecondary,
+          }}>
+            ✏ 커스텀 평가 항목이 없습니다 — 「⚙ 설정」 ▸ 「🏅 평가 항목·가중치」에서
+            친절도·모니터링 점수 등 커스텀 평가 항목을 먼저 만드세요.
+          </div>
+        )
+      )}
+
       {/* ── 상담원별 평가 테이블 ──────────────────────────────── */}
       {data && !isEmpty && (
         <div style={{ marginBottom: 14 }}>
@@ -355,6 +420,7 @@ export default function KpiEvaluation() {
             🏅 상담원별 종합 평가
             <span style={{ fontSize: 11, fontWeight: 600, color: COLORS.textMuted, marginLeft: 8 }}>
               컬럼 클릭으로 정렬 · 종합 점수 75↑ 우수 / 50↑ 보통 / 미만 미흡
+              {hasCustomItems ? ' · ✏ 표시는 커스텀 항목' : ''}
             </span>
           </div>
           <NeuDataTable
@@ -385,6 +451,322 @@ export default function KpiEvaluation() {
               ),
             }}
           />
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ════════════════════════════════════════════════════════════════
+// 커스텀 평가 항목 점수 입력 패널 — kpi/eval-scores
+//   행 = 상담원(workers), 열 = 커스텀 항목(items). 셀 = 0~max_score 입력.
+//   저장 후 onSaved() 로 evaluation 재조회 → 종합점수 갱신.
+//   직접범위(custom) 모드면 점수 입력 비활성 — 월/주 단위 입력 안내.
+// ════════════════════════════════════════════════════════════════
+function CustomScorePanel({ period, onSaved }: {
+  period: KpiPeriod
+  onSaved: () => void
+}) {
+  // 직접범위 모드 — from/to 둘 다 있으면 점수 입력 비활성
+  const isCustomRange = !!(period.from && period.to)
+  const [open, setOpen] = useState(false)
+  const [sd, setSd] = useState<EvalScoresData | null>(null)
+  // 입력 중 점수 — `${item_id}|${worker_id}` → 문자열(input value)
+  const [draft, setDraft] = useState<Record<string, string>>({})
+  const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [result, setResult] = useState<ScoreResult | null>(null)
+
+  const cellKey = (itemId: string, workerId: string) => `${itemId}|${workerId}`
+
+  const loadScores = useCallback(async () => {
+    setLoading(true); setResult(null)
+    try {
+      const auth = await getAuthHeader()
+      const res = await fetch(
+        `/api/call-scheduler/kpi/eval-scores?granularity=${period.granularity}&date=${period.date}`,
+        { headers: auth },
+      )
+      const json = await res.json()
+      if (!res.ok) throw new Error(json?.error || '조회 실패')
+      const d: EvalScoresData = json.data
+      setSd(d)
+      // draft 초기화 — 기존 점수로 채움
+      const init: Record<string, string> = {}
+      for (const s of (d?.scores ?? [])) {
+        init[cellKey(s.item_id, s.worker_id)] = String(s.score)
+      }
+      setDraft(init)
+    } catch (e: any) {
+      setResult({ ok: false, text: '❌ 커스텀 점수 조회 실패', detail: e?.message, at: scoreNowLabel() })
+      setSd(null)
+    } finally {
+      setLoading(false)
+    }
+  }, [period.granularity, period.date])
+
+  // 패널 열릴 때 / 기간 바뀔 때 로드 (직접범위 모드는 제외)
+  useEffect(() => {
+    if (open && !isCustomRange) loadScores()
+  }, [open, isCustomRange, loadScores])
+
+  const save = async () => {
+    if (!sd) return
+    setSaving(true); setResult(null)
+    try {
+      // draft 의 모든 셀을 scores 배열로 — 빈 값은 0 처리
+      const scores: { item_id: string; worker_id: string; score: number }[] = []
+      for (const it of sd.items) {
+        for (const w of sd.workers) {
+          const raw = draft[cellKey(it.id, w.id)]
+          if (raw == null || raw === '') continue
+          const n = Number(raw)
+          if (!Number.isFinite(n)) continue
+          const clamped = Math.max(0, Math.min(it.max_score, n))
+          scores.push({ item_id: it.id, worker_id: w.id, score: clamped })
+        }
+      }
+      const auth = await getAuthHeader()
+      const res = await fetch('/api/call-scheduler/kpi/eval-scores', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...auth },
+        body: JSON.stringify({
+          granularity: period.granularity, date: period.date, scores,
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json?.error || '저장 실패')
+      const d = json.data || {}
+      const errs: string[] = Array.isArray(d.errors) ? d.errors : []
+      setResult({
+        ok: errs.length === 0,
+        text: errs.length === 0 ? '✏ 커스텀 점수 저장 완료' : '⚠ 커스텀 점수 일부 저장',
+        detail: `${d.period_label || ''} · 저장 ${Number(d.saved || 0)}건` +
+          (errs.length > 0 ? ` · 실패 ${errs.length}건 (${errs.slice(0, 3).join(' / ')})` : '') +
+          ' — 종합점수에 반영됩니다.',
+        at: scoreNowLabel(),
+      })
+      await loadScores()
+      onSaved() // evaluation 재조회 — 종합점수 갱신
+    } catch (e: any) {
+      setResult({ ok: false, text: '❌ 커스텀 점수 저장 실패', detail: e?.message, at: scoreNowLabel() })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div style={{
+      ...GLASS.L4, borderRadius: 12, marginBottom: 12,
+      border: `1px solid ${COLORS.borderViolet}`, overflow: 'hidden',
+    }}>
+      {/* 헤더 — 토글 */}
+      <button type="button" onClick={() => setOpen(o => !o)}
+        style={{
+          width: '100%', display: 'flex', alignItems: 'center', gap: 10,
+          padding: '10px 14px', cursor: 'pointer', textAlign: 'left',
+          background: open ? COLORS.bgViolet : 'transparent',
+          border: 'none',
+          borderBottom: open ? `1px solid ${COLORS.borderViolet}` : 'none',
+        }}>
+        <span style={{ fontSize: 14, fontWeight: 800, color: COLORS.textPrimary }}>
+          ✏ 커스텀 항목 점수 입력
+        </span>
+        <span style={{ fontSize: 11, color: COLORS.textMuted, fontWeight: 600 }}>
+          매니저가 만든 평가 항목의 상담원별 점수 — 종합점수에 가중 반영
+        </span>
+        <span style={{ flex: 1 }} />
+        <span style={{ fontSize: 13, color: COLORS.textMuted, fontWeight: 800 }}>
+          {open ? '▾ 접기' : '▸ 펼치기'}
+        </span>
+      </button>
+
+      {open && (
+        <div style={{ padding: 14 }}>
+          {/* 직접범위 모드 — 입력 비활성 안내 */}
+          {isCustomRange ? (
+            <div style={{
+              padding: '10px 12px', borderRadius: 8,
+              background: COLORS.bgAmber, border: `1px solid ${COLORS.borderAmber}`,
+              fontSize: 12, color: COLORS.warning, fontWeight: 600,
+            }}>
+              ⚠ 「직접」 범위 모드에서는 커스텀 점수를 입력할 수 없습니다 —
+              상단 기간 선택을 「일·주·월」 프리셋으로 바꾸면 해당 단위로 점수를 입력할 수 있습니다.
+            </div>
+          ) : (
+            <>
+              <ScoreResultPanel result={result} onClose={() => setResult(null)} />
+
+              {sd?._migration_pending && (
+                <div style={{
+                  padding: '8px 12px', borderRadius: 8, marginBottom: 12,
+                  background: COLORS.bgAmber, border: `1px solid ${COLORS.borderAmber}`,
+                  fontSize: 11, color: COLORS.warning,
+                }}>
+                  ⚠ cs_kpi_eval_items / cs_kpi_eval_scores 테이블이 아직 적용되지 않은 것으로 보입니다 —
+                  마이그레이션 적용 전에는 점수 저장이 반영되지 않습니다.
+                </div>
+              )}
+
+              {loading && !sd && (
+                <div style={{ fontSize: 12, color: COLORS.textMuted }}>조회 중...</div>
+              )}
+
+              {sd && (
+                <>
+                  <div style={{ fontSize: 11, color: COLORS.textMuted, marginBottom: 10 }}>
+                    {sd.period_label} 기준 — 각 상담원의 항목별 점수(0~만점)를 입력하고 저장하세요.
+                    저장 즉시 위 종합 평가에 반영됩니다.
+                  </div>
+
+                  {sd.items.length === 0 || sd.workers.length === 0 ? (
+                    <div style={{
+                      ...GLASS.L1, borderRadius: 8, padding: 12,
+                      fontSize: 12, color: COLORS.textMuted, textAlign: 'center',
+                    }}>
+                      {sd.items.length === 0
+                        ? '커스텀 평가 항목이 없습니다 — 「⚙ 설정」에서 먼저 만드세요.'
+                        : '점수를 입력할 상담원이 없습니다.'}
+                    </div>
+                  ) : (
+                    <div style={{ overflowX: 'auto' }}>
+                      <table style={{
+                        borderCollapse: 'separate', borderSpacing: 0, width: '100%',
+                        fontSize: 12,
+                      }}>
+                        <thead>
+                          <tr>
+                            <th style={{
+                              textAlign: 'left', padding: '6px 10px', whiteSpace: 'nowrap',
+                              color: COLORS.textSecondary, fontWeight: 800,
+                              borderBottom: `1px solid ${COLORS.borderSubtle}`,
+                              position: 'sticky', left: 0, background: COLORS.bgGray,
+                            }}>
+                              상담원
+                            </th>
+                            {sd.items.map((it) => (
+                              <th key={it.id} style={{
+                                textAlign: 'right', padding: '6px 10px', whiteSpace: 'nowrap',
+                                color: COLORS.textSecondary, fontWeight: 800,
+                                borderBottom: `1px solid ${COLORS.borderSubtle}`,
+                              }}>
+                                ✏ {it.name}
+                                <span style={{
+                                  fontSize: 10, fontWeight: 600, color: COLORS.textMuted, marginLeft: 4,
+                                }}>
+                                  /{it.max_score}
+                                </span>
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {sd.workers.map((w) => (
+                            <tr key={w.id}>
+                              <td style={{
+                                padding: '6px 10px', whiteSpace: 'nowrap',
+                                fontWeight: 700, color: COLORS.textPrimary,
+                                borderBottom: `1px solid ${COLORS.borderFaint}`,
+                                position: 'sticky', left: 0, background: COLORS.bgGray,
+                              }}>
+                                {w.name}
+                              </td>
+                              {sd.items.map((it) => {
+                                const k = cellKey(it.id, w.id)
+                                return (
+                                  <td key={it.id} style={{
+                                    padding: '4px 8px', textAlign: 'right',
+                                    borderBottom: `1px solid ${COLORS.borderFaint}`,
+                                  }}>
+                                    <input
+                                      type="number" min={0} max={it.max_score}
+                                      value={draft[k] ?? ''}
+                                      placeholder="—"
+                                      disabled={saving}
+                                      onChange={(e) => setDraft(prev => ({
+                                        ...prev, [k]: e.target.value,
+                                      }))}
+                                      style={{
+                                        ...GLASS.L1, width: 70, boxSizing: 'border-box',
+                                        padding: '5px 8px', borderRadius: 6,
+                                        fontSize: 13, fontWeight: 700, textAlign: 'right',
+                                        color: COLORS.textPrimary, fontFamily: 'inherit',
+                                      }} />
+                                  </td>
+                                )
+                              })}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+
+                  <div style={{
+                    display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12,
+                  }}>
+                    <button type="button" onClick={loadScores} disabled={loading || saving}
+                      style={{
+                        padding: '8px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700,
+                        background: COLORS.bgGray, border: `1px solid ${COLORS.borderFaint}`,
+                        color: COLORS.textSecondary,
+                        cursor: (loading || saving) ? 'not-allowed' : 'pointer',
+                      }}>
+                      ↻ 다시 불러오기
+                    </button>
+                    <button type="button" onClick={save}
+                      disabled={saving || loading || sd.items.length === 0 || sd.workers.length === 0}
+                      style={{
+                        ...BTN.md, background: COLORS.success, color: '#fff', border: 'none',
+                        cursor: (saving || loading || sd.items.length === 0 || sd.workers.length === 0)
+                          ? 'not-allowed' : 'pointer',
+                        opacity: (saving || loading || sd.items.length === 0 || sd.workers.length === 0)
+                          ? 0.6 : 1,
+                      }}>
+                      {saving ? '저장 중...' : '✓ 커스텀 점수 저장'}
+                    </button>
+                  </div>
+                </>
+              )}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── 점수 저장 결과 글래스 패널 (규칙 20 — alert 금지) ──────────────
+function ScoreResultPanel({ result, onClose }: {
+  result: ScoreResult | null; onClose: () => void
+}) {
+  if (!result) return null
+  return (
+    <div style={{
+      ...GLASS.L4, borderRadius: 12, padding: 14, marginBottom: 12,
+      border: `1px solid ${result.ok ? COLORS.borderGreen : COLORS.borderRed}`,
+      background: result.ok ? COLORS.bgGreen : COLORS.bgRed,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span style={{
+          fontSize: 13, fontWeight: 800,
+          color: result.ok ? COLORS.success : COLORS.danger,
+        }}>
+          {result.text}
+          <span style={{ fontSize: 11, fontWeight: 600, color: COLORS.textMuted, marginLeft: 6 }}>
+            {result.at}
+          </span>
+        </span>
+        <div style={{ flex: 1 }} />
+        <button type="button" onClick={onClose}
+          style={{
+            background: 'transparent', border: 'none', cursor: 'pointer',
+            fontSize: 13, color: COLORS.textMuted, fontWeight: 700,
+          }}>× 닫기</button>
+      </div>
+      {result.detail && (
+        <div style={{ fontSize: 12, color: COLORS.textSecondary, marginTop: 6 }}>
+          {result.detail}
         </div>
       )}
     </div>
