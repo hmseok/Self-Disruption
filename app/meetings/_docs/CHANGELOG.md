@@ -6,6 +6,26 @@
 
 ## 2026-05-13
 
+### hotfix #7 — TODO 메모 영역 확대 + 리스트 표시
+
+**사용자 보고**: 「todo 에 메모가 너무 작아요」
+
+**진단**: PR-V2-Todo-C 의 EditForm 비고가 좁은 한 줄 input + 취소/저장 버튼과 같은 행에 끼임. TodoRow 에는 메모 표시 자체가 없음 (입력만 하고 안 보임).
+
+**수정** (`TodoListView.tsx`):
+1. **EditForm 비고 → textarea**:
+   - 한 줄 input → `<textarea rows={4}>` (resize vertical, minHeight 80)
+   - 「📝 메모 / 비고 (선택)」 라벨 + 전체 너비
+   - 취소/저장 버튼은 아래 별도 행으로 분리
+2. **TodoRow 에 메모 표시**:
+   - memo 있으면 content/메타 아래에 회색 박스로 표시
+   - `whiteSpace: pre-wrap` — 줄바꿈 보존
+   - 「📝 {메모}」
+
+**Rule 21**: 자기 모듈 / **Rule 22**: 본 CHANGELOG
+
+---
+
 ### hotfix #6 — TODO 상태 select (진행중/완료/취소 직접 변경)
 
 **사용자 보고**: 「상태값은 못바꾸나요? 투두에서」

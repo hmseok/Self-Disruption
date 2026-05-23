@@ -227,6 +227,16 @@ function TodoRow({ item, onToggleStatus, onMeetingOpen, onEdit, onDelete }: {
             </span>
           )}
         </div>
+        {/* 메모 — 있으면 표시 (개인 TODO) */}
+        {item.memo && item.memo.trim() && (
+          <div style={{
+            marginTop: 4, padding: '5px 9px', borderRadius: 6,
+            background: 'rgba(0,0,0,0.03)', fontSize: 12, color: COLORS.textSecondary,
+            lineHeight: 1.5, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+          }}>
+            📝 {item.memo}
+          </div>
+        )}
       </div>
 
       {/* 상태 select — 진행중 / 완료 / 취소 직접 변경 */}
@@ -307,9 +317,17 @@ function EditForm({ draft, setDraft, categories, onSave, onCancel, busy, mode }:
             }}>{c}</button>
         ))}
       </div>
-      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-        <input value={draft.memo} onChange={e => set({ memo: e.target.value })}
-          placeholder="비고 (선택)" style={{ ...inp, flex: 1 }} />
+      {/* 비고 / 메모 — 여러 줄 textarea */}
+      <div style={{ marginBottom: 8 }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: COLORS.textSecondary, marginBottom: 3 }}>
+          📝 메모 / 비고 (선택)
+        </div>
+        <textarea value={draft.memo} onChange={e => set({ memo: e.target.value })}
+          placeholder="상세 메모를 자유롭게 작성하세요 — 진행 상황, 참고 사항 등"
+          rows={4}
+          style={{ ...inp, width: '100%', resize: 'vertical', minHeight: 80, lineHeight: 1.5 }} />
+      </div>
+      <div style={{ display: 'flex', gap: 6, alignItems: 'center', justifyContent: 'flex-end' }}>
         <button onClick={onCancel} disabled={busy}
           style={{ padding: '6px 14px', fontSize: 12, borderRadius: 8, background: '#fff', border: `1px solid ${COLORS.borderSubtle}`, color: COLORS.textSecondary, cursor: 'pointer', whiteSpace: 'nowrap' }}>
           취소
