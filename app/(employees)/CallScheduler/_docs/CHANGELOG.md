@@ -3,6 +3,12 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-23 (Phase CX-KPI-18) — WFM 필요인원 재설계 (요일×인터벌 히트맵)
+
+- `kpi/staffing` route 재작성 — 24시간 일렬 배열(`hourly[]`) 대신 **(요일 × 30/60분 인터벌) 격자**(`grid[]`, 7×`buckets_per_day` 셀)를 반환. `cs_call_records` 를 `WEEKDAY()`+`start_time` 의 실제 시·분으로 집계(가짜 균등분할 제거), `(요일,버킷) 평균 콜 = 합 ÷ 해당 요일 일수`. overnight 시프트는 다음날 요일로 spill. 응답에 `dow_days[]`(요일별 일수)·`buckets_per_day`·`peak_dow`/`peak_bucket`/`short_cells`/`active_cells` 추가.
+- `KpiStaffing.tsx` 재작성 — 기간 픽커·산정 기준 줄·목표SL 패널·시프트 카드는 유지하고 새 계약 필드로 이식(`shifts` 의 `reason` 제거 → `shortage` 인원수만 표시). 5 스탯 카드는 `peak_required`(피크 요일·HH:MM subValue)·`short_cells`/`active_cells`·`total_calls`·`sum_required`/`sum_scheduled`·`interval_minutes` 로 교체.
+- 「⏰ 시간대별 막대 표」를 **「🔥 요일×시간대 과부족 히트맵」**으로 교체 — 행=발생 요일(`dow_days[dow]>0`)·열=버킷 0..`buckets_per_day-1`. 셀 16×16px 정사각형(`overflow-x:auto` 가로 스크롤), 색은 `required=0`→회색·`diff<0`→`COLORS.danger`·`diff≥0`→`COLORS.success` 에 격차 비례 `opacity`(0.30~1.0). 상단 시각 라벨은 2시간 간격(60분=짝수 버킷·30분=4의 배수 버킷)만 표기, 셀 `title` 호버에 콜·필요·배정·과부족 상세, 하단 범례 한 줄. `COLORS`/`GLASS` 토큰만 사용.
+
 ## 2026-05-23 (Phase CX-KPI-17) — 커스텀 평가 항목
 
 - 마이그레이션 2종 — `cs_kpi_eval_items`(매니저가 만드는 평가 항목: 이름·설명·만점·가중치·정렬·사용여부) + `cs_kpi_eval_scores`(상담원×항목×기간 점수). 계산지표(`cs_kpi_eval_weights`)와 별개의 정성 평가 축.

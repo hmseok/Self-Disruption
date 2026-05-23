@@ -1,21 +1,24 @@
 // ═══════════════════════════════════════════════════════════════════
 // GET /api/call-scheduler/kpi/staffing
-//   WFM 필요인원 산정 — Erlang C 시간대별 (KPI-DESIGN.md §5-4 / §6)
+//   WFM 필요인원 재설계 (CX-KPI-18) — 요일 × 인터벌 격자 Erlang C
 //
-//   query:
-//     · granularity = day | week | month   (기본 month — dashboard 와 동일)
-//     · date        = YYYY-MM-DD           (granularity 의 기준일)
-//     · from / to   = YYYY-MM-DD           (직접 범위 지정 — date 보다 우선)
+//   query: granularity=day|week|month, date=YYYY-MM-DD, from/to=YYYY-MM-DD
 //
 //   처리:
-//     ① cs_wfm_config        — 산정 기준 (목표 SL·응대시간·부재율·점유율·인터벌)
-//     ② cs_call_records      — 기간 내 콜을 시간대(시)별 집계 → 인터벌당 평균 콜 수 λ
-//     ③ cs_assignments × cs_shift_slots — 시간대별 커버(근무 중) 인원
-//     → 시간대별 requiredAgents() vs 커버 인원 비교 → 과부족
+//     ① cs_wfm_config — 산정 기준 (목표 SL·응대시간·부재율·점유율·인터벌)
+//     ② cs_call_records — 콜을 (요일 × 30/60분 인터벌) 실제 버킷으로 집계
+//        · start_time 의 시·분으로 실제 인터벌 산출 (가짜 균등 분할 X)
+//        · WEEKDAY(call_date) 로 월~일 7개 요일 프로파일
+//        · (요일,인터벌) 평균 콜 = 합 ÷ 해당 요일 일수
+//     ③ cs_assignments × cs_shift_slots — (요일 × 인터벌) 실제 배치 격자
+//        · overnight 슬롯은 다음날 요일로 spill (콜 요일과 정합)
+//     ④ (요일 × 인터벌) 셀마다 Erlang C requiredAgents → 과부족
+//     ⑤ cs_response_queue — 실측 SL (목표·이론 vs 실측 괴리 표시)
 //
-//   모두 graceful try/catch — 테이블 미적재 시 빈 결과 + 안내
-//
-//   응답: { config, hourly: [...], shifts: [...], summary: {...} }
+//   응답: { config, interval_minutes, buckets_per_day, dow_days,
+//           grid:[{dow,bucket,calls,aht,required,scheduled,diff}],
+//           shifts:[...], summary:{...} }
+//   호환: MySQL 8.0 — WEEKDAY/HOUR/MINUTE/FLOOR/COUNT/SUM (회색함수 X)
 // ═══════════════════════════════════════════════════════════════════
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyUser } from '@/lib/auth-server'
@@ -36,11 +39,12 @@ const isoOf = (d: Date) =>
 
 type Granularity = 'day' | 'week' | 'month'
 
-// ── 법정검사 데이터 제외 (KT 계정 공용 — CX WFM 산정에서 법정검사 분리) ──
-// dashboard route 와 동일 기준. 검사 업무(법정검사·검사대행·직검검사소 등) LIKE 매칭.
+// 검사 업무 제외 (dashboard route 와 동일 기준)
 const LEGAL_KEYWORD = '%검사%'
 
-// granularity + 기준일 → { from, to } (YYYY-MM-DD) — dashboard route 패턴 재사용
+// JS Date.getDay(): 0=일..6=토 → WEEKDAY 식 0=월..6=일 로 변환
+const jsDowToWeekday = (d: Date) => (d.getDay() + 6) % 7
+
 function resolveRange(granularity: Granularity, base: Date): { from: string; to: string } {
   if (granularity === 'day') {
     const iso = isoOf(base)
@@ -48,34 +52,25 @@ function resolveRange(granularity: Granularity, base: Date): { from: string; to:
   }
   if (granularity === 'week') {
     const d = new Date(base)
-    const dow = (d.getDay() + 6) % 7 // 0 = 월
+    const dow = jsDowToWeekday(d)
     const mon = new Date(d); mon.setDate(d.getDate() - dow)
     const sun = new Date(mon); sun.setDate(mon.getDate() + 6)
     return { from: isoOf(mon), to: isoOf(sun) }
   }
-  // month
   const y = base.getFullYear()
   const m = base.getMonth() + 1
   const last = new Date(y, m, 0).getDate()
   return { from: `${y}-${pad(m)}-01`, to: `${y}-${pad(m)}-${pad(last)}` }
 }
 
-// TIME 문자열("HH:MM:SS") → 시(hour) 정수. 파싱 실패 시 null
-function hourOf(time: string | null | undefined): number | null {
-  if (!time) return null
-  const m = String(time).match(/^(\d{1,2}):/)
+// 'HH:MM[:SS]' → 분(0~1439). 실패 시 null
+function timeToMin(t: string | null | undefined): number | null {
+  if (!t) return null
+  const m = String(t).match(/^(\d{1,2}):(\d{2})/)
   if (!m) return null
-  const h = Number(m[1])
-  return h >= 0 && h <= 23 ? h : null
-}
-
-// 두 날짜(YYYY-MM-DD) 사이 일수 (포함)
-function dayCount(from: string, to: string): number {
-  const a = new Date(from + 'T00:00:00')
-  const b = new Date(to + 'T00:00:00')
-  if (isNaN(a.getTime()) || isNaN(b.getTime())) return 1
-  const diff = Math.round((b.getTime() - a.getTime()) / 86400000) + 1
-  return diff > 0 ? diff : 1
+  const h = Number(m[1]); const mi = Number(m[2])
+  if (!Number.isFinite(h) || !Number.isFinite(mi)) return null
+  return h * 60 + mi
 }
 
 interface WfmConfig {
@@ -109,22 +104,31 @@ export async function GET(request: NextRequest) {
     let { from, to } = resolveRange(
       granularity, isNaN(base.getTime()) ? new Date() : base,
     )
-    // from/to 직접 지정 시 범위 override (dashboard route 와 동일 패턴)
-    if (fromParam && toParam) {
-      from = fromParam
-      to = toParam
-    }
-    const days = dayCount(from, to)
+    if (fromParam && toParam) { from = fromParam; to = toParam }
 
-    // ════ ① cs_wfm_config — 산정 기준 (1행) ════
+    // ── 요일별 일수 (from~to 안 각 요일이 며칠인가) ──
+    const dowDays = [0, 0, 0, 0, 0, 0, 0] // 0=월..6=일
+    {
+      const a = new Date(from + 'T00:00:00')
+      const b = new Date(to + 'T00:00:00')
+      if (!isNaN(a.getTime()) && !isNaN(b.getTime())) {
+        let guard = 0
+        const cur = new Date(a)
+        while (cur <= b && guard < 800) {
+          dowDays[jsDowToWeekday(cur)]++
+          cur.setDate(cur.getDate() + 1)
+          guard++
+        }
+      }
+    }
+
+    // ════ ① cs_wfm_config ════
     let config: WfmConfig = { ...DEFAULT_CONFIG }
     try {
       const cfgRows = await prisma.$queryRaw<any[]>`
         SELECT target_service_level_pct, target_answer_sec,
                shrinkage_pct, interval_minutes, max_occupancy_pct
-        FROM cs_wfm_config
-        ORDER BY updated_at DESC
-        LIMIT 1
+        FROM cs_wfm_config ORDER BY updated_at DESC LIMIT 1
       `
       if (cfgRows.length > 0) {
         const r = cfgRows[0]
@@ -136,128 +140,173 @@ export async function GET(request: NextRequest) {
           max_occupancy_pct: Number(r.max_occupancy_pct ?? 85),
         }
       }
-    } catch { /* graceful — cs_wfm_config 미적재 시 기본값 */ }
+    } catch { /* graceful — 기본값 */ }
 
-    // 인터벌 단위 — 30 또는 60분. 그 외 값은 60 으로 보정
     const intervalMin = [30, 60].includes(config.interval_minutes)
       ? config.interval_minutes : 60
     const intervalSec = intervalMin * 60
-    // 1시간 = intervalsPerHour 개 인터벌 (60→1, 30→2)
-    const intervalsPerHour = 60 / intervalMin
+    const bucketsPerDay = Math.round(1440 / intervalMin) // 30→48, 60→24
 
-    // ════ ② cs_call_records — 시간대(시)별 콜 집계 ════
-    // 시간(0~23)별: 콜 수 합계, 통화시간 합계 → 인터벌당 평균 콜 / AHT
-    type HourAgg = { hour: number; calls: number; durSum: number }
-    const hourAgg = new Map<number, HourAgg>()
+    // ════ ② cs_call_records — (요일 × 인터벌) 실제 버킷 집계 ════
+    const callAgg = new Map<string, { cnt: number; dur: number }>() // `${dow}|${bucket}`
     let hasCallData = false
     let totalCalls = 0
-    let totalDurSum = 0
-
+    let totalDur = 0
     try {
       const callRows = await prisma.$queryRaw<any[]>`
         SELECT
-          HOUR(start_time) AS hh,
-          COUNT(*)              AS cnt,
+          WEEKDAY(call_date) AS dow,
+          FLOOR((HOUR(start_time) * 60 + MINUTE(start_time)) / ${intervalMin}) AS bucket,
+          COUNT(*)                       AS cnt,
           COALESCE(SUM(duration_sec), 0) AS dur
         FROM cs_call_records
         WHERE call_date BETWEEN ${from} AND ${to}
           AND start_time IS NOT NULL
-          -- 법정검사 제외 (dashboard route 와 동일 기준)
           AND COALESCE(department, '') NOT LIKE ${LEGAL_KEYWORD}
           AND COALESCE(center, '')     NOT LIKE ${LEGAL_KEYWORD}
           AND COALESCE(type1, '')      NOT LIKE ${LEGAL_KEYWORD}
           AND COALESCE(type2, '')      NOT LIKE ${LEGAL_KEYWORD}
-        GROUP BY HOUR(start_time)
+        GROUP BY
+          WEEKDAY(call_date),
+          FLOOR((HOUR(start_time) * 60 + MINUTE(start_time)) / ${intervalMin})
       `
       for (const r of callRows) {
-        const h = Number(r.hh)
-        if (!(h >= 0 && h <= 23)) continue
+        const dow = Number(r.dow)
+        const bucket = Number(r.bucket)
+        if (!(dow >= 0 && dow <= 6)) continue
+        if (!(bucket >= 0 && bucket < bucketsPerDay)) continue
         const cnt = Number(r.cnt || 0)
         const dur = Number(r.dur || 0)
-        hourAgg.set(h, { hour: h, calls: cnt, durSum: dur })
+        callAgg.set(`${dow}|${bucket}`, { cnt, dur })
         totalCalls += cnt
-        totalDurSum += dur
+        totalDur += dur
       }
       hasCallData = callRows.length > 0
     } catch { /* graceful — cs_call_records 미적재 */ }
 
-    // 전체 평균 AHT (해당 시간대 데이터 없을 때 fallback)
-    const globalAht = totalCalls > 0
-      ? Math.round(totalDurSum / totalCalls)
-      : 0
+    const globalAht = totalCalls > 0 ? Math.round(totalDur / totalCalls) : 0
 
-    // ════ ③ cs_assignments × cs_shift_slots — 시간대별 커버 인원 ════
-    // 각 시(hour)를 근무 중인 상담사(배정 셀) 수. is_overnight 시 자정 넘김.
-    // 시프트별 커버 시간대도 함께 수집 (시프트 과부족 카드용).
-    const hourCover = new Map<number, number>()   // hour → 커버 셀 수 (기간 평균)
-    type ShiftAgg = {
-      slotId: string                               // cs_shift_slots.id
-      code: string; label: string
-      startH: number; endH: number; overnight: boolean
-      hours: number[]                              // 커버하는 시간대 목록
-      cellCount: number                            // 기간 내 배정 셀 수
+    // ════ ③ cs_assignments × cs_shift_slots — (요일 × 인터벌) 배치 격자 ════
+    // overnight 슬롯은 시작 요일 D 의 늦은 버킷 + (D+1)%7 의 이른 버킷 커버.
+    const coverAgg = new Map<string, number>() // `${dow}|${bucket}` → 셀 수 합
+    type SlotAgg = {
+      slotId: string; code: string; label: string
+      startMin: number; endMin: number; overnight: boolean
+      totalCells: number
+      dowSet: Set<number>          // 배정된 요일들
+      buckets: { dow: number; bucket: number }[] // 커버 (요일,버킷) 목록
     }
-    const shiftAgg = new Map<string, ShiftAgg>()
+    const slotAgg = new Map<string, SlotAgg>()
     let hasWorkData = false
-
     try {
-      // 슬롯별 배정 셀 수 — special_code='none'(정상근무) + worker 배정된 셀만
-      const slotRows = await prisma.$queryRaw<any[]>`
+      const rows = await prisma.$queryRaw<any[]>`
         SELECT
-          s.id          AS slot_id,
-          s.code        AS code,
-          s.label       AS label,
-          s.start_time  AS start_time,
-          s.end_time    AS end_time,
-          s.is_overnight AS is_overnight,
-          COUNT(a.id)   AS cell_count
-        FROM cs_shift_slots s
-        LEFT JOIN cs_assignments a
-          ON a.shift_slot_id = s.id
-         AND a.work_date BETWEEN ${from} AND ${to}
-         AND a.worker_id IS NOT NULL
-         AND a.special_code = 'none'
-        GROUP BY s.id, s.code, s.label, s.start_time, s.end_time, s.is_overnight
+          WEEKDAY(a.work_date)               AS dow,
+          s.id                               AS slot_id,
+          s.code                             AS code,
+          s.label                            AS label,
+          TIME_FORMAT(s.start_time, '%H:%i') AS start_time,
+          TIME_FORMAT(s.end_time, '%H:%i')   AS end_time,
+          s.is_overnight                     AS is_overnight,
+          COUNT(*)                           AS cells
+        FROM cs_assignments a
+        JOIN cs_shift_slots s ON s.id = a.shift_slot_id
+        WHERE a.work_date BETWEEN ${from} AND ${to}
+          AND a.worker_id IS NOT NULL
+          AND a.special_code = 'none'
+        GROUP BY
+          WEEKDAY(a.work_date), s.id, s.code, s.label,
+          s.start_time, s.end_time, s.is_overnight
       `
-      for (const r of slotRows) {
-        const startH = hourOf(r.start_time)
-        const endH = hourOf(r.end_time)
-        if (startH === null || endH === null) continue
-        const overnight = Number(r.is_overnight) === 1
-        const cellCount = Number(r.cell_count || 0)
+      for (const r of rows) {
+        const dow = Number(r.dow)
+        if (!(dow >= 0 && dow <= 6)) continue
+        const sMin = timeToMin(r.start_time)
+        const eMin = timeToMin(r.end_time)
+        if (sMin == null || eMin == null) continue
+        const overnight = Number(r.is_overnight) === 1 || eMin <= sMin
+        const cells = Number(r.cells || 0)
+        if (cells <= 0) continue
+        hasWorkData = true
 
-        // 시프트가 커버하는 시간대 목록 산출
-        const coverHours: number[] = []
-        if (overnight || endH <= startH) {
-          // 자정 넘김: startH..23, 0..endH-1
-          for (let h = startH; h <= 23; h++) coverHours.push(h)
-          for (let h = 0; h < endH; h++) coverHours.push(h)
+        const slotId = String(r.slot_id || '')
+        const startB = Math.floor(sMin / intervalMin)
+        const endB = Math.floor(eMin / intervalMin)
+
+        // 커버 (요일,버킷) 산출
+        const covered: { dow: number; bucket: number }[] = []
+        if (overnight) {
+          for (let b = startB; b < bucketsPerDay; b++) covered.push({ dow, bucket: b })
+          const nextDow = (dow + 1) % 7
+          for (let b = 0; b < endB; b++) covered.push({ dow: nextDow, bucket: b })
         } else {
-          // 당일: startH..endH-1 (종료시각 시간대는 미포함 — 그 시각 직전까지 근무)
-          for (let h = startH; h < endH; h++) coverHours.push(h)
+          for (let b = startB; b < endB; b++) covered.push({ dow, bucket: b })
         }
-        if (coverHours.length === 0) coverHours.push(startH)
+        if (covered.length === 0) covered.push({ dow, bucket: startB })
 
-        shiftAgg.set(String(r.code || r.slot_id), {
-          slotId: String(r.slot_id || ''),
-          code: String(r.code || ''),
-          label: String(r.label || ''),
-          startH, endH, overnight,
-          hours: coverHours,
-          cellCount,
-        })
-
-        // 시간대별 커버 인원 누적 — 기간 평균 = 셀 수 / 일수
-        const avgCells = cellCount / days
-        for (const h of coverHours) {
-          hourCover.set(h, (hourCover.get(h) || 0) + avgCells)
+        for (const c of covered) {
+          const key = `${c.dow}|${c.bucket}`
+          coverAgg.set(key, (coverAgg.get(key) || 0) + cells)
         }
-        if (cellCount > 0) hasWorkData = true
+
+        let sa = slotAgg.get(slotId)
+        if (!sa) {
+          sa = {
+            slotId, code: String(r.code || ''), label: String(r.label || ''),
+            startMin: sMin, endMin: eMin, overnight,
+            totalCells: 0, dowSet: new Set<number>(), buckets: covered,
+          }
+          slotAgg.set(slotId, sa)
+        }
+        sa.totalCells += cells
+        sa.dowSet.add(dow)
       }
     } catch { /* graceful — cs_assignments / cs_shift_slots 미적재 */ }
 
-    // ════ ④ cs_response_queue — 실제 서비스레벨 (graceful) ════
-    // 기간 내 큐 데이터의 가중평균 service_level (20초내 응대호 / 총인입)
+    // ════ ④ (요일 × 인터벌) 격자 Erlang C ════
+    type Cell = {
+      dow: number; bucket: number
+      calls: number; aht: number
+      required: number; scheduled: number; diff: number
+    }
+    const grid: Cell[] = []
+    // required 룩업 — 시프트 카드용
+    const requiredAt = new Map<string, number>()
+    for (let dow = 0; dow <= 6; dow++) {
+      for (let b = 0; b < bucketsPerDay; b++) {
+        const ca = callAgg.get(`${dow}|${b}`)
+        const cnt = ca ? ca.cnt : 0
+        // (요일,버킷) 평균 콜 = 합 ÷ 해당 요일 일수
+        const avgCalls = dowDays[dow] > 0 ? cnt / dowDays[dow] : 0
+        const aht = ca && ca.cnt > 0
+          ? Math.round(ca.dur / ca.cnt)
+          : (globalAht > 0 ? globalAht : 180)
+
+        const r = requiredAgents({
+          callsPerInterval: avgCalls,
+          ahtSec: aht,
+          intervalSec,
+          targetSlPct: config.target_service_level_pct,
+          targetAnswerSec: config.target_answer_sec,
+          maxOccupancyPct: config.max_occupancy_pct,
+          shrinkagePct: config.shrinkage_pct,
+        })
+        const cover = coverAgg.get(`${dow}|${b}`) || 0
+        const scheduled = dowDays[dow] > 0 ? cover / dowDays[dow] : 0
+
+        requiredAt.set(`${dow}|${b}`, r.requiredAgents)
+        grid.push({
+          dow, bucket: b,
+          calls: Math.round(avgCalls * 10) / 10,
+          aht,
+          required: r.requiredAgents,
+          scheduled: Math.round(scheduled * 10) / 10,
+          diff: Math.round((scheduled - r.requiredAgents) * 10) / 10,
+        })
+      }
+    }
+
+    // ════ ⑤ cs_response_queue — 실측 SL ════
     let actualServiceLevel: number | null = null
     let hasResponseData = false
     try {
@@ -267,7 +316,6 @@ export async function GET(request: NextRequest) {
           COALESCE(SUM(answered_in_20s), 0) AS answered_in_20s
         FROM cs_response_queue
         WHERE stat_date BETWEEN ${from} AND ${to}
-          -- 법정검사 스킬 제외 (dashboard route 와 동일 기준)
           AND COALESCE(skill, '') NOT LIKE ${LEGAL_KEYWORD}
       `
       const inbound = Number(slRows[0]?.inbound || 0)
@@ -276,197 +324,94 @@ export async function GET(request: NextRequest) {
         actualServiceLevel = Math.round((in20s / inbound) * 1000) / 10
         hasResponseData = true
       }
-    } catch { /* graceful — cs_response_queue 미적재 */ }
-
-    // ════ ⑤ 시프트별 회피·휴가 건수 (부족 사유 보조 — graceful) ════
-    // 기간 내 해당 슬롯에 배정된 워커들의 승인된 회피일/휴가 건수.
-    // 테이블·조인 실패 시 빈 맵 → 사유 텍스트에서 회피·휴가 부분만 생략.
-    const skipBySlot = new Map<string, number>()   // slot_id → 승인 회피 건수
-    const leaveBySlot = new Map<string, number>()  // slot_id → 승인 휴가 건수
-    try {
-      const skipRows = await prisma.$queryRaw<any[]>`
-        SELECT a.shift_slot_id AS slot_id, COUNT(DISTINCT k.id) AS cnt
-        FROM cs_assignments a
-        JOIN cs_group_member_skip_dates k
-          ON k.worker_id = a.worker_id
-         AND k.status = 'approved'
-         AND k.start_date <= ${to}
-         AND k.end_date   >= ${from}
-        WHERE a.work_date BETWEEN ${from} AND ${to}
-          AND a.worker_id IS NOT NULL
-          AND a.shift_slot_id IS NOT NULL
-        GROUP BY a.shift_slot_id
-      `
-      for (const r of skipRows) {
-        skipBySlot.set(String(r.slot_id || ''), Number(r.cnt || 0))
-      }
-    } catch { /* graceful — cs_group_member_skip_dates 미적재/조인 실패 */ }
-    try {
-      const leaveRows = await prisma.$queryRaw<any[]>`
-        SELECT a.shift_slot_id AS slot_id, COUNT(DISTINCT l.id) AS cnt
-        FROM cs_assignments a
-        JOIN cs_leaves l
-          ON l.worker_id = a.worker_id
-         AND l.status = 'approved'
-         AND l.start_date <= ${to}
-         AND l.end_date   >= ${from}
-        WHERE a.work_date BETWEEN ${from} AND ${to}
-          AND a.worker_id IS NOT NULL
-          AND a.shift_slot_id IS NOT NULL
-        GROUP BY a.shift_slot_id
-      `
-      for (const r of leaveRows) {
-        leaveBySlot.set(String(r.slot_id || ''), Number(r.cnt || 0))
-      }
-    } catch { /* graceful — cs_leaves 미적재/status 컬럼 부재 */ }
-
-    // ════ 시간대별 필요인원 산정 (Erlang C) ════
-    type HourResult = {
-      hour: number
-      calls: number          // 인터벌당 평균 콜 수 (반올림)
-      aht: number            // 해당 시간대 평균 AHT (초)
-      required: number       // Erlang C 필요 인원 (부재율 보정 후)
-      scheduled: number      // 배정(커버) 인원 (반올림)
-      diff: number           // scheduled − required (음수=부족)
-    }
-    const hourly: HourResult[] = []
-    for (let h = 0; h < 24; h++) {
-      const agg = hourAgg.get(h)
-      const hourCalls = agg ? agg.calls : 0
-      // 시간당 콜 → 인터벌당 평균 콜 수 (요일/일수로 나눠 평균)
-      const callsPerIntervalAvg = days > 0
-        ? hourCalls / days / intervalsPerHour
-        : 0
-      // 해당 시간대 AHT — 없으면 전체 평균, 그것도 없으면 180 기본
-      const hourAht = agg && agg.calls > 0
-        ? Math.round(agg.durSum / agg.calls)
-        : (globalAht > 0 ? globalAht : 180)
-
-      const r = requiredAgents({
-        callsPerInterval: callsPerIntervalAvg,
-        ahtSec: hourAht,
-        intervalSec,
-        targetSlPct: config.target_service_level_pct,
-        targetAnswerSec: config.target_answer_sec,
-        maxOccupancyPct: config.max_occupancy_pct,
-        shrinkagePct: config.shrinkage_pct,
-      })
-      const scheduled = Math.round((hourCover.get(h) || 0) * 10) / 10
-
-      hourly.push({
-        hour: h,
-        calls: Math.round(callsPerIntervalAvg * 10) / 10,
-        aht: hourAht,
-        required: r.requiredAgents,
-        scheduled,
-        diff: Math.round((scheduled - r.requiredAgents) * 10) / 10,
-      })
-    }
+    } catch { /* graceful */ }
 
     // ════ 시프트별 과부족 카드 ════
     type ShiftResult = {
-      shift_name: string
-      hours: string                 // "07~16시"
-      required_peak: number         // 시프트 커버 시간대 중 최대 필요 인원
-      scheduled: number             // 시프트 기간 평균 배정 인원
+      shift_name: string; code: string
+      hours: string
+      required_peak: number    // 커버 셀 중 최대 필요 인원
+      scheduled: number        // 평균 배치 인원 (셀 ÷ 요일 발생일수)
       status: 'short' | 'ok' | 'over'
-      shortage: number              // 부족 인원수 (required_peak − scheduled, 양수, short 일 때만 > 0)
-      reason: string                // 부족 사유 텍스트 (short 가 아니면 '')
+      shortage: number
     }
-    // 사유 분류용 — 콜 발생 시프트들의 평균 피크 필요 인원 (인입량 과다 판정 기준)
-    const shiftPeaks: number[] = []
-    for (const sa of shiftAgg.values()) {
-      let p = 0
-      for (const h of sa.hours) {
-        const hr = hourly[h]
-        if (hr && hr.required > p) p = hr.required
-      }
-      if (p > 0) shiftPeaks.push(p)
-    }
-    const avgShiftPeak = shiftPeaks.length > 0
-      ? shiftPeaks.reduce((s, v) => s + v, 0) / shiftPeaks.length
-      : 0
-
     const shifts: ShiftResult[] = []
-    for (const sa of shiftAgg.values()) {
-      // 시프트 커버 시간대들의 필요 인원 중 피크
+    for (const sa of slotAgg.values()) {
       let reqPeak = 0
-      for (const h of sa.hours) {
-        const hr = hourly[h]
-        if (hr && hr.required > reqPeak) reqPeak = hr.required
+      for (const c of sa.buckets) {
+        const req = requiredAt.get(`${c.dow}|${c.bucket}`) || 0
+        if (req > reqPeak) reqPeak = req
       }
-      // 시프트 평균 배정 인원 = 셀 수 / 일수 (한 슬롯은 한 시간대당 1셀 기준)
-      const sched = Math.round((sa.cellCount / days) * 10) / 10
-      // 과부족 판정 — 피크 필요 대비
+      // 발생 일수 = 배정된 요일들의 일수 합
+      let occ = 0
+      for (const d of sa.dowSet) occ += dowDays[d]
+      const sched = occ > 0 ? Math.round((sa.totalCells / occ) * 10) / 10 : 0
       let status: 'short' | 'ok' | 'over' = 'ok'
       if (sched < reqPeak) status = 'short'
       else if (sched > reqPeak + Math.max(1, reqPeak * 0.25)) status = 'over'
-
-      // ── 부족 사유 산출 ──
-      let shortage = 0
-      let reason = ''
-      if (status === 'short') {
-        shortage = Math.round((reqPeak - sched) * 10) / 10
-        // 인입량 과다: 이 시프트 피크 필요가 시프트 평균 대비 20%+ 높음
-        // 배정 부족: 그 외 (배정 인원 자체가 적음)
-        const isHighInflow = avgShiftPeak > 0 && reqPeak > avgShiftPeak * 1.2
-        const base = isHighInflow ? '인입량 과다' : '배정 부족'
-        // 회피·휴가 건수 동반 표시 (graceful — 0 이면 생략)
-        const skip = skipBySlot.get(sa.slotId) || 0
-        const leave = leaveBySlot.get(sa.slotId) || 0
-        const extra: string[] = []
-        if (skip > 0) extra.push(`회피 ${skip}`)
-        if (leave > 0) extra.push(`휴가 ${leave}`)
-        reason = `${base} (${shortage}명 부족)`
-          + (extra.length > 0 ? ` · ${extra.join(' · ')}` : '')
-      }
-
-      const hh = (n: number) => `${pad(n)}`
       shifts.push({
         shift_name: sa.label || sa.code,
-        hours: `${hh(sa.startH)}~${hh(sa.endH)}시${sa.overnight ? ' (익일)' : ''}`,
+        code: sa.code,
+        hours: `${pad(Math.floor(sa.startMin / 60))}:${pad(sa.startMin % 60)}`
+          + `~${pad(Math.floor(sa.endMin / 60))}:${pad(sa.endMin % 60)}`
+          + (sa.overnight ? ' (익일)' : ''),
         required_peak: reqPeak,
         scheduled: sched,
         status,
-        shortage,
-        reason,
+        shortage: status === 'short'
+          ? Math.round((reqPeak - sched) * 10) / 10 : 0,
       })
     }
-    // 시작 시간 순 정렬
+    // 시작 시각 문자열 기준 정렬
     shifts.sort((a, b) => a.hours.localeCompare(b.hours))
 
     // ════ 요약 ════
-    const peakHour = hourly.reduce(
-      (acc, h) => (h.required > acc.required ? h : acc),
-      hourly[0],
-    )
-    const reqHours = hourly.filter(h => h.required > 0)
-    const sumRequired = hourly.reduce((s, h) => s + h.required, 0)
-    const sumScheduled = hourly.reduce((s, h) => s + h.scheduled, 0)
-    const shortHours = hourly.filter(h => h.required > 0 && h.diff < 0).length
+    let peak: Cell | null = null
+    let sumRequired = 0
+    let sumScheduled = 0
+    let shortCells = 0
+    let activeCells = 0
+    for (const c of grid) {
+      if (dowDays[c.dow] === 0) continue // 기간에 없는 요일은 제외
+      sumRequired += c.required
+      sumScheduled += c.scheduled
+      if (c.required > 0) {
+        activeCells++
+        if (c.diff < 0) shortCells++
+      }
+      if (!peak || c.required > peak.required) peak = c
+    }
 
     const summary = {
-      granularity, from, to, days,
+      granularity, from, to,
       interval_minutes: intervalMin,
+      buckets_per_day: bucketsPerDay,
       total_calls: totalCalls,
       avg_aht: globalAht,
-      peak_hour: peakHour ? peakHour.hour : 0,
-      peak_required: peakHour ? peakHour.required : 0,
-      avg_required: reqHours.length > 0
-        ? Math.round((sumRequired / reqHours.length) * 10) / 10 : 0,
+      peak_dow: peak ? peak.dow : 0,
+      peak_bucket: peak ? peak.bucket : 0,
+      peak_required: peak ? peak.required : 0,
       sum_required: Math.round(sumRequired * 10) / 10,
       sum_scheduled: Math.round(sumScheduled * 10) / 10,
-      short_hours: shortHours,
+      short_cells: shortCells,
+      active_cells: activeCells,
       has_call_data: hasCallData,
       has_work_data: hasWorkData,
-      // 목표 SL vs 실제 SL (cs_response_queue 가중평균)
       target_service_level: config.target_service_level_pct,
       actual_service_level: actualServiceLevel,
       has_response_data: hasResponseData,
     }
 
     return NextResponse.json({
-      data: serialize({ config, hourly, shifts, summary }),
+      data: serialize({
+        config,
+        interval_minutes: intervalMin,
+        buckets_per_day: bucketsPerDay,
+        dow_days: dowDays,
+        grid,
+        shifts,
+        summary,
+      }),
       error: null,
     })
   } catch (e: any) {

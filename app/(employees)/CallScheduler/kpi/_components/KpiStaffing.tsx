@@ -1,12 +1,12 @@
 'use client'
 // ═══════════════════════════════════════════════════════════════════
-// CX KPI — WFM 필요인원 산정 (Erlang C) — KPI-DESIGN.md §5-4
-//   · 일/주/월 토글 + 날짜 (KpiDashboard 와 동일 UX)
-//   · 시간대별 필요 vs 배정(커버) 인원 — 글래스 막대 표
+// CX KPI — WFM 필요인원 산정 (Erlang C) — CX-KPI-18 재설계
+//   · 일/주/월 토글 + 날짜 (KpiPeriodPicker 공용)
+//   · 요일 × 인터벌 격자 — 요일×시간대 과부족 히트맵
 //   · 시프트별 과부족 카드 (🔴 부족 / 🟢 적정 / 🟡 과잉)
 //   · cs_wfm_config 기준 요약 줄 표시 (편집은 KPI 설정 탭으로 이관)
 //   데이터: GET /api/call-scheduler/kpi/staffing
-//           (산정 기준은 staffing 응답의 config 로 표시만)
+//           (요일×인터벌 grid + dow_days + buckets_per_day 반환)
 // ═══════════════════════════════════════════════════════════════════
 import { useState, useEffect, useCallback } from 'react'
 import { COLORS, GLASS } from '@/app/utils/ui-tokens'
@@ -25,30 +25,33 @@ interface WfmConfig {
   max_occupancy_pct: number
   updated_at?: string | null
 }
-interface HourRow {
-  hour: number
+// (요일 × 인터벌) 격자 셀
+interface GridCell {
+  dow: number          // 0=월..6=일
+  bucket: number       // 0..buckets_per_day-1
   calls: number
   aht: number
   required: number
   scheduled: number
-  diff: number
+  diff: number         // scheduled - required (음수 = 부족)
 }
 interface ShiftRow {
   shift_name: string
+  code: string
   hours: string
   required_peak: number
   scheduled: number
   status: 'short' | 'ok' | 'over'
   shortage: number          // 부족 인원수 (short 일 때 > 0)
-  reason: string            // 부족 사유 텍스트 (short 가 아니면 '')
 }
 interface StaffingSummary {
-  granularity: string; from: string; to: string; days: number
+  granularity: string; from: string; to: string
   interval_minutes: number
+  buckets_per_day: number
   total_calls: number; avg_aht: number
-  peak_hour: number; peak_required: number
-  avg_required: number; sum_required: number; sum_scheduled: number
-  short_hours: number
+  peak_dow: number; peak_bucket: number; peak_required: number
+  sum_required: number; sum_scheduled: number
+  short_cells: number; active_cells: number
   has_call_data: boolean; has_work_data: boolean
   target_service_level: number
   actual_service_level: number | null
@@ -56,7 +59,10 @@ interface StaffingSummary {
 }
 interface StaffingData {
   config: WfmConfig
-  hourly: HourRow[]
+  interval_minutes: number
+  buckets_per_day: number
+  dow_days: number[]
+  grid: GridCell[]
   shifts: ShiftRow[]
   summary: StaffingSummary
 }
@@ -74,6 +80,15 @@ function fmtMS(sec: number): string {
   return `${m}:${String(s).padStart(2, '0')}`
 }
 const GRAN_LABEL: Record<Granularity, string> = { day: '일', week: '주', month: '월' }
+
+// 요일 인덱스(0=월..6=일) → 한글 라벨
+const DOW_LABEL = ['월', '화', '수', '목', '금', '토', '일']
+
+// 버킷 시작 시각(분) → "HH:MM" 라벨
+function bucketLabel(bucket: number, intervalMin: number): string {
+  const m = bucket * intervalMin
+  return `${pad(Math.floor(m / 60))}:${pad(m % 60)}`
+}
 
 // 과부족 상태 → 시각 토큰
 const STATUS_META: Record<ShiftRow['status'], { emoji: string; label: string; bg: string; border: string; color: string }> = {
@@ -114,30 +129,48 @@ export default function KpiStaffing() {
   // 산정 기준 — staffing 응답의 config (표시 전용, 편집은 KPI 설정 탭)
   const cfg = data?.config ?? null
   const s = data?.summary
-  const hourly = data?.hourly ?? []
+  const grid = data?.grid ?? []
   const shifts = data?.shifts ?? []
-  // 데이터 표시 시간대 — 콜 또는 배정이 있는 시간대만 (0건 시간 다 보여주면 노이즈)
-  const activeHours = hourly.filter(h => h.calls > 0 || h.scheduled > 0 || h.required > 0)
+  const dowDays = data?.dow_days ?? [0, 0, 0, 0, 0, 0, 0]
+  const bucketsPerDay = data?.buckets_per_day ?? 24
+  const intervalMin = data?.interval_minutes ?? 60
   const isEmpty = !!data && !s?.has_call_data && !s?.has_work_data
 
+  // 격자 룩업 — `${dow}|${bucket}` → 셀
+  const cellMap = new Map<string, GridCell>()
+  for (const c of grid) cellMap.set(`${c.dow}|${c.bucket}`, c)
+  // 표시 대상 요일 — 기간에 실제 발생한 요일만
+  const activeDows: number[] = []
+  for (let d = 0; d <= 6; d++) if (dowDays[d] > 0) activeDows.push(d)
+  // 시각 라벨 표기 간격 — 60분: 2버킷마다(2h), 30분: 4버킷마다(2h)
+  const labelEvery = intervalMin >= 60 ? 2 : 4
+
   // ── 상단 5 카드 ──
+  const peakLabel = s
+    ? `${DOW_LABEL[s.peak_dow] ?? '?'} ${bucketLabel(s.peak_bucket, intervalMin)}`
+    : undefined
   const stats: StatItem[] = [
     { label: '피크 필요인원', value: s?.peak_required ?? 0, unit: '명', tint: 'red', icon: '🔺',
-      subValue: s ? `${pad(s.peak_hour)}시 기준` : undefined },
-    { label: '평균 필요인원', value: s?.avg_required ?? 0, unit: '명', tint: 'blue', icon: '📊',
-      subValue: s ? `인터벌 ${s.interval_minutes}분` : undefined },
+      subValue: peakLabel ? `${peakLabel} 피크` : undefined },
+    { label: '부족 셀', value: s?.short_cells ?? 0, unit: '칸', tint: 'amber', icon: '⚠',
+      subValue: s ? `필요 발생 ${s.active_cells}칸 중` : undefined },
     { label: '총 통화량', value: s?.total_calls ?? 0, unit: '콜', tint: 'green', icon: '📞',
       subValue: s ? `평균 AHT ${fmtMS(s.avg_aht)}` : undefined },
-    { label: '부족 시간대', value: s?.short_hours ?? 0, unit: '개', tint: 'amber', icon: '⚠',
-      subValue: s ? `필요 발생 시간대 중` : undefined },
-    { label: '커버 인원', value: s?.sum_scheduled ?? 0, unit: '명·시', tint: 'purple', icon: '👥',
-      subValue: s ? `필요 합 ${s.sum_required}` : undefined },
+    { label: '필요 합', value: s?.sum_required ?? 0, unit: '명·칸', tint: 'blue', icon: '📊',
+      subValue: s ? `커버 합 ${s.sum_scheduled}` : undefined },
+    { label: '산정 인터벌', value: intervalMin, unit: '분', tint: 'purple', icon: '⏱',
+      subValue: s ? `요일×시간대 격자` : undefined },
   ]
 
-  // 막대 표 스케일 — 필요·배정 중 최댓값
-  const maxAgents = Math.max(
-    ...activeHours.map(h => Math.max(h.required, h.scheduled)), 1,
-  )
+  // 히트맵 색조 스케일 — 부족·충분 양쪽 최대 |diff|
+  let maxShort = 1
+  let maxOver = 1
+  for (const c of grid) {
+    if (dowDays[c.dow] === 0) continue
+    if (c.required <= 0) continue
+    if (c.diff < 0 && -c.diff > maxShort) maxShort = -c.diff
+    if (c.diff >= 0 && c.diff > maxOver) maxOver = c.diff
+  }
 
   return (
     <div>
@@ -147,9 +180,9 @@ export default function KpiStaffing() {
       }}>
         <KpiPeriodPicker value={period} onChange={setPeriod} />
         {s && (
-          <span style={{ fontSize: 11, color: COLORS.textMuted }}>
+          <span style={{ fontSize: 11, color: COLORS.textMuted, whiteSpace: 'nowrap' }}>
             📅 {s.from}{s.from !== s.to ? ` ~ ${s.to}` : ''}
-            {' · '}{s.days}일 평균 · 인터벌 {s.interval_minutes}분
+            {' · '}요일 프로파일 · 인터벌 {intervalMin}분
           </span>
         )}
         <div style={{ flex: 1 }} />
@@ -279,7 +312,7 @@ export default function KpiStaffing() {
             {shifts.map((sh) => {
               const m = STATUS_META[sh.status]
               return (
-                <div key={`${sh.shift_name}-${sh.hours}`} style={{
+                <div key={`${sh.code}-${sh.hours}`} style={{
                   ...GLASS.L3, background: m.bg, border: `1px solid ${m.border}`,
                   borderRadius: 12, padding: 12,
                 }}>
@@ -307,15 +340,15 @@ export default function KpiStaffing() {
                       / 필요 {sh.required_peak}명
                     </span>
                   </div>
-                  {/* 🔴 부족 시프트 — 사유 한 줄 표시 */}
-                  {sh.status === 'short' && sh.reason && (
+                  {/* 🔴 부족 시프트 — 부족 인원수 한 줄 표시 */}
+                  {sh.status === 'short' && sh.shortage > 0 && (
                     <div style={{
                       marginTop: 8, padding: '5px 8px', borderRadius: 7,
-                      background: '#fff', border: `1px solid ${COLORS.borderRed}`,
+                      background: COLORS.bgRed, border: `1px solid ${COLORS.borderRed}`,
                       fontSize: 11, fontWeight: 700, color: COLORS.danger,
                       whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                    }} title={sh.reason}>
-                      ⚠ {sh.reason}
+                    }}>
+                      ⚠ 부족 {sh.shortage}명 — 추가 배정 필요
                     </div>
                   )}
                 </div>
@@ -325,71 +358,92 @@ export default function KpiStaffing() {
         </div>
       )}
 
-      {/* ── 시간대별 필요 vs 배정 — 막대 표 ───────────────────── */}
+      {/* ── 요일×시간대 과부족 히트맵 ─────────────────────────── */}
       {data && !isEmpty && (
         <div style={{ ...GLASS.L4, borderRadius: 12, padding: 14, marginBottom: 14 }}>
           <div style={{ fontSize: 13, fontWeight: 800, color: COLORS.textPrimary, marginBottom: 4 }}>
-            ⏰ 시간대별 필요인원 vs 배정(커버) 인원
+            🔥 요일×시간대 과부족 히트맵
           </div>
           <div style={{ fontSize: 11, color: COLORS.textMuted, marginBottom: 10 }}>
-            <span style={{ color: COLORS.primary, fontWeight: 700 }}>■ 필요(Erlang C)</span>
-            <span style={{ margin: '0 6px' }}>·</span>
-            <span style={{ color: COLORS.success, fontWeight: 700 }}>■ 배정 커버</span>
-            {' '}— 콜·배정이 있는 시간대만 표시
+            셀 = (요일 × {intervalMin}분 인터벌) 필요인원 대비 배정 커버 — 진할수록 격차 큼
           </div>
-          {activeHours.length === 0 ? (
+          {activeDows.length === 0 ? (
             <div style={{
               padding: 16, textAlign: 'center', fontSize: 12, color: COLORS.textMuted,
-              background: 'rgba(0,0,0,0.02)', borderRadius: 8,
-            }}>표시할 시간대가 없습니다</div>
+              background: COLORS.bgGray, borderRadius: 8,
+            }}>표시할 요일이 없습니다</div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-              {/* 헤더 행 */}
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: 8, padding: '2px 10px',
-                fontSize: 10, fontWeight: 700, color: COLORS.textMuted,
-              }}>
-                <span style={{ minWidth: 52 }}>시간</span>
-                <span style={{ minWidth: 64, textAlign: 'right' }}>콜/처리시간</span>
-                <span style={{ flex: 1 }}>필요 / 배정</span>
-                <span style={{ minWidth: 70, textAlign: 'right' }}>과부족</span>
-              </div>
-              {activeHours.map((h) => {
-                const reqPct = (h.required / maxAgents) * 100
-                const schPct = (h.scheduled / maxAgents) * 100
-                const short = h.required > 0 && h.diff < 0
-                return (
-                  <div key={h.hour} style={{
-                    display: 'flex', alignItems: 'center', gap: 8,
-                    padding: '5px 10px', borderRadius: 8,
-                    background: short ? COLORS.bgRed : COLORS.bgGray,
-                    border: `1px solid ${short ? COLORS.borderRed : COLORS.borderFaint}`,
-                    fontSize: 12,
-                  }}>
-                    <span style={{
-                      minWidth: 52, fontWeight: 700, color: COLORS.textPrimary, whiteSpace: 'nowrap',
-                    }}>{pad(h.hour)}시</span>
-                    <span style={{
-                      minWidth: 56, textAlign: 'right', fontSize: 10, color: COLORS.textMuted,
-                      whiteSpace: 'nowrap',
-                    }}>{h.calls} / {fmtMS(h.aht)}</span>
-                    {/* 막대 — 필요(파랑) + 배정(녹색) 2단 */}
-                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
-                      <Bar pct={reqPct} value={h.required} color={COLORS.primary} label="필요" />
-                      <Bar pct={schPct} value={h.scheduled} color={COLORS.success} label="배정" />
-                    </div>
-                    <span style={{
-                      minWidth: 70, textAlign: 'right', fontSize: 11, fontWeight: 800,
-                      whiteSpace: 'nowrap',
-                      color: h.diff < 0 ? COLORS.danger : h.diff > 0 ? COLORS.warning : COLORS.success,
+            <div style={{ overflowX: 'auto', paddingBottom: 4 }}>
+              <div style={{ display: 'inline-flex', flexDirection: 'column', gap: 3 }}>
+                {/* ── 상단 시각 라벨 행 ── */}
+                <div style={{ display: 'flex', gap: 2 }}>
+                  <div style={{ width: 34, flexShrink: 0 }} />
+                  {Array.from({ length: bucketsPerDay }, (_, b) => (
+                    <div key={`hl-${b}`} style={{
+                      width: 16, flexShrink: 0, fontSize: 8, fontWeight: 700,
+                      color: COLORS.textMuted, textAlign: 'left', whiteSpace: 'nowrap',
+                      overflow: 'visible',
                     }}>
-                      {h.diff < 0 ? `${h.diff}명` : h.diff > 0 ? `+${h.diff}명` : '적정'}
-                    </span>
+                      {b % labelEvery === 0 ? bucketLabel(b, intervalMin) : ''}
+                    </div>
+                  ))}
+                </div>
+                {/* ── 요일별 셀 행 ── */}
+                {activeDows.map((dow) => (
+                  <div key={`row-${dow}`} style={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                    <div style={{
+                      width: 34, flexShrink: 0, fontSize: 11, fontWeight: 800,
+                      color: COLORS.textPrimary, whiteSpace: 'nowrap',
+                    }}>
+                      {DOW_LABEL[dow]}
+                      <span style={{ fontSize: 9, fontWeight: 600, color: COLORS.textMuted }}>
+                        {' '}{dowDays[dow]}일
+                      </span>
+                    </div>
+                    {Array.from({ length: bucketsPerDay }, (_, b) => {
+                      const cell = cellMap.get(`${dow}|${b}`)
+                      const required = cell?.required ?? 0
+                      const diff = cell?.diff ?? 0
+                      const calls = cell?.calls ?? 0
+                      const scheduled = cell?.scheduled ?? 0
+                      // 색 결정
+                      let bg: string = COLORS.bgGray
+                      let opacity = 1
+                      if (required > 0) {
+                        if (diff < 0) {
+                          bg = COLORS.danger
+                          // 부족 클수록 진하게 — opacity 0.30~1.0
+                          opacity = 0.30 + 0.70 * Math.min(1, -diff / maxShort)
+                        } else {
+                          bg = COLORS.success
+                          opacity = 0.30 + 0.70 * Math.min(1, diff / maxOver)
+                        }
+                      }
+                      const tip = `${DOW_LABEL[dow]} ${bucketLabel(b, intervalMin)}\n`
+                        + `콜 ${calls} · 필요 ${required} · 배정 ${scheduled} · 과부족 ${diff}`
+                      return (
+                        <div key={`c-${dow}-${b}`} title={tip} style={{
+                          width: 16, height: 16, flexShrink: 0, borderRadius: 3,
+                          background: bg, opacity,
+                          border: `1px solid ${COLORS.borderFaint}`,
+                        }} />
+                      )
+                    })}
                   </div>
-                )
-              })}
+                ))}
+              </div>
             </div>
           )}
+          {/* ── 범례 ── */}
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 14, marginTop: 10,
+            fontSize: 10, color: COLORS.textMuted, flexWrap: 'wrap',
+          }}>
+            <LegendChip color={COLORS.danger} label="부족 (배정 < 필요)" />
+            <LegendChip color={COLORS.success} label="충분 (배정 ≥ 필요)" />
+            <LegendChip color={COLORS.bgGray} label="콜 없음 (필요 0)" border />
+            <span style={{ whiteSpace: 'nowrap' }}>· 진할수록 격차 큼 · 셀에 마우스를 올리면 상세</span>
+          </div>
         </div>
       )}
 
@@ -416,7 +470,7 @@ function SummaryChip({ label, value }: { label: string; value: string }) {
     <span style={{
       display: 'inline-flex', alignItems: 'baseline', gap: 4,
       padding: '3px 9px', borderRadius: 7, whiteSpace: 'nowrap',
-      background: '#fff', border: `1px solid ${COLORS.borderBlue}`,
+      background: COLORS.bgBlue, border: `1px solid ${COLORS.borderBlue}`,
     }}>
       <span style={{ fontSize: 10, color: COLORS.textSecondary, fontWeight: 600 }}>{label}</span>
       <span style={{ fontSize: 12, color: COLORS.textPrimary, fontWeight: 800 }}>{value}</span>
@@ -424,29 +478,15 @@ function SummaryChip({ label, value }: { label: string; value: string }) {
   )
 }
 
-// ── 단일 막대 (필요 또는 배정) ─────────────────────────────────
-function Bar({ pct, value, color, label }: {
-  pct: number; value: number; color: string; label: string
-}) {
+// ── 히트맵 범례 칩 ──────────────────────────────────────────────
+function LegendChip({ color, label, border }: { color: string; label: string; border?: boolean }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap' }}>
       <span style={{
-        fontSize: 9, color: COLORS.textMuted, minWidth: 24, whiteSpace: 'nowrap',
-      }}>{label}</span>
-      <div style={{
-        flex: 1, height: 12, position: 'relative',
-        background: '#fff', borderRadius: 4,
-        border: `1px solid ${COLORS.borderFaint}`, overflow: 'hidden',
-      }}>
-        <div style={{
-          position: 'absolute', left: 0, top: 0, bottom: 0,
-          width: `${Math.min(pct, 100)}%`, background: color, transition: 'width 0.2s',
-        }} />
-      </div>
-      <span style={{
-        fontSize: 11, fontWeight: 800, color, minWidth: 30, textAlign: 'right',
-        whiteSpace: 'nowrap',
-      }}>{value}명</span>
-    </div>
+        width: 12, height: 12, borderRadius: 3, background: color,
+        border: border ? `1px solid ${COLORS.borderFaint}` : 'none',
+      }} />
+      {label}
+    </span>
   )
 }
