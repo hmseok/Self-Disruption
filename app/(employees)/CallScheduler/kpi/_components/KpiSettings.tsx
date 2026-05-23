@@ -1,11 +1,12 @@
 'use client'
 // ═══════════════════════════════════════════════════════════════════
 // CX KPI — 통합 설정 탭 — KPI-DESIGN.md §5-3
-//   흩어져 있던 KPI 설정성 항목을 한 화면 4섹션으로 통합:
-//     ① 목표치          — kpi/targets        (KpiTargets 컴포넌트 그대로 렌더)
-//     ② WFM 산정 기준   — kpi/wfm-config     (Erlang C 입력 폼)
-//     ③ 평가 항목·가중치 — kpi/eval-weights   (지표별 사용·가중치 편집)
-//     ④ 상담원 매칭      — kpi/agent-mapping  (KT ID ↔ 콜센터 워커 연결)
+//   흩어져 있던 KPI 설정성 항목을 한 화면 5섹션으로 통합:
+//     ① 목표치          — kpi/targets             (KpiTargets 컴포넌트 그대로 렌더)
+//     ② WFM 산정 기준   — kpi/wfm-config          (Erlang C 입력 폼)
+//     ③ 평가 항목·가중치 — kpi/eval-weights        (지표별 사용·가중치 편집)
+//     ④ 상담원 매칭      — kpi/agent-mapping       (KT ID ↔ 콜센터 워커 연결)
+//     ⑤ 근태 기준        — kpi/attendance-config   (지각·조퇴 유예시간)
 //   각 섹션은 접이식. 저장 결과 = 글래스 패널 메시지 (CLAUDE.md 규칙 20).
 // ═══════════════════════════════════════════════════════════════════
 import { useState, useEffect, useCallback } from 'react'
@@ -49,11 +50,12 @@ export default function KpiSettings() {
   const [openWfm, setOpenWfm] = useState(true)
   const [openWeights, setOpenWeights] = useState(true)
   const [openMapping, setOpenMapping] = useState(true)
+  const [openAttendance, setOpenAttendance] = useState(true)
 
   return (
     <div>
       <div style={{ fontSize: 11, color: COLORS.textMuted, marginBottom: 12 }}>
-        CX KPI 의 설정성 항목을 한 곳에 모았습니다 — 목표치 · WFM 산정 기준 · 평가 항목/가중치 · 상담원 매칭.
+        CX KPI 의 설정성 항목을 한 곳에 모았습니다 — 목표치 · WFM 산정 기준 · 평가 항목/가중치 · 상담원 매칭 · 근태 기준.
       </div>
 
       {/* ── ① 목표치 ─────────────────────────────────────────── */}
@@ -86,6 +88,14 @@ export default function KpiSettings() {
         desc="KT 엑셀의 상담사 ID ↔ 콜센터 워커 연결 — 동명이인·표기차 깨짐 방지"
         open={openMapping} onToggle={() => setOpenMapping(o => !o)}>
         <AgentMappingSection />
+      </Section>
+
+      {/* ── ⑤ 근태 기준 ──────────────────────────────────────── */}
+      <Section
+        emoji="🕐" title="근태 기준"
+        desc="지각·조퇴 판정 유예시간 — 정시 ±N분 이내는 정상 처리"
+        open={openAttendance} onToggle={() => setOpenAttendance(o => !o)}>
+        <AttendanceConfigSection />
       </Section>
     </div>
   )
@@ -764,6 +774,116 @@ function AgentMappingSection() {
             opacity: (saving || workers.length === 0) ? 0.6 : 1,
           }}>
           {saving ? '저장 중...' : '✓ 상담원 매칭 저장'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ════════════════════════════════════════════════════════════════
+// ⑤ 근태 기준 — kpi/attendance-config
+//   지각·조퇴 판정 유예시간(grace) — 정시 ±N분 이내는 정상.
+// ════════════════════════════════════════════════════════════════
+function AttendanceConfigSection() {
+  const [grace, setGrace] = useState<number>(0)
+  const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [migrationPending, setMigrationPending] = useState(false)
+  const [result, setResult] = useState<SaveResult | null>(null)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const auth = await getAuthHeader()
+      const res = await fetch('/api/call-scheduler/kpi/attendance-config', { headers: auth })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json?.error || '조회 실패')
+      setGrace(Number(json?.data?.grace_minutes) || 0)
+      setMigrationPending(!!json?.data?._migration_pending)
+    } catch (e: any) {
+      setResult({ ok: false, text: '❌ 근태 기준 조회 실패', detail: e?.message, at: nowLabel() })
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  const save = async () => {
+    setSaving(true); setResult(null)
+    try {
+      const auth = await getAuthHeader()
+      const res = await fetch('/api/call-scheduler/kpi/attendance-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...auth },
+        body: JSON.stringify({ grace_minutes: grace }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json?.error || '저장 실패')
+      const saved = Number(json?.data?.grace_minutes) || 0
+      setGrace(saved)
+      setResult({
+        ok: true, text: '🕐 근태 기준 저장 완료',
+        detail: `유예시간 ${saved}분 — 「🕐 근태」 탭 지각·조퇴 판정에 반영됩니다.`,
+        at: nowLabel(),
+      })
+    } catch (e: any) {
+      setResult({
+        ok: false, text: '❌ 근태 기준 저장 실패',
+        detail: (e?.message || '') +
+          (migrationPending ? ' — 마이그레이션(cs_kpi_attendance_config) 미적용으로 보입니다.' : ''),
+        at: nowLabel(),
+      })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div>
+      <div style={{ fontSize: 11, color: COLORS.textMuted, marginBottom: 12 }}>
+        지각·조퇴 판정 시 정시 ±유예시간 이내는 정상으로 처리합니다. 0분이면 정시 엄격 기준
+        (1분만 늦어도 지각). {loading ? ' · 조회 중...' : ''}
+      </div>
+
+      {migrationPending && (
+        <div style={{
+          padding: '8px 12px', borderRadius: 8, marginBottom: 12,
+          background: COLORS.bgAmber, border: `1px solid ${COLORS.borderAmber}`,
+          fontSize: 11, color: COLORS.warning,
+        }}>
+          ⚠ cs_kpi_attendance_config 테이블이 아직 적용되지 않은 것으로 보입니다 —
+          마이그레이션 적용 전에는 저장이 반영되지 않습니다 (현재 0분으로 판정).
+        </div>
+      )}
+
+      <ResultPanel result={result} onClose={() => setResult(null)} />
+
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 12, flexWrap: 'wrap' }}>
+        <div style={{ minWidth: 140 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSecondary, marginBottom: 4 }}>
+            유예시간 (분)
+          </div>
+          <input type="number" min={0} max={120} value={grace}
+            onChange={(e) => {
+              const n = Number(e.target.value)
+              setGrace(Number.isFinite(n) && n >= 0 ? Math.min(120, Math.round(n)) : 0)
+            }}
+            style={{
+              ...GLASS.L1, width: 120, boxSizing: 'border-box',
+              padding: '6px 10px', borderRadius: 8, fontSize: 13, fontWeight: 700,
+              color: COLORS.textPrimary, fontFamily: 'inherit',
+            }} />
+          <div style={{ fontSize: 10, color: COLORS.textMuted, marginTop: 3 }}>
+            0~120분 · 기본 0분
+          </div>
+        </div>
+        <button type="button" onClick={save} disabled={saving}
+          style={{
+            ...BTN.md, background: COLORS.success, color: '#fff', border: 'none',
+            cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.6 : 1,
+          }}>
+          {saving ? '저장 중...' : '✓ 근태 기준 저장'}
         </button>
       </div>
     </div>

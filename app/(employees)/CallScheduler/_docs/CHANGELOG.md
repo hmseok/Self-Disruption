@@ -3,6 +3,15 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-23 (Phase CX-KPI-14) — 근태 (지각·조퇴) 체크
+
+- 마이그레이션 `2026-05-23_cs_kpi_attendance_config.sql` — 근태 판정 유예시간 1행 설정 테이블(`grace_minutes`, 기본 0분). 멱등(NOT EXISTS 가드).
+- API `kpi/attendance-config` (GET/POST) 신규 — 유예시간 조회/저장. 단일 행 upsert, 0~120분 클램프. 테이블 미적용 시 `_migration_pending` graceful.
+- API `kpi/attendance` (GET) 신규 — 근무표 예정 시각(`cs_shift_slots`) ↔ KT 생산성 실측 로그인/로그아웃(`cs_agent_productivity` daily) 매칭으로 지각·조퇴 산출. 매칭: `cs_assignments`→`cs_shift_slots`(예정) + `cs_assignments.worker_id`→`cs_workers.kt_id`→`cs_agent_productivity`(period_label=work_date). **그룹 시간 겹침 처리** — 한 사람이 하루 여러 슬롯(부엉+달빛)이면 슬롯 구간을 union 으로 계산(겹침 중복 제거), 지각=가장 이른 시작·조퇴=가장 늦은 종료 기준 1회 판정. 정시 ±grace 이내 정상. overnight(20:30~08:30)은 평면 TIME 비교(login_first 저녁/login_last 아침). cs_agent_productivity 는 별도 쿼리 후 TS 에서 kt_id join — collation mismatch 회피. 전 쿼리 graceful try/catch.
+- 「🕐 근태」 탭 신설(`kpi/page.tsx`, KpiTab 'attendance') + `KpiAttendance` 컴포넌트 — 일/주/월 토글, DcStatStrip 5카드(근무일·지각·조퇴·정상·미집계), NeuDataTable 워커별 표(전 컬럼 sortBy), 「지각·조퇴 상세」 적발 일자 표(예정 vs 실측 + 판정 배지). daily 생산성 없음·마이그레이션 미적용·빈 상태 안내 포함.
+- `KpiSettings` 에 5번째 섹션 「🕐 근태 기준」(`AttendanceConfigSection`) — 유예시간(분) 편집, 기본 0분. 저장 결과 글래스 패널(규칙 20).
+- ⚠ 알려진 검증 항목: KT 가 야간(overnight) 근무 생산성을 시작일/종료일 어느 날짜 행에 기록하는지 — 배포 후 야간조 실데이터로 확인, 어긋나면 overnight 만 work_date 보정.
+
 ## 2026-05-23 (Phase CX-KPI-13) — Cafe24 사고·긴급출동 접수량 통합
 
 - API `kpi/cafe24-intake` (GET) 신규 — Cafe24 ERP(read-only) 에서 일별 접수 건수 시계열. 사고 접수(`acrotpth`, `otptmddt`, `otptrgst='R'`) / 긴급출동 접수(`aceesosh`, `esosmddt`, `esosrgst='R'`) 각각 별도 `GROUP BY` 집계. 취소건('C') 제외 — 유효 접수만(사용자 명시). granularity(일/주/월)·date·from/to 로 범위 산정, 빈 날(0건)도 시계열 포함. 대시보드 본체와 분리된 독립 엔드포인트 — 느린 외부 DB 가 KPI 대시보드 로딩을 막지 않도록. graceful try/catch(Cafe24 미연결 시 `cafe24_ok:false`). MariaDB 10.1 호환 — COUNT/CHAR_LENGTH/BETWEEN/GROUP BY 만.
