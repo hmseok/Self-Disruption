@@ -192,6 +192,8 @@ export default function LottoPage() {
   const [fortune, setFortune] = useState<{ text: string; luck: number } | null>(null)
   const [buyResult, setBuyResult] = useState<{ ok: boolean; msg: string } | null>(null)
   const [busy, setBusy] = useState(false)
+  const [now, setNow] = useState(() => Date.now()) // 카운트다운용
+  const [latestResult, setLatestResult] = useState<ResultRow | null>(null) // 최근 추첨 결과
 
   // ── 내 기록 상태 ──
   const [entries, setEntries] = useState<EntryRow[]>([])
@@ -234,6 +236,24 @@ export default function LottoPage() {
     const u = getStoredUser() as { role?: string } | null
     setIsAdmin(u?.role === 'admin')
   }, [])
+
+  // 카운트다운 1초 틱 + 최근 추첨 결과(직전 회차) 조회
+  useEffect(() => {
+    const tick = setInterval(() => setNow(Date.now()), 1000)
+    const token = getStoredToken()
+    fetch(`/api/ride-vision/lotto-result?drwNo=${roundInfo.round - 1}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      cache: 'no-store',
+    })
+      .then(r => r.json())
+      .then(j => {
+        if (j?.data) setLatestResult(j.data as ResultRow)
+      })
+      .catch(() => {
+        // graceful — 최근 결과 미표시
+      })
+    return () => clearInterval(tick)
+  }, [roundInfo.round])
 
   // 내 기록 탭 — 구매기록 + 회차별 당첨결과
   const loadRecords = useCallback(async () => {
@@ -623,36 +643,93 @@ export default function LottoPage() {
       {/* ═══ 탭 1 — 번호 추출 ═══════════════════════════════════ */}
       {tab === 'extract' && (
         <div>
-          {/* 이번 회차 배너 */}
-          <div
-            style={{
-              ...GLASS.L3,
-              border: `1px solid ${COLORS.borderBlue}`,
-              padding: '10px 16px',
-              borderRadius: 12,
-              marginBottom: 14,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              flexWrap: 'wrap',
-              fontSize: 13,
-            }}
-          >
-            <span style={{ fontWeight: 800, color: COLORS.primary }}>
-              🎯 이번 회차 {roundInfo.round}회
-            </span>
-            <span style={{ color: COLORS.textSecondary }}>· 추첨일 {roundInfo.drawDate} (토)</span>
-            <span
-              style={{
-                marginLeft: 'auto',
-                fontSize: 12,
-                fontWeight: 700,
-                color: roundClosed ? COLORS.danger : COLORS.textSecondary,
-              }}
-            >
-              이번 회차 구매 {purchasedTotal}/{MAX_PURCHASE}
-            </span>
-          </div>
+          {/* 이번 회차 위젯 — 회차 / 카운트다운 / 구매 링크 / 최근 결과 */}
+          {(() => {
+            const drawTs = new Date(`${roundInfo.drawDate}T20:35:00+09:00`).getTime()
+            const remain = Math.max(0, drawTs - now)
+            const dd = Math.floor(remain / 86400000)
+            const hh = Math.floor(remain / 3600000) % 24
+            const mm = Math.floor(remain / 60000) % 60
+            const ss = Math.floor(remain / 1000) % 60
+            const pad = (n: number) => String(n).padStart(2, '0')
+            return (
+              <div
+                style={{
+                  ...GLASS.L3,
+                  border: `1px solid ${COLORS.borderBlue}`,
+                  padding: 14,
+                  borderRadius: 14,
+                  marginBottom: 14,
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 14, fontWeight: 800, color: COLORS.primary }}>
+                    🎱 제{roundInfo.round}회
+                  </span>
+                  <span style={{ fontSize: 12, color: COLORS.textSecondary }}>
+                    추첨 {roundInfo.drawDate}(토) 20:35
+                  </span>
+                  <span
+                    style={{
+                      fontSize: 12,
+                      fontWeight: 800,
+                      color: COLORS.danger,
+                      fontVariantNumeric: 'tabular-nums',
+                    }}
+                  >
+                    남은시간 {dd}일 {pad(hh)}:{pad(mm)}:{pad(ss)}
+                  </span>
+                  <a
+                    href="https://www.dhlottery.co.kr/lt645/intro"
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{ ...BTN.sm, marginLeft: 'auto', background: COLORS.primary, color: '#fff', textDecoration: 'none' }}
+                  >
+                    동행복권 구매 ↗
+                  </a>
+                  <span
+                    style={{
+                      fontSize: 12,
+                      fontWeight: 700,
+                      color: roundClosed ? COLORS.danger : COLORS.textSecondary,
+                    }}
+                  >
+                    구매 {purchasedTotal}/{MAX_PURCHASE}
+                  </span>
+                </div>
+                {latestResult && (
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      flexWrap: 'wrap',
+                      marginTop: 10,
+                      paddingTop: 10,
+                      borderTop: `1px solid ${COLORS.borderFaint}`,
+                    }}
+                  >
+                    <span style={{ fontSize: 12, color: COLORS.textMuted, whiteSpace: 'nowrap' }}>
+                      최근 결과 제{latestResult.draw_no}회
+                      {latestResult.draw_date ? ` (${latestResult.draw_date})` : ''}
+                    </span>
+                    {[
+                      latestResult.n1,
+                      latestResult.n2,
+                      latestResult.n3,
+                      latestResult.n4,
+                      latestResult.n5,
+                      latestResult.n6,
+                    ].map(n => (
+                      <Ball key={n} n={n} size={26} />
+                    ))}
+                    <span style={{ fontSize: 13, color: COLORS.textMuted, fontWeight: 700 }}>+</span>
+                    <Ball n={latestResult.bonus} size={26} />
+                  </div>
+                )}
+              </div>
+            )
+          })()}
 
           {/* 컨트롤 카드 */}
           <div style={{ ...GLASS.L4, padding: 16, borderRadius: 14, marginBottom: 14 }}>
