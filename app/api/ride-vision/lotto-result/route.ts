@@ -3,21 +3,21 @@
  *
  * GET ?drwNo=N — N 회차 당첨번호
  *   1) ride_lotto_results 캐시 조회 → 있으면 반환 (외부 호출 없음)
- *   2) 없으면 동행복권 common.do JSON 조회 (AbortController 5초 + User-Agent)
- *      · returnValue==='success' → 번호 캐시 + 반환
- *      · returnValue==='fail'    → 미추첨 회차
- *      · 타임아웃/네트워크 에러   → egressBlocked:true (Cloud Run 외부송신 차단)
- *      · JSON 아닌 응답(HTML)     → endpointDead:true  (엔드포인트 폐기)
+ *   2) 없으면 동행복권 selectMainInfo.do JSON 조회 → 최근 회차 결과 캐시
+ *      · 응답 data.result.pstLtEpstInfo.lt645 = { ltEpsd, tm1~6WnNo, bnsWnNo, ltRflYmd }
+ *      · 캐시 후 N 회차가 잡히면 반환, 아니면 미제공(추첨 대기)
  *
- * egress 판가름용 — 배포 후 ?drwNo=1100 1회 호출로 확정.
+ * 옛 getLottoNumber JSON 엔드포인트는 폐기 → selectMainInfo.do AJAX 엔드포인트 사용.
+ * selectMainInfo.do 는 최근 회차 1건을 제공 → 호출 시마다 그 회차를 캐시 (점진 적재).
+ *
  * 인증: verifyUser (로그인 직원 누구나)
- * RideVision 세션 — PR-VISION-2a → 2d → 3
+ * RideVision 세션 — PR-VISION-2a → 2d → 3 → 4
  */
 import { NextResponse } from 'next/server'
 import { verifyUser } from '@/lib/auth-server'
 import { prisma } from '@/lib/prisma'
 
-const DHLOTTERY_URL = 'https://www.dhlottery.co.kr/common.do?method=getLottoNumber&drwNo='
+const DHLOTTERY_MAIN_INFO = 'https://www.dhlottery.co.kr/selectMainInfo.do'
 
 interface ResultRow {
   draw_no: number
@@ -31,12 +31,19 @@ interface ResultRow {
   draw_date: string | null
 }
 
-// 모듈 수명 동안 egress 차단이 1회 확인되면 이후 dhlottery 호출 skip (불필요한 5초 대기 방지)
+// egress 차단이 1회 확인되면 이후 외부 호출 skip (불필요한 대기 방지 — 인스턴스 캐시)
 let egressBlockedSeen = false
 
 function isMissingTable(e: unknown): boolean {
   const msg = String((e as { message?: string })?.message || e)
   return /doesn't exist|Unknown table|no such table/i.test(msg)
+}
+
+// "20260516" → "2026-05-16"
+function fmtYmd(v: unknown): string | null {
+  const s = String(v ?? '').replace(/[^0-9]/g, '')
+  if (s.length !== 8) return null
+  return `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}`
 }
 
 // 캐시 조회 (테이블 미적용 시 null)
@@ -71,62 +78,78 @@ async function putCache(r: ResultRow): Promise<void> {
 }
 
 type FetchOutcome = {
-  status: 'ok' | 'not_drawn' | 'egress_blocked' | 'endpoint_dead'
+  status: 'ok' | 'no_data' | 'egress_blocked' | 'bad_response'
   result?: ResultRow
   debug?: string
 }
 
-// 동행복권 단건 조회 (raw 로깅 — Rule 3 [B][C])
-async function fetchDhLottery(drwNo: number): Promise<FetchOutcome> {
+// 동행복권 selectMainInfo.do — 최근 로또 6/45 회차 결과 조회
+async function fetchLatestResult(): Promise<FetchOutcome> {
   if (egressBlockedSeen) {
     return { status: 'egress_blocked', debug: 'egress 차단 확인됨(인스턴스 캐시) — 호출 skip' }
   }
   const ctrl = new AbortController()
-  const timer = setTimeout(() => ctrl.abort(), 5000)
+  const timer = setTimeout(() => ctrl.abort(), 6000)
   try {
-    const res = await fetch(`${DHLOTTERY_URL}${drwNo}`, {
+    const res = await fetch(`${DHLOTTERY_MAIN_INFO}?_=${Date.now()}`, {
       signal: ctrl.signal,
       headers: {
         'User-Agent':
           'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         Accept: 'application/json, text/plain, */*',
+        Referer: 'https://www.dhlottery.co.kr/',
       },
       cache: 'no-store',
     })
     const text = await res.text()
-    console.log(`[lotto-result] drwNo=${drwNo} status=${res.status} raw=${text.slice(0, 200)}`)
     let json: Record<string, unknown>
     try {
       json = JSON.parse(text)
     } catch {
-      // 연결은 됐으나 JSON 아님 → 엔드포인트 폐기 (egress 는 정상)
-      return {
-        status: 'endpoint_dead',
-        debug: `non-JSON status=${res.status} ct=${res.headers.get('content-type') || '-'} body=${text.slice(0, 120)}`,
-      }
+      console.log(`[lotto-result] selectMainInfo non-JSON status=${res.status} body=${text.slice(0, 150)}`)
+      return { status: 'bad_response', debug: `non-JSON status=${res.status}` }
     }
-    if (json.returnValue === 'success') {
-      const num = (k: string) => Number(json[k])
-      return {
-        status: 'ok',
-        result: {
-          draw_no: num('drwNo'),
-          n1: num('drwtNo1'),
-          n2: num('drwtNo2'),
-          n3: num('drwtNo3'),
-          n4: num('drwtNo4'),
-          n5: num('drwtNo5'),
-          n6: num('drwtNo6'),
-          bonus: num('bnusNo'),
-          draw_date: (json.drwNoDate as string) || null,
-        },
-      }
+    // data.result.pstLtEpstInfo.lt645
+    const data = json.data as Record<string, unknown> | undefined
+    const result = data?.result as Record<string, unknown> | undefined
+    const pst = result?.pstLtEpstInfo as Record<string, unknown> | undefined
+    const lt = pst?.lt645 as Record<string, unknown> | undefined
+    if (!lt || lt.ltEpsd == null) {
+      return { status: 'no_data', debug: 'lt645 미발견 — 응답 구조 변경 가능' }
     }
-    return { status: 'not_drawn', debug: `returnValue=${String(json.returnValue)}` }
+    const num = (k: string) => Number(lt[k])
+    const drawNo = num('ltEpsd')
+    const nums = [
+      num('tm1WnNo'),
+      num('tm2WnNo'),
+      num('tm3WnNo'),
+      num('tm4WnNo'),
+      num('tm5WnNo'),
+      num('tm6WnNo'),
+    ]
+    const bonus = num('bnsWnNo')
+    if (!Number.isInteger(drawNo) || drawNo < 1 || nums.some(n => !Number.isInteger(n) || n < 1 || n > 45)) {
+      return { status: 'no_data', debug: `lt645 값 이상 ltEpsd=${lt.ltEpsd}` }
+    }
+    console.log(`[lotto-result] selectMainInfo OK lt645 회차=${drawNo} ${nums.join(',')}+${bonus}`)
+    return {
+      status: 'ok',
+      result: {
+        draw_no: drawNo,
+        n1: nums[0],
+        n2: nums[1],
+        n3: nums[2],
+        n4: nums[3],
+        n5: nums[4],
+        n6: nums[5],
+        bonus,
+        draw_date: fmtYmd(lt.ltRflYmd),
+      },
+    }
   } catch (e) {
     const err = e as Error
     egressBlockedSeen = true
-    console.error('[lotto-result] egress-blocked', drwNo, err.name, err.message)
+    console.error('[lotto-result] selectMainInfo fetch 실패', err.name, err.message)
     return { status: 'egress_blocked', debug: `fetch-throw ${err.name}: ${err.message}` }
   } finally {
     clearTimeout(timer)
@@ -149,31 +172,36 @@ export async function GET(request: Request) {
   }
 
   try {
+    // 1) 캐시
     const cached = await getCached(drwNo)
     if (cached) {
       return NextResponse.json({ success: true, data: cached, meta: { drawn: true, cached: true } })
     }
 
-    const fetched = await fetchDhLottery(drwNo)
-
+    // 2) selectMainInfo.do 조회 → 최근 회차 캐시
+    const fetched = await fetchLatestResult()
     if (fetched.status === 'ok' && fetched.result) {
       await putCache(fetched.result)
-      return NextResponse.json({ success: true, data: fetched.result, meta: { drawn: true, cached: false } })
-    }
-    if (fetched.status === 'not_drawn') {
-      return NextResponse.json({ success: true, data: null, meta: { drawn: false, drwNo, debug: fetched.debug } })
+      if (fetched.result.draw_no === drwNo) {
+        return NextResponse.json({ success: true, data: fetched.result, meta: { drawn: true, cached: false } })
+      }
+      // 요청 회차는 아직 selectMainInfo 가 제공하지 않음 (추첨 대기 / 과거 회차)
+      return NextResponse.json({
+        success: true,
+        data: null,
+        meta: { drawn: false, drwNo, latestKnown: fetched.result.draw_no },
+      })
     }
 
-    // egress_blocked / endpoint_dead — status 200 (페이지가 플래그를 읽을 수 있도록)
+    // egress 차단 / 응답 이상
     return NextResponse.json({
       success: false,
       data: null,
       egressBlocked: fetched.status === 'egress_blocked',
-      endpointDead: fetched.status === 'endpoint_dead',
       error:
         fetched.status === 'egress_blocked'
           ? 'Cloud Run 외부 송신 차단 (egress)'
-          : '동행복권 엔드포인트 폐기 — JSON 아님',
+          : '동행복권 응답 이상',
       debug: fetched.debug,
     })
   } catch (e) {

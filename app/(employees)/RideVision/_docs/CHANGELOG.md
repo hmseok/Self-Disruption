@@ -5,6 +5,36 @@
 
 ---
 
+## 2026-05-24 | PR-VISION-4 | 동행복권 자동조회 복구 (selectMainInfo.do JSON API)
+
+### 배경 — egress 판가름 결과
+PR-3 배포 후 `?drwNo=1100` 3회 호출 → 모두 http 200, `egressBlocked:false`.
+→ **Cloud Run egress 정상.** 앞선 PR-2d 의 AbortError 는 일시적 타임아웃이었음 (정정).
+옛 `getLottoNumber` JSON 엔드포인트는 폐기(HTML 응답) 확인.
+
+### 발견 — 동행복권 홈 AJAX 엔드포인트
+홈페이지 네트워크 추적 → `selectMainInfo.do` (application/json) 발견.
+`data.result.pstLtEpstInfo.lt645` = `{ ltEpsd, tm1~6WnNo, bnsWnNo, ltRflYmd }`
+→ 회차·당첨번호 6개·보너스·추첨일이 JSON 으로 제공. egress 정상 → 서버 조회 가능.
+
+### 변경
+- **수정** `app/api/ride-vision/lotto-result/route.ts`
+  - 조회 소스를 `getLottoNumber`(폐기) → `selectMainInfo.do` 로 교체
+  - `lt645` 파싱 → 최근 회차 결과 ride_lotto_results 에 캐시 (호출 시마다 점진 적재)
+  - 요청 회차가 캐시/최근회차에 없으면 추첨 대기로 응답
+  - AbortController 6초, egress 차단 시 인스턴스 캐시로 이후 skip
+
+### 한계 / 비고
+- `selectMainInfo.do` 는 최근 회차 1건 제공 → 페이지 열람 시마다 호출되어 점진 캐시.
+- 매우 오래된 회차(캐시에도 없고 최근회차도 아님)는 미제공 — 실사용(최근 회차 확인)엔 무방.
+
+### GATE 진행 상태
+- ✅ G5 tsc — 신규 에러 0건 / G6 lint:harness 새 위반 0건
+- ⏳ G7 배포 후 ?drwNo 호출로 실제 회차 적재 확인
+- ✅ Rule 22 _docs 갱신 (CHANGELOG)
+
+---
+
 ## 2026-05-24 | PR-VISION-3 | UX 전면 개편 + egress 판가름 라우트
 
 ### 사용자 요청 (시각 검수 후 누적)
