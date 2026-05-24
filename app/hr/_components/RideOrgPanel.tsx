@@ -565,11 +565,15 @@ export default function RideOrgPanel() {
   // ─── NeuDataTable 컬럼 (Rule 18 — 모든 컬럼 sortBy) ────────────────
   const columns: TableColumn<RideEmp>[] = [
     {
-      key: 'check', label: '', width: 40, align: 'center',
+      key: 'check', label: '', width: 52, align: 'center',
       render: (r) => (
-        <input type="checkbox" checked={checkedIds.has(r.id)}
-          onChange={() => toggleCheck(r.id)} onClick={(e) => e.stopPropagation()}
-          style={{ cursor: 'pointer' }} />
+        <label onClick={(e) => e.stopPropagation()}
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer', padding: '8px 6px', margin: '-8px -6px' }}>
+          <input type="checkbox" checked={checkedIds.has(r.id)}
+            onChange={() => toggleCheck(r.id)}
+            style={{ width: 18, height: 18, cursor: 'pointer', accentColor: '#0f2440' }} />
+        </label>
       ),
     },
     {
@@ -923,9 +927,10 @@ export default function RideOrgPanel() {
           </div>
 
           {filteredEmps.length > 0 && (
-            <label style={{ fontSize: 11, color: '#64748b', display: 'flex', alignItems: 'center',
-              gap: 5, cursor: 'pointer', paddingLeft: 4 }}>
-              <input type="checkbox" checked={allChecked} onChange={toggleCheckAll} />
+            <label style={{ fontSize: 12, color: '#64748b', display: 'flex', alignItems: 'center',
+              gap: 7, cursor: 'pointer', paddingLeft: 4 }}>
+              <input type="checkbox" checked={allChecked} onChange={toggleCheckAll}
+                style={{ width: 17, height: 17, cursor: 'pointer', accentColor: '#0f2440' }} />
               현재 목록 전체 선택 ({filteredEmps.length}명)
             </label>
           )}

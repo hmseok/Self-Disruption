@@ -5,6 +5,9 @@
 
 ## 2026-05-16
 
+- **PR-HR-5c** (hr 세션) — RideOrgPanel 직원 선택 체크박스 확대.
+  - 기본 13px → 18px (`accentColor` 네이비), `label` 래퍼로 클릭 영역 확장 (사용자 피드백: 체크박스 너무 작음).
+  - 전체 선택 체크박스도 17px 로.
 - **정책 기록** — `_docs/HR-OPERATIONS.md § 9` 신설: 라이드 직원 계정(외부 매니저, 옵션 a) + 독립 브랜딩(라이드주식회사) + 인사마스터 동기화 정책. 멀티 브랜딩은 메인 세션 위탁 (PR-MULTI-BRAND).
 - **PR-HR-5b** (hr 세션) — 컨택 명단 17명 연락처/이메일 UPSERT (`migrations/2026-05-16_ride_employees_contact.sql`).
   - bulk-upload 는 INSERT-only → 기존 직원 보강 불가. UPDATE + NOT EXISTS INSERT 멱등 UPSERT 로 해결.
