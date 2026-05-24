@@ -2,6 +2,7 @@
 import { usePathname } from 'next/navigation'
 import { useEffect } from 'react'
 import { GLASS } from '../utils/ui-tokens'
+import { COMPANY_BRANDS } from '@/lib/company-brand'
 
 // ═══════════════════════════════════════════════════════════════
 // PageTitle — Neumorphism (Style E) 페이지 타이틀 컴포넌트
@@ -211,27 +212,16 @@ export default function PageTitle({ dynamicMenuName, brand, primaryLabel }: Page
       : (primaryLabel || 'FMI ERP')
   }, [pageName, sectionLabel, primaryLabel])
 
-  // ── favicon 동적화 (2026-05-24, hotfix 2026-05-24) ──
-  //   사용자: 기본 삼각형 favicon 대신 헤더 배지처럼 회사 이니셜로.
+  // ── favicon 동적화 (2026-05-24, hotfix·심볼 2026-05-24) ──
+  //   회사별 favicon: company-brand 에 공식 심볼 파비콘 자산이 있으면
+  //   그대로 사용(RIDE), 없으면 이니셜 배지를 캔버스로 생성(FMI).
   //   ⚠ 초판이 Next.js 가 관리하는 <link rel=icon> 을 .remove() 해서
   //     네비게이션 시 removeChild(null) 크래시 + 더블클릭 버그 유발.
-  //   → append-only 로 수정: Next.js link 는 절대 안 건드리고, 자체 전용
+  //   → append-only: Next.js link 는 절대 안 건드리고, 자체 전용
   //     link(id=fmi-dynamic-favicon) 하나만 만들어 href 만 갱신.
   useEffect(() => {
-    const b = brand === 'RIDE' ? { color: '#0d9488', initial: 'R' } : { color: '#3b6eb5', initial: 'F' }
-    try {
-      const cv = document.createElement('canvas')
-      cv.width = 64; cv.height = 64
-      const ctx = cv.getContext('2d')
-      if (!ctx) return
-      ctx.fillStyle = b.color
-      ctx.beginPath(); ctx.arc(32, 32, 32, 0, Math.PI * 2); ctx.fill()
-      ctx.fillStyle = '#fff'
-      ctx.font = 'bold 42px -apple-system, BlinkMacSystemFont, sans-serif'
-      ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
-      ctx.fillText(b.initial, 32, 35)
-      const url = cv.toDataURL('image/png')
-      // 자체 전용 link 하나만 유지 — Next.js 관리 link 는 제거 X (.remove 금지)
+    // 자체 전용 link 하나만 유지 — Next.js 관리 link 는 제거 X (.remove 금지)
+    const apply = (href: string) => {
       let link = document.getElementById('fmi-dynamic-favicon') as HTMLLinkElement | null
       if (!link) {
         link = document.createElement('link')
@@ -240,7 +230,24 @@ export default function PageTitle({ dynamicMenuName, brand, primaryLabel }: Page
         link.type = 'image/png'
         document.head.appendChild(link)
       }
-      link.href = url
+      link.href = href
+    }
+    const cb = COMPANY_BRANDS[brand === 'RIDE' ? 'RIDE' : 'FMI']
+    // 공식 심볼 파비콘 자산이 있으면 그대로 사용 (RIDE — 네이비 R 심볼)
+    if (cb.favicon) { apply(cb.favicon); return }
+    // 자산 없으면 이니셜 배지 캔버스 생성 (FMI)
+    try {
+      const cv = document.createElement('canvas')
+      cv.width = 64; cv.height = 64
+      const ctx = cv.getContext('2d')
+      if (!ctx) return
+      ctx.fillStyle = cb.primary
+      ctx.beginPath(); ctx.arc(32, 32, 32, 0, Math.PI * 2); ctx.fill()
+      ctx.fillStyle = '#fff'
+      ctx.font = 'bold 42px -apple-system, BlinkMacSystemFont, sans-serif'
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+      ctx.fillText(cb.shortName.charAt(0), 32, 35)
+      apply(cv.toDataURL('image/png'))
     } catch { /* canvas 미지원 환경 — 기본 favicon 유지 */ }
   }, [brand])
 
