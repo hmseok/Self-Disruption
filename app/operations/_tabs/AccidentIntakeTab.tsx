@@ -46,7 +46,7 @@ function rideAccidentIdFromIdno(idno: string): number {
 //        기간 넓힐 땐 오늘/3일/7일/30일/1년 퀵버튼 사용
 export default function AccidentIntakeTab() {
   const router = useRouter()
-  const [filter, setFilter] = useState<FilterKey>('all')  // PR-U: 사고접수는 「전체」 한 뷰만 (대차사용 건은 대차리스트로)
+  const [filter, setFilter] = useState<FilterKey>('dcyn_y')  // PR-Y1.1: 기본 「대차요청」 (사용자 명시)
 
   const [allRows, setAllRows] = useState<DispatchRequestRow[] | null>(null)
   const [orders, setOrders] = useState<DispatchOrder[]>([])  // PR-F — 우리 진행 dispatch_orders
@@ -207,18 +207,22 @@ export default function AccidentIntakeTab() {
   }
 
   const statItems: StatItem[] = [
-    { label: '🔔 미진행', value: counts.todo, unit: '건', tint: 'red' },
     { label: '📋 전체 (활성)', value: counts.all, unit: '건', tint: 'blue' },
-    { label: '🚗 대차 사용', value: counts.dcyn_y, unit: '건', tint: 'amber' },
+    { label: '🚗 대차요청', value: counts.dcyn_y, unit: '건', tint: 'red' },
+    { label: '🚙 대차미요청', value: counts.dcyn_n, unit: '건', tint: 'amber' },
     { label: '✅ 종결', value: counts.closed, unit: '건', tint: 'green' },
     { label: '🔍 검색결과', value: filtered.length, unit: '건', tint: 'purple' },
   ]
   const statActions: ActionButton[] = [
     { label: '새로고침', onClick: refresh, variant: 'secondary', icon: '🔄' },
   ]
-  // PR-U (2026-05-23) — 사고접수는 필터 탭 없이 「전체」 한 뷰만
+  // PR-Y1.1 (2026-05-23) — 사용자 명시: 「대차 요청건과 미요청건은 분리 탭이」
+  //   → 대차 Y/N 필터 복원 (PR-U 단일 「전체」 → 전체/요청/미요청/종결)
   const filterItems: FilterItem[] = [
     { key: 'all', label: '📋 전체', count: counts.all },
+    { key: 'dcyn_y', label: '🚗 대차요청', count: counts.dcyn_y },
+    { key: 'dcyn_n', label: '🚙 대차미요청', count: counts.dcyn_n },
+    { key: 'closed', label: '✅ 종결', count: counts.closed },
   ]
 
   const columns: TableColumn<DispatchRequestRow>[] = [
