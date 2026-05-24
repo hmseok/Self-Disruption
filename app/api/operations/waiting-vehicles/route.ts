@@ -31,7 +31,7 @@ import { prisma } from '@/lib/prisma'
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
-type DerivedStatus = 'available' | 'rented' | 'returned'
+type DerivedStatus = 'available' | 'rented' | 'returned' | 'leased'
 
 export async function GET(request: NextRequest) {
   try {
@@ -90,9 +90,31 @@ export async function GET(request: NextRequest) {
     }
     const dispatchOk = dispatchedIds.size > 0
 
+    // 2-b) 활성 장기렌트 차량 — 「사용가능」에서 제외 (PR-L1d)
+    //   long_term_rentals 는 vehicle_id 또는 vehicle_car_number 로 차량 식별.
+    const leasedIds = new Set<string>()
+    const leasedNumbers = new Set<string>()
+    try {
+      const rows = await prisma.$queryRaw<Array<{ vehicle_id: string | null; vehicle_car_number: string | null }>>`
+        SELECT vehicle_id, vehicle_car_number
+          FROM long_term_rentals
+         WHERE status = 'active'
+           AND (start_date IS NULL OR start_date <= CURDATE())
+           AND (end_date IS NULL OR end_date >= CURDATE())`
+      for (const r of rows) {
+        if (r.vehicle_id) leasedIds.add(String(r.vehicle_id))
+        if (r.vehicle_car_number) leasedNumbers.add(String(r.vehicle_car_number).replace(/\s/g, ''))
+      }
+    } catch (e: unknown) {
+      // Rule 23 graceful fallback — long_term_rentals 미적용 시 장기렌트 제외 skip
+      console.warn('[waiting-vehicles] leased query failed:', (e as Error)?.message?.slice(0, 200))
+    }
+
     // 3) 도출 상태 계산
-    const derive = (carStatus: string | null, id: string): DerivedStatus => {
+    const derive = (carStatus: string | null, id: string, number: string | null): DerivedStatus => {
       if (dispatchedIds.has(id)) return 'rented'                // 배차중 (fmi_rentals 기준)
+      const numNorm = (number || '').replace(/\s/g, '')
+      if (leasedIds.has(id) || (numNorm && leasedNumbers.has(numNorm))) return 'leased'  // 장기렌트중
       if (carStatus === 'returned') return 'returned'           // 정비·점검
       // fmi_rentals 조회 실패 시에는 cars.status 의 'rented' 도 존중
       if (!dispatchOk && carStatus === 'rented') return 'rented'
@@ -106,7 +128,7 @@ export async function GET(request: NextRequest) {
       trim: c.trim,
       year: c.year,
       image_url: c.image_url,
-      status: derive(c.status, c.id),
+      status: derive(c.status, c.id, c.number),
       location: c.location,
       mileage: c.mileage,
     }))
@@ -115,7 +137,7 @@ export async function GET(request: NextRequest) {
     const wantStatus =
       statusInput === 'all' ? null
       : statusInput === 'active' ? 'available'
-      : (['available', 'rented', 'returned'].includes(statusInput) ? statusInput : 'available')
+      : (['available', 'rented', 'returned', 'leased'].includes(statusInput) ? statusInput : 'available')
     const filtered = wantStatus
       ? enriched.filter((c) => c.status === wantStatus)
       : enriched
