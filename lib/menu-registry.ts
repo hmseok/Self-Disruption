@@ -55,10 +55,11 @@ export const GROUPS: MenuGroup[] = [
   // 직장인필수 (Employee of Ride Inc. — 모든 로그인 사용자)
   { id: 'work-essentials', label: '직장인필수',    section: 'work-essentials', sortOrder: 10 },
   { id: 'cx-team',         label: 'CX팀',         section: 'work-essentials', sortOrder: 11 },
-  // PR-6.9.b (2026-05-06) — 관리자 운영 그룹 신설 (Employee of Ride Inc. 하위)
-  { id: 'admin-ops',       label: '관리자 운영',   section: 'work-essentials', sortOrder: 12 },
   // PR-MT-OPS (2026-05-11) — MT팀 운영 그룹 (위탁: 다른 세션 작업, 본 세션 단독 commit)
-  { id: 'mt-team',         label: '🔧 MT팀',      section: 'work-essentials', sortOrder: 13 },
+  { id: 'mt-team',         label: '🔧 MT팀',      section: 'work-essentials', sortOrder: 12 },
+  // PR-6.9.b (2026-05-06) — 관리자 운영 그룹 신설 (Employee of Ride Inc. 하위)
+  // 2026-05-24 — 라이드 하위 그룹 중 항상 최하단 (사용자 요청) → sortOrder 최대
+  { id: 'admin-ops',       label: '관리자 운영',   section: 'work-essentials', sortOrder: 13 },
   // 설정 (admin 전용 — 사이드바 별도 섹션)
   { id: 'settings',        label: '설정',         section: 'settings',         sortOrder: 20 },
 ]

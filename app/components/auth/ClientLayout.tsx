@@ -465,25 +465,8 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
                 )
               })()}
 
-              {/* 관리자 운영 sub-section (PR-6.9.b) — 권한 있는 사용자만 */}
-              {(() => {
-                const visibleAdminOps = ADMIN_OPS_MENUS.filter(item => !item.requirePermission || role === 'admin' || hasPageAccess(item.path))
-                if (visibleAdminOps.length === 0) return null
-                return (
-                  <>
-                    <div className="px-4 mt-2 mb-0.5">
-                      <span className="text-[9px] font-semibold text-slate-500 tracking-wider">▸ 관리자 운영</span>
-                    </div>
-                    <div className="space-y-0.5 ml-2">
-                      {visibleAdminOps.map(item => (
-                        <MenuItem key={item.path} item={item} pathname={pathname} allPaths={allMenuPaths} />
-                      ))}
-                    </div>
-                  </>
-                )
-              })()}
-
               {/* MT팀 sub-section (PR-MT-OPS-FIX) — 권한 있는 사용자만 */}
+              {/* 순서: 관리자 운영보다 위 (2026-05-24 사용자 요청) */}
               {(() => {
                 const visibleMtTeam = MT_TEAM_MENUS.filter(item => !item.requirePermission || role === 'admin' || hasPageAccess(item.path))
                 if (visibleMtTeam.length === 0) return null
@@ -494,6 +477,25 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
                     </div>
                     <div className="space-y-0.5 ml-2">
                       {visibleMtTeam.map(item => (
+                        <MenuItem key={item.path} item={item} pathname={pathname} allPaths={allMenuPaths} />
+                      ))}
+                    </div>
+                  </>
+                )
+              })()}
+
+              {/* 관리자 운영 sub-section (PR-6.9.b) — 권한 있는 사용자만 */}
+              {/* 순서: 라이드 하위 그룹 중 항상 최하단 (2026-05-24 사용자 요청) */}
+              {(() => {
+                const visibleAdminOps = ADMIN_OPS_MENUS.filter(item => !item.requirePermission || role === 'admin' || hasPageAccess(item.path))
+                if (visibleAdminOps.length === 0) return null
+                return (
+                  <>
+                    <div className="px-4 mt-2 mb-0.5">
+                      <span className="text-[9px] font-semibold text-slate-500 tracking-wider">▸ 관리자 운영</span>
+                    </div>
+                    <div className="space-y-0.5 ml-2">
+                      {visibleAdminOps.map(item => (
                         <MenuItem key={item.path} item={item} pathname={pathname} allPaths={allMenuPaths} />
                       ))}
                     </div>

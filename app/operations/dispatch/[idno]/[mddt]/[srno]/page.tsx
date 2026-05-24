@@ -346,6 +346,24 @@ export default function DispatchDetailPage({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vehicleModalOpen])
 
+  // PR-Y2 — ?vehicle= 로 진입 시 (대기차량 탭 「이 차로 배차」) 해당 차량 사전선택
+  useEffect(() => {
+    const vid = searchParams.get('vehicle')
+    if (!vid) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const headers = await getAuthHeader()
+        const res = await fetch('/api/operations/waiting-vehicles?status=all', { headers })
+        const json = await res.json().catch(() => ({}))
+        const car = (Array.isArray(json?.data) ? json.data : []).find((c: WaitingVehicle) => c.id === vid)
+        if (car && !cancelled) setSelectedVehicle(car)
+      } catch { /* 무시 — 수동 재선택 가능 */ }
+    })()
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const fetchOrder = useCallback(async () => {
     setOrderLoading(true)
     try {
