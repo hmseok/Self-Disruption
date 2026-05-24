@@ -15,12 +15,30 @@
 // 회의록(meetings) 연동 — ride_departments.leader_employee_id 공유.
 // ═══════════════════════════════════════════════════════════════════
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react'
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
+import * as XLSX from 'xlsx'
 import DcStatStrip, { StatItem } from '../../components/DcStatStrip'
 import NeuDataTable, { TableColumn } from '../../components/NeuDataTable'
 import { auth } from '@/lib/auth-client'
 import { GLASS } from '@/app/utils/ui-tokens'
+
+// ─── 엑셀 일괄 등록 (PR-HR-5) ──────────────────────────────────────
+type UploadRow = { name: string; phone: string; email: string; department: string; position: string }
+type UploadPlan = {
+  summary: { total: number; ok: number; empty: number; duplicate: number; error: number }
+  plan: { index: number; status: string; errors: string[]; raw: any; parsed?: any }[]
+}
+// 엑셀 헤더 → 필드 매핑
+function mapHeader(h: string): keyof UploadRow | null {
+  const s = h.trim().toLowerCase()
+  if (/이름|성명|직원명|^name$/.test(s)) return 'name'
+  if (/연락처|전화|휴대폰|핸드폰|폰번호|phone|mobile|tel/.test(s)) return 'phone'
+  if (/이메일|메일|mail/.test(s)) return 'email'
+  if (/부서|소속|department/.test(s)) return 'department'
+  if (/직급|직책|position|직위/.test(s)) return 'position'
+  return null
+}
 
 // ─── 타입 ───────────────────────────────────────────────────────────
 type RideDept = {
@@ -149,14 +167,23 @@ export default function RideOrgPanel() {
   const [empForm, setEmpForm] = useState<EmpForm>(EMP_FORM_EMPTY)
   const [savingEmp, setSavingEmp] = useState(false)
 
+  // ─── 엑셀 일괄 등록 상태 (PR-HR-5) ───────────────────────────────
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [uploadRows, setUploadRows] = useState<UploadRow[] | null>(null)
+  const [uploadPlan, setUploadPlan] = useState<UploadPlan | null>(null)
+  const [uploading, setUploading] = useState(false)
+  const [uploadFileName, setUploadFileName] = useState('')
+
   // ─── 데이터 로드 ──────────────────────────────────────────────────
   const load = useCallback(async () => {
     setLoading(true)
     try {
       const h = await authHeader()
+      // cache: 'no-store' — mutation(퇴사/수정/부서변경) 후 refetch 가 브라우저 캐시된
+      // 옛 데이터를 받지 않도록 강제 (PR-HR-4b — "리스트 적용 안 됨" 수정)
       const [treeRes, empRes] = await Promise.all([
-        fetch('/api/ride-departments/tree', { headers: h }),
-        fetch('/api/ride-employees?include_inactive=1', { headers: h }),
+        fetch('/api/ride-departments/tree', { headers: h, cache: 'no-store' }),
+        fetch('/api/ride-employees?include_inactive=1', { headers: h, cache: 'no-store' }),
       ])
       const treeJson = await treeRes.json().catch(() => ({}))
       const empJson = await empRes.json().catch(() => ({}))
@@ -448,6 +475,93 @@ export default function RideOrgPanel() {
     }
   }
 
+  // ─── 엑셀 일괄 등록 (PR-HR-5) ────────────────────────────────────
+  const handleFile = async (file: File) => {
+    setUploading(true)
+    setUploadFileName(file.name)
+    try {
+      const buf = await file.arrayBuffer()
+      const wb = XLSX.read(buf, { type: 'array' })
+      const ws = wb.Sheets[wb.SheetNames[0]]
+      const matrix: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false })
+      if (matrix.length < 2) {
+        setResult({ ok: false, title: '엑셀 비어있음', lines: ['헤더 + 1행 이상 필요합니다.'] })
+        return
+      }
+      // 헤더 행 — 매핑되는 컬럼이 1개 이상인 첫 행
+      let headerIdx = 0
+      let colMap: Partial<Record<keyof UploadRow, number>> = {}
+      for (let h = 0; h < Math.min(matrix.length, 5); h++) {
+        const cand: Partial<Record<keyof UploadRow, number>> = {}
+        ;(matrix[h] || []).forEach((cell, idx) => {
+          const f = mapHeader(String(cell ?? ''))
+          if (f && cand[f] == null) cand[f] = idx
+        })
+        if (cand.name != null) { headerIdx = h; colMap = cand; break }
+      }
+      if (colMap.name == null) {
+        setResult({ ok: false, title: '이름 컬럼 없음', lines: ['엑셀에 「이름/성명」 헤더가 필요합니다.'] })
+        return
+      }
+      const rows: UploadRow[] = matrix.slice(headerIdx + 1).map(r => ({
+        name: String(r[colMap.name!] ?? '').trim(),
+        phone: colMap.phone != null ? String(r[colMap.phone] ?? '').trim() : '',
+        email: colMap.email != null ? String(r[colMap.email] ?? '').trim() : '',
+        department: colMap.department != null ? String(r[colMap.department] ?? '').trim() : '',
+        position: colMap.position != null ? String(r[colMap.position] ?? '').trim() : '',
+      })).filter(r => r.name)
+      if (rows.length === 0) {
+        setResult({ ok: false, title: '등록할 행 없음', lines: ['이름이 있는 행이 없습니다.'] })
+        return
+      }
+      setUploadRows(rows)
+      // preview API
+      const h = await authHeader()
+      const res = await fetch('/api/ride-employees/bulk-upload', {
+        method: 'POST',
+        headers: { ...h, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'preview', rows }),
+      })
+      const json = await res.json()
+      if (json.error) { setResult({ ok: false, title: '미리보기 실패', lines: [json.error] }); return }
+      setUploadPlan(json.data as UploadPlan)
+    } catch (e: any) {
+      setResult({ ok: false, title: '엑셀 분석 오류', lines: [e?.message || '파일을 읽을 수 없습니다.'] })
+    } finally {
+      setUploading(false)
+    }
+  }
+  const applyUpload = async () => {
+    if (!uploadRows) return
+    setUploading(true)
+    try {
+      const h = await authHeader()
+      const res = await fetch('/api/ride-employees/bulk-upload', {
+        method: 'POST',
+        headers: { ...h, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'apply', rows: uploadRows }),
+      })
+      const json = await res.json()
+      if (json.error) { setResult({ ok: false, title: '일괄 등록 실패', lines: [json.error] }); return }
+      const d = json.data
+      setResult({
+        ok: true, title: `✅ 엑셀 일괄 등록 — ${uploadFileName}`,
+        lines: [
+          `신규 등록: ${d.inserted}명`,
+          `중복 skip: ${d.summary.duplicate}명 / 빈 행: ${d.summary.empty} / 오류: ${d.summary.error}`,
+        ],
+      })
+      setUploadRows(null)
+      setUploadPlan(null)
+      await load()
+    } catch (e: any) {
+      setResult({ ok: false, title: '일괄 등록 오류', lines: [e?.message || '네트워크 오류'] })
+    } finally {
+      setUploading(false)
+    }
+  }
+  const cancelUpload = () => { setUploadRows(null); setUploadPlan(null); setUploadFileName('') }
+
   // ─── NeuDataTable 컬럼 (Rule 18 — 모든 컬럼 sortBy) ────────────────
   const columns: TableColumn<RideEmp>[] = [
     {
@@ -607,7 +721,13 @@ export default function RideOrgPanel() {
           라이드케어(외주) 직원 — 본 ERP 계정 X. 부서/조직 마스터는 여기서 관리, 회의록·근무스케줄과 연동.
         </div>
         <DcStatStrip stats={stats}
-          actions={[{ label: '신규 직원', icon: '+', onClick: () => openEmpModal('new') }]} />
+          actions={[
+            { label: '신규 직원', icon: '+', onClick: () => openEmpModal('new') },
+            { label: '엑셀 일괄 등록', icon: '📥', onClick: () => fileInputRef.current?.click() },
+          ]} />
+        <input ref={fileInputRef} type="file" accept=".xlsx,.xls,.csv"
+          onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = '' }}
+          style={{ display: 'none' }} />
       </div>
 
       {/* 본문 — 좌측 트리 + 우측 테이블 */}
@@ -931,6 +1051,67 @@ export default function RideOrgPanel() {
                   {savingEmp ? '저장 중...' : (empModal === 'new' ? '등록' : '저장')}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 엑셀 일괄 등록 미리보기 모달 (PR-HR-5) */}
+      {uploadPlan && (
+        <div onClick={cancelUpload}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.45)', zIndex: 1000,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+          <div onClick={(e) => e.stopPropagation()}
+            style={{ background: '#fff', borderRadius: 14, padding: 22, width: 540, maxWidth: '100%',
+              maxHeight: '88vh', overflowY: 'auto', boxShadow: '0 12px 40px rgba(0,0,0,0.2)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+              <h3 style={{ fontSize: 15, fontWeight: 700, color: '#1e293b', margin: 0 }}>📥 엑셀 일괄 등록 미리보기</h3>
+              <button onClick={cancelUpload}
+                style={{ fontSize: 16, color: '#94a3b8', background: 'none', border: 'none', cursor: 'pointer' }}>✕</button>
+            </div>
+            <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 12 }}>{uploadFileName}</div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 8, marginBottom: 12 }}>
+              {([['신규', uploadPlan.summary.ok, '#16a34a'],
+                 ['중복', uploadPlan.summary.duplicate, '#94a3b8'],
+                 ['빈 행', uploadPlan.summary.empty, '#cbd5e1'],
+                 ['오류', uploadPlan.summary.error, '#dc2626']] as const).map(([label, val, color]) => (
+                <div key={label} style={{ ...glassCard, padding: '8px 4px', textAlign: 'center' }}>
+                  <div style={{ fontSize: 18, fontWeight: 700, color }}>{val}</div>
+                  <div style={{ fontSize: 10, color: '#94a3b8' }}>{label}</div>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ border: '1px solid rgba(0,0,0,0.06)', borderRadius: 8, maxHeight: 300, overflowY: 'auto' }}>
+              {uploadPlan.plan.filter(p => p.status !== 'skip-empty').map(p => (
+                <div key={p.index} style={{ padding: '6px 10px', borderBottom: '1px solid rgba(0,0,0,0.04)',
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 12, color: '#334155', whiteSpace: 'nowrap' }}>
+                    {p.raw?.name || `(행 ${p.index})`}
+                    {p.raw?.phone && <span style={{ color: '#94a3b8', marginLeft: 6 }}>{p.raw.phone}</span>}
+                  </span>
+                  <span style={{ fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap',
+                    color: p.status === 'ok' ? '#16a34a' : p.status === 'skip-duplicate' ? '#94a3b8' : '#dc2626' }}>
+                    {p.status === 'ok' ? '✨ 신규' : p.status === 'skip-duplicate' ? '중복 skip' : (p.errors.join(', ') || '오류')}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', gap: 8, marginTop: 16, justifyContent: 'flex-end' }}>
+              <button onClick={cancelUpload}
+                style={{ fontSize: 12, fontWeight: 600, color: '#64748b', background: '#fff',
+                  border: '1px solid rgba(0,0,0,0.10)', borderRadius: 8, padding: '7px 16px', cursor: 'pointer' }}>
+                취소
+              </button>
+              <button onClick={applyUpload} disabled={uploading || uploadPlan.summary.ok === 0}
+                style={{ fontSize: 12, fontWeight: 600, color: '#fff',
+                  background: (uploading || uploadPlan.summary.ok === 0) ? '#94a3b8' : '#0f2440',
+                  border: 'none', borderRadius: 8, padding: '7px 18px',
+                  cursor: (uploading || uploadPlan.summary.ok === 0) ? 'not-allowed' : 'pointer' }}>
+                {uploading ? '등록 중...' : `${uploadPlan.summary.ok}명 등록`}
+              </button>
             </div>
           </div>
         </div>

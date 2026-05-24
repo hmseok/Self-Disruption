@@ -5,6 +5,18 @@
 
 ## 2026-05-16
 
+- **정책 기록** — `_docs/HR-OPERATIONS.md § 9` 신설: 라이드 직원 계정(외부 매니저, 옵션 a) + 독립 브랜딩(라이드주식회사) + 인사마스터 동기화 정책. 멀티 브랜딩은 메인 세션 위탁 (PR-MULTI-BRAND).
+- **PR-HR-5b** (hr 세션) — 컨택 명단 17명 연락처/이메일 UPSERT (`migrations/2026-05-16_ride_employees_contact.sql`).
+  - bulk-upload 는 INSERT-only → 기존 직원 보강 불가. UPDATE + NOT EXISTS INSERT 멱등 UPSERT 로 해결.
+- **PR-HR-5** (hr 세션) — RideOrgPanel 엑셀 일괄 등록 (컨택 명단).
+  - DcStatStrip 「📥 엑셀 일괄 등록」 버튼 → 파일 선택 → 브라우저 XLSX 파싱.
+  - 헤더 자동 매핑 (이름/성명, 연락처/전화/휴대폰, 이메일, 부서, 직급) — 5행 내 헤더 자동 탐지.
+  - `bulk-upload` API preview → 미리보기 모달 (신규/중복/빈행/오류 summary + 행별 상태) → apply.
+  - 같은 이름 중복 자동 skip (API), 결과 글래스 패널 (Rule 20).
+- **PR-HR-4b** (hr 세션) — 퇴사/수정 후 리스트 미갱신 hotfix.
+  - mutation(퇴사·수정·부서변경) 후 `load()` 의 GET 이 브라우저 캐시된 옛 데이터를 받아
+    리스트에 반영 안 됨 (사용자 피드백: "떴는데 리스트에 적용이 안 됨").
+  - `load()` 의 tree/employees fetch 에 `cache: 'no-store'` 추가 — refetch 시 항상 fresh.
 - **PR-HR-4** (hr 세션) — RideOrgPanel 직원 편집/등록 모달.
   - 직원 행 클릭 → 편집 모달 / DcStatStrip 「+ 신규 직원」 → 등록 모달.
   - 필드 11종: 이름/부서/직급/승진대상/고용형태/입사일/퇴사일/연락처/이메일/색상/활성.
