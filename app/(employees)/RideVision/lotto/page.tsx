@@ -458,7 +458,7 @@ export default function LottoPage() {
 
   // ───────────────────────────────────────────────────────────────
   return (
-    <div style={{ padding: 16, maxWidth: 940, margin: '0 auto' }}>
+    <div style={{ padding: 16 }}>
       {/* ── 탭 바 ─────────────────────────────────────────────── */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
         {([

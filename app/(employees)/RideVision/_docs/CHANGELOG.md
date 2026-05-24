@@ -5,6 +5,15 @@
 
 ---
 
+## 2026-05-24 | PR-VISION-5 | 페이지 전체 너비 표준 적용 (UI-DESIGN-STANDARD §1.6)
+
+하네스 표준 갱신(PR-DESIGN-4/5) 반영 — 페이지 최상위 래퍼 중앙정렬 금지.
+- `lotto/page.tsx` 최상위 래퍼 `maxWidth: 940 + margin:'0 auto'` 제거 → `padding: 16` 전체 너비
+- 추출 탭 내부 래퍼 `maxWidth: 680` 유지 (의도된 좁은 유틸 영역 — §1.6 허용 예외)
+- 검증: `npm run lint:ui-design` — RideVision/lotto 경고·위반 0건
+
+---
+
 ## 2026-05-24 | PR-VISION-4 | 동행복권 자동조회 복구 (selectMainInfo.do JSON API)
 
 ### 배경 — egress 판가름 결과
