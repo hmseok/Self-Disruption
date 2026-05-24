@@ -15,7 +15,7 @@ import { COLOR_TONE_OPTIONS } from '@/app/(employees)/CallScheduler/utils/types'
 import { getAuthHeader } from '@/app/utils/auth-client'
 import InfoLine from './InfoLine'
 import EmployeePickerModal from './EmployeePickerModal'
-import AgentMappingSection from './AgentMappingSection'
+import { useAgentMatching, MatchingTopBar, WorkerMatchEditor, MatchStatusDots } from './AgentMappingSection'
 import type { Worker, ColorTone, ShiftSlot, HrEmployee } from '@/app/(employees)/CallScheduler/utils/types'
 
 const GROUP_OPTIONS: (string | null)[] = [null, '주간', '야간', '저녁', '관리', '기타']
@@ -45,6 +45,8 @@ export default function WorkersTab() {
   const [pickerMode, setPickerMode] = useState<'create' | 'link' | null>(null)
   const [linkTarget, setLinkTarget] = useState<Worker | null>(null)
   const [pickerBusy, setPickerBusy] = useState(false)
+  // WHR-B2 — 상담원 ID 매칭 (KT·Cafe24) — 워커 편집에 통합
+  const matching = useAgentMatching()
 
   // Phase K — 정체성 편집 state (옮긴 필드 모두 제거)
   const [editTone, setEditTone] = useState<ColorTone>('none')
@@ -113,7 +115,10 @@ export default function WorkersTab() {
         : []
     ))
   }
-  const cancelEdit = () => { setEditingId(null) }
+  const cancelEdit = () => {
+    if (editingId) matching.resetWorker(editingId)
+    setEditingId(null)
+  }
 
   // Phase WHR-A — 직원 선택 모달 핸들러
   const openCreatePicker = () => { setLinkTarget(null); setPickerMode('create') }
@@ -278,7 +283,15 @@ export default function WorkersTab() {
       const wJson = await wRes.json()
       if (!wRes.ok) throw new Error(wJson?.error || 'cs_workers 저장 실패')
 
-      setActionMsg({ ok: true, text: `${w.name} 변경 저장됨` })
+      // WHR-B2 — KT·Cafe24 매칭도 함께 저장
+      const mr = await matching.saveWorker(w.id)
+
+      setActionMsg({
+        ok: mr.ok,
+        text: mr.ok
+          ? `${w.name} 변경 저장됨 · ${mr.detail}`
+          : `${w.name} 정보 저장됨 · 매칭 실패: ${mr.detail}`,
+      })
       setEditingId(null)
       await load()
     } catch (e: any) { setActionMsg({ ok: false, text: e?.message || '오류' }) }
@@ -358,6 +371,9 @@ export default function WorkersTab() {
         편집합니다 (그룹마다 다르게 적용 가능).
       </InfoLine>
 
+      {/* WHR-B2 — 상담원 ID 매칭 요약 + 전체 자동 매칭 (워커 표 상단) */}
+      <MatchingTopBar matching={matching} />
+
       {loading ? (
         <div style={{ padding: 40, textAlign: 'center', color: COLORS.textMuted }}>로딩 중...</div>
       ) : (
@@ -405,6 +421,7 @@ export default function WorkersTab() {
                             border: `1px solid ${COLORS.borderAmber}`,
                           }}>⚠ 인사 미연결</span>
                         )}
+                        <MatchStatusDots workerId={worker.id} matching={matching} />
                       </td>
                       <td style={{ ...tdStyle, color: COLORS.textMuted, fontSize: 12 }}>
                         {employee?.department || '·'}
@@ -552,6 +569,10 @@ export default function WorkersTab() {
                             dowAvoid={editDowAvoid} setDowAvoid={setEditDowAvoid}
                             slots={slots}
                           />
+                          <WorkerMatchEditor
+                            workerId={worker.id} workerName={worker.name}
+                            matching={matching}
+                          />
                         </td>
                       </tr>
                     )}
@@ -590,17 +611,6 @@ export default function WorkersTab() {
           )}
         </>
       )}
-
-      {/* WHR-B (2026-05-24) — KT·Cafe24 ID 매칭 (KPI 설정 ④ 에서 이동) */}
-      <div style={{ ...GLASS.L4, borderRadius: 12, padding: 12, marginTop: 14 }}>
-        <div style={{
-          fontSize: 13, fontWeight: 800, color: COLORS.textPrimary,
-          padding: '4px 6px', marginBottom: 8,
-        }}>
-          🔗 상담원 ID 매칭 — KT 상담사 ID · Cafe24 접수자
-        </div>
-        <AgentMappingSection />
-      </div>
 
       {/* Phase WHR-A — 직원 선택 모달 (신규 워커 / 레거시 연결 공용) */}
       <EmployeePickerModal

@@ -3,6 +3,14 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-24 (Phase WHR-B2) — 상담원 ID 매칭을 워커 「편집」에 통합
+
+> WHR-B 가 매칭을 별도 패널로 이식해 워커 목록이 위(워커 표)·아래(매칭 패널) 두 번 나옴. 같은 워커를 두 목록으로 관리하는 중복 → 워커 표 하나로 통합 (사용자 지시).
+
+- **AgentMappingSection 재구성** — 단일 컴포넌트 → `useAgentMatching` 훅 + `MatchingTopBar`(미매칭 요약·전체 자동 매칭·일괄 저장) + `WorkerMatchEditor`(워커 편집 펼침의 per-워커 KT/Cafe24 드롭다운) + `MatchStatusDots`(행 접힘 상태 KT/C24 칩).
+- **WorkersTab 통합** — 별도 매칭 패널 제거. 워커 표 상단에 `MatchingTopBar`, 각 행 이름 옆에 `MatchStatusDots`, 「편집」 펼침에 `WorkerMatchEditor` 추가. 워커 「저장」 시 정체성 + KT·Cafe24 매칭 동시 저장(`saveWorker`), 「편집」 취소 시 매칭 draft 원복(`resetWorker`).
+- 워커 목록이 한 개로 통합 — 위/아래 중복 제거. API·DB 변경 없음.
+
 ## 2026-05-24 (Phase WHR-B) — KT·Cafe24 ID 매칭 UI를 「설정 › 워커」로 이동
 
 > 워커 정체성이므로 ID 매칭도 워커 설정에 위치해야 한다는 사용자 지시 반영.
