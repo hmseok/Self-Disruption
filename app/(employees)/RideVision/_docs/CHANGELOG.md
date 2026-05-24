@@ -5,6 +5,26 @@
 
 ---
 
+## 2026-05-24 | PR-VISION-8 | 재로그인 시 추출 재개방 차단
+
+### 사용자 피드백
+> "이미 복사 구매 완료했는데 재로그인하면 추출이 또 진행되는 것도 막아주세요"
+
+### 원인
+`drawCount` 는 메모리 상태 → 재로그인·새로고침 시 0으로 초기화되어 추출이 다시 열림.
+
+### 변경
+- **수정** `lotto/page.tsx`
+  - `alreadyBought = purchasedTotal > 0` — DB 구매 기록 기준 (재로그인 후에도 유지)
+  - `canDraw = drawsLeft > 0 && !alreadyBought` — 이미 구매한 회차면 추출 잠금
+  - `handleDraw` 가드에 `purchasedTotal > 0` 추가
+  - 컨트롤 카드·빈 상태 문구 — 이미 구매 시 「이번 회차 구매 완료 / 내 기록에서 확인」 안내
+
+### GATE
+- ✅ G5 tsc 0건 / G6 lint:harness 위반 0건 / Rule 22 CHANGELOG
+
+---
+
 ## 2026-05-24 | PR-VISION-7 | 추출 탭 전체 너비 + 회차당 추출 1회
 
 ### 사용자 피드백

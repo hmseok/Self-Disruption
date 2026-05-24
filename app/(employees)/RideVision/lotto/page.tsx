@@ -244,13 +244,16 @@ export default function LottoPage() {
   )
   const roundClosed = purchasedTotal >= MAX_PURCHASE
   const drawsLeft = MAX_DRAWS - drawCount
+  // 이번 회차에 이미 구매 기록이 있으면(재로그인·새로고침 후에도 DB 기준) 추출 잠금
+  const alreadyBought = purchasedTotal > 0
+  const canDraw = drawsLeft > 0 && !alreadyBought
 
   const gameToText = (g: number[], idx: number) => `게임 ${GAME_LABELS[idx] ?? idx + 1}: ${g.join(', ')}`
   const sumOf = (g: number[]) => g.reduce((a, b) => a + b, 0)
 
   // ── 번호 추출 (회차당 1회 — 재추출 없음) ──
   const handleDraw = useCallback(() => {
-    if (drawCount >= MAX_DRAWS) return
+    if (drawCount >= MAX_DRAWS || purchasedTotal > 0) return
     const games = Array.from({ length: GAMES_PER_DRAW }, () => drawGame())
     setResults(games)
     setBoughtIdx([])
@@ -260,7 +263,7 @@ export default function LottoPage() {
       luck: 55 + Math.floor(Math.random() * 45),
     })
     setDrawCount(c => c + 1)
-  }, [drawCount])
+  }, [drawCount, purchasedTotal])
 
   // ── 복사 = 구매 기록 (회차당 5게임 제한) ──
   const buyGames = useCallback(
@@ -524,22 +527,30 @@ export default function LottoPage() {
               <span style={{ fontSize: 13, fontWeight: 700, color: COLORS.textSecondary }}>
                 회차당 1회 · 5게임 추출
               </span>
-              <span style={{ fontSize: 12, color: drawsLeft > 0 ? COLORS.textMuted : COLORS.danger }}>
-                {drawsLeft > 0 ? '버튼을 눌러 5게임을 받으세요' : '이번 회차 추출 완료'}
+              <span style={{ fontSize: 12, color: canDraw ? COLORS.textMuted : COLORS.danger }}>
+                {canDraw
+                  ? '버튼을 눌러 5게임을 받으세요'
+                  : alreadyBought
+                    ? '이번 회차 구매 완료'
+                    : '이번 회차 추출 완료'}
               </span>
               <button
                 onClick={handleDraw}
-                disabled={drawsLeft <= 0}
+                disabled={!canDraw}
                 style={{
                   ...BTN.lg,
                   marginLeft: 'auto',
-                  background: drawsLeft > 0 ? COLORS.primary : COLORS.neutral,
+                  background: canDraw ? COLORS.primary : COLORS.neutral,
                   color: '#fff',
                   border: 'none',
-                  cursor: drawsLeft > 0 ? 'pointer' : 'not-allowed',
+                  cursor: canDraw ? 'pointer' : 'not-allowed',
                 }}
               >
-                {drawsLeft > 0 ? '🎱 번호 추출' : '✓ 이번 회차 추출 완료'}
+                {canDraw
+                  ? '🎱 번호 추출'
+                  : alreadyBought
+                    ? '✓ 이번 회차 구매 완료'
+                    : '✓ 이번 회차 추출 완료'}
               </button>
             </div>
           </div>
@@ -698,9 +709,21 @@ export default function LottoPage() {
                 lineHeight: 1.7,
               }}
             >
-              <strong style={{ color: COLORS.textSecondary }}>번호 추출</strong> 을 누르면 5게임을 한 번에 뽑습니다.
-              <br />
-              한국 로또 6/45 — 회차당 1회 추출 · 구매 5게임까지.
+              {alreadyBought ? (
+                <>
+                  이번 회차({roundInfo.round}회)에 이미{' '}
+                  <strong style={{ color: COLORS.textSecondary }}>{purchasedTotal}게임</strong> 구매하셨습니다.
+                  <br />
+                  「📒 내 기록」 탭에서 당첨여부를 확인하세요.
+                </>
+              ) : (
+                <>
+                  <strong style={{ color: COLORS.textSecondary }}>번호 추출</strong> 을 누르면 5게임을 한 번에
+                  뽑습니다.
+                  <br />
+                  한국 로또 6/45 — 회차당 1회 추출 · 구매 5게임까지.
+                </>
+              )}
             </div>
           )}
 
