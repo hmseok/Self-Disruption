@@ -4,14 +4,14 @@
  * GET ?drwNo=N — N 회차 당첨번호
  *   1) ride_lotto_results 캐시 조회 → 있으면 반환 (외부 호출 없음)
  *   2) 없으면 동행복권 selectMainInfo.do JSON 조회 → 최근 회차 결과 캐시
- *      · 응답 data.result.pstLtEpstInfo.lt645 = { ltEpsd, tm1~6WnNo, bnsWnNo, ltRflYmd }
+ *      · 응답 data.result.pstLtEpstInfo.lt645 = [{ ltEpsd, tm1~6WnNo, bnsWnNo, ltRflYmd }]
+ *        (lt645 는 배열 — 제공 회차 전부 캐시)
  *      · 캐시 후 N 회차가 잡히면 반환, 아니면 미제공(추첨 대기)
  *
  * 옛 getLottoNumber JSON 엔드포인트는 폐기 → selectMainInfo.do AJAX 엔드포인트 사용.
- * selectMainInfo.do 는 최근 회차 1건을 제공 → 호출 시마다 그 회차를 캐시 (점진 적재).
  *
  * 인증: verifyUser (로그인 직원 누구나)
- * RideVision 세션 — PR-VISION-2a → 2d → 3 → 4
+ * RideVision 세션 — PR-VISION-2a → 2d → 3 → 4 → 6
  */
 import { NextResponse } from 'next/server'
 import { verifyUser } from '@/lib/auth-server'
@@ -77,14 +77,45 @@ async function putCache(r: ResultRow): Promise<void> {
   }
 }
 
+// lt645 배열 1개 항목 → ResultRow (유효성 검사)
+function parseLt645(item: unknown): ResultRow | null {
+  if (!item || typeof item !== 'object') return null
+  const o = item as Record<string, unknown>
+  const num = (k: string) => Number(o[k])
+  const drawNo = num('ltEpsd')
+  const nums = [
+    num('tm1WnNo'),
+    num('tm2WnNo'),
+    num('tm3WnNo'),
+    num('tm4WnNo'),
+    num('tm5WnNo'),
+    num('tm6WnNo'),
+  ]
+  const bonus = num('bnsWnNo')
+  if (!Number.isInteger(drawNo) || drawNo < 1) return null
+  if (nums.some(n => !Number.isInteger(n) || n < 1 || n > 45)) return null
+  if (!Number.isInteger(bonus) || bonus < 1 || bonus > 45) return null
+  return {
+    draw_no: drawNo,
+    n1: nums[0],
+    n2: nums[1],
+    n3: nums[2],
+    n4: nums[3],
+    n5: nums[4],
+    n6: nums[5],
+    bonus,
+    draw_date: fmtYmd(o.ltRflYmd),
+  }
+}
+
 type FetchOutcome = {
   status: 'ok' | 'no_data' | 'egress_blocked' | 'bad_response'
-  result?: ResultRow
+  results?: ResultRow[]
   debug?: string
 }
 
-// 동행복권 selectMainInfo.do — 최근 로또 6/45 회차 결과 조회
-async function fetchLatestResult(): Promise<FetchOutcome> {
+// 동행복권 selectMainInfo.do — 최근 로또 6/45 회차 결과 조회 (lt645 배열)
+async function fetchLatestResults(): Promise<FetchOutcome> {
   if (egressBlockedSeen) {
     return { status: 'egress_blocked', debug: 'egress 차단 확인됨(인스턴스 캐시) — 호출 skip' }
   }
@@ -109,43 +140,24 @@ async function fetchLatestResult(): Promise<FetchOutcome> {
       console.log(`[lotto-result] selectMainInfo non-JSON status=${res.status} body=${text.slice(0, 150)}`)
       return { status: 'bad_response', debug: `non-JSON status=${res.status}` }
     }
-    // data.result.pstLtEpstInfo.lt645
+    // data.result.pstLtEpstInfo.lt645  (lt645 = 배열)
     const data = json.data as Record<string, unknown> | undefined
     const result = data?.result as Record<string, unknown> | undefined
     const pst = result?.pstLtEpstInfo as Record<string, unknown> | undefined
-    const lt = pst?.lt645 as Record<string, unknown> | undefined
-    if (!lt || lt.ltEpsd == null) {
-      return { status: 'no_data', debug: 'lt645 미발견 — 응답 구조 변경 가능' }
+    const lt645 = pst?.lt645
+    if (!Array.isArray(lt645) || lt645.length === 0) {
+      return { status: 'no_data', debug: 'lt645 배열 없음 — 응답 구조 변경 가능' }
     }
-    const num = (k: string) => Number(lt[k])
-    const drawNo = num('ltEpsd')
-    const nums = [
-      num('tm1WnNo'),
-      num('tm2WnNo'),
-      num('tm3WnNo'),
-      num('tm4WnNo'),
-      num('tm5WnNo'),
-      num('tm6WnNo'),
-    ]
-    const bonus = num('bnsWnNo')
-    if (!Number.isInteger(drawNo) || drawNo < 1 || nums.some(n => !Number.isInteger(n) || n < 1 || n > 45)) {
-      return { status: 'no_data', debug: `lt645 값 이상 ltEpsd=${lt.ltEpsd}` }
+    const results: ResultRow[] = []
+    for (const item of lt645) {
+      const r = parseLt645(item)
+      if (r) results.push(r)
     }
-    console.log(`[lotto-result] selectMainInfo OK lt645 회차=${drawNo} ${nums.join(',')}+${bonus}`)
-    return {
-      status: 'ok',
-      result: {
-        draw_no: drawNo,
-        n1: nums[0],
-        n2: nums[1],
-        n3: nums[2],
-        n4: nums[3],
-        n5: nums[4],
-        n6: nums[5],
-        bonus,
-        draw_date: fmtYmd(lt.ltRflYmd),
-      },
+    if (results.length === 0) {
+      return { status: 'no_data', debug: `lt645 ${lt645.length}건 파싱 실패` }
     }
+    console.log(`[lotto-result] selectMainInfo OK — ${results.map(r => r.draw_no).join(',')}회`)
+    return { status: 'ok', results }
   } catch (e) {
     const err = e as Error
     egressBlockedSeen = true
@@ -178,18 +190,19 @@ export async function GET(request: Request) {
       return NextResponse.json({ success: true, data: cached, meta: { drawn: true, cached: true } })
     }
 
-    // 2) selectMainInfo.do 조회 → 최근 회차 캐시
-    const fetched = await fetchLatestResult()
-    if (fetched.status === 'ok' && fetched.result) {
-      await putCache(fetched.result)
-      if (fetched.result.draw_no === drwNo) {
-        return NextResponse.json({ success: true, data: fetched.result, meta: { drawn: true, cached: false } })
+    // 2) selectMainInfo.do 조회 → 제공 회차 전부 캐시
+    const fetched = await fetchLatestResults()
+    if (fetched.status === 'ok' && fetched.results) {
+      for (const r of fetched.results) await putCache(r)
+      const hit = fetched.results.find(r => r.draw_no === drwNo)
+      if (hit) {
+        return NextResponse.json({ success: true, data: hit, meta: { drawn: true, cached: false } })
       }
-      // 요청 회차는 아직 selectMainInfo 가 제공하지 않음 (추첨 대기 / 과거 회차)
+      // 요청 회차는 selectMainInfo 가 제공하지 않음 (추첨 대기 / 과거 회차)
       return NextResponse.json({
         success: true,
         data: null,
-        meta: { drawn: false, drwNo, latestKnown: fetched.result.draw_no },
+        meta: { drawn: false, drwNo, available: fetched.results.map(r => r.draw_no) },
       })
     }
 

@@ -472,9 +472,9 @@ export default function LottoPage() {
               onClick={() => setTab(key)}
               style={{
                 ...BTN.md,
-                background: active ? '#0f2440' : 'transparent',
+                background: active ? '#3b6eb5' : 'transparent',
                 color: active ? '#fff' : COLORS.textSecondary,
-                border: `1px solid ${active ? '#0f2440' : COLORS.borderFaint}`,
+                border: `1px solid ${active ? '#3b6eb5' : COLORS.borderFaint}`,
                 cursor: 'pointer',
               }}
             >
