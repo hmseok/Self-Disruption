@@ -3,6 +3,13 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-23 (Phase CX-KPI-21) — 알리고 SMS 근무표 배포
+
+- 알리고 헬퍼 `lib/aligo.ts` — `sendMass`(다건 발송)·`aligoConfigured`·`isValidPhone`·`normalizePhone`·`ALIGO_MAX_RECIPIENTS`. ALIGO_API_KEY/ALIGO_USER_ID/ALIGO_SENDER 환경변수 기반, testmode 지원.
+- 발송 API `POST /api/call-scheduler/schedules/[id]/distribute` — body `{ mode:'preview'|'test'|'send' }`. preview=수신자/메시지 목록만, test=알리고 testmode 무과금 검증, send=실제 발송 + `cs_distributions` 이력 기록. 워커 `view_token` 멱등 생성, 직원별 메시지(근무일수·첫근무일·본인 일정 공개 링크) 빌드, 잘못된 전화번호 제외·보고.
+- 모달 UI `_components/DistributeModal.tsx` 신규 — 열릴 때 `mode:'preview'` 자동 호출 → 요약 pill(총/발송가능/전화번호오류) + 수신자 표(이름·전화번호·근무일·메시지 펼침). `aligo_configured===false` 면 빨강 안내 + 발송 버튼 비활성. 「🧪 테스트 발송」(무과금)·「📤 실제 발송」 버튼, 실제 발송은 인라인 글래스 확인 패널("N명 실제 발송 — 과금됩니다") 한 번 더 거침(confirm() 미사용 — 규칙 20). 발송 결과는 글래스 패널(result_code/success_cnt/error_cnt/testmode). 전화번호 오류 행 빨강 강조 + "발송 제외" 표기. 색상 전부 COLORS/GLASS/BTN 토큰.
+- `[id]/page.tsx` 그리드 상단 툴바 「⚡ 배포」 옆에 「📤 문자 배포」 버튼 추가 — 배정 시프트 없으면 비활성.
+
 ## 2026-05-23 (Phase CX-KPI-20) — 직원 근무표 공개 페이지 (토큰 링크)
 
 - 마이그레이션 `2026-05-23_cs_workers_view_token.sql` — `cs_workers.view_token`(UUID 32자 hex) 컬럼 + UNIQUE 인덱스. 기존 워커 토큰 일괄 채움(멱등).
