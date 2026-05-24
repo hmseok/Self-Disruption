@@ -53,6 +53,9 @@ type ClaimRow = {
   paid_amount: number | null
   payment_status: string | null
   payment_memo: string | null
+  // PR-N7.1 — 과실율 / 청구율
+  fault_rate: number | null
+  claim_rate: number | null
 }
 
 type FilterKey = 'active' | 'all' | 'returned' | 'claiming' | 'settled'
@@ -95,6 +98,8 @@ export default function ClaimsTab() {
   const [paymentMemo, setPaymentMemo] = useState('')        // PR-N6c — 지급 메모
   const [lotteRateIdx, setLotteRateIdx] = useState<number>(-1)  // PR-N7 — 롯데 차종 행
   const [lotteDays, setLotteDays] = useState<string>('')        // PR-N7 — 산출 대여일수
+  const [faultRate, setFaultRate] = useState<string>('')        // PR-N7.1 — 과실율(%)
+  const [claimRate, setClaimRate] = useState<string>('')        // PR-N7.1 — 청구율(%)
   const [claimBusy, setClaimBusy] = useState(false)
   const [claimMsg, setClaimMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
 
@@ -139,6 +144,8 @@ export default function ClaimsTab() {
     setPaymentMemo(r.payment_memo || '')
     setLotteRateIdx(-1)
     setLotteDays(r.rental_days != null ? String(r.rental_days) : '')
+    setFaultRate(r.fault_rate != null ? String(r.fault_rate) : '')
+    setClaimRate(r.claim_rate != null ? String(r.claim_rate) : '')
     setClaimMsg(null)
     setClaimModalOpen(true)
   }, [])
@@ -158,8 +165,15 @@ export default function ClaimsTab() {
     const rate = LOTTE_SHORT_TERM_RATES[lotteRateIdx]
     const d = Number(lotteDays)
     if (!rate || !d || d < 1) return null
-    return computeLotteClaim(rate, d)
-  }, [lotteRateIdx, lotteDays])
+    const base = computeLotteClaim(rate, d)  // 정가 (구간일요금 × 일수)
+    // PR-N7.1 — 과실율·청구율 적용. 미입력/비정상 → 100%
+    const fr = faultRate === '' ? 100 : Number(faultRate)
+    const cr = claimRate === '' ? 100 : Number(claimRate)
+    const faultPct = Number.isFinite(fr) && fr >= 0 ? fr : 100
+    const claimPct = Number.isFinite(cr) && cr >= 0 ? cr : 100
+    const finalTotal = Math.round(base.total * (faultPct / 100) * (claimPct / 100))
+    return { ...base, faultPct, claimPct, finalTotal }
+  }, [lotteRateIdx, lotteDays, faultRate, claimRate])
 
   // 청구 저장 (status 전이: claiming / settled)
   const saveClaim = useCallback(async (nextStatus: 'claiming' | 'settled') => {
@@ -177,6 +191,8 @@ export default function ClaimsTab() {
           claim_type: claimType || null,
           payment_status: paymentStatus || null,
           payment_memo: paymentMemo || null,
+          fault_rate: faultRate === '' ? null : Number(faultRate),
+          claim_rate: claimRate === '' ? null : Number(claimRate),
           status: nextStatus,
         }),
       })
@@ -190,7 +206,7 @@ export default function ClaimsTab() {
     } finally {
       setClaimBusy(false)
     }
-  }, [selectedClaim, claimAmount, claimNo, claimType, paymentStatus, paymentMemo, refresh])
+  }, [selectedClaim, claimAmount, claimNo, claimType, paymentStatus, paymentMemo, faultRate, claimRate, refresh])
 
   // 청구관리 영역 (returned/claiming/settled) — 부가세 필터 적용
   const claimRows = useMemo(() => {
@@ -472,23 +488,45 @@ export default function ClaimsTab() {
                     />
                     <span style={{ fontSize: 11, color: '#94a3b8' }}>일</span>
                   </div>
+                  <div style={{ ...GLASS.L1, display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px', borderRadius: 8 }}>
+                    <span style={{ fontSize: 11, color: '#94a3b8' }}>과실</span>
+                    <input
+                      type="number" value={faultRate}
+                      onChange={(e) => setFaultRate(e.target.value)} placeholder="100"
+                      style={{ border: 'none', background: 'transparent', fontSize: 12, color: '#1e293b', fontWeight: 700, outline: 'none', width: 42 }}
+                    />
+                    <span style={{ fontSize: 11, color: '#94a3b8' }}>%</span>
+                  </div>
+                  <div style={{ ...GLASS.L1, display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px', borderRadius: 8 }}>
+                    <span style={{ fontSize: 11, color: '#94a3b8' }}>청구율</span>
+                    <input
+                      type="number" value={claimRate}
+                      onChange={(e) => setClaimRate(e.target.value)} placeholder="100"
+                      style={{ border: 'none', background: 'transparent', fontSize: 12, color: '#1e293b', fontWeight: 700, outline: 'none', width: 42 }}
+                    />
+                    <span style={{ fontSize: 11, color: '#94a3b8' }}>%</span>
+                  </div>
                 </div>
                 {lotteResult ? (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: 12, color: '#475569' }}>
-                      [{lotteResult.tierLabel}] {lotteResult.dailyRate.toLocaleString('ko-KR')}원/일 × {lotteResult.days}일 ={' '}
-                      <b style={{ color: '#0f2440' }}>{lotteResult.total.toLocaleString('ko-KR')}원</b>
-                      <span style={{ fontSize: 10, color: '#94a3b8', marginLeft: 5 }}>VAT 포함 · 공급가 {lotteResult.supply.toLocaleString('ko-KR')}</span>
+                    <span style={{ fontSize: 12, color: '#475569', lineHeight: 1.55 }}>
+                      [{lotteResult.tierLabel}] {lotteResult.dailyRate.toLocaleString('ko-KR')}원/일 × {lotteResult.days}일
+                      {(lotteResult.faultPct !== 100 || lotteResult.claimPct !== 100) ? ` × 과실 ${lotteResult.faultPct}% × 청구율 ${lotteResult.claimPct}%` : ''}
+                      {' = '}
+                      <b style={{ color: '#0f2440', fontSize: 13 }}>{lotteResult.finalTotal.toLocaleString('ko-KR')}원</b>
+                      <span style={{ fontSize: 10, color: '#94a3b8', marginLeft: 5 }}>
+                        VAT 포함{(lotteResult.faultPct !== 100 || lotteResult.claimPct !== 100) ? ` · 정가 ${lotteResult.total.toLocaleString('ko-KR')}` : ` · 공급가 ${lotteResult.supply.toLocaleString('ko-KR')}`}
+                      </span>
                     </span>
                     <div style={{ flex: 1 }} />
                     <button
                       type="button"
-                      onClick={() => setClaimAmount(String(lotteResult.total))}
+                      onClick={() => setClaimAmount(String(lotteResult.finalTotal))}
                       style={{ padding: '6px 12px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 800, background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)', color: '#fff' }}
                     >청구액에 적용 →</button>
                   </div>
                 ) : (
-                  <div style={{ fontSize: 11, color: '#94a3b8' }}>차종과 대여일수를 입력하면 롯데 공식 요금이 산출됩니다 (구간별 일요금 × 일수, VAT 포함).</div>
+                  <div style={{ fontSize: 11, color: '#94a3b8' }}>차종·대여일수·과실율·청구율을 입력하면 롯데 공식 요금이 산출됩니다 (구간일요금 × 일수 × 과실율 × 청구율, VAT 포함).</div>
                 )}
               </div>
               {/* 청구액 */}
