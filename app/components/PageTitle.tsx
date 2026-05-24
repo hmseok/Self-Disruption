@@ -191,6 +191,30 @@ export default function PageTitle({ dynamicMenuName, brand, primaryLabel }: Page
       : (primaryLabel || 'FMI ERP')
   }, [pageName, sectionLabel, primaryLabel])
 
+  // ── favicon 동적화 (2026-05-24) ──
+  //   사용자: 기본 삼각형 favicon 대신 헤더 배지처럼 회사 이니셜로.
+  //   canvas 로 원형 배지(F=파랑 / R=청록) 그려 data-URL 로 <link rel=icon> 교체.
+  useEffect(() => {
+    const b = brand === 'RIDE' ? { color: '#0d9488', initial: 'R' } : { color: '#3b6eb5', initial: 'F' }
+    try {
+      const cv = document.createElement('canvas')
+      cv.width = 64; cv.height = 64
+      const ctx = cv.getContext('2d')
+      if (!ctx) return
+      ctx.fillStyle = b.color
+      ctx.beginPath(); ctx.arc(32, 32, 32, 0, Math.PI * 2); ctx.fill()
+      ctx.fillStyle = '#fff'
+      ctx.font = 'bold 42px -apple-system, BlinkMacSystemFont, sans-serif'
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+      ctx.fillText(b.initial, 32, 35)
+      const url = cv.toDataURL('image/png')
+      document.querySelectorAll("link[rel~='icon']").forEach(l => l.remove())
+      const link = document.createElement('link')
+      link.rel = 'icon'; link.type = 'image/png'; link.href = url
+      document.head.appendChild(link)
+    } catch { /* canvas 미지원 환경 — 기본 favicon 유지 */ }
+  }, [brand])
+
   if (!pageName || pathname === '/dashboard') return null
 
   return (
