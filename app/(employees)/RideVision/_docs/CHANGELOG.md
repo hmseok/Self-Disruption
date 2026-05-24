@@ -5,6 +5,40 @@
 
 ---
 
+## 2026-05-24 | PR-VISION-3 | UX 전면 개편 + egress 판가름 라우트
+
+### 사용자 요청 (시각 검수 후 누적)
+> 이번 회차·추첨일 표시 / 5게임 고정 / 「구매함」 제거 → 「복사」=구매 / 내 기록 즉시 반영 /
+> 회차당 5게임·재추출 5회 제한 / 동행복권 자동조회는 server 라우트로 egress부터 판가름
+
+### 변경
+- **수정** `app/(employees)/RideVision/lotto/page.tsx` — 전면 개편
+  - 이번 회차 + 추첨일자 자동 표시 (날짜계산 — 1회차 2002-12-07 기준, 외부 API 없음)
+  - 5게임 고정 (게임 수 선택 제거), 재추출 회차당 5회 제한
+  - 「구매함」 제거 → 「복사」 = 클립보드 복사 + 구매 자동 기록
+  - 구매 직후 entries 재조회 → 「내 기록」 즉시 반영, 결과 패널에 「내 기록 보기」
+  - 회차당 5게임 구매 제한 (구매 N/5 표시, 마감 시 버튼 잠금)
+  - 최근 추출 기록 섹션 제거 (내 기록으로 대체)
+- **수정** `app/api/ride-vision/lotto-entries/route.ts` — 회차당 5게임 제한 (POST 시 기존 수 검증)
+- **수정** `app/api/ride-vision/lotto-result/route.ts` — egress 판가름 라우트
+  - 캐시 우선 → 없으면 동행복권 common.do JSON 조회 (AbortController 5초 + User-Agent)
+  - 응답에 `egressBlocked` / `endpointDead` 플래그 명시
+  - egress 차단 1회 확인 시 인스턴스 캐시로 이후 호출 skip (5초 대기 방지)
+
+### egress 판가름 (배포 후 ?drwNo=1100 1회 호출)
+- JSON 번호 반환 → egress 정상 → 자동조회 완성 단계로
+- egressBlocked → Cloud Run 외부 송신 차단 확정 → 메인 세션 인프라 과제로 보고
+- (PR-2d 진단에서 이미 fetch-throw AbortError 확인 — egress 차단 유력)
+
+### GATE 진행 상태
+- ✅ G3 사용자 지시 누적 반영
+- ✅ G5 tsc — RideVision·ride-vision 신규 에러 0건
+- ✅ G6 lint:harness 새 위반 0건
+- ⏳ G7 Designer — 배포 후 hmseok.com 시각 검수
+- ✅ Rule 22 _docs 갱신 (CHANGELOG)
+
+---
+
 ## 2026-05-24 | PR-VISION-2d | 동행복권 조회 진단 (시각 검수 후속)
 
 ### 배경

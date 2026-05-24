@@ -27,7 +27,8 @@ interface EntryRow {
 }
 
 const ENTRY_AMOUNT = 1000 // 로또 1게임 = 1,000원
-const MAX_GAMES = 20 // 1회 등록 상한 (안전망)
+const MAX_GAMES = 5 // 1회 등록 상한 (1 슬립 = 5게임)
+const MAX_PER_ROUND = 5 // 회차당 최대 게임 수 (현실 로또 1매 = A~E 5게임)
 
 function isMissingTable(e: unknown): boolean {
   const msg = String((e as { message?: string })?.message || e)
@@ -119,6 +120,23 @@ export async function POST(request: Request) {
   }
 
   try {
+    // 회차당 최대 5게임 제한 (이미 기록된 게임 수 + 신규 ≤ 5)
+    const cntRows = await prisma.$queryRaw<{ cnt: bigint }[]>`
+      SELECT COUNT(*) AS cnt FROM ride_lotto_entries
+       WHERE user_id = ${user.id} AND draw_no = ${drawNo}
+    `
+    const existing = Number(cntRows[0]?.cnt || 0)
+    if (existing + games.length > MAX_PER_ROUND) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `회차당 최대 ${MAX_PER_ROUND}게임 — ${drawNo}회차에 이미 ${existing}게임 기록됨`,
+          existing,
+        },
+        { status: 400 }
+      )
+    }
+
     const ids: string[] = []
     for (const g of games) {
       const id = randomUUID()
