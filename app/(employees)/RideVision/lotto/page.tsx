@@ -155,7 +155,27 @@ function rankOf(nums: number[], r: ResultRow): { rank: number; matches: number }
 }
 
 // ─── 번호 공 ───────────────────────────────────────────────────────
-function Ball({ n, size = 42, dim = false }: { n: number; size?: number; dim?: boolean }) {
+// 빈도 히트맵 색상 — t: 0(낮음·파랑) ~ 1(높음·빨강)
+function heatColor(t: number): string {
+  const c = Math.max(0, Math.min(1, t))
+  const lo = [59, 110, 181] // 파랑
+  const hi = [239, 68, 68] // 빨강
+  const m = lo.map((v, i) => Math.round(v + (hi[i] - v) * c))
+  return `rgb(${m[0]}, ${m[1]}, ${m[2]})`
+}
+
+function Ball({
+  n,
+  size = 42,
+  dim = false,
+  bg,
+}: {
+  n: number
+  size?: number
+  dim?: boolean
+  bg?: string
+}) {
+  const heat = bg != null
   return (
     <span
       style={{
@@ -165,8 +185,9 @@ function Ball({ n, size = 42, dim = false }: { n: number; size?: number; dim?: b
         width: size,
         height: size,
         borderRadius: '50%',
-        background: ballColor(n),
-        color: COLORS.textPrimary,
+        background: bg ?? ballColor(n),
+        color: heat ? '#ffffff' : COLORS.textPrimary,
+        textShadow: heat ? '0 1px 2px rgba(0,0,0,0.4)' : undefined,
         fontWeight: 800,
         fontSize: Math.round(size * 0.42),
         boxShadow: '0 2px 5px rgba(0,0,0,0.18)',
@@ -206,6 +227,7 @@ export default function LottoPage() {
   const recLoadedRef = useRef(false)
   const [isAdmin, setIsAdmin] = useState(false) // 삭제 권한 — 슈퍼어드민(admin) 전용
   const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [smsMsg, setSmsMsg] = useState<{ ok: boolean; text: string } | null>(null)
 
   const authHeaders = (): Record<string, string> => {
     const token = getStoredToken()
@@ -356,6 +378,26 @@ export default function LottoPage() {
     },
     [loadRecords]
   )
+
+  // 회차 게임을 본인 휴대폰으로 문자 발송 (Aligo)
+  const sendSms = useCallback(async (drawNo: number) => {
+    setSmsMsg(null)
+    try {
+      const res = await fetch('/api/ride-vision/lotto-sms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ draw_no: drawNo }),
+      })
+      const json = await res.json()
+      if (res.ok && json.success) {
+        setSmsMsg({ ok: true, text: `${json.draw_no}회 ${json.games}게임을 ${json.sentTo} 로 전송했습니다` })
+      } else {
+        setSmsMsg({ ok: false, text: json.error || `문자 발송 실패 (HTTP ${res.status})` })
+      }
+    } catch (e) {
+      setSmsMsg({ ok: false, text: String(e) })
+    }
+  }, [])
 
   // ── 이번 회차 구매 수량 ──
   const purchasedTotal = useMemo(
@@ -613,6 +655,18 @@ export default function LottoPage() {
             }}
           >
             {copiedId === `round-${r.draw_no}` ? '✓ 복사됨' : '회차 복사'}
+          </button>
+          <button
+            onClick={() => sendSms(r.draw_no)}
+            style={{
+              ...BTN.sm,
+              background: COLORS.bgGreen,
+              color: COLORS.success,
+              border: `1px solid ${COLORS.borderGreen}`,
+              cursor: 'pointer',
+            }}
+          >
+            📱 문자
           </button>
           {isAdmin && (
             <button
@@ -1212,6 +1266,32 @@ export default function LottoPage() {
             </div>
           )}
 
+          {smsMsg && (
+            <div
+              style={{
+                ...GLASS.L3,
+                border: `1px solid ${smsMsg.ok ? COLORS.borderGreen : COLORS.borderRed}`,
+                padding: '10px 14px',
+                borderRadius: 12,
+                marginBottom: 10,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                flexWrap: 'wrap',
+              }}
+            >
+              <span style={{ fontSize: 13, fontWeight: 700, color: smsMsg.ok ? COLORS.success : COLORS.danger }}>
+                {smsMsg.ok ? '📱 ✅' : '⚠️'} {smsMsg.text}
+              </span>
+              <button
+                onClick={() => setSmsMsg(null)}
+                style={{ ...BTN.sm, marginLeft: 'auto', background: 'transparent', color: COLORS.textMuted, border: `1px solid ${COLORS.borderFaint}`, cursor: 'pointer' }}
+              >
+                ✕ 닫기
+              </button>
+            </div>
+          )}
+
           <NeuDataTable
             columns={recordColumns}
             data={recordRows}
@@ -1272,6 +1352,12 @@ export default function LottoPage() {
                 ['31–40', 31, 40],
                 ['41–45', 41, 45],
               ]
+              // 빈도 히트맵 — 최다(빨강) ~ 최소(파랑)
+              const fVals = nums.map(n => freq[n] || 0)
+              const minF = Math.min(...fVals)
+              const maxF = Math.max(...fVals)
+              const heat = (n: number) =>
+                heatColor(maxF > minF ? ((freq[n] || 0) - minF) / (maxF - minF) : 0.5)
               return (
                 <>
                   <div style={{ ...GLASS.L4, padding: 16, borderRadius: 14, marginBottom: 14 }}>
@@ -1279,7 +1365,7 @@ export default function LottoPage() {
                       <span style={{ fontSize: 12, fontWeight: 800, color: COLORS.danger, width: 64 }}>🔥 핫</span>
                       {hot.map(n => (
                         <span key={n} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-                          <Ball n={n} size={34} />
+                          <Ball n={n} size={34} bg={heat(n)} />
                           <span style={{ fontSize: 10, color: COLORS.textMuted }}>{freq[n] || 0}회</span>
                         </span>
                       ))}
@@ -1288,7 +1374,7 @@ export default function LottoPage() {
                       <span style={{ fontSize: 12, fontWeight: 800, color: COLORS.primary, width: 64 }}>❄️ 콜드</span>
                       {cold.map(n => (
                         <span key={n} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-                          <Ball n={n} size={34} />
+                          <Ball n={n} size={34} bg={heat(n)} />
                           <span style={{ fontSize: 10, color: COLORS.textMuted }}>{freq[n] || 0}회</span>
                         </span>
                       ))}
@@ -1306,7 +1392,7 @@ export default function LottoPage() {
                             key={n}
                             style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, opacity: f === 0 ? 0.35 : 1 }}
                           >
-                            <Ball n={n} size={30} />
+                            <Ball n={n} size={30} bg={heat(n)} />
                             <span style={{ fontSize: 10, fontWeight: 700, color: f > 0 ? COLORS.textSecondary : COLORS.textMuted }}>
                               {f}회
                             </span>
