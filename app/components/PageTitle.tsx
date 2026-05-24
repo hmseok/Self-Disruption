@@ -1,5 +1,6 @@
 'use client'
 import { usePathname } from 'next/navigation'
+import { useEffect } from 'react'
 import { GLASS } from '../utils/ui-tokens'
 
 // ═══════════════════════════════════════════════════════════════
@@ -164,6 +165,18 @@ export default function PageTitle({ dynamicMenuName }: PageTitleProps) {
   const pageName = dynamicMenuName || findBestMatch(PAGE_NAMES)
   const groupId = findBestMatch(PATH_TO_GROUP) || findBestMatch(ADMIN_GROUP)
   const sectionLabel = groupId ? GROUP_LABELS[groupId] : null
+
+  // ── 브라우저 탭 제목 동적화 (2026-05-24) ──
+  //   사용자: 「ERP 탭이 여러 개 열리면 다 똑같아 구분이 안 됨」
+  //   → document.title 을 「{페이지명} · FMI ERP」 로 — 페이지명이 앞에 와서
+  //     탭이 좁아도 어느 화면인지 보임. (favicon = 회사 아이콘은 그대로 유지)
+  useEffect(() => {
+    const base = 'FMI ERP'
+    const label = pageName
+      ? (sectionLabel ? `${pageName} (${sectionLabel})` : pageName)
+      : null
+    document.title = label ? `${label} · ${base}` : base
+  }, [pageName, sectionLabel])
 
   if (!pageName || pathname === '/dashboard') return null
 

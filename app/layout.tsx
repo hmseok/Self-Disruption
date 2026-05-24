@@ -13,13 +13,13 @@ export const viewport: Viewport = {
 }
 
 export const metadata: Metadata = {
-  title: 'ERP hmseok',
+  title: 'FMI ERP',
   description: '전사 운영 시스템',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
-    title: 'ERP hmseok',
+    title: 'FMI ERP',
   },
   other: {
     'mobile-web-app-capable': 'yes',
