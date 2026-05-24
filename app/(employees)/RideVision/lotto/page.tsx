@@ -5,7 +5,7 @@
 // ───────────────────────────────────────────────────────────────────
 // 탭 2개:
 //  · 🎱 번호 추출 — 한국 로또 6/45, 5게임 고정. 운세 + 「복사」(=구매 기록).
-//                  이번 회차/추첨일 자동 표시. 회차당 5게임·재추출 5회 제한.
+//                  이번 회차/추첨일 자동 표시. 회차당 1회 추출 · 5게임 구매 제한.
 //  · 📒 내 기록   — 로그인 본인 구매·당첨 기록, 투자금/손실/손익.
 //
 // 당첨번호 자동조회는 제외 (동행복권 엔드포인트 폐기 + Cloud Run egress 차단 — PR-VISION-3).
@@ -22,7 +22,7 @@ import DcStatStrip, { type StatItem } from '@/app/components/DcStatStrip'
 
 // ─── 제한 상수 ─────────────────────────────────────────────────────
 const GAMES_PER_DRAW = 5 // 1회 추출 = 5게임 (로또 1매)
-const MAX_DRAWS = 5 // 회차당 재추출 횟수 (계속 누르면 운이 없으니까)
+const MAX_DRAWS = 1 // 회차당 추출 1회 — 5게임, 운명의 한 장 (재추출 없음)
 const MAX_PURCHASE = 5 // 회차당 구매 게임 수
 
 // ─── 회차 날짜 계산 (동행복권 없이) ────────────────────────────────
@@ -248,7 +248,7 @@ export default function LottoPage() {
   const gameToText = (g: number[], idx: number) => `게임 ${GAME_LABELS[idx] ?? idx + 1}: ${g.join(', ')}`
   const sumOf = (g: number[]) => g.reduce((a, b) => a + b, 0)
 
-  // ── 번호 추출 (회차당 5회 제한) ──
+  // ── 번호 추출 (회차당 1회 — 재추출 없음) ──
   const handleDraw = useCallback(() => {
     if (drawCount >= MAX_DRAWS) return
     const games = Array.from({ length: GAMES_PER_DRAW }, () => drawGame())
@@ -486,7 +486,7 @@ export default function LottoPage() {
 
       {/* ═══ 탭 1 — 번호 추출 ═══════════════════════════════════ */}
       {tab === 'extract' && (
-        <div style={{ maxWidth: 680, margin: '0 auto' }}>
+        <div>
           {/* 이번 회차 배너 */}
           <div
             style={{
@@ -522,10 +522,10 @@ export default function LottoPage() {
           <div style={{ ...GLASS.L4, padding: 16, borderRadius: 14, marginBottom: 14 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
               <span style={{ fontSize: 13, fontWeight: 700, color: COLORS.textSecondary }}>
-                한 번에 5게임 추출
+                회차당 1회 · 5게임 추출
               </span>
               <span style={{ fontSize: 12, color: drawsLeft > 0 ? COLORS.textMuted : COLORS.danger }}>
-                남은 추출 {drawsLeft}회
+                {drawsLeft > 0 ? '버튼을 눌러 5게임을 받으세요' : '이번 회차 추출 완료'}
               </span>
               <button
                 onClick={handleDraw}
@@ -539,7 +539,7 @@ export default function LottoPage() {
                   cursor: drawsLeft > 0 ? 'pointer' : 'not-allowed',
                 }}
               >
-                {drawsLeft > 0 ? '🎱 번호 추출' : '추출 5회 모두 사용'}
+                {drawsLeft > 0 ? '🎱 번호 추출' : '✓ 이번 회차 추출 완료'}
               </button>
             </div>
           </div>
@@ -700,7 +700,7 @@ export default function LottoPage() {
             >
               <strong style={{ color: COLORS.textSecondary }}>번호 추출</strong> 을 누르면 5게임을 한 번에 뽑습니다.
               <br />
-              한국 로또 6/45 — 회차당 추출 5회 · 구매 5게임까지.
+              한국 로또 6/45 — 회차당 1회 추출 · 구매 5게임까지.
             </div>
           )}
 
