@@ -183,7 +183,17 @@ import DcToolbar from '@/app/components/DcToolbar'
 </div>
 ```
 
-활성 탭: 검정 배경 + 흰 글씨 (`#0f2440`)
+### 4.1 활성(선택) 탭 색상 — 표준 (2026-05-24 변경)
+
+활성 탭: **브랜드 블루 배경 `#3b6eb5` + 흰 글씨**.
+
+- 구 표준이던 네이비 `#0f2440` → 디자인 시스템 primary(`#3b6eb5`)와 통일.
+  헤더 배지(F/R) / DcStatStrip 활성 / NeuFilterTabs 가 모두 이 블루.
+- 솔리드 `#3b6eb5` 또는 블루 그라데이션 `linear-gradient(135deg, #3b6eb5, #5a8fd4)`
+  (NeuFilterTabs) 둘 다 표준으로 허용 — 같은 블루 계열.
+- ❌ 금지 — 활성 탭에 네이비 `#0f2440` / 슬레이트 `#1e293b` / 퍼플 등
+  primary 외 색상 사용.
+- 검사: `npm run lint:ui-design` — 활성 탭에 비표준 색상 사용 시 경고.
 비활성 탭: 투명 배경 + 회색 글씨 (`#64748b`)
 
 ---

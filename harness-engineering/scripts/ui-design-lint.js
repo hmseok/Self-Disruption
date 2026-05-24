@@ -96,6 +96,9 @@ for (const fp of pageFiles) {
     hasCustomBreadcrumbBox: /Employee of Ride Inc[^<]*›|차량관리[^<]*›|재무\/경영[^<]*›/.test(content),
     // 2026-05-24 — 페이지 최상위 래퍼 중앙정렬 (전체 너비여야)
     hasCenteredWrapper: topWrapperCentered(content),
+    // 2026-05-24 — 활성 탭 네이비(#0f2440) — 표준은 브랜드 블루 #3b6eb5
+    // (#1e293b 등은 데이터 셀 텍스트색으로도 흔해 navy 전용으로 한정 — 오탐 회피)
+    hasOffStandardTabColor: /\?\s*'#0f2440'/.test(content),
   }
 
   // 1) stat strip 자체 구현 (5+ 카드 패턴 있는데 DcStatStrip 미사용)
@@ -142,6 +145,14 @@ for (const fp of pageFiles) {
     warnings.push({
       file: rel,
       issue: '페이지 최상위 래퍼 중앙정렬 (maxWidth + margin:auto) — 전체 너비로 (UI-DESIGN-STANDARD § 1.6). 모달/카드 내부는 제외',
+    })
+  }
+
+  // 8) 2026-05-24: 활성 탭 비표준 색상 — 표준은 브랜드 블루 #3b6eb5
+  if (checks.hasOffStandardTabColor) {
+    warnings.push({
+      file: rel,
+      issue: '활성 탭에 네이비(#0f2440) — 표준 브랜드 블루 #3b6eb5 사용 (UI-DESIGN-STANDARD § 4.1)',
     })
   }
 }
