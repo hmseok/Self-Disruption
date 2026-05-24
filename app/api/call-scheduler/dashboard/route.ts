@@ -34,7 +34,13 @@ export async function GET(request: NextRequest) {
   try {
     const url = new URL(request.url)
     const dateParam = url.searchParams.get('date')
-    const now = dateParam ? new Date(dateParam) : new Date()
+    // 서버 TZ(Cloud Run 은 UTC 일 수 있음) 무관하게 KST 기준으로 계산.
+    // tzShiftMs: 현재 서버 오프셋을 KST(UTC+9)로 맞추는 보정값.
+    //   UTC 서버 → +9h / KST 서버 → 0.
+    const tzShiftMs = (new Date().getTimezoneOffset() + 540) * 60000
+    const now = dateParam
+      ? new Date(new Date(dateParam + 'T00:00:00Z').getTime() + tzShiftMs)
+      : new Date(Date.now() + tzShiftMs)
     const today = isoOf(now)
     const tomorrowD = new Date(now); tomorrowD.setDate(tomorrowD.getDate() + 1)
     const tomorrow = isoOf(tomorrowD)
@@ -163,11 +169,12 @@ export async function GET(request: NextRequest) {
                  TIME_FORMAT(s.start_time, '%H:%i') AS start_time,
                  TIME_FORMAT(s.end_time, '%H:%i') AS end_time,
                  s.is_overnight,
-                 g.name AS group_name
+                 (SELECT g.name FROM cs_shift_groups g
+                   WHERE g.shift_slot_id = s.id
+                   ORDER BY g.name ASC LIMIT 1) AS group_name
           FROM cs_assignments a
           JOIN cs_workers w ON w.id = a.worker_id
           JOIN cs_shift_slots s ON s.id = a.shift_slot_id
-          LEFT JOIN cs_shift_groups g ON g.shift_slot_id = s.id
           WHERE a.schedule_id = ${scheduleId}
             AND a.work_date = ${isoDate}
             AND a.worker_id IS NOT NULL
@@ -211,11 +218,12 @@ export async function GET(request: NextRequest) {
                  TIME_FORMAT(s.start_time, '%H:%i') AS start_time,
                  TIME_FORMAT(s.end_time, '%H:%i') AS end_time,
                  s.is_overnight,
-                 g.name AS group_name
+                 (SELECT g.name FROM cs_shift_groups g
+                   WHERE g.shift_slot_id = s.id
+                   ORDER BY g.name ASC LIMIT 1) AS group_name
           FROM cs_assignments a
           JOIN cs_workers w ON w.id = a.worker_id
           JOIN cs_shift_slots s ON s.id = a.shift_slot_id
-          LEFT JOIN cs_shift_groups g ON g.shift_slot_id = s.id
           WHERE a.schedule_id = ${scheduleId}
             AND a.work_date = ${yesterday}
             AND a.worker_id IS NOT NULL

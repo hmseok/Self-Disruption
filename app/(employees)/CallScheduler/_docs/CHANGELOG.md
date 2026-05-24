@@ -3,6 +3,11 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-23 (Phase N-72) — 운영 대시보드 버그 2건 수정
+
+- **JOIN 중복** — `dashboard` route 의 `fetchDay`·어제야간 쿼리가 `LEFT JOIN cs_shift_groups`(슬롯↔그룹 1:N)로 워커 칩을 그룹 수만큼 복제(L02 ×3, L13 ×6). 그룹명을 스칼라 subquery(`LIMIT 1`)로 바꿔 1배정=1칩 보장 — 「오늘/내일/지금 일하는 사람」이 근무표 그대로 표시.
+- **시간대 버그** — 서버 TZ(Cloud Run UTC)에서 `now.getHours()` 가 9시간 어긋나 09:51 인데 00:51 로 계산 → 20:30~08:30 야간조가 "지금 일하는 사람"으로 오표시. `getTimezoneOffset()` 기반 보정값으로 KST 고정(UTC 서버 +9h / KST 서버 0).
+
 ## 2026-05-23 (Phase CX-KPI-21) — 알리고 SMS 근무표 배포
 
 - 알리고 헬퍼 `lib/aligo.ts` — `sendMass`(다건 발송)·`aligoConfigured`·`isValidPhone`·`normalizePhone`·`ALIGO_MAX_RECIPIENTS`. ALIGO_API_KEY/ALIGO_USER_ID/ALIGO_SENDER 환경변수 기반, testmode 지원.
