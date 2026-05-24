@@ -5,6 +5,39 @@
 
 ---
 
+## 2026-05-24 | PR-VISION-2a | 마이그레이션 + 동행복권 결과 조회 API
+
+### 사용자 요청
+> "아이디 별로 개인페이지 탭 — 번호 사용여부 체크, 당첨여부, 비당첨 시 투자금액·손실금액 표출"
+
+### 공동 시뮬레이션 확정 (CLAUDE.md §11-1, AskUserQuestion 3문)
+- 저장: 서버 DB (정식 기능) / 당첨번호: 동행복권 자동 조회 / 기록: 추출기 "구매함" 체크
+- 원 브리프("가벼운 유틸 / DB·API 불필요")에서 범위 확장 — 사용자 명시 GO
+
+### 변경 (PR-VISION-2a — 마이그레이션 + 결과 조회 API)
+- **NEW** `migrations/2026-05-24_ride_vision_lotto.sql`
+  - `ride_lotto_entries` — 사용자 구매 게임 (계정별·회차별, 멱등 CREATE TABLE)
+  - `ride_lotto_results` — 동행복권 당첨번호 캐시 (INSERT IGNORE 멱등 적재)
+- **NEW** `app/api/ride-vision/lotto-result/route.ts`
+  - `GET ?drwNo=N` / `?latest=1` — 캐시 우선 → 동행복권 서버사이드 조회
+  - 첫 호출 raw 응답 로깅 (Rule 3 dry-run), 6초 타임아웃, graceful fallback
+  - 인증: verifyUser (로그인 직원 누구나 — page-permission 미적용)
+- **NEW** `app/(employees)/RideVision/_docs/DATA-MODEL.md`
+
+### ⚠ 마이그레이션 적용 필요 (Rule 23)
+> 석호민님이 Cloud SQL 에 `migrations/2026-05-24_ride_vision_lotto.sql` 직접 적용.
+> 미적용 시 결과 조회는 동작(라이브 조회), 캐시만 생략 — 2b 구매기록 저장은 적용 후 가능.
+> 메인 세션(sweet-amazing-galileo)에 마이그레이션 신설 공유.
+
+### GATE 진행 상태
+- ✅ G3 설계서 v2 + 사용자 GO ("진행")
+- ✅ G5 tsc — RideVision 신규 에러 0건
+- ✅ G6 lint:harness 새 위반 0건
+- ⏳ G7 Designer — UI 없음 (2b/2c 에서 검수)
+- ✅ Rule 22 _docs 갱신 (DATA-MODEL / CHANGELOG)
+
+---
+
 ## 2026-05-24 | PR-VISION-1 | 로또번호추출기 신설
 
 ### 사용자 요청
