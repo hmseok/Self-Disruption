@@ -216,13 +216,11 @@ export default function AccidentIntakeTab() {
   const statActions: ActionButton[] = [
     { label: '새로고침', onClick: refresh, variant: 'secondary', icon: '🔄' },
   ]
-  // PR-Y1.1 (2026-05-23) — 사용자 명시: 「대차 요청건과 미요청건은 분리 탭이」
-  //   → 대차 Y/N 필터 복원 (PR-U 단일 「전체」 → 전체/요청/미요청/종결)
+  // PR-Y1.2 (2026-05-24) — 사용자 명시: 「사고접수전체, 대차요청 두 개 탭만」
+  //   → 필터칩 2개로 단순화 (미요청/종결 건수는 stat strip 으로 확인)
   const filterItems: FilterItem[] = [
-    { key: 'all', label: '📋 전체', count: counts.all },
+    { key: 'all', label: '📋 사고접수 전체', count: counts.all },
     { key: 'dcyn_y', label: '🚗 대차요청', count: counts.dcyn_y },
-    { key: 'dcyn_n', label: '🚙 대차미요청', count: counts.dcyn_n },
-    { key: 'closed', label: '✅ 종결', count: counts.closed },
   ]
 
   const columns: TableColumn<DispatchRequestRow>[] = [
