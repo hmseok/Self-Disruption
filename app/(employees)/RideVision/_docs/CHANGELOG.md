@@ -5,6 +5,22 @@
 
 ---
 
+## 2026-05-24 | PR-VISION-11 | 삭제 권한 admin 단일 역할로 축소
+
+### 사용자 요청
+> "모든 권한은 슈퍼어드민 만"
+
+### 변경
+- 삭제 권한 `['admin','master']` → **`['admin']`** 단일 (master 제외)
+  - `lotto-entries/[id]/route.ts` — `DELETE_ROLES = ['admin']`
+  - `lotto/page.tsx` — `isAdmin` = `role === 'admin'`
+- 「슈퍼어드민」 = admin(최고관리자) 역할로 확정
+
+### GATE
+- ✅ G5 tsc 0건 / G6 lint:harness 위반 0건 / Rule 22 CHANGELOG
+
+---
+
 ## 2026-05-24 | PR-VISION-10 | 내 기록 번호 복사 + 삭제 권한 슈퍼어드민 한정
 
 ### 사용자 요청

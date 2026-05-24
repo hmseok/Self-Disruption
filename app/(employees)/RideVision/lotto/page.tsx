@@ -200,7 +200,7 @@ export default function LottoPage() {
   const [recError, setRecError] = useState<string | null>(null)
   const [migrationPending, setMigrationPending] = useState(false)
   const recLoadedRef = useRef(false)
-  const [isAdmin, setIsAdmin] = useState(false) // 삭제 권한 — 슈퍼어드민(admin/master)
+  const [isAdmin, setIsAdmin] = useState(false) // 삭제 권한 — 슈퍼어드민(admin) 전용
   const [copiedId, setCopiedId] = useState<string | null>(null)
 
   const authHeaders = (): Record<string, string> => {
@@ -229,10 +229,10 @@ export default function LottoPage() {
     fetchEntries()
   }, [fetchEntries])
 
-  // 삭제 권한 — 슈퍼어드민(admin/master) 만
+  // 삭제 권한 — 슈퍼어드민(admin) 만
   useEffect(() => {
     const u = getStoredUser() as { role?: string } | null
-    setIsAdmin(!!u && ['admin', 'master'].includes(u.role || ''))
+    setIsAdmin(u?.role === 'admin')
   }, [])
 
   // 내 기록 탭 — 구매기록 + 회차별 당첨결과

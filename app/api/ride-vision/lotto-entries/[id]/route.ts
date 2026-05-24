@@ -1,7 +1,7 @@
 /**
  * /api/ride-vision/lotto-entries/[id]
  *
- * DELETE — 구매 기록 삭제. 슈퍼어드민(admin/master) 전용.
+ * DELETE — 구매 기록 삭제. 슈퍼어드민(admin) 전용.
  *   손실 추적 무결성을 위해 일반 직원은 자기 기록도 삭제 불가 —
  *   정정·정리는 관리자만 (낙첨 기록을 임의 삭제하면 손익 집계가 무의미).
  *
@@ -11,7 +11,7 @@ import { NextResponse } from 'next/server'
 import { verifyUser } from '@/lib/auth-server'
 import { prisma } from '@/lib/prisma'
 
-const DELETE_ROLES = ['admin', 'master'] // 슈퍼어드민 tier
+const DELETE_ROLES = ['admin'] // 슈퍼어드민(최고관리자) 전용
 
 function isMissingTable(e: unknown): boolean {
   const msg = String((e as { message?: string })?.message || e)
@@ -31,7 +31,7 @@ export async function DELETE(
   const role = String((user as { role?: string }).role || '')
   if (!DELETE_ROLES.includes(role)) {
     return NextResponse.json(
-      { success: false, error: '삭제 권한 없음 — 관리자(admin/master) 전용입니다' },
+      { success: false, error: '삭제 권한 없음 — 슈퍼어드민(admin) 전용입니다' },
       { status: 403 }
     )
   }
