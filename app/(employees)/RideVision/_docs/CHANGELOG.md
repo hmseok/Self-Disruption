@@ -5,6 +5,31 @@
 
 ---
 
+## 2026-05-24 | PR-VISION-16 | 로또 전체회차(1~1225) 당첨번호 시드
+
+### 사용자 요청
+> "번호 통계 5회차는 너무 적다 / 전체로 가고, 신규건은 자동 누적"
+
+### 변경
+- **NEW** `migrations/2026-05-24_ride_lotto_results_seed.sql`
+  - 로또 6/45 전체 1~1225회 당첨번호 시드 (INSERT IGNORE — 멱등, 1248줄/48.7KB)
+  - 출처: smok95/lotto (GitHub Pages, 동행복권 추첨결과 미러)
+  - 정확도 검증: 1224·1225·1회차를 동행복권 실측값과 교차검증 (스크립트 assert 통과)
+
+### 신규 회차 자동 누적
+- 별도 작업 불필요 — 위젯·내 기록이 페이지 열림 시 selectMainInfo.do 조회 →
+  최근 회차를 `INSERT IGNORE` 로 자동 캐시. 매주 새 회차는 다음 방문 때 누적됨.
+
+### ⚠ 적용 필요 (Rule 23)
+> 석호민님이 Cloud SQL 에 `migrations/2026-05-24_ride_lotto_results_seed.sql` 실행.
+> 적용 후 「번호 통계」 탭이 5회차 → 1225회차 기준으로 풍성해짐.
+> (선행: `2026-05-24_ride_vision_lotto.sql` — ride_lotto_results 테이블)
+
+### GATE
+- ✅ G5 데이터 검증 (스크립트 assert) / G6 lint:harness 새 위반 0건 / Rule 22·24
+
+---
+
 ## 2026-05-24 | PR-VISION-15 | 번호 통계 탭 (재미용 — 정직 표기)
 
 ### 사용자 질문
