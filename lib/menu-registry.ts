@@ -139,7 +139,7 @@ export const MENUS: MenuEntry[] = [
   { id: 'mod-mt-chargers', name: '충전기',   displayName: '🔌 충전기',   path: '/RideMTOps/chargers',          iconKey: 'Bolt',      group: 'mt-team', sortOrder: 52, requirePermission: true, sidebarHidden: true },
 
   // PR-VISION (2026-05-24) — 비전 그룹 (가벼운 유틸). 페이지: 별도 세션 PR-VISION-1
-  { id: 'mod-lotto', name: '로또번호추출기', displayName: '🎰 로또번호추출기', path: '/RideVision/lotto', iconKey: 'Doc', group: 'vision', sortOrder: 90, requirePermission: true },
+  { id: 'mod-lotto', name: '믿을 건 로또 뿐', displayName: '🎰 믿을 건 로또 뿐', path: '/RideVision/lotto', iconKey: 'Doc', group: 'vision', sortOrder: 90, requirePermission: true },
 
   // ── 설정 (settings) ── admin 전용 (사이드바 별도 섹션)
   // 권한 부여 대상 — 일부 사용자에게 회사 정보 / 메시지 센터 등 위임 가능

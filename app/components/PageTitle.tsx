@@ -150,7 +150,7 @@ const PAGE_NAMES: Record<string, string> = {
   '/RideMTOps/legal-inspections':    '법정검사',
   '/RideMTOps/chargers':             '충전기',
   // 비전 (PR-VISION — 2026-05-24)
-  '/RideVision/lotto':               '로또번호추출기',
+  '/RideVision/lotto':               '믿을 건 로또 뿐',
   // PR-PT-COV (2026-05-24) — menu-registry 엔 있으나 PageTitle 누락이던 활성 페이지
   '/factory-search':                 '협력공장 추천',
   '/RideEmployees':                  '직원 마스터',
