@@ -16,7 +16,7 @@
 
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { COLORS, GLASS, BTN } from '@/app/utils/ui-tokens'
-import { getStoredToken } from '@/lib/auth-client'
+import { getStoredToken, getStoredUser } from '@/lib/auth-client'
 import NeuDataTable, { type TableColumn } from '@/app/components/NeuDataTable'
 import DcStatStrip, { type StatItem } from '@/app/components/DcStatStrip'
 
@@ -200,6 +200,8 @@ export default function LottoPage() {
   const [recError, setRecError] = useState<string | null>(null)
   const [migrationPending, setMigrationPending] = useState(false)
   const recLoadedRef = useRef(false)
+  const [isAdmin, setIsAdmin] = useState(false) // 삭제 권한 — 슈퍼어드민(admin/master)
+  const [copiedId, setCopiedId] = useState<string | null>(null)
 
   const authHeaders = (): Record<string, string> => {
     const token = getStoredToken()
@@ -226,6 +228,12 @@ export default function LottoPage() {
   useEffect(() => {
     fetchEntries()
   }, [fetchEntries])
+
+  // 삭제 권한 — 슈퍼어드민(admin/master) 만
+  useEffect(() => {
+    const u = getStoredUser() as { role?: string } | null
+    setIsAdmin(!!u && ['admin', 'master'].includes(u.role || ''))
+  }, [])
 
   // 내 기록 탭 — 구매기록 + 회차별 당첨결과
   const loadRecords = useCallback(async () => {
@@ -261,6 +269,35 @@ export default function LottoPage() {
   useEffect(() => {
     if (tab === 'records' && !recLoadedRef.current) loadRecords()
   }, [tab, loadRecords])
+
+  // 기록 번호 복사 (전 직원 — 실제 구매하러 갈 때)
+  const copyNumbers = useCallback((id: string, numbers: number[]) => {
+    navigator.clipboard.writeText(numbers.join(', ')).then(
+      () => {
+        setCopiedId(id)
+        setTimeout(() => setCopiedId(c => (c === id ? null : c)), 1300)
+      },
+      () => {
+        // 클립보드 권한 불가 — 무시
+      }
+    )
+  }, [])
+
+  // 기록 삭제 (슈퍼어드민 전용 — 손실 추적 무결성)
+  const deleteEntry = useCallback(
+    async (id: string) => {
+      try {
+        const res = await fetch(`/api/ride-vision/lotto-entries/${id}`, {
+          method: 'DELETE',
+          headers: authHeaders(),
+        })
+        if (res.ok) loadRecords()
+      } catch {
+        // 무시 — 다음 새로고침 시 정합
+      }
+    },
+    [loadRecords]
+  )
 
   // ── 이번 회차 구매 수량 ──
   const purchasedTotal = useMemo(
@@ -500,6 +537,41 @@ export default function LottoPage() {
           </span>
         )
       },
+    },
+    {
+      key: 'action',
+      label: '',
+      align: 'right',
+      render: r => (
+        <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+          <button
+            onClick={() => copyNumbers(r.id, r.numbers)}
+            style={{
+              ...BTN.sm,
+              background: COLORS.bgBlue,
+              color: COLORS.primary,
+              border: `1px solid ${COLORS.borderBlue}`,
+              cursor: 'pointer',
+            }}
+          >
+            {copiedId === r.id ? '✓ 복사됨' : '복사'}
+          </button>
+          {isAdmin && (
+            <button
+              onClick={() => deleteEntry(r.id)}
+              style={{
+                ...BTN.sm,
+                background: 'transparent',
+                color: COLORS.textMuted,
+                border: `1px solid ${COLORS.borderFaint}`,
+                cursor: 'pointer',
+              }}
+            >
+              삭제
+            </button>
+          )}
+        </div>
+      ),
     },
   ]
 
