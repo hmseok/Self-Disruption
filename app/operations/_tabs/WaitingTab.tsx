@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import DcStatStrip, { StatItem, ActionButton } from '@/app/components/DcStatStrip'
 import DcToolbar, { FilterItem } from '@/app/components/DcToolbar'
 import NeuDataTable, { TableColumn, MobileCardConfig } from '@/app/components/NeuDataTable'
-import { GLASS } from '@/app/utils/ui-tokens'
+import { GLASS, COLORS } from '@/app/utils/ui-tokens'
 import type { DispatchRequestRow, DispatchOrder } from '@/app/operations/intake/types'
 import { fmtCafe24DateTime } from '@/app/operations/intake/types'
 
@@ -62,6 +62,7 @@ const STATUS_META: Record<string, { label: string; bg: string; fg: string }> = {
   available: { label: '🟢 사용가능',  bg: 'rgba(34,197,94,0.12)',   fg: '#15803d' },
   rented:    { label: '🚗 배차중',    bg: 'rgba(239,68,68,0.12)',   fg: '#991b1b' },
   returned:  { label: '🔧 반납·점검', bg: 'rgba(245,158,11,0.12)',  fg: '#b45309' },
+  leased:    { label: '🔑 장기렌트',  bg: COLORS.bgBlue,            fg: COLORS.primary },  // PR-L1d
 }
 
 // PR-Y1 (2026-05-23) — lockStatus prop:
