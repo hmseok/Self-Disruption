@@ -1236,7 +1236,7 @@ export default function DispatchDetailPage({
                               padding: '10px 18px',
                               background: (!dispatchOrder || migrationPending || posting || !newNote.trim())
                                 ? '#94a3b8'
-                                : 'linear-gradient(135deg, #6366f1, #4f46e5)',
+                                : 'linear-gradient(135deg, #3b6eb5, #5a8fd4)',
                               color: '#fff',
                               border: 'none',
                               borderRadius: 10,
@@ -1346,7 +1346,7 @@ export default function DispatchDetailPage({
                     disabled={busy}
                     style={{
                       padding: '8px 14px',
-                      background: 'linear-gradient(135deg, #6366f1, #4f46e5)',
+                      background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)',
                       color: '#fff', border: 'none', borderRadius: 8,
                       cursor: busy ? 'not-allowed' : 'pointer',
                       fontWeight: 800, fontSize: 12, whiteSpace: 'nowrap',
@@ -1396,7 +1396,7 @@ export default function DispatchDetailPage({
                   onClick={() => setReturnModalOpen(true)}
                   style={{
                     padding: '8px 16px',
-                    background: 'linear-gradient(135deg, #6366f1, #4f46e5)',
+                    background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)',
                     color: '#fff',
                     border: 'none',
                     borderRadius: 8,
@@ -1860,7 +1860,7 @@ export default function DispatchDetailPage({
                 disabled={returnBusy || returnUploading}
                 style={{
                   padding: '9px 20px',
-                  background: 'linear-gradient(135deg, #6366f1, #4f46e5)',
+                  background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)',
                   color: '#fff', border: 'none', borderRadius: 8,
                   cursor: (returnBusy || returnUploading) ? 'not-allowed' : 'pointer',
                   fontWeight: 800, fontSize: 13,

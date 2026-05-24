@@ -491,7 +491,7 @@ export default function ClaimsTab() {
                 disabled={claimBusy}
                 style={{
                   padding: '9px 18px',
-                  background: 'linear-gradient(135deg, #6366f1, #4f46e5)',
+                  background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)',
                   color: '#fff', border: 'none', borderRadius: 8,
                   cursor: claimBusy ? 'not-allowed' : 'pointer', fontWeight: 800, fontSize: 12,
                   opacity: claimBusy ? 0.5 : 1,
