@@ -46,6 +46,12 @@ type ClaimRow = {
   claim_type: string | null
   vat_extra_billing: string | null
   capital_company: string | null
+  // PR-N6c — 입고공장 / 지급 추적
+  repair_factory: string | null
+  customer_birth: string | null
+  paid_amount: number | null
+  payment_status: string | null
+  payment_memo: string | null
 }
 
 type FilterKey = 'active' | 'all' | 'returned' | 'claiming' | 'settled'
@@ -53,6 +59,7 @@ type FilterKey = 'active' | 'all' | 'returned' | 'claiming' | 'settled'
 // 청구관리 영역 = 회차 후 단계
 const VISIBLE_STATUS = ['returned', 'claiming', 'settled']
 const CLAIM_TYPES = ['보험', '라이드', '고객유상', '유상대차', '정비대차', '사고대차']
+const PAYMENT_STATUSES = ['미지급', '지급완료', '종결']
 
 const STATUS_META: Record<string, { label: string; bg: string; fg: string }> = {
   returned: { label: '📥 회차완료', bg: 'rgba(245,158,11,0.12)', fg: '#b45309' },
@@ -83,6 +90,8 @@ export default function ClaimsTab() {
   const [claimAmount, setClaimAmount] = useState('')
   const [claimNo, setClaimNo] = useState('')
   const [claimType, setClaimType] = useState('')
+  const [paymentStatus, setPaymentStatus] = useState('')   // PR-N6c — 지급여부
+  const [paymentMemo, setPaymentMemo] = useState('')        // PR-N6c — 지급 메모
   const [claimBusy, setClaimBusy] = useState(false)
   const [claimMsg, setClaimMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
 
@@ -123,6 +132,8 @@ export default function ClaimsTab() {
     setClaimAmount(r.final_claim_amount != null ? String(r.final_claim_amount) : '')
     setClaimNo(r.insurance_claim_no || '')
     setClaimType(r.claim_type || '')
+    setPaymentStatus(r.payment_status || '')
+    setPaymentMemo(r.payment_memo || '')
     setClaimMsg(null)
     setClaimModalOpen(true)
   }, [])
@@ -141,6 +152,8 @@ export default function ClaimsTab() {
           final_claim_amount: claimAmount === '' ? null : Number(claimAmount),
           insurance_claim_no: claimNo || null,
           claim_type: claimType || null,
+          payment_status: paymentStatus || null,
+          payment_memo: paymentMemo || null,
           status: nextStatus,
         }),
       })
@@ -154,7 +167,7 @@ export default function ClaimsTab() {
     } finally {
       setClaimBusy(false)
     }
-  }, [selectedClaim, claimAmount, claimNo, claimType, refresh])
+  }, [selectedClaim, claimAmount, claimNo, claimType, paymentStatus, paymentMemo, refresh])
 
   // 청구관리 영역 (returned/claiming/settled) — 부가세 필터 적용
   const claimRows = useMemo(() => {
@@ -259,6 +272,13 @@ export default function ClaimsTab() {
       key: 'customer_name', label: '고객', width: 128,
       sortBy: (r) => r.customer_name || '',
       render: (r) => <span style={{ fontWeight: 600, color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: 128 }}>{r.customer_name || '-'}</span>,
+    },
+    {
+      key: 'repair_factory', label: '입고공장', width: 124,
+      sortBy: (r) => r.repair_factory || '',
+      render: (r) => r.repair_factory
+        ? <span style={{ fontSize: 12, color: '#0f2440', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: 124 }}>🔧 {r.repair_factory}</span>
+        : <span style={{ fontSize: 11, color: '#cbd5e1' }}>-</span>,
     },
     {
       key: 'insurance_company', label: '보험사', width: 116,
@@ -379,6 +399,13 @@ export default function ClaimsTab() {
                 <span style={{ color: '#1e293b', fontWeight: 600 }}>{fmtWon(selectedClaim.daily_rate)}</span>
                 <span style={{ color: '#94a3b8', fontWeight: 700 }}>대여료 합계</span>
                 <span style={{ color: '#1e293b', fontWeight: 600 }}>{fmtWon(selectedClaim.total_rental_fee)}</span>
+                <span style={{ color: '#94a3b8', fontWeight: 700 }}>입고공장</span>
+                <span style={{ color: '#1e293b', fontWeight: 600 }}>{selectedClaim.repair_factory ? `🔧 ${selectedClaim.repair_factory}` : '-'}</span>
+                <span style={{ color: '#94a3b8', fontWeight: 700 }}>지급금액</span>
+                <span style={{ color: '#1e293b', fontWeight: 600 }}>
+                  {fmtWon(selectedClaim.paid_amount)}
+                  <span style={{ fontSize: 10, color: '#94a3b8', marginLeft: 5 }}>재무 통장/카드 자동매칭</span>
+                </span>
                 {selectedClaim.vat_extra_billing === 'Y' && (
                   <>
                     <span style={{ color: '#b45309', fontWeight: 700 }}>부가세</span>
@@ -421,6 +448,28 @@ export default function ClaimsTab() {
                   value={claimNo}
                   onChange={(e) => setClaimNo(e.target.value)}
                   placeholder="보험사 청구 접수번호"
+                  style={{ ...GLASS.L1, width: '100%', padding: '9px 12px', borderRadius: 8, fontSize: 13, color: '#1e293b' }}
+                />
+              </div>
+              {/* 지급여부 (지급금액은 재무 자동매칭 — 위 참고정보 표시) */}
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#475569', marginBottom: 5 }}>지급여부</label>
+                <select
+                  value={paymentStatus}
+                  onChange={(e) => setPaymentStatus(e.target.value)}
+                  style={{ ...GLASS.L1, width: '100%', padding: '9px 12px', borderRadius: 8, fontSize: 13, color: '#1e293b' }}
+                >
+                  <option value="">— 선택 —</option>
+                  {PAYMENT_STATUSES.map((t) => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+              {/* 지급 메모 */}
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#475569', marginBottom: 5 }}>지급 메모</label>
+                <input
+                  value={paymentMemo}
+                  onChange={(e) => setPaymentMemo(e.target.value)}
+                  placeholder="청구·지급 관련 메모"
                   style={{ ...GLASS.L1, width: '100%', padding: '9px 12px', borderRadius: 8, fontSize: 13, color: '#1e293b' }}
                 />
               </div>

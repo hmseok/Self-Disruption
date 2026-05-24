@@ -47,6 +47,7 @@ type Row = {
   status: string                       // request / new / consulting / pending / dispatched
   notes: string | null
   fleet_group: string | null
+  repair_factory?: string | null       // PR-N6c — 입고공장 (사고차량 수리처)
   order_id?: string
   cafe24_idno?: string | null
   cafe24_mddt?: string | null
@@ -156,6 +157,7 @@ export default function RentalListTab({ scope = 'all' }: { scope?: 'all' | 'disp
           status: r.status || 'pending',
           notes: r.notes ?? null,
           fleet_group: r.fleet_group ?? null,
+          repair_factory: r.repair_factory ?? null,
         }))
 
       // 상담중 = fmi_rental 아직 없고 done/cancelled 아닌 dispatch_order
@@ -427,6 +429,13 @@ export default function RentalListTab({ scope = 'all' }: { scope?: 'all' | 'disp
       render: (r) => <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: 150, fontSize: 12, color: '#475569' }}>
         {r.customer_car_number || '-'}{r.customer_car_type ? ` · ${r.customer_car_type}` : ''}
       </span>,
+    },
+    {
+      key: 'repair_factory', label: '입고공장', width: 130,
+      sortBy: (r) => r.repair_factory || '',
+      render: (r) => r.repair_factory
+        ? <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: 130, fontSize: 12, color: '#0f2440' }}>🔧 {r.repair_factory}</span>
+        : <span style={{ fontSize: 11, color: '#cbd5e1' }}>-</span>,
     },
     {
       key: 'customer', label: '고객', width: 150,
