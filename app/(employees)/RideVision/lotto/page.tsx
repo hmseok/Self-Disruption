@@ -643,90 +643,183 @@ export default function LottoPage() {
       {/* ═══ 탭 1 — 번호 추출 ═══════════════════════════════════ */}
       {tab === 'extract' && (
         <div>
-          {/* 이번 회차 위젯 — 회차 / 카운트다운 / 구매 링크 / 최근 결과 */}
+          {/* 이번 회차 위젯 — 큼직한 2-패널 (회차·카운트다운 / 최근 결과) */}
           {(() => {
             const drawTs = new Date(`${roundInfo.drawDate}T20:35:00+09:00`).getTime()
             const remain = Math.max(0, drawTs - now)
-            const dd = Math.floor(remain / 86400000)
-            const hh = Math.floor(remain / 3600000) % 24
-            const mm = Math.floor(remain / 60000) % 60
-            const ss = Math.floor(remain / 1000) % 60
             const pad = (n: number) => String(n).padStart(2, '0')
+            const cd: { label: string; val: number }[] = [
+              { label: '일', val: Math.floor(remain / 86400000) },
+              { label: '시', val: Math.floor(remain / 3600000) % 24 },
+              { label: '분', val: Math.floor(remain / 60000) % 60 },
+              { label: '초', val: Math.floor(remain / 1000) % 60 },
+            ]
+            const winNums = latestResult
+              ? [latestResult.n1, latestResult.n2, latestResult.n3, latestResult.n4, latestResult.n5, latestResult.n6]
+              : []
             return (
               <div
                 style={{
-                  ...GLASS.L3,
-                  border: `1px solid ${COLORS.borderBlue}`,
-                  padding: 14,
-                  borderRadius: 14,
-                  marginBottom: 14,
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+                  gap: 14,
+                  marginBottom: 16,
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: 14, fontWeight: 800, color: COLORS.primary }}>
-                    🎱 제{roundInfo.round}회
-                  </span>
-                  <span style={{ fontSize: 12, color: COLORS.textSecondary }}>
-                    추첨 {roundInfo.drawDate}(토) 20:35
-                  </span>
-                  <span
+                {/* ── 패널 A — 이번 회차 + 카운트다운 ── */}
+                <div
+                  style={{
+                    ...GLASS.L4,
+                    border: `1px solid ${COLORS.borderBlue}`,
+                    borderRadius: 18,
+                    padding: 24,
+                    textAlign: 'center',
+                  }}
+                >
+                  <div
                     style={{
-                      fontSize: 12,
+                      fontSize: 11,
                       fontWeight: 800,
-                      color: COLORS.danger,
-                      fontVariantNumeric: 'tabular-nums',
+                      letterSpacing: '0.12em',
+                      color: COLORS.primary,
+                      marginBottom: 4,
                     }}
                   >
-                    남은시간 {dd}일 {pad(hh)}:{pad(mm)}:{pad(ss)}
-                  </span>
+                    🎱 이번 회차
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 36,
+                      fontWeight: 800,
+                      lineHeight: 1.1,
+                      backgroundImage: `linear-gradient(135deg, ${COLORS.primaryDark}, ${COLORS.primary})`,
+                      WebkitBackgroundClip: 'text',
+                      backgroundClip: 'text',
+                      color: 'transparent',
+                    }}
+                  >
+                    제{roundInfo.round}회
+                  </div>
+                  <div style={{ fontSize: 13, color: COLORS.textSecondary, marginTop: 4 }}>
+                    {roundInfo.drawDate} (토) 추첨 예정
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 18 }}>
+                    {cd.map(c => (
+                      <div
+                        key={c.label}
+                        style={{
+                          flex: 1,
+                          maxWidth: 76,
+                          background: COLORS.bgBlue,
+                          border: `1px solid ${COLORS.borderBlue}`,
+                          borderRadius: 12,
+                          padding: '12px 4px',
+                        }}
+                      >
+                        <div
+                          style={{
+                            fontSize: 30,
+                            fontWeight: 800,
+                            color: COLORS.danger,
+                            fontVariantNumeric: 'tabular-nums',
+                            lineHeight: 1,
+                          }}
+                        >
+                          {pad(c.val)}
+                        </div>
+                        <div style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 4 }}>{c.label}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 8 }}>추첨까지 남은 시간</div>
                   <a
                     href="https://www.dhlottery.co.kr/lt645/intro"
                     target="_blank"
                     rel="noreferrer"
-                    style={{ ...BTN.sm, marginLeft: 'auto', background: COLORS.primary, color: '#fff', textDecoration: 'none' }}
+                    style={{
+                      display: 'block',
+                      marginTop: 16,
+                      padding: '13px 0',
+                      borderRadius: 12,
+                      background: `linear-gradient(135deg, ${COLORS.primary}, ${COLORS.primaryDark})`,
+                      color: '#fff',
+                      fontWeight: 800,
+                      fontSize: 14,
+                      textDecoration: 'none',
+                    }}
                   >
-                    동행복권 구매 ↗
+                    동행복권에서 구매하기 ↗
                   </a>
-                  <span
+                  <div
                     style={{
                       fontSize: 12,
                       fontWeight: 700,
+                      marginTop: 10,
                       color: roundClosed ? COLORS.danger : COLORS.textSecondary,
                     }}
                   >
-                    구매 {purchasedTotal}/{MAX_PURCHASE}
-                  </span>
+                    이번 회차 구매 {purchasedTotal} / {MAX_PURCHASE}
+                  </div>
                 </div>
-                {latestResult && (
+
+                {/* ── 패널 B — 최근 추첨 결과 ── */}
+                <div
+                  style={{
+                    ...GLASS.L4,
+                    border: `1px solid ${COLORS.borderSubtle}`,
+                    borderRadius: 18,
+                    padding: 24,
+                    textAlign: 'center',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'center',
+                  }}
+                >
                   <div
                     style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 6,
-                      flexWrap: 'wrap',
-                      marginTop: 10,
-                      paddingTop: 10,
-                      borderTop: `1px solid ${COLORS.borderFaint}`,
+                      fontSize: 11,
+                      fontWeight: 800,
+                      letterSpacing: '0.12em',
+                      color: COLORS.textMuted,
+                      marginBottom: 4,
                     }}
                   >
-                    <span style={{ fontSize: 12, color: COLORS.textMuted, whiteSpace: 'nowrap' }}>
-                      최근 결과 제{latestResult.draw_no}회
-                      {latestResult.draw_date ? ` (${latestResult.draw_date})` : ''}
-                    </span>
-                    {[
-                      latestResult.n1,
-                      latestResult.n2,
-                      latestResult.n3,
-                      latestResult.n4,
-                      latestResult.n5,
-                      latestResult.n6,
-                    ].map(n => (
-                      <Ball key={n} n={n} size={26} />
-                    ))}
-                    <span style={{ fontSize: 13, color: COLORS.textMuted, fontWeight: 700 }}>+</span>
-                    <Ball n={latestResult.bonus} size={26} />
+                    최근 추첨 결과
                   </div>
-                )}
+                  {latestResult ? (
+                    <>
+                      <div style={{ fontSize: 30, fontWeight: 800, color: COLORS.textPrimary, lineHeight: 1.1 }}>
+                        제{latestResult.draw_no}회
+                      </div>
+                      <div style={{ fontSize: 13, color: COLORS.textSecondary, marginTop: 4 }}>
+                        {latestResult.draw_date || '-'} 추첨
+                      </div>
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                          gap: 8,
+                          flexWrap: 'wrap',
+                          marginTop: 20,
+                        }}
+                      >
+                        {winNums.map(n => (
+                          <Ball key={n} n={n} size={46} />
+                        ))}
+                        <span style={{ fontSize: 22, color: COLORS.textMuted, fontWeight: 700 }}>+</span>
+                        <Ball n={latestResult.bonus} size={46} />
+                      </div>
+                      <div style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 12 }}>
+                        당첨번호 6개 · 보너스 1개
+                      </div>
+                    </>
+                  ) : (
+                    <div style={{ padding: '48px 0', fontSize: 13, color: COLORS.textMuted }}>
+                      최근 결과를 불러오는 중…
+                    </div>
+                  )}
+                </div>
               </div>
             )
           })()}
@@ -937,7 +1030,92 @@ export default function LottoPage() {
             </div>
           )}
 
-          <div style={{ marginTop: 4, textAlign: 'center', fontSize: 11, color: COLORS.textDim }}>
+          {/* 시스템 소개 — RideVision 로또 시스템 */}
+          <div
+            style={{
+              ...GLASS.L4,
+              border: `1px solid ${COLORS.borderSubtle}`,
+              borderRadius: 18,
+              padding: 24,
+              marginTop: 16,
+            }}
+          >
+            <div style={{ textAlign: 'center', marginBottom: 18 }}>
+              <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.12em', color: COLORS.primary }}>
+                RIDEVISION 로또 시스템
+              </div>
+              <div
+                style={{
+                  fontSize: 28,
+                  fontWeight: 800,
+                  marginTop: 4,
+                  backgroundImage: `linear-gradient(135deg, ${COLORS.primaryDark}, ${COLORS.primary})`,
+                  WebkitBackgroundClip: 'text',
+                  backgroundClip: 'text',
+                  color: 'transparent',
+                }}
+              >
+                믿을 건 로또 뿐
+              </div>
+              <div style={{ fontSize: 13, color: COLORS.textSecondary, marginTop: 4 }}>
+                공정한 추출부터 당첨 확인·손익 분석까지 — 한 곳에서 정확하게
+              </div>
+            </div>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))',
+                gap: 12,
+              }}
+            >
+              {[
+                {
+                  icon: '🎲',
+                  title: '공정한 무작위 추출',
+                  desc: 'Fisher–Yates 셔플로 1~45 완전 균등 추첨. 어떤 번호도 편향 없이 동일한 확률.',
+                },
+                {
+                  icon: '📡',
+                  title: '동행복권 실시간 연동',
+                  desc: '매 회차 공식 당첨번호를 자동 수집·대조. 내 번호 당첨 여부를 자동 확인.',
+                },
+                {
+                  icon: '📊',
+                  title: '당첨·손익 자동 분석',
+                  desc: '구매 기록·당첨 등수·투자금·손익을 회차별로 집계. 내 로또 운을 데이터로.',
+                },
+                {
+                  icon: '🔮',
+                  title: '오늘의 운세',
+                  desc: '추출할 때마다 행운지수와 운세 한 줄. 당첨·낙첨 멘트까지 — 재미는 덤.',
+                },
+              ].map(f => (
+                <div
+                  key={f.title}
+                  style={{
+                    background: COLORS.bgGray,
+                    border: `1px solid ${COLORS.borderFaint}`,
+                    borderRadius: 12,
+                    padding: 16,
+                  }}
+                >
+                  <div style={{ fontSize: 24, marginBottom: 6 }}>{f.icon}</div>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: COLORS.textPrimary, marginBottom: 4 }}>
+                    {f.title}
+                  </div>
+                  <div style={{ fontSize: 12, color: COLORS.textSecondary, lineHeight: 1.5 }}>{f.desc}</div>
+                </div>
+              ))}
+            </div>
+            <div style={{ marginTop: 16, textAlign: 'center', fontSize: 12, color: COLORS.textMuted, lineHeight: 1.6 }}>
+              로또 당첨은 순전히 운입니다 — 어떤 시스템도 확률을 바꾸지 못합니다.
+              <br />
+              다만 <strong style={{ color: COLORS.textSecondary }}>추출·기록·당첨 확인은 이 시스템이 정확하게</strong>{' '}
+              책임집니다.
+            </div>
+          </div>
+
+          <div style={{ marginTop: 12, textAlign: 'center', fontSize: 11, color: COLORS.textDim }}>
             재미로 보는 무작위 추출 · 추출은 브라우저에서, 구매 기록만 계정에 저장됩니다
           </div>
         </div>
