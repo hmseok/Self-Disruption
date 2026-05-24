@@ -21,21 +21,21 @@ import ClaimsTab from './_tabs/ClaimsTab'
 //     접수·상담  → AccidentIntakeTab (cafe24 사고 + 상담 진행상태, 기본 오늘)
 //     사용가능   → WaitingTab lockStatus='available'
 //     배차중     → RentalListTab scope='dispatch' (배차예정+배차완료)
-//     반납점검   → WaitingTab lockStatus='returned'
 //     반납·청구  → ClaimsTab (회차완료·청구중·정산완료)
+//
+// PR-Y3 (2026-05-24) — 사용자 명시: 반납점검 탭 제거 (정비는 대차업무 흐름 외).
 // ═══════════════════════════════════════════════════════════════════
 
-type SubTab = 'intake' | 'available' | 'dispatched' | 'maintenance' | 'claims'
+type SubTab = 'intake' | 'available' | 'dispatched' | 'claims'
 
 const TAB_LIST: Array<{ key: SubTab; label: string; icon: string }> = [
   { key: 'intake',      label: '접수·상담', icon: '📋' },
   { key: 'available',   label: '사용가능', icon: '🟢' },
   { key: 'dispatched',  label: '배차중',   icon: '🚗' },
-  { key: 'maintenance', label: '반납점검', icon: '🔧' },
   { key: 'claims',      label: '반납·청구', icon: '💰' },
 ]
 
-const TAB_KEYS: SubTab[] = ['intake', 'available', 'dispatched', 'maintenance', 'claims']
+const TAB_KEYS: SubTab[] = ['intake', 'available', 'dispatched', 'claims']
 
 export default function OperationsPage() {
   const [tab, setTab] = useState<SubTab>('intake')  // default: 접수·상담 (업무 진입점)
@@ -92,8 +92,6 @@ export default function OperationsPage() {
         {tab === 'available' && <WaitingTab lockStatus="available" />}
 
         {tab === 'dispatched' && <RentalListTab scope="dispatch" />}
-
-        {tab === 'maintenance' && <WaitingTab lockStatus="returned" />}
 
         {tab === 'claims' && <ClaimsTab />}
       </div>
