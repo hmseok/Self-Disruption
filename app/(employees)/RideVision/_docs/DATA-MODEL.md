@@ -45,8 +45,16 @@
 - 미추첨 회차 → `data: null, meta.drawn: false`
 - 인증: verifyUser (로그인 직원 누구나)
 
-### (예정) `GET/POST /api/ride-vision/lotto-entries` — PR-VISION-2b
-### (예정) `DELETE /api/ride-vision/lotto-entries/[id]` — PR-VISION-2b
+### `GET /api/ride-vision/lotto-entries` — PR-VISION-2b
+- 로그인 사용자 본인 구매 게임 목록 (`WHERE user_id = 본인`)
+- 응답: `{ success, data: EntryRow[], meta }` — 테이블 미적용 시 `meta._migration_pending`
+
+### `POST /api/ride-vision/lotto-entries` — PR-VISION-2b
+- 구매 게임 일괄 기록. body: `{ draw_no, games: number[][] }`
+- 게임 유효성: 1~45 중복 없는 6개. 1회 최대 20게임. amount 1,000원 고정.
+
+### `DELETE /api/ride-vision/lotto-entries/[id]` — PR-VISION-2b
+- 본인 기록만 삭제 (`WHERE id = ? AND user_id = 본인`)
 
 ---
 
@@ -58,5 +66,9 @@
 - 서버사이드(API route)에서만 호출 — 클라이언트 직접 호출 X
 - 결과 캐시(`ride_lotto_results`)로 같은 회차 재호출 차단
 
-## 당첨 판정 규칙 (PR-VISION-2c 예정)
+## 당첨 판정 규칙 (PR-VISION-2b — 페이지 「내 기록」 탭 클라이언트 계산)
 일치 개수: 6→1등 / 5+보너스→2등 / 5→3등 / 4→4등(5만원) / 3→5등(5천원) / 그 외→낙첨
+- 4·5등 당첨금 고정 → net = 당첨금 − 투자금
+- 1~3등 당첨금 회차별 상이 → "당첨금 별도" 표기, 순손익 합계서 제외
+- 미추첨 회차 → "추첨 대기"
+- 비당첨 손실 = 낙첨 게임 투자금 합 (사용자 핵심 요청)

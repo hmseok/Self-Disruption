@@ -5,6 +5,35 @@
 
 ---
 
+## 2026-05-24 | PR-VISION-2b | 구매기록 API + 페이지 탭 전면개편 (운세 + 당첨추적)
+
+> PR-VISION-2b 가 페이지 전면개편을 포함 → 당초 분리 예정이던 2c(내 기록 탭)도 본 PR 에 통합.
+
+### 변경
+- **NEW** `app/api/ride-vision/lotto-entries/route.ts` — GET(내 기록) / POST(구매 일괄 기록)
+- **NEW** `app/api/ride-vision/lotto-entries/[id]/route.ts` — DELETE(본인 기록만)
+- **수정** `app/(employees)/RideVision/lotto/page.tsx` — 탭 2개로 전면개편
+  - 탭 1 「🎱 번호 추출」 — 기존 추출기 + 오늘의 로또 운세(클라 랜덤·행운지수)
+    + 구매 회차 입력 + 게임별/전체 「구매함」 버튼 → DB 기록
+  - 탭 2 「📒 내 기록」 — 로그인 본인 구매·당첨 기록
+    · DcStatStrip 5카드 (총 게임 / 총 투자금 / 당첨 / 비당첨 손실 / 순손익)
+    · NeuDataTable — 회차 / 구매번호(당첨공 강조) / 결과 등수 / 손익 / 삭제
+    · 당첨번호 동행복권 자동 조회 → 클라이언트 당첨판정
+  - 구매 결과는 글래스 패널로 표시 (Rule 20 — alert 미사용)
+
+### 운세 (사용자 추가 요청)
+- 추출 시 "오늘의 로또 운세" 한 줄 + 행운지수 — 16개 큐레이션 문구 클라 랜덤. 외부 연동 없음.
+
+### GATE 진행 상태
+- ✅ G3 설계서 v2 + 사용자 GO ("진행")
+- ✅ G5 tsc — RideVision/ride-vision 신규 에러 0건
+- ✅ G6 lint:harness 새 위반 0 / ui-token RideVision 위반 0
+- ⏳ G7 Designer — 배포 후 hmseok.com 시각 검수 (Rule 6)
+- ✅ Rule 22 _docs 갱신 (DATA-MODEL / CHANGELOG)
+- ⚠ Rule 23 마이그레이션(2a) 적용 후 구매기록 저장 정상화 — graceful fallback 적용
+
+---
+
 ## 2026-05-24 | PR-VISION-2a | 마이그레이션 + 동행복권 결과 조회 API
 
 ### 사용자 요청
