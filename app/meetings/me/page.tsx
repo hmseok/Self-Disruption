@@ -18,6 +18,13 @@ import TodoCalendarView from '../_components/TodoCalendarView'
 // 개인 TODO 기본 카테고리 (자유 입력 — 칩/datalist 제안)
 const TODO_CATEGORIES = ['개인', '업무', '스케줄', '회의준비', '학습', '약속', '건강', '거래처', '기타']
 
+// tags(쉼표구분 문자열) → 배열 정규화
+function parseTags(raw: any): string[] {
+  if (!raw) return []
+  if (Array.isArray(raw)) return raw.map(String).map(s => s.trim()).filter(Boolean)
+  return String(raw).split(',').map(s => s.trim()).filter(Boolean)
+}
+
 type Toast = { id: number; tone: 'success' | 'error'; text: string }
 let __toastId = 0
 
@@ -30,6 +37,7 @@ export default function MyTodoPage() {
   const [search, setSearch] = useState('')
   const [sourceFilter, setSourceFilter] = useState<'all' | 'meeting' | 'personal'>('all')
   const [categoryFilter, setCategoryFilter] = useState<string>('all')
+  const [tagFilter, setTagFilter] = useState<string>('all')
   const [migrationPending, setMigrationPending] = useState(false)
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list')
 
@@ -58,6 +66,7 @@ export default function MyTodoPage() {
       source: 'personal' as const,
       id: t.id, content: t.content, due_date: t.due_date, status: t.status,
       category: t.category, priority: t.priority, memo: t.memo,
+      tags: parseTags(t.tags),
     }))
     setMigrationPending(!!todosRes.json?._migration_pending)
     setItems([...actions, ...todos])
@@ -87,12 +96,26 @@ export default function MyTodoPage() {
     return Array.from(set).sort()
   }, [items])
 
+  // 사용 중 해시태그
+  const usedTags = useMemo(() => {
+    const set = new Set<string>()
+    for (const it of items) {
+      if (it.source === 'personal' && it.tags) {
+        for (const t of it.tags) if (t.trim()) set.add(t.trim())
+      }
+    }
+    return Array.from(set).sort()
+  }, [items])
+
   // 검색 + source + category 필터
   const filtered = useMemo(() => {
     let r = items
     if (sourceFilter !== 'all') r = r.filter(x => x.source === sourceFilter)
     if (categoryFilter !== 'all') {
       r = r.filter(x => x.source === 'personal' && (x.category || '') === categoryFilter)
+    }
+    if (tagFilter !== 'all') {
+      r = r.filter(x => x.source === 'personal' && (x.tags || []).includes(tagFilter))
     }
     if (search.trim()) {
       const q = search.trim().toLowerCase()
@@ -101,10 +124,11 @@ export default function MyTodoPage() {
         || (x.meeting_title || '').toLowerCase().includes(q)
         || (x.category || '').toLowerCase().includes(q)
         || (x.organizer_name || '').toLowerCase().includes(q)
+        || (x.tags || []).join(' ').toLowerCase().includes(q)
       )
     }
     return r
-  }, [items, search, sourceFilter, categoryFilter])
+  }, [items, search, sourceFilter, categoryFilter, tagFilter])
 
   // ── 콜백 ─────────────────────────────────────────────────────
   const toggleStatus = useCallback(async (item: TodoItem, newStatus: 'open' | 'done' | 'dropped') => {
@@ -130,6 +154,7 @@ export default function MyTodoPage() {
         category: draft.category.trim() || null,
         priority: draft.priority || null,
         memo: draft.memo.trim() || null,
+        tags: draft.tags.length ? draft.tags.join(',') : null,
       },
     })
     if (ok) { showToast('success', '✓ 개인 TODO 추가됨'); await load() }
@@ -147,6 +172,7 @@ export default function MyTodoPage() {
         category: draft.category.trim() || null,
         priority: draft.priority || null,
         memo: draft.memo.trim() || null,
+        tags: draft.tags.length ? draft.tags.join(',') : null,
       },
     })
     if (ok) { showToast('success', '✓ 개인 TODO 수정됨'); await load() }
@@ -209,6 +235,13 @@ export default function MyTodoPage() {
                 title="개인 TODO 카테고리 필터" style={selStyle}>
                 <option value="all">📂 분류: 전체</option>
                 {usedCategories.map(c => <option key={c} value={c}>📂 {c}</option>)}
+              </select>
+            )}
+            {usedTags.length > 0 && (
+              <select value={tagFilter} onChange={(e) => setTagFilter(e.target.value)}
+                title="개인 TODO 해시태그 필터" style={selStyle}>
+                <option value="all"># 태그: 전체</option>
+                {usedTags.map(t => <option key={t} value={t}># {t}</option>)}
               </select>
             )}
             {/* 리스트 / 캘린더 토글 */}

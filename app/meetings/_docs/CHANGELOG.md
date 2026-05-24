@@ -4,6 +4,43 @@
 
 ---
 
+## 2026-05-24
+
+### PR-MTG-V2-Todo-D — 개인 TODO 다중 해시태그
+
+**사용자 명령**: 「해시태그나 카테고리로 구분이나 필터할수있을까?」 → 옵션 A 채택 — `category`(단일 분류)는 그대로 두고 `tags`(다중 해시태그)를 별도 신설.
+
+**변경**:
+1. **마이그레이션** `migrations/2026-05-24_personal_todos_tags.sql`
+   - `personal_todos.tags VARCHAR(255)` 추가 — 쉼표 구분 문자열 (예: `긴급,거래처`)
+   - 멱등: information_schema table + column 2중 체크 (테이블 없으면 안내 출력)
+   - 선행: `2026-05-16_personal_todos.sql`
+2. **API** `app/api/meetings/me/todos/route.ts`
+   - `hasTagsColumn()` — tags 컬럼 graceful 탐지 (Rule 23). true 영구 캐시 / false 매 요청 재탐지 → 마이그 적용 후 인스턴스 재시작 없이 자가 치유
+   - `normalizeTags()` — 배열/쉼표문자열 허용, `#`·쉼표 제거, 트림, 중복 제거, 255자 캡
+   - GET/POST/PATCH 모두 tags 조건부 처리 — 컬럼 미적용 시 무시 (앱 정상)
+3. **UI** `TodoListView.tsx`
+   - `TodoItem.tags` / `EditDraft.tags` 추가
+   - EditForm: 해시태그 입력 (칩 + input, Enter·쉼표·blur 로 추가, × 제거, 최대 10개·20자)
+   - TodoRow: 메타 행에 `#태그` 칩 표시 (teal `#0d9488` — 분류 purple 과 색 구분)
+4. **UI** `me/page.tsx`
+   - `parseTags()` 매핑, create/update 시 `tags` 전송
+   - `tagFilter` state + `usedTags` + DcToolbar 해시태그 필터 select
+   - 검색이 태그도 매칭
+
+**GATE 진행 상태**:
+- ✅ G3 설계 — 옵션 A 사용자 확정
+- ✅ G5 tsc --noEmit — meetings 모듈 0 에러
+- ✅ G6 lint:harness — 새 critical 위반 0
+- ⚠ G7 Designer — 배포 후 사용자 스크린샷 검수 예정 (Chrome MCP 미연결)
+- ✅ Rule 21 분리 commit 2 (api:meetings / meetings)
+- ✅ Rule 22 본 CHANGELOG
+- ✅ Rule 23 tags 컬럼 graceful
+
+**사용자 적용 필요**: `migrations/2026-05-24_personal_todos_tags.sql` (DBeaver/CLI). 미적용 시에도 앱은 정상 동작 — tags 만 표시/저장되지 않음.
+
+---
+
 ## 2026-05-13
 
 ### hotfix #7 — TODO 메모 영역 확대 + 리스트 표시

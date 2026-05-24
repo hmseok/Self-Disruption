@@ -23,6 +23,7 @@ export interface TodoItem {
   category?: string | null
   priority?: string | null
   memo?: string | null
+  tags?: string[]
 }
 
 export interface EditDraft {
@@ -31,6 +32,7 @@ export interface EditDraft {
   category: string
   priority: string
   memo: string
+  tags: string[]
 }
 
 interface Props {
@@ -53,7 +55,7 @@ const STATUS_META: Record<string, { label: string; color: string; bg: string }> 
   done:    { label: '완료',   color: '#15803d', bg: 'rgba(34,197,94,0.12)' },
   dropped: { label: '취소',   color: '#64748b', bg: 'rgba(100,116,139,0.12)' },
 }
-const EMPTY_DRAFT: EditDraft = { content: '', due_date: '', category: '', priority: 'normal', memo: '' }
+const EMPTY_DRAFT: EditDraft = { content: '', due_date: '', category: '', priority: 'normal', memo: '', tags: [] }
 
 export default function TodoListView({
   items, loading, emptyMessage = '할 일이 없습니다',
@@ -73,6 +75,7 @@ export default function TodoListView({
       category: it.category || '',
       priority: it.priority || 'normal',
       memo: it.memo || '',
+      tags: it.tags ? [...it.tags] : [],
     })
   }, [])
   const cancelEdit = useCallback(() => { setEditingId(null); setDraft(EMPTY_DRAFT) }, [])
@@ -226,6 +229,12 @@ function TodoRow({ item, onToggleStatus, onMeetingOpen, onEdit, onDelete }: {
               ⏱ {fmtDate(item.due_date)}{dueExtra && ` ${dueExtra}`}
             </span>
           )}
+          {/* 해시태그 */}
+          {item.tags && item.tags.map(t => (
+            <span key={t} style={{ fontSize: 10, fontWeight: 600, color: '#0d9488', whiteSpace: 'nowrap' }}>
+              #{t}
+            </span>
+          ))}
         </div>
         {/* 메모 — 있으면 표시 (개인 TODO) */}
         {item.memo && item.memo.trim() && (
@@ -285,6 +294,14 @@ function EditForm({ draft, setDraft, categories, onSave, onCancel, busy, mode }:
   mode: 'new' | 'edit'
 }) {
   const set = (patch: Partial<EditDraft>) => setDraft({ ...draft, ...patch })
+  const [tagInput, setTagInput] = useState('')
+  const addTag = () => {
+    const c = tagInput.replace(/[#,]/g, '').trim()
+    setTagInput('')
+    if (!c || c.length > 20) return
+    if (draft.tags.includes(c) || draft.tags.length >= 10) return
+    set({ tags: [...draft.tags, c] })
+  }
   return (
     <div style={{
       ...GLASS.L3, borderRadius: 10, padding: 12, marginBottom: 4,
@@ -305,7 +322,7 @@ function EditForm({ draft, setDraft, categories, onSave, onCancel, busy, mode }:
           <option value="low">낮음</option>
         </select>
       </div>
-      {/* 분류 칩 */}
+      {/* 분류 칩 — 단일 선택 */}
       <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6 }}>
         {categories.map(c => (
           <button key={c} onClick={() => set({ category: draft.category === c ? '' : c })}
@@ -316,6 +333,38 @@ function EditForm({ draft, setDraft, categories, onSave, onCancel, busy, mode }:
               color: draft.category === c ? '#fff' : '#7c3aed',
             }}>{c}</button>
         ))}
+      </div>
+      {/* 해시태그 — 다중 (분류와 별개) */}
+      <div style={{ marginBottom: 8 }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: COLORS.textSecondary, marginBottom: 3 }}>
+          # 해시태그 (선택 · 여러 개 가능 — Enter 또는 쉼표로 추가)
+        </div>
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
+          {draft.tags.map(t => (
+            <span key={t} style={{
+              display: 'inline-flex', alignItems: 'center', gap: 3,
+              padding: '2px 4px 2px 8px', fontSize: 11, fontWeight: 600, borderRadius: 99,
+              background: 'rgba(13,148,136,0.12)', color: '#0d9488', whiteSpace: 'nowrap',
+            }}>
+              #{t}
+              <button onClick={() => set({ tags: draft.tags.filter(x => x !== t) })}
+                title="태그 제거"
+                style={{
+                  width: 14, height: 14, borderRadius: '50%', border: 'none', cursor: 'pointer',
+                  background: 'rgba(13,148,136,0.22)', color: '#0d9488', fontSize: 10, fontWeight: 800,
+                  lineHeight: 1, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>×</button>
+            </span>
+          ))}
+          <input value={tagInput} onChange={e => setTagInput(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addTag() }
+              if (e.key === 'Escape') onCancel()
+            }}
+            onBlur={() => { if (tagInput.trim()) addTag() }}
+            placeholder="태그 입력"
+            style={{ ...inp, width: 130, padding: '4px 10px' }} />
+        </div>
       </div>
       {/* 비고 / 메모 — 여러 줄 textarea */}
       <div style={{ marginBottom: 8 }}>
