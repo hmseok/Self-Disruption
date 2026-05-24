@@ -176,16 +176,14 @@ export default function PageTitle({ dynamicMenuName, brand, primaryLabel }: Page
   const sectionLabel = groupId ? GROUP_LABELS[groupId] : null
 
   // ── 브라우저 탭 제목 동적화 (2026-05-24) ──
-  //   사용자: 「ERP 탭이 여러 개 열리면 다 똑같아 구분이 안 됨」
-  //   → document.title 을 「{페이지명} · {브랜드}」 로 — 페이지명이 앞에 와서
-  //     탭이 좁아도 어느 화면인지 보임. base 는 로그인 회사(org-brand)에 맞춰
-  //     'FMI ERP' / 'RIDE CARE' — 헤더 배지(F/R)와 일관.
+  //   사용자: 「탭이 여러 개 열리면 하위 페이지명만 보여 헷갈림 — 중간 그룹도」
+  //   → 헤더 브레드크럼과 똑같은 「{그룹} › {페이지}」 포맷.
+  //     그룹을 앞에 둬서 탭이 좁아 잘려도 어느 영역인지 먼저 보임.
+  //     회사 식별은 favicon + 헤더 배지(F/R)가 담당 — 탭 제목은 최대한 짧게.
   useEffect(() => {
-    const base = primaryLabel || 'FMI ERP'
-    const label = pageName
-      ? (sectionLabel ? `${pageName} (${sectionLabel})` : pageName)
-      : null
-    document.title = label ? `${label} · ${base}` : base
+    document.title = pageName
+      ? (sectionLabel ? `${sectionLabel} › ${pageName}` : pageName)
+      : (primaryLabel || 'FMI ERP')
   }, [pageName, sectionLabel, primaryLabel])
 
   if (!pageName || pathname === '/dashboard') return null
