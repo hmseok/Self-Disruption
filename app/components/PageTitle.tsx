@@ -209,9 +209,12 @@ export default function PageTitle({ dynamicMenuName, brand, primaryLabel }: Page
       : (primaryLabel || 'FMI ERP')
   }, [pageName, sectionLabel, primaryLabel])
 
-  // ── favicon 동적화 (2026-05-24) ──
+  // ── favicon 동적화 (2026-05-24, hotfix 2026-05-24) ──
   //   사용자: 기본 삼각형 favicon 대신 헤더 배지처럼 회사 이니셜로.
-  //   canvas 로 원형 배지(F=파랑 / R=청록) 그려 data-URL 로 <link rel=icon> 교체.
+  //   ⚠ 초판이 Next.js 가 관리하는 <link rel=icon> 을 .remove() 해서
+  //     네비게이션 시 removeChild(null) 크래시 + 더블클릭 버그 유발.
+  //   → append-only 로 수정: Next.js link 는 절대 안 건드리고, 자체 전용
+  //     link(id=fmi-dynamic-favicon) 하나만 만들어 href 만 갱신.
   useEffect(() => {
     const b = brand === 'RIDE' ? { color: '#0d9488', initial: 'R' } : { color: '#3b6eb5', initial: 'F' }
     try {
@@ -226,10 +229,16 @@ export default function PageTitle({ dynamicMenuName, brand, primaryLabel }: Page
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
       ctx.fillText(b.initial, 32, 35)
       const url = cv.toDataURL('image/png')
-      document.querySelectorAll("link[rel~='icon']").forEach(l => l.remove())
-      const link = document.createElement('link')
-      link.rel = 'icon'; link.type = 'image/png'; link.href = url
-      document.head.appendChild(link)
+      // 자체 전용 link 하나만 유지 — Next.js 관리 link 는 제거 X (.remove 금지)
+      let link = document.getElementById('fmi-dynamic-favicon') as HTMLLinkElement | null
+      if (!link) {
+        link = document.createElement('link')
+        link.id = 'fmi-dynamic-favicon'
+        link.rel = 'icon'
+        link.type = 'image/png'
+        document.head.appendChild(link)
+      }
+      link.href = url
     } catch { /* canvas 미지원 환경 — 기본 favicon 유지 */ }
   }, [brand])
 
