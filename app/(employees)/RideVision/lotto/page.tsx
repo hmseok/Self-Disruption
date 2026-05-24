@@ -86,6 +86,31 @@ const FORTUNES: string[] = [
   '오늘의 운세: 맑음 — 좋은 소식이 들려올지도 몰라요',
 ]
 
+// ─── 당첨/꽝 축하 멘트 (클라이언트 랜덤 — 「만든 사람」 드립) ─────────
+const WIN_COMMON: string[] = [
+  '당첨인데 만든 사람한테 입 싹 닦으면 3년 재수없습니다. 농담 아니에요.',
+  '당첨금 들고 튀면 만든 사람 저주가 평생 따라다닙니다.',
+  '개발자 한 턱 안 쏘면 그 돈, 손가락 사이로 다 빠져나갑니다.',
+  '만든 사람 모른 척하면 다음 회차부터 번호가 등을 돌립니다.',
+  '혼자 다 먹으면 체합니다 — 만든 사람 몫은 비상약이에요.',
+]
+const WIN_JACKPOT: string[] = [
+  '1등?! 만든 사람 무시하고 퇴사하면 그 돈 3년 안에 못 만집니다.',
+  '대박 — 한 턱은 우주의 법칙입니다. 거스르면 우주가 회수해 갑니다.',
+]
+const WIN_SMALL: string[] = [
+  '푼돈이라고 입 막을 생각 마세요. 치킨은 쏴야 인지상정.',
+  '딱 만든 사람 회식비만큼 버셨네요. 우연일 리가요.',
+]
+const MISS_MESSAGES: string[] = [
+  '꽝! 운이 없었던 게 아니라 만든 사람한테 인사를 안 했죠?',
+  '낙첨... 만든 사람 탓하면 다음 주도 꽝입니다. 조용히 재도전.',
+  '꽝이지만 만든 사람도 매번 꽝입니다. 동지애 느끼고 가세요.',
+  '1,000원으로 일주일 설렘 샀다 치죠 — 만든 사람이 서비스로 드린 겁니다.',
+  '번호는 컴퓨터가 골랐으니 만든 사람 욕은... 음, 조금만 하세요.',
+  '다음 회차엔 만든 사람한테 잘 보이고 오세요. 그게 진짜 전략입니다.',
+]
+
 interface ResultRow {
   draw_no: number
   n1: number
@@ -372,6 +397,25 @@ export default function LottoPage() {
       },
     ]
   }, [summary])
+
+  // 당첨/꽝 축하 멘트 (랜덤 — recordRows 변경 시 재선정)
+  const celebration = useMemo<{ tone: 'win' | 'miss'; msg: string } | null>(() => {
+    const winRows = recordRows.filter(r => r.drawn && r.rank >= 1 && r.rank <= 5)
+    if (winRows.length > 0) {
+      const bestRank = Math.min(...winRows.map(r => r.rank))
+      const pool =
+        bestRank <= 2
+          ? [...WIN_JACKPOT, ...WIN_COMMON]
+          : bestRank >= 4
+            ? [...WIN_SMALL, ...WIN_COMMON]
+            : WIN_COMMON
+      return { tone: 'win', msg: pool[Math.floor(Math.random() * pool.length)] }
+    }
+    if (recordRows.some(r => r.drawn && r.rank === 0)) {
+      return { tone: 'miss', msg: MISS_MESSAGES[Math.floor(Math.random() * MISS_MESSAGES.length)] }
+    }
+    return null
+  }, [recordRows])
 
   const rankLabel = (r: RecordRow): string => {
     if (!r.drawn) return '추첨 대기'
@@ -750,6 +794,34 @@ export default function LottoPage() {
               }}
             >
               ⚠️ DB 마이그레이션 미적용 — migrations/2026-05-24_ride_vision_lotto.sql 적용 후 기록이 저장됩니다.
+            </div>
+          )}
+
+          {celebration && (
+            <div
+              style={{
+                ...GLASS.L3,
+                border: `1px solid ${
+                  celebration.tone === 'win' ? COLORS.borderViolet : COLORS.borderFaint
+                }`,
+                padding: '12px 16px',
+                borderRadius: 14,
+                marginBottom: 14,
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 12,
+                  fontWeight: 800,
+                  color: celebration.tone === 'win' ? '#7c3aed' : COLORS.textMuted,
+                  marginBottom: 4,
+                }}
+              >
+                {celebration.tone === 'win' ? '🎉 당첨 축하합니다!' : '😵 이번엔 꽝'}
+              </div>
+              <div style={{ fontSize: 13, color: COLORS.textSecondary, lineHeight: 1.5 }}>
+                {celebration.msg}
+              </div>
             </div>
           )}
 
