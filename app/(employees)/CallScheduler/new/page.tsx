@@ -111,7 +111,7 @@ export default function CallSchedulerNewPage() {
   }
 
   return (
-    <div style={{ padding: 24, maxWidth: 720, margin: '0 auto' }}>
+    <div style={{ padding: 24}}>
       {/* N-12 — 자체 헤더 제거 (PageTitle 자동) */}
 
       <div style={{

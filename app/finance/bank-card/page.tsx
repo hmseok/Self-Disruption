@@ -3482,7 +3482,7 @@ export default function BankCardPage() {
   // ═══ 렌더링 ═════════════════════════════════════════════
 
   return (
-    <div style={{ padding: '0 0 40px', maxWidth: 1200, margin: '0 auto' }}>
+    <div style={{ padding: '0 0 40px'}}>
 
       {/* 페이지 제목 */}
       <div style={{ padding: '24px 16px 12px', display: 'flex', alignItems: 'center', gap: 10 }}>

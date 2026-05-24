@@ -70,7 +70,7 @@ export default function AssetDetailPage() {
   if (!asset) return null
 
   return (
-    <div style={{ padding: '24px 32px', maxWidth: 1100, margin: '0 auto' }}>
+    <div style={{ padding: '24px 32px'}}>
       <Link href="/RideCompliance" style={{ color: COLORS.primary, fontSize: 13, marginBottom: 8, display: 'inline-block' }}>← 자산 목록</Link>
       <h1 style={{ margin: '4px 0 16px', fontSize: 20 }}>📦 {asset.asset_code} · {asset.name}</h1>
 

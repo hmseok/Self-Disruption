@@ -427,7 +427,7 @@ export default function RideAccidentsPage() {
     stalenessSec > 300 ? COLORS.danger : stalenessSec > 60 ? COLORS.warning : COLORS.success
 
   return (
-    <div style={{ padding: '20px 24px', maxWidth: 1400, margin: '0 auto' }}>
+    <div style={{ padding: '20px 24px'}}>
       {/* 헤더 */}
       <div
         style={{

@@ -177,7 +177,7 @@ export default function LegalInspectionsPage() {
   return (
     <>
       <MTOpsNavTabs />
-      <div style={{ padding: 16, maxWidth: 1700, margin: '0 auto' }}>
+      <div style={{ padding: 16}}>
         {/* PR-6.14.a — PageTitle 자동 (메인 세션 위탁 후) */}
         <div style={{ ...GLASS.L4, padding: 12, borderRadius: 12, marginBottom: 12 }}>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>

@@ -463,7 +463,7 @@ export default function RideAccidentReportsPage() {
     stalenessSec > 300 ? COLORS.danger : stalenessSec > 60 ? COLORS.warning : COLORS.success
 
   return (
-    <div style={{ padding: '20px 24px', maxWidth: 1400, margin: '0 auto' }}>
+    <div style={{ padding: '20px 24px'}}>
       <div
         style={{
           ...GLASS.L5,

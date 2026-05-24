@@ -107,7 +107,7 @@ export default function MaintenanceToursPage() {
   return (
     <>
       <MTOpsNavTabs />
-      <div style={{ padding: 16, maxWidth: 1700, margin: '0 auto' }}>
+      <div style={{ padding: 16}}>
         {note && (
           <div style={{ padding: 8, background: COLORS.bgAmber, color: COLORS.warning, borderRadius: 8, marginBottom: 8, fontSize: 11 }}>
             ⚠ {note}

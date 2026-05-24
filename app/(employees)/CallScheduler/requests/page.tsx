@@ -348,7 +348,7 @@ export default function RequestsPage() {
   }
 
   return (
-    <div style={{ maxWidth: 1200, margin: '0 auto', padding: '20px 24px' }}>
+    <div style={{ padding: '20px 24px' }}>
       {/* N-12 — 자체 헤더 제거 (PageTitle 자동) */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'flex-end',

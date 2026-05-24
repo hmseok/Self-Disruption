@@ -39,7 +39,7 @@ function SettingsInner() {
   }, [sp])
 
   return (
-    <div style={{ padding: '16px 24px', maxWidth: 1280, margin: '0 auto' }}>
+    <div style={{ padding: '16px 24px'}}>
       {/* N-12 — 자체 헤더 제거 (PageTitle 자동) */}
 
       {/* N-14 — 운영/설정 분류 (사용자 의도: 워커/그룹도 설정 안)

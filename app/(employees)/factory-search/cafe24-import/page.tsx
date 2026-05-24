@@ -545,7 +545,7 @@ export default function Cafe24ImportPage() {
   return (
     <>
       <SubNav />
-      <div style={{ padding: 16, maxWidth: 1700, margin: '0 auto', display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+      <div style={{ padding: 16, display: 'flex', gap: 12, alignItems: 'flex-start' }}>
         {/* ─── 좌측 컨트롤 패널 ─── */}
         <div style={{ width: 320, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 12, position: 'sticky', top: 16 }}>
           <div style={{ ...GLASS.L5, padding: '12px 16px', borderRadius: 12 }}>

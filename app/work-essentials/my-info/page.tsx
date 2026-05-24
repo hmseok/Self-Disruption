@@ -187,7 +187,7 @@ export default function MyInfoPage() {
   // ── admin 회사 미선택 시 차단 ──
   if (!company) {
     return (
-      <div style={{ maxWidth: 700, margin: '0 auto', padding: '24px 16px', minHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ padding: '24px 16px', minHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <div style={{ textAlign: 'center', padding: '60px 20px', background: '#fff', borderRadius: 16, width: '100%', maxWidth: 500 }}>
           <span style={{ fontSize: 48, display: 'block', marginBottom: 12 }}>🏢</span>
           <p style={{ fontWeight: 700, color: '#374151', fontSize: 16, marginBottom: 8 }}>좌측 상단에서 회사를 먼저 선택해주세요</p>

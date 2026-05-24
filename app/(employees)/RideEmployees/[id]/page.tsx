@@ -121,7 +121,7 @@ export default function RideEmployeeDetailPage({
   }
   if (error || !emp) {
     return (
-      <div style={{ padding: 24, maxWidth: 600, margin: '0 auto' }}>
+      <div style={{ padding: 24}}>
         <div style={{ padding: 16, borderRadius: 12, background: COLORS.bgRed,
           border: `1px solid ${COLORS.borderRed}`, color: COLORS.danger }}>
           ❌ {error || '직원을 찾을 수 없습니다.'}
@@ -138,7 +138,7 @@ export default function RideEmployeeDetailPage({
   const tokenUrl = emp.public_token ? `/CallScheduler/e/${emp.public_token}` : null
 
   return (
-    <div style={{ padding: '16px 24px', maxWidth: 960, margin: '0 auto' }}>
+    <div style={{ padding: '16px 24px'}}>
       <div style={{ marginBottom: 14 }}>
         <Link href="/RideEmployees" style={{ fontSize: 12, color: COLORS.info, textDecoration: 'none' }}>
           ← 직원 목록

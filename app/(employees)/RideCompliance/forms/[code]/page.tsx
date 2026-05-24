@@ -139,7 +139,7 @@ export default function FormDetailPage() {
 // ────────── 카테고리 list (default route) ──────────
 function CategoriesIndex(props: { allForms: FormDoc[]; allSubs: Submission[] }) {
   return (
-    <div style={{ padding: '24px 32px', maxWidth: 1400, margin: '0 auto' }}>
+    <div style={{ padding: '24px 32px'}}>
       <Link href="/RideCompliance?tab=documents" style={{ color: COLORS.primary, fontSize: 13, marginBottom: 8, display: 'inline-block' }}>← 라이드 정보보안</Link>
       <h1 style={{ margin: '4px 0 16px', fontSize: 20 }}>📝 서식 카테고리</h1>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 14 }}>
@@ -192,7 +192,7 @@ function CategoryView(props: { code: string; info: { parent: string | null; labe
   ]
 
   return (
-    <div style={{ padding: '24px 32px', maxWidth: 1400, margin: '0 auto' }}>
+    <div style={{ padding: '24px 32px'}}>
       <Link href="/RideCompliance?tab=documents" style={{ color: COLORS.primary, fontSize: 13, marginBottom: 8, display: 'inline-block' }}>← 라이드 정보보안</Link>
       <h1 style={{ margin: '4px 0 4px', fontSize: 20 }}>📝 {props.info.label}</h1>
       <p style={{ margin: '0 0 16px', fontSize: 13, color: COLORS.textSecondary }}>{props.info.description}</p>
@@ -239,7 +239,7 @@ function IndividualFormView(props: {
   ]
 
   return (
-    <div style={{ padding: '24px 32px', maxWidth: 1400, margin: '0 auto' }}>
+    <div style={{ padding: '24px 32px'}}>
       <div style={{ marginBottom: 8 }}>
         <Link href="/RideCompliance?tab=documents" style={{ color: COLORS.primary, fontSize: 13 }}>← 라이드 정보보안</Link>
         {props.form.parent_manual_code && (

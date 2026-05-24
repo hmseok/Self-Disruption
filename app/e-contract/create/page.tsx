@@ -381,7 +381,7 @@ export default function CreateContractPage() {
 
   if (loading) {
     return (
-      <div style={{ maxWidth: 900, margin: '0 auto', padding: '24px', minHeight: '100vh', background: '#f9fafb' }}>
+      <div style={{ padding: '24px', minHeight: '100vh', background: '#f9fafb' }}>
         <div style={{ padding: '80px 20px', textAlign: 'center', color: '#9ca3af', fontSize: 14 }}>
           <p>로드 중...</p>
         </div>

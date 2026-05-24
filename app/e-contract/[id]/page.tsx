@@ -76,7 +76,7 @@ export default function EContractDetailPage() {
   const st = STATUS_MAP[contract.status] || STATUS_MAP.draft
 
   return (
-    <div style={{ maxWidth: 1000, margin: '0 auto', padding: '24px 16px', minHeight: '100vh', background: '#f9fafb' }}>
+    <div style={{ padding: '24px 16px', minHeight: '100vh', background: '#f9fafb' }}>
       {/* 브레드크럼 */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
         <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#3b6eb5', display: 'inline-block' }} />

@@ -80,7 +80,7 @@ function QuoteTimeline({ quoteId }: { quoteId?: string }) {
   const displayed = expanded ? events : events.slice(0, 5)
 
   return (
-    <div className="no-print" style={{ maxWidth: 900, margin: '0 auto', padding: '0 16px 24px' }}>
+    <div className="no-print" style={{ padding: '0 16px 24px' }}>
       <div style={{ background: 'rgba(255,255,255,0.72)', borderRadius: 16, border: '1px solid rgba(0,0,0,0.06)', overflow: 'hidden' }}>
         <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(0,0,0,0.04)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#111' }}>📋 활동 타임라인</h3>

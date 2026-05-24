@@ -303,7 +303,7 @@ export default function RideVehicleRegistryPage() {
   return (
     <>
     <RideOpsNavTabs />
-    <div style={{ padding: '20px 24px', maxWidth: 1600, margin: '0 auto' }}>
+    <div style={{ padding: '20px 24px'}}>
       {/* PR-6.13.c — 페이지 헤더 X (PageTitle 자동 mount). 액션 버튼만 우측 상단 */}
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
         <button

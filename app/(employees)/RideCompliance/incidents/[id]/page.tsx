@@ -89,7 +89,7 @@ export default function IncidentDetailPage() {
   const slaH = slaRemainHours(incident.detected_at, incident.notified_at)
 
   return (
-    <div style={{ padding: '24px 32px', maxWidth: 1100, margin: '0 auto' }}>
+    <div style={{ padding: '24px 32px'}}>
       <Link href="/RideCompliance" style={{ color: COLORS.primary, fontSize: 13, marginBottom: 8, display: 'inline-block' }}>← 사고 목록</Link>
       <h1 style={{ margin: '4px 0 8px', fontSize: 20 }}>🚨 {incident.incident_code}</h1>
       <p style={{ margin: '0 0 16px', fontSize: 16, color: COLORS.textPrimary }}>{incident.title}</p>

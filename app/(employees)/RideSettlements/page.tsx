@@ -259,7 +259,7 @@ export default function RideSettlementsPage() {
   return (
     <>
     <RideOpsNavTabs />
-    <div style={{ padding: 16, maxWidth: 1600, margin: '0 auto' }}>
+    <div style={{ padding: 16}}>
       {/* PR-6.13.c — PageTitle 자동 mount, 자체 헤더 X */}
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
         <button

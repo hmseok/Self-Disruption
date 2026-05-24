@@ -238,7 +238,7 @@ export default function ManualDetailPage() {
   const verifiedColor = meta.is_master_verified === 1 ? COLORS.success : COLORS.warning
 
   return (
-    <div style={{ padding: '24px 32px', maxWidth: 1400, margin: '0 auto' }}>
+    <div style={{ padding: '24px 32px'}}>
       <Link href="/RideCompliance?tab=documents" style={{ color: COLORS.primary, fontSize: 13, marginBottom: 8, display: 'inline-block' }}>← 라이드 정보보안</Link>
       <h1 style={{ margin: '4px 0 4px', fontSize: 20 }}>📘 {meta.doc_code} · {meta.title}</h1>
       {desc && <p style={{ margin: '0 0 16px', fontSize: 13, color: COLORS.textSecondary }}>{desc.intro}</p>}

@@ -34,7 +34,7 @@ export default function RideEmployeeNewPage() {
   }
 
   return (
-    <div style={{ padding: '16px 24px', maxWidth: 720, margin: '0 auto' }}>
+    <div style={{ padding: '16px 24px'}}>
       <div style={{ marginBottom: 14 }}>
         <Link href="/RideEmployees" style={{ fontSize: 12, color: COLORS.info, textDecoration: 'none' }}>
           ← 직원 목록

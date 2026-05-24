@@ -509,7 +509,7 @@ export default function ChargersPage() {
   return (
     <>
       <MTOpsNavTabs />
-      <div style={{ padding: 16, maxWidth: 1700, margin: '0 auto' }}>
+      <div style={{ padding: 16}}>
         {migrationPending && (
           <div
             style={{

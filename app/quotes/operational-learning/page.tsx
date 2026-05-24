@@ -169,10 +169,7 @@ function OperationalLearningInner() {
 
   return (
     <div style={{
-      padding: '20px 24px',
-      maxWidth: 1600,
-      margin: '0 auto',
-    }}>
+      padding: '20px 24px'}}>
       {/* 페이지 헤더 */}
       <div style={{ marginBottom: 18 }}>
         <h1 style={{ fontSize: 22, fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>

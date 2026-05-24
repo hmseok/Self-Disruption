@@ -169,7 +169,7 @@ function DetailInner({ id }: { id: string }) {
   }
   if (error) {
     return (
-      <div style={{ padding: 24, maxWidth: 600, margin: '0 auto' }}>
+      <div style={{ padding: 24}}>
         <div style={{
           padding: 16, borderRadius: 12, background: COLORS.bgRed,
           border: `1px solid ${COLORS.borderRed}`, color: COLORS.danger,
