@@ -119,7 +119,7 @@ export default function WorkersTab() {
   const openLinkPicker = (w: Worker) => { setLinkTarget(w); setPickerMode('link') }
   const closePicker = () => { setPickerMode(null); setLinkTarget(null) }
 
-  // 모달에서 직원 선택 — create: 워커 생성 POST / link: 워커 PATCH (profile_id)
+  // 모달에서 직원 선택 — create: 워커 생성 POST / link: 워커 PATCH (employee_id)
   const handleEmployeePicked = async (emp: HrEmployee) => {
     setPickerBusy(true); setActionMsg(null)
     try {
@@ -128,7 +128,7 @@ export default function WorkersTab() {
         const res = await fetch(`/api/call-scheduler/workers/${linkTarget.id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json', ...auth },
-          body: JSON.stringify({ profile_id: emp.id }),
+          body: JSON.stringify({ employee_id: emp.id }),
         })
         const json = await res.json()
         if (!res.ok) throw new Error(json?.error || '연결 실패')
@@ -137,7 +137,7 @@ export default function WorkersTab() {
         const res = await fetch('/api/call-scheduler/workers', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...auth },
-          body: JSON.stringify({ profile_id: emp.id }),
+          body: JSON.stringify({ employee_id: emp.id }),
         })
         const json = await res.json()
         if (!res.ok) throw new Error(json?.error || '워커 생성 실패')
@@ -395,9 +395,9 @@ export default function WorkersTab() {
                           background: TONE_BG[tone] !== 'transparent' ? TONE_BG[tone] : undefined,
                           padding: '2px 8px', borderRadius: 4, fontWeight: 700,
                         }}>
-                          {worker.profile_name || worker.name}
+                          {employee?.name || worker.name}
                         </span>
-                        {!worker.profile_id && (
+                        {!worker.employee_id && (
                           <span style={{
                             marginLeft: 4, fontSize: 9, fontWeight: 800, padding: '1px 6px',
                             borderRadius: 4, background: COLORS.bgAmber, color: COLORS.warning,
@@ -406,10 +406,10 @@ export default function WorkersTab() {
                         )}
                       </td>
                       <td style={{ ...tdStyle, color: COLORS.textMuted, fontSize: 12 }}>
-                        {worker.profile_department || employee?.department || '·'}
+                        {employee?.department || '·'}
                       </td>
                       <td style={{ ...tdStyle, color: COLORS.textMuted, fontSize: 12 }}>
-                        {worker.profile_position || employee?.position || '·'}
+                        {employee?.position || '·'}
                       </td>
                       <td style={tdStyle}>
                         {isEditing ? (
@@ -497,7 +497,7 @@ export default function WorkersTab() {
                                   }}>편집</button>
                         )}
                         {/* Phase WHR-A — 레거시(인사 미연결) 워커 → 직원 연결 */}
-                        {!isEditing && !worker.profile_id && (
+                        {!isEditing && !worker.employee_id && (
                           <button type="button" onClick={() => openLinkPicker(worker)}
                                   title="인사마스터 직원과 연결"
                                   style={{
@@ -595,7 +595,7 @@ export default function WorkersTab() {
         open={pickerMode !== null}
         onClose={closePicker}
         onSelect={handleEmployeePicked}
-        linkTargetName={pickerMode === 'link' ? (linkTarget?.profile_name || linkTarget?.name || null) : null}
+        linkTargetName={pickerMode === 'link' ? (linkTarget?.name || null) : null}
         busy={pickerBusy}
       />
     </div>

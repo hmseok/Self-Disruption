@@ -11,8 +11,8 @@ import { prisma } from '@/lib/prisma'
 const ALLOWED = new Set([
   'color_tone', 'group_label', 'phone', 'email',
   'is_external', 'external_pattern',
-  // Phase WHR-A — 인사마스터 연결 (직원 선택 시 profile_id + name/phone 갱신)
-  'profile_id',
+  // Phase WHR-A / WHR-A-fix — 인사마스터 연결 (직원 선택 시 employee_id + name/phone 갱신)
+  'employee_id',
   // Phase K — 외부 근무 cycle (워커 글로벌, 외부 회사 일정)
   'cycle_days_on', 'cycle_days_off', 'cycle_start_date',
   // N-29-a — 개인 한계 (그룹 무관 — 워커 단위)
@@ -64,13 +64,13 @@ export async function PATCH(
     const sets: string[] = []
     const params: any[] = []
 
-    // Phase WHR-A — profile_id 연결 시 profiles 에서 name/phone 복사 (캐시 동기화)
-    if (body && Object.prototype.hasOwnProperty.call(body, 'profile_id') && body.profile_id) {
-      const pid = String(body.profile_id).trim()
+    // Phase WHR-A / WHR-A-fix — employee_id 연결 시 ride_employees 에서 name/phone 복사 (캐시 동기화)
+    if (body && Object.prototype.hasOwnProperty.call(body, 'employee_id') && body.employee_id) {
+      const eid = String(body.employee_id).trim()
       // 다른 워커가 이미 이 직원을 사용 중이면 거부 (1:1)
       const dup = await prisma.$queryRaw<any[]>`
         SELECT id, name FROM cs_workers
-        WHERE profile_id = ${pid} AND id <> ${id} AND is_active = 1
+        WHERE employee_id = ${eid} AND id <> ${id} AND is_active = 1
         LIMIT 1
       `
       if (dup.length > 0) {
@@ -78,26 +78,26 @@ export async function PATCH(
           { error: `이미 다른 워커에 연결된 직원입니다 (${dup[0].name})` }, { status: 409 },
         )
       }
-      const prof = await prisma.$queryRaw<any[]>`
-        SELECT id, name, phone, email FROM profiles
-        WHERE id = ${pid} AND is_active = 1
+      const emp = await prisma.$queryRaw<any[]>`
+        SELECT id, name, phone, email FROM ride_employees
+        WHERE id = ${eid} AND is_active = 1
         LIMIT 1
       `
-      if (prof.length === 0) {
+      if (emp.length === 0) {
         return NextResponse.json(
           { error: '인사마스터에 없는 직원이거나 퇴사자입니다' }, { status: 400 },
         )
       }
-      sets.push('profile_id = ?'); params.push(pid)
-      sets.push('name = ?'); params.push(String(prof[0].name || '').trim())
-      sets.push('phone = ?'); params.push(prof[0].phone ?? null)
-      if (prof[0].email != null) { sets.push('email = ?'); params.push(prof[0].email) }
+      sets.push('employee_id = ?'); params.push(eid)
+      sets.push('name = ?'); params.push(String(emp[0].name || '').trim())
+      sets.push('phone = ?'); params.push(emp[0].phone ?? null)
+      if (emp[0].email != null) { sets.push('email = ?'); params.push(emp[0].email) }
     }
 
     for (const [k, v] of Object.entries(body || {})) {
       if (!ALLOWED.has(k)) continue
-      // profile_id 는 위에서 처리 (name/phone 동반 갱신)
-      if (k === 'profile_id') continue
+      // employee_id 는 위에서 처리 (name/phone 동반 갱신)
+      if (k === 'employee_id') continue
       if ((k === 'is_external' || k === 'external_pattern') && !hasExt) continue
       if (CYCLE_COLS.has(k) && !hasCycle) continue
       if (LIMIT_COLS.has(k) && !hasLimits) continue

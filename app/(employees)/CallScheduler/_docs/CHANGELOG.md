@@ -3,6 +3,16 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-24 (Phase WHR-A-fix) — 인사마스터 연동 대상 정정 (profiles → ride_employees)
+
+> WHR-A 가 연동 대상을 `profiles` 로 잘못 잡음. 진단 결과 — CallScheduler 워커 16명은 `profiles` 에 없고 `ride_employees`(department='콜센터') 에 있으며, `cs_workers.employee_id` → `ride_employees.id` 연결이 16명 전원 이미 정상. WHR-A 의 `profile_id` 경로를 `employee_id` 경로로 전면 교체.
+
+- **인사마스터 = `ride_employees`** — CallScheduler 워커의 인사 출처는 `profiles`(로그인 계정)가 아니라 `ride_employees`(Ride Inc. 직원 마스터, 콜센터 포함). 정식 연결 컬럼 = `cs_workers.employee_id` (FK `fk_cs_worker_employee`, 2026-05-03 신설, 16명 전원 채워져 있음).
+- **`hr-employees` API** — `profiles` → `ride_employees` 조회로 교체. 재직자(is_active=1), 콜센터 우선 정렬, `cs_workers.employee_id` 사용 중이면 `already_linked`.
+- **워커 CRUD API** — POST/PATCH 가 `profile_id` → `employee_id` 수용. `ride_employees` 에서 name/phone/email 복사, `employee_id` 1:1 중복 409 거부. GET 이 `employee_id` 반환(WorkersTab 이 `/api/ride-employees` 와 클라이언트 조인), profiles JOIN 제거.
+- **WorkersTab / EmployeePickerModal / types** — 직원 선택·연결이 `employee_id` 전송. 행 이름·부서·직급은 ride_employees 조인값 사용. 「인사 미연결」 판정은 `employee_id` 기준. `Worker` 타입에서 `profile_name/department/position` 제거, `employee_id` 추가.
+- **마이그레이션** — `migrations/2026-05-24_ride_employees_dedup.sql`(신규): `ride_employees` 콜센터 중복 정리(48행 → 16행) — 비활성 중복 32행 삭제(활성 정본·cs_workers 연결행 보존, 1093 회피 파생테이블 래핑, 멱등). `2026-05-24_cs_workers_profile_backfill.sql`(폐기): 잘못된 타깃 — git rm.
+
 ## 2026-05-24 (Phase WHR-A) — 워커↔인사마스터 연동 (직원 선택 생성 + profile_id 백필)
 
 - **신규 API** — `GET /api/call-scheduler/hr-employees`: `profiles(is_active=1)` 직원 목록(id·name·phone·department·position) 반환, `cs_workers.profile_id` 사용 중인 직원은 `already_linked: true`. 정렬 = CX팀 우선 → 이름순. 부서 하드 필터 없음(프론트 검색).

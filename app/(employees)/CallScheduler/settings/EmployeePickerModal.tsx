@@ -1,10 +1,10 @@
 'use client'
 // ═══════════════════════════════════════════════════════════════════
 // EmployeePickerModal — 인사마스터 직원 선택 모달
-//   Phase WHR-A (2026-05-24) — 워커 ↔ 인사마스터 연동
+//   Phase WHR-A / WHR-A-fix (2026-05-24) — 워커 ↔ 인사마스터 연동
 //   용도 1: 신규 워커 생성 (mode='create')
 //   용도 2: 레거시 워커에 직원 연결 (mode='link' — 대상 워커명 표시)
-//   GET /api/call-scheduler/hr-employees → profiles(is_active=1) 목록.
+//   GET /api/call-scheduler/hr-employees → ride_employees(is_active=1, 콜센터 우선) 목록.
 //   이미 연결된 직원(already_linked)은 회색 + "이미 등록" 표시.
 // ═══════════════════════════════════════════════════════════════════
 import { useEffect, useMemo, useState } from 'react'

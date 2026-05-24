@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
     let rows: any[]
     if (hasCycle) {
       rows = await prisma.$queryRaw<any[]>`
-        SELECT id, name, profile_id, color_tone, group_label, phone, email, is_active,
+        SELECT id, name, profile_id, employee_id, color_tone, group_label, phone, email, is_active,
                is_external, external_pattern,
                cycle_days_on, cycle_days_off,
                DATE_FORMAT(cycle_start_date, '%Y-%m-%d') AS cycle_start_date
@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
       `
     } else if (hasExternal) {
       rows = await prisma.$queryRaw<any[]>`
-        SELECT id, name, profile_id, color_tone, group_label, phone, email, is_active,
+        SELECT id, name, profile_id, employee_id, color_tone, group_label, phone, email, is_active,
                is_external, external_pattern
         FROM cs_workers
         WHERE is_active = 1
@@ -69,7 +69,7 @@ export async function GET(request: NextRequest) {
       `
     } else {
       rows = await prisma.$queryRaw<any[]>`
-        SELECT id, name, profile_id, color_tone, group_label, phone, email, is_active
+        SELECT id, name, profile_id, employee_id, color_tone, group_label, phone, email, is_active
         FROM cs_workers
         WHERE is_active = 1
         ORDER BY group_label DESC, name ASC
@@ -125,43 +125,13 @@ export async function GET(request: NextRequest) {
       } catch { /* graceful */ }
     }
 
-    // Phase WHR-A — 인사마스터(profiles) 정보 graceful JOIN (별도 조회)
-    //   profile_id 로 연결된 워커의 직원명/부서/직급을 UI 가 표시.
-    const profileMap = new Map<string, {
-      profile_name: string | null
-      profile_department: string | null
-      profile_position: string | null
-    }>()
-    const profileIds = rows
-      .map(r => r.profile_id)
-      .filter((v): v is string => !!v)
-    if (profileIds.length > 0) {
-      try {
-        const placeholders = profileIds.map(() => '?').join(',')
-        const profRows = await prisma.$queryRawUnsafe<any[]>(
-          `SELECT id, name, department, position FROM profiles WHERE id IN (${placeholders})`,
-          ...profileIds,
-        )
-        for (const p of profRows) {
-          profileMap.set(String(p.id), {
-            profile_name: p.name ?? null,
-            profile_department: p.department ?? null,
-            profile_position: p.position ?? null,
-          })
-        }
-      } catch { /* graceful — profiles 조회 실패 시 NULL */ }
-    }
-
+    // WHR-A-fix — 인사 정보(부서/직급)는 WorkersTab 이 /api/ride-employees 를
+    //   별도 조회해 employee_id 로 클라이언트 조인. 본 API 는 employee_id 만 반환.
     const data = rows.map(r => {
       const limits = limitsMap.get(r.id)
-      const prof = r.profile_id ? profileMap.get(String(r.profile_id)) : undefined
       return {
         ...r,
         is_active: Boolean(r.is_active),
-        // Phase WHR-A — 인사 연결 정보 (profile_id NULL 또는 미존재 시 NULL)
-        profile_name: prof?.profile_name ?? null,
-        profile_department: prof?.profile_department ?? null,
-        profile_position: prof?.profile_position ?? null,
         is_external: hasExternal ? Boolean(r.is_external) : false,
         external_pattern: hasExternal ? (r.external_pattern ?? null) : null,
         // Phase K — 외부 cycle (워커 글로벌 — 모든 그룹 공통 일정)
@@ -194,18 +164,18 @@ export async function POST(request: NextRequest) {
     const tone: Tone = COLOR_TONES.includes(body?.color_tone) ? body.color_tone : 'none'
     const group_label: string | null = body?.group_label ?? null
 
-    // Phase WHR-A — 워커는 인사마스터 직원에서 선택 생성.
-    //   profile_id 받으면 profiles 에서 name/phone 복사 (단일 출처).
-    let profile_id: string | null = body?.profile_id ? String(body.profile_id).trim() : null
+    // Phase WHR-A / WHR-A-fix — 워커는 인사마스터(ride_employees)에서 선택 생성.
+    //   employee_id 받으면 ride_employees 에서 name/phone/email 복사 (단일 출처).
+    let employee_id: string | null = body?.employee_id ? String(body.employee_id).trim() : null
     let name: string = String(body?.name || '').trim()
     let phone: string | null = body?.phone ?? null
     let email: string | null = body?.email ?? null
 
-    if (profile_id) {
+    if (employee_id) {
       // 같은 직원이 이미 워커면 거부 (1:1 — 중복 방지)
       const dup = await prisma.$queryRaw<any[]>`
         SELECT id, name FROM cs_workers
-        WHERE profile_id = ${profile_id} AND is_active = 1
+        WHERE employee_id = ${employee_id} AND is_active = 1
         LIMIT 1
       `
       if (dup.length > 0) {
@@ -213,20 +183,20 @@ export async function POST(request: NextRequest) {
           { error: `이미 워커로 등록된 직원입니다 (${dup[0].name})` }, { status: 409 },
         )
       }
-      // profiles 에서 name/phone 복사 (캐시)
-      const prof = await prisma.$queryRaw<any[]>`
-        SELECT id, name, phone, email FROM profiles
-        WHERE id = ${profile_id} AND is_active = 1
+      // ride_employees 에서 name/phone/email 복사 (캐시)
+      const emp = await prisma.$queryRaw<any[]>`
+        SELECT id, name, phone, email FROM ride_employees
+        WHERE id = ${employee_id} AND is_active = 1
         LIMIT 1
       `
-      if (prof.length === 0) {
+      if (emp.length === 0) {
         return NextResponse.json(
           { error: '인사마스터에 없는 직원이거나 퇴사자입니다' }, { status: 400 },
         )
       }
-      name = String(prof[0].name || '').trim()
-      phone = prof[0].phone ?? null
-      email = prof[0].email ?? null
+      name = String(emp[0].name || '').trim()
+      phone = emp[0].phone ?? null
+      email = emp[0].email ?? null
     }
 
     if (!name) return NextResponse.json({ error: '이름은 필수' }, { status: 400 })
@@ -240,18 +210,18 @@ export async function POST(request: NextRequest) {
       const external_pattern: string | null = body?.external_pattern ?? null
       await prisma.$executeRaw`
         INSERT INTO cs_workers
-          (id, name, profile_id, color_tone, group_label, phone, email, is_active,
+          (id, name, employee_id, color_tone, group_label, phone, email, is_active,
            is_external, external_pattern, created_at, updated_at)
         VALUES
-          (${id}, ${name}, ${profile_id}, ${tone}, ${group_label}, ${phone}, ${email}, 1,
+          (${id}, ${name}, ${employee_id}, ${tone}, ${group_label}, ${phone}, ${email}, 1,
            ${is_external}, ${external_pattern}, NOW(), NOW())
       `
     } else {
       await prisma.$executeRaw`
         INSERT INTO cs_workers
-          (id, name, profile_id, color_tone, group_label, phone, email, is_active, created_at, updated_at)
+          (id, name, employee_id, color_tone, group_label, phone, email, is_active, created_at, updated_at)
         VALUES
-          (${id}, ${name}, ${profile_id}, ${tone}, ${group_label}, ${phone}, ${email}, 1, NOW(), NOW())
+          (${id}, ${name}, ${employee_id}, ${tone}, ${group_label}, ${phone}, ${email}, 1, NOW(), NOW())
       `
     }
 

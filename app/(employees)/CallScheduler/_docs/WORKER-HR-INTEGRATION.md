@@ -5,6 +5,28 @@
 
 ---
 
+## 0. 정정 — WHR-A-fix (2026-05-24, 구현 후 데이터 검증)
+
+> 본 설계서는 인사마스터를 `profiles` 로 가정했으나 **틀렸다**. 아래가 정정된 사실.
+
+**인사마스터 = `ride_employees`** (profiles 아님).
+
+- CallScheduler 워커 16명은 `profiles` 에 없음 (이름 매칭 0/16 — 전소현만 우연히 profiles 계정 보유).
+- 16명은 `ride_employees`(department='콜센터')에 있음.
+- 정식 연결 컬럼 = **`cs_workers.employee_id` → `ride_employees.id`** (FK `fk_cs_worker_employee`, 2026-05-03 신설). 16명 전원 이미 정상 연결됨.
+- `profiles` ↔ `ride_employees` 는 `ride_employees.profile_id` 로 옵션 연결 (로그인 계정 있는 직원만). 콜센터 16명은 전부 NULL.
+- 3층 구조: `profiles`(로그인 계정) ←옵션← `ride_employees`(인사 마스터) ←`employee_id`← `cs_workers`(콜센터 스케줄링).
+
+**아래 § 본문에서 `profiles` / `profile_id` 라고 쓴 부분은 모두 `ride_employees` / `employee_id` 로 읽을 것.**
+
+- § 3-2 KT ID / Cafe24 ID 매칭, § 4 UI, § 5 Phase 계획은 유효 — 연동 컬럼만 `employee_id`.
+- § 3-3 「백필」 불필요 — `employee_id` 는 이미 채워져 있음. 대신 `ride_employees` 콜센터 중복 정리(`2026-05-24_ride_employees_dedup.sql`) 수행.
+- § 6 「확정 사항」 1번 `profiles.department='CX팀'` → 실제는 `ride_employees.department='콜센터'`.
+
+데이터 검증 근거: 2026-05-24 진단 — `cs_workers` 16명 ↔ `ride_employees` linkage_status 전원 OK / `ride_employees` 콜센터 48행(활성16+중복32, 중복은 dedup 으로 정리).
+
+---
+
 ## 1. 현황
 
 ### 1-1. 인사마스터 = `profiles` 테이블

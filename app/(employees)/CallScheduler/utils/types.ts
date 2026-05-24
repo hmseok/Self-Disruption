@@ -83,10 +83,10 @@ export interface Worker {
   preferred_dow_prefer?: string | null
   preferred_dow_avoid?: string | null
   min_days_per_month?: number | null
-  // Phase WHR-A (2026-05-24) — 인사마스터(profiles) 연결 정보 (GET 응답 캐시)
-  profile_name?: string | null
-  profile_department?: string | null
-  profile_position?: string | null
+  // Phase WHR-A / WHR-A-fix (2026-05-24) — 인사마스터(ride_employees) 연결
+  //   인사 출처는 ride_employees(콜센터 직원). 부서/직급/연락처는 WorkersTab 이
+  //   /api/ride-employees 를 별도 조회해 employee_id 로 클라이언트 조인.
+  employee_id?: string | null
 }
 
 // Phase WHR-A — 인사마스터 직원 (직원 선택 모달 후보)
