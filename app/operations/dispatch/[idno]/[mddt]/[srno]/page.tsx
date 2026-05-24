@@ -112,6 +112,9 @@ const DISPATCH_STATUS_LABEL: Record<DispatchOrder['status'], string> = {
   cancelled: '✗ 취소',
 }
 
+// PR-N7.2 — 청구유형 (ClaimsTab 과 동일 목록)
+const CLAIM_TYPES = ['보험', '라이드', '고객유상', '유상대차', '정비대차', '사고대차']
+
 export default function DispatchDetailPage({
   params,
 }: {
@@ -208,6 +211,12 @@ export default function DispatchDetailPage({
   const [expReturn, setExpReturn] = useState('')
   const [status, setStatus] = useState<DispatchOrder['status']>('consulting')
   const [busy, setBusy] = useState(false)
+
+  // ── 청구 정보 (PR-N7.2) — 배차 단계에서 체크, fmi_rental 에 저장 ──
+  const [claimType, setClaimType] = useState('')
+  const [claimFaultRate, setClaimFaultRate] = useState('')
+  const [claimClaimRate, setClaimClaimRate] = useState('')
+  const [claimInfoBusy, setClaimInfoBusy] = useState(false)
 
   // ── 상담 ──
   const [consultations, setConsultations] = useState<Consultation[]>([])
@@ -387,7 +396,12 @@ export default function DispatchDetailPage({
           try {
             const rRes = await fetch(`/api/fmi-rentals/${found.fmi_rental_id}`, { headers })
             const rJson = await rRes.json().catch(() => ({}))
-            const vid: string | null = rJson?.data?.vehicle_id || null
+            const rd = rJson?.data || {}
+            // PR-N7.2 — 청구 정보 동기화
+            setClaimType(rd.claim_type || '')
+            setClaimFaultRate(rd.fault_rate != null ? String(rd.fault_rate) : '')
+            setClaimClaimRate(rd.claim_rate != null ? String(rd.claim_rate) : '')
+            const vid: string | null = rd.vehicle_id || null
             if (vid) {
               const cRes = await fetch('/api/operations/waiting-vehicles?status=all', { headers })
               const cJson = await cRes.json().catch(() => ({}))
@@ -600,6 +614,34 @@ export default function DispatchDetailPage({
       showResult({ type: 'err', text: e?.message || '사진 업로드 실패' })
     } finally {
       setReleaseUploading(false)
+    }
+  }
+
+  // PR-N7.2 — 청구 정보 (청구유형·과실율·청구율) → fmi_rental 저장
+  const saveClaimInfo = async () => {
+    if (!dispatchOrder?.fmi_rental_id) {
+      showResult({ type: 'err', text: '배차 확정(차량 연결)을 먼저 해주세요' })
+      return
+    }
+    setClaimInfoBusy(true)
+    try {
+      const headers = { ...(await getAuthHeader()), 'Content-Type': 'application/json' }
+      const res = await fetch(`/api/fmi-rentals/${dispatchOrder.fmi_rental_id}`, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({
+          claim_type: claimType || null,
+          fault_rate: claimFaultRate === '' ? null : Number(claimFaultRate),
+          claim_rate: claimClaimRate === '' ? null : Number(claimClaimRate),
+        }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || json?.error) throw new Error(json?.error || '저장 실패')
+      showResult({ type: 'ok', text: '청구 정보 저장 — 청구 모달에 동기화됩니다' })
+    } catch (e: any) {
+      showResult({ type: 'err', text: e?.message || '청구 정보 저장 오류' })
+    } finally {
+      setClaimInfoBusy(false)
     }
   }
 
@@ -1525,6 +1567,42 @@ export default function DispatchDetailPage({
                       resize: 'vertical', fontFamily: 'inherit',
                     }}
                   />
+                </div>
+                {/* PR-N7.2 — 청구 정보 (청구유형·과실율·청구율) */}
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#475569', marginBottom: 4, whiteSpace: 'nowrap' }}>
+                    청구 정보
+                    <span style={{ marginLeft: 6, fontSize: 10, color: '#94a3b8', fontWeight: 500 }}>상담·배차 단계에서 체크 — 청구 모달에 동기화</span>
+                  </label>
+                  {dispatchOrder?.fmi_rental_id ? (
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                      <select value={claimType} onChange={(e) => setClaimType(e.target.value)}
+                        style={{ ...GLASS.L1, padding: '8px 10px', borderRadius: 8, fontSize: 12, color: '#1e293b', flex: '1 1 150px' }}>
+                        <option value="">— 청구유형 —</option>
+                        {CLAIM_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                      </select>
+                      <div style={{ ...GLASS.L1, display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', borderRadius: 8 }}>
+                        <span style={{ fontSize: 11, color: '#94a3b8' }}>과실</span>
+                        <input type="number" value={claimFaultRate} onChange={(e) => setClaimFaultRate(e.target.value)} placeholder="100"
+                          style={{ border: 'none', background: 'transparent', fontSize: 12, color: '#1e293b', fontWeight: 700, outline: 'none', width: 44 }} />
+                        <span style={{ fontSize: 11, color: '#94a3b8' }}>%</span>
+                      </div>
+                      <div style={{ ...GLASS.L1, display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', borderRadius: 8 }}>
+                        <span style={{ fontSize: 11, color: '#94a3b8' }}>청구율</span>
+                        <input type="number" value={claimClaimRate} onChange={(e) => setClaimClaimRate(e.target.value)} placeholder="100"
+                          style={{ border: 'none', background: 'transparent', fontSize: 12, color: '#1e293b', fontWeight: 700, outline: 'none', width: 44 }} />
+                        <span style={{ fontSize: 11, color: '#94a3b8' }}>%</span>
+                      </div>
+                      <button onClick={saveClaimInfo} disabled={claimInfoBusy}
+                        style={{ padding: '7px 14px', borderRadius: 8, border: 'none', cursor: claimInfoBusy ? 'wait' : 'pointer', fontSize: 12, fontWeight: 800, background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)', color: '#fff', opacity: claimInfoBusy ? 0.5 : 1 }}>
+                        {claimInfoBusy ? '저장 중…' : '청구정보 저장'}
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={{ ...GLASS.L1, padding: '8px 12px', borderRadius: 8, fontSize: 11, color: '#94a3b8' }}>
+                      배차 확정 후 입력할 수 있습니다 — 청구유형·과실율·청구율은 청구 모달과 동기화됩니다.
+                    </div>
+                  )}
                 </div>
               </div>
             )}
