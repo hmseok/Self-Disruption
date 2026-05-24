@@ -83,6 +83,20 @@ export interface Worker {
   preferred_dow_prefer?: string | null
   preferred_dow_avoid?: string | null
   min_days_per_month?: number | null
+  // Phase WHR-A (2026-05-24) — 인사마스터(profiles) 연결 정보 (GET 응답 캐시)
+  profile_name?: string | null
+  profile_department?: string | null
+  profile_position?: string | null
+}
+
+// Phase WHR-A — 인사마스터 직원 (직원 선택 모달 후보)
+export interface HrEmployee {
+  id: string
+  name: string
+  phone: string | null
+  department: string | null
+  position: string | null
+  already_linked: boolean
 }
 
 // Phase K — 그룹 안에서의 멤버 설정 (cs_group_members 행)

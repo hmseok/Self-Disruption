@@ -3,6 +3,13 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-24 (Phase WHR-A) — 워커↔인사마스터 연동 (직원 선택 생성 + profile_id 백필)
+
+- **신규 API** — `GET /api/call-scheduler/hr-employees`: `profiles(is_active=1)` 직원 목록(id·name·phone·department·position) 반환, `cs_workers.profile_id` 사용 중인 직원은 `already_linked: true`. 정렬 = CX팀 우선 → 이름순. 부서 하드 필터 없음(프론트 검색).
+- **워커 CRUD API** — POST 가 `profile_id` 수용: profiles 에서 name/phone/email 복사(단일 출처), 같은 profile_id 가 이미 워커면 409 거부. PATCH 가 `profile_id` 수용(레거시 워커 인사 연결) — 연결 시 name/phone/email 동반 갱신, 1:1 중복 거부. GET 이 profile 정보(profile_name·department·position) graceful JOIN.
+- **WorkersTab UI** — 자유 입력 「+ 워커」 폐기 → 「+ 워커 (직원 선택)」 버튼이 `EmployeePickerModal`(신규) 열어 인사마스터 직원 선택. 이름/부서 검색, `already_linked` 직원은 회색 「이미 등록」. 워커 행 이름은 인사마스터 출처(읽기전용), `profile_id` NULL 레거시 워커는 「⚠ 인사 미연결」 배지 + 「👤 직원 연결」 버튼(같은 모달 link 모드).
+- **마이그레이션** — `migrations/2026-05-24_cs_workers_profile_backfill.sql`: `profile_id` IS NULL 워커를 profiles 와 이름 정확 일치 + 해당 이름의 활성 profile 이 정확히 1명일 때만 연결. 동명이인 skip, 멱등, 1:1 보장. 검증 SELECT 주석 포함.
+
 ## 2026-05-24 (Phase N-74) — 그룹·워커 기본 색상 베이스
 
 - 시프트는 N-73 에서 색상(카테고리 기본색 + ShiftsTab 선택)을 가졌으나 워커·그룹은 `color_tone` 기본값이 'none'(회색)이라 기본 색이 없었음. 마이그레이션 `2026-05-24_cs_default_colors.sql` — `cs_workers`·`cs_shift_groups` 의 'none' 행에 14색 팔레트를 이름순 순환 배정(멱등 — 'none' 만 대상이라 사용자 지정·기존 색 보존). 이제 그룹·워커·시프트 세 항목 모두 기본색 베이스를 갖고, 각 설정 탭(WorkersTab·GroupEditor·ShiftsTab)에서 직접 변경 가능.

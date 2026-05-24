@@ -125,11 +125,43 @@ export async function GET(request: NextRequest) {
       } catch { /* graceful */ }
     }
 
+    // Phase WHR-A — 인사마스터(profiles) 정보 graceful JOIN (별도 조회)
+    //   profile_id 로 연결된 워커의 직원명/부서/직급을 UI 가 표시.
+    const profileMap = new Map<string, {
+      profile_name: string | null
+      profile_department: string | null
+      profile_position: string | null
+    }>()
+    const profileIds = rows
+      .map(r => r.profile_id)
+      .filter((v): v is string => !!v)
+    if (profileIds.length > 0) {
+      try {
+        const placeholders = profileIds.map(() => '?').join(',')
+        const profRows = await prisma.$queryRawUnsafe<any[]>(
+          `SELECT id, name, department, position FROM profiles WHERE id IN (${placeholders})`,
+          ...profileIds,
+        )
+        for (const p of profRows) {
+          profileMap.set(String(p.id), {
+            profile_name: p.name ?? null,
+            profile_department: p.department ?? null,
+            profile_position: p.position ?? null,
+          })
+        }
+      } catch { /* graceful — profiles 조회 실패 시 NULL */ }
+    }
+
     const data = rows.map(r => {
       const limits = limitsMap.get(r.id)
+      const prof = r.profile_id ? profileMap.get(String(r.profile_id)) : undefined
       return {
         ...r,
         is_active: Boolean(r.is_active),
+        // Phase WHR-A — 인사 연결 정보 (profile_id NULL 또는 미존재 시 NULL)
+        profile_name: prof?.profile_name ?? null,
+        profile_department: prof?.profile_department ?? null,
+        profile_position: prof?.profile_position ?? null,
         is_external: hasExternal ? Boolean(r.is_external) : false,
         external_pattern: hasExternal ? (r.external_pattern ?? null) : null,
         // Phase K — 외부 cycle (워커 글로벌 — 모든 그룹 공통 일정)
@@ -158,14 +190,46 @@ export async function POST(request: NextRequest) {
   if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
   try {
     const body = await request.json()
-    const name: string = String(body?.name || '').trim()
-    if (!name) return NextResponse.json({ error: '이름은 필수' }, { status: 400 })
 
     const tone: Tone = COLOR_TONES.includes(body?.color_tone) ? body.color_tone : 'none'
     const group_label: string | null = body?.group_label ?? null
-    const phone: string | null = body?.phone ?? null
-    const email: string | null = body?.email ?? null
-    const profile_id: string | null = body?.profile_id ?? null
+
+    // Phase WHR-A — 워커는 인사마스터 직원에서 선택 생성.
+    //   profile_id 받으면 profiles 에서 name/phone 복사 (단일 출처).
+    let profile_id: string | null = body?.profile_id ? String(body.profile_id).trim() : null
+    let name: string = String(body?.name || '').trim()
+    let phone: string | null = body?.phone ?? null
+    let email: string | null = body?.email ?? null
+
+    if (profile_id) {
+      // 같은 직원이 이미 워커면 거부 (1:1 — 중복 방지)
+      const dup = await prisma.$queryRaw<any[]>`
+        SELECT id, name FROM cs_workers
+        WHERE profile_id = ${profile_id} AND is_active = 1
+        LIMIT 1
+      `
+      if (dup.length > 0) {
+        return NextResponse.json(
+          { error: `이미 워커로 등록된 직원입니다 (${dup[0].name})` }, { status: 409 },
+        )
+      }
+      // profiles 에서 name/phone 복사 (캐시)
+      const prof = await prisma.$queryRaw<any[]>`
+        SELECT id, name, phone, email FROM profiles
+        WHERE id = ${profile_id} AND is_active = 1
+        LIMIT 1
+      `
+      if (prof.length === 0) {
+        return NextResponse.json(
+          { error: '인사마스터에 없는 직원이거나 퇴사자입니다' }, { status: 400 },
+        )
+      }
+      name = String(prof[0].name || '').trim()
+      phone = prof[0].phone ?? null
+      email = prof[0].email ?? null
+    }
+
+    if (!name) return NextResponse.json({ error: '이름은 필수' }, { status: 400 })
 
     const { hasExternal } = await detectFeatures()
     const id = crypto.randomUUID()

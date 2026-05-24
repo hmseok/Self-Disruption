@@ -14,7 +14,8 @@ import { TONE_BG, TONE_TEXT } from '@/app/(employees)/CallScheduler/utils/palett
 import { COLOR_TONE_OPTIONS } from '@/app/(employees)/CallScheduler/utils/types'
 import { getAuthHeader } from '@/app/utils/auth-client'
 import InfoLine from './InfoLine'
-import type { Worker, ColorTone, ShiftSlot } from '@/app/(employees)/CallScheduler/utils/types'
+import EmployeePickerModal from './EmployeePickerModal'
+import type { Worker, ColorTone, ShiftSlot, HrEmployee } from '@/app/(employees)/CallScheduler/utils/types'
 
 const GROUP_OPTIONS: (string | null)[] = [null, '주간', '야간', '저녁', '관리', '기타']
 
@@ -39,6 +40,10 @@ export default function WorkersTab() {
   const [actionMsg, setActionMsg] = useState<{ ok: boolean; text: string } | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  // Phase WHR-A — 직원 선택 모달 (create = 신규 워커 / link = 레거시 워커 연결)
+  const [pickerMode, setPickerMode] = useState<'create' | 'link' | null>(null)
+  const [linkTarget, setLinkTarget] = useState<Worker | null>(null)
+  const [pickerBusy, setPickerBusy] = useState(false)
 
   // Phase K — 정체성 편집 state (옮긴 필드 모두 제거)
   const [editTone, setEditTone] = useState<ColorTone>('none')
@@ -108,6 +113,42 @@ export default function WorkersTab() {
     ))
   }
   const cancelEdit = () => { setEditingId(null) }
+
+  // Phase WHR-A — 직원 선택 모달 핸들러
+  const openCreatePicker = () => { setLinkTarget(null); setPickerMode('create') }
+  const openLinkPicker = (w: Worker) => { setLinkTarget(w); setPickerMode('link') }
+  const closePicker = () => { setPickerMode(null); setLinkTarget(null) }
+
+  // 모달에서 직원 선택 — create: 워커 생성 POST / link: 워커 PATCH (profile_id)
+  const handleEmployeePicked = async (emp: HrEmployee) => {
+    setPickerBusy(true); setActionMsg(null)
+    try {
+      const auth = await getAuthHeader()
+      if (pickerMode === 'link' && linkTarget) {
+        const res = await fetch(`/api/call-scheduler/workers/${linkTarget.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', ...auth },
+          body: JSON.stringify({ profile_id: emp.id }),
+        })
+        const json = await res.json()
+        if (!res.ok) throw new Error(json?.error || '연결 실패')
+        setActionMsg({ ok: true, text: `${linkTarget.name} → ${emp.name} 인사 연결됨` })
+      } else {
+        const res = await fetch('/api/call-scheduler/workers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...auth },
+          body: JSON.stringify({ profile_id: emp.id }),
+        })
+        const json = await res.json()
+        if (!res.ok) throw new Error(json?.error || '워커 생성 실패')
+        setActionMsg({ ok: true, text: `${emp.name} 워커 추가됨 (인사마스터 연동)` })
+      }
+      closePicker()
+      await load()
+    } catch (e: any) {
+      setActionMsg({ ok: false, text: e?.message || '오류' })
+    } finally { setPickerBusy(false) }
+  }
 
   // N-50 — 영구 링크 토큰 발급/복사/폐기
   const handleTokenAction = async (w: Worker, emp: any) => {
@@ -294,12 +335,20 @@ export default function WorkersTab() {
             </span>
           )}
         </div>
-        <Link href="/RideEmployees" style={{
-          ...BTN.sm, background: 'transparent', color: COLORS.info,
-          border: `1px solid ${COLORS.borderBlue}`, textDecoration: 'none',
-        }}>
-          → 라이드 직원 마스터로
-        </Link>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <button type="button" onClick={openCreatePicker} style={{
+            ...BTN.sm, background: COLORS.primary, color: '#fff', border: 'none',
+            cursor: 'pointer',
+          }}>
+            + 워커 (직원 선택)
+          </button>
+          <Link href="/RideEmployees" style={{
+            ...BTN.sm, background: 'transparent', color: COLORS.info,
+            border: `1px solid ${COLORS.borderBlue}`, textDecoration: 'none',
+          }}>
+            → 라이드 직원 마스터로
+          </Link>
+        </div>
       </div>
 
       {/* Phase K 안내 — 그룹별 설정은 그룹쪽에서 */}
@@ -340,24 +389,27 @@ export default function WorkersTab() {
                     <Fragment key={worker.id}>
                     <tr style={{ borderBottom: isEditing ? 'none' : `1px solid ${COLORS.borderFaint}` }}>
                       <td style={tdStyle}>
+                        {/* Phase WHR-A — 이름은 인사마스터 출처(읽기전용) */}
                         <span style={{
                           color: TONE_TEXT[tone],
                           background: TONE_BG[tone] !== 'transparent' ? TONE_BG[tone] : undefined,
                           padding: '2px 8px', borderRadius: 4, fontWeight: 700,
                         }}>
-                          {employee?.name || worker.name}
+                          {worker.profile_name || worker.name}
                         </span>
-                        {!employee && (
-                          <span style={{ marginLeft: 4, fontSize: 10, color: COLORS.warning }}>
-                            ⚠ 라이드 직원 미연결
-                          </span>
+                        {!worker.profile_id && (
+                          <span style={{
+                            marginLeft: 4, fontSize: 9, fontWeight: 800, padding: '1px 6px',
+                            borderRadius: 4, background: COLORS.bgAmber, color: COLORS.warning,
+                            border: `1px solid ${COLORS.borderAmber}`,
+                          }}>⚠ 인사 미연결</span>
                         )}
                       </td>
                       <td style={{ ...tdStyle, color: COLORS.textMuted, fontSize: 12 }}>
-                        {employee?.department || '·'}
+                        {worker.profile_department || employee?.department || '·'}
                       </td>
                       <td style={{ ...tdStyle, color: COLORS.textMuted, fontSize: 12 }}>
-                        {employee?.position || '·'}
+                        {worker.profile_position || employee?.position || '·'}
                       </td>
                       <td style={tdStyle}>
                         {isEditing ? (
@@ -444,6 +496,16 @@ export default function WorkersTab() {
                                     border: `1px solid ${COLORS.borderBlue}`, cursor: 'pointer',
                                   }}>편집</button>
                         )}
+                        {/* Phase WHR-A — 레거시(인사 미연결) 워커 → 직원 연결 */}
+                        {!isEditing && !worker.profile_id && (
+                          <button type="button" onClick={() => openLinkPicker(worker)}
+                                  title="인사마스터 직원과 연결"
+                                  style={{
+                                    ...BTN.sm, marginLeft: 4,
+                                    background: COLORS.bgAmber, color: COLORS.warning,
+                                    border: `1px solid ${COLORS.borderAmber}`, cursor: 'pointer',
+                                  }}>👤 직원 연결</button>
+                        )}
                         {/* N-50 — 영구 링크 토큰 발급/복사/폐기 */}
                         {!isEditing && employee && (
                           <button type="button"
@@ -527,6 +589,15 @@ export default function WorkersTab() {
           )}
         </>
       )}
+
+      {/* Phase WHR-A — 직원 선택 모달 (신규 워커 / 레거시 연결 공용) */}
+      <EmployeePickerModal
+        open={pickerMode !== null}
+        onClose={closePicker}
+        onSelect={handleEmployeePicked}
+        linkTargetName={pickerMode === 'link' ? (linkTarget?.profile_name || linkTarget?.name || null) : null}
+        busy={pickerBusy}
+      />
     </div>
   )
 }
