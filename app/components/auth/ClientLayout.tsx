@@ -575,8 +575,8 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
             border: '1px solid rgba(0,0,0,0.06)',
             minHeight: 'calc(100dvh - 100px)',
           }}>
-            {/* 프레임 헤더 — 브레드크럼 */}
-            <PageTitle />
+            {/* 프레임 헤더 — 브레드크럼 + 회사 식별 배지 */}
+            <PageTitle brand={orgBrand.brand} primaryLabel={orgBrand.primaryLabel} />
             {/* 프레임 콘텐츠 */}
             <div style={{ padding: '0 4px 24px' }}>
               {children}

@@ -145,11 +145,20 @@ const ADMIN_GROUP: Record<string, string> = {
   '/admin/message-templates': 'settings',
 }
 
-interface PageTitleProps {
-  dynamicMenuName?: string
+// 회사 식별 배지 (org-brand) — 로그인 회사 첫 글자.
+// 솔리드 hex / linear-gradient 라 ui-token-lint(rgba 토큰) 무관.
+const BRAND_BADGE: Record<string, { initial: string; gradient: string }> = {
+  FMI:  { initial: 'F', gradient: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)' },
+  RIDE: { initial: 'R', gradient: 'linear-gradient(135deg, #0d9488, #14b8a6)' },
 }
 
-export default function PageTitle({ dynamicMenuName }: PageTitleProps) {
+interface PageTitleProps {
+  dynamicMenuName?: string
+  brand?: string         // 'FMI' | 'RIDE' — 로그인 회사 (org-brand)
+  primaryLabel?: string  // 'FMI ERP' | 'RIDE CARE' — 탭 제목 base
+}
+
+export default function PageTitle({ dynamicMenuName, brand, primaryLabel }: PageTitleProps) {
   const pathname = usePathname()
 
   const findBestMatch = (map: Record<string, string>): string | null => {
@@ -168,15 +177,16 @@ export default function PageTitle({ dynamicMenuName }: PageTitleProps) {
 
   // ── 브라우저 탭 제목 동적화 (2026-05-24) ──
   //   사용자: 「ERP 탭이 여러 개 열리면 다 똑같아 구분이 안 됨」
-  //   → document.title 을 「{페이지명} · FMI ERP」 로 — 페이지명이 앞에 와서
-  //     탭이 좁아도 어느 화면인지 보임. (favicon = 회사 아이콘은 그대로 유지)
+  //   → document.title 을 「{페이지명} · {브랜드}」 로 — 페이지명이 앞에 와서
+  //     탭이 좁아도 어느 화면인지 보임. base 는 로그인 회사(org-brand)에 맞춰
+  //     'FMI ERP' / 'RIDE CARE' — 헤더 배지(F/R)와 일관.
   useEffect(() => {
-    const base = 'FMI ERP'
+    const base = primaryLabel || 'FMI ERP'
     const label = pageName
       ? (sectionLabel ? `${pageName} (${sectionLabel})` : pageName)
       : null
     document.title = label ? `${label} · ${base}` : base
-  }, [pageName, sectionLabel])
+  }, [pageName, sectionLabel, primaryLabel])
 
   if (!pageName || pathname === '/dashboard') return null
 
@@ -191,12 +201,29 @@ export default function PageTitle({ dynamicMenuName }: PageTitleProps) {
       alignItems: 'center',
       gap: 12,
     }}>
-      {/* 컬러 도트 (맥 윈도우 스타일) */}
-      <div style={{ display: 'flex', gap: 6, marginRight: 4 }}>
-        <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#f87171' }} />
-        <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#fbbf24' }} />
-        <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#34d399' }} />
-      </div>
+      {/* 회사 식별 배지 — 로그인 회사 첫 글자 (org-brand) */}
+      {(() => {
+        const badge = BRAND_BADGE[brand || 'FMI'] || BRAND_BADGE.FMI
+        return (
+          <div title={primaryLabel || 'FMI ERP'} style={{
+            width: 22,
+            height: 22,
+            borderRadius: '50%',
+            background: badge.gradient,
+            color: '#fff',
+            fontSize: 12,
+            fontWeight: 800,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginRight: 4,
+            flexShrink: 0,
+            boxShadow: '2px 2px 5px rgba(140,170,210,0.30)',
+          }}>
+            {badge.initial}
+          </div>
+        )
+      })()}
       {/* 브레드크럼 */}
       {sectionLabel && (
         <>
