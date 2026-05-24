@@ -63,7 +63,6 @@ type FilterKey = 'active' | 'all' | 'returned' | 'claiming' | 'settled'
 // 청구관리 영역 = 회차 후 단계
 const VISIBLE_STATUS = ['returned', 'claiming', 'settled']
 const CLAIM_TYPES = ['보험', '라이드', '고객유상', '유상대차', '정비대차', '사고대차']
-const PAYMENT_STATUSES = ['미지급', '지급완료', '종결']
 
 const STATUS_META: Record<string, { label: string; bg: string; fg: string }> = {
   returned: { label: '📥 회차완료', bg: 'rgba(245,158,11,0.12)', fg: '#b45309' },
@@ -94,8 +93,8 @@ export default function ClaimsTab() {
   const [claimAmount, setClaimAmount] = useState('')
   const [claimNo, setClaimNo] = useState('')
   const [claimType, setClaimType] = useState('')
-  const [paymentStatus, setPaymentStatus] = useState('')   // PR-N6c — 지급여부
   const [paymentMemo, setPaymentMemo] = useState('')        // PR-N6c — 지급 메모
+  // 지급여부(payment_status)는 재무 통장 매칭 자동 — 조회 전용 (selectedClaim 에서 표시)
   const [lotteRateIdx, setLotteRateIdx] = useState<number>(-1)  // PR-N7 — 롯데 차종 행
   const [lotteDays, setLotteDays] = useState<string>('')        // PR-N7 — 산출 대여일수
   const [faultRate, setFaultRate] = useState<string>('')        // PR-N7.1 — 과실율(%)
@@ -140,7 +139,6 @@ export default function ClaimsTab() {
     setClaimAmount(r.final_claim_amount != null ? String(r.final_claim_amount) : '')
     setClaimNo(r.insurance_claim_no || '')
     setClaimType(r.claim_type || '')
-    setPaymentStatus(r.payment_status || '')
     setPaymentMemo(r.payment_memo || '')
     setLotteRateIdx(-1)
     setLotteDays(r.rental_days != null ? String(r.rental_days) : '')
@@ -189,7 +187,6 @@ export default function ClaimsTab() {
           final_claim_amount: claimAmount === '' ? null : Number(claimAmount),
           insurance_claim_no: claimNo || null,
           claim_type: claimType || null,
-          payment_status: paymentStatus || null,
           payment_memo: paymentMemo || null,
           fault_rate: faultRate === '' ? null : Number(faultRate),
           claim_rate: claimRate === '' ? null : Number(claimRate),
@@ -206,7 +203,7 @@ export default function ClaimsTab() {
     } finally {
       setClaimBusy(false)
     }
-  }, [selectedClaim, claimAmount, claimNo, claimType, paymentStatus, paymentMemo, faultRate, claimRate, refresh])
+  }, [selectedClaim, claimAmount, claimNo, claimType, paymentMemo, faultRate, claimRate, refresh])
 
   // 청구관리 영역 (returned/claiming/settled) — 부가세 필터 적용
   const claimRows = useMemo(() => {
@@ -555,17 +552,14 @@ export default function ClaimsTab() {
                   style={{ ...GLASS.L1, width: '100%', padding: '9px 12px', borderRadius: 8, fontSize: 13, color: '#1e293b' }}
                 />
               </div>
-              {/* 지급여부 (지급금액은 재무 자동매칭 — 위 참고정보 표시) */}
+              {/* 지급여부 — 재무 통장/카드 매칭 자동 반영 (조회 전용) */}
               <div>
-                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#475569', marginBottom: 5 }}>지급여부</label>
-                <select
-                  value={paymentStatus}
-                  onChange={(e) => setPaymentStatus(e.target.value)}
-                  style={{ ...GLASS.L1, width: '100%', padding: '9px 12px', borderRadius: 8, fontSize: 13, color: '#1e293b' }}
-                >
-                  <option value="">— 선택 —</option>
-                  {PAYMENT_STATUSES.map((t) => <option key={t} value={t}>{t}</option>)}
-                </select>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#475569', marginBottom: 5 }}>
+                  지급여부 <span style={{ fontSize: 10, color: '#94a3b8', fontWeight: 500 }}>재무 통장/카드 매칭 자동</span>
+                </label>
+                <div style={{ ...GLASS.L1, width: '100%', padding: '9px 12px', borderRadius: 8, fontSize: 13, color: selectedClaim.payment_status ? '#15803d' : '#94a3b8', fontWeight: 700 }}>
+                  {selectedClaim.payment_status || '미지급 — 재무 매칭 시 자동 반영'}
+                </div>
               </div>
               {/* 지급 메모 */}
               <div>
