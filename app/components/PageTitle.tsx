@@ -51,6 +51,8 @@ const PATH_TO_GROUP: Record<string, string> = {
   '/CallScheduler/skips':                          'cx',
   '/CallScheduler/me':                             'cx',
   '/CallScheduler/kpi':                            'cx',
+  '/factory-search':                               'cx',  // PR-PT-COV (2026-05-24)
+  '/RideEmployees':                                'cx',  // PR-PT-COV — 하위 경로 자동 커버
   // ── MT팀 운영 — PR-MT-OPS (2026-05-11) ──
   '/RideMTOps/maintenance-tours':                  'mt-team',
   '/RideMTOps/legal-inspections':                  'mt-team',
@@ -141,6 +143,12 @@ const PAGE_NAMES: Record<string, string> = {
   '/RideMTOps/chargers':             '충전기',
   // 비전 (PR-VISION — 2026-05-24)
   '/RideVision/lotto':               '로또번호추출기',
+  // PR-PT-COV (2026-05-24) — menu-registry 엔 있으나 PageTitle 누락이던 활성 페이지
+  '/factory-search':                 '협력공장 추천',
+  '/RideEmployees':                  '직원 마스터',
+  '/hr':                             '인사 마스터',
+  '/hr/payroll':                     '급여 운영',
+  '/db/codes':                       '회사 정보',
 }
 
 // 설정 그룹 매핑
@@ -148,6 +156,10 @@ const ADMIN_GROUP: Record<string, string> = {
   '/admin/employees': 'settings',
   '/admin/contract-terms': 'settings',
   '/admin/message-templates': 'settings',
+  // PR-PT-COV (2026-05-24) — 설정 그룹 활성 페이지 (PageTitle 누락분)
+  '/hr': 'settings',
+  '/hr/payroll': 'settings',
+  '/db/codes': 'settings',
 }
 
 // 회사 식별 배지 (org-brand) — 로그인 회사 첫 글자.
