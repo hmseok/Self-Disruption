@@ -15,6 +15,7 @@ import { COLOR_TONE_OPTIONS } from '@/app/(employees)/CallScheduler/utils/types'
 import { getAuthHeader } from '@/app/utils/auth-client'
 import InfoLine from './InfoLine'
 import EmployeePickerModal from './EmployeePickerModal'
+import AgentMappingSection from './AgentMappingSection'
 import type { Worker, ColorTone, ShiftSlot, HrEmployee } from '@/app/(employees)/CallScheduler/utils/types'
 
 const GROUP_OPTIONS: (string | null)[] = [null, '주간', '야간', '저녁', '관리', '기타']
@@ -589,6 +590,17 @@ export default function WorkersTab() {
           )}
         </>
       )}
+
+      {/* WHR-B (2026-05-24) — KT·Cafe24 ID 매칭 (KPI 설정 ④ 에서 이동) */}
+      <div style={{ ...GLASS.L4, borderRadius: 12, padding: 12, marginTop: 14 }}>
+        <div style={{
+          fontSize: 13, fontWeight: 800, color: COLORS.textPrimary,
+          padding: '4px 6px', marginBottom: 8,
+        }}>
+          🔗 상담원 ID 매칭 — KT 상담사 ID · Cafe24 접수자
+        </div>
+        <AgentMappingSection />
+      </div>
 
       {/* Phase WHR-A — 직원 선택 모달 (신규 워커 / 레거시 연결 공용) */}
       <EmployeePickerModal

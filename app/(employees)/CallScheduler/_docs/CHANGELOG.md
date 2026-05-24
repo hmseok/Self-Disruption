@@ -3,6 +3,15 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-24 (Phase WHR-B) — KT·Cafe24 ID 매칭 UI를 「설정 › 워커」로 이동
+
+> 워커 정체성이므로 ID 매칭도 워커 설정에 위치해야 한다는 사용자 지시 반영.
+
+- **AgentMappingSection 독립 파일화** — `KpiSettings.tsx` 내부 함수였던 상담원 매칭 UI(워커별 KT 상담사 ID·Cafe24 접수자 드롭다운 + 이름일치 자동추천 + 「✨ 전체 자동 매칭」 + 미매칭 요약)를 `settings/AgentMappingSection.tsx` 독립 컴포넌트로 추출.
+- **WorkersTab 에 패널 이식** — 워커 표 하단에 「🔗 상담원 ID 매칭」 패널로 렌더. API(`kpi/agent-mapping`)는 변경 없음.
+- **KPI 설정 ④ 상담원 매칭 섹션 제거** — KpiSettings 는 4섹션(목표치·WFM·평가·근태)으로 간결화. 헤더·인트로 텍스트 정정, ⑤→④ 재번호.
+- API·DB 변경 없음 (`cs_workers.kt_id`/`cafe24_user_id` 컬럼 그대로).
+
 ## 2026-05-24 (Phase WHR-A-fix) — 인사마스터 연동 대상 정정 (profiles → ride_employees)
 
 > WHR-A 가 연동 대상을 `profiles` 로 잘못 잡음. 진단 결과 — CallScheduler 워커 16명은 `profiles` 에 없고 `ride_employees`(department='콜센터') 에 있으며, `cs_workers.employee_id` → `ride_employees.id` 연결이 16명 전원 이미 정상. WHR-A 의 `profile_id` 경로를 `employee_id` 경로로 전면 교체.
