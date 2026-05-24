@@ -13,7 +13,7 @@
       "label": "glass-bg-hardcode",
       "hash": "5688890001a9",
       "occ": 0,
-      "line": 415,
+      "line": 419,
       "snippet": "background: TONE_BG[w.tone] !== 'transparent' ? TONE_BG[w.tone] : 'rgba(255,255,255,0.7)',"
     },
     {
@@ -29,7 +29,7 @@
       "label": "glass-bg-hardcode",
       "hash": "c38aa8e8cb8e",
       "occ": 0,
-      "line": 983,
+      "line": 984,
       "snippet": "background: 'rgba(255,255,255,0.95)',"
     },
     {
@@ -37,7 +37,7 @@
       "label": "glass-bg-hardcode",
       "hash": "4bdb20dec6dc",
       "occ": 0,
-      "line": 1046,
+      "line": 1067,
       "snippet": "borderLeft: `1px dashed rgba(255,255,255,0.7)`,"
     },
     {
@@ -285,7 +285,7 @@
       "label": "glass-bg-hardcode",
       "hash": "21cdcd360633",
       "occ": 0,
-      "line": 517,
+      "line": 579,
       "snippet": "background: 'rgba(255,255,255,0.5)',"
     },
     {
@@ -293,7 +293,7 @@
       "label": "glass-bg-hardcode",
       "hash": "d8f0788fada4",
       "occ": 0,
-      "line": 635,
+      "line": 706,
       "snippet": "background: 'rgba(255,255,255,0.6)', color: COLORS.textPrimary,"
     },
     {
@@ -1221,7 +1221,7 @@
       "label": "glass-bg-hardcode",
       "hash": "e85618606388",
       "occ": 0,
-      "line": 110,
+      "line": 112,
       "snippet": "boxShadow: '3px 3px 8px rgba(140,170,210,0.19), -1px -1px 4px rgba(255,255,255,0.47)',"
     },
     {
@@ -1229,7 +1229,7 @@
       "label": "glass-bg-hardcode",
       "hash": "a48895ab13ce",
       "occ": 0,
-      "line": 301,
+      "line": 303,
       "snippet": "<div className=\"fixed top-0 left-0 right-0 z-30 safe-top\" style={{ background: 'rgba(255,255,255,0.85)', backdropFilter:"
     },
     {
@@ -1237,7 +1237,7 @@
       "label": "glass-bg-hardcode",
       "hash": "8e26b31a8f62",
       "occ": 0,
-      "line": 327,
+      "line": 329,
       "snippet": "<aside className={`${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} w-60 transition-transform duration-300 overf"
     },
     {
@@ -1245,7 +1245,7 @@
       "label": "glass-bg-hardcode",
       "hash": "798a926214bf",
       "occ": 0,
-      "line": 342,
+      "line": 344,
       "snippet": "<div className=\"rounded-lg px-3 py-3\" style={{ background: 'rgba(0,0,0,0.02)', border: '1px solid rgba(0,0,0,0.06)', box"
     },
     {
@@ -1253,7 +1253,7 @@
       "label": "glass-bg-hardcode",
       "hash": "e85618606388",
       "occ": 1,
-      "line": 382,
+      "line": 384,
       "snippet": "boxShadow: '3px 3px 8px rgba(140,170,210,0.19), -1px -1px 4px rgba(255,255,255,0.47)',"
     },
     {
@@ -1261,7 +1261,7 @@
       "label": "glass-bg-hardcode",
       "hash": "77d288765500",
       "occ": 0,
-      "line": 400,
+      "line": 402,
       "snippet": "boxShadow: '3px 3px 8px rgba(16,185,129,0.22), -1px -1px 4px rgba(255,255,255,0.47)',"
     },
     {
@@ -1269,7 +1269,7 @@
       "label": "glass-bg-hardcode",
       "hash": "b44153c4de72",
       "occ": 0,
-      "line": 407,
+      "line": 409,
       "snippet": "'4px 4px 12px rgba(16,185,129,0.30), -1px -1px 4px rgba(255,255,255,0.55)'"
     },
     {
@@ -1277,7 +1277,7 @@
       "label": "glass-bg-hardcode",
       "hash": "6e2f29a0b50b",
       "occ": 0,
-      "line": 412,
+      "line": 414,
       "snippet": "'3px 3px 8px rgba(16,185,129,0.22), -1px -1px 4px rgba(255,255,255,0.47)'"
     },
     {
@@ -1285,7 +1285,7 @@
       "label": "glass-bg-hardcode",
       "hash": "45ec62a1c8c5",
       "occ": 0,
-      "line": 574,
+      "line": 596,
       "snippet": "boxShadow: '12px 12px 30px rgba(140,170,210,0.25), -8px -8px 20px rgba(255,255,255,0.5)',"
     },
     {
@@ -1293,7 +1293,7 @@
       "label": "glass-bg-hardcode",
       "hash": "3a2d3fd06b93",
       "occ": 0,
-      "line": 667,
+      "line": 689,
       "snippet": "<div style={{ width: 14, height: 14, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '5"
     },
     {
@@ -1301,7 +1301,7 @@
       "label": "glass-bg-hardcode",
       "hash": "97ebe2a9bf9d",
       "occ": 0,
-      "line": 685,
+      "line": 707,
       "snippet": "background: 'rgba(22,32,54,0.97)', backdropFilter: 'blur(16px)', boxShadow: '0 8px 32px rgba(0,0,0,0.4), 0 0 0 1px rgba("
     },
     {
@@ -1309,7 +1309,7 @@
       "label": "glass-bg-hardcode",
       "hash": "53e54badd5eb",
       "occ": 0,
-      "line": 699,
+      "line": 721,
       "snippet": "<div style={{ width: 16, height: 16, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '5"
     },
     {
@@ -1317,7 +1317,7 @@
       "label": "glass-bg-hardcode",
       "hash": "13629b69e033",
       "occ": 0,
-      "line": 709,
+      "line": 731,
       "snippet": "<span style={{ fontSize: 11, fontWeight: 700, color: '#fff', background: 'rgba(255,255,255,0.2)', padding: '2px 8px', bo"
     },
     {
@@ -1325,7 +1325,7 @@
       "label": "glass-bg-hardcode",
       "hash": "c33f4fd939c1",
       "occ": 0,
-      "line": 714,
+      "line": 736,
       "snippet": "<span style={{ fontSize: 11, fontWeight: 700, color: '#fff', background: 'rgba(255,255,255,0.25)', padding: '2px 8px', b"
     },
     {
@@ -1333,7 +1333,7 @@
       "label": "glass-bg-hardcode",
       "hash": "0d11243732f8",
       "occ": 0,
-      "line": 719,
+      "line": 741,
       "snippet": "style={{ background: 'rgba(255,255,255,0.15)', border: 'none', cursor: 'pointer', borderRadius: 6, padding: '2px 6px', c"
     },
     {
@@ -1341,7 +1341,7 @@
       "label": "glass-bg-hardcode",
       "hash": "0d11243732f8",
       "occ": 1,
-      "line": 725,
+      "line": 747,
       "snippet": "style={{ background: 'rgba(255,255,255,0.15)', border: 'none', cursor: 'pointer', borderRadius: 6, padding: '2px 6px', c"
     },
     {
@@ -1349,7 +1349,7 @@
       "label": "glass-bg-hardcode",
       "hash": "bbe2a9a5821b",
       "occ": 0,
-      "line": 737,
+      "line": 759,
       "snippet": "<div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 6, height: 5, overflow: 'hidden', marginBottom: 8 }}>"
     },
     {
@@ -1375,14 +1375,6 @@
       "occ": 0,
       "line": 28,
       "snippet": "background: 'rgba(255,255,255,0.50)',"
-    },
-    {
-      "file": "app/contracts/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "dd412bda5705",
-      "occ": 0,
-      "line": 43,
-      "snippet": "background: mainTab === t.key ? 'rgba(255,255,255,0.85)' : 'transparent',"
     },
     {
       "file": "app/contracts/page.tsx",
@@ -4227,10 +4219,10 @@
     {
       "file": "app/report/ReportDashboard.tsx",
       "label": "glass-bg-hardcode",
-      "hash": "115cd6f30257",
+      "hash": "92c788930a0b",
       "occ": 0,
       "line": 264,
-      "snippet": "background: periodMonths === m ? '#0f2440' : 'rgba(255,255,255,0.6)',"
+      "snippet": "background: periodMonths === m ? '#3b6eb5' : 'rgba(255,255,255,0.6)',"
     },
     {
       "file": "app/work-essentials/receipts/page.tsx",
@@ -4361,6 +4353,6 @@
       "snippet": "boxShadow: '6px 6px 18px rgba(140,170,210,0.14), -6px -6px 18px rgba(255,255,255,0.47)',"
     }
   ],
-  "generatedAt": "2026-05-22T06:39:10.569Z",
+  "generatedAt": "2026-05-24T04:40:39.083Z",
   "note": "UI 토큰 hardcode (inline rgba). baseline 키 = file:label:contentHash:occurrence (line 번호 비의존 — PR-COORD-7 2026-05-22). 기존 위반 동결, 새 위반만 차단."
 }

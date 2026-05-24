@@ -38,6 +38,7 @@ const coworkStagingLint = require('./cowork-staging-lint')
 const uiTokenLint = require('./ui-token-lint')
 const menuPathDupLint = require('./menu-path-duplicate-lint')
 const pageTitleCovLint = require('./pagetitle-coverage-lint')
+const tabColorLint = require('./tab-color-lint')
 
 const flags = new Set(process.argv.slice(2))
 
@@ -218,6 +219,10 @@ function main() {
   console.log('\n▸ [3.9] pagetitle-coverage-lint — 활성 메뉴 PageTitle 등록 강제')
   const ptCovR = pageTitleCovLint.main() || { total: 0, newCount: 0, violations: [] }
 
+  // [평가] 3.10 — 활성 탭 색상 표준 (PR-DESIGN-6, 2026-05-24)
+  console.log('\n▸ [3.10] tab-color-lint — 활성 탭 #3b6eb5 표준 강제')
+  const tabColorR = tabColorLint.main() || { total: 0, newCount: 0, violations: [] }
+
   // [평가] 3.7. cowork-staging — 한 commit 에 여러 모듈 영역 동시 staged 차단 (CLAUDE.md 규칙 21)
   // 회귀 케이스: 2026-05-06 — 두 세션 동시 작업 시 git add . 로 다른 세션 작업물 흡수 사고
   console.log('\n▸ [3.7] cowork-staging-lint — 멀티 세션 staging 침범 차단')
@@ -308,7 +313,8 @@ function main() {
     newSqlViolations.length + fnR.violations.length + newApiBroken.length +
     newSign.length + newHelper.length + newAlias.length + newGb.length +
     menuR.violations.length + coworkCritical +
-    (uiTokenR.newCount || 0) + (menuDupR.newCount || 0) + (ptCovR.newCount || 0)
+    (uiTokenR.newCount || 0) + (menuDupR.newCount || 0) + (ptCovR.newCount || 0) +
+    (tabColorR.newCount || 0)
   console.log('\n═══ 결과 ═══')
   console.log(`  새 critical 위반: ${newCritical}`)
   console.log(`  known issue: ${knownSqlViolations.length} SQL + ${apiR.brokenCalls.length - newApiBroken.length} broken-call`)
