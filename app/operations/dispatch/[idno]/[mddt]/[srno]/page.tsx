@@ -1285,7 +1285,7 @@ export default function DispatchDetailPage({
                 onClick={() => setPanelOpen((v) => !v)}
                 style={{
                   padding: '6px 12px',
-                  background: panelOpen ? '#0f2440' : 'transparent',
+                  background: panelOpen ? '#3b6eb5' : 'transparent',
                   color: panelOpen ? '#fff' : '#0f2440',
                   border: panelOpen ? 'none' : '1px solid rgba(15,36,64,0.2)',
                   borderRadius: 8,
@@ -1497,7 +1497,7 @@ export default function DispatchDetailPage({
                             padding: '6px 12px', borderRadius: 8, cursor: 'pointer',
                             fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap',
                             border: active ? 'none' : '1px solid rgba(0,0,0,0.12)',
-                            background: active ? '#0f2440' : 'transparent',
+                            background: active ? '#3b6eb5' : 'transparent',
                             color: active ? '#fff' : '#475569',
                           }}
                         >

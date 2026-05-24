@@ -74,7 +74,7 @@ export default function OperationsPage() {
                   fontSize: 13,
                   fontWeight: active ? 800 : 600,
                   whiteSpace: 'nowrap',
-                  background: active ? '#0f2440' : 'transparent',
+                  background: active ? '#3b6eb5' : 'transparent',
                   color: active ? '#fff' : '#475569',
                   boxShadow: active ? '0 4px 12px rgba(15,36,64,0.2)' : 'none',
                   transition: 'all 0.2s',

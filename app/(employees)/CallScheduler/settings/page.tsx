@@ -85,7 +85,7 @@ function SettingsTab({ active, onClick, children }: {
       style={{
         padding: '8px 16px', borderRadius: 8,
         fontSize: 13, fontWeight: 700,
-        background: active ? '#0f2440' : 'transparent',
+        background: active ? '#3b6eb5' : 'transparent',
         color: active ? '#fff' : '#64748b',
         border: 'none',
         cursor: 'pointer',

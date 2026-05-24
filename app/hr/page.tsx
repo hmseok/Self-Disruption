@@ -1353,7 +1353,7 @@ export default function HRMasterPage() {
               <button key={key} onClick={() => setExternalSubTab(key)}
                 style={{
                   padding: '6px 16px', fontSize: 13, fontWeight: 600, borderRadius: 8, cursor: 'pointer', border: 'none',
-                  background: externalSubTab === key ? '#0f2440' : 'transparent',
+                  background: externalSubTab === key ? '#3b6eb5' : 'transparent',
                   color: externalSubTab === key ? '#fff' : '#64748b',
                 }}>
                 {label}

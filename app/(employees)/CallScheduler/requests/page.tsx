@@ -458,10 +458,10 @@ export default function RequestsPage() {
                                 style={{
                                   padding: '5px 11px', borderRadius: 6, fontSize: 12, fontWeight: 700,
                                   background: active
-                                    ? '#0f2440'
+                                    ? '#3b6eb5'
                                     : (TONE_BG[tone] !== 'transparent' ? TONE_BG[tone] : COLORS.bgGray),
                                   color: active ? '#fff' : (TONE_TEXT[tone] || COLORS.textPrimary),
-                                  border: `1px solid ${active ? '#0f2440' : COLORS.borderFaint}`,
+                                  border: `1px solid ${active ? '#3b6eb5' : COLORS.borderFaint}`,
                                   cursor: 'pointer',
                                 }}>
                           {w.name}
@@ -573,10 +573,10 @@ export default function RequestsPage() {
                                 style={{
                                   padding: '5px 11px', borderRadius: 6, fontSize: 12, fontWeight: 700,
                                   background: active
-                                    ? '#0f2440'
+                                    ? '#3b6eb5'
                                     : (TONE_BG[tone] !== 'transparent' ? TONE_BG[tone] : COLORS.bgGray),
                                   color: active ? '#fff' : (TONE_TEXT[tone] || COLORS.textPrimary),
-                                  border: `1px solid ${active ? '#0f2440' : COLORS.borderFaint}`,
+                                  border: `1px solid ${active ? '#3b6eb5' : COLORS.borderFaint}`,
                                   cursor: 'pointer',
                                 }}>
                           {w.name}
