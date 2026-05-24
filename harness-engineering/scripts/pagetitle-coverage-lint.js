@@ -29,15 +29,9 @@ function extractKeys(src, varName) {
   return new Set((m[1].match(/'(\/[^']*)'\s*:/g) || []).map(k => k.replace(/'\s*:$/, '').replace(/^'/, '')))
 }
 
-// PageTitle 의 findBestMatch — 경로 또는 상위 경로 매칭
-function bestMatch(set, pathname) {
-  if (set.has(pathname)) return true
-  const seg = pathname.split('/')
-  for (let i = seg.length - 1; i >= 2; i--) {
-    if (set.has(seg.slice(0, i).join('/'))) return true
-  }
-  return false
-}
+// PR-PT-COV2 (2026-05-24) — 메뉴 페이지는 PageTitle 에 「자기 이름」 항목이
+// 정확히 있어야 한다. 부모 경로 이름을 빌려쓰면(예: /finance/investor 가
+// /finance 의 '재무 대시보드' 를 표시) 브레드크럼이 틀리므로 exact 검사.
 
 function lint() {
   const pt = fs.readFileSync(PT_FILE, 'utf-8')
@@ -65,7 +59,8 @@ function lint() {
       if (/\bhidden:\s*true/.test(line)) continue
       if (hiddenPaths.has(p)) continue
       checked++
-      if (!bestMatch(PAGE_NAMES, p)) {
+      // exact 검사 — 메뉴 경로가 PAGE_NAMES 에 자기 키로 등록돼야 함
+      if (!PAGE_NAMES.has(p)) {
         const nm = line.match(/\bname:\s*'([^']+)'/)
         violations.push({ path: p, name: nm ? nm[1] : '' })
       }

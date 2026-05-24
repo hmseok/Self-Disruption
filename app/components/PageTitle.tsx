@@ -106,6 +106,12 @@ const PAGE_NAMES: Record<string, string> = {
   '/finance/upload': '카드/통장 관리',
   '/finance/cards': '카드 관리',
   '/finance/codef': '은행/카드 자동연동',
+  // PR-PT-COV2 (2026-05-24) — finance 메뉴 페이지 (부모 '재무 대시보드' 빌려쓰던 것 정정)
+  '/finance/bank-card': '통장/카드',
+  '/finance/investor': '투자자 정산',
+  '/finance/cost-analysis': '원가 분석',
+  '/finance/classify': '거래 분류',
+  '/finance/sms': 'SMS 수집',
   '/admin/payroll': '급여 관리',
   '/report': '보고서',
   '/loans': '대출 관리',
