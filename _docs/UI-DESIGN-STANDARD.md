@@ -89,6 +89,24 @@ PageTitle 자동 헤더 아래 페이지 본문 구조:
 - 자체 검색바 + 필터 영역 만들기
 - 자체 테이블 만들기 (NeuDataTable 사용)
 
+### 1.6 페이지 너비 — 전체 너비 (2026-05-24)
+
+페이지 최상위 래퍼는 콘텐츠 프레임 **전체 너비**를 채운다. ClientLayout 의
+콘텐츠 프레임이 이미 사이드바를 제외한 영역을 잡아주므로, 페이지가 다시
+`maxWidth` 로 가운데 정렬하면 좌우가 비어 답답해진다 (반응형으로 펴지지 않음).
+
+❌ 금지 — 페이지 최상위 래퍼 중앙정렬 (`maxWidth` + `margin: '0 auto'`):
+
+    <div style={{ padding: 16, maxWidth: 940, margin: '0 auto' }}>
+
+✅ 올바름 — 전체 너비:
+
+    <div style={{ padding: 16 }}>
+
+- `maxWidth` + `margin: '0 auto'` 는 **모달 / 카드 내부** 등 의도된 좁은
+  영역에만 사용. 페이지 본문 최상위 래퍼에는 금지.
+- 검사: `npm run lint:ui-design` — page.tsx 최상위 래퍼 중앙정렬 패턴 경고.
+
 ---
 
 ## 2. Stat Strip — DcStatStrip 사용

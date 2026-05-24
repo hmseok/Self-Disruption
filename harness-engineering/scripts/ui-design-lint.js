@@ -44,6 +44,26 @@ function listPageFiles(dir, files = []) {
   return files
 }
 
+// 페이지 최상위 래퍼 중앙정렬 (maxWidth + margin auto) 검출 — 전체 너비여야 (2026-05-24)
+// 모든 `return (` 직후 첫 <div 의 style 을 검사 (sub-component / early-return 대응).
+// maxWidth ≥ 600 + margin auto 조합만 — 좁은 모달(≤560) 은 대체로 제외됨.
+function topWrapperCentered(content) {
+  const re = /return\s*\(/g
+  let mm
+  while ((mm = re.exec(content)) !== null) {
+    const after = content.slice(mm.index, mm.index + 600)
+    const dm = after.match(/<div\b[^>]*style=\{\{([^}]*)\}\}/)
+    if (!dm) continue
+    const styleBody = dm[1]
+    const wm = styleBody.match(/\bmaxWidth:\s*['"]?(\d{2,4})\b/)
+    if (wm && parseInt(wm[1], 10) >= 600
+      && /\bmargin:\s*['"`][^'"`]*\bauto\b/.test(styleBody)) {
+      return true
+    }
+  }
+  return false
+}
+
 const violations = []
 const warnings = []
 
@@ -74,6 +94,8 @@ for (const fp of pageFiles) {
     hasCustomBigTitle: /<h1[^>]*style[^>]*fontSize:\s*(2[4-9]|3[0-9])/.test(content)
                      || /<h2[^>]*style[^>]*fontSize:\s*(3[0-9]|4[0-9])/.test(content),
     hasCustomBreadcrumbBox: /Employee of Ride Inc[^<]*›|차량관리[^<]*›|재무\/경영[^<]*›/.test(content),
+    // 2026-05-24 — 페이지 최상위 래퍼 중앙정렬 (전체 너비여야)
+    hasCenteredWrapper: topWrapperCentered(content),
   }
 
   // 1) stat strip 자체 구현 (5+ 카드 패턴 있는데 DcStatStrip 미사용)
@@ -112,6 +134,14 @@ for (const fp of pageFiles) {
     warnings.push({
       file: rel,
       issue: '자체 breadcrumb (그룹 › 페이지명) — PageTitle 가 자동으로 표시. 자체 추가 시 중복',
+    })
+  }
+
+  // 7) 2026-05-24: 페이지 최상위 래퍼 중앙정렬 — 콘텐츠 프레임 전체 너비로 펴야
+  if (checks.hasCenteredWrapper) {
+    warnings.push({
+      file: rel,
+      issue: '페이지 최상위 래퍼 중앙정렬 (maxWidth + margin:auto) — 전체 너비로 (UI-DESIGN-STANDARD § 1.6). 모달/카드 내부는 제외',
     })
   }
 }
