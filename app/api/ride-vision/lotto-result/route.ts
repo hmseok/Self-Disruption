@@ -48,16 +48,21 @@ function estimateLatestRound(): number {
   return Math.max(1, Math.floor(elapsed / WEEK_MS) + 1)
 }
 
-// 동행복권 단건 조회 (raw 로깅 — Rule 3 dry-run)
+// 동행복권 단건 조회 (raw 로깅 + debug 노출 — Rule 3 [B][C])
 async function fetchDhLottery(
   drwNo: number
-): Promise<{ ok: boolean; drawn: boolean; result?: ResultRow }> {
+): Promise<{ ok: boolean; drawn: boolean; result?: ResultRow; debug?: string }> {
   const ctrl = new AbortController()
-  const timer = setTimeout(() => ctrl.abort(), 6000)
+  const timer = setTimeout(() => ctrl.abort(), 8000)
   try {
     const res = await fetch(`${DHLOTTERY_URL}${drwNo}`, {
       signal: ctrl.signal,
-      headers: { 'User-Agent': 'Mozilla/5.0 (FMI-ERP RideVision)' },
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        Accept: 'application/json, text/plain, */*',
+        Referer: 'https://www.dhlottery.co.kr/',
+      },
       cache: 'no-store',
     })
     const text = await res.text()
@@ -66,10 +71,14 @@ async function fetchDhLottery(
     try {
       json = JSON.parse(text)
     } catch {
-      return { ok: false, drawn: false }
+      return {
+        ok: false,
+        drawn: false,
+        debug: `parse-fail status=${res.status} ct=${res.headers.get('content-type') || '-'} body=${text.slice(0, 160)}`,
+      }
     }
     if (json.returnValue !== 'success') {
-      return { ok: true, drawn: false } // 미추첨 / 미존재 회차
+      return { ok: true, drawn: false, debug: `returnValue=${String(json.returnValue)}` } // 미추첨 / 미존재
     }
     const num = (k: string) => Number(json[k])
     return {
@@ -88,8 +97,9 @@ async function fetchDhLottery(
       },
     }
   } catch (e) {
-    console.error('[lotto-result] fetch 실패', drwNo, (e as Error).message)
-    return { ok: false, drawn: false }
+    const err = e as Error
+    console.error('[lotto-result] fetch 실패', drwNo, err.name, err.message)
+    return { ok: false, drawn: false, debug: `fetch-throw ${err.name}: ${err.message}` }
   } finally {
     clearTimeout(timer)
   }
@@ -140,6 +150,7 @@ export async function GET(request: Request) {
     // ── 최신 회차 ──
     if (latestFlag === '1' || latestFlag === 'true') {
       let round = estimateLatestRound()
+      let lastDebug: string | undefined
       for (let attempt = 0; attempt < 3 && round >= 1; attempt++) {
         const cached = await getCached(round)
         if (cached) {
@@ -150,6 +161,7 @@ export async function GET(request: Request) {
           })
         }
         const fetched = await fetchDhLottery(round)
+        lastDebug = fetched.debug
         if (fetched.ok && fetched.drawn && fetched.result) {
           await putCache(fetched.result)
           return NextResponse.json({
@@ -163,7 +175,7 @@ export async function GET(request: Request) {
       return NextResponse.json({
         success: true,
         data: null,
-        meta: { latest: true, error: '최신 회차 확인 실패' },
+        meta: { latest: true, error: '최신 회차 확인 실패', debug: lastDebug },
       })
     }
 
@@ -184,12 +196,12 @@ export async function GET(request: Request) {
     const fetched = await fetchDhLottery(drwNo)
     if (!fetched.ok) {
       return NextResponse.json(
-        { success: false, data: null, error: '동행복권 조회 실패' },
+        { success: false, data: null, error: '동행복권 조회 실패', meta: { debug: fetched.debug } },
         { status: 502 }
       )
     }
     if (!fetched.drawn || !fetched.result) {
-      return NextResponse.json({ success: true, data: null, meta: { drawn: false, drwNo } })
+      return NextResponse.json({ success: true, data: null, meta: { drawn: false, drwNo, debug: fetched.debug } })
     }
     await putCache(fetched.result)
     return NextResponse.json({

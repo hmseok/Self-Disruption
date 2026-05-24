@@ -5,6 +5,24 @@
 
 ---
 
+## 2026-05-24 | PR-VISION-2d | 동행복권 조회 진단 (시각 검수 후속)
+
+### 배경
+배포 후 시각 검수(Rule 6)에서 `/api/ride-vision/lotto-result` 가 502 — Cloud Run
+서버사이드 동행복권 fetch 실패 확인. 회차 자동입력·당첨판정이 막힘.
+
+### 변경
+- **수정** `app/api/ride-vision/lotto-result/route.ts`
+  - 실패 응답에 `meta.debug` 노출 — fetch-throw(에러명/메시지) / parse-fail(status·ct·body) /
+    returnValue 구분 (Rule 3 [C] — 원인 즉시 파악)
+  - 요청 헤더 보강 (브라우저 UA + Accept + Referer) — HTML 차단 페이지 응답 케이스 대비
+  - 타임아웃 6초 → 8초
+
+### 다음 단계
+배포 후 `meta.debug` 로 실패 원인 확정 → 타깃 수정 (또는 egress 차단 시 사용자 직접입력 폴백).
+
+---
+
 ## 2026-05-24 | PR-VISION-2b | 구매기록 API + 페이지 탭 전면개편 (운세 + 당첨추적)
 
 > PR-VISION-2b 가 페이지 전면개편을 포함 → 당초 분리 예정이던 2c(내 기록 탭)도 본 PR 에 통합.
