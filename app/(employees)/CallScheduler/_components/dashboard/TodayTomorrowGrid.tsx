@@ -3,7 +3,8 @@
 // N-17 — 오늘 / 내일 근무자 그리드 (2 컬럼)
 // ═══════════════════════════════════════════════════════════════════
 import { COLORS, GLASS } from '@/app/utils/ui-tokens'
-import { TONE_BG, TONE_TEXT, TONE_BORDER, shiftConceptTone } from '../../utils/palette'
+import { TONE_BG, TONE_TEXT } from '../../utils/palette'
+import type { ColorTone } from '../../utils/types'
 import type { WorkerChip } from './NowWorkingStrip'
 
 export default function TodayTomorrowGrid({
@@ -85,27 +86,29 @@ function DayCard({ title, subtitle, isHoliday, assignments }: {
           {groupKeys.map(k => {
             const arr = groups.get(k) || []
             const first = arr[0]
-            // 시프트 시간대 개념색 (주간 sky / 저녁 orange / 야간 indigo)
-            const tone = shiftConceptTone(first.is_overnight, first.shift_start)
             return (
               <div key={k} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
                 <span style={{
-                  fontSize: 11, fontWeight: 700, color: TONE_TEXT[tone],
-                  background: TONE_BG[tone], padding: '4px 8px', borderRadius: 6,
+                  fontSize: 11, fontWeight: 700, color: COLORS.textSecondary,
+                  background: COLORS.bgGray, padding: '4px 8px', borderRadius: 6,
                   minWidth: 100, textAlign: 'center', whiteSpace: 'nowrap',
-                  border: `1px solid ${TONE_BORDER[tone]}`,
+                  border: `1px solid ${COLORS.borderFaint}`,
                 }}>
                   {first.is_overnight ? '🌙' : '☀️'} {first.shift_start}~{first.shift_end}
                 </span>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, flex: 1 }}>
-                  {arr.map(w => (
-                    <span key={w.worker_id} style={{
-                      fontSize: 12, fontWeight: 700,
-                      color: TONE_TEXT[tone], background: TONE_BG[tone],
-                      padding: '4px 10px', borderRadius: 99,
-                      border: `1px solid ${TONE_BORDER[tone]}`, whiteSpace: 'nowrap',
-                    }}>{w.name}</span>
-                  ))}
+                  {arr.map(w => {
+                    const tone = (w.color_tone || 'none') as ColorTone
+                    const bg = TONE_BG[tone] || COLORS.bgGray
+                    const fg = TONE_TEXT[tone] || COLORS.textPrimary
+                    return (
+                      <span key={w.worker_id} style={{
+                        fontSize: 12, fontWeight: 700, color: fg, background: bg,
+                        padding: '4px 10px', borderRadius: 99,
+                        border: `1px solid ${COLORS.borderFaint}`, whiteSpace: 'nowrap',
+                      }}>{w.name}</span>
+                    )
+                  })}
                 </div>
               </div>
             )

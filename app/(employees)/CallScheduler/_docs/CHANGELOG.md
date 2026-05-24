@@ -3,9 +3,9 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
-## 2026-05-23 (Phase N-74) — 대시보드 칩 시프트 개념색 적용
+## 2026-05-24 (Phase N-74) — 그룹·워커 기본 색상 베이스
 
-- 대시보드 「지금 일하는 사람」·「오늘/내일」 칩이 워커 color_tone(대부분 'none'→회색)으로 칠해져 컨셉색이 안 보임. `palette.shiftConceptTone(is_overnight, shift_start)` 신규 — 시간대 기반 개념색(주간→sky / 저녁 18시~→orange / 야간→indigo). `NowWorkingStrip`·`TodayTomorrowGrid` 칩을 이 개념색으로 칠함. 마이그레이션·API 의존 없음(칩 데이터의 is_overnight·shift_start 만으로 산출) — 즉시 적용.
+- 시프트는 N-73 에서 색상(카테고리 기본색 + ShiftsTab 선택)을 가졌으나 워커·그룹은 `color_tone` 기본값이 'none'(회색)이라 기본 색이 없었음. 마이그레이션 `2026-05-24_cs_default_colors.sql` — `cs_workers`·`cs_shift_groups` 의 'none' 행에 14색 팔레트를 이름순 순환 배정(멱등 — 'none' 만 대상이라 사용자 지정·기존 색 보존). 이제 그룹·워커·시프트 세 항목 모두 기본색 베이스를 갖고, 각 설정 탭(WorkersTab·GroupEditor·ShiftsTab)에서 직접 변경 가능.
 
 ## 2026-05-23 (Phase N-72-fix) — 대시보드 기준 시각 이중 보정 수정
 

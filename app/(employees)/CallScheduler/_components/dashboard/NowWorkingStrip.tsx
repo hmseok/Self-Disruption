@@ -4,7 +4,8 @@
 // 24/365 운영 가시화 — 누가 일하고 있는지, 다음 교대 시각
 // ═══════════════════════════════════════════════════════════════════
 import { COLORS, GLASS } from '@/app/utils/ui-tokens'
-import { TONE_BG, TONE_TEXT, TONE_BORDER, shiftConceptTone } from '../../utils/palette'
+import { TONE_BG, TONE_TEXT } from '../../utils/palette'
+import type { ColorTone } from '../../utils/types'
 
 export interface WorkerChip {
   worker_id: string
@@ -95,16 +96,15 @@ export default function NowWorkingStrip({
       ) : (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
           {workers.map(w => {
-            // 시프트 시간대 개념색 (주간 sky / 저녁 orange / 야간 indigo)
-            const tone = shiftConceptTone(w.is_overnight, w.shift_start)
-            const bg = TONE_BG[tone]
-            const fg = TONE_TEXT[tone]
+            const tone = (w.color_tone || 'none') as ColorTone
+            const bg = TONE_BG[tone] || COLORS.bgGray
+            const fg = TONE_TEXT[tone] || COLORS.textPrimary
             return (
               <div key={w.worker_id + w.shift_label} style={{
                 display: 'inline-flex', alignItems: 'center', gap: 6,
                 padding: '6px 10px', borderRadius: 99,
                 background: bg, color: fg, fontSize: 12, fontWeight: 700,
-                border: `1px solid ${TONE_BORDER[tone]}`,
+                border: `1px solid ${COLORS.borderFaint}`,
               }}>
                 <span>{w.is_overnight ? '🌙' : '☀️'}</span>
                 <span>{w.name}</span>

@@ -63,21 +63,6 @@ export const TONE_TEXT: Record<ColorTone, string> = {
   slate:  '#475569',
 }
 
-/**
- * 시프트 시간대 → 개념 색상 (내용에 맞는 기본색).
- *   야간(overnight) → indigo / 저녁(시작 18시~) → orange / 주간 → sky
- * 대시보드 칩 등에서 시프트 컨셉을 색으로 구분할 때 사용.
- * (cs_shift_slots.color_tone 마이그레이션 미적용 환경에서도 동작 — 시각 기반)
- */
-export function shiftConceptTone(
-  isOvernight: boolean, startHHMM: string | null | undefined,
-): ColorTone {
-  if (isOvernight) return 'indigo'
-  const h = Number(String(startHHMM || '').split(':')[0])
-  if (Number.isFinite(h) && h >= 18) return 'orange'
-  return 'sky'
-}
-
 /** 진한 색상 (chip/badge 배경, dot 등) */
 export const TONE_SOLID: Record<ColorTone, string> = {
   blue:   '#3b82f6',
