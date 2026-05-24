@@ -79,7 +79,7 @@ export const MENUS: MenuEntry[] = [
   // P2.2 (2026-05-13) — operations 통합 페이지로 정리.
   // /operations 안 5 sub-tab: 사고접수 / 대차접수 / 배차스케줄 / 청구관리 / 대기차량
   // /maintenance, /operations/intake 메뉴는 hide (페이지는 그대로 — backward compat)
-  { id: 'mod-ops',    name: '차량 운영',  displayName: '🚗 차량 운영',   path: '/operations',        iconKey: 'Wrench',            group: 'operation', sortOrder: 10 },
+  { id: 'mod-ops',    name: '사고대차',  displayName: '🚗 사고대차',   path: '/operations',        iconKey: 'Wrench',            group: 'operation', sortOrder: 10 },
   // PR-L1 (2026-05-24) — 장기렌트 (대차와 별개 장기 계약 원장)
   { id: 'mod-long-term', name: '장기렌트', displayName: '🔑 장기렌트', path: '/long-term-rentals', iconKey: 'Car', group: 'operation', sortOrder: 11 },
 

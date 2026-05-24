@@ -84,7 +84,7 @@ const PAGE_NAMES: Record<string, string> = {
   '/registration': '차량 등록증',
   '/insurance': '보험/가입',
   '/fleet/vehicle-lookup': '거래처 차량조회',
-  '/operations': '차량 운영',
+  '/operations': '사고대차',
   '/long-term-rentals': '장기렌트',
   '/operations/intake': '접수/오더 (이전)',
   '/operations/accident': '사고 상세',
