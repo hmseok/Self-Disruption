@@ -38,17 +38,24 @@ export async function GET(
     const schedule = schedRows[0]
 
     // 2) 슬롯 마스터
-    const slotsRows = await prisma.$queryRaw<any[]>`
-      SELECT id, code, label,
+    // Phase N-73 — color_tone 컬럼 graceful (마이그 미적용 시 'none')
+    let hasSlotColorCol = true
+    try {
+      await prisma.$queryRaw<any[]>`SELECT color_tone FROM cs_shift_slots LIMIT 1`
+    } catch { hasSlotColorCol = false }
+    const slotsRows = await prisma.$queryRawUnsafe<any[]>(
+      `SELECT id, code, label,
              TIME_FORMAT(start_time, '%H:%i:%s') AS start_time,
              TIME_FORMAT(end_time, '%H:%i:%s')   AS end_time,
-             is_overnight, category, sort_order, is_active
-      FROM cs_shift_slots WHERE is_active = 1 ORDER BY sort_order ASC
-    `
+             is_overnight, category, sort_order, is_active,
+             ${hasSlotColorCol ? 'color_tone' : "'none' AS color_tone"}
+      FROM cs_shift_slots WHERE is_active = 1 ORDER BY sort_order ASC`,
+    )
     const slots = slotsRows.map(r => ({
       ...r,
       is_overnight: Boolean(r.is_overnight),
       is_active: Boolean(r.is_active),
+      color_tone: r.color_tone || 'none',
     }))
 
     // 3) 근무자

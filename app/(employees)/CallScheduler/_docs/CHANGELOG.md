@@ -3,6 +3,18 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-23 (Phase N-72-fix) — 대시보드 기준 시각 이중 보정 수정
+
+- N-72 에서 백엔드 KST 보정은 맞았으나 `meta.now_iso` 까지 보정된 `now` 를 내보내 프론트가 또 KST 변환 → 표시 시각 +9h(예: 10:05 → 19:05). `now_iso` 를 실제 instant(`nowReal`)로 분리 — 백엔드 계산용 `now`(KST 값)와 표시용 `now_iso`(실제 instant)를 구분.
+
+## 2026-05-23 (Phase N-73) — 시프트 색상 추가
+
+- **마이그레이션** — `migrations/2026-05-23_cs_shift_slots_color.sql` 로 `cs_shift_slots` 에 `color_tone VARCHAR(16) DEFAULT 'none'` 추가. 카테고리별 기본색 자동 부여(주간 day→sky / 저녁 evening→orange / 야간 overnight→indigo). 멱등.
+- **타입** — `ShiftSlot` 인터페이스에 `color_tone: ColorTone` 추가 (워커·그룹과 동일 14색 팔레트).
+- **ShiftsTab UI** — 시프트 편집 폼에 14색 선택기 + 라벨 미리보기 추가, 목록 표에 「색상」 컬럼(dot + 라벨) 추가. WorkersTab 색상 편집 UX 와 동일. 신규 시프트에서 '없음' 선택 시 저장 시점에 카테고리 기본색 자동 적용.
+- **API** — `shift-slots` GET/POST + `shift-slots/[id]` PATCH 가 `color_tone` 읽기/쓰기 (graceful 컬럼 detection, 허용값 14색 외 'none' 강제). `schedules/[id]` 상세 응답 슬롯에 `color_tone` 포함.
+- **그리드 반영** — `ScheduleGrid` 의 시프트 행 헤더(코드+시간 라벨)를 슬롯 `color_tone` 으로 틴트, `DayView` 타임라인 슬롯 막대 + 슬롯 카드 좌측 보더/코드를 슬롯 색으로 반영. 워커 색은 셀쪽 유지 — 슬롯 색은 행 헤더쪽으로 역할 분리.
+
 ## 2026-05-23 (Phase N-72) — 운영 대시보드 버그 2건 수정
 
 - **JOIN 중복** — `dashboard` route 의 `fetchDay`·어제야간 쿼리가 `LEFT JOIN cs_shift_groups`(슬롯↔그룹 1:N)로 워커 칩을 그룹 수만큼 복제(L02 ×3, L13 ×6). 그룹명을 스칼라 subquery(`LIMIT 1`)로 바꿔 1배정=1칩 보장 — 「오늘/내일/지금 일하는 사람」이 근무표 그대로 표시.

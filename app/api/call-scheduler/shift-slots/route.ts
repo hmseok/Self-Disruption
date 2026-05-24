@@ -15,6 +15,16 @@ function serialize<T>(data: T): T {
 
 const CATEGORIES = ['day', 'evening', 'overnight'] as const
 
+// Phase N-73 — 시프트 식별 색상 (palette ColorTone 14색 + 'none')
+const COLOR_TONES = new Set([
+  'none', 'blue', 'sky', 'indigo', 'violet', 'pink', 'red',
+  'orange', 'amber', 'lime', 'green', 'teal', 'gray', 'slate',
+])
+function normalizeTone(v: any): string {
+  const t = String(v ?? 'none')
+  return COLOR_TONES.has(t) ? t : 'none'
+}
+
 export async function GET(request: NextRequest) {
   const user = await verifyUser(request)
   if (!user) {
@@ -24,77 +34,37 @@ export async function GET(request: NextRequest) {
     // PR-2SS-b/e — 안전 가드 + 시간 분해 컬럼 graceful (PR-2SS-d revert 후 seniority 제거)
     let hasSafetyCols = true
     let hasBreakdownCols = true
+    let hasColorCol = true   // Phase N-73 — 시프트 색상 (마이그 미적용 시 'none')
     try {
       await prisma.$queryRaw<any[]>`SELECT next_day_blocking_hours FROM cs_shift_slots LIMIT 1`
     } catch { hasSafetyCols = false }
     try {
       await prisma.$queryRaw<any[]>`SELECT night_period_start FROM cs_shift_slots LIMIT 1`
     } catch { hasBreakdownCols = false }
+    try {
+      await prisma.$queryRaw<any[]>`SELECT color_tone FROM cs_shift_slots LIMIT 1`
+    } catch { hasColorCol = false }
 
     const includeInactive = request.nextUrl.searchParams.get('include_inactive') === '1'
-    let rows: any[]
-    if (hasSafetyCols && hasBreakdownCols) {
-      rows = includeInactive
-        ? await prisma.$queryRaw<any[]>`
-            SELECT id, code, label,
-              TIME_FORMAT(start_time, '%H:%i:%s') AS start_time,
-              TIME_FORMAT(end_time,   '%H:%i:%s') AS end_time,
-              is_overnight, category, sort_order, is_active,
-              next_day_blocking_hours, max_consecutive_days,
-              TIME_FORMAT(night_period_start, '%H:%i:%s') AS night_period_start,
-              TIME_FORMAT(night_period_end,   '%H:%i:%s') AS night_period_end,
-              night_premium_rate
-            FROM cs_shift_slots
-            ORDER BY is_active DESC, sort_order ASC`
-        : await prisma.$queryRaw<any[]>`
-            SELECT id, code, label,
-              TIME_FORMAT(start_time, '%H:%i:%s') AS start_time,
-              TIME_FORMAT(end_time,   '%H:%i:%s') AS end_time,
-              is_overnight, category, sort_order, is_active,
-              next_day_blocking_hours, max_consecutive_days,
-              TIME_FORMAT(night_period_start, '%H:%i:%s') AS night_period_start,
-              TIME_FORMAT(night_period_end,   '%H:%i:%s') AS night_period_end,
-              night_premium_rate
-            FROM cs_shift_slots
-            WHERE is_active = 1
-            ORDER BY sort_order ASC`
-    } else if (hasSafetyCols) {
-      rows = includeInactive
-        ? await prisma.$queryRaw<any[]>`
-            SELECT id, code, label,
-              TIME_FORMAT(start_time, '%H:%i:%s') AS start_time,
-              TIME_FORMAT(end_time,   '%H:%i:%s') AS end_time,
-              is_overnight, category, sort_order, is_active,
-              next_day_blocking_hours, max_consecutive_days
-            FROM cs_shift_slots
-            ORDER BY is_active DESC, sort_order ASC`
-        : await prisma.$queryRaw<any[]>`
-            SELECT id, code, label,
-              TIME_FORMAT(start_time, '%H:%i:%s') AS start_time,
-              TIME_FORMAT(end_time,   '%H:%i:%s') AS end_time,
-              is_overnight, category, sort_order, is_active,
-              next_day_blocking_hours, max_consecutive_days
-            FROM cs_shift_slots
-            WHERE is_active = 1
-            ORDER BY sort_order ASC`
-    } else {
-      rows = includeInactive
-        ? await prisma.$queryRaw<any[]>`
-            SELECT id, code, label,
-              TIME_FORMAT(start_time, '%H:%i:%s') AS start_time,
-              TIME_FORMAT(end_time,   '%H:%i:%s') AS end_time,
-              is_overnight, category, sort_order, is_active
-            FROM cs_shift_slots
-            ORDER BY is_active DESC, sort_order ASC`
-        : await prisma.$queryRaw<any[]>`
-            SELECT id, code, label,
-              TIME_FORMAT(start_time, '%H:%i:%s') AS start_time,
-              TIME_FORMAT(end_time,   '%H:%i:%s') AS end_time,
-              is_overnight, category, sort_order, is_active
-            FROM cs_shift_slots
-            WHERE is_active = 1
-            ORDER BY sort_order ASC`
-    }
+    // 컬럼 목록을 detection 결과로 조립 (whitelist 만 — SQL injection 무관)
+    const cols = [
+      'id', 'code', 'label',
+      "TIME_FORMAT(start_time, '%H:%i:%s') AS start_time",
+      "TIME_FORMAT(end_time, '%H:%i:%s') AS end_time",
+      'is_overnight', 'category', 'sort_order', 'is_active',
+    ]
+    if (hasSafetyCols) cols.push('next_day_blocking_hours', 'max_consecutive_days')
+    if (hasBreakdownCols) cols.push(
+      "TIME_FORMAT(night_period_start, '%H:%i:%s') AS night_period_start",
+      "TIME_FORMAT(night_period_end, '%H:%i:%s') AS night_period_end",
+      'night_premium_rate',
+    )
+    cols.push(hasColorCol ? 'color_tone' : "'none' AS color_tone")
+    const sql = `SELECT ${cols.join(', ')} FROM cs_shift_slots`
+      + (includeInactive
+        ? ' ORDER BY is_active DESC, sort_order ASC'
+        : ' WHERE is_active = 1 ORDER BY sort_order ASC')
+    const rows = await prisma.$queryRawUnsafe<any[]>(sql)
     const data = rows.map(r => ({
       ...r,
       is_overnight: Boolean(r.is_overnight),
@@ -110,6 +80,8 @@ export async function GET(request: NextRequest) {
       night_period_end: hasBreakdownCols ? (r.night_period_end ?? null) : null,
       night_premium_rate: hasBreakdownCols && r.night_premium_rate != null
         ? Number(r.night_premium_rate) : 0,
+      // Phase N-73 — 시프트 색상 graceful
+      color_tone: normalizeTone(r.color_tone),
     }))
     return NextResponse.json({ data: serialize(data), error: null })
   } catch (e: any) {
@@ -154,6 +126,15 @@ export async function POST(request: NextRequest) {
       ? Math.max(1, Math.min(31, Number(body.max_consecutive_days) || 0)) || null
       : (is_overnight ? 3 : null)
     // PR-2SS-d revert — min_seniority_months 폐기
+    // Phase N-73 — 시프트 색상 — 사용자 미지정('none')이면 category 기본색 부여
+    //   (마이그레이션의 카테고리 기본색 로직과 동일 — 신규 슬롯도 색 보장)
+    const CATEGORY_TONE: Record<string, string> = {
+      day: 'sky', evening: 'orange', overnight: 'indigo',
+    }
+    const requestedTone = normalizeTone(body?.color_tone)
+    const colorTone: string = requestedTone === 'none'
+      ? (CATEGORY_TONE[category] || 'none')
+      : requestedTone
 
     // code 중복 체크
     const dup = await prisma.$queryRaw<any[]>`
@@ -168,6 +149,11 @@ export async function POST(request: NextRequest) {
     try {
       await prisma.$queryRaw<any[]>`SELECT next_day_blocking_hours FROM cs_shift_slots LIMIT 1`
     } catch { hasSafetyCols = false }
+    // Phase N-73 — color_tone 컬럼 graceful
+    let hasColorCol = true
+    try {
+      await prisma.$queryRaw<any[]>`SELECT color_tone FROM cs_shift_slots LIMIT 1`
+    } catch { hasColorCol = false }
 
     const id = crypto.randomUUID()
     if (hasSafetyCols) {
@@ -189,15 +175,28 @@ export async function POST(request: NextRequest) {
            ${is_overnight ? 1 : 0}, ${category}, ${sort_order}, 1, NOW(), NOW())
       `
     }
-    const rows = await prisma.$queryRaw<any[]>`
-      SELECT id, code, label,
+    // Phase N-73 — 색상은 INSERT 후 별도 UPDATE (컬럼 graceful — 분기 폭증 방지)
+    if (hasColorCol) {
+      await prisma.$executeRaw`
+        UPDATE cs_shift_slots SET color_tone = ${colorTone} WHERE id = ${id}
+      `
+    }
+    const rows = await prisma.$queryRawUnsafe<any[]>(
+      `SELECT id, code, label,
         TIME_FORMAT(start_time, '%H:%i:%s') AS start_time,
         TIME_FORMAT(end_time, '%H:%i:%s') AS end_time,
-        is_overnight, category, sort_order, is_active
-      FROM cs_shift_slots WHERE id = ${id} LIMIT 1
-    `
+        is_overnight, category, sort_order, is_active,
+        ${hasColorCol ? 'color_tone' : "'none' AS color_tone"}
+      FROM cs_shift_slots WHERE id = ? LIMIT 1`,
+      id,
+    )
     const created = rows[0]
-      ? { ...rows[0], is_overnight: Boolean(rows[0].is_overnight), is_active: Boolean(rows[0].is_active) }
+      ? {
+          ...rows[0],
+          is_overnight: Boolean(rows[0].is_overnight),
+          is_active: Boolean(rows[0].is_active),
+          color_tone: normalizeTone(rows[0].color_tone),
+        }
       : null
     return NextResponse.json({ data: serialize(created), error: null }, { status: 201 })
   } catch (e: any) {

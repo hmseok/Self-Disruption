@@ -21,12 +21,19 @@ const ALLOWED_COLS = new Set([
   // PR-2SS-d revert — min_seniority_months 폐기
   // PR-2SS-e — 시간 분해
   'night_period_start', 'night_period_end', 'night_premium_rate',
+  // Phase N-73 — 시프트 식별 색상
+  'color_tone',
 ])
 // PR-2SS-b — 안전 가드 컬럼 (graceful 검사 대상)
 const SAFETY_COLS = new Set(['next_day_blocking_hours', 'max_consecutive_days'])
 // PR-2SS-e — 시간 분해 컬럼
 const BREAKDOWN_COLS = new Set(['night_period_start', 'night_period_end', 'night_premium_rate'])
 const CATEGORIES = new Set(['day', 'evening', 'overnight'])
+// Phase N-73 — 시프트 색상 (palette ColorTone 14색 + 'none')
+const COLOR_TONES = new Set([
+  'none', 'blue', 'sky', 'indigo', 'violet', 'pink', 'red',
+  'orange', 'amber', 'lime', 'green', 'teal', 'gray', 'slate',
+])
 
 function normalizeTime(t: string): string {
   if (!t) return '00:00:00'
@@ -50,12 +57,16 @@ export async function PATCH(
     // PR-2SS-b/e — 안전 가드 + 시간 분해 컬럼 graceful (d revert 후 seniority 제거)
     let hasSafetyCols = true
     let hasBreakdownCols = true
+    let hasColorCol = true   // Phase N-73 — 시프트 색상
     try {
       await prisma.$queryRaw<any[]>`SELECT next_day_blocking_hours FROM cs_shift_slots LIMIT 1`
     } catch { hasSafetyCols = false }
     try {
       await prisma.$queryRaw<any[]>`SELECT night_period_start FROM cs_shift_slots LIMIT 1`
     } catch { hasBreakdownCols = false }
+    try {
+      await prisma.$queryRaw<any[]>`SELECT color_tone FROM cs_shift_slots LIMIT 1`
+    } catch { hasColorCol = false }
 
     const sets: string[] = []
     const params: any[] = []
@@ -63,7 +74,13 @@ export async function PATCH(
       if (!ALLOWED_COLS.has(k)) continue
       if (SAFETY_COLS.has(k) && !hasSafetyCols) continue
       if (BREAKDOWN_COLS.has(k) && !hasBreakdownCols) continue
+      if (k === 'color_tone' && !hasColorCol) continue
       if (k === 'category' && !CATEGORIES.has(String(v))) continue
+      if (k === 'color_tone') {
+        // Phase N-73 — 허용값(14색)만 — 그 외는 'none' 으로 강제
+        const t = COLOR_TONES.has(String(v)) ? String(v) : 'none'
+        sets.push(`${k} = ?`); params.push(t); continue
+      }
       if (k === 'start_time' || k === 'end_time') {
         sets.push(`${k} = ?`); params.push(normalizeTime(String(v))); continue
       }
@@ -98,22 +115,19 @@ export async function PATCH(
     params.push(id)
     await prisma.$executeRawUnsafe(sql, ...params)
 
-    const rows = hasSafetyCols
-      ? await prisma.$queryRaw<any[]>`
-          SELECT id, code, label,
-            TIME_FORMAT(start_time, '%H:%i:%s') AS start_time,
-            TIME_FORMAT(end_time, '%H:%i:%s') AS end_time,
-            is_overnight, category, sort_order, is_active,
-            next_day_blocking_hours, max_consecutive_days
-          FROM cs_shift_slots WHERE id = ${id} LIMIT 1
-        `
-      : await prisma.$queryRaw<any[]>`
-          SELECT id, code, label,
-            TIME_FORMAT(start_time, '%H:%i:%s') AS start_time,
-            TIME_FORMAT(end_time, '%H:%i:%s') AS end_time,
-            is_overnight, category, sort_order, is_active
-          FROM cs_shift_slots WHERE id = ${id} LIMIT 1
-        `
+    // SELECT-back — 컬럼 detection 결과로 조립 (whitelist 만 — SQL injection 무관)
+    const selCols = [
+      'id', 'code', 'label',
+      "TIME_FORMAT(start_time, '%H:%i:%s') AS start_time",
+      "TIME_FORMAT(end_time, '%H:%i:%s') AS end_time",
+      'is_overnight', 'category', 'sort_order', 'is_active',
+    ]
+    if (hasSafetyCols) selCols.push('next_day_blocking_hours', 'max_consecutive_days')
+    selCols.push(hasColorCol ? 'color_tone' : "'none' AS color_tone")
+    const rows = await prisma.$queryRawUnsafe<any[]>(
+      `SELECT ${selCols.join(', ')} FROM cs_shift_slots WHERE id = ? LIMIT 1`,
+      id,
+    )
     const updated = rows[0]
       ? {
           ...rows[0],
@@ -123,6 +137,8 @@ export async function PATCH(
             ? Number(rows[0].next_day_blocking_hours) : 0,
           max_consecutive_days: hasSafetyCols && rows[0].max_consecutive_days != null
             ? Number(rows[0].max_consecutive_days) : null,
+          // Phase N-73 — 시프트 색상 (허용값 외 'none')
+          color_tone: COLOR_TONES.has(String(rows[0].color_tone)) ? rows[0].color_tone : 'none',
         }
       : null
     return NextResponse.json({ data: serialize(updated), error: null })

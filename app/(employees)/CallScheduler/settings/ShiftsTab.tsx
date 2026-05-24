@@ -5,7 +5,9 @@
 import { useEffect, useState } from 'react'
 import { COLORS, GLASS, BTN, pillStyle } from '@/app/utils/ui-tokens'
 import { getAuthHeader } from '@/app/utils/auth-client'
-import type { ShiftSlot } from '@/app/(employees)/CallScheduler/utils/types'
+import { TONE_BG, TONE_TEXT, TONE_BORDER } from '@/app/(employees)/CallScheduler/utils/palette'
+import { COLOR_TONE_OPTIONS } from '@/app/(employees)/CallScheduler/utils/types'
+import type { ShiftSlot, ColorTone } from '@/app/(employees)/CallScheduler/utils/types'
 
 const CATEGORY_OPTIONS: { value: 'day' | 'evening' | 'overnight'; label: string }[] = [
   { value: 'day',       label: '주간' },
@@ -22,6 +24,8 @@ interface FormState {
   is_overnight: boolean
   category: 'day' | 'evening' | 'overnight'
   sort_order: number
+  // Phase N-73 — 시프트 식별 색상 ('none' 이면 저장 시 마이그 기본색 적용)
+  color_tone: ColorTone
   // PR-2SS-b — 안전 가드
   next_day_blocking_hours: number    // 종료 후 N시간 안 다른 슬롯 시작 금지 (0=제약 X)
   max_consecutive_days: string       // 연속 N일 한도 ('' = 무제한)
@@ -40,6 +44,7 @@ const EMPTY_FORM: FormState = {
   is_overnight: false,
   category: 'day',
   sort_order: 0,
+  color_tone: 'none',
   next_day_blocking_hours: 0,
   max_consecutive_days: '',
   night_period_start: '',
@@ -85,6 +90,8 @@ export default function ShiftsTab() {
       is_overnight: s.is_overnight,
       category: s.category,
       sort_order: s.sort_order,
+      // Phase N-73 — 시프트 색상 (마이그 미적용 시 undefined → 'none')
+      color_tone: s.color_tone || 'none',
       // PR-2SS-b — 안전 가드
       next_day_blocking_hours: Number(s.next_day_blocking_hours || 0),
       max_consecutive_days: s.max_consecutive_days != null ? String(s.max_consecutive_days) : '',
@@ -112,6 +119,8 @@ export default function ShiftsTab() {
         is_overnight: editing.is_overnight,
         category: editing.category,
         sort_order: editing.sort_order,
+        // Phase N-73 — 시프트 색상
+        color_tone: editing.color_tone,
         // PR-2SS-b — 안전 가드
         next_day_blocking_hours: editing.next_day_blocking_hours,
         max_consecutive_days: editing.max_consecutive_days === '' ? null : Number(editing.max_consecutive_days),
@@ -229,7 +238,7 @@ export default function ShiftsTab() {
                      style={inputStyle} />
             </Field>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginTop: 10 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginTop: 10 }}>
             <Field label="카테고리">
               <div style={{ display: 'flex', gap: 4 }}>
                 {CATEGORY_OPTIONS.map(opt => (
@@ -273,6 +282,44 @@ export default function ShiftsTab() {
               <input type="number" value={editing.sort_order}
                      onChange={(e) => setEditing({ ...editing, sort_order: Number(e.target.value) })}
                      style={inputStyle} />
+            </Field>
+            {/* Phase N-73 — 시프트 식별 색상 (그리드 행 헤더에 반영) */}
+            <Field label="색상 (캘린더)">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+                  {COLOR_TONE_OPTIONS.map(opt => {
+                    const active = editing.color_tone === opt.value
+                    return (
+                      <button key={opt.value} type="button"
+                              onClick={() => setEditing({ ...editing, color_tone: opt.value })}
+                              title={opt.label}
+                              style={{
+                                width: 18, height: 18, borderRadius: '50%',
+                                background: opt.value === 'none' ? '#fff' : opt.hex,
+                                border: active ? `2px solid ${COLORS.primary}` : `1px solid ${COLORS.borderFaint}`,
+                                cursor: 'pointer', padding: 0,
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                fontSize: 10, color: '#fff', fontWeight: 700,
+                              }}>
+                        {active ? '✓' : ''}
+                      </button>
+                    )
+                  })}
+                </div>
+                {/* 미리보기 — 그리드 시프트 라벨이 보일 모습 */}
+                <span style={{
+                  fontSize: 11, fontWeight: 700,
+                  color: TONE_TEXT[editing.color_tone],
+                  background: TONE_BG[editing.color_tone] !== 'transparent' ? TONE_BG[editing.color_tone] : '#fff',
+                  border: `1px solid ${TONE_BORDER[editing.color_tone]}`,
+                  padding: '2px 8px', borderRadius: 4, whiteSpace: 'nowrap',
+                }}>
+                  {editing.code || 'L--'} {editing.start_time}~{editing.end_time}
+                </span>
+              </div>
+              <div style={{ fontSize: 10, color: COLORS.textMuted, marginTop: 2 }}>
+                없음 = 카테고리 기본색 (주간 하늘 / 저녁 노을 / 야간 인디고)
+              </div>
             </Field>
           </div>
 
@@ -384,6 +431,7 @@ export default function ShiftsTab() {
             <thead>
               <tr style={{ borderBottom: `1px solid ${COLORS.borderFaint}` }}>
                 <th style={thStyle}>코드</th>
+                <th style={thStyle}>색상</th>
                 <th style={thStyle}>라벨</th>
                 <th style={thStyle}>시작</th>
                 <th style={thStyle}>종료</th>
@@ -404,6 +452,23 @@ export default function ShiftsTab() {
                       fontFamily: 'monospace', fontWeight: 700,
                       color: COLORS.textMuted, fontSize: 12,
                     }}>{s.code}</span>
+                  </td>
+                  {/* Phase N-73 — 시프트 색상 (dot + 라벨) */}
+                  <td style={tdStyle}>
+                    {(() => {
+                      const tone: ColorTone = s.color_tone || 'none'
+                      const opt = COLOR_TONE_OPTIONS.find(o => o.value === tone)
+                      return (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap' }}>
+                          <span style={{
+                            display: 'inline-block', width: 12, height: 12, borderRadius: 3,
+                            background: TONE_BG[tone] !== 'transparent' ? TONE_BG[tone] : '#fff',
+                            border: `1px solid ${TONE_BORDER[tone]}`,
+                          }} />
+                          <span style={{ fontSize: 11, color: COLORS.textMuted }}>{opt?.label || '없음'}</span>
+                        </span>
+                      )
+                    })()}
                   </td>
                   <td style={tdStyle}>{s.label}</td>
                   <td style={tdStyle}>{s.start_time.substring(0, 5)}</td>

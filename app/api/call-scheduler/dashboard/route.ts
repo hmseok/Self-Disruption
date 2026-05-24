@@ -38,9 +38,13 @@ export async function GET(request: NextRequest) {
     // tzShiftMs: 현재 서버 오프셋을 KST(UTC+9)로 맞추는 보정값.
     //   UTC 서버 → +9h / KST 서버 → 0.
     const tzShiftMs = (new Date().getTimezoneOffset() + 540) * 60000
+    // nowReal: 실제 instant — meta.now_iso(프론트가 KST 로 변환 표시) 용.
+    // now: KST 값으로 보정된 Date — 백엔드 날짜·시각 계산(getHours/getDate) 용.
+    //   now 를 now_iso 로 내보내면 프론트에서 또 KST 변환 → 이중 보정(+9h) 버그.
+    const nowReal = new Date()
     const now = dateParam
       ? new Date(new Date(dateParam + 'T00:00:00Z').getTime() + tzShiftMs)
-      : new Date(Date.now() + tzShiftMs)
+      : new Date(nowReal.getTime() + tzShiftMs)
     const today = isoOf(now)
     const tomorrowD = new Date(now); tomorrowD.setDate(tomorrowD.getDate() + 1)
     const tomorrow = isoOf(tomorrowD)
@@ -412,7 +416,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       data: serialize({
         meta: {
-          now_iso: now.toISOString(),
+          now_iso: (dateParam ? now : nowReal).toISOString(),
           today, tomorrow,
           year, month, last_day: lastDay,
           today_label: `${todayDate.getMonth()+1}/${todayDate.getDate()} ${DOW_KR[todayDate.getDay()]}`,

@@ -6,7 +6,7 @@
 // ═══════════════════════════════════════════════════════════════════
 import { useMemo, useState } from 'react'
 import { COLORS, GLASS, pillStyle } from '@/app/utils/ui-tokens'
-import { TONE_BG, TONE_TEXT } from '../utils/palette'
+import { TONE_BG, TONE_TEXT, TONE_BORDER } from '../utils/palette'
 import { monthDays, dowIndex, DOW_LABEL } from '../utils/hours'
 import { SPECIAL_LABEL } from '../utils/types'
 import type { ScheduleDetail, Assignment, Worker, ShiftSlot, SpecialCode, ColorTone } from '../utils/types'
@@ -398,12 +398,16 @@ function DayDetailModal({ isoDate, assignments, slotMap, workerMap, onClose }: {
                             background: h === 24 ? 'rgba(0,0,0,0.2)' : 'rgba(0,0,0,0.06)',
                           }} />
                         ))}
-                        {/* 슬롯 막대 */}
+                        {/* 슬롯 막대 — Phase N-73: 슬롯 color_tone 으로 (없으면 overnight fallback) */}
                         <div style={{
                           position: 'absolute', left: leftPx, width: widthPx,
                           top: 2, bottom: 2,
-                          background: r.slot.is_overnight ? COLORS.bgViolet : COLORS.bgBlue,
-                          border: `1px solid ${r.slot.is_overnight ? COLORS.borderViolet : COLORS.borderBlue}`,
+                          background: (r.slot.color_tone && r.slot.color_tone !== 'none')
+                            ? TONE_BG[r.slot.color_tone]
+                            : (r.slot.is_overnight ? COLORS.bgViolet : COLORS.bgBlue),
+                          border: `1px solid ${(r.slot.color_tone && r.slot.color_tone !== 'none')
+                            ? TONE_BORDER[r.slot.color_tone]
+                            : (r.slot.is_overnight ? COLORS.borderViolet : COLORS.borderBlue)}`,
                           borderRadius: 4,
                           display: 'flex', alignItems: 'center', gap: 2,
                           padding: '0 4px', overflow: 'hidden',
@@ -448,9 +452,13 @@ function DayDetailModal({ isoDate, assignments, slotMap, workerMap, onClose }: {
             {Array.from(bySlot.entries()).map(([slotId, slotAssigns]) => {
               const slot = slotMap.get(slotId)
               if (!slot) return null
+              // Phase N-73 — 슬롯 식별 색상 (카드 좌측 border + 코드 틴트)
+              const slotTone: ColorTone = slot.color_tone || 'none'
+              const slotTinted = slotTone !== 'none'
               return (
                 <div key={slotId} style={{
                   ...GLASS.L1, borderRadius: 8, padding: 10,
+                  borderLeft: slotTinted ? `3px solid ${TONE_BORDER[slotTone]}` : undefined,
                 }}>
                   <div style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -458,7 +466,11 @@ function DayDetailModal({ isoDate, assignments, slotMap, workerMap, onClose }: {
                   }}>
                     <div>
                       <span style={{
-                        fontSize: 11, color: COLORS.textMuted, marginRight: 6, fontFamily: 'monospace',
+                        fontSize: 11, marginRight: 6, fontFamily: 'monospace', fontWeight: 700,
+                        color: slotTinted ? TONE_TEXT[slotTone] : COLORS.textMuted,
+                        background: slotTinted ? TONE_BG[slotTone] : undefined,
+                        padding: slotTinted ? '1px 5px' : undefined,
+                        borderRadius: slotTinted ? 3 : undefined,
                       }}>{slot.code}</span>
                       <span style={{ fontSize: 13, fontWeight: 700, color: COLORS.textPrimary }}>
                         {slot.start_time.substring(0, 5)}~{slot.end_time.substring(0, 5)}

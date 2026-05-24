@@ -44,6 +44,8 @@ export interface ShiftSlot {
   category: ShiftCategory
   sort_order: number
   is_active: boolean
+  // Phase N-73 — 시프트 식별 색상 (워커/그룹과 동일 14색 — 마이그 미적용 시 'none')
+  color_tone: ColorTone
   // PR-2SS-b — 안전 가드 (graceful — 마이그 미적용 시 undefined)
   next_day_blocking_hours?: number       // 종료 후 N시간 안 다른 슬롯 시작 금지 (0=제약 X, 야간 디폴트 16)
   max_consecutive_days?: number | null   // 연속 N일 한도 (PR-2SS-c 활용, 야간 디폴트 3)

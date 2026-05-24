@@ -5,6 +5,7 @@
 // ═══════════════════════════════════════════════════════════════════
 import { useMemo, useState, useEffect, Fragment } from 'react'
 import { COLORS, GLASS } from '@/app/utils/ui-tokens'
+import { TONE_BG, TONE_TEXT, TONE_BORDER } from '../utils/palette'
 import AssignmentCell from './AssignmentCell'
 import WorkerPicker from './WorkerPicker'
 import { monthDays, dowIndex, DOW_LABEL, isOnExternalDuty } from '../utils/hours'
@@ -987,14 +988,34 @@ export default function ScheduleGrid({ detail, onChanged, myWorkerId }: Props) {
                 borderLeft: `3px solid ${grpBorder}`,
               }}>
                 {/* 1행: 슬롯 코드 + 시간 + 그룹 라벨 (N-26 — 시간순 view 라 라벨 inline) */}
+                {/* Phase N-73 — 시프트 색상: 코드+시간 라벨을 슬롯 color_tone 으로 틴트
+                    (워커 색은 셀쪽 — 역할 분리, 슬롯 색은 행 헤더쪽) */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 2 }}>
-                  <span style={{
-                    fontSize: 9, color: COLORS.textMuted, fontFamily: 'monospace', fontWeight: 700,
-                  }}>{slot.code}</span>
-                  <span style={{ fontSize: 11, fontWeight: 700 }}>
-                    {slot.start_time.substring(0,5)}~{slot.end_time.substring(0,5)}
-                    {isOvernight && <span style={{ fontSize: 8, color: COLORS.warning, marginLeft: 2 }}>익</span>}
-                  </span>
+                  {(() => {
+                    const slotTone = slot.color_tone || 'none'
+                    const slotLabelStyle: React.CSSProperties = slotTone !== 'none'
+                      ? {
+                          display: 'inline-flex', alignItems: 'center', gap: 4,
+                          background: TONE_BG[slotTone],
+                          border: `1px solid ${TONE_BORDER[slotTone]}`,
+                          borderRadius: 4, padding: '1px 5px',
+                        }
+                      : { display: 'inline-flex', alignItems: 'center', gap: 4 }
+                    const codeColor = slotTone !== 'none' ? TONE_TEXT[slotTone] : COLORS.textMuted
+                    const timeColor = slotTone !== 'none' ? TONE_TEXT[slotTone] : COLORS.textPrimary
+                    return (
+                      <span style={slotLabelStyle}
+                            title={`시프트 ${slot.code} (${slot.label})`}>
+                        <span style={{
+                          fontSize: 9, color: codeColor, fontFamily: 'monospace', fontWeight: 700,
+                        }}>{slot.code}</span>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: timeColor }}>
+                          {slot.start_time.substring(0,5)}~{slot.end_time.substring(0,5)}
+                          {isOvernight && <span style={{ fontSize: 8, color: COLORS.warning, marginLeft: 2 }}>익</span>}
+                        </span>
+                      </span>
+                    )
+                  })()}
                   {curGrp && (
                     <span style={{
                       fontSize: 9, fontWeight: 700, color: COLORS.textSecondary,
