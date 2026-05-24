@@ -5,6 +5,7 @@ import DcStatStrip, { StatItem, ActionButton } from '@/app/components/DcStatStri
 import DcToolbar, { FilterItem } from '@/app/components/DcToolbar'
 import NeuDataTable, { TableColumn, MobileCardConfig } from '@/app/components/NeuDataTable'
 import { GLASS } from '@/app/utils/ui-tokens'
+import { LOTTE_SHORT_TERM_RATES, computeLotteClaim } from '@/lib/lotte-short-term-rates'
 
 // ═══════════════════════════════════════════════════════════════════
 // ClaimsTab — 청구관리 (회차완료 → 청구 → 정산)
@@ -92,6 +93,8 @@ export default function ClaimsTab() {
   const [claimType, setClaimType] = useState('')
   const [paymentStatus, setPaymentStatus] = useState('')   // PR-N6c — 지급여부
   const [paymentMemo, setPaymentMemo] = useState('')        // PR-N6c — 지급 메모
+  const [lotteRateIdx, setLotteRateIdx] = useState<number>(-1)  // PR-N7 — 롯데 차종 행
+  const [lotteDays, setLotteDays] = useState<string>('')        // PR-N7 — 산출 대여일수
   const [claimBusy, setClaimBusy] = useState(false)
   const [claimMsg, setClaimMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
 
@@ -134,9 +137,29 @@ export default function ClaimsTab() {
     setClaimType(r.claim_type || '')
     setPaymentStatus(r.payment_status || '')
     setPaymentMemo(r.payment_memo || '')
+    setLotteRateIdx(-1)
+    setLotteDays(r.rental_days != null ? String(r.rental_days) : '')
     setClaimMsg(null)
     setClaimModalOpen(true)
   }, [])
+
+  // PR-N7 — 롯데 차종 select 그룹 + 산출 결과
+  const lotteGroups = useMemo(() => {
+    const out: { cat: string; rows: { idx: number; label: string }[] }[] = []
+    LOTTE_SHORT_TERM_RATES.forEach((r, idx) => {
+      let g = out.find((x) => x.cat === r.category)
+      if (!g) { g = { cat: r.category, rows: [] }; out.push(g) }
+      g.rows.push({ idx, label: r.vehicle_names })
+    })
+    return out
+  }, [])
+  const lotteResult = useMemo(() => {
+    if (lotteRateIdx < 0) return null
+    const rate = LOTTE_SHORT_TERM_RATES[lotteRateIdx]
+    const d = Number(lotteDays)
+    if (!rate || !d || d < 1) return null
+    return computeLotteClaim(rate, d)
+  }, [lotteRateIdx, lotteDays])
 
   // 청구 저장 (status 전이: claiming / settled)
   const saveClaim = useCallback(async (nextStatus: 'claiming' | 'settled') => {
@@ -424,6 +447,49 @@ export default function ClaimsTab() {
                   <option value="">— 선택 —</option>
                   {CLAIM_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
                 </select>
+              </div>
+              {/* PR-N7 — 롯데 단기 요금 산출 */}
+              <div style={{ ...GLASS.L3, padding: 12, borderRadius: 8, display: 'flex', flexDirection: 'column', gap: 9 }}>
+                <div style={{ fontSize: 12, fontWeight: 800, color: '#1e293b' }}>💡 롯데 단기 요금 산출</div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <select
+                    value={lotteRateIdx}
+                    onChange={(e) => setLotteRateIdx(Number(e.target.value))}
+                    style={{ ...GLASS.L1, flex: '1 1 220px', padding: '8px 10px', borderRadius: 8, fontSize: 12, color: '#1e293b' }}
+                  >
+                    <option value={-1}>— 대차차량 차종 선택 —</option>
+                    {lotteGroups.map((g) => (
+                      <optgroup key={g.cat} label={g.cat}>
+                        {g.rows.map((r) => <option key={r.idx} value={r.idx}>{r.label}</option>)}
+                      </optgroup>
+                    ))}
+                  </select>
+                  <div style={{ ...GLASS.L1, display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px', borderRadius: 8 }}>
+                    <input
+                      type="number" value={lotteDays}
+                      onChange={(e) => setLotteDays(e.target.value)} placeholder="일수"
+                      style={{ border: 'none', background: 'transparent', fontSize: 12, color: '#1e293b', fontWeight: 700, outline: 'none', width: 52 }}
+                    />
+                    <span style={{ fontSize: 11, color: '#94a3b8' }}>일</span>
+                  </div>
+                </div>
+                {lotteResult ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 12, color: '#475569' }}>
+                      [{lotteResult.tierLabel}] {lotteResult.dailyRate.toLocaleString('ko-KR')}원/일 × {lotteResult.days}일 ={' '}
+                      <b style={{ color: '#0f2440' }}>{lotteResult.total.toLocaleString('ko-KR')}원</b>
+                      <span style={{ fontSize: 10, color: '#94a3b8', marginLeft: 5 }}>VAT 포함 · 공급가 {lotteResult.supply.toLocaleString('ko-KR')}</span>
+                    </span>
+                    <div style={{ flex: 1 }} />
+                    <button
+                      type="button"
+                      onClick={() => setClaimAmount(String(lotteResult.total))}
+                      style={{ padding: '6px 12px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 800, background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)', color: '#fff' }}
+                    >청구액에 적용 →</button>
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 11, color: '#94a3b8' }}>차종과 대여일수를 입력하면 롯데 공식 요금이 산출됩니다 (구간별 일요금 × 일수, VAT 포함).</div>
+                )}
               </div>
               {/* 청구액 */}
               <div>
