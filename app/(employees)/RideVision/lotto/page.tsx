@@ -182,7 +182,7 @@ function Ball({ n, size = 42, dim = false }: { n: number; size?: number; dim?: b
 const won = (v: number) => `${v.toLocaleString()}원`
 
 export default function LottoPage() {
-  const [tab, setTab] = useState<'extract' | 'records'>('extract')
+  const [tab, setTab] = useState<'extract' | 'records' | 'stats'>('extract')
   const [roundInfo] = useState(() => currentRoundInfo())
 
   // ── 추출기 상태 ──
@@ -194,6 +194,8 @@ export default function LottoPage() {
   const [busy, setBusy] = useState(false)
   const [now, setNow] = useState(() => Date.now()) // 카운트다운용
   const [latestResult, setLatestResult] = useState<ResultRow | null>(null) // 최근 추첨 결과
+  const [stats, setStats] = useState<{ draws: number; freq: number[]; bonusFreq: number[] } | null>(null)
+  const statsLoadedRef = useRef(false)
 
   // ── 내 기록 상태 ──
   const [entries, setEntries] = useState<EntryRow[]>([])
@@ -286,9 +288,28 @@ export default function LottoPage() {
     }
   }, [fetchEntries])
 
+  // 번호 통계 로드 (재미용 — 캐시된 회차 출현 빈도)
+  const loadStats = useCallback(async () => {
+    try {
+      const token = getStoredToken()
+      const res = await fetch('/api/ride-vision/lotto-stats', {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        cache: 'no-store',
+      })
+      const json = await res.json()
+      if (json?.data) {
+        setStats(json.data as { draws: number; freq: number[]; bonusFreq: number[] })
+      }
+      statsLoadedRef.current = true
+    } catch {
+      // graceful — 통계 미표시
+    }
+  }, [])
+
   useEffect(() => {
     if (tab === 'records' && !recLoadedRef.current) loadRecords()
-  }, [tab, loadRecords])
+    if (tab === 'stats' && !statsLoadedRef.current) loadStats()
+  }, [tab, loadRecords, loadStats])
 
   // 회차 번호 텍스트 구성 (회차 + 게임별 번호 + 서명)
   const roundText = useCallback(
@@ -620,6 +641,7 @@ export default function LottoPage() {
         {([
           ['extract', '🎱 번호 추출'],
           ['records', '📒 내 기록'],
+          ['stats', '📊 번호 통계'],
         ] as const).map(([key, label]) => {
           const active = tab === key
           return (
@@ -1201,7 +1223,127 @@ export default function LottoPage() {
           />
 
           <div style={{ marginTop: 12, textAlign: 'center', fontSize: 11, color: COLORS.textDim }}>
-            당첨번호가 등록되면 회차별 당첨여부·손익이 자동 계산됩니다 (현재 자동 조회 미연동 — 추첨 대기로 표시)
+            당첨여부는 동행복권 회차 결과로 자동 판정됩니다 · 1~3등 당첨금은 회차별로 달라 별도 표기됩니다
+          </div>
+        </div>
+      )}
+
+      {/* ═══ 탭 3 — 번호 통계 ═══════════════════════════════════ */}
+      {tab === 'stats' && (
+        <div>
+          <div
+            style={{
+              ...GLASS.L3,
+              border: `1px solid ${COLORS.borderAmber}`,
+              padding: '12px 16px',
+              borderRadius: 12,
+              marginBottom: 14,
+            }}
+          >
+            <div style={{ fontSize: 12, fontWeight: 800, color: COLORS.warning, marginBottom: 3 }}>
+              📊 재미로 보는 번호 통계
+            </div>
+            <div style={{ fontSize: 12, color: COLORS.textSecondary, lineHeight: 1.5 }}>
+              로또는 매 회차 완전히 독립된 추첨입니다 — 아래 출현 빈도는 다음 회차 당첨 확률과
+              무관합니다. 캐시된 회차만 집계되며, 회차를 열람할수록 누적됩니다.
+            </div>
+          </div>
+          {stats === null ? (
+            <div style={{ ...GLASS.L4, padding: 40, borderRadius: 14, textAlign: 'center', color: COLORS.textMuted, fontSize: 13 }}>
+              불러오는 중…
+            </div>
+          ) : stats.draws === 0 ? (
+            <div style={{ ...GLASS.L4, padding: 40, borderRadius: 14, textAlign: 'center', color: COLORS.textMuted, fontSize: 13 }}>
+              집계할 회차 데이터가 아직 없습니다 — 위젯·「내 기록」을 열면 회차가 누적됩니다.
+            </div>
+          ) : (
+            (() => {
+              const freq = stats.freq
+              const nums = Array.from({ length: 45 }, (_, i) => i + 1)
+              const sorted = [...nums].sort((a, b) => (freq[b] || 0) - (freq[a] || 0))
+              const hot = sorted.slice(0, 7)
+              const cold = [...sorted].reverse().slice(0, 7)
+              const oddSum = nums.filter(n => n % 2 === 1).reduce((s, n) => s + (freq[n] || 0), 0)
+              const evenSum = nums.filter(n => n % 2 === 0).reduce((s, n) => s + (freq[n] || 0), 0)
+              const ranges: [string, number, number][] = [
+                ['1–10', 1, 10],
+                ['11–20', 11, 20],
+                ['21–30', 21, 30],
+                ['31–40', 31, 40],
+                ['41–45', 41, 45],
+              ]
+              return (
+                <>
+                  <div style={{ ...GLASS.L4, padding: 16, borderRadius: 14, marginBottom: 14 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: 12, fontWeight: 800, color: COLORS.danger, width: 64 }}>🔥 핫</span>
+                      {hot.map(n => (
+                        <span key={n} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                          <Ball n={n} size={34} />
+                          <span style={{ fontSize: 10, color: COLORS.textMuted }}>{freq[n] || 0}회</span>
+                        </span>
+                      ))}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: 12, fontWeight: 800, color: COLORS.primary, width: 64 }}>❄️ 콜드</span>
+                      {cold.map(n => (
+                        <span key={n} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                          <Ball n={n} size={34} />
+                          <span style={{ fontSize: 10, color: COLORS.textMuted }}>{freq[n] || 0}회</span>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <div style={{ ...GLASS.L4, padding: 16, borderRadius: 14, marginBottom: 14 }}>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: COLORS.textPrimary, marginBottom: 12 }}>
+                      번호별 출현 빈도 · {stats.draws}회차 집계
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(52px, 1fr))', gap: 8 }}>
+                      {nums.map(n => {
+                        const f = freq[n] || 0
+                        return (
+                          <div
+                            key={n}
+                            style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, opacity: f === 0 ? 0.35 : 1 }}
+                          >
+                            <Ball n={n} size={30} />
+                            <span style={{ fontSize: 10, fontWeight: 700, color: f > 0 ? COLORS.textSecondary : COLORS.textMuted }}>
+                              {f}회
+                            </span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 14 }}>
+                    <div style={{ ...GLASS.L4, padding: 16, borderRadius: 14 }}>
+                      <div style={{ fontSize: 13, fontWeight: 800, color: COLORS.textPrimary, marginBottom: 8 }}>홀짝 분포</div>
+                      <div style={{ fontSize: 13, color: COLORS.textSecondary }}>
+                        홀수 {oddSum}회 · 짝수 {evenSum}회
+                      </div>
+                    </div>
+                    <div style={{ ...GLASS.L4, padding: 16, borderRadius: 14 }}>
+                      <div style={{ fontSize: 13, fontWeight: 800, color: COLORS.textPrimary, marginBottom: 8 }}>구간 분포</div>
+                      <div style={{ fontSize: 12, color: COLORS.textSecondary, lineHeight: 1.7 }}>
+                        {ranges.map(([label, lo, hi]) => {
+                          const sum = nums
+                            .filter(n => n >= lo && n <= hi)
+                            .reduce((s, n) => s + (freq[n] || 0), 0)
+                          return (
+                            <div key={label}>
+                              {label} : {sum}회
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )
+            })()
+          )}
+          <div style={{ marginTop: 12, textAlign: 'center', fontSize: 11, color: COLORS.textDim }}>
+            통계는 재미용입니다 · 과거 출현 빈도는 미래 추첨에 영향을 주지 않습니다
           </div>
         </div>
       )}
