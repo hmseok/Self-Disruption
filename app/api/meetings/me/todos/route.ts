@@ -4,15 +4,17 @@ import { prisma } from '@/lib/prisma'
 import { randomUUID } from 'crypto'
 
 // ═══════════════════════════════════════════════════════════════
-// /api/meetings/me/todos — 개인 TODO (PR-MTG-V2-Todo-A)
+// /api/meetings/me/todos — 개인 TODO (PR-MTG-V2-Todo-A → D)
 //
 // GET    ?status=open|done|dropped|all → { data: [], stats: {} }
-// POST   { content, due_date?, category?, priority?, memo? } → 생성
+// POST   { content, due_date?, category?, priority?, memo?, tags? } → 생성
 // PATCH  { id, ...patch } → 수정 (status='done' 시 done_at 자동)
 // DELETE ?id= → 삭제
 //
 // 본인 (user_id = current) 것만. 회의 무관 독립 TODO.
-// Rule 23 graceful: personal_todos 테이블 미적용 시 _migration_pending
+// Rule 23 graceful:
+//   · personal_todos 테이블 미적용 시 _migration_pending
+//   · tags 컬럼 미적용 시 hasTagsColumn() 으로 무시 (PR-MTG-V2-Todo-D)
 // ═══════════════════════════════════════════════════════════════
 
 function serialize<T>(d: T): T {
@@ -21,6 +23,36 @@ function serialize<T>(d: T): T {
 
 function isMigrationMissing(msg: string): boolean {
   return msg.includes('personal_todos') && (msg.includes("doesn't exist") || msg.includes('1146'))
+}
+
+// PR-MTG-V2-Todo-D — tags 컬럼 graceful 지원 (Rule 23)
+// true 면 영구 캐시 / false 면 매 요청 재탐지 → 마이그 적용 후 인스턴스 재시작 없이 자가 치유
+let _tagsColOk = false
+async function hasTagsColumn(): Promise<boolean> {
+  if (_tagsColOk) return true
+  try {
+    const r = await prisma.$queryRawUnsafe<any[]>(
+      `SELECT COUNT(*) AS c FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'personal_todos' AND COLUMN_NAME = 'tags'`
+    )
+    _tagsColOk = Number(r?.[0]?.c || 0) > 0
+  } catch { /* 미적용 — false 유지 */ }
+  return _tagsColOk
+}
+
+// 해시태그 정규화 — 배열/쉼표문자열 모두 허용 → '#'·쉼표 제거, 트림, 중복 제거, 쉼표 join
+function normalizeTags(raw: any): string | null {
+  if (!raw) return null
+  const arr = Array.isArray(raw) ? raw : String(raw).split(',')
+  const seen = new Set<string>()
+  for (const t of arr) {
+    const c = String(t).replace(/[#,]/g, '').trim()
+    if (c) seen.add(c)
+  }
+  if (seen.size === 0) return null
+  let out = Array.from(seen).join(',')
+  if (out.length > 255) out = out.slice(0, 255)
+  return out
 }
 
 // ── GET ─────────────────────────────────────────────────────────
@@ -39,8 +71,9 @@ export async function GET(request: NextRequest) {
         conditions.push('status = ?')
         params.push(status)
       }
+      const tagsOk = await hasTagsColumn()
       const rows = await prisma.$queryRawUnsafe<any[]>(
-        `SELECT id, content, due_date, status, category, priority, memo, done_at, created_at
+        `SELECT id, content, due_date, status, category, priority, memo${tagsOk ? ', tags' : ''}, done_at, created_at
            FROM personal_todos
           WHERE ${conditions.join(' AND ')}
           ORDER BY
@@ -88,14 +121,19 @@ export async function POST(request: NextRequest) {
 
     try {
       const id = randomUUID()
-      await prisma.$executeRawUnsafe(
-        `INSERT INTO personal_todos (id, user_id, content, due_date, status, category, priority, memo, created_at, updated_at)
-              VALUES (?, ?, ?, ?, 'open', ?, ?, ?, NOW(), NOW())`,
+      const tagsOk = await hasTagsColumn()
+      const params: any[] = [
         id, user.id, content,
         body?.due_date || null,
         body?.category || null,
         body?.priority || null,
-        body?.memo || null
+        body?.memo || null,
+      ]
+      if (tagsOk) params.push(normalizeTags(body?.tags))
+      await prisma.$executeRawUnsafe(
+        `INSERT INTO personal_todos (id, user_id, content, due_date, status, category, priority, memo${tagsOk ? ', tags' : ''}, created_at, updated_at)
+              VALUES (?, ?, ?, ?, 'open', ?, ?, ?${tagsOk ? ', ?' : ''}, NOW(), NOW())`,
+        ...params
       )
       return NextResponse.json({ ok: true, id })
     } catch (e: any) {
@@ -131,15 +169,17 @@ export async function PATCH(request: NextRequest) {
     )
     if (!own[0]) return NextResponse.json({ error: '권한 없음 또는 없음' }, { status: 404 })
 
-    const ALLOWED = new Set(['content', 'due_date', 'status', 'category', 'priority', 'memo'])
-    const entries = Object.entries(body).filter(([k]) => ALLOWED.has(k))
+    const tagsOk = await hasTagsColumn()
+    const ALLOWED = new Set(['content', 'due_date', 'status', 'category', 'priority', 'memo', 'tags'])
+    let entries = Object.entries(body).filter(([k]) => ALLOWED.has(k))
+    if (!tagsOk) entries = entries.filter(([k]) => k !== 'tags')  // 컬럼 미적용 시 tags 무시
     if (entries.length === 0) return NextResponse.json({ error: '변경 항목 없음' }, { status: 400 })
 
     const setParts: string[] = []
     const params: any[] = []
     for (const [k, v] of entries) {
       setParts.push(`\`${k}\` = ?`)
-      params.push(v === '' ? null : v)
+      params.push(k === 'tags' ? normalizeTags(v) : (v === '' ? null : v))
     }
     // status='done' 시 done_at 자동
     if (body.status === 'done') setParts.push('done_at = NOW()')
