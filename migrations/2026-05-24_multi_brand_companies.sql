@@ -58,9 +58,14 @@ SELECT UUID(), '주식회사 에프엠아이', 'FMI', '', NOW(), NOW()
 WHERE NOT EXISTS (SELECT 1 FROM companies WHERE company_key='FMI');
 
 -- 3c. RIDE 행 없으면 생성
+--   ※ 공식 표기 '라이드 주식회사' (띄어쓰기) — 라이드_표기규칙.xlsx 회사명 시트.
 INSERT INTO companies (id, name, company_key, subdomain, created_at, updated_at)
-SELECT UUID(), '라이드주식회사', 'RIDE', 'ride', NOW(), NOW()
+SELECT UUID(), '라이드 주식회사', 'RIDE', 'ride', NOW(), NOW()
 WHERE NOT EXISTS (SELECT 1 FROM companies WHERE company_key='RIDE');
+
+-- 3d. 회사명 공식 표기 보정 (멱등) — 기존 적용분 '라이드주식회사' → '라이드 주식회사'
+UPDATE companies SET name='라이드 주식회사'
+  WHERE company_key='RIDE' AND name<>'라이드 주식회사';
 
 -- ── 4. profiles.company_id 백필 (org-brand 로직 — 부서/이메일) ──
 -- 4a. 라이드 소속 (부서 '라이드'·'CX팀' 또는 rideoffice 도메인) → RIDE

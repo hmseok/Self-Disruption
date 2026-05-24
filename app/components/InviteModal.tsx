@@ -337,8 +337,8 @@ export default function InviteModal({ companyName, companyId, isOpen, onClose, o
           </div>
           <h3 className="text-xl font-black text-gray-900">새로운 멤버 초대</h3>
           <p className="text-sm text-gray-500 mt-1">
-            {/* PR-RIDE-BRAND — 초대 브랜딩 라이드주식회사 고정 (FMI 노출 금지) */}
-            <span className="font-bold text-steel-600">라이드주식회사</span>
+            {/* PR-RIDE-BRAND — 초대 브랜딩 라이드 주식회사 고정 (FMI 노출 금지) */}
+            <span className="font-bold text-steel-600">라이드 주식회사</span>
           </p>
         </div>
 

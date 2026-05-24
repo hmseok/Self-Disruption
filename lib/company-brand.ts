@@ -12,7 +12,7 @@ export type CompanyKey = 'FMI' | 'RIDE'
 
 export interface CompanyBrand {
   key: CompanyKey
-  name: string        // 정식 회사명 (라이드주식회사 / 주식회사 에프엠아이)
+  name: string        // 정식 회사명 (라이드 주식회사 / 주식회사 에프엠아이)
   shortName: string   // 짧은 표기 (RIDE / FMI)
   primary: string     // 브랜드 primary 색상 (hex)
   logo: string        // 밝은 배경용 로고 (없으면 '' → 텍스트 워드마크)
@@ -30,7 +30,7 @@ export const COMPANY_BRANDS: Record<CompanyKey, CompanyBrand> = {
   },
   RIDE: {
     key: 'RIDE',
-    name: '라이드주식회사',
+    name: '라이드 주식회사',
     shortName: 'RIDE',
     primary: '#0C0C30',
     logo: '/brand/ride-logo.png',

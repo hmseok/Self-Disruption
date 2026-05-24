@@ -26,7 +26,7 @@ function AuthPage() {
   const [verifyCountdown, setVerifyCountdown] = useState(0)
 
   // PR-MULTI-BRAND P3 — 서브도메인 회사 브랜드 (P2 미들웨어가 세팅한 company_key 쿠키)
-  //   ride.hmseok.com → 라이드주식회사 / 그 외 → FMI. SSR 기본 FMI → 마운트 후 보정.
+  //   ride.hmseok.com → 라이드 주식회사 / 그 외 → FMI. SSR 기본 FMI → 마운트 후 보정.
   const [brand, setBrand] = useState(() => COMPANY_BRANDS.FMI)
   useEffect(() => { setBrand(getCompanyBrand()) }, [])
 

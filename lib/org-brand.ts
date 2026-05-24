@@ -33,7 +33,7 @@ export const ORG_BRAND_CONFIGS: Record<OrgBrand, OrgBrandConfig> = {
   RIDE: {
     brand: 'RIDE',
     primaryLabel: 'RIDE CARE',
-    companyLabel: '라이드주식회사',
+    companyLabel: '라이드 주식회사',
   },
 }
 
