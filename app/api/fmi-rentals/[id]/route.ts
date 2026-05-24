@@ -32,11 +32,14 @@ const ALLOWED_FIELDS = new Set([
   'status', 'handler_id', 'handler_name', 'dispatcher_name', 'notes', 'accident_id',
   // PR-O (2026-05-22) — 청구유형 / 부가세 추가청구
   'claim_type', 'vat_extra_billing', 'capital_company', 'fleet_group',
+  // PR-N6 (2026-05-24) — 입고공장 / 생년월일 / 지급 추적
+  'repair_factory', 'customer_birth', 'paid_amount', 'payment_status', 'payment_memo',
 ])
 const DATE_FIELDS = new Set(['dispatch_date', 'expected_return_date', 'actual_return_date'])
 const NUMBER_FIELDS = new Set([
   'rental_days', 'dispatch_mileage', 'return_mileage', 'driven_km',
   'daily_rate', 'total_rental_fee', 'additional_charges', 'deduction_amount', 'final_claim_amount',
+  'paid_amount',
 ])
 
 export async function GET(

@@ -59,6 +59,8 @@ export async function GET(request: NextRequest) {
          r.status, r.handler_name, r.dispatcher_name, r.notes,
          r.created_at, r.updated_at,
          r.claim_type, r.vat_extra_billing, r.capital_company,
+         r.repair_factory, r.customer_birth, r.dispatch_location,
+         r.paid_amount, r.payment_status, r.payment_memo,
          COALESCE(r.fleet_group, v.ownership_type) AS fleet_group,
          v.status AS vehicle_status
        FROM fmi_rentals r
@@ -74,6 +76,7 @@ export async function GET(request: NextRequest) {
       daily_rate: r.daily_rate !== null ? Number(r.daily_rate) : null,
       total_rental_fee: r.total_rental_fee !== null ? Number(r.total_rental_fee) : null,
       final_claim_amount: r.final_claim_amount !== null ? Number(r.final_claim_amount) : null,
+      paid_amount: r.paid_amount !== null && r.paid_amount !== undefined ? Number(r.paid_amount) : null,
     }))
 
     let stats: any = null
