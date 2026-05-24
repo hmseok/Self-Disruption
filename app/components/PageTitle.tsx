@@ -55,6 +55,8 @@ const PATH_TO_GROUP: Record<string, string> = {
   '/RideMTOps/maintenance-tours':                  'mt-team',
   '/RideMTOps/legal-inspections':                  'mt-team',
   '/RideMTOps/chargers':                           'mt-team',
+  // ── 비전 — PR-VISION (2026-05-24) ──
+  '/RideVision/lotto':                             'vision',
 }
 
 // 그룹 ID → 섹션 라벨
@@ -67,6 +69,7 @@ const GROUP_LABELS: Record<string, string> = {
   'admin-ops': '관리자 운영',  // PR-6.13.c
   cx: 'CX팀',                  // N-12 — CallScheduler 등
   'mt-team': 'MT팀',           // PR-MT-OPS (2026-05-11)
+  vision: '비전',              // PR-VISION (2026-05-24)
 }
 
 // 경로 → 페이지 이름 (사이드바 NAME_OVERRIDES와 동기화)
@@ -136,6 +139,8 @@ const PAGE_NAMES: Record<string, string> = {
   '/RideMTOps/maintenance-tours':    '순회정비',
   '/RideMTOps/legal-inspections':    '법정검사',
   '/RideMTOps/chargers':             '충전기',
+  // 비전 (PR-VISION — 2026-05-24)
+  '/RideVision/lotto':               '로또번호추출기',
 }
 
 // 설정 그룹 매핑

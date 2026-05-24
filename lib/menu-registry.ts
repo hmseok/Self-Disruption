@@ -57,9 +57,11 @@ export const GROUPS: MenuGroup[] = [
   { id: 'cx-team',         label: 'CX팀',         section: 'work-essentials', sortOrder: 11 },
   // PR-MT-OPS (2026-05-11) — MT팀 운영 그룹 (위탁: 다른 세션 작업, 본 세션 단독 commit)
   { id: 'mt-team',         label: '🔧 MT팀',      section: 'work-essentials', sortOrder: 12 },
+  // PR-VISION (2026-05-24) — 비전 그룹 (로또번호추출기 등 가벼운 유틸)
+  { id: 'vision',          label: '비전',         section: 'work-essentials', sortOrder: 13 },
   // PR-6.9.b (2026-05-06) — 관리자 운영 그룹 신설 (Employee of Ride Inc. 하위)
   // 2026-05-24 — 라이드 하위 그룹 중 항상 최하단 (사용자 요청) → sortOrder 최대
-  { id: 'admin-ops',       label: '관리자 운영',   section: 'work-essentials', sortOrder: 13 },
+  { id: 'admin-ops',       label: '관리자 운영',   section: 'work-essentials', sortOrder: 14 },
   // 설정 (admin 전용 — 사이드바 별도 섹션)
   { id: 'settings',        label: '설정',         section: 'settings',         sortOrder: 20 },
 ]
@@ -133,6 +135,9 @@ export const MENUS: MenuEntry[] = [
   { id: 'mod-mt-tours',    name: '순회정비', displayName: '🚗 순회정비', path: '/RideMTOps/maintenance-tours', iconKey: 'Wrench',    group: 'mt-team', sortOrder: 50, requirePermission: true },
   { id: 'mod-mt-inspect',  name: '법정검사', displayName: '📋 법정검사', path: '/RideMTOps/legal-inspections', iconKey: 'Clipboard', group: 'mt-team', sortOrder: 51, requirePermission: true, sidebarHidden: true },
   { id: 'mod-mt-chargers', name: '충전기',   displayName: '🔌 충전기',   path: '/RideMTOps/chargers',          iconKey: 'Bolt',      group: 'mt-team', sortOrder: 52, requirePermission: true, sidebarHidden: true },
+
+  // PR-VISION (2026-05-24) — 비전 그룹 (가벼운 유틸). 페이지: 별도 세션 PR-VISION-1
+  { id: 'mod-lotto', name: '로또번호추출기', displayName: '🎰 로또번호추출기', path: '/RideVision/lotto', iconKey: 'Doc', group: 'vision', sortOrder: 90, requirePermission: true },
 
   // ── 설정 (settings) ── admin 전용 (사이드바 별도 섹션)
   // 권한 부여 대상 — 일부 사용자에게 회사 정보 / 메시지 센터 등 위임 가능
