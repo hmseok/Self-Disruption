@@ -240,7 +240,7 @@ export default function MeetingSidebar({ activeId, collapsed, onToggleCollapsed,
             style={{
               padding: '4px 10px', fontSize: 11, fontWeight: 600, borderRadius: 6,
               cursor: 'pointer', whiteSpace: 'nowrap',
-              background: filter === b.k ? '#0f2440' : 'transparent',
+              background: filter === b.k ? '#3b6eb5' : 'transparent',
               color: filter === b.k ? '#fff' : '#64748b',
               border: filter === b.k ? 'none' : `1px solid ${COLORS.borderSubtle}`,
             }}>

@@ -47,7 +47,7 @@ export default function DcSubFilters({ groups }: Props) {
                 border: 'none',
                 fontSize: 12,
                 fontWeight: 700,
-                background: group.activeKey === item.key ? '#0f2440' : 'rgba(100,116,139,0.08)',
+                background: group.activeKey === item.key ? '#3b6eb5' : 'rgba(100,116,139,0.08)',
                 color: group.activeKey === item.key ? '#fff' : '#64748b',
                 cursor: 'pointer',
                 fontFamily: 'inherit',

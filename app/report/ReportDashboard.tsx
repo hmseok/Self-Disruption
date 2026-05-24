@@ -261,7 +261,7 @@ export default function ReportDashboard() {
                 style={{
                   padding: '5px 12px', borderRadius: 8, fontSize: 11, fontWeight: 700,
                   border: periodMonths === m ? 'none' : '1px solid rgba(0,0,0,0.06)',
-                  background: periodMonths === m ? '#0f2440' : 'rgba(255,255,255,0.6)',
+                  background: periodMonths === m ? '#3b6eb5' : 'rgba(255,255,255,0.6)',
                   color: periodMonths === m ? '#fff' : '#64748b',
                   cursor: 'pointer', whiteSpace: 'nowrap',
                 }}>

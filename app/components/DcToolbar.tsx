@@ -90,7 +90,7 @@ export default function DcToolbar({
                 border: 'none',
                 fontSize: 12,
                 fontWeight: 700,
-                background: activeFilter === f.key ? '#0f2440' : 'transparent',
+                background: activeFilter === f.key ? '#3b6eb5' : 'transparent',
                 color: activeFilter === f.key ? '#fff' : '#64748b',
                 cursor: 'pointer',
                 fontFamily: 'inherit',

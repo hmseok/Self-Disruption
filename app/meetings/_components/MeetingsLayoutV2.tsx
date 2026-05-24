@@ -663,7 +663,7 @@ function TabBtn({ label, active, onClick }: { label: string; active: boolean; on
     <button onClick={onClick} style={{
       padding: '7px 14px', borderRadius: 8, border: 'none',
       fontSize: 12, fontWeight: 700,
-      background: active ? '#0f2440' : GLASS.L1.background,
+      background: active ? '#3b6eb5' : GLASS.L1.background,
       color: active ? '#fff' : COLORS.textSecondary,
       cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit',
       transition: 'all 0.15s',
