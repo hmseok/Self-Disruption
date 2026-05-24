@@ -3,6 +3,10 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-23 (Phase N-74) — 대시보드 칩 시프트 개념색 적용
+
+- 대시보드 「지금 일하는 사람」·「오늘/내일」 칩이 워커 color_tone(대부분 'none'→회색)으로 칠해져 컨셉색이 안 보임. `palette.shiftConceptTone(is_overnight, shift_start)` 신규 — 시간대 기반 개념색(주간→sky / 저녁 18시~→orange / 야간→indigo). `NowWorkingStrip`·`TodayTomorrowGrid` 칩을 이 개념색으로 칠함. 마이그레이션·API 의존 없음(칩 데이터의 is_overnight·shift_start 만으로 산출) — 즉시 적용.
+
 ## 2026-05-23 (Phase N-72-fix) — 대시보드 기준 시각 이중 보정 수정
 
 - N-72 에서 백엔드 KST 보정은 맞았으나 `meta.now_iso` 까지 보정된 `now` 를 내보내 프론트가 또 KST 변환 → 표시 시각 +9h(예: 10:05 → 19:05). `now_iso` 를 실제 instant(`nowReal`)로 분리 — 백엔드 계산용 `now`(KST 값)와 표시용 `now_iso`(실제 instant)를 구분.
