@@ -5,6 +5,25 @@
 
 ---
 
+## 2026-05-24 | PR-VISION-12 | 회차 전체 복사 + 포맷·서명
+
+### 사용자 요청
+> "같은 회차는 전부복사 / 회차랑 게임별 번호 / made by seok"
+
+### 변경
+- `lotto/page.tsx`
+  - `roundText()` — 회차별 전체 게임 텍스트 구성
+    포맷: `🎱 로또 N회` + `1게임 …` + `2게임 …` + `made by seok`
+  - `copyRound()` — 해당 회차 전체 게임을 한 번에 클립보드 복사
+  - 「내 기록」 액션 컬럼 복사 버튼 → 「회차 복사」 (행별 1게임 → 회차 전체)
+- 비고: page.tsx 가 외부에서 반쯤 수정돼(roundText/copyRound 추가, 버튼 미연결)
+  빌드 불가 상태였음 → 버튼을 copyRound 로 연결해 정합화 (copyNumbers 미정의 해소)
+
+### GATE
+- ✅ G5 tsc 0건 / G6 lint:harness 새 위반 0건 / Rule 22 CHANGELOG
+
+---
+
 ## 2026-05-24 | PR-VISION-11 | 삭제 권한 admin 단일 역할로 축소
 
 ### 사용자 요청

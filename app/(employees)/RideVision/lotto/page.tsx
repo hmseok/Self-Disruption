@@ -270,18 +270,35 @@ export default function LottoPage() {
     if (tab === 'records' && !recLoadedRef.current) loadRecords()
   }, [tab, loadRecords])
 
-  // 기록 번호 복사 (전 직원 — 실제 구매하러 갈 때)
-  const copyNumbers = useCallback((id: string, numbers: number[]) => {
-    navigator.clipboard.writeText(numbers.join(', ')).then(
-      () => {
-        setCopiedId(id)
-        setTimeout(() => setCopiedId(c => (c === id ? null : c)), 1300)
-      },
-      () => {
-        // 클립보드 권한 불가 — 무시
-      }
-    )
-  }, [])
+  // 회차 번호 텍스트 구성 (회차 + 게임별 번호 + 서명)
+  const roundText = useCallback(
+    (drawNo: number): string => {
+      const games = entries.filter(e => e.draw_no === drawNo)
+      const lines = games.map(
+        (e, i) => `${i + 1}게임  ${[e.n1, e.n2, e.n3, e.n4, e.n5, e.n6].join(', ')}`
+      )
+      return `🎱 로또 ${drawNo}회\n${lines.join('\n')}\n\nmade by seok`
+    },
+    [entries]
+  )
+
+  // 회차 전체 복사 (해당 회차 모든 게임 — 전 직원, 실제 구매하러 갈 때)
+  const copyRound = useCallback(
+    (drawNo: number) => {
+      const text = roundText(drawNo)
+      navigator.clipboard.writeText(text).then(
+        () => {
+          const key = `round-${drawNo}`
+          setCopiedId(key)
+          setTimeout(() => setCopiedId(c => (c === key ? null : c)), 1500)
+        },
+        () => {
+          // 클립보드 권한 불가 — 무시
+        }
+      )
+    },
+    [roundText]
+  )
 
   // 기록 삭제 (슈퍼어드민 전용 — 손실 추적 무결성)
   const deleteEntry = useCallback(
@@ -545,7 +562,7 @@ export default function LottoPage() {
       render: r => (
         <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
           <button
-            onClick={() => copyNumbers(r.id, r.numbers)}
+            onClick={() => copyRound(r.draw_no)}
             style={{
               ...BTN.sm,
               background: COLORS.bgBlue,
@@ -554,7 +571,7 @@ export default function LottoPage() {
               cursor: 'pointer',
             }}
           >
-            {copiedId === r.id ? '✓ 복사됨' : '복사'}
+            {copiedId === `round-${r.draw_no}` ? '✓ 복사됨' : '회차 복사'}
           </button>
           {isAdmin && (
             <button
