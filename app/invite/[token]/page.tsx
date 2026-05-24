@@ -217,7 +217,8 @@ export default function InviteAcceptPage() {
             <span className="bg-white/20 text-white text-xs font-black px-3 py-1.5 rounded-lg uppercase tracking-wider">SELF-DISRUPTION</span>
           </div>
           <h1 className="text-4xl font-black tracking-tight mb-4 leading-tight">
-            {invite?.company?.name || '회사'}에<br/>
+            {/* PR-RIDE-BRAND — 초대 페이지 회사명 라이드주식회사 고정 (FMI 노출 금지) */}
+            라이드주식회사에<br/>
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-300 to-purple-300">초대되었습니다</span>
           </h1>
           <p className="text-lg text-white/70 leading-relaxed">

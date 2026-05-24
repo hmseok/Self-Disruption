@@ -720,7 +720,7 @@ function AuthPage() {
             <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center">
               <span className="text-slate-900 font-black text-lg">S</span>
             </div>
-            <span className="text-xl font-bold tracking-tight">ERP hmseok</span>
+            <span className="text-xl font-bold tracking-tight">라이드주식회사</span>
           </div>
 
           <div className="space-y-6">
@@ -760,7 +760,7 @@ function AuthPage() {
 
         {/* 하단 Copyright */}
         <div className="relative z-10 pt-6 border-t border-black/10">
-          <p className="text-[11px] text-slate-500">&copy; 2025 ERP hmseok Inc. All rights reserved.</p>
+          <p className="text-[11px] text-slate-500">&copy; 2025 라이드주식회사. All rights reserved.</p>
         </div>
       </div>
 
@@ -806,7 +806,7 @@ function AuthPage() {
                     </svg>
                   </div>
                   <div className="text-sm text-emerald-700 leading-relaxed">
-                    계정이 활성화되었습니다. 아래 버튼을 눌러 ERP hmseok에 입장하세요.
+                    계정이 활성화되었습니다. 아래 버튼을 눌러 라이드주식회사에 입장하세요.
                   </div>
                 </div>
               </div>
@@ -830,7 +830,7 @@ function AuthPage() {
                   {loading ? (
                     <><svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" className="opacity-25"/><path d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" fill="currentColor" className="opacity-75"/></svg> 로그인 중...</>
                   ) : (
-                    <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg> ERP hmseok 시작하기</>
+                    <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg> 라이드주식회사 시작하기</>
                   )}
                 </button>
 
@@ -955,7 +955,7 @@ function AuthPage() {
                 <div className="w-8 h-8 bg-slate-900 rounded-lg flex items-center justify-center">
                   <span className="text-white font-black text-sm">S</span>
                 </div>
-                <span className="text-lg font-bold text-slate-900">ERP hmseok</span>
+                <span className="text-lg font-bold text-slate-900">라이드주식회사</span>
               </div>
 
               {/* 헤딩 */}

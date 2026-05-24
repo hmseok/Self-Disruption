@@ -116,7 +116,7 @@ async function sendInviteMessages(params: {
       })
       const fallbackResult = await sendEmail({
         to: email,
-        subject: `[ERP hmseok] ${companyName}에서 초대합니다`,
+        subject: `[라이드주식회사] 멤버 초대`,
         html: emailHtml,
       })
       emailSent = fallbackResult.success
@@ -129,7 +129,7 @@ async function sendInviteMessages(params: {
           templateKey: 'member_invite',
           channel: 'email',
           recipient: email,
-          subject: `[ERP hmseok] ${companyName}에서 초대합니다`,
+          subject: `[라이드주식회사] 멤버 초대`,
           body: '(fallback HTML)',
           status: fallbackResult.success ? 'sent' : 'failed',
           resultCode: fallbackResult.resultCode,
@@ -233,14 +233,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '관리자 초대는 플랫폼 관리자만 가능합니다.' }, { status: 403 })
     }
 
-    // 단독 ERP: companies 테이블 조회 시도, 없으면 기본값
+    // 초대/메일 브랜딩 — 라이드주식회사 고정 (FMI 노출 금지, 라이드 소속용)
     let company_id = 'fmi-single'
-    let companyName = '주식회사 에프엠아이'
+    const companyName = '라이드주식회사'
     try {
-      const fmiCompanies = await prisma.$queryRaw<any[]>`SELECT id, name FROM companies LIMIT 1`
+      const fmiCompanies = await prisma.$queryRaw<any[]>`SELECT id FROM companies LIMIT 1`
       if (fmiCompanies.length > 0) {
         company_id = fmiCompanies[0].id
-        companyName = fmiCompanies[0].name || companyName
+        // companyName 은 라이드주식회사 고정 — companies 테이블 이름으로 덮어쓰지 않음
       }
     } catch {
       // companies 테이블 미존재 시 기본값 사용
