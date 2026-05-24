@@ -228,10 +228,12 @@ function main() {
       console.log(`  · [${g.canonical}] ${g.files.length} files${merged}`)
     }
     for (const v of coworkR.violations) {
+      // PR-COORD-9 — v.message 우선 (multi-module / new-file-mix 통합)
+      const msg = v.message || `여러 모듈 staged: ${(v.modules || []).join(', ')}`
       if (process.env.COWORK_ALLOW_MULTI_MODULE === '1') {
-        console.warn(`  ⚠ multi-module 허용 (COWORK_ALLOW_MULTI_MODULE=1): ${v.modules.join(', ')}`)
+        console.warn(`  ⚠ 허용 (COWORK_ALLOW_MULTI_MODULE=1) [${v.type}]: ${msg}`)
       } else {
-        console.error(`  ❌ 한 commit 에 여러 모듈 staged: ${v.modules.join(', ')}`)
+        console.error(`  ❌ [${v.type}] ${msg}`)
       }
     }
   }
