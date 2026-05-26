@@ -104,6 +104,17 @@ for (const fp of pageFiles) {
     //   NeuFilterTabs 가 이미 import 되어 있으면 OK (sub-tab 혼용 가능).
     hasSelfTabSetter: /\bset[A-Z]\w*Tab\w*\s*\(/.test(content),
     hasNeuFilterTabs: /NeuFilterTabs/.test(content),
+    // 2026-05-26 — alert / confirm — 글래스 패널 사용 의무 (Rule 20)
+    //   기계적 message 박스 금지. 결과 메시지는 React state + 글래스.
+    //   exec context 안 alert (window.alert / 단순 alert) 검출.
+    //   prompt() 도 같이 — confirm 은 일부 case 허용 (data-loss 위험 시) → 정보성.
+    hasAlertCall: /(?:^|[^.\w])alert\s*\(/m.test(content),
+    hasConfirmCall: /(?:^|[^.\w])confirm\s*\(/m.test(content),
+    // 2026-05-26 — 자체 진행률 — AIProgressFloater 사용 의무 (Rule 16)
+    //   batch loop / AI 호출 / 1초+ 작업 = useAIProgress 호출.
+    //   setProgress / setBarWidth 같은 자체 progress state setter 검출.
+    hasSelfProgressSetter: /\bset(?:Progress|BarProgress|LoadingProgress|UploadProgress)\s*\(/.test(content),
+    hasAIProgress: /useAIProgress|AIProgressFloater/.test(content),
   }
 
   // 1) stat strip 자체 구현 (5+ 카드 패턴 있는데 DcStatStrip 미사용)
@@ -170,6 +181,33 @@ for (const fp of pageFiles) {
       issue: '자체 탭 strip 추정 — 공용 NeuFilterTabs 사용 권장 (UI-DESIGN-STANDARD § 4 — 같은 기능 같은 UI)',
     })
   }
+
+  // 10) 2026-05-26: alert() — 글래스 패널 사용 의무 (CLAUDE.md Rule 20)
+  //   기계적 message 박스 ERP 수준 떨어뜨림. 결과는 React state + Glass L3/L4.
+  if (checks.hasAlertCall) {
+    warnings.push({
+      file: rel,
+      issue: 'alert() 사용 — Rule 20: 결과 메시지는 글래스 패널 (React state + GLASS) 로. 기계적 alert 금지',
+    })
+  }
+  // 11) 2026-05-26: confirm() — 단순 confirm 은 dialog component 로 대체 권장
+  //   data-loss 위험 confirm 은 허용 (정보성 — 강제 X)
+  if (checks.hasConfirmCall) {
+    warnings.push({
+      file: rel,
+      issue: 'confirm() 사용 — Rule 20: dialog component 권장 (data-loss 위험 case 만 예외 허용)',
+    })
+  }
+
+  // 12) 2026-05-26: 자체 진행률 — AIProgressFloater 사용 의무 (CLAUDE.md Rule 16)
+  //   setProgress / setBarProgress / setLoadingProgress / setUploadProgress 같은
+  //   자체 progress state 가 있는데 useAIProgress 미 import → 자체 진행률.
+  if (checks.hasSelfProgressSetter && !checks.hasAIProgress) {
+    warnings.push({
+      file: rel,
+      issue: '자체 진행률 state — Rule 16: useAIProgress() / AIProgressFloater 사용 권장 (플로팅 진행률 통일)',
+    })
+  }
 }
 
 console.log('═══ 결과 ═══')
@@ -179,7 +217,10 @@ console.log(`  위반: ${violations.length}`)
 
 if (warnings.length > 0) {
   console.log('\n▸ 경고 (정보성):')
-  for (const w of warnings.slice(0, 30)) {
+  // 2026-05-26 — DETAIL: 환경변수 / 인자로 truncation 해제 (전수조사 용도)
+  const DETAIL = process.env.UI_DESIGN_LINT_DETAIL === '1' || process.argv.includes('--detail')
+  const MAX = DETAIL ? warnings.length : 60
+  for (const w of warnings.slice(0, MAX)) {
     console.warn(`  ⚠ ${w.file}`)
     console.warn(`     ${w.issue}`)
   }
