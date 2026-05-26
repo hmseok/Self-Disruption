@@ -4,6 +4,15 @@
 
 ## 2026-05-16
 
+- **PR-ASSETS-2.1** — 권한자 선택 UI + 사용자별 자산 탭 + 엑셀 카테고리별 시트 (재커밋)
+  - 권한자 추가: `window.prompt` 제거 → `profiles` 활성 계정 드롭다운 선택
+    · 신규 API `profile-options` — 로그인 계정 목록 (이미 권한자인 계정 제외 표시)
+  - 신규 탭 「👥 사용자별 자산」 — 직원/외부인력 선택 → 해당 사용자 매칭 자산 목록
+  - 엑셀 템플릿 개편: 단일 시트 → 카테고리별 시트탭 (시트 1개 = 카테고리 1개)
+    · 시트명 = 카테고리명, 업로드 시 시트명으로 카테고리 자동 결정
+    · 안내 시트 포함, 빈 시트·빈 행 자동 무시
+  - 재커밋 사유: 다른 세션 git 작업 중 분실 → CLAUDE.md § 21 「commit 즉시 push 의무」 준수
+
 - **PR-ASSETS-2.0** — 대량 등록(인라인 리스트 + 엑셀) + 매칭 대상 확장
   - 매칭 모델 전환: `assigned_user_id`(profiles) → `assigned_to_kind` + `assigned_to_id`
     · 'employee' = `ride_employees` (라이드 직원 16명) / 'freelancer' = `freelancers` (외부인력 22명)

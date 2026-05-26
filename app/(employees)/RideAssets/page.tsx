@@ -64,6 +64,14 @@ interface Assignee {
   sub: string | null
 }
 
+interface ProfileOption {
+  id: string
+  name: string
+  department: string | null
+  role: string | null
+  is_admin_already: boolean
+}
+
 interface AssetAdmin {
   user_id: string
   user_name: string | null
@@ -114,6 +122,7 @@ export default function RideAssetsPage() {
   const [categories, setCategories] = useState<Category[]>([])
   const [assignees, setAssignees] = useState<Assignee[]>([])
   const [assetAdmins, setAssetAdmins] = useState<AssetAdmin[]>([])
+  const [profiles, setProfiles] = useState<ProfileOption[]>([])
 
   // 탭/필터
   const [activeTab, setActiveTab] = useState<TabKey>('all')
@@ -174,6 +183,19 @@ export default function RideAssetsPage() {
     } catch { /* noop */ }
   }, [isSysAdmin])
 
+  const fetchProfiles = useCallback(async () => {
+    if (!isSysAdmin) return
+    const token = getStoredToken()
+    try {
+      const res = await fetch('/api/ride-assets/profile-options', {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        cache: 'no-store',
+      })
+      const json = await res.json()
+      setProfiles(json.data || [])
+    } catch { /* noop */ }
+  }, [isSysAdmin])
+
   const fetchAssets = useCallback(async () => {
     setLoading(true)
     setErr(null)
@@ -215,13 +237,13 @@ export default function RideAssetsPage() {
 
   useEffect(() => {
     if (!authChecked || !canAccessPage) return
-    if (activeTab === 'print' || activeTab === 'admins' || activeTab === 'categories' || activeTab === 'bulk') return
+    if (activeTab === 'print' || activeTab === 'admins' || activeTab === 'categories' || activeTab === 'bulk' || activeTab === 'by-assignee') return
     fetchAssets()
   }, [authChecked, canAccessPage, activeTab, statusFilter, search, fetchAssets])
 
   useEffect(() => {
-    if (activeTab === 'admins') fetchAssetAdmins()
-  }, [activeTab, fetchAssetAdmins])
+    if (activeTab === 'admins') { fetchAssetAdmins(); fetchProfiles() }
+  }, [activeTab, fetchAssetAdmins, fetchProfiles])
 
   // 일반 사용자 진입 시 기본 탭을 '내 자산'으로
   useEffect(() => {
@@ -484,15 +506,13 @@ export default function RideAssetsPage() {
     }
   }
 
-  async function handleAddAdmin() {
-    const userId = window.prompt('권한자로 추가할 user_id 입력:')
+  async function handleAddAdmin(userId: string) {
     if (!userId) return
-    const note = window.prompt('메모 (선택):') || null
     const token = getStoredToken()
     const res = await fetch('/api/ride-asset-admins', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-      body: JSON.stringify({ user_id: userId.trim(), note }),
+      body: JSON.stringify({ user_id: userId, note: null }),
     })
     const json = await res.json()
     if (!res.ok || !json.success) {
@@ -501,6 +521,7 @@ export default function RideAssetsPage() {
     }
     setResultPanel({ tone: 'success', msg: '✅ 권한자 추가됨' })
     fetchAssetAdmins()
+    fetchProfiles()
   }
 
   async function handleRemoveAdmin(userId: string) {
@@ -562,6 +583,7 @@ export default function RideAssetsPage() {
       adminOnly: !isAssetAdmin,  // 일반 사용자도 카테고리 탭은 본인 자산만 보여주므로 표시
     })),
     ...(isAssetAdmin ? [{ key: 'common', label: '📦 공통 자산', adminOnly: true }] : []),
+    ...(isAssetAdmin ? [{ key: 'by-assignee', label: '👥 사용자별 자산', adminOnly: true }] : []),
     { key: 'mine', label: '👤 내 자산', adminOnly: false },
     ...(isAssetAdmin ? [{ key: 'bulk', label: '➕ 대량 등록', adminOnly: true }] : []),
     ...(isAssetAdmin ? [{ key: 'print', label: '🖨️ QR 인쇄', adminOnly: true }] : []),
@@ -573,6 +595,7 @@ export default function RideAssetsPage() {
   const isCategoryMgmtTab = activeTab === 'categories'
   const isPrintTab = activeTab === 'print'
   const isBulkTab = activeTab === 'bulk'
+  const isByAssigneeTab = activeTab === 'by-assignee'
 
   return (
     <div style={{ padding: '0 16px 32px', maxWidth: 1400, margin: '0 auto' }}>
@@ -645,7 +668,9 @@ export default function RideAssetsPage() {
 
       {/* 탭별 컨텐츠 */}
       {isAdminTab ? (
-        <AdminsTab admins={assetAdmins} onAdd={handleAddAdmin} onRemove={handleRemoveAdmin} />
+        <AdminsTab admins={assetAdmins} profiles={profiles} onAdd={handleAddAdmin} onRemove={handleRemoveAdmin} />
+      ) : isByAssigneeTab ? (
+        <ByAssigneeTab assignees={assignees} />
       ) : isCategoryMgmtTab ? (
         <CategoriesTab
           categories={categories}
@@ -754,23 +779,43 @@ export default function RideAssetsPage() {
 // AdminsTab — 권한자 관리 (admin only)
 // ─────────────────────────────────────────────────────────────
 function AdminsTab({
-  admins, onAdd, onRemove,
-}: { admins: AssetAdmin[]; onAdd: () => void; onRemove: (uid: string) => void }) {
+  admins, profiles, onAdd, onRemove,
+}: {
+  admins: AssetAdmin[]
+  profiles: ProfileOption[]
+  onAdd: (userId: string) => void
+  onRemove: (uid: string) => void
+}) {
+  const [pick, setPick] = useState('')
+  const selectable = profiles.filter(p => !p.is_admin_already)
+
   return (
     <div style={{ ...GLASS.L4, borderRadius: 12, padding: 20 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        marginBottom: 16, gap: 12, flexWrap: 'wrap' }}>
         <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: COLORS.textPrimary }}>
           ⚙ 자산 권한자 (총무팀)
         </h3>
-        <button
-          onClick={onAdd}
-          style={{ ...BTN.md, background: COLORS.primary, color: '#fff', border: 'none', cursor: 'pointer' }}
-        >
-          + 권한자 추가
-        </button>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <select value={pick} onChange={e => setPick(e.target.value)}
+            style={{ ...GLASS.L1, borderRadius: 8, padding: '8px 10px', fontSize: 13,
+              color: COLORS.textPrimary, outline: 'none', minWidth: 200 }}>
+            <option value="">계정 선택...</option>
+            {selectable.map(p => (
+              <option key={p.id} value={p.id}>
+                {p.name}{p.department ? ` · ${p.department}` : ''}{p.role === 'admin' ? ' (관리자)' : ''}
+              </option>
+            ))}
+          </select>
+          <button onClick={() => { if (pick) { onAdd(pick); setPick('') } }} disabled={!pick}
+            style={{ ...BTN.md, background: COLORS.primary, color: '#fff', border: 'none',
+              cursor: pick ? 'pointer' : 'not-allowed', opacity: pick ? 1 : 0.5 }}>
+            + 권한자 추가
+          </button>
+        </div>
       </div>
       <p style={{ fontSize: 12, color: COLORS.textMuted, marginTop: 0, marginBottom: 16 }}>
-        라이드 admin 은 자동으로 권한자입니다. 본 목록은 추가 위임된 총무팀원 화이트리스트입니다.
+        라이드 admin 은 자동으로 권한자입니다. 위 드롭다운에서 로그인 계정을 선택해 총무팀원을 권한자로 추가하세요.
       </p>
       {admins.length === 0 ? (
         <div style={{ padding: 32, textAlign: 'center', color: COLORS.textMuted, fontSize: 13 }}>
@@ -786,20 +831,101 @@ function AdminsTab({
             }}>
               <div style={{ fontSize: 13 }}>
                 <span style={{ fontWeight: 600, color: COLORS.textPrimary }}>{a.user_name || '(이름 없음)'}</span>
-                <span style={{ marginLeft: 8, color: COLORS.textMuted, fontFamily: 'monospace', fontSize: 11 }}>
-                  {a.user_id}
-                </span>
                 {a.note && <span style={{ marginLeft: 8, color: COLORS.textSecondary, fontSize: 12 }}>· {a.note}</span>}
               </div>
-              <button
-                onClick={() => onRemove(a.user_id)}
-                style={{ ...BTN.sm, background: 'transparent', color: COLORS.danger, border: `1px solid ${COLORS.borderRed}`, cursor: 'pointer' }}
-              >
+              <button onClick={() => onRemove(a.user_id)}
+                style={{ ...BTN.sm, background: 'transparent', color: COLORS.danger,
+                  border: `1px solid ${COLORS.borderRed}`, cursor: 'pointer' }}>
                 제거
               </button>
             </div>
           ))}
         </div>
+      )}
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────
+// ByAssigneeTab — 사용자별 자산 조회
+// ─────────────────────────────────────────────────────────────
+function ByAssigneeTab({ assignees }: { assignees: Assignee[] }) {
+  const [picked, setPicked] = useState('')
+  const [list, setList] = useState<Asset[]>([])
+  const [loading, setLoading] = useState(false)
+
+  async function load(key: string) {
+    setPicked(key)
+    if (!key) { setList([]); return }
+    const id = key.split(':')[1]
+    setLoading(true)
+    try {
+      const token = getStoredToken()
+      const res = await fetch(`/api/ride-assets?assigned=${encodeURIComponent(id)}&limit=500`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}, cache: 'no-store',
+      })
+      const json = await res.json()
+      setList(json.success ? (json.data || []) : [])
+    } catch { setList([]) } finally { setLoading(false) }
+  }
+
+  const pickedAssignee = assignees.find(a => `${a.kind}:${a.id}` === picked)
+
+  return (
+    <div style={{ ...GLASS.L4, borderRadius: 12, padding: 20 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        marginBottom: 16, gap: 12, flexWrap: 'wrap' }}>
+        <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: COLORS.textPrimary }}>
+          👥 사용자별 자산
+        </h3>
+        <select value={picked} onChange={e => load(e.target.value)}
+          style={{ ...GLASS.L1, borderRadius: 8, padding: '8px 10px', fontSize: 13,
+            color: COLORS.textPrimary, outline: 'none', minWidth: 220 }}>
+          <option value="">사용자 선택 (직원 / 외부인력)...</option>
+          {assignees.map(a => (
+            <option key={`${a.kind}:${a.id}`} value={`${a.kind}:${a.id}`}>
+              {a.kind === 'employee' ? '[직원]' : '[외부]'} {a.name}{a.sub ? ` · ${a.sub}` : ''}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {!picked ? (
+        <div style={{ padding: 32, textAlign: 'center', color: COLORS.textMuted, fontSize: 13 }}>
+          위에서 사용자를 선택하면 해당 사용자에게 매칭된 자산이 표시됩니다.
+        </div>
+      ) : loading ? (
+        <div style={{ padding: 32, textAlign: 'center', color: COLORS.textMuted, fontSize: 13 }}>불러오는 중...</div>
+      ) : list.length === 0 ? (
+        <div style={{ padding: 32, textAlign: 'center', color: COLORS.textMuted, fontSize: 13 }}>
+          {pickedAssignee?.name}님에게 매칭된 자산이 없습니다.
+        </div>
+      ) : (
+        <>
+          <div style={{ fontSize: 12, color: COLORS.textSecondary, marginBottom: 10 }}>
+            {pickedAssignee?.name}님 — 매칭 자산 {list.length}건
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {list.map(a => {
+              const b = STATUS_BADGE[a.status] || { label: a.status, tone: 'neutral' as const }
+              return (
+                <div key={a.id} style={{ ...GLASS.L3, borderRadius: 8, padding: 12,
+                  border: `1px solid ${COLORS.borderSubtle}`,
+                  display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <span style={{ fontSize: 18 }}>{a.category_emoji}</span>
+                  <span style={{ fontFamily: 'monospace', fontWeight: 700, color: COLORS.primary,
+                    minWidth: 120, whiteSpace: 'nowrap' }}>{a.asset_code}</span>
+                  <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: COLORS.textPrimary,
+                    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.name}</span>
+                  <span style={{ fontSize: 11, color: COLORS.textMuted, whiteSpace: 'nowrap' }}>
+                    📍 {a.location || '미지정'}
+                  </span>
+                  <span style={pillStyle(b.tone)}>{b.label}</span>
+                </div>
+              )
+            })}
+          </div>
+        </>
       )}
     </div>
   )

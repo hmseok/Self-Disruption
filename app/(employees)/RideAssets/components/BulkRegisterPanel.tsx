@@ -111,27 +111,36 @@ export default function BulkRegisterPanel({ categories, assignees, onDone }: Pro
     }
   }
 
-  // ── 엑셀 템플릿 다운로드 ──
+  // ── 엑셀 템플릿 다운로드 (카테고리별 시트탭) ──
   function downloadTemplate() {
-    const headers = ['카테고리', '자산명', '취득일(YYYY-MM-DD)', '취득가', '사용자', '위치', '메모']
-    const example = [
-      ['IT장비', 'ThinkPad X1 Carbon', '2026-01-15', '2500000', '박지훈', '3F 개발팀', '신규 입고'],
-      ['차량', '카니발 12가3456', '2025-08-01', '38000000', '', '본사 차고지', ''],
-    ]
-    const ws = XLSX.utils.aoa_to_sheet([headers, ...example])
-    ws['!cols'] = [{ wch: 12 }, { wch: 24 }, { wch: 18 }, { wch: 12 }, { wch: 12 }, { wch: 16 }, { wch: 20 }]
-    // 참고 시트 — 카테고리 목록
-    const catSheet = XLSX.utils.aoa_to_sheet([
-      ['사용 가능 카테고리 (자산명 열의 카테고리에 아래 이름을 그대로 입력)'],
-      ...activeCategories.map(c => [c.name]),
-    ])
     const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, '자산등록')
-    XLSX.utils.book_append_sheet(wb, catSheet, '카테고리목록')
+    const guide = XLSX.utils.aoa_to_sheet([
+      ['📦 라이드 자산 대량 등록 양식'],
+      [''],
+      ['· 아래 카테고리별 시트탭에 자산을 입력하세요 (시트 1개 = 카테고리 1개).'],
+      ['· 「자산명」은 필수입니다. 나머지 항목은 선택.'],
+      ['· 「사용자(매칭)」 칸에 직원/외부인력 이름을 정확히 입력 (빈칸이면 공통 자산).'],
+      ['· 작성한 시트만 등록되며, 빈 행·빈 시트는 무시됩니다.'],
+      ['· 취득일 형식: YYYY-MM-DD (예: 2026-01-15)'],
+    ])
+    guide['!cols'] = [{ wch: 64 }]
+    XLSX.utils.book_append_sheet(wb, guide, '안내')
+
+    const headers = ['자산명 *', '취득일(YYYY-MM-DD)', '취득가', '사용자(매칭)', '위치', '메모']
+    const cols = [{ wch: 24 }, { wch: 18 }, { wch: 12 }, { wch: 14 }, { wch: 16 }, { wch: 22 }]
+    if (activeCategories.length === 0) {
+      const ws = XLSX.utils.aoa_to_sheet([headers]); ws['!cols'] = cols
+      XLSX.utils.book_append_sheet(wb, ws, '자산')
+    } else {
+      activeCategories.forEach(c => {
+        const ws = XLSX.utils.aoa_to_sheet([headers]); ws['!cols'] = cols
+        XLSX.utils.book_append_sheet(wb, ws, sheetNameOf(c.name, c.code))
+      })
+    }
     XLSX.writeFile(wb, `라이드자산_등록양식_${new Date().toISOString().slice(0, 10)}.xlsx`)
   }
 
-  // ── 엑셀 업로드 파싱 ──
+  // ── 엑셀 업로드 파싱 (카테고리별 시트 순회) ──
   function handleExcelUpload(e: React.ChangeEvent<HTMLInputElement>) {
     setExcelError(null)
     const file = e.target.files?.[0]
@@ -141,66 +150,61 @@ export default function BulkRegisterPanel({ categories, assignees, onDone }: Pro
       try {
         const data = new Uint8Array(ev.target?.result as ArrayBuffer)
         const wb = XLSX.read(data, { type: 'array' })
-        const ws = wb.Sheets[wb.SheetNames[0]]
-        const aoa: unknown[][] = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false })
-        if (aoa.length < 2) { setExcelError('데이터 행이 없습니다.'); return }
 
-        // 카테고리 이름 → id, 사용자 이름 → assignee 매핑
-        const catByName = new Map(activeCategories.map(c => [c.name.trim(), c.id]))
+        const catBySheet = new Map(activeCategories.map(c => [sheetNameOf(c.name, c.code), c.id]))
         const assigneeByName = new Map<string, Assignee[]>()
         assignees.forEach(a => {
           const list = assigneeByName.get(a.name.trim()) || []
-          list.push(a)
-          assigneeByName.set(a.name.trim(), list)
+          list.push(a); assigneeByName.set(a.name.trim(), list)
         })
 
         const parsed: DraftRow[] = []
-        for (let i = 1; i < aoa.length; i++) {
-          const r = aoa[i]
-          const catName = String(r[0] ?? '').trim()
-          const name = String(r[1] ?? '').trim()
-          if (!catName && !name) continue  // 빈 행 skip
+        for (const sheetName of wb.SheetNames) {
+          if (sheetName === '안내') continue
+          const catId = catBySheet.get(sheetName.trim())
+          const ws = wb.Sheets[sheetName]
+          const aoa: unknown[][] = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false })
+          for (let i = 1; i < aoa.length; i++) {
+            const r = aoa[i]
+            const name = String(r[0] ?? '').trim()
+            if (!name) continue
 
-          const errs: string[] = []
-          const catId = catByName.get(catName)
-          if (!catId) errs.push(`카테고리 '${catName}' 없음`)
+            const errs: string[] = []
+            if (!catId) errs.push(`시트 '${sheetName}' 가 카테고리와 불일치`)
 
-          let assigneeKey = ''
-          const userName = String(r[4] ?? '').trim()
-          if (userName) {
-            const matches = assigneeByName.get(userName)
-            if (!matches || matches.length === 0) errs.push(`사용자 '${userName}' 없음`)
-            else if (matches.length > 1) errs.push(`'${userName}' 동명이인 — 화면에서 선택`)
-            else assigneeKey = `${matches[0].kind}:${matches[0].id}`
-          }
-          if (!name) errs.push('자산명 누락')
-
-          // 취득일 — 엑셀 날짜 직렬값 또는 문자열
-          let acquiredAt = ''
-          const rawDate = r[2]
-          if (rawDate != null && rawDate !== '') {
-            if (typeof rawDate === 'number') {
-              const d = XLSX.SSF.parse_date_code(rawDate)
-              if (d) acquiredAt = `${d.y}-${String(d.m).padStart(2, '0')}-${String(d.d).padStart(2, '0')}`
-            } else {
-              acquiredAt = String(rawDate).trim()
+            let assigneeKey = ''
+            const userName = String(r[3] ?? '').trim()
+            if (userName) {
+              const matches = assigneeByName.get(userName)
+              if (!matches || matches.length === 0) errs.push(`사용자 '${userName}' 없음`)
+              else if (matches.length > 1) errs.push(`'${userName}' 동명이인 — 화면에서 선택`)
+              else assigneeKey = `${matches[0].kind}:${matches[0].id}`
             }
-          }
 
-          parsed.push({
-            category_id: catId || '',
-            name,
-            acquired_at: acquiredAt,
-            acquired_cost: r[3] != null ? String(r[3]).trim() : '',
-            assignee_key: assigneeKey,
-            location: String(r[5] ?? '').trim(),
-            notes: String(r[6] ?? '').trim(),
-            _error: errs.length ? errs.join(', ') : undefined,
-          })
+            let acquiredAt = ''
+            const rawDate = r[1]
+            if (rawDate != null && rawDate !== '') {
+              if (typeof rawDate === 'number') {
+                const d = XLSX.SSF.parse_date_code(rawDate)
+                if (d) acquiredAt = `${d.y}-${String(d.m).padStart(2, '0')}-${String(d.d).padStart(2, '0')}`
+              } else acquiredAt = String(rawDate).trim()
+            }
+
+            parsed.push({
+              category_id: catId || '',
+              name,
+              acquired_at: acquiredAt,
+              acquired_cost: r[2] != null ? String(r[2]).trim() : '',
+              assignee_key: assigneeKey,
+              location: String(r[4] ?? '').trim(),
+              notes: String(r[5] ?? '').trim(),
+              _error: errs.length ? errs.join(', ') : undefined,
+            })
+          }
         }
-        if (parsed.length === 0) { setExcelError('읽을 데이터가 없습니다.'); return }
+        if (parsed.length === 0) { setExcelError('읽을 데이터가 없습니다. 카테고리 시트에 자산명을 입력했는지 확인하세요.'); return }
         setRows(parsed)
-        setMode('inline')  // 미리보기 = 인라인 표에서 확인/수정
+        setMode('inline')
       } catch (err) {
         setExcelError('엑셀 파싱 실패: ' + String(err))
       }
@@ -350,6 +354,13 @@ export default function BulkRegisterPanel({ categories, assignees, onDone }: Pro
       </div>
     </div>
   )
+}
+
+// 엑셀 시트명 — 31자 제한 + 금지문자(\ / ? * [ ] :) 제거. 비면 카테고리 코드 fallback.
+// 다운로드·업로드 양쪽에서 동일 변환 → 시트명 ↔ 카테고리 매핑 일관성 보장.
+function sheetNameOf(name: string, code: string): string {
+  const clean = name.replace(/[\\/?*[\]:]/g, '').trim().slice(0, 28)
+  return clean || code
 }
 
 const cell: React.CSSProperties = { padding: '4px 6px', verticalAlign: 'middle' }
