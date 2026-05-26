@@ -181,6 +181,34 @@
 - 새 그룹(operation/admin/cx-team/mt-team 등) 이 초대 모달에 누락
 - → InviteModal 도 menu-registry import 하도록 수정 (메인 세션)
 
+### 9.5 부서 구조 통합 — 옵션 C 채택 (2026-05-24 사용자 결정)
+
+> **사용자 명시**: 「매니저랑 라이드랑 부서관리 라이드주식회사랑 엉켜있다 — 정리해야」
+>
+> **결정**: **C (회사 분리, PR-MULTI-BRAND 합류)** — A(별개 유지)·B(FMI 부서 폐기) 거부.
+
+**현재 엉킴**:
+- FMI `departments` 의 「라이드주식회사」 단일 부서 (외부 매니저 ERP 계정용)
+- vs `ride_departments` 18 부서 (라이드 자체 트리)
+- 같은 사람(예: 안경희)이 양쪽에서 부서가 다르게 표시 + 권한 모델도 「라이드주식회사」 단일 기준만
+
+**통합 방향 (C)**:
+- FMI `departments.「라이드주식회사」` **폐기**
+- 라이드 직원(외부 매니저 ERP 계정 포함) 부서 = **`ride_departments` 만 사용**
+- `profiles` 에 회사 구분 추가 — `company_id` (또는 `ride_department_id`) FK
+- PR-MULTI-BRAND 의 P3+ 일환으로 진행 (메인 세션 주도)
+
+**hr 세션 받침 (협업)**:
+- `ride_employees.profile_id` (이미 존재) 활용 — profiles ↔ ride_employees 1:1 연결
+- 외부 매니저 ↔ ride_employees 매핑 헬퍼 API (PR-HR-6 — by-profile / lookup)
+- 라이드 매니저 페이지 권한 모델 = `ride_departments` 부서 기준 (라이드 하위 메뉴 위주)
+
+**마이그 단계 (메인 세션)**:
+1. `profiles` 에 `company_id` (또는 `ride_department_id`) 컬럼 추가
+2. 현재 「라이드주식회사」 부서의 외부 매니저 row → `ride_employees` 매핑 (이름·이메일 기준, hr 의 lookup API 사용)
+3. 매니저별 정확한 `ride_departments` 부서 배정 (사용자 검수)
+4. FMI `departments.「라이드주식회사」` row 삭제 (또는 deprecated)
+
 ---
 
 본 문서는 운영 사실 변경 시 갱신 (Rule 22).
