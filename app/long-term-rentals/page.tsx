@@ -36,19 +36,30 @@ type Row = {
   deposit: number | null
   status: string | null
   notes: string | null
+  contract_type: string | null
+  vehicle_spec: string | null
 }
 
-type FilterKey = 'all' | 'active' | 'expiring' | 'ended'
+// PR-L2 — 라이프사이클 필터 (계약대기 / 출고대기 / 운영중 / 종결)
+type FilterKey = 'all' | 'contracted' | 'pending_delivery' | 'active' | 'ended'
 
 const STATUS_META: Record<string, { label: string; bg: string; fg: string }> = {
-  active:     { label: '🔵 계약중', bg: COLORS.bgBlue,            fg: COLORS.primary },
-  expired:    { label: '⏳ 만기',   bg: 'rgba(245,158,11,0.12)',  fg: '#b45309' },
-  terminated: { label: '✗ 해지',   bg: 'rgba(239,68,68,0.12)',   fg: '#991b1b' },
+  contracted:       { label: '📝 계약대기',  bg: 'rgba(148,163,184,0.18)', fg: '#475569' },
+  pending_delivery: { label: '🚚 출고대기',  bg: 'rgba(245,158,11,0.12)',  fg: '#b45309' },
+  active:           { label: '🔵 운영중',    bg: COLORS.bgBlue,            fg: COLORS.primary },
+  expired:          { label: '⏳ 만기',      bg: 'rgba(148,163,184,0.15)', fg: '#475569' },
+  terminated:       { label: '✗ 해지',       bg: 'rgba(239,68,68,0.12)',   fg: '#991b1b' },
 }
 const STATUS_OPTIONS = [
-  { value: 'active', label: '계약중' },
+  { value: 'contracted', label: '계약대기' },
+  { value: 'pending_delivery', label: '출고대기 (신차)' },
+  { value: 'active', label: '운영중 (배차 완료)' },
   { value: 'expired', label: '만기' },
   { value: 'terminated', label: '해지' },
+]
+const CONTRACT_TYPES = [
+  { value: '기존차량', label: '기존차량' },
+  { value: '신차구입', label: '신차구입' },
 ]
 
 function fmtWon(n: number | null | undefined): string {
@@ -67,12 +78,13 @@ function daysUntil(end: string | null | undefined): number | null {
 }
 
 const emptyForm = {
+  contract_type: '기존차량', vehicle_spec: '',
   vehicle_car_number: '', customer_name: '', customer_phone: '', contract_no: '',
   start_date: '', end_date: '', monthly_fee: '', deposit: '', status: 'active', notes: '',
 }
 
 export default function LongTermRentalsPage() {
-  const [filter, setFilter] = useState<FilterKey>('active')
+  const [filter, setFilter] = useState<FilterKey>('contracted')
   const [search, setSearch] = useState('')
   const [rows, setRows] = useState<Row[] | null>(null)
   const [loading, setLoading] = useState(false)
@@ -125,6 +137,8 @@ export default function LongTermRentalsPage() {
   const openEdit = useCallback((r: Row) => {
     setEditId(r.id)
     setForm({
+      contract_type: r.contract_type || '기존차량',
+      vehicle_spec: r.vehicle_spec || '',
       vehicle_car_number: r.vehicle_car_number || '',
       customer_name: r.customer_name || '',
       customer_phone: r.customer_phone || '',
@@ -145,6 +159,8 @@ export default function LongTermRentalsPage() {
     try {
       const headers = { ...(await getAuthHeader()), 'Content-Type': 'application/json' }
       const body = {
+        contract_type: form.contract_type || '기존차량',
+        vehicle_spec: form.vehicle_spec.trim() || null,
         vehicle_car_number: form.vehicle_car_number.trim() || null,
         customer_name: form.customer_name.trim(),
         customer_phone: form.customer_phone.trim() || null,
@@ -189,15 +205,17 @@ export default function LongTermRentalsPage() {
   }, [delTarget, refresh, showToast])
 
   const allRows = rows || []
-  const data = useMemo(() => {
-    const active = allRows.filter((r) => r.status === 'active')
-    return {
-      all: allRows,
-      active,
-      expiring: active.filter((r) => { const d = daysUntil(r.end_date); return d != null && d >= 0 && d <= 30 }),
-      ended: allRows.filter((r) => r.status === 'expired' || r.status === 'terminated'),
-    }
-  }, [allRows])
+  const data = useMemo(() => ({
+    all: allRows,
+    contracted: allRows.filter((r) => r.status === 'contracted'),
+    pending_delivery: allRows.filter((r) => r.status === 'pending_delivery'),
+    active: allRows.filter((r) => r.status === 'active'),
+    ended: allRows.filter((r) => r.status === 'expired' || r.status === 'terminated'),
+  }), [allRows])
+  // 만기임박 (운영중 + 30일 이하)
+  const expiringSoon = useMemo(() => data.active.filter((r) => {
+    const d = daysUntil(r.end_date); return d != null && d >= 0 && d <= 30
+  }), [data])
 
   const activeData = data[filter]
   const filtered = useMemo(() => {
@@ -212,36 +230,55 @@ export default function LongTermRentalsPage() {
   }, [activeData, search])
 
   const counts = {
-    all: data.all.length, active: data.active.length,
-    expiring: data.expiring.length, ended: data.ended.length,
+    all: data.all.length,
+    contracted: data.contracted.length,
+    pending_delivery: data.pending_delivery.length,
+    active: data.active.length,
+    ended: data.ended.length,
+    expiring: expiringSoon.length,
   }
 
   const statItems: StatItem[] = [
     { label: '📋 전체', value: counts.all, unit: '건', tint: 'blue' },
-    { label: '🔵 계약중', value: counts.active, unit: '건', tint: 'green' },
-    { label: '⏳ 만기임박 (30일)', value: counts.expiring, unit: '건', tint: 'amber' },
-    { label: '✗ 만기·해지', value: counts.ended, unit: '건', tint: 'red' },
-    { label: '🔍 검색결과', value: filtered.length, unit: '건', tint: 'purple' },
+    { label: '📝 계약대기', value: counts.contracted, unit: '건', tint: 'purple' },
+    { label: '🚚 출고대기 (신차)', value: counts.pending_delivery, unit: '건', tint: 'amber' },
+    { label: '🔵 운영중', value: counts.active, unit: '건', tint: 'green' },
+    { label: '⏳ 만기임박 (30일)', value: counts.expiring, unit: '건', tint: 'red' },
   ]
   const statActions: ActionButton[] = [
     { label: '장기렌트 등록', onClick: openCreate, variant: 'primary', icon: '➕' },
     { label: '새로고침', onClick: refresh, variant: 'secondary', icon: '🔄' },
   ]
   const filterItems: FilterItem[] = [
-    { key: 'active', label: '🔵 계약중', count: counts.active },
-    { key: 'expiring', label: '⏳ 만기임박', count: counts.expiring },
-    { key: 'ended', label: '✗ 만기·해지', count: counts.ended },
+    { key: 'contracted', label: '📝 계약대기', count: counts.contracted },
+    { key: 'pending_delivery', label: '🚚 출고대기', count: counts.pending_delivery },
+    { key: 'active', label: '🔵 운영중', count: counts.active },
+    { key: 'ended', label: '✗ 종결', count: counts.ended },
     { key: 'all', label: '📋 전체', count: counts.all },
   ]
 
   const columns: TableColumn<Row>[] = [
     {
-      key: 'vehicle', label: '차량', width: 150,
-      sortBy: (r) => r.vehicle_car_number || '',
-      render: (r) => <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: 150, fontSize: 12 }}>
+      key: 'contract_type', label: '유형', width: 78, align: 'center',
+      sortBy: (r) => r.contract_type || '',
+      render: (r) => {
+        const isNew = r.contract_type === '신차구입'
+        return <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 6, fontSize: 10, fontWeight: 800, whiteSpace: 'nowrap',
+          background: isNew ? 'rgba(245,158,11,0.14)' : COLORS.bgBlue,
+          color: isNew ? '#b45309' : COLORS.primary }}>
+          {isNew ? '🆕 신차' : '🚗 기존'}
+        </span>
+      },
+    },
+    {
+      key: 'vehicle', label: '차량', width: 168,
+      sortBy: (r) => r.vehicle_car_number || r.vehicle_spec || '',
+      render: (r) => <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: 168, fontSize: 12 }}>
         {r.vehicle_car_number
           ? <><span style={{ fontWeight: 800, color: '#0f2440' }}>🚗 {r.vehicle_car_number}</span>{(r.vehicle_brand || r.vehicle_model) ? <span style={{ color: '#94a3b8' }}> · {[r.vehicle_brand, r.vehicle_model].filter(Boolean).join(' ')}</span> : null}</>
-          : <span style={{ color: '#cbd5e1' }}>미지정</span>}
+          : r.vehicle_spec
+            ? <span style={{ color: '#b45309', fontWeight: 600 }}>🚚 {r.vehicle_spec} <span style={{ fontSize: 10, color: '#94a3b8' }}>(출고대기)</span></span>
+            : <span style={{ color: '#cbd5e1' }}>미지정</span>}
       </span>,
     },
     {
@@ -364,8 +401,24 @@ export default function LongTermRentalsPage() {
                 <button onClick={() => !saving && setModalOpen(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 16, color: '#64748b' }}>✕</button>
               </div>
               <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 13 }}>
+                {/* PR-L2 — 계약 유형 */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 12 }}>
+                  <div><label style={labelStyle}>계약 유형</label>
+                    <select value={form.contract_type} onChange={(e) => fld('contract_type', e.target.value)} style={inputStyle}>
+                      {CONTRACT_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+                    </select></div>
+                  <div><label style={labelStyle}>
+                    예정 차종/스펙
+                    <span style={{ marginLeft: 6, fontSize: 10, color: '#94a3b8', fontWeight: 500 }}>신차구입 시 — 차량 도착 전</span>
+                  </label>
+                    <input value={form.vehicle_spec} onChange={(e) => fld('vehicle_spec', e.target.value)}
+                      placeholder={form.contract_type === '신차구입' ? '예: GV80 디젤 5인승 25년식' : '선택'} style={inputStyle} /></div>
+                </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                  <div><label style={labelStyle}>차량번호</label>
+                  <div><label style={labelStyle}>
+                    차량번호
+                    {form.contract_type === '신차구입' && <span style={{ marginLeft: 6, fontSize: 10, color: '#94a3b8', fontWeight: 500 }}>차량 도착 후 입력</span>}
+                  </label>
                     <input value={form.vehicle_car_number} onChange={(e) => fld('vehicle_car_number', e.target.value)} placeholder="예: 12가3456" style={inputStyle} /></div>
                   <div><label style={labelStyle}>계약번호</label>
                     <input value={form.contract_no} onChange={(e) => fld('contract_no', e.target.value)} placeholder="선택" style={inputStyle} /></div>
