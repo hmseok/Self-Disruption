@@ -2,6 +2,42 @@
 import { auth } from '@/lib/auth-client'
 import { useState, useEffect, useMemo } from 'react'
 import { getAuthHeader } from '@/app/utils/auth-client'
+import { COMPANY_BRANDS } from '@/lib/company-brand'
+
+// PR-MULTI-BRAND P3+c — RIDE 부서 트리 평탄화 (depth 들여쓰기 prefix)
+//   tree 응답 형식 (HR PR-HR-1/6):  { id, name, children?: [...] }[]
+//   또는 parent_id 기반 평탄형 — 둘 다 호환 처리.
+function flattenDeptTree(nodes: any[], depth = 0, byParent?: Map<string, any[]>): DropdownItem[] {
+  const out: DropdownItem[] = []
+  const prefix = depth === 0 ? '' : '· '.repeat(depth) // 시각 들여쓰기
+  for (const n of nodes) {
+    out.push({ id: n.id, name: prefix + (n.name || n.label || '') })
+    const children = n.children || (byParent ? byParent.get(n.id) : null)
+    if (children && children.length > 0) {
+      out.push(...flattenDeptTree(children, depth + 1, byParent))
+    }
+  }
+  return out
+}
+
+// flat array (parent_id 기반) → tree 변환 (방어적 — 응답 포맷 모호 대비)
+function buildTreeIfFlat(raw: any[]): { roots: any[]; byParent?: Map<string, any[]> } {
+  if (raw.length === 0) return { roots: [] }
+  const hasChildrenField = raw.some(n => Array.isArray(n.children))
+  if (hasChildrenField) return { roots: raw } // 이미 트리 구조
+  // parent_id 기반 → root + children 맵
+  const byParent = new Map<string, any[]>()
+  const roots: any[] = []
+  for (const n of raw) {
+    const pid = n.parent_id || n.parentId
+    if (!pid) roots.push(n)
+    else {
+      if (!byParent.has(pid)) byParent.set(pid, [])
+      byParent.get(pid)!.push(n)
+    }
+  }
+  return { roots, byParent }
+}
 
 interface Props {
   companyName: string
@@ -66,6 +102,8 @@ export default function InviteModal({ companyName, companyId, isOpen, onClose, o
   const [departmentId, setDepartmentId] = useState('')
   const [positionId, setPositionId] = useState('')
   const [loading, setLoading] = useState(false)
+  // PR-MULTI-BRAND P3+c — 초대 대상 회사 (FMI 직원 / RIDE 직원)
+  const [inviteCompany, setInviteCompany] = useState<'FMI' | 'RIDE'>('FMI')
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
 
   // 드롭다운 데이터
@@ -78,18 +116,30 @@ export default function InviteModal({ companyName, companyId, isOpen, onClose, o
   const [showPerms, setShowPerms] = useState(false)
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
 
-  // 부서/직급/모듈 로드 (단독 ERP - companyId 불필요)
+  // 부서/직급/모듈 로드 — PR-MULTI-BRAND P3+c: inviteCompany 따라 분기
+  //   FMI  → /api/departments       (단일 회사 평탄 부서)
+  //   RIDE → /api/ride-departments/tree  (라이드 부서 트리 — HR PR-HR-1)
   useEffect(() => {
     if (isOpen) {
+      // 회사 전환 시 선택값 리셋 (ID 공간 다름)
+      setDepartmentId('')
+
       const loadData = async () => {
         const headers = await getAuthHeader()
 
-        // 부서 로드
+        // 부서 로드 — inviteCompany 별 다른 API
         try {
-          const res = await fetch('/api/departments', { headers })
+          const deptUrl = inviteCompany === 'RIDE' ? '/api/ride-departments/tree' : '/api/departments'
+          const res = await fetch(deptUrl, { headers })
           if (res.ok) {
             const json = await res.json()
-            setDepartments(json.data || json || [])
+            const raw = json.data || json || []
+            if (inviteCompany === 'RIDE') {
+              const { roots, byParent } = buildTreeIfFlat(raw)
+              setDepartments(flattenDeptTree(roots, 0, byParent))
+            } else {
+              setDepartments(raw)
+            }
           }
         } catch (error) {
           console.error('Failed to load departments:', error)
@@ -132,7 +182,7 @@ export default function InviteModal({ companyName, companyId, isOpen, onClose, o
 
       loadData()
     }
-  }, [isOpen])
+  }, [isOpen, inviteCompany])
 
   // 모달 닫힐 때 초기화
   useEffect(() => {
@@ -147,6 +197,7 @@ export default function InviteModal({ companyName, companyId, isOpen, onClose, o
       setPagePerms({})
       setShowPerms(false)
       setExpandedGroups(new Set())
+      setInviteCompany('FMI')
     }
   }, [isOpen])
 
@@ -235,8 +286,11 @@ export default function InviteModal({ companyName, companyId, isOpen, onClose, o
         body: JSON.stringify({
           email,
           company_id: companyId,
+          // PR-MULTI-BRAND P3+c — 회사별 부서 ID 분리 (서버 처리는 P3+c-2)
+          target_company: inviteCompany,
           position_id: positionId || null,
-          department_id: departmentId || null,
+          department_id: inviteCompany === 'FMI' ? (departmentId || null) : null,
+          ride_department_id: inviteCompany === 'RIDE' ? (departmentId || null) : null,
           role,
           send_channel: sendChannel,
           recipient_phone: phone || '',
@@ -268,8 +322,10 @@ export default function InviteModal({ companyName, companyId, isOpen, onClose, o
             body: JSON.stringify({
               email,
               company_id: companyId,
+              target_company: inviteCompany,
               position_id: positionId || null,
-              department_id: departmentId || null,
+              department_id: inviteCompany === 'FMI' ? (departmentId || null) : null,
+              ride_department_id: inviteCompany === 'RIDE' ? (departmentId || null) : null,
               role,
               send_channel: sendChannel,
               recipient_phone: phone || '',
@@ -337,8 +393,8 @@ export default function InviteModal({ companyName, companyId, isOpen, onClose, o
           </div>
           <h3 className="text-xl font-black text-gray-900">새로운 멤버 초대</h3>
           <p className="text-sm text-gray-500 mt-1">
-            {/* PR-RIDE-BRAND — 초대 브랜딩 라이드 주식회사 고정 (FMI 노출 금지) */}
-            <span className="font-bold text-steel-600">라이드 주식회사</span>
+            {/* PR-MULTI-BRAND P3+c — 회사명 동적 (inviteCompany 라디오 따라) */}
+            <span className="font-bold text-steel-600">{COMPANY_BRANDS[inviteCompany].name}</span>
           </p>
         </div>
 
@@ -352,6 +408,24 @@ export default function InviteModal({ companyName, companyId, isOpen, onClose, o
           )}
 
           <div className="space-y-4">
+            {/* PR-MULTI-BRAND P3+c — 초대 대상 회사 선택 (FMI / RIDE) */}
+            <div>
+              <label className="block text-xs font-bold text-gray-500 mb-1.5 ml-1">초대 대상 회사</label>
+              <div className="flex gap-2">
+                {(['FMI', 'RIDE'] as const).map(key => {
+                  const b = COMPANY_BRANDS[key]
+                  return (
+                    <button key={key} type="button" onClick={() => setInviteCompany(key)} disabled={loading}
+                      className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all border ${
+                        inviteCompany === key ? 'bg-steel-600 text-white border-steel-600' : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
+                      }`}>
+                      {b.shortName} · {b.name}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
             {/* 발송 채널 */}
             <div>
               <label className="block text-xs font-bold text-gray-500 mb-1.5 ml-1">발송 방법</label>
