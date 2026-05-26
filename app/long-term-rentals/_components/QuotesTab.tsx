@@ -938,7 +938,7 @@ function QuoteModal(props: {
                         {aiResult.variants.map((v: any, vi: number) =>
                           v.trims?.map((t: any, ti: number) => (
                             <button key={`${vi}-${ti}`} onClick={() => onApplyAiTrim(vi, ti)}
-                              style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px', borderRadius: 6, border: '1px solid rgba(0,0,0,0.08)', background: 'rgba(255,255,255,0.6)', cursor: 'pointer', fontSize: 11, textAlign: 'left' }}>
+                              style={{ ...GLASS.L3, display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px', borderRadius: 6, cursor: 'pointer', fontSize: 11, textAlign: 'left' }}>
                               <span style={{ fontWeight: 600, color: '#475569', minWidth: 80 }}>{v.fuel_type}</span>
                               <span style={{ flex: 1, color: '#1e293b' }}>{t.name}</span>
                               <span style={{ fontWeight: 700, color: COLORS.primary }}>{(t.base_price || 0).toLocaleString('ko-KR')}원</span>
@@ -1067,7 +1067,7 @@ function QuoteModal(props: {
                   <div style={{ fontSize: 24, fontWeight: 900, marginTop: 2 }}>{calcResult.suggested_rent_with_vat.toLocaleString('ko-KR')}원</div>
                   <div style={{ fontSize: 10, opacity: 0.75, marginTop: 2 }}>VAT 별도: {calcResult.suggested_rent.toLocaleString('ko-KR')}원</div>
                   <button onClick={onApplyCalc}
-                    style={{ marginTop: 10, padding: '8px 12px', background: 'rgba(255,255,255,0.95)', color: COLORS.primary, border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 11, fontWeight: 800, width: '100%' }}>
+                    style={{ marginTop: 10, padding: '8px 12px', background: '#fff', color: COLORS.primary, border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 11, fontWeight: 800, width: '100%' }}>
                     ↓ 이 가격으로 적용
                   </button>
                 </div>
