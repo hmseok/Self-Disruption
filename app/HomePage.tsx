@@ -47,12 +47,12 @@ export default function DashboardPage() {
         const carList = carsJson.data || []
         setCars(carList)
 
-        // 2. 활성 계약(매출) 가져오기
-        const quotesRes = await fetch('/api/quotes?status=active', {
+        // 2. 활성 계약(매출) 가져오기 — PR-Q2-5: quotes 폐기 → lt_quotes (converted)
+        const quotesRes = await fetch('/api/lt-quotes?status=converted', {
           headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }
         })
         const quotesJson = await quotesRes.json()
-        const totalRevenue = quotesJson.data?.reduce((sum: number, q: any) => sum + (q.rent_fee || 0), 0) || 0
+        const totalRevenue = quotesJson.data?.reduce((sum: number, q: any) => sum + (q.monthly_fee || 0), 0) || 0
 
         // 3. 금융 비용(지출 1) 가져오기
         const financeRes = await fetch('/api/financial-products', {

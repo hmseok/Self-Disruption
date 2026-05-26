@@ -42,7 +42,8 @@ export async function GET(request: NextRequest) {
       safeQuery(() => prisma.$queryRaw<any[]>`SELECT COUNT(*) as count FROM customers`),
       safeQuery(() => prisma.$queryRaw<any[]>`SELECT invest_amount FROM general_investments`),
       safeQuery(() => prisma.$queryRaw<any[]>`SELECT COUNT(*) as count FROM jiip_contracts`),
-      safeQuery(() => prisma.$queryRaw<any[]>`SELECT rent_fee FROM quotes WHERE status = 'active'`),
+      // PR-Q2-5: quotes 폐기 → lt_quotes 의 converted (계약 전환 완료) 합계
+      safeQuery(() => prisma.$queryRaw<any[]>`SELECT monthly_fee AS rent_fee FROM lt_quotes WHERE status = 'converted'`),
       safeQuery(() => prisma.$queryRaw<any[]>`SELECT monthly_payment FROM financial_products`),
       safeQuery(() => prisma.$queryRaw<any[]>`SELECT total_premium FROM insurance_contracts`),
       safeQuery(() => prisma.$queryRawUnsafe<any[]>(
