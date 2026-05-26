@@ -57,6 +57,13 @@ cd "$(git rev-parse --show-toplevel)"
 LOCK_FILE=".git/cowork-pipeline.lock"
 LOCK_TIMEOUT=600  # 10분
 
+# PR-COORD-11 hotfix (operations 세션 보고 2026-05-26):
+#   /tmp/ 는 cowork 세션간 공유라 다른 세션 UID 소유 파일 충돌 → Permission denied.
+#   mktemp 으로 세션별 unique 경로 확보, trap 으로 종료 시 정리.
+COMMIT_ERR=$(mktemp -t cowork-commit.XXXXXX.err 2>/dev/null || mktemp "${TMPDIR:-.git}/cowork-commit.XXXXXX.err")
+PUSH_ERR=$(mktemp -t cowork-push.XXXXXX.err 2>/dev/null || mktemp "${TMPDIR:-.git}/cowork-push.XXXXXX.err")
+trap 'rm -f "$COMMIT_ERR" "$PUSH_ERR"' EXIT
+
 # ── flock 가용성 확인 ────────────────────────────────────────────
 if ! command -v flock >/dev/null 2>&1; then
   echo "⚠ flock 명령 없음 — race-free 보장 불가. 폴백: safe-commit.sh 사용."
@@ -117,8 +124,8 @@ fi
 # ── 3. commit (pathspec 명시 — atomic, race-free) ───────────────
 echo ""
 echo "═══ 3. commit (pathspec 한정) ═══"
-if ! git commit -m "$MSG" -- "${PATHSPEC[@]}" 2> /tmp/cowork-commit.err; then
-  ERR=$(cat /tmp/cowork-commit.err)
+if ! git commit -m "$MSG" -- "${PATHSPEC[@]}" 2> "$COMMIT_ERR"; then
+  ERR=$(cat "$COMMIT_ERR")
   echo "❌ commit 실패:"
   echo "$ERR"
   exit 1
@@ -130,13 +137,13 @@ echo "✅ commit ${COMMIT_SHA:0:8}"
 echo ""
 echo "═══ 4. push ═══"
 for attempt in 1 2 3; do
-  if git push origin main 2> /tmp/cowork-push.err; then
+  if git push origin main 2> "$PUSH_ERR"; then
     echo "✅ push 성공"
     echo ""
     echo "🔓 파이프라인 락 자동 해제 (스크립트 종료)"
     exit 0
   fi
-  ERR=$(cat /tmp/cowork-push.err)
+  ERR=$(cat "$PUSH_ERR")
   if echo "$ERR" | grep -qi 'rejected\|non-fast-forward'; then
     echo "⚠ origin 변경 (다른 세션 push 함) — pull --rebase 후 재시도 (${attempt}/3)"
     if ! git pull --rebase origin main 2>&1 | tail -5; then
