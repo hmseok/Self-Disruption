@@ -122,6 +122,11 @@ if [ $LINT_R -ne 0 ]; then
 fi
 
 # ── 3. commit (pathspec 명시 — atomic, race-free) ───────────────
+# PR-COORD-11 2차 hotfix (operations 세션 보고 2026-05-26):
+#   pre-commit hook 의 harness-lint 가 broad-scope UI lint 로 다른 세션 working-tree
+#   변경까지 검출 → 본 commit 무관하게 차단.
+#   COWORK_LINT_STAGED_ONLY=1 로 broad-scope lint skip (commit-critical 만 유지).
+export COWORK_LINT_STAGED_ONLY=1
 echo ""
 echo "═══ 3. commit (pathspec 한정) ═══"
 if ! git commit -m "$MSG" -- "${PATHSPEC[@]}" 2> "$COMMIT_ERR"; then

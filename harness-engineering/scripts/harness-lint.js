@@ -43,6 +43,12 @@ const reflogIntegrity = require('./cowork-reflog-integrity')
 
 const flags = new Set(process.argv.slice(2))
 
+// PR-COORD-11 2차 (operations 세션 보고 2026-05-26):
+//   cowork-commit.sh 가 pre-commit hook 거치면 다른 세션 working-tree 변경까지
+//   broad-scope lint 가 검출 → 본 commit 과 무관하게 차단.
+//   COWORK_LINT_STAGED_ONLY=1 면 broad-scope UI lint 스킵 (commit-critical 만 유지).
+const STAGED_ONLY = process.env.COWORK_LINT_STAGED_ONLY === '1'
+
 function loadBaseline() {
   if (!fs.existsSync(BASELINE_FILE)) return new Set()
   try {
@@ -213,16 +219,33 @@ function main() {
   const menuDupR = menuPathDupLint.main() || { total: 0, newCount: 0, knownCount: 0, newViolations: [] }
 
   // [평가] 3.8 — UI 토큰 hardcode 차단 (PR-HARNESS-1, 트리거: PR-6.13)
-  console.log('\n▸ [3.8] ui-token-lint — Soft Ice Glass / COLORS 토큰 사용 강제')
-  const uiTokenR = uiTokenLint.main() || { total: 0, newCount: 0, knownCount: 0, newViolations: [] }
+  // STAGED_ONLY: broad-scope UI lint — 다른 세션 working-tree 변경까지 잡아
+  //   본 commit 무관하게 차단 → cowork-commit 모드에선 skip.
+  let uiTokenR = { total: 0, newCount: 0, knownCount: 0, newViolations: [] }
+  if (STAGED_ONLY) {
+    console.log('\n▸ [3.8] ui-token-lint — (cowork-commit 모드 — staged 외부 broad lint skip)')
+  } else {
+    console.log('\n▸ [3.8] ui-token-lint — Soft Ice Glass / COLORS 토큰 사용 강제')
+    uiTokenR = uiTokenLint.main() || uiTokenR
+  }
 
   // [평가] 3.9 — PageTitle 등록 누락 (PR-PT-COV, 2026-05-24)
-  console.log('\n▸ [3.9] pagetitle-coverage-lint — 활성 메뉴 PageTitle 등록 강제')
-  const ptCovR = pageTitleCovLint.main() || { total: 0, newCount: 0, violations: [] }
+  let ptCovR = { total: 0, newCount: 0, violations: [] }
+  if (STAGED_ONLY) {
+    console.log('\n▸ [3.9] pagetitle-coverage-lint — (cowork-commit 모드 skip)')
+  } else {
+    console.log('\n▸ [3.9] pagetitle-coverage-lint — 활성 메뉴 PageTitle 등록 강제')
+    ptCovR = pageTitleCovLint.main() || ptCovR
+  }
 
   // [평가] 3.10 — 활성 탭 색상 표준 (PR-DESIGN-6, 2026-05-24)
-  console.log('\n▸ [3.10] tab-color-lint — 활성 탭 #3b6eb5 표준 강제')
-  const tabColorR = tabColorLint.main() || { total: 0, newCount: 0, violations: [] }
+  let tabColorR = { total: 0, newCount: 0, violations: [] }
+  if (STAGED_ONLY) {
+    console.log('\n▸ [3.10] tab-color-lint — (cowork-commit 모드 skip)')
+  } else {
+    console.log('\n▸ [3.10] tab-color-lint — 활성 탭 #3b6eb5 표준 강제')
+    tabColorR = tabColorLint.main() || tabColorR
+  }
 
   // [평가] 3.7. cowork-staging — 한 commit 에 여러 모듈 영역 동시 staged 차단 (CLAUDE.md 규칙 21)
   // 회귀 케이스: 2026-05-06 — 두 세션 동시 작업 시 git add . 로 다른 세션 작업물 흡수 사고
@@ -258,11 +281,16 @@ function main() {
   console.log(reflogIntegrity.format(reflogR))
 
   // [평가] 4. UI 화면 데이터 정합성
+  // STAGED_ONLY: 전체 app/ 스캔이라 cowork-commit 모드에선 skip
+  let uiR = { urlGroups: {}, pages: [] }
+  let uiWarnings = []
+  if (STAGED_ONLY) {
+    console.log('\n▸ [4/4] ui-data-coverage — (cowork-commit 모드 skip)')
+  } else {
   console.log('\n▸ [4/4] ui-data-coverage — 같은 API 호출 page 들 사이 누락 필드')
-  const uiR = uiCoverage.buildCoverage()
+  uiR = uiCoverage.buildCoverage()
   // (단순 buildCoverage 는 warnings 만 — 필요 시 별도 lint 호출)
   // 여기선 inline 으로 strict 임계치 적용
-  const uiWarnings = []
   for (const [url, pageSet] of Object.entries(uiR.urlGroups)) {
     if (pageSet.size < 3) continue
     const pages = [...pageSet]
@@ -283,6 +311,7 @@ function main() {
     }
   }
   console.log(`  ${uiR.pages.length} UI files, warnings=${uiWarnings.length} (정보성)`)
+  } // STAGED_ONLY else 닫기
 
   // [기록] knowledge/lint-violations.md 자동 append
   const summary = {
