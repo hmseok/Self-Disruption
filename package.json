@@ -28,6 +28,7 @@
     "cowork:check": "node harness-engineering/scripts/cowork-health-check.js",
     "cowork:fix": "node harness-engineering/scripts/cowork-health-check.js --fix",
     "cowork:init": "node harness-engineering/scripts/cowork-init.js",
+    "cowork:commit": "bash harness-engineering/scripts/cowork-commit.sh",
     "seed:compliance-manuals": "node harness-engineering/scripts/seed-compliance-manuals.js",
     "seed:compliance-pdfs": "node harness-engineering/scripts/seed-compliance-pdfs.js",
     "seed:compliance-content-md": "node harness-engineering/scripts/seed-compliance-content-md.js"
