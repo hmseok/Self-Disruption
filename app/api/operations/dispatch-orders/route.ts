@@ -31,6 +31,11 @@ export async function GET(request: NextRequest) {
     const ALLOWED_STAGES = ['new', 'consulting', 'scheduled', 'dispatched', 'done', 'cancelled']
     const stage = stageInput && ALLOWED_STAGES.includes(stageInput) ? stageInput : null
     const limit = Math.min(Number(url.searchParams.get('limit') || 500), 1000)
+    // 2026-05-26 hotfix: cafe24 키 직접 필터 (BigInt mismatch / limit 누락 회피)
+    const cafe24Idno = url.searchParams.get('cafe24_otpt_idno')
+    const cafe24Mddt = url.searchParams.get('cafe24_otpt_mddt')
+    const cafe24Srno = url.searchParams.get('cafe24_otpt_srno')
+    const rideAccIdInput = url.searchParams.get('ride_accident_id')
 
     // ride_accidents 가 INT id, operations_dispatch_orders.ride_accident_id INT
     // graceful fallback: 테이블 미적용 시 빈 배열
@@ -72,26 +77,39 @@ export async function GET(request: NextRequest) {
        FROM operations_dispatch_orders o
        LEFT JOIN ride_accidents a ON a.id = o.ride_accident_id`
     const baseSql = baseSqlWithCafe24
-    const sql = stage
-      ? `${baseSql} WHERE o.status = ? ORDER BY o.created_at DESC LIMIT ${limit}`
-      : `${baseSql} ORDER BY o.created_at DESC LIMIT ${limit}`
-    const params = stage ? [stage] : []
+    // 2026-05-26 hotfix: cafe24 / ride_accident_id 직접 필터 (페이지 fetchOrder 정합성)
+    const wheres: string[] = []
+    const params: unknown[] = []
+    if (stage) { wheres.push('o.status = ?'); params.push(stage) }
+    if (cafe24Idno) { wheres.push('o.cafe24_otpt_idno = ?'); params.push(cafe24Idno) }
+    if (cafe24Mddt) { wheres.push('o.cafe24_otpt_mddt = ?'); params.push(cafe24Mddt) }
+    if (cafe24Srno) { wheres.push('o.cafe24_otpt_srno = ?'); params.push(parseInt(cafe24Srno, 10)) }
+    if (rideAccIdInput) { wheres.push('o.ride_accident_id = ?'); params.push(parseInt(rideAccIdInput, 10)) }
+    const whereClause = wheres.length ? ` WHERE ${wheres.join(' AND ')}` : ''
+    const sql = `${baseSql}${whereClause} ORDER BY o.created_at DESC LIMIT ${limit}`
     const rows = await prisma.$queryRawUnsafe<Array<any>>(sql, ...params).catch(async (e: any) => {
       // P2.1c-1: cafe24_otpt_* 미적용 시 fallback
       if (e?.message?.includes("Unknown column 'o.cafe24_otpt_")) {
-        const fallbackSql = stage
-          ? `${baseSqlLegacy} WHERE o.status = ? ORDER BY o.created_at DESC LIMIT ${limit}`
-          : `${baseSqlLegacy} ORDER BY o.created_at DESC LIMIT ${limit}`
-        return await prisma.$queryRawUnsafe<Array<any>>(fallbackSql, ...params).catch(() => [])
+        // cafe24 키 필터는 불가 — stage / ride_accident_id 만 남김
+        const fallbackWheres: string[] = []
+        const fallbackParams: unknown[] = []
+        if (stage) { fallbackWheres.push('o.status = ?'); fallbackParams.push(stage) }
+        if (rideAccIdInput) { fallbackWheres.push('o.ride_accident_id = ?'); fallbackParams.push(parseInt(rideAccIdInput, 10)) }
+        const fbClause = fallbackWheres.length ? ` WHERE ${fallbackWheres.join(' AND ')}` : ''
+        const fallbackSql = `${baseSqlLegacy}${fbClause} ORDER BY o.created_at DESC LIMIT ${limit}`
+        return await prisma.$queryRawUnsafe<Array<any>>(fallbackSql, ...fallbackParams).catch(() => [])
       }
       console.warn('[dispatch-orders GET] table not yet migrated:', e?.message?.slice(0, 200))
       return []
     })
 
+    // 2026-05-26 hotfix: BigInt 직렬화 안전화 (ride_accident_id 등 INT 컬럼이
+    //   prisma raw 에서 간헐적으로 BigInt 로 와서 client `===` 비교 mismatch 유발)
+    const safeData = JSON.parse(JSON.stringify(rows, (_, v) => (typeof v === 'bigint' ? Number(v) : v)))
     return NextResponse.json({
-      data: rows,
-      total: rows.length,
-      _migration_pending: rows.length === 0 ? false : undefined, // 0건일 때만 진단 여지
+      data: safeData,
+      total: safeData.length,
+      _migration_pending: safeData.length === 0 ? false : undefined,
     })
   } catch (e: any) {
     console.error('[dispatch-orders GET]', e)
