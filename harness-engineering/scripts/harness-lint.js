@@ -39,6 +39,7 @@ const uiTokenLint = require('./ui-token-lint')
 const menuPathDupLint = require('./menu-path-duplicate-lint')
 const pageTitleCovLint = require('./pagetitle-coverage-lint')
 const tabColorLint = require('./tab-color-lint')
+const reflogIntegrity = require('./cowork-reflog-integrity')
 
 const flags = new Set(process.argv.slice(2))
 
@@ -247,6 +248,14 @@ function main() {
       }
     }
   }
+
+  // [평가] 3.11 — cowork reflog 무결성 (PR-COORD-10, 2026-05-26)
+  // 회귀 케이스: 다른 세션 `git reset --hard origin/main` 으로 본 세션
+  // unpushed commit 이 lineage 에서 떨어진 사고 (P3+a 50556a2 분실).
+  // reflog 의 commit: 항목 중 HEAD/origin 둘 다 도달 불가 → 분실 후보 경고.
+  console.log('\n▸ [3.11] cowork-reflog-integrity — 분실 commit 탐지')
+  const reflogR = reflogIntegrity.check()
+  console.log(reflogIntegrity.format(reflogR))
 
   // [평가] 4. UI 화면 데이터 정합성
   console.log('\n▸ [4/4] ui-data-coverage — 같은 API 호출 page 들 사이 누락 필드')

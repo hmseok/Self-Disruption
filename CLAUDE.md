@@ -884,6 +884,18 @@ const cardColumns: TableColumn<Transaction>[] = [
    - lock 자주 발생하면 다른 세션 commit 진행 중 신호
    - 1~3분 자연 해제 대기 후 자기 영역 add 진행
    - 사용자에게 "다른 세션 작업 끝남" 확인 후 진행
+- ❌ **`git reset --hard <ref>` 절대 사용 X** (2026-05-26 P3+a 분실 후 강화)
+   - 다른 세션 unpushed commit 을 lineage 에서 떨어뜨려 영구 분실 위험
+   - 분실 사고: 2026-05-26 PR-MULTI-BRAND P3+a (50556a2) 가 다른 세션의
+     `git reset --hard origin/main` 으로 main 에서 분리 → 재커밋 필요
+   - 의도된 hard reset 은 사용자 명시 GO 후만, push 한 commit 만 대상
+
+**commit 즉시 push 의무 (2026-05-26 PR-COORD-10)**:
+unpushed 상태로 두면 다른 세션 reset --hard 에 분실 노출. 따라서:
+- commit 직후 같은 세션 안에서 push (다음 작업 시작 전).
+- batch (2~3 commit 묶음) 도 5분 내 push 종결.
+- `cowork-reflog-integrity` (harness-lint [3.11]) 가 분실 commit 사후 탐지.
+  분실 후 회복: `git cherry-pick <sha>` 또는 파일 재생성 + 재커밋.
 
 **자동화 안전장치 (도입 완료 — 2026-05-06)**:
 ```
@@ -903,6 +915,17 @@ const cardColumns: TableColumn<Transaction>[] = [
      · 1차 (2026-05-06 새벽): RideAccidents PR-6.3.c 가 CallScheduler PR-2SS 1,407 라인 흡수
      · 2차 (2026-05-06 저녁): PR-B10 프리랜서 엑셀 commit 이 CallScheduler PR-2SS-h-1-fix 233 라인 흡수
    - 한계: --no-verify 사용 시 hook 우회 — CLAUDE.md 규칙 21 금지 항목 강화로 보강
+
+✅ 12. cowork-reflog-integrity (harness-engineering/scripts/cowork-reflog-integrity.js)
+   - git reflog 의 `commit:` 항목 SHA 수집
+   - 각 SHA → HEAD 도 origin/main 도 도달 불가 → 분실 후보로 알림
+   - 다른 세션 `git reset --hard origin/main` 등으로 본 세션 unpushed
+     commit 떨어진 사고 사후 탐지
+   - harness-lint.js [3.11] sub-lint 로 자동 통합 (정보성 — 빌드 안 막음)
+   - 회복: 출력된 SHA 로 `git cherry-pick <sha>` 또는 파일 재생성 + 재커밋
+   - 트리거 사고 (2026-05-26):
+     · 다른 세션 reset --hard 로 PR-MULTI-BRAND P3+a (50556a2) 분실 →
+       재커밋 2be9843 로 회복. 이후 자동 탐지 위해 본 lint 신설.
 ```
 
 ### 규칙 22 — 모듈 _docs 갱신 의무 (2026-05-04 신설, 강력)
