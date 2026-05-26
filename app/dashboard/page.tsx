@@ -17,7 +17,8 @@ async function getAuthHeader(): Promise<Record<string, string>> {
   }
 }
 import { useApp } from '../context/AppContext'
-import { getOrgBrandConfig } from '@/lib/org-brand'
+import { getOrgConfigByKey } from '@/lib/org-brand'
+import { useMyCompanyKey } from '@/lib/use-company'
 import { usePermission } from '../hooks/usePermission'
 
 // ============================================
@@ -52,8 +53,9 @@ type OpsStats = {
 export default function DashboardPage() {
   const router = useRouter()
   const { user, role, position, department, loading: appLoading } = useApp()
-  // 부서/이메일 따라 회사명 + 배지 동적 (라이드 직원이면 「라이드주식회사」 / 「RIDE」)
-  const orgBrand = getOrgBrandConfig(department?.name, user?.email)
+  // 회사 배지 — PR-MULTI-BRAND P3+f: profiles.company_id (via /api/me/company) 기반
+  const companyKey = useMyCompanyKey()
+  const orgBrand = getOrgConfigByKey(companyKey || 'FMI')
   const { hasPageAccess } = usePermission()
   const [stats, setStats] = useState<DashboardStats>({
     totalCars: 0, availableCars: 0, rentedCars: 0, maintenanceCars: 0,

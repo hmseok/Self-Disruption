@@ -86,7 +86,19 @@ export function detectOrgBrand(deptName?: string | null, email?: string | null):
 
 /**
  * 헤더 설정 (편의 함수) — 부서명 + 이메일 모두 고려.
+ * ⚠ DEPRECATED (PR-MULTI-BRAND P3+f, 2026-05-26):
+ *   문자열 매칭 기반 — profiles.company_id 기반으로 대체 중.
+ *   메인 영역(ClientLayout / dashboard / my-info) 은 useMyCompanyKey + getOrgConfigByKey 사용.
+ *   HR 영역(hr/page.tsx / PayrollOps) 은 P3+b 머지 후 emp.company_key 기반으로 전환 예정.
  */
 export function getOrgBrandConfig(deptName?: string | null, email?: string | null): OrgBrandConfig {
   return ORG_BRAND_CONFIGS[detectOrgBrand(deptName, email)]
+}
+
+/**
+ * PR-MULTI-BRAND P3+f — 회사 키 직접 매핑.
+ * profiles.company_id 기반 분기에서 dept 문자열 매칭 회피.
+ */
+export function getOrgConfigByKey(key: OrgBrand): OrgBrandConfig {
+  return ORG_BRAND_CONFIGS[key] || ORG_BRAND_CONFIGS.FMI
 }

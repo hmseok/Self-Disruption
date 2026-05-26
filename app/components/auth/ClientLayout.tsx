@@ -56,7 +56,8 @@ import {
   getDisplayName,
   getMenusByGroup,
 } from '@/lib/menu-registry'
-import { getOrgBrandConfig } from '@/lib/org-brand'
+import { getOrgConfigByKey } from '@/lib/org-brand'
+import { useMyCompanyKey } from '@/lib/use-company'
 
 // menu-registry 의 MenuEntry → ClientLayout 호환 형식 (legacy MenuItem 의 { name, path, iconKey })
 // requirePermission 정보를 함께 보존 — 사이드바 권한 필터 시 사용
@@ -137,9 +138,10 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
   const { user, role, position, department, permissions, loading, menuRefreshKey } = useApp()
-  // 조직 브랜드 — 부서명 + 이메일 도메인 따라 헤더 동적 변경
-  // (예: 'CX팀' 또는 @rideoffice.kr → RIDE CARE / 라이드주식회사)
-  const orgBrand = getOrgBrandConfig(department?.name, user?.email)
+  // 조직 브랜드 — PR-MULTI-BRAND P3+f: profiles.company_id (via /api/me/company) 기반.
+  //   useMyCompanyKey() 가 sessionStorage 캐시 + 자동 fetch. 로딩 중엔 FMI 폴백.
+  const companyKey = useMyCompanyKey()
+  const orgBrand = getOrgConfigByKey(companyKey || 'FMI')
   const { hasPageAccess } = usePermission()
 
   const [dynamicMenus, setDynamicMenus] = useState<any[]>([])

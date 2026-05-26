@@ -24,13 +24,15 @@ const CARD_COMPANIES = [
   'NH농협카드', 'BC카드', '하나카드', '우리카드', '기업은행', '기타',
 ]
 
-import { getOrgBrandConfig } from '@/lib/org-brand'
+import { getOrgConfigByKey } from '@/lib/org-brand'
+import { useMyCompanyKey } from '@/lib/use-company'
 
 export default function MyInfoPage() {
   const { user, company, role, department } = useApp()
   const effectiveCompanyId = company?.id
-  // 부서별 회사명 동적 — 라이드 부서 또는 라이드 이메일 도메인 직원이면 「라이드주식회사」 표시
-  const orgBrand = getOrgBrandConfig(department?.name, user?.email)
+  // 회사명 — PR-MULTI-BRAND P3+f: profiles.company_id (via /api/me/company) 기반
+  const companyKey = useMyCompanyKey()
+  const orgBrand = getOrgConfigByKey(companyKey || 'FMI')
 
   // 프로필
   const [name, setName] = useState('')
