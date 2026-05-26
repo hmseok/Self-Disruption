@@ -19,6 +19,7 @@ import { COLORS, GLASS, BTN } from '@/app/utils/ui-tokens'
 import { getStoredToken, getStoredUser } from '@/lib/auth-client'
 import NeuDataTable, { type TableColumn } from '@/app/components/NeuDataTable'
 import DcStatStrip, { type StatItem } from '@/app/components/DcStatStrip'
+import { rankOf, netOf, type LottoResult } from '@/lib/lotto-rank'
 
 // ─── 제한 상수 ─────────────────────────────────────────────────────
 const GAMES_PER_DRAW = 5 // 1회 추출 = 5게임 (로또 1매)
@@ -138,21 +139,8 @@ interface EntryRow {
 }
 
 // ─── 당첨 판정 ──────────────────────────────────────────────────────
-// 6→1등 / 5+보너스→2등 / 5→3등 / 4→4등 / 3→5등 / 그 외→낙첨
-const FIXED_PRIZE: Record<number, number> = { 4: 50000, 5: 5000 }
-
-function rankOf(nums: number[], r: ResultRow): { rank: number; matches: number } {
-  const win = [r.n1, r.n2, r.n3, r.n4, r.n5, r.n6]
-  const matches = nums.filter(n => win.includes(n)).length
-  const bonusHit = nums.includes(r.bonus)
-  let rank = 0
-  if (matches === 6) rank = 1
-  else if (matches === 5 && bonusHit) rank = 2
-  else if (matches === 5) rank = 3
-  else if (matches === 4) rank = 4
-  else if (matches === 3) rank = 5
-  return { rank, matches }
-}
+// rankOf / FIXED_PRIZE 는 @/lib/lotto-rank 에서 import (동형 패턴 — Rule 14)
+// 같은 등수 계산을 본인 기록 / 전체 기록(admin) 양쪽이 공유.
 
 // ─── 번호 공 ───────────────────────────────────────────────────────
 // 빈도 히트맵 색상 — t: 0(낮음·파랑) ~ 1(높음·빨강)
@@ -202,8 +190,40 @@ function Ball({
 
 const won = (v: number) => `${v.toLocaleString()}원`
 
+// ─── 전체 기록 (admin only) — API DTO ─────────────────────────────────
+interface AllEntryDto {
+  id: string
+  draw_no: number
+  numbers: number[]
+  amount: number
+  source: string
+  created_at: string
+  drawn: boolean
+  rank: number
+  matches: number
+  net: number | null
+  draw_date: string | null
+}
+interface UserSummary {
+  user_id: string
+  name: string
+  email: string | null
+  department: string | null
+  total_games: number
+  total_amount: number
+  pending_count: number
+  win_count: number
+  miss_count: number
+  rank_counts: Record<number, number>
+  loss_sum: number
+  net: number
+  top_wins: number
+  rounds: number
+  entries: AllEntryDto[]
+}
+
 export default function LottoPage() {
-  const [tab, setTab] = useState<'extract' | 'records' | 'stats'>('extract')
+  const [tab, setTab] = useState<'extract' | 'records' | 'stats' | 'all'>('extract')
   const [roundInfo] = useState(() => currentRoundInfo())
 
   // ── 추출기 상태 ──
@@ -225,9 +245,17 @@ export default function LottoPage() {
   const [recError, setRecError] = useState<string | null>(null)
   const [migrationPending, setMigrationPending] = useState(false)
   const recLoadedRef = useRef(false)
-  const [isAdmin, setIsAdmin] = useState(false) // 삭제 권한 — 슈퍼어드민(admin) 전용
+  const [isAdmin, setIsAdmin] = useState(false) // 삭제 권한 + 전체 기록 탭 — 슈퍼어드민(admin) 전용
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [smsMsg, setSmsMsg] = useState<{ ok: boolean; text: string } | null>(null)
+
+  // ── 전체 기록(admin) 상태 ──
+  const [allUsers, setAllUsers] = useState<UserSummary[]>([])
+  const [allMeta, setAllMeta] = useState<{ user_count: number; total_entries: number; draw_count: number } | null>(null)
+  const [allLoading, setAllLoading] = useState(false)
+  const [allError, setAllError] = useState<string | null>(null)
+  const [expandedUser, setExpandedUser] = useState<string | null>(null)
+  const allLoadedRef = useRef(false)
 
   const authHeaders = (): Record<string, string> => {
     const token = getStoredToken()
@@ -328,10 +356,35 @@ export default function LottoPage() {
     }
   }, [])
 
+  // 전체 기록 로드 (admin only) — entries × profiles × results 일괄 조회
+  const loadAllEntries = useCallback(async () => {
+    setAllLoading(true)
+    setAllError(null)
+    try {
+      const res = await fetch('/api/ride-vision/lotto-all-entries', {
+        headers: authHeaders(),
+        cache: 'no-store',
+      })
+      const json = await res.json()
+      if (res.ok && json.success) {
+        setAllUsers((json.data as UserSummary[]) || [])
+        setAllMeta(json.meta || null)
+        allLoadedRef.current = true
+      } else {
+        setAllError(json.error || `HTTP ${res.status}`)
+      }
+    } catch (e) {
+      setAllError(String(e))
+    } finally {
+      setAllLoading(false)
+    }
+  }, [])
+
   useEffect(() => {
     if (tab === 'records' && !recLoadedRef.current) loadRecords()
     if (tab === 'stats' && !statsLoadedRef.current) loadStats()
-  }, [tab, loadRecords, loadStats])
+    if (tab === 'all' && isAdmin && !allLoadedRef.current) loadAllEntries()
+  }, [tab, isAdmin, loadRecords, loadStats, loadAllEntries])
 
   // 회차 번호 텍스트 구성 (회차 + 게임별 번호 + 서명)
   const roundText = useCallback(
@@ -494,10 +547,8 @@ export default function LottoPage() {
       if (!result) {
         return { id: e.id, draw_no: e.draw_no, numbers, amount: e.amount, drawn: false, rank: -1, matches: 0, net: null }
       }
-      const { rank, matches } = rankOf(numbers, result)
-      let net: number | null = null
-      if (rank === 0) net = -e.amount
-      else if (rank === 4 || rank === 5) net = FIXED_PRIZE[rank] - e.amount
+      const { rank, matches } = rankOf(numbers, result as LottoResult)
+      const net = netOf(rank, true, e.amount)
       return { id: e.id, draw_no: e.draw_no, numbers, amount: e.amount, drawn: true, rank, matches, net }
     })
   }, [entries, resultMap])
@@ -691,22 +742,30 @@ export default function LottoPage() {
   return (
     <div style={{ padding: 16 }}>
       {/* ── 탭 바 ─────────────────────────────────────────────── */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
-        {([
-          ['extract', '🎱 번호 추출'],
-          ['records', '📒 내 기록'],
-          ['stats', '📊 번호 통계'],
-        ] as const).map(([key, label]) => {
+      <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
+        {(
+          [
+            ['extract', '🎱 번호 추출'],
+            ['records', '📒 내 기록'],
+            ['stats', '📊 번호 통계'],
+            ...(isAdmin ? ([['all', '👑 전체 기록']] as const) : []),
+          ] as const
+        ).map(([key, label]) => {
           const active = tab === key
+          const adminTab = key === 'all'
           return (
             <button
               key={key}
-              onClick={() => setTab(key)}
+              onClick={() => setTab(key as 'extract' | 'records' | 'stats' | 'all')}
               style={{
                 ...BTN.md,
-                background: active ? '#3b6eb5' : 'transparent',
-                color: active ? '#fff' : COLORS.textSecondary,
-                border: `1px solid ${active ? '#3b6eb5' : COLORS.borderFaint}`,
+                background: active
+                  ? adminTab
+                    ? '#7c3aed'
+                    : '#3b6eb5'
+                  : 'transparent',
+                color: active ? '#fff' : adminTab ? '#7c3aed' : COLORS.textSecondary,
+                border: `1px solid ${active ? (adminTab ? '#7c3aed' : '#3b6eb5') : adminTab ? COLORS.borderViolet : COLORS.borderFaint}`,
                 cursor: 'pointer',
               }}
             >
@@ -1430,6 +1489,333 @@ export default function LottoPage() {
           )}
           <div style={{ marginTop: 12, textAlign: 'center', fontSize: 11, color: COLORS.textDim }}>
             통계는 재미용입니다 · 과거 출현 빈도는 미래 추첨에 영향을 주지 않습니다
+          </div>
+        </div>
+      )}
+
+      {/* ═══ 탭 4 — 전체 기록 (admin only) ════════════════════════ */}
+      {tab === 'all' && isAdmin && (
+        <div>
+          <div
+            style={{
+              ...GLASS.L3,
+              border: `1px solid ${COLORS.borderViolet}`,
+              padding: '12px 16px',
+              borderRadius: 12,
+              marginBottom: 14,
+            }}
+          >
+            <div style={{ fontSize: 12, fontWeight: 800, color: '#7c3aed', marginBottom: 3 }}>
+              👑 갓 어드민 — 전 직원 로또 기록
+            </div>
+            <div style={{ fontSize: 12, color: COLORS.textSecondary, lineHeight: 1.5 }}>
+              구매 · 당첨 · 손익 추적용. 개인정보 보호를 위해 슈퍼어드민만 접근 가능합니다.
+              {allMeta && (
+                <>
+                  <br />
+                  <strong style={{ color: COLORS.textPrimary }}>
+                    {allMeta.user_count}명 · {allMeta.draw_count}회차 · 총 {allMeta.total_entries}게임
+                  </strong>
+                </>
+              )}
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', marginBottom: 10 }}>
+            <span style={{ fontSize: 13, fontWeight: 800, color: COLORS.textPrimary }}>직원별 요약</span>
+            <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 8 }}>
+              {allLoading ? '불러오는 중…' : `${allUsers.length}명`}
+            </span>
+            <button
+              onClick={loadAllEntries}
+              style={{
+                ...BTN.sm,
+                marginLeft: 'auto',
+                background: COLORS.bgViolet,
+                color: '#7c3aed',
+                border: `1px solid ${COLORS.borderViolet}`,
+                cursor: 'pointer',
+              }}
+            >
+              ↻ 새로고침
+            </button>
+          </div>
+
+          {allError && (
+            <div
+              style={{
+                padding: 10,
+                background: COLORS.bgRed,
+                color: COLORS.danger,
+                borderRadius: 8,
+                marginBottom: 12,
+                fontSize: 12,
+                fontWeight: 700,
+              }}
+            >
+              ❌ {allError}
+            </div>
+          )}
+
+          {!allLoading && !allError && allUsers.length === 0 && (
+            <div
+              style={{
+                ...GLASS.L4,
+                padding: 40,
+                borderRadius: 14,
+                textAlign: 'center',
+                color: COLORS.textMuted,
+                fontSize: 13,
+              }}
+            >
+              아직 구매 기록이 없습니다 — 직원이 「번호 추출」 탭에서 복사를 누르면 여기 누적됩니다.
+            </div>
+          )}
+
+          {/* 직원 카드 그리드 — 클릭 펼침 */}
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+              gap: 12,
+              marginBottom: 14,
+            }}
+          >
+            {allUsers.map(u => {
+              const expanded = expandedUser === u.user_id
+              const netNeg = u.net < 0
+              const netPos = u.net > 0
+              return (
+                <div
+                  key={u.user_id}
+                  style={{
+                    ...GLASS.L4,
+                    border: `1px solid ${expanded ? COLORS.borderViolet : COLORS.borderSubtle}`,
+                    borderRadius: 14,
+                    padding: 14,
+                    cursor: 'pointer',
+                    transition: 'border-color 0.15s',
+                  }}
+                  onClick={() => setExpandedUser(expanded ? null : u.user_id)}
+                >
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                    <span style={{ fontSize: 15, fontWeight: 800, color: COLORS.textPrimary }}>
+                      {u.name}
+                    </span>
+                    {u.department && (
+                      <span style={{ fontSize: 11, color: COLORS.textMuted }}>· {u.department}</span>
+                    )}
+                    <span style={{ marginLeft: 'auto', fontSize: 11, color: COLORS.textMuted }}>
+                      {expanded ? '▲' : '▼'}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', gap: 12, marginTop: 8, fontSize: 12, color: COLORS.textSecondary }}>
+                    <span>
+                      구매 <strong style={{ color: COLORS.textPrimary }}>{u.total_games}</strong>게임
+                    </span>
+                    <span>
+                      회차 <strong style={{ color: COLORS.textPrimary }}>{u.rounds}</strong>
+                    </span>
+                    <span>
+                      투자 <strong style={{ color: COLORS.textPrimary }}>{won(u.total_amount)}</strong>
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+                    {[1, 2, 3, 4, 5].map(rk => {
+                      const c = u.rank_counts[rk] || 0
+                      if (c === 0) return null
+                      const top = rk <= 3
+                      return (
+                        <span
+                          key={rk}
+                          style={{
+                            padding: '2px 8px',
+                            borderRadius: 999,
+                            fontSize: 11,
+                            fontWeight: 700,
+                            background: top ? COLORS.bgViolet : COLORS.bgGreen,
+                            color: top ? '#7c3aed' : COLORS.success,
+                            border: `1px solid ${top ? COLORS.borderViolet : COLORS.borderGreen}`,
+                          }}
+                        >
+                          {rk}등 {c}
+                        </span>
+                      )
+                    })}
+                    {u.win_count === 0 && u.miss_count > 0 && (
+                      <span
+                        style={{
+                          padding: '2px 8px',
+                          borderRadius: 999,
+                          fontSize: 11,
+                          fontWeight: 700,
+                          background: COLORS.bgGray,
+                          color: COLORS.textMuted,
+                          border: `1px solid ${COLORS.borderFaint}`,
+                        }}
+                      >
+                        당첨 없음
+                      </span>
+                    )}
+                    {u.pending_count > 0 && (
+                      <span
+                        style={{
+                          padding: '2px 8px',
+                          borderRadius: 999,
+                          fontSize: 11,
+                          fontWeight: 700,
+                          background: COLORS.bgBlue,
+                          color: COLORS.primary,
+                          border: `1px solid ${COLORS.borderBlue}`,
+                        }}
+                      >
+                        추첨대기 {u.pending_count}
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', gap: 12, marginTop: 8, fontSize: 12 }}>
+                    <span style={{ color: COLORS.textMuted }}>
+                      낙첨 손실{' '}
+                      <strong style={{ color: u.loss_sum > 0 ? COLORS.danger : COLORS.textPrimary }}>
+                        {won(u.loss_sum)}
+                      </strong>
+                    </span>
+                    <span style={{ color: COLORS.textMuted }}>
+                      4·5등 손익{' '}
+                      <strong
+                        style={{
+                          color: netNeg ? COLORS.danger : netPos ? COLORS.success : COLORS.textPrimary,
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {u.net === 0 ? '0원' : netNeg ? `손실 ${won(-u.net)}` : `수익 ${won(u.net)}`}
+                      </strong>
+                    </span>
+                    {u.top_wins > 0 && (
+                      <span style={{ color: '#7c3aed', fontWeight: 700 }}>1~3등 {u.top_wins}건 별도</span>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* 펼침 — 선택 직원의 회차별 상세 */}
+          {expandedUser && (() => {
+            const u = allUsers.find(x => x.user_id === expandedUser)
+            if (!u) return null
+            return (
+              <div style={{ ...GLASS.L4, padding: 16, borderRadius: 14, marginBottom: 14 }}>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 14, fontWeight: 800, color: COLORS.textPrimary }}>{u.name}</span>
+                  <span style={{ fontSize: 12, color: COLORS.textMuted }}>회차별 구매 · 당첨</span>
+                  <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 'auto' }}>
+                    {u.entries.length}게임
+                  </span>
+                  <button
+                    onClick={() => setExpandedUser(null)}
+                    style={{
+                      ...BTN.sm,
+                      background: 'transparent',
+                      color: COLORS.textMuted,
+                      border: `1px solid ${COLORS.borderFaint}`,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    ✕ 닫기
+                  </button>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {u.entries.map(e => {
+                    const tone =
+                      !e.drawn
+                        ? { bg: COLORS.bgGray, color: COLORS.textMuted, border: COLORS.borderFaint, label: '추첨 대기' }
+                        : e.rank === 0
+                          ? { bg: COLORS.bgRed, color: COLORS.danger, border: COLORS.borderRed, label: '낙첨' }
+                          : e.rank >= 1 && e.rank <= 3
+                            ? { bg: COLORS.bgViolet, color: '#7c3aed', border: COLORS.borderViolet, label: `${e.rank}등` }
+                            : { bg: COLORS.bgGreen, color: COLORS.success, border: COLORS.borderGreen, label: `${e.rank}등` }
+                    return (
+                      <div
+                        key={e.id}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 10,
+                          flexWrap: 'wrap',
+                          padding: '8px 10px',
+                          borderRadius: 10,
+                          border: `1px solid ${COLORS.borderFaint}`,
+                          background: 'transparent',
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontSize: 12,
+                            fontWeight: 800,
+                            color: COLORS.textSecondary,
+                            width: 64,
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {e.draw_no}회
+                        </span>
+                        <div style={{ display: 'flex', gap: 5 }}>
+                          {e.numbers.map(n => (
+                            <Ball key={n} n={n} size={26} />
+                          ))}
+                        </div>
+                        <span
+                          style={{
+                            padding: '2px 8px',
+                            borderRadius: 999,
+                            fontSize: 11,
+                            fontWeight: 700,
+                            background: tone.bg,
+                            color: tone.color,
+                            border: `1px solid ${tone.border}`,
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {tone.label}
+                          {e.drawn && e.rank > 0 && (
+                            <span style={{ marginLeft: 4, opacity: 0.7 }}>{e.matches}개</span>
+                          )}
+                        </span>
+                        <span
+                          style={{
+                            marginLeft: 'auto',
+                            fontSize: 12,
+                            fontWeight: 700,
+                            color:
+                              !e.drawn
+                                ? COLORS.textMuted
+                                : e.net === null
+                                  ? '#7c3aed'
+                                  : e.net < 0
+                                    ? COLORS.danger
+                                    : COLORS.success,
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {!e.drawn
+                            ? '—'
+                            : e.net === null
+                              ? '당첨금 별도'
+                              : e.net < 0
+                                ? `손실 ${won(-e.net)}`
+                                : `수익 ${won(e.net)}`}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          })()}
+
+          <div style={{ marginTop: 12, textAlign: 'center', fontSize: 11, color: COLORS.textDim }}>
+            전 직원 데이터는 개인정보 — 화면 캡처 · 외부 공유 주의
           </div>
         </div>
       )}
