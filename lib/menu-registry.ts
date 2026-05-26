@@ -81,6 +81,7 @@ export const MENUS: MenuEntry[] = [
   // /maintenance, /operations/intake 메뉴는 hide (페이지는 그대로 — backward compat)
   { id: 'mod-ops',    name: '사고대차',  displayName: '🚗 사고대차',   path: '/operations',        iconKey: 'Wrench',            group: 'operation', sortOrder: 10 },
   // PR-L1 (2026-05-24) — 장기렌트 (대차와 별개 장기 계약 원장)
+  // PR-Q1 (2026-05-26) — 견적 탭 추가 (영업 동선 우선) — long_term_quotes 별도 테이블
   { id: 'mod-long-term', name: '장기렌트', displayName: '🔑 장기렌트', path: '/long-term-rentals', iconKey: 'Car', group: 'operation', sortOrder: 11 },
 
   // ── 재무 (finance) ── 통장 진입점 + 손익/정산/투자

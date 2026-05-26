@@ -14,11 +14,12 @@ export default function ConditionalLayout({ children }: { children: React.ReactN
   const pathname = usePathname()
 
   // 게스트 전용 경로 — ClientLayout 완전 우회 (인증 불필요)
-  const isGuestRoute = pathname.startsWith('/public/quote')  // 견적 서명 (v2)
-    || pathname.startsWith('/sign')                           // 레거시 서명 (리다이렉트)
-    || pathname.startsWith('/settlement/view')                // 정산 내역 공유
-    || pathname.startsWith('/e-contract/')                    // 전자계약 서명
-    || pathname.startsWith('/invite/')                        // 초대 수락
+  const isGuestRoute = pathname.startsWith('/public/quote')              // 견적 서명 (v2)
+    || pathname.startsWith('/public/long-term-quote')                    // PR-Q1 장기렌트 견적 공개 페이지
+    || pathname.startsWith('/sign')                                       // 레거시 서명 (리다이렉트)
+    || pathname.startsWith('/settlement/view')                            // 정산 내역 공유
+    || pathname.startsWith('/e-contract/')                                // 전자계약 서명
+    || pathname.startsWith('/invite/')                                    // 초대 수락
 
   if (isGuestRoute) {
     return <>{children}</>
