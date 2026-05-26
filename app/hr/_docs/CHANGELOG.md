@@ -3,6 +3,14 @@
 > Rule 22 (_docs 의무) — 매 PR 한 줄 이상.
 > 세션: peaceful-laughing-volta (hr 세션, 2026-05-16~)
 
+## 2026-05-26
+
+- **PR-HR-6** (hr 세션) — `profile ↔ ride_employees` 매핑 헬퍼 API.
+  - `GET /api/ride-employees/by-profile/[profileId]` — 1:1 조회 (회사 판별: 있으면 RIDE)
+  - `GET /api/ride-employees/lookup?email=&name=` — 이메일/이름 매칭 후보 list (최대 20)
+  - 메인 세션 PR-MULTI-BRAND P3+b/c/d 위탁 충족 (getSoSokType 회사 기반 / InviteModal RIDE 부서 / FMI 「라이드주식회사」 폐기 매핑)
+- **§ 9.5 기록** — `_docs/HR-OPERATIONS.md` 부서 구조 통합 C 정책 (2026-05-24 사용자 결정, 본 커밋과 분리).
+
 ## 2026-05-16
 
 - **PR-HR-5c** (hr 세션) — RideOrgPanel 직원 선택 체크박스 확대.
