@@ -18,7 +18,8 @@ export type CompanyKey = 'FMI' | 'RIDE'
 
 export interface CompanyBrand {
   key: CompanyKey
-  name: string        // 정식 회사명 (라이드 주식회사 / 주식회사 에프엠아이)
+  name: string        // 정식 회사명 (DB·계약서·이메일 등 내부 식별용)
+  publicName: string  // 로그인·공개 페이지 노출 이름 (FMI 는 중립 'ERP')
   shortName: string   // 짧은 표기 (RIDE / FMI)
   primary: string     // 브랜드 primary 색상 (hex)
   accent: string      // 보조 강조색 (hex)
@@ -33,6 +34,7 @@ export const COMPANY_BRANDS: Record<CompanyKey, CompanyBrand> = {
   FMI: {
     key: 'FMI',
     name: '주식회사 에프엠아이',
+    publicName: 'ERP',          // 메인(hmseok.com) 로그인은 중립 — FMI 표기 노출 X
     shortName: 'FMI',
     primary: '#3b6eb5',
     accent: '#5b8def',
@@ -45,6 +47,7 @@ export const COMPANY_BRANDS: Record<CompanyKey, CompanyBrand> = {
   RIDE: {
     key: 'RIDE',
     name: '라이드 주식회사',
+    publicName: '라이드 주식회사',
     shortName: 'RIDE',
     primary: '#0C0C30',        // Prestige Navy (공식)
     accent: '#0A93FF',         // Spark Blue (공식)
