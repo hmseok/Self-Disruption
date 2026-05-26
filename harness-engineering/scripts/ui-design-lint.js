@@ -99,6 +99,11 @@ for (const fp of pageFiles) {
     // 2026-05-24 — 활성 탭 네이비(#0f2440) — 표준은 브랜드 블루 #3b6eb5
     // (#1e293b 등은 데이터 셀 텍스트색으로도 흔해 navy 전용으로 한정 — 오탐 회피)
     hasOffStandardTabColor: /\?\s*'#0f2440'/.test(content),
+    // 2026-05-26 — 자체 탭 strip — 공용 NeuFilterTabs 사용 의무
+    //   setActive*Tab / setTop*Tab / setSub*Tab / setTabKey 등 setter 검출.
+    //   NeuFilterTabs 가 이미 import 되어 있으면 OK (sub-tab 혼용 가능).
+    hasSelfTabSetter: /\bset[A-Z]\w*Tab\w*\s*\(/.test(content),
+    hasNeuFilterTabs: /NeuFilterTabs/.test(content),
   }
 
   // 1) stat strip 자체 구현 (5+ 카드 패턴 있는데 DcStatStrip 미사용)
@@ -153,6 +158,16 @@ for (const fp of pageFiles) {
     warnings.push({
       file: rel,
       issue: '활성 탭에 네이비(#0f2440) — 표준 브랜드 블루 #3b6eb5 사용 (UI-DESIGN-STANDARD § 4.1)',
+    })
+  }
+
+  // 9) 2026-05-26: 자체 탭 strip — 공용 NeuFilterTabs 사용 의무 (UI-DESIGN-STANDARD § 4)
+  //   setActiveTab/setTopTab/setSubTab/setTabKey 같은 setter 가 있는데
+  //   NeuFilterTabs 미 import → 자체 탭 strip 으로 추정.
+  if (checks.hasSelfTabSetter && !checks.hasNeuFilterTabs) {
+    warnings.push({
+      file: rel,
+      issue: '자체 탭 strip 추정 — 공용 NeuFilterTabs 사용 권장 (UI-DESIGN-STANDARD § 4 — 같은 기능 같은 UI)',
     })
   }
 }

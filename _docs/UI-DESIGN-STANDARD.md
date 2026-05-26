@@ -169,19 +169,34 @@ import DcToolbar from '@/app/components/DcToolbar'
 
 ---
 
-## 4. 탭 (sub-section)
+## 4. 탭 (sub-section) — 공용 NeuFilterTabs 사용 의무 (2026-05-26 강화)
+
+**「같은 기능이면 같은 UI」 원칙 — 탭 strip 은 모든 페이지가 공용 컴포넌트 사용.**
 
 ```tsx
-{/* 탭 이름 앞에 이모지/아이콘 */}
-<div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-  <button>📋 계약 현황</button>
-  <button>📈 매출 분석</button>
-  <button>💸 지급 관리 25</button>
-  <button>📊 손익계산서</button>
-  <button>⚡ 정산 실행 25</button>
-  <button>📒 정산 원장</button>
-</div>
+import NeuFilterTabs, { FilterTab } from '@/app/components/NeuFilterTabs'
+
+const tabs: FilterTab[] = [
+  { key: 'overview', label: '📋 계약 현황', count: 25 },
+  { key: 'sales',    label: '📈 매출 분석' },
+  { key: 'payment',  label: '💸 지급 관리', count: 12 },
+]
+
+<NeuFilterTabs tabs={tabs} activeKey={tab} onSelect={setTab} />
 ```
+
+### 4.0 자체 탭 strip 금지 (2026-05-26 신설)
+
+- ❌ `<div><button onClick={() => setTab('x')} style={{ active ? ... }}>` 자체 구현
+- ❌ 탭마다 다른 padding / border / color 패턴
+- ❌ 같은 페이지 안에서도 상단 탭은 자체 / 하단 탭은 NeuFilterTabs 처럼 혼용
+- ✅ 모든 페이지·세션 공통 `NeuFilterTabs` 사용
+- 검사: `npm run lint:ui-design` — `setActiveTab` / `setTopTab` / `setSubTab` 등 setter 가 있는데
+  `NeuFilterTabs` 미 import 면 경고 (정보성 — 합의 시 차단으로 승격).
+
+**예외 케이스**:
+- 단순 toggle (2개 옵션, on/off 의미) → 라디오/스위치 사용
+- 탭 안 sub-tab → NeuFilterTabs `compact` prop 사용
 
 ### 4.1 활성(선택) 탭 색상 — 표준 (2026-05-24 변경)
 
