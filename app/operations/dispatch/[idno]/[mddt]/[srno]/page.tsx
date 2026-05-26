@@ -377,10 +377,19 @@ export default function DispatchDetailPage({
     setOrderLoading(true)
     try {
       const headers = await getAuthHeader()
-      const res = await fetch('/api/operations/dispatch-orders', { headers })
+      // 2026-05-26 hotfix: cafe24 키로 직접 필터 (ride_accident_id 매칭 mismatch 회피)
+      const res = await fetch(`/api/operations/dispatch-orders?cafe24_otpt_idno=${encodeURIComponent(idno)}&cafe24_otpt_mddt=${encodeURIComponent(mddt)}&cafe24_otpt_srno=${encodeURIComponent(srno)}`, { headers })
       const json = await res.json().catch(() => ({}))
       const orders: DispatchOrder[] = Array.isArray(json?.data) ? json.data : []
-      const found = orders.find((o) => o.ride_accident_id === rideAccidentId) || null
+      // cafe24 키 매칭 우선 → 없으면 ride_accident_id 매칭 fallback
+      //   (Number() 캐스팅으로 BigInt/string mismatch 안전화)
+      const byCafe24 = orders.find((o) =>
+        String(o.cafe24_otpt_idno || '') === String(idno) &&
+        String(o.cafe24_otpt_mddt || '') === String(mddt) &&
+        Number(o.cafe24_otpt_srno || 0) === parseInt(srno, 10)
+      )
+      const byRideId = orders.find((o) => Number(o.ride_accident_id) === Number(rideAccidentId))
+      const found = byCafe24 || byRideId || null
       setDispatchOrder(found)
       if (found) {
         setExpDispatch(found.expected_dispatch_date || '')
@@ -530,6 +539,13 @@ export default function DispatchDetailPage({
           }),
         })
         const json = await res.json()
+        // 2026-05-26 hotfix: 409 (이미 진행 중) → fetchOrder 재호출로 화면 갱신
+        //   (client find 가 BigInt/limit 으로 못 찾았던 케이스 자동 회복)
+        if (res.status === 409 && json?.existing_id) {
+          showResult({ type: 'ok', text: '기존 배차를 불러왔습니다 — 수정 모드로 전환' })
+          await fetchOrder()
+          return
+        }
         if (json.error) throw new Error(json.error)
         showResult({ type: 'ok', text: '배차 정보 등록 완료 — 이제 상담을 추가할 수 있습니다' })
         await fetchOrder()
