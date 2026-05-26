@@ -18,6 +18,10 @@
 | b) 단기·사고대차 통합 여부 | **분리** — 단기 = 사고대차이므로 별개 (`fmi_rentals` / `claims` 유지) |
 | c) operational-learning | **폐기** — 새 모듈에서 처음부터 안 가져감 |
 | d) 기존 `quotes` 데이터 | **거의 없음 — 폐기 가능** (마이그레이션 불필요) |
+| e) 신차 입력 방식 | **3가지 다** — 기존차량 / 신차 카탈로그 / 신차 AI 캡쳐 |
+| f) AI 파싱 비용 | **첫 추출 후 자동 카탈로그 저장** → 같은 차종 재호출 시 카탈로그 fetch. Rule 1 안전망 (N=1 dry-run + 사용자 보고) 적용 |
+| g) 시세 자동 조회 | **카탈로그 등록 시 1회만 호출 + 캐시** (market-sync) |
+| 기타) 메뉴 위치 | `/long-term-rentals` 안의 견적 탭만 — 사이드바 `mod-quotes` 폐기 |
 
 ### 폐기 사유 정리
 - 기존 `quotes` + `RentPricingBuilder` (4,135줄 wizard / 9탭 설정) — 영업이 견적 1건당 클릭 50+ 회
@@ -228,6 +232,49 @@ export interface QuoteCostResult {
 }
 ```
 
+## 4-b. 신차 차량 정보 입력 흐름 (3가지 진입)
+
+> **재사용 자산**: `new_car_prices` 테이블, `/api/parse-quote` (Gemini Vision), `/api/new-car-prices/*`, `/api/cost-standards/market-sync`, `NewCarResult` 타입 — 모두 폐기 X, 그대로 사용.
+
+### 진입 1: 「기존 차량」 (cars 테이블 검색)
+```
+차량번호 입력 → cars.id/brand/model/year/fuel/cc 자동 채움
+→ purchase_price 는 cars.purchase_price (있으면) 또는 영업 입력
+```
+
+### 진입 2: 「신차 — 카탈로그」 (new_car_prices 에서 선택)
+```
+브랜드 → 모델 → 연식 → 트림 → 변형(variant: 가솔린/디젤/하이브리드/전기, 개별소비세 5%/3.5%)
+→ 외장 색상 / 내장 색상 / 옵션 패키지 (다중 선택)
+→ base_price (VAT 포함 출고가) 표시
+→ 매입가 입력 필드 (영업이 할인된 실제 가격 — 원가 산출의 핵심 입력)
+```
+
+### 진입 3: 「신차 — AI 캡쳐」 (PDF/이미지 업로드 → Gemini 파싱)
+```
+1. 영업이 차량 견적서 PDF 또는 카탈로그 사진 업로드 (≤ 10MB)
+2. POST /api/parse-quote (Gemini 2.0 Flash)
+   - 응답: NewCarResult (brand, model, year, variants, trims, options, colors)
+3. 모달에 추출 결과 미리보기 (트림 목록 / 색상 / 옵션)
+4. 영업이 트림 + 변형 + 색상 + 옵션 선택
+5. ☑ "카탈로그에 저장" (기본 ON) 체크 시:
+   - POST /api/new-car-prices 자동 호출 → new_car_prices 등록
+   - 첫 등록 시 동시에 /api/cost-standards/market-sync (1회) → 시세 캐시
+6. 매입가 입력 (base_price 와 별도, 영업이 실제 매입가)
+```
+
+### Rule 1 안전망 (외부 LLM 호출)
+- **N=1 dry-run**: 첫 PR-Q2-4 통합 시 실제 PDF 1건으로 추출 결과 raw 샘플 사용자 보고
+- **break 조건**: 추출 실패 (variants[] 비어있음) 시 즉시 중단 + 사용자 보고
+- **비용 노출**: 모달 헤더에 "AI 파싱: Gemini Flash · ~₩1~3 / 호출" 표시
+- **캐시 우선**: 같은 brand+model+year 가 카탈로그에 있으면 AI 호출 X (카탈로그 fetch)
+
+### 시세 자동 조회 (g 결정)
+- AI 파싱으로 신차 등록 시 동시에 1회 `/api/cost-standards/market-sync` 호출
+- 결과는 `cost_standards` 테이블 캐시 (이미 운영 중)
+- 새 견적 시 별도 조회 X — 카탈로그 fetch 시 자연스럽게 캐시된 시세 활용
+- 사용자가 「시세 새로고침」 버튼 (선택) → 강제 재호출
+
 ## 5. UI 구조 — 모달 (좌:입력 / 우:실시간 원가)
 
 ```
@@ -286,6 +333,14 @@ POST   /api/lt-quotes/[id]/send    (status='sent' + share_token)
 POST   /api/lt-quotes/[id]/convert (long_term_rentals 생성)
 POST   /api/lt-quotes/calculate    (원가 자동 산출 — input → result, save X)
 GET    /api/public/lt-quote/[token] (공개 조회, 무인증)
+```
+
+### 재사용 (그대로, 폐기 X)
+```
+GET/POST /api/new-car-prices         신차 카탈로그 CRUD (캐시)
+GET/PATCH/DELETE /api/new-car-prices/[id]
+POST     /api/parse-quote            AI 파싱 (Gemini Vision)
+POST     /api/cost-standards/market-sync   시세 자동 조회 (카탈로그 등록 시 1회)
 ```
 
 ### 폐기 (PR-Q2-5)
