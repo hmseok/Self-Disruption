@@ -21,7 +21,8 @@ const PATH_TO_GROUP: Record<string, string> = {
   '/fleet/factory-mgmt': 'vehicle',
   '/claims/accident-mgmt': 'vehicle', '/claims/billing-mgmt': 'vehicle',
   // ── 영업/계약 (견적→계약→수금→정산 파이프라인) ──
-  '/quotes': 'sales', '/quotes/create': 'sales', '/quotes/operational-learning': 'sales',
+  // PR-Q2-5 폐기: '/quotes', '/quotes/create', '/quotes/operational-learning'
+  //   (장기렌트 견적은 /long-term-rentals 안 견적 탭으로 이전)
   '/contracts': 'sales', '/customers': 'sales',
   '/finance/collections': 'sales', '/finance/settlement': 'sales',
   '/db/pricing-standards': 'sales',
@@ -94,9 +95,7 @@ const PAGE_NAMES: Record<string, string> = {
   '/claims/accident-mgmt': '사고관리',
   '/claims/billing-mgmt': '보험청구관리',
   // 영업/계약
-  '/quotes': '견적 관리',
-  '/quotes/create': '견적 작성',
-  '/quotes/operational-learning': '운영학습',
+  // PR-Q2-5 폐기: '/quotes', '/quotes/create', '/quotes/operational-learning'
   '/contracts': '계약 관리',
   '/customers': '고객 관리',
   '/finance/collections': '수금/회수',

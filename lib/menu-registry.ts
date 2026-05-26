@@ -94,8 +94,8 @@ export const MENUS: MenuEntry[] = [
   { id: 'mod-sms',           name: 'SMS 수집',   displayName: '📨 SMS 수집',  path: '/finance/sms',           iconKey: 'Doc',   group: 'finance', sortOrder: 26 },
 
   // ── 영업/계약 (sales) ──
-  { id: 'mod-quotes',                  name: '견적 관리', displayName: '📝 견적 관리', path: '/quotes',                      iconKey: 'Doc',   group: 'sales', sortOrder: 30 },
-  { id: 'mod-operational-learning',    name: '운영학습',  displayName: '📚 운영학습',  path: '/quotes/operational-learning', iconKey: 'Chart', group: 'sales', sortOrder: 31 },
+  // PR-Q2-5 (2026-05-26) — 폐기: mod-quotes, mod-operational-learning
+  //   장기렌트 견적은 /long-term-rentals 안 견적 탭 (mod-long-term)으로 통합.
   { id: 'mod-contracts',               name: '계약/고객', displayName: '📑 계약/고객', path: '/contracts',                   iconKey: 'Doc',   group: 'sales', sortOrder: 32 },
 
   // ── 관리 (admin) ──
@@ -172,7 +172,7 @@ export const HIDDEN_PATHS = new Set<string>([
   '/operations/rentals',    // → /operations 안 「배차스케줄」 sub-tab (예정)
   '/operations/intake-bulk',// → /operations 안 작업 (또는 별도 admin)
   '/e-contract',
-  '/quotes/pricing', '/quotes/short-term',
+  // PR-Q2-5 폐기: '/quotes/pricing', '/quotes/short-term' (hidden 도 제거)
   '/customers',
   '/finance/collections',
   '/db/pricing-standards',
