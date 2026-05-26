@@ -3,6 +3,14 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-24 (Phase W-1a + W-1b) — 날씨 기반 인력 예측 초기 (스키마 + CRUD API)
+
+> 설계서: `_docs/WEATHER-STAFFING-DESIGN.md`. 17 광역자치단체 + 인구비례 가중치 + OpenWeather + 1h 캐시 + Erlang C λ 가산. W-1c (OpenWeather 어댑터·캐시), W-1d (설정 UI), W-1e (위젯), W-2 (staffing 확장 + 알림) 단계별 진행. W-3 (외부인력 SMS 호출) 다음 PR.
+
+- **W-1a 마이그** `migrations/2026-05-24_cs_weather_init.sql` — 3 테이블 신설: `cs_weather_regions` (17 광역 시드, 인구비례 가중치, weight 합 100.00), `cs_weather_cache` (권역당 1행 덮어쓰기, 1h TTL, FK CASCADE), `cs_weather_factors` (보정율 10행 시드, condition_key UNIQUE). 멱등 (UNIQUE+INSERT IGNORE — 사용자 편집값 보존).
+- **W-1b 권역 CRUD API** `app/api/call-scheduler/kpi/weather/regions/route.ts` — GET(`?include_inactive=1`, 가중치 합 동봉) / POST(bulk save: id→UPDATE / 없으면 INSERT, 한국 좌표 33~39°N · 124~132°E 검증) / DELETE(`?id=`).
+- **W-1b 룰 CRUD API** `app/api/call-scheduler/kpi/weather/factors/route.ts` — GET / POST(bulk save, factor 0~10 검증, openweather_codes 콤마 구분 3자리 정수만 정규화) / DELETE.
+
 ## 2026-05-24 (Phase WHR-B2) — 상담원 ID 매칭을 워커 「편집」에 통합
 
 > WHR-B 가 매칭을 별도 패널로 이식해 워커 목록이 위(워커 표)·아래(매칭 패널) 두 번 나옴. 같은 워커를 두 목록으로 관리하는 중복 → 워커 표 하나로 통합 (사용자 지시).
