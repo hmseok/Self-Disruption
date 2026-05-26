@@ -44,7 +44,8 @@ export async function GET(request: NextRequest) {
     const rows = await prisma.$queryRawUnsafe<Record<string, unknown>[]>(
       `SELECT l.id, l.vehicle_id, l.vehicle_car_number, l.customer_name, l.customer_phone,
               l.contract_no, l.start_date, l.end_date, l.monthly_fee, l.deposit,
-              l.status, l.notes, l.created_at, l.updated_at,
+              l.status, l.notes, l.contract_type, l.vehicle_spec,
+              l.created_at, l.updated_at,
               c.brand AS vehicle_brand, c.model AS vehicle_model
          FROM long_term_rentals l
          LEFT JOIN cars c ON c.id = l.vehicle_id
@@ -87,12 +88,14 @@ export async function POST(request: NextRequest) {
       INSERT INTO long_term_rentals (
         id, vehicle_id, vehicle_car_number, customer_name, customer_phone,
         contract_no, start_date, end_date, monthly_fee, deposit, status, notes,
+        contract_type, vehicle_spec,
         created_at, updated_at
       ) VALUES (
         ${id}, ${body.vehicle_id || null}, ${body.vehicle_car_number || null},
         ${String(body.customer_name).trim()}, ${body.customer_phone || null},
         ${body.contract_no || null}, ${toDate(body.start_date)}, ${toDate(body.end_date)},
         ${monthlyFee}, ${deposit}, ${body.status || 'active'}, ${body.notes || null},
+        ${body.contract_type || '기존차량'}, ${body.vehicle_spec || null},
         NOW(), NOW()
       )`
 

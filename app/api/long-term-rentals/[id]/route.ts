@@ -18,6 +18,8 @@ function serialize<T>(d: T): T {
 const ALLOWED_FIELDS = new Set([
   'vehicle_id', 'vehicle_car_number', 'customer_name', 'customer_phone',
   'contract_no', 'start_date', 'end_date', 'monthly_fee', 'deposit', 'status', 'notes',
+  // PR-L2 — 계약 유형 / 신차 예정 스펙
+  'contract_type', 'vehicle_spec',
 ])
 const DATE_FIELDS = new Set(['start_date', 'end_date'])
 const NUMBER_FIELDS = new Set(['monthly_fee', 'deposit'])
