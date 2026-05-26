@@ -1,11 +1,12 @@
 'use client'
 // ═══════════════════════════════════════════════════════════════════
 // CX KPI — 통합 설정 탭 — KPI-DESIGN.md §5-3
-//   흩어져 있던 KPI 설정성 항목을 한 화면 4섹션으로 통합:
+//   흩어져 있던 KPI 설정성 항목을 한 화면 5섹션으로 통합:
 //     ① 목표치          — kpi/targets             (KpiTargets 컴포넌트 그대로 렌더)
 //     ② WFM 산정 기준   — kpi/wfm-config          (Erlang C 입력 폼)
 //     ③ 평가 항목·가중치 — kpi/eval-weights        (지표별 사용·가중치 편집)
 //     ④ 근태 기준        — kpi/attendance-config   (지각·조퇴 유예시간)
+//     ⑤ 날씨 기준        — kpi/weather/*           (W-1d: 권역·보정율 + OpenWeather)
 //   ※ 상담원 매칭(KT·Cafe24)은 「설정 › 워커」로 이동 (WHR-B 2026-05-24)
 //   각 섹션은 접이식. 저장 결과 = 글래스 패널 메시지 (CLAUDE.md 규칙 20).
 // ═══════════════════════════════════════════════════════════════════
@@ -13,6 +14,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { COLORS, GLASS, BTN } from '@/app/utils/ui-tokens'
 import { getAuthHeader } from '@/app/utils/auth-client'
 import KpiTargets from './KpiTargets'
+import WeatherConfigSection from './WeatherConfigSection'
 
 // ── WFM 산정 기준 ──────────────────────────────────────────────
 interface WfmConfig {
@@ -50,11 +52,12 @@ export default function KpiSettings() {
   const [openWfm, setOpenWfm] = useState(true)
   const [openWeights, setOpenWeights] = useState(true)
   const [openAttendance, setOpenAttendance] = useState(true)
+  const [openWeather, setOpenWeather] = useState(true)
 
   return (
     <div>
       <div style={{ fontSize: 11, color: COLORS.textMuted, marginBottom: 12 }}>
-        CX KPI 의 설정성 항목을 한 곳에 모았습니다 — 목표치 · WFM 산정 기준 · 평가 항목/가중치 · 근태 기준.
+        CX KPI 의 설정성 항목을 한 곳에 모았습니다 — 목표치 · WFM 산정 기준 · 평가 항목/가중치 · 근태 기준 · 날씨 기준.
       </div>
 
       {/* ── ① 목표치 ─────────────────────────────────────────── */}
@@ -91,6 +94,14 @@ export default function KpiSettings() {
         desc="지각·조퇴 판정 유예시간 — 정시 ±N분 이내는 정상 처리"
         open={openAttendance} onToggle={() => setOpenAttendance(o => !o)}>
         <AttendanceConfigSection />
+      </Section>
+
+      {/* ── ⑤ 날씨 기준 (W-1d) ────────────────────────────────── */}
+      <Section
+        emoji="⛅" title="날씨 기준"
+        desc="권역별 날씨 → 인입량 보정율 — WFM Erlang C λ 가산 (W-2 알림 단계)"
+        open={openWeather} onToggle={() => setOpenWeather(o => !o)}>
+        <WeatherConfigSection />
       </Section>
     </div>
   )

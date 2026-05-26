@@ -3,6 +3,14 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-24 (Phase W-1d) — KPI 설정 「⛅ 날씨 기준」 섹션
+
+> KPI 설정 탭에 5번째 섹션 추가 — 매니저가 권역·보정율 룰을 화면에서 자유롭게 추가/수정/삭제. W-1a~c API 위에 UI 얹기.
+
+- **신규** `app/(employees)/CallScheduler/kpi/_components/WeatherConfigSection.tsx` — OpenWeather 키 상태 + 마지막 fetch 시각 / 권역 테이블(code·이름·위경도·가중치·순서·활성 인라인 편집, weight 합 100 라이브 검증, 추가/삭제) / 보정율 룰 테이블(condition_key·이름·factor·OpenWeather codes CSV·순서, 추가/삭제). bulk save 패턴 (POST + 누적 DELETE). 자체 ResultPanel.
+- **수정** `KpiSettings.tsx` — 5번째 Section(⛅ 날씨 기준) JSX + `openWeather` state + `WeatherConfigSection` import. 헤더 4섹션→5섹션·인트로 텍스트 정정.
+- API·DB 변경 없음 (W-1a/b/c 의존).
+
 ## 2026-05-24 (Phase W-1a + W-1b + W-1c) — 날씨 기반 인력 예측 초기 (스키마 + CRUD API + OpenWeather 어댑터·캐시)
 
 > 설계서: `_docs/WEATHER-STAFFING-DESIGN.md`. 17 광역자치단체 + 인구비례 가중치 + OpenWeather + 1h 캐시 + Erlang C λ 가산. W-1d (설정 UI), W-1e (위젯), W-2 (staffing 확장 + 알림) 단계별 진행. W-3 (외부인력 SMS 호출) 다음 PR.
