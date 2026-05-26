@@ -5,6 +5,9 @@ import DcStatStrip, { StatItem, ActionButton } from '@/app/components/DcStatStri
 import DcToolbar, { FilterItem } from '@/app/components/DcToolbar'
 import NeuDataTable, { TableColumn, MobileCardConfig } from '@/app/components/NeuDataTable'
 import { GLASS, COLORS } from '@/app/utils/ui-tokens'
+import QuotesTab from './_components/QuotesTab'
+
+type TopTab = 'quotes' | 'rentals'
 
 // ═══════════════════════════════════════════════════════════════════
 // /long-term-rentals — 장기렌트 관리 (PR-L1)
@@ -84,6 +87,7 @@ const emptyForm = {
 }
 
 export default function LongTermRentalsPage() {
+  const [topTab, setTopTab] = useState<TopTab>('quotes')
   const [filter, setFilter] = useState<FilterKey>('contracted')
   const [search, setSearch] = useState('')
   const [rows, setRows] = useState<Row[] | null>(null)
@@ -360,6 +364,32 @@ export default function LongTermRentalsPage() {
           </div>
         )}
 
+        {/* 상단 탭 — 견적 / 계약·운영 (PR-Q1) */}
+        <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+          {([
+            { k: 'quotes', label: '📝 견적', hint: '작성 / 발송 / 채택률' },
+            { k: 'rentals', label: '🔑 계약 · 운영', hint: '체결 / 출고 / 운영중 / 종결' },
+          ] as { k: TopTab; label: string; hint: string }[]).map((t) => {
+            const active = topTab === t.k
+            return (
+              <button key={t.k} onClick={() => setTopTab(t.k)}
+                style={{
+                  padding: '10px 18px', borderRadius: 10, cursor: 'pointer', fontSize: 13, fontWeight: active ? 800 : 600,
+                  border: active ? `1px solid ${COLORS.borderBlue}` : '1px solid rgba(0,0,0,0.08)',
+                  background: active ? COLORS.bgBlue : GLASS.L2.background,
+                  color: active ? COLORS.primary : '#475569',
+                  display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2,
+                }}>
+                <span style={{ whiteSpace: 'nowrap' }}>{t.label}</span>
+                <span style={{ fontSize: 10, fontWeight: 500, color: active ? COLORS.primary : '#94a3b8' }}>{t.hint}</span>
+              </button>
+            )
+          })}
+        </div>
+
+        {topTab === 'quotes' && <QuotesTab />}
+
+        {topTab === 'rentals' && (<>
         <DcStatStrip stats={statItems} actions={statActions} />
         <DcToolbar
           search={search}
@@ -481,6 +511,7 @@ export default function LongTermRentalsPage() {
             </div>
           </div>
         )}
+        </>)}
       </div>
     </div>
   )
