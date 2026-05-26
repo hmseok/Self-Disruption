@@ -538,54 +538,10 @@ model Contract {
   @@map("contracts")
 }
 
-model Quote {
-  id               String    @id @default(uuid()) @db.Char(36)
-  company_id       String?   @db.Char(36)
-  car_id           String?   @db.Char(36)
-  customer_id      String?   @db.Char(36)
-  customer_name    String?
-  contract_type    String?   @db.VarChar(20) // return, buyout
-  term_months      Int?
-  start_date       DateTime? @db.Date
-  end_date         DateTime? @db.Date
-  deposit          Decimal?  @db.Decimal(12, 0)
-  rent_fee         Decimal?  @db.Decimal(12, 0)
-  margin           Decimal?  @db.Decimal(12, 0)
-  status           String    @default("draft") // draft, pending, active, signed, archived
-  shared_at        DateTime?
-  signed_at        DateTime?
-  expires_at       DateTime?
-  terms_version_id Int?
-  quote_type       String?   @default("long_term") @db.VarChar(20) // long_term, short_term
-  quote_detail     Json? // 상세 산출 내역 (car_info, ins_estimate, maint_package 등)
-  created_by       String?   @db.Char(36)
-  created_at       DateTime  @default(now())
-  updated_at       DateTime  @default(now()) @updatedAt
-
-  share_tokens QuoteShareToken[]
-
-  @@index([company_id])
-  @@index([status])
-  @@index([customer_id])
-  @@map("quotes")
-}
-
-model QuoteShareToken {
-  id           String    @id @default(uuid()) @db.Char(36)
-  quote_id     String    @db.Char(36)
-  company_id   String?   @db.Char(36)
-  token        String    @unique
-  status       String    @default("active") // active, revoked, signed, expired
-  expires_at   DateTime?
-  access_count Int       @default(0)
-  accessed_at  DateTime?
-  created_at   DateTime  @default(now())
-
-  quote Quote @relation(fields: [quote_id], references: [id])
-
-  @@index([quote_id])
-  @@map("quote_share_tokens")
-}
+// PR-Q2-5 (2026-05-26) 폐기:
+//   model Quote (quotes 테이블) — lt_quotes 로 대체
+//   model QuoteShareToken (quote_share_tokens) — share_token 컬럼 inline
+// DROP TABLE 은 migrations/2026-05-26_Q2_drop_quotes.sql 에서 처리.
 
 model CustomerSignature {
   id             String    @id @default(uuid()) @db.Char(36)
@@ -1067,22 +1023,9 @@ model MessageSendLog {
   @@map("message_send_logs")
 }
 
-model QuoteLifecycleEvent {
-  id          String   @id @default(uuid()) @db.Char(36)
-  quote_id    String   @db.Char(36)
-  contract_id String?  @db.Char(36)
-  event_type  String // created, shared, sent, viewed, signed, contract_created, revoked, pdf_stored
-  channel     String? // sms, kakao, email, link
-  recipient   String?
-  metadata    Json?
-  actor_id    String?  @db.Char(36)
-  created_at  DateTime @default(now())
-
-  @@index([quote_id])
-  @@index([event_type])
-  @@index([created_at])
-  @@map("quote_lifecycle_events")
-}
+// PR-Q2-5 (2026-05-26) 폐기:
+//   model QuoteLifecycleEvent (quote_lifecycle_events) — quote_id 의존
+// DROP TABLE 은 migrations/2026-05-26_Q2_drop_quotes.sql 에서 처리.
 
 model PaymentSchedule {
   id           Int       @id @default(autoincrement())
