@@ -213,7 +213,11 @@ export async function POST(request: NextRequest) {
       send_channel = 'email',
       recipient_phone = '',
       page_permissions = [],
+      // PR-MULTI-BRAND P3+c-2 — 회사 분리
+      target_company: rawTargetCompany,    // 'FMI' | 'RIDE' (생략 시 FMI)
+      ride_department_id: rideDepartmentId,
     } = body
+    const targetCompany: 'FMI' | 'RIDE' = rawTargetCompany === 'RIDE' ? 'RIDE' : 'FMI'
 
     console.log('[member-invite POST] 요청:', {
       email, send_channel,
@@ -321,15 +325,19 @@ export async function POST(request: NextRequest) {
     const invitationToken = crypto.randomBytes(16).toString('hex')
     const invitationId = crypto.randomUUID()
 
+    // PR-MULTI-BRAND P3+c-2: target_company / ride_department_id 컬럼 추가
+    //   (migrations/2026-05-26_invitations_multi_company.sql)
     await prisma.$executeRaw`
       INSERT INTO member_invitations
-      (id, email, company_id, position_id, department_id, role, invited_by, expires_at, page_permissions, token, status, created_at)
+      (id, email, company_id, position_id, department_id, role, invited_by, expires_at, page_permissions, token, status, target_company, ride_department_id, created_at)
       VALUES (
         ${invitationId}, ${email}, ${company_id},
         ${position_id || null}, ${department_id || null},
         ${role}, ${admin.id}, ${expiresAt},
         ${JSON.stringify(page_permissions || [])},
-        ${invitationToken}, 'pending', NOW()
+        ${invitationToken}, 'pending',
+        ${targetCompany}, ${rideDepartmentId || null},
+        NOW()
       )
     `
 

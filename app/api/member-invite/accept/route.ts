@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { getCompanyIdByKey } from '@/lib/company-context'
 
 const bcrypt = require('bcryptjs')
 const crypto = require('crypto')
@@ -21,9 +22,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '필수 정보가 누락되었습니다.' }, { status: 400 })
     }
 
-    // 1. 초대 정보 조회
+    // 1. 초대 정보 조회 — PR-MULTI-BRAND P3+c-2: target_company / ride_department_id 포함
     const invites = await prisma.$queryRaw<any[]>`
-      SELECT id, email, company_id, role, position_id, department_id, status, expires_at, page_permissions
+      SELECT id, email, company_id, role, position_id, department_id, status, expires_at, page_permissions,
+             target_company, ride_department_id
       FROM member_invitations WHERE token = ${token} LIMIT 1
     `
 
@@ -75,6 +77,23 @@ export async function POST(request: NextRequest) {
         (id, email, role, position_id, department_id, name, employee_name, phone, password_hash, is_active, is_approved, created_at)
         VALUES (${userId}, ${invite.email}, ${invite.role || 'user'}, ${invite.position_id || null}, ${invite.department_id || null}, ${name}, ${name}, ${phone || null}, ${passwordHash}, 1, 1, NOW())
       `
+    }
+
+    // PR-MULTI-BRAND P3+c-2 — 회사 컨텍스트 적용
+    //   target_company === 'RIDE' 면 profile.company_id 를 RIDE 로 갱신.
+    //   FMI(또는 NULL legacy)이면 P1 backfill 이 이미 FMI 로 세팅해 둔 상태 유지.
+    //   ride_employees 매핑(department_id 적용) 은 HR 세션이 별도 write API 통해 처리 예정.
+    try {
+      if (invite.target_company === 'RIDE') {
+        const rideCompanyId = await getCompanyIdByKey('RIDE')
+        if (rideCompanyId) {
+          await prisma.$executeRaw`
+            UPDATE profiles SET company_id = ${rideCompanyId} WHERE id = ${userId}
+          `
+        }
+      }
+    } catch (e) {
+      console.error('[member-invite/accept] 회사 컨텍스트 적용 실패 (무시):', e)
     }
 
   // 4. 페이지 권한 자동 생성 (초대 시 설정된 권한이 있는 경우)
