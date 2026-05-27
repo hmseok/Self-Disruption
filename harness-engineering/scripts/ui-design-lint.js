@@ -208,6 +208,31 @@ for (const fp of pageFiles) {
       issue: '자체 진행률 state — Rule 16: useAIProgress() / AIProgressFloater 사용 권장 (플로팅 진행률 통일)',
     })
   }
+
+  // 13) 2026-05-26: 페이지 아나토미 불완전 (UI-DESIGN-STANDARD § 0-A)
+  //   리스트/대시보드 페이지는 DcStatStrip + DcToolbar + NeuDataTable 의무.
+  //   부분만 있으면 아나토미가 불완전 → 정보성 경고.
+  if (checks.hasDcStatStrip && !checks.hasDcToolbar) {
+    warnings.push({
+      file: rel,
+      issue: '아나토미 불완전: DcStatStrip ✓ / DcToolbar ✗ — 5층 표준 (§ 0-A) 누락. 검색·필터 영역 누락',
+    })
+  }
+  if (checks.hasDcToolbar && !checks.hasNeuDataTable) {
+    warnings.push({
+      file: rel,
+      issue: '아나토미 불완전: DcToolbar ✓ / NeuDataTable ✗ — 5층 표준 (§ 0-A) 누락. 자체 <table> 추정',
+    })
+  }
+  // 14) 2026-05-26: 자체 <table> 사용 (NeuDataTable 미사용)
+  //   <table> 태그 직접 사용 + NeuDataTable 미 import → 자체 테이블.
+  //   data 표시면 NeuDataTable 사용 의무 (§ 0-A [5]).
+  if (/<table[\s>]/i.test(content) && !checks.hasNeuDataTable) {
+    warnings.push({
+      file: rel,
+      issue: '자체 <table> 추정 — 공용 NeuDataTable 사용 권장 (§ 0-A [5] — 정렬 + 모바일 카드 자동)',
+    })
+  }
 }
 
 console.log('═══ 결과 ═══')
