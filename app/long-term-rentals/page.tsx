@@ -351,7 +351,8 @@ export default function LongTermRentalsPage() {
 
   return (
     <div className="page-bg">
-      <div className="max-w-[1800px] mx-auto py-4 px-4 md:py-5 md:px-6">
+      {/* PR-DESIGN-9 § 1.6: 페이지 전체 너비 — max-w 제거, 좌우 패딩만 */}
+      <div className="py-4 px-4 md:py-5 md:px-6">
         {toast && (
           <div role="status" style={{
             position: 'fixed', top: 72, left: '50%', transform: 'translateX(-50%)', zIndex: 60,
