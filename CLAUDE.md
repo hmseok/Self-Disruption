@@ -921,6 +921,21 @@ npm run cowork:commit -- '커밋 메시지' -- <pathspec...>
 
 **한계**: 모든 세션이 본 래퍼 사용해야 효력. raw `git commit` 쓰는 세션은 락 무시 — CLAUDE.md § 21 규칙으로 모든 세션 채택 권장.
 
+**🔖 Cowork-Session trailer + push 차단 (2026-05-27 PR-COORD-12)**:
+
+shared lineage 에 다른 세션 unpushed commit 이 있으면 push 시 piggy-back 되어
+중복/충돌 발생. cowork-commit.sh 가:
+1. 세션 ID 자동 추출 (`/sessions/<id>/...` 경로) → commit message 끝에 trailer:
+   ```
+   Cowork-Session: sweet-amazing-galileo
+   ```
+2. push 직전 `git log origin/main..HEAD` 스캔 → 다른 세션 tagged commit 발견 시 차단.
+3. legacy untagged commit 은 통과 (점진 migration).
+
+차단 시 조치:
+- 해당 세션 push 완료 대기 → `git pull --rebase origin main` → 재시도.
+- 의도적 piggy-back: `COWORK_ALLOW_PIGGYBACK=1 npm run cowork:commit -- ...`
+
 **자동화 안전장치 (도입 완료 — 2026-05-06)**:
 ```
 ✅ 11. cowork-staging-lint (harness-engineering/scripts/cowork-staging-lint.js)
