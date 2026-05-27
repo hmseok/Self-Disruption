@@ -4,10 +4,14 @@ import { useEffect, useState, useCallback, useMemo } from 'react'
 import DcStatStrip, { StatItem, ActionButton } from '@/app/components/DcStatStrip'
 import DcToolbar, { FilterItem } from '@/app/components/DcToolbar'
 import NeuDataTable, { TableColumn, MobileCardConfig } from '@/app/components/NeuDataTable'
+import NeuFilterTabs, { FilterTab } from '@/app/components/NeuFilterTabs'
 import { GLASS, COLORS } from '@/app/utils/ui-tokens'
 import QuotesTab from './_components/QuotesTab'
+import NewCarCatalogTab from './_components/NewCarCatalogTab'
 
-type TopTab = 'quotes' | 'rentals'
+// PR-Q3-1 (2026-05-26) — 탭 3개로 확장 (카탈로그가 첫 탭, 작성중 앞)
+// PR-DESIGN-9 적용 — NeuFilterTabs 의무 사용 (자체 button strip 폐기)
+type TopTab = 'catalog' | 'quotes' | 'rentals'
 
 // ═══════════════════════════════════════════════════════════════════
 // /long-term-rentals — 장기렌트 관리 (PR-L1)
@@ -87,7 +91,7 @@ const emptyForm = {
 }
 
 export default function LongTermRentalsPage() {
-  const [topTab, setTopTab] = useState<TopTab>('quotes')
+  const [topTab, setTopTab] = useState<TopTab>('catalog')
   const [filter, setFilter] = useState<FilterKey>('contracted')
   const [search, setSearch] = useState('')
   const [rows, setRows] = useState<Row[] | null>(null)
@@ -364,29 +368,18 @@ export default function LongTermRentalsPage() {
           </div>
         )}
 
-        {/* 상단 탭 — 견적 / 계약·운영 (PR-Q1) */}
-        <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
-          {([
-            { k: 'quotes', label: '📝 견적', hint: '작성 / 발송 / 채택률' },
-            { k: 'rentals', label: '🔑 계약 · 운영', hint: '체결 / 출고 / 운영중 / 종결' },
-          ] as { k: TopTab; label: string; hint: string }[]).map((t) => {
-            const active = topTab === t.k
-            return (
-              <button key={t.k} onClick={() => setTopTab(t.k)}
-                style={{
-                  padding: '10px 18px', borderRadius: 10, cursor: 'pointer', fontSize: 13, fontWeight: active ? 800 : 600,
-                  border: active ? `1px solid ${COLORS.borderBlue}` : '1px solid rgba(0,0,0,0.08)',
-                  background: active ? COLORS.bgBlue : GLASS.L2.background,
-                  color: active ? COLORS.primary : '#475569',
-                  display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2,
-                }}>
-                <span style={{ whiteSpace: 'nowrap' }}>{t.label}</span>
-                <span style={{ fontSize: 10, fontWeight: 500, color: active ? COLORS.primary : '#94a3b8' }}>{t.hint}</span>
-              </button>
-            )
-          })}
-        </div>
+        {/* 상단 탭 — 카탈로그 / 견적 / 계약·운영 (PR-Q3-1 + PR-DESIGN-9 NeuFilterTabs) */}
+        <NeuFilterTabs
+          tabs={[
+            { key: 'catalog', label: '🚗 신차 카탈로그' },
+            { key: 'quotes', label: '📝 견적' },
+            { key: 'rentals', label: '🔑 계약 · 운영' },
+          ] as FilterTab[]}
+          activeKey={topTab}
+          onSelect={(k) => setTopTab(k as TopTab)}
+        />
 
+        {topTab === 'catalog' && <NewCarCatalogTab />}
         {topTab === 'quotes' && <QuotesTab />}
 
         {topTab === 'rentals' && (<>
