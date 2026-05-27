@@ -5,6 +5,17 @@
 
 ## 2026-05-26
 
+- **PR-HR-7+9** (hr 세션) — getSoSokType 회사 기반 + SOSOK_LABEL 「RIDE 직원」 (구 「외부 매니저」).
+  - `/api/profiles/route.ts` — LEFT JOIN companies + `company_key` 응답 평탄화 (메인 PR-MULTI-BRAND P3+b 의존).
+    graceful fallback (Rule 23): JOIN 자체 실패 시 `SELECT *` 폴백 — page.tsx 가 FMI 디폴트 처리.
+  - `app/hr/page.tsx` — `getSoSokType` dept.name 문자열 매칭 (`'라이드주식회사' / /라이드/`) 폐기 → `emp.company_key === 'RIDE'` 회사 기반 분기. SOSOK_LABEL `'외부 매니저'` → `'RIDE 직원'`. 탭 「👥 RIDE 직원」 + 주석 일괄 정리.
+  - `app/hr/_components/PayrollOps.tsx` — `isExternal` 회사 기반 + graceful fallback (dept 매칭 유지).
+  - 사용자 GO (AskUserQuestion): `'외부 매니저'` → `'RIDE 직원'` 전수 교체 + `/api/employees`(실 `/api/profiles`) 수정은 hr 세션 처리.
+- **PR-HR-8** (hr 세션) — `POST /api/ride-employees/upsert-from-invite` 신설.
+  - 메인 세션 PR-MULTI-BRAND P3+c-3 (member-invite/accept) 호출 대기용.
+  - target_company === 'RIDE' 인 초대 수락 시 profile 생성 직후 본 API → ride_employees UPSERT.
+  - 기존 row UPDATE (COALESCE 기존값 보존) / 없으면 INSERT (name 필수).
+  - 응답: `{ data: { ...row, upserted: 'update' | 'insert' } }` — JOIN ride_departments 로 부서명 포함.
 - **PR-HR-6** (hr 세션) — `profile ↔ ride_employees` 매핑 헬퍼 API.
   - `GET /api/ride-employees/by-profile/[profileId]` — 1:1 조회 (회사 판별: 있으면 RIDE)
   - `GET /api/ride-employees/lookup?email=&name=` — 이메일/이름 매칭 후보 list (최대 20)

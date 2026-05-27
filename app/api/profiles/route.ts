@@ -32,13 +32,20 @@ export async function GET(request: NextRequest) {
     const whereSql = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
 
     // JOIN 쿼리 시도 (타임아웃 포함)
+    //   PR-HR-7 (2026-05-26) — LEFT JOIN companies 추가, company_key 노출.
+    //     메인 PR-MULTI-BRAND P3+b 의존 — getSoSokType 가 dept.name 문자열 매칭
+    //     ('라이드' / '라이드주식회사') 대신 company_key === 'RIDE' 로 분기.
+    //     graceful fallback (Rule 23): companies 컬럼 미적용 시 JOIN 자체 실패 →
+    //     아래 SELECT * 폴백 (company_key 없음, page.tsx 가 FMI 디폴트 처리).
     let data = await withTimeout(prisma.$queryRawUnsafe<any[]>(`
       SELECT p.*,
              pos.id   AS _pos_id,   pos.name   AS _pos_name,   pos.level AS _pos_level,
-             dept.id  AS _dept_id,  dept.name  AS _dept_name
+             dept.id  AS _dept_id,  dept.name  AS _dept_name,
+             c.id     AS _company_id, c.company_key AS _company_key, c.name AS _company_name
       FROM profiles p
       LEFT JOIN positions   pos  ON p.position_id   = pos.id
       LEFT JOIN departments dept ON p.department_id = dept.id
+      LEFT JOIN companies   c    ON c.id            = p.company_id
       ${whereSql}
       ORDER BY COALESCE(p.employee_name, p.name, p.email)
     `))
@@ -63,14 +70,18 @@ export async function GET(request: NextRequest) {
       const displayName = rawName || (p.email ? String(p.email).split('@')[0] : '(이름 미설정)')
       const position = p._pos_id ? { id: p._pos_id, name: p._pos_name, level: p._pos_level } : null
       const department = p._dept_id ? { id: p._dept_id, name: p._dept_name } : null
+      // PR-HR-7 — companies 객체 + company_key 평탄화 (page.tsx getSoSokType 편의)
+      const company = p._company_id ? { id: p._company_id, key: p._company_key, name: p._company_name } : null
       // 언더스코어 임시 필드 제거
-      const { _pos_id, _pos_name, _pos_level, _dept_id, _dept_name, ...rest } = p
+      const { _pos_id, _pos_name, _pos_level, _dept_id, _dept_name, _company_id, _company_key, _company_name, ...rest } = p
       return {
         ...rest,
         employee_name: rawName,
         display_name: displayName,
         position,
         department,
+        company,
+        company_key: p._company_key || null,  // PR-HR-7 평탄화 — getSoSokType 직접 분기
       }
     })
     return NextResponse.json({ data: serialize(mapped), error: null })

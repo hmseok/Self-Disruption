@@ -932,10 +932,14 @@ export default function PayrollOps() {
                 // employee_id → profile 매핑 — 재직 + FMI 직원 필터
                 const empMap: Record<string, any> = {}
                 for (const e of emps) empMap[e.id] = e
-                // 외부 매니저 판별 (라이드주식회사 부서)
+                // RIDE 직원 판별 (company_key === 'RIDE')
+                // PR-HR-7 (2026-05-26) — 회사 기반 분기 (dept.name 문자열 매칭 폐기).
+                //   메인 PR-MULTI-BRAND P3+b 의존: companies.company_key.
+                //   fallback (마이그 미적용): dept 문자열 매칭 유지.
                 const isExternal = (p: any) => {
+                  if (p?.company_key === 'RIDE') return true
                   const dept = p?.department?.name || p?.department || ''
-                  return /라이드/.test(String(dept))
+                  return /라이드/.test(String(dept))  // graceful fallback
                 }
                 const isResigned = (p: any) => {
                   const s = p?.emp_status

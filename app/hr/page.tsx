@@ -553,23 +553,25 @@ export default function HRMasterPage() {
   }
 
   // ===== 「소속 유형」 헬퍼 =====
-  // FMI = 본 회사 정직원 (급여 모달 노출)
-  // 외부 매니저 = 라이드주식회사 부서 (본 ERP 권한만, 급여 본 시스템 X)
+  // FMI = 본 회사 정직원 (급여 모달 노출) — company_key === 'FMI'
+  // RIDE 직원 = 라이드 주식회사 (본 ERP 권한만, 급여 본 시스템 X) — company_key === 'RIDE'
   // 시스템 관리자 = role='admin' (GOD ADMIN — 급여 무관)
+  // PR-HR-7 (2026-05-26) — 회사 기반 분기 (dept.name 문자열 매칭 폐기).
+  //   메인 PR-MULTI-BRAND P3+b 의존: profiles.company_id + companies.company_key.
+  //   fallback (Rule 23): company_key 없으면 (마이그 미적용) FMI 디폴트.
   type SoSokType = 'fmi' | 'external' | 'admin'
   const getSoSokType = (emp: any): SoSokType => {
     if (emp.role === 'admin') return 'admin'
-    const dept = emp.department?.name || ''
-    if (dept === '라이드주식회사' || /라이드/.test(dept)) return 'external'
+    if (emp.company_key === 'RIDE') return 'external'
     return 'fmi'
   }
-  const SOSOK_LABEL: Record<SoSokType, string> = { fmi: 'FMI 직원', external: '외부 매니저', admin: '시스템 관리자' }
+  const SOSOK_LABEL: Record<SoSokType, string> = { fmi: 'FMI 직원', external: 'RIDE 직원', admin: '시스템 관리자' }
   const SOSOK_STYLE: Record<SoSokType, { bg: string; color: string }> = {
     fmi:      { bg: 'rgba(34,197,94,0.12)', color: '#16a34a' },
     external: { bg: 'rgba(168,85,247,0.12)', color: '#9333ea' },
     admin:    { bg: 'rgba(14,165,233,0.12)', color: '#0284c7' },
   }
-  // 외부 매니저 + admin 은 급여 모달 § 급여 설정 노출 안 함
+  // RIDE 직원 + admin 은 급여 모달 § 급여 설정 노출 안 함
   const showSalaryTab = (emp: any) => getSoSokType(emp) === 'fmi' && (emp.role === 'user' || emp.role === 'master')
 
   // ===== 검색 + 필터 로직 =====
@@ -635,7 +637,7 @@ export default function HRMasterPage() {
   const SOSOK_FILTER_ITEMS: FilterItem[] = [
     { key: 'all',      label: '전체 소속',     count: employees.length },
     { key: 'fmi',      label: '🏢 FMI 직원',   count: fmiCount },
-    { key: 'external', label: '👥 외부 매니저', count: externalCount },
+    { key: 'external', label: '👥 RIDE 직원', count: externalCount },
     { key: 'admin',    label: '🔧 시스템 관리자', count: adminSosokCount },
   ]
 
@@ -1198,7 +1200,7 @@ export default function HRMasterPage() {
       {/* ─── 탭 1: 직원 관리 ─── */}
       {topTab === 'employees' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {/* 소속 유형 필터 — FMI / 외부 매니저 / 시스템 관리자 구분 */}
+          {/* 소속 유형 필터 — FMI / RIDE 직원 / 시스템 관리자 구분 */}
           <DcToolbar
             search=""
             onSearchChange={() => {}}
@@ -2033,7 +2035,7 @@ export default function HRMasterPage() {
             </div>
 
             {/* 섹션 탭 — 기본정보 / 급여설정 (FMI 직원만) / 페이지권한 (user 만) */}
-            {/* 외부 매니저 (라이드주식회사) + admin (GOD) 은 § 급여 미노출 — 본 ERP 급여 받지 않음 */}
+            {/* RIDE 직원 (company_key=RIDE) + admin (GOD) 은 § 급여 미노출 — 본 ERP 급여 받지 않음 */}
             <div style={{ display: 'flex', borderBottom: '1px solid rgba(0,0,0,0.06)', background: 'rgba(255,255,255,0.30)', flexShrink: 0 }}>
               {([
                 { key: 'profile', label: '👤 기본정보' },
