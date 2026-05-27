@@ -57,6 +57,14 @@ cd "$(git rev-parse --show-toplevel)"
 LOCK_FILE=".git/cowork-pipeline.lock"
 LOCK_TIMEOUT=600  # 10분
 
+# PR-COORD-12 (2026-05-27 사용자 요청):
+#   「내 commit 파일이 아니면 push 에서 제외」.
+#   각 cowork 세션이 자기 commit 에 Cowork-Session: trailer 자동 추가.
+#   push 전 lineage 스캔 — 다른 세션 tagged commit 있으면 차단.
+#   (untagged commit 은 legacy/ambiguous — 통과)
+SESSION_ID="$(echo "$PWD" | sed -nE 's|^/sessions/([^/]+)(/.*)?$|\1|p')"
+SESSION_ID="${SESSION_ID:-${COWORK_SESSION_ID:-unknown}}"
+
 # PR-COORD-11 hotfix (operations 세션 보고 2026-05-26):
 #   /tmp/ 는 cowork 세션간 공유라 다른 세션 UID 소유 파일 충돌 → Permission denied.
 #   mktemp 으로 세션별 unique 경로 확보, trap 으로 종료 시 정리.
@@ -128,19 +136,63 @@ fi
 #   COWORK_LINT_STAGED_ONLY=1 로 broad-scope lint skip (commit-critical 만 유지).
 export COWORK_LINT_STAGED_ONLY=1
 echo ""
-echo "═══ 3. commit (pathspec 한정) ═══"
-if ! git commit -m "$MSG" -- "${PATHSPEC[@]}" 2> "$COMMIT_ERR"; then
+echo "═══ 3. commit (pathspec 한정 + Cowork-Session trailer) ═══"
+# PR-COORD-12: 메시지 끝에 Cowork-Session trailer 자동 추가 → push 시점 식별 가능.
+COMMIT_MSG="$MSG
+
+Cowork-Session: $SESSION_ID"
+if ! git commit -m "$COMMIT_MSG" -- "${PATHSPEC[@]}" 2> "$COMMIT_ERR"; then
   ERR=$(cat "$COMMIT_ERR")
   echo "❌ commit 실패:"
   echo "$ERR"
   exit 1
 fi
 COMMIT_SHA=$(git rev-parse HEAD)
-echo "✅ commit ${COMMIT_SHA:0:8}"
+echo "✅ commit ${COMMIT_SHA:0:8} (Cowork-Session: $SESSION_ID)"
 
-# ── 4. push (pull --rebase 자동, 최대 3회 retry) ────────────────
+# ── 4. push 전 — 다른 세션 commit 검출 (PR-COORD-12) ────────────
 echo ""
-echo "═══ 4. push ═══"
+echo "═══ 4. lineage 검사 — 다른 세션 commit 차단 ═══"
+git fetch origin main --quiet 2>/dev/null || true
+UNPUSHED=$(git log origin/main..HEAD --format='%H' 2>/dev/null)
+OTHER_LIST=""
+MINE_COUNT=0
+UNTAGGED_COUNT=0
+for sha in $UNPUSHED; do
+  TAG=$(git show -s --format='%B' "$sha" | grep -E '^Cowork-Session: ' | tail -1 | sed 's/^Cowork-Session: //' | tr -d '[:space:]')
+  if [ -z "$TAG" ]; then
+    UNTAGGED_COUNT=$((UNTAGGED_COUNT + 1))
+  elif [ "$TAG" = "$SESSION_ID" ]; then
+    MINE_COUNT=$((MINE_COUNT + 1))
+  else
+    SUBJECT=$(git show -s --format='%s' "$sha")
+    OTHER_LIST="${OTHER_LIST}$(printf '\n  · %s [%s] %s' "${sha:0:8}" "$TAG" "$SUBJECT")"
+  fi
+done
+echo "  unpushed: 본 세션 $MINE_COUNT / untagged(legacy) $UNTAGGED_COUNT / 다른 세션 $(echo "$OTHER_LIST" | grep -c '·' || echo 0)"
+
+if [ -n "$OTHER_LIST" ]; then
+  if [ "${COWORK_ALLOW_PIGGYBACK:-}" = "1" ]; then
+    echo "⚠ 다른 세션 commit 함께 push 허용 (COWORK_ALLOW_PIGGYBACK=1):"
+    echo "$OTHER_LIST"
+  else
+    echo ""
+    echo "❌ 다른 세션 commit 이 lineage 에 있음 — push 차단:$OTHER_LIST"
+    echo ""
+    echo "조치 (권장):"
+    echo "  1) 해당 세션이 자기 push 끝낸 후"
+    echo "  2) git pull --rebase origin main"
+    echo "  3) npm run cowork:commit -- ... (재시도)"
+    echo ""
+    echo "또는 의도적 piggy-back (드물게):"
+    echo "  COWORK_ALLOW_PIGGYBACK=1 npm run cowork:commit -- ..."
+    exit 1
+  fi
+fi
+
+# ── 5. push (pull --rebase 자동, 최대 3회 retry) ────────────────
+echo ""
+echo "═══ 5. push ═══"
 for attempt in 1 2 3; do
   if git push origin main 2> "$PUSH_ERR"; then
     echo "✅ push 성공"
