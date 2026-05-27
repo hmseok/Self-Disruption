@@ -51,14 +51,27 @@ function topWrapperCentered(content) {
   const re = /return\s*\(/g
   let mm
   while ((mm = re.exec(content)) !== null) {
-    const after = content.slice(mm.index, mm.index + 600)
-    const dm = after.match(/<div\b[^>]*style=\{\{([^}]*)\}\}/)
-    if (!dm) continue
-    const styleBody = dm[1]
-    const wm = styleBody.match(/\bmaxWidth:\s*['"]?(\d{2,4})\b/)
-    if (wm && parseInt(wm[1], 10) >= 600
-      && /\bmargin:\s*['"`][^'"`]*\bauto\b/.test(styleBody)) {
-      return true
+    // 2026-05-27: 윈도우 확대 (600 → 1200) — 외부 wrapper (page-bg 등) 다음의 centered wrapper 도 캐치
+    const after = content.slice(mm.index, mm.index + 1200)
+    // (1) 인라인 style — <div style={{ maxWidth: 1800, margin: 'auto' }}> — 모든 div 검사
+    const styleMatches = after.matchAll(/<div\b[^>]*style=\{\{([^}]*)\}\}/g)
+    for (const dm of styleMatches) {
+      const styleBody = dm[1]
+      const wm = styleBody.match(/\bmaxWidth:\s*['"]?(\d{2,4})\b/)
+      if (wm && parseInt(wm[1], 10) >= 600
+        && /\bmargin:\s*['"`][^'"`]*\bauto\b/.test(styleBody)) {
+        return true
+      }
+    }
+    // (2) Tailwind class — className="max-w-[1800px] mx-auto" — 모든 div 검사
+    const classMatches = after.matchAll(/<div\b[^>]*className=["'`]([^"'`]+)["'`]/g)
+    for (const cm of classMatches) {
+      const cls = cm[1]
+      // 2026-05-27: `\b` 가 `]` 뒤 word boundary 안 만들어 max-w-[1800px] 매칭 fail.
+      //   bracket 패턴은 \b 빼고, 명명 패턴(7xl 등)만 \b 유지.
+      const hasMaxW = /max-w-\[\d{3,4}(?:px|rem|em)?\]|\bmax-w-(?:screen-)?(?:xl|2xl|3xl|4xl|5xl|6xl|7xl)\b/.test(cls)
+      const hasMxAuto = /\bmx-auto\b/.test(cls)
+      if (hasMaxW && hasMxAuto) return true
     }
   }
   return false
