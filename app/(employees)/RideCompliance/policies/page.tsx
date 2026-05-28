@@ -17,6 +17,7 @@
  */
 
 import { useEffect, useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { getStoredToken } from '@/lib/auth-client'
 import NeuDataTable, { type TableColumn } from '@/app/components/NeuDataTable'
 import DcStatStrip, { type StatItem } from '@/app/components/DcStatStrip'
@@ -124,12 +125,12 @@ function confidenceBadge(c: number | null): React.ReactNode {
 // MAIN PAGE
 // ═══════════════════════════════════════════════════════════════
 export default function PoliciesPage() {
+  const router = useRouter()
   const [rows, setRows] = useState<Policy[]>([])
   const [loading, setLoading] = useState(false)
   const [migrationPending, setMigrationPending] = useState<string | null>(null)
   const [q, setQ] = useState('')
   const [createOpen, setCreateOpen] = useState(false)
-  const [reviewing, setReviewing] = useState<Policy | null>(null)
   const [resultPanel, setResultPanel] = useState<{ kind: 'ok' | 'err'; msg: string } | null>(null)
   // P16 — 체크박스 선택 + 일괄 삭제
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -220,13 +221,25 @@ export default function PoliciesPage() {
     {
       key: 'select', label: '', width: 40,
       render: (r) => (
-        <input
-          type="checkbox"
-          checked={selectedIds.has(r.id)}
-          onChange={(e) => toggleSelect(r.id, e.target.checked)}
-          style={{ cursor: 'pointer', width: 16, height: 16 }}
-          onClick={(e) => e.stopPropagation()}
-        />
+        <div style={{
+          width: 24, height: 24,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          margin: 0, padding: 0,
+        }}>
+          <input
+            type="checkbox"
+            checked={selectedIds.has(r.id)}
+            onChange={(e) => toggleSelect(r.id, e.target.checked)}
+            style={{
+              cursor: 'pointer',
+              width: 16, height: 16,
+              margin: 0, padding: 0,
+              boxSizing: 'border-box',
+              verticalAlign: 'middle',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
       ),
     },
     {
@@ -278,7 +291,7 @@ export default function PoliciesPage() {
       render: (r) => (
         <button
           style={{ ...btnPrimary, padding: '2px 8px', fontSize: 11 }}
-          onClick={() => setReviewing(r)}
+          onClick={() => router.push(`/RideCompliance/policies/${r.id}/review`)}
         >📋 검수</button>
       ),
     },
@@ -374,14 +387,7 @@ export default function PoliciesPage() {
         />
       )}
 
-      {reviewing && (
-        <ReviewModal
-          policy={reviewing}
-          onClose={() => setReviewing(null)}
-          onChanged={(msg) => { setResultPanel({ kind: 'ok', msg }); fetchList() }}
-          onError={(msg) => setResultPanel({ kind: 'err', msg })}
-        />
-      )}
+      {/* P17-A — ReviewModal 제거, /policies/[id]/review 페이지로 분리 */}
     </div>
   )
 }
