@@ -14,19 +14,25 @@
  *   - 50MB 크기 제한
  */
 
-// Phase 2.3 hotfix3 (2026-05-28): 실제 함수명은 parseOffice (Async 없음).
-// node_modules/officeparser/dist 확인:
-//   ESM: export { OfficeParser, parseOffice, terminateOcr, ... }
-//   CJS: exports.parseOffice = parseOffice
-//   default = OfficeParser class (→ "Class constructors cannot be invoked" 에러 원인)
-type ParseOfficeFn = (buffer: Buffer | string, config?: Record<string, unknown>) => Promise<string>
+// Phase 2.3 hotfix7 (2026-05-28): officeparser 7.x API 근본 변경 발견.
+// types.d.ts 확인:
+//   parseOffice 는 file path 받음 (Buffer 아님)
+//   결과는 OfficeParserAST 객체 — .toText() 로 plain text 추출
+//   const ast = await OfficeParser.parseOffice('document.docx', {...})
+//   console.log(ast.toText())  // Plain text
+//
+// 흐름 변경:
+//   buffer → /tmp 임시 파일 저장 → parseOffice(path) → ast.toText() → /tmp 삭제
+interface OfficeAst {
+  toText: () => string
+}
+type ParseOfficeFn = (input: string | Buffer, config?: Record<string, unknown>) => Promise<OfficeAst | string>
 let _parseFn: ParseOfficeFn | null = null
 
 async function getParseOffice(): Promise<ParseOfficeFn> {
   if (_parseFn) return _parseFn
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mod: any = await import('officeparser')
-  // named export parseOffice 만 사용 (default 는 class — 호출 시 에러)
   const fn: unknown = mod.parseOffice || mod.default?.parseOffice
   if (typeof fn !== 'function') {
     const keys = Object.keys(mod || {}).join(',')
@@ -176,31 +182,54 @@ export async function extractTextFromBuffer(
     throw new Error(`officeparser 모듈 로드 실패: ${lm}`)
   }
 
-  // Phase 2.3 hotfix5 (2026-05-28): officeparser 가 buffer 의 magic bytes 자동 감지 못함.
-  // 에러: "Auto-detection of file type from buffer failed.
-  //        Please provide the 'fileType' hint in your configuration"
-  // 해결: fileType 명시 (이미 ext 알고 있음).
-  // (hotfix4 의 tempFilesLocation /tmp + outputErrorToConsole 도 유지)
-  const extracted = await Promise.race([
-    parseOffice(buffer, {
-      fileType: ext,  // 'pptx' | 'pdf' | 'docx' | 'xlsx' | 'txt' — extractExt 결과
-      newlineDelimiter: '\n',
-      ignoreNotes: false,
-      putNotesAtLast: true,
-      outputErrorToConsole: true,
-      tempFilesLocation: '/tmp',
-    }).catch((err: unknown) => {
-      // 에러 메시지 전체 보존 (substring X)
-      const em = err instanceof Error
-        ? `${err.message}${err.stack ? ' | stack: ' + err.stack.split('\n').slice(0, 3).join(' / ') : ''}`
-        : String(err)
-      console.error(`[policy-file-extractor] officeparser .${ext} 실패:`, err)
-      throw new Error(`officeparser 추출 실패 (.${ext}): ${em}`)
-    }),
-    new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error(`텍스트 추출 timeout (${TIMEOUT_MS / 1000}초)`)), TIMEOUT_MS)
-    ),
-  ])
+  // Phase 2.3 hotfix7 (2026-05-28): buffer → /tmp 임시 파일 → file path 전달 → AST.toText().
+  // officeparser 7.x API: parseOffice(path, config) → OfficeParserAST.
+  const { writeFile, unlink } = await import('fs/promises')
+  const { join } = await import('path')
+  const { randomUUID } = await import('crypto')
+
+  const tmpFileName = `${randomUUID()}.${ext}`
+  const tmpPath = join('/tmp', tmpFileName)
+
+  let extractedText: string
+  try {
+    await writeFile(tmpPath, buffer)
+    console.log(`[policy-file-extractor] 임시 파일 저장: ${tmpPath} (${buffer.length} bytes)`)
+
+    const result = await Promise.race([
+      parseOffice(tmpPath, {
+        extractAttachments: false,
+        includeRawContent: false,
+        ocr: false,
+      }).catch((err: unknown) => {
+        const em = err instanceof Error
+          ? `${err.message}${err.stack ? ' | stack: ' + err.stack.split('\n').slice(0, 3).join(' / ') : ''}`
+          : String(err)
+        console.error(`[policy-file-extractor] officeparser .${ext} 실패:`, err)
+        throw new Error(`officeparser 추출 실패 (.${ext}): ${em}`)
+      }),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error(`텍스트 추출 timeout (${TIMEOUT_MS / 1000}초)`)), TIMEOUT_MS)
+      ),
+    ])
+
+    // AST 객체 또는 string — 둘 다 처리
+    if (typeof result === 'string') {
+      extractedText = result
+    } else if (result && typeof (result as OfficeAst).toText === 'function') {
+      extractedText = (result as OfficeAst).toText()
+    } else {
+      // 모르는 형태 — JSON 직렬화 fallback
+      extractedText = JSON.stringify(result).substring(0, 1_000_000)
+      warnings.push(`AST 객체 toText() 메서드 없음 — JSON 직렬화 fallback (${extractedText.length} chars)`)
+    }
+    console.log(`[policy-file-extractor] 추출 완료: ${extractedText.length} chars`)
+  } finally {
+    // 임시 파일 삭제 (실패해도 무시)
+    await unlink(tmpPath).catch(() => { /* graceful */ })
+  }
+
+  const extracted = extractedText
 
   if (!extracted || extracted.trim().length < 50) {
     warnings.push('추출된 텍스트가 매우 짧음 — 파일이 이미지/스캔본일 가능성')
