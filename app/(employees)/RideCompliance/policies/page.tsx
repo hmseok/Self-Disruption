@@ -305,112 +305,142 @@ export default function PoliciesPage() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// Create Modal — 메타 + 본문 텍스트 입력 + AI 추출 트리거
+// Create Modal — Phase 2.3 (2026-05-28)
+// 사용자 통찰: 「파일 등록만 하면 자동 입력되어야 함 — 입력 너무 많다」
+// → 드롭존 + 코드(옵션) 만. 제목/버전/시행일/섹션 모두 AI 자동.
 // ═══════════════════════════════════════════════════════════════
 function CreateModal(props: {
   onClose: () => void
   onCreated: (msg: string) => void
   onError: (msg: string) => void
 }) {
+  const [file, setFile] = useState<File | null>(null)
   const [code, setCode] = useState('')
-  const [title, setTitle] = useState('')
-  const [version, setVersion] = useState('v1.0')
-  const [effectiveDate, setEffectiveDate] = useState('')
-  const [sourceFileName, setSourceFileName] = useState('')
-  const [sourceFileType, setSourceFileType] = useState('pptx')
-  const [contentText, setContentText] = useState('')
   const [busy, setBusy] = useState(false)
-  const [phase, setPhase] = useState<'form' | 'creating' | 'extracting'>('form')
+  const [phase, setPhase] = useState<'form' | 'uploading' | 'extracting' | 'analyzing'>('form')
+  const [dragOver, setDragOver] = useState(false)
+
+  const onFileChange = (f: File | null) => {
+    if (!f) { setFile(null); return }
+    const ext = f.name.toLowerCase().match(/\.([a-z0-9]+)$/)?.[1]
+    if (!ext || !['pptx', 'pdf', 'docx', 'xlsx', 'txt'].includes(ext)) {
+      props.onError(`지원 안 되는 형식: .${ext || '?'} — PPTX/PDF/DOCX/XLSX/TXT 만 가능`)
+      return
+    }
+    if (f.size > 50 * 1024 * 1024) {
+      props.onError(`파일 크기 초과 (${(f.size / 1024 / 1024).toFixed(1)}MB > 50MB)`)
+      return
+    }
+    setFile(f)
+  }
 
   const submit = async () => {
-    if (!code.trim() || !title.trim()) {
-      props.onError('policy_code, title 필수')
-      return
-    }
-    if (contentText.length < 100) {
-      props.onError('본문 텍스트가 너무 짧습니다 (100자 이상)')
-      return
-    }
-    setBusy(true)
-    setPhase('creating')
+    if (!file) { props.onError('파일을 먼저 선택하세요'); return }
+    setBusy(true); setPhase('uploading')
     try {
       const token = getStoredToken()
-      // 1. policy 메타 INSERT
-      const createRes = await fetch('/api/ride-compliance/policies', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-        body: JSON.stringify({
-          policy_code: code.trim(),
-          title: title.trim(),
-          version: version.trim() || 'v1.0',
-          effective_date: effectiveDate || null,
-          source_file_name: sourceFileName.trim() || null,
-          source_file_type: sourceFileType || null,
-        }),
-      })
-      const createJson = await createRes.json()
-      if (!createRes.ok || !createJson.success) {
-        props.onError(`내규 등록 실패: ${createJson.error || createRes.status}`)
-        return
-      }
-      const policyId = createJson.data.id
-
-      // 2. AI 추출 트리거
+      const fd = new FormData()
+      fd.append('file', file)
+      if (code.trim()) fd.append('policy_code', code.trim())
       setPhase('extracting')
-      const extractRes = await fetch(`/api/ride-compliance/policies/${policyId}/extract`, {
+      const res = await fetch('/api/ride-compliance/policies/upload', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-        body: JSON.stringify({ content_text: contentText }),
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        body: fd,
       })
-      const extractJson = await extractRes.json()
-      if (!extractRes.ok || !extractJson.success) {
-        props.onError(`등록 완료 / AI 추출 실패: ${extractJson.error || extractRes.status} — 검수 화면에서 재시도 가능`)
+      setPhase('analyzing')
+      const json = await res.json()
+      if (!res.ok || !json.success) {
+        props.onError(`등록 실패: ${json.error || res.status}`)
         return
       }
-      const d = extractJson.data
-      const msg = `등록 + AI 추출 완료 — ${d.inserted_sections}건 (조항 ${d.by_kind.article} / 별첨 ${d.by_kind.attachment} / Playbook ${d.by_kind.playbook_step} / 연간 ${d.by_kind.annual_event})`
+      const d = json.data
+      const msg = `등록 + AI 분석 완료 — ${d.policy_code} 「${String(d.policy_title).substring(0, 30)}…」 / 섹션 ${d.sections_inserted}건 (조항 ${d.by_kind.article} / 별첨 ${d.by_kind.attachment} / Playbook ${d.by_kind.playbook_step} / 연간 ${d.by_kind.annual_event} / 화면 ${d.by_kind.screen_spec})`
       props.onCreated(msg)
     } catch (e) {
       props.onError(`오류: ${e}`)
     } finally {
-      setBusy(false)
-      setPhase('form')
+      setBusy(false); setPhase('form')
     }
+  }
+
+  const phaseLabel: Record<typeof phase, string> = {
+    form:       '🤖 등록 + AI 분석',
+    uploading:  '📤 업로드중…',
+    extracting: '📖 파일 텍스트 추출중…',
+    analyzing:  '🤖 AI 분석중… (1~3분)',
   }
 
   return (
     <ModalShell title="+ 새 내규 등록" onClose={busy ? () => {} : props.onClose} wide>
-      <div style={{ fontSize: 12, color: COLORS.textMuted, marginBottom: 12 }}>
-        PPTX/PDF 본문 텍스트를 추출하여 paste 하면 AI 가 조항·별첨·Playbook·연간 운영 4 종류 섹션을 자동 추출합니다.
+      <div style={{ fontSize: 12, color: COLORS.textMuted, marginBottom: 16 }}>
+        PPTX/PDF/DOCX 파일을 드롭하면 시스템이 자동으로 텍스트 추출 + AI 분석합니다.
+        제목·버전·시행일·5 카테고리 섹션 모두 자동 추출 → 검수 모달에서 편집 가능.
       </div>
 
-      <FieldRow label="코드 *"><input value={code} onChange={(e) => setCode(e.target.value)} placeholder="예: RIDE-PMP-2026-001" style={inputStyle} disabled={busy} /></FieldRow>
-      <FieldRow label="제목 *"><input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="예: 개인정보보호 내부관리계획서" style={inputStyle} disabled={busy} /></FieldRow>
-      <FieldRow label="버전"><input value={version} onChange={(e) => setVersion(e.target.value)} placeholder="v1.0" style={inputStyle} disabled={busy} /></FieldRow>
-      <FieldRow label="시행일"><input type="date" value={effectiveDate} onChange={(e) => setEffectiveDate(e.target.value)} style={inputStyle} disabled={busy} /></FieldRow>
-      <FieldRow label="원본 파일명"><input value={sourceFileName} onChange={(e) => setSourceFileName(e.target.value)} placeholder="라이드_개인정보보호 내부계획서.pptx" style={inputStyle} disabled={busy} /></FieldRow>
-      <FieldRow label="원본 형식">
-        <select value={sourceFileType} onChange={(e) => setSourceFileType(e.target.value)} style={inputStyle} disabled={busy}>
-          <option value="pptx">PPTX</option>
-          <option value="pdf">PDF</option>
-          <option value="docx">DOCX</option>
-          <option value="txt">TXT</option>
-        </select>
-      </FieldRow>
-      <FieldRow label="본문 텍스트 *">
-        <textarea value={contentText} onChange={(e) => setContentText(e.target.value)} rows={10}
-          placeholder="PPTX/PDF 추출 텍스트를 붙여넣으세요 (100자 이상)…"
-          style={{ ...inputStyle, fontFamily: 'monospace', resize: 'vertical' }} disabled={busy} />
-      </FieldRow>
-      <div style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 4 }}>
-        텍스트 길이: {contentText.length.toLocaleString()} chars
-        {contentText.length > 60_000 && <span style={{ marginLeft: 8, color: '#b45309' }}>⚠ 5~6 chunk 분할 호출 — 1~3분 소요 예상</span>}
+      {/* 파일 드롭존 */}
+      <div
+        onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={(e) => {
+          e.preventDefault(); setDragOver(false)
+          const f = e.dataTransfer.files?.[0]
+          if (f) onFileChange(f)
+        }}
+        onClick={() => !busy && document.getElementById('policy-file-input')?.click()}
+        style={{
+          ...GLASS.L2,
+          padding: 32, borderRadius: 12, textAlign: 'center', cursor: busy ? 'wait' : 'pointer',
+          border: `2px dashed ${dragOver ? COLORS.primary : COLORS.borderSubtle}`,
+          marginBottom: 12, transition: 'all 0.15s ease',
+        }}
+      >
+        {!file && (
+          <>
+            <div style={{ fontSize: 36, marginBottom: 8 }}>📂</div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: COLORS.textPrimary, marginBottom: 4 }}>
+              파일 드래그·드롭 또는 클릭하여 선택
+            </div>
+            <div style={{ fontSize: 11, color: COLORS.textMuted }}>
+              PPTX / PDF / DOCX / XLSX / TXT (최대 50MB)
+            </div>
+          </>
+        )}
+        {file && (
+          <>
+            <div style={{ fontSize: 28, marginBottom: 4 }}>📄</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.textPrimary, marginBottom: 4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {file.name}
+            </div>
+            <div style={{ fontSize: 11, color: COLORS.textMuted }}>
+              {(file.size / 1024 / 1024).toFixed(2)} MB
+            </div>
+            {!busy && (
+              <button
+                onClick={(e) => { e.stopPropagation(); setFile(null) }}
+                style={{ ...btnSecondary, marginTop: 8, padding: '2px 10px', fontSize: 11 }}
+              >✕ 다른 파일</button>
+            )}
+          </>
+        )}
+        <input
+          id="policy-file-input" type="file" style={{ display: 'none' }}
+          accept=".pptx,.pdf,.docx,.xlsx,.txt"
+          onChange={(e) => onFileChange(e.target.files?.[0] || null)}
+          disabled={busy}
+        />
       </div>
+
+      <FieldRow label="코드 (옵션)">
+        <input value={code} onChange={(e) => setCode(e.target.value)}
+          placeholder="비어있으면 자동 생성 — 예: POLICY-2026-001"
+          style={inputStyle} disabled={busy} />
+      </FieldRow>
 
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
         <button style={btnSecondary} onClick={props.onClose} disabled={busy}>취소</button>
-        <button style={btnPrimary} onClick={submit} disabled={busy}>
-          {phase === 'creating' ? '등록중…' : phase === 'extracting' ? '🤖 AI 추출중… (chunk 분할 처리)' : '🤖 등록 + AI 추출'}
+        <button style={btnPrimary} onClick={submit} disabled={busy || !file}>
+          {phaseLabel[phase]}
         </button>
       </div>
     </ModalShell>
