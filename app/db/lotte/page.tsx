@@ -604,7 +604,7 @@ export default function BenchmarkPage() {
 
       {/* ═══ AI 조회 모달 ═══ */}
       {showAiModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => { setShowAiModal(false); setAiResult(null) }}>
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => { setShowAiModal(false); setAiResult(null) }}>
           <div className="bg-white rounded-2xl w-full max-w-lg shadow-xl overflow-hidden max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
             <div className="bg-purple-600 text-white px-5 py-4 flex justify-between items-center flex-shrink-0">
               <div>
@@ -711,7 +711,7 @@ export default function BenchmarkPage() {
 
       {/* ═══ 수동 등록 모달 ═══ */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowAddModal(false)}>
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowAddModal(false)}>
           <div className="bg-white rounded-2xl w-full max-w-md shadow-xl overflow-hidden max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
             <div className="bg-gray-900 text-white px-5 py-4 flex justify-between items-center flex-shrink-0">
               <h3 className="text-sm font-bold">경쟁사 견적 수동 등록</h3>

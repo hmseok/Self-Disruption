@@ -493,7 +493,7 @@ export default function LoanListPage() {
 
       {/* 차량 선택 모달 (OCR 후) */}
       {carSelectModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => { setCarSelectModal(false); setPendingOcrData(null) }}>
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => { setCarSelectModal(false); setPendingOcrData(null) }}>
           <div className="bg-white rounded-2xl w-full max-w-lg h-[600px] flex flex-col shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
             <div className="px-6 py-5 border-b bg-steel-50 shrink-0">
               <div className="flex justify-between items-center">
