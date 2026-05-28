@@ -13,6 +13,7 @@ import { getAuthHeader } from '@/app/utils/auth-client'
 import DcStatStrip, { type StatItem } from '@/app/components/DcStatStrip'
 import NeuDataTable, { type TableColumn } from '@/app/components/NeuDataTable'
 import KpiPeriodPicker, { type KpiPeriod, periodQuery } from './KpiPeriodPicker'
+import WeatherWidget from '../../_components/dashboard/WeatherWidget'
 
 type Granularity = 'day' | 'week' | 'month'
 
@@ -373,6 +374,9 @@ export default function KpiDashboard() {
 
   return (
     <div>
+      {/* W-1e — 권역별 날씨 위젯 (대시보드 상단, 5권역 + 통합 보정율) */}
+      <WeatherWidget />
+
       {/* ── 기간 선택 (프리셋·이전/다음·직접범위) + 새로고침 ─────── */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap',

@@ -6,6 +6,7 @@ import { COLORS, GLASS } from '@/app/utils/ui-tokens'
 import { TONE_BG, TONE_TEXT } from '../../utils/palette'
 import type { ColorTone } from '../../utils/types'
 import type { WorkerChip } from './NowWorkingStrip'
+import { TodayWeatherBadge } from './WeatherWidget'
 
 export default function TodayTomorrowGrid({
   todayLabel, todayAssignments, todayIsHoliday,
@@ -24,16 +25,17 @@ export default function TodayTomorrowGrid({
       marginBottom: 12,
     }}>
       <DayCard title="오늘" subtitle={todayLabel} isHoliday={todayIsHoliday}
-               assignments={todayAssignments} />
+               assignments={todayAssignments} showWeather />
       <DayCard title="내일" subtitle={tomorrowLabel} isHoliday={tomorrowIsHoliday}
                assignments={tomorrowAssignments} />
     </div>
   )
 }
 
-function DayCard({ title, subtitle, isHoliday, assignments }: {
+function DayCard({ title, subtitle, isHoliday, assignments, showWeather }: {
   title: string; subtitle: string; isHoliday: boolean
   assignments: WorkerChip[]
+  showWeather?: boolean
 }) {
   // 그룹 / shift 별 grouping
   const groups = new Map<string, WorkerChip[]>()
@@ -69,6 +71,7 @@ function DayCard({ title, subtitle, isHoliday, assignments }: {
               border: `1px solid ${COLORS.borderRed}`, marginLeft: 8,
             }}>🎌 휴일</span>
           )}
+          {showWeather && <TodayWeatherBadge />}
         </div>
         <span style={{ fontSize: 11, color: COLORS.textMuted, fontWeight: 600 }}>
           {assignments.length}명

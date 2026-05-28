@@ -3,6 +3,18 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-24 (Phase W-1e) — 대시보드 + 스케줄 화면 날씨 위젯
+
+> KPI 대시보드 상단에 권역별 날씨 카드 + 통합 보정율 배지. CallScheduler 「오늘」 카드 헤더에 거점 권역 날씨 인라인 표시.
+
+- **신규** `app/(employees)/CallScheduler/_components/dashboard/WeatherWidget.tsx` —
+  - `WeatherWidget` (default export): KPI 대시보드 상단 권역 카드 (default 5권역, 가중치 큰 순) + 통합 보정율 배지 (factor 1.2+ amber · 1.5+ red). fetch 실패·키 미설정 graceful (위젯 숨김 or 안내). 보정율 ≥1.2 시 「인입량 증가 예상」 안내 박스 (W-2 단계 연결).
+  - `TodayWeatherBadge` (named export): 인라인 작은 배지 — 거점 권역(가중치 최대 active) 날씨 + 기온. title 속성에 권역명·설명·factor·통합값.
+  - `weatherEmoji` (named export): condition_main → 이모지 매핑 (Clear/Clouds/Rain/Drizzle/Thunderstorm/Snow/Mist 등).
+- **수정** `kpi/_components/KpiDashboard.tsx` — KpiPeriodPicker 상단에 `<WeatherWidget />` 렌더.
+- **수정** `_components/dashboard/TodayTomorrowGrid.tsx` — `DayCard` 에 `showWeather` 옵션 prop 추가. 「오늘」만 `showWeather` true → 헤더에 `<TodayWeatherBadge />`. 「내일」은 미표시 (current API 비제공, forecast 추가 단계로 보류).
+- API·DB 변경 없음. 다음: W-2 (staffing 확장 — `weather_adjusted` λ 가산 + 시간대별 알림).
+
 ## 2026-05-24 (Phase W-1d) — KPI 설정 「⛅ 날씨 기준」 섹션
 
 > KPI 설정 탭에 5번째 섹션 추가 — 매니저가 권역·보정율 룰을 화면에서 자유롭게 추가/수정/삭제. W-1a~c API 위에 UI 얹기.
