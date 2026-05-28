@@ -77,35 +77,15 @@
     },
     {
       "file": "app/(employees)/RideCompliance/manuals/[code]/page.tsx",
+      "issue": "AI 잔존 표현 1건 — § 8 인간 손길 표준 (어댑터/sync/fetch 등 기술 용어 사용자 노출 금지)"
+    },
+    {
+      "file": "app/(employees)/RideCompliance/manuals/[code]/page.tsx",
       "issue": "JSX 영어 텍스트 4건 이상 — § 7 한글 100% 의무 (한국어 표시. 기술 약어만 영어 허용)"
     },
     {
       "file": "app/(employees)/RideCompliance/page.tsx",
-      "issue": "검색바 자체 구현 — DcToolbar 사용 권장"
-    },
-    {
-      "file": "app/(employees)/RideCompliance/page.tsx",
-      "issue": "자체 탭 strip 추정 — 공용 NeuFilterTabs 사용 권장 (UI-DESIGN-STANDARD § 4 — 같은 기능 같은 UI)"
-    },
-    {
-      "file": "app/(employees)/RideCompliance/page.tsx",
-      "issue": "alert() 사용 — Rule 20: 결과 메시지는 글래스 패널 (React state + GLASS) 로. 기계적 alert 금지"
-    },
-    {
-      "file": "app/(employees)/RideCompliance/page.tsx",
-      "issue": "confirm() 사용 — Rule 20: dialog component 권장 (data-loss 위험 case 만 예외 허용)"
-    },
-    {
-      "file": "app/(employees)/RideCompliance/page.tsx",
-      "issue": "아나토미 불완전: DcStatStrip ✓ / DcToolbar ✗ — 5층 표준 (§ 0-A) 누락. 검색·필터 영역 누락"
-    },
-    {
-      "file": "app/(employees)/RideCompliance/page.tsx",
       "issue": "JSX 영어 텍스트 2건 이상 — § 7 한글 100% 의무 (한국어 표시. 기술 약어만 영어 허용)"
-    },
-    {
-      "file": "app/(employees)/RideCompliance/page.tsx",
-      "issue": "체크박스 2건 — § 6 표준 미준수 (width:18 + accentColor:'#3b6eb5' 의무)"
     },
     {
       "file": "app/(employees)/RideCompliance/policies/[id]/review/page.tsx",

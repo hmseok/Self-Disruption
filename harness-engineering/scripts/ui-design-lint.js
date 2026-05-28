@@ -288,6 +288,30 @@ for (const fp of pageFiles) {
     })
   }
 
+  // 18) 2026-05-28: AI 잔존 표현 금지 (UI-DESIGN-STANDARD § 8)
+  //   "AI 가 만든 느낌" 패턴 — 💡 + 기술 키워드 / em-dash 기술 부연 / 운영 단계 노출.
+  //   사용자에게 보여서는 안 되는 기술 용어 검출.
+  //   문자열 안 (>/" 뒤) 한정 — 코드 변수명·주석은 무시.
+  const AI_PATTERNS = [
+    /💡[^<]{0,200}?(?:adapter|direct|proxy|sync|fetch|cache|hash|token|env|adapter|어댑터|동기화)/i,
+    /어댑터\s*모드\s*[:：]/,
+    /sync\s*후\s*표시/i,
+    /adapter\s*[:：]\s*\w+/i,
+    /(?:fetch|loading)\s*중\.{2,3}/i,   // 'fetch 중...' (한글이지만 영어 동사 노출)
+    /status\s*=\s*\w+\s*[\-—]\s*\w+/i,  // 'status=pending — 검수 대기' 같은 디버그 노출
+    /\b(?:INSERT|UPDATE|DELETE)\s+(?:INTO|FROM|TABLE)/i,
+  ]
+  let aiHits = 0
+  for (const re of AI_PATTERNS) {
+    if (re.test(content)) aiHits++
+  }
+  if (aiHits > 0) {
+    warnings.push({
+      file: rel,
+      issue: `AI 잔존 표현 ${aiHits}건 — § 8 인간 손길 표준 (어댑터/sync/fetch 등 기술 용어 사용자 노출 금지)`,
+    })
+  }
+
   // 17) 2026-05-28: 표시 텍스트 100% 한글 (UI-DESIGN-STANDARD § 7)
   //   JSX text content (예: <button>Click Me</button>) 안 한글 0 + 영어 단어 6자+
   //   → 정보성 경고. 기술 약어 화이트리스트 통과.
