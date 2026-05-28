@@ -14,29 +14,25 @@
  *   - 50MB 크기 제한
  */
 
-// Phase 2.3 hotfix2 (2026-05-28): officeparser ESM/CJS export 구조 다양성 대응.
-// 사용자 진단: "k.parseOfficeAsync is not a function" — root 에 함수 없음.
-type ParseOfficeAsyncFn = (buffer: Buffer, config?: Record<string, unknown>) => Promise<string>
-let _parseFn: ParseOfficeAsyncFn | null = null
+// Phase 2.3 hotfix3 (2026-05-28): 실제 함수명은 parseOffice (Async 없음).
+// node_modules/officeparser/dist 확인:
+//   ESM: export { OfficeParser, parseOffice, terminateOcr, ... }
+//   CJS: exports.parseOffice = parseOffice
+//   default = OfficeParser class (→ "Class constructors cannot be invoked" 에러 원인)
+type ParseOfficeFn = (buffer: Buffer | string, config?: Record<string, unknown>) => Promise<string>
+let _parseFn: ParseOfficeFn | null = null
 
-async function getParseOfficeAsync(): Promise<ParseOfficeAsyncFn> {
+async function getParseOffice(): Promise<ParseOfficeFn> {
   if (_parseFn) return _parseFn
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mod: any = await import('officeparser')
-  // 가능한 모든 export 경로 시도:
-  const candidates: Array<unknown> = [
-    mod.parseOfficeAsync,
-    mod.default?.parseOfficeAsync,
-    mod.default,
-    mod,
-  ]
-  const fn = candidates.find((c) => typeof c === 'function') as ParseOfficeAsyncFn | undefined
-  if (!fn) {
+  // named export parseOffice 만 사용 (default 는 class — 호출 시 에러)
+  const fn: unknown = mod.parseOffice || mod.default?.parseOffice
+  if (typeof fn !== 'function') {
     const keys = Object.keys(mod || {}).join(',')
-    const defKeys = mod?.default ? Object.keys(mod.default).join(',') : '(no default)'
-    throw new Error(`officeparser parseOfficeAsync 함수 인식 실패. mod keys: [${keys}] / default keys: [${defKeys}]`)
+    throw new Error(`officeparser parseOffice 함수 인식 실패. mod keys: [${keys}]`)
   }
-  _parseFn = fn
+  _parseFn = fn as ParseOfficeFn
   return _parseFn
 }
 
@@ -92,10 +88,10 @@ export async function extractTextFromBuffer(
     }
   }
 
-  // officeparser dynamic load + export 구조 자동 탐지
-  let parseOfficeAsync: ParseOfficeAsyncFn
+  // officeparser dynamic load (named export parseOffice)
+  let parseOffice: ParseOfficeFn
   try {
-    parseOfficeAsync = await getParseOfficeAsync()
+    parseOffice = await getParseOffice()
   } catch (loadErr) {
     const lm = loadErr instanceof Error ? loadErr.message : String(loadErr)
     throw new Error(`officeparser 모듈 로드 실패: ${lm}`)
@@ -103,7 +99,7 @@ export async function extractTextFromBuffer(
 
   // officeparser timeout race
   const extracted = await Promise.race([
-    parseOfficeAsync(buffer, {
+    parseOffice(buffer, {
       newlineDelimiter: '\n',
       ignoreNotes: false,
       putNotesAtLast: true,
