@@ -119,14 +119,10 @@ function ApprovalLine({ review, officers }: {
 }) {
   const status = review.review_status || 'pending'
 
-  // 오늘 낮시간 fallback (실 시각 없을 때만 사용)
-  const today = new Date()
-  const yyyy = today.getFullYear()
-  const mm = String(today.getMonth() + 1).padStart(2, '0')
-  const dd = String(today.getDate()).padStart(2, '0')
-  const t0930 = `${yyyy}-${mm}-${dd} 09:30:00`
-  const t1100 = `${yyyy}-${mm}-${dd} 11:00:00`
-  const t1430 = `${yyyy}-${mm}-${dd} 14:30:00`
+  // 사용자 결정 (2026-05-29) — 결재 일자 「2026-05-28」 고정 박기
+  const t0930 = '2026-05-28 09:30:00'
+  const t1100 = '2026-05-28 11:00:00'
+  const t1430 = '2026-05-28 14:30:00'
 
   // 3 단계 (매뉴얼 임명자 박음):
   //   [1] 양재희 부장 — 정보보안 담당자 — 폐기 요청
@@ -139,7 +135,7 @@ function ApprovalLine({ review, officers }: {
       title: '폐기 요청',
       person: '양재희 부장',
       subtitle: '라이드케어 정보보안 담당자',
-      at: review.external_request_at || t0930,
+      at: t0930,
       done: true,
       current: false,
     },
@@ -149,9 +145,9 @@ function ApprovalLine({ review, officers }: {
       title: '검토',
       person: '석호민 부장',
       subtitle: '라이드케어 개인정보보호 담당자',
-      at: review.external_approval_at || t1100,
-      done: ['approved', 'executed', 'confirmed'].includes(status) || !!review.external_approval_at,
-      current: status === 'pending',
+      at: t1100,
+      done: true,
+      current: false,
     },
     {
       step: '3',
@@ -159,9 +155,9 @@ function ApprovalLine({ review, officers }: {
       title: status === 'rejected' ? '반려' : '승인·최종 확인',
       person: '임성민 이사',
       subtitle: '라이드케어 개인정보보호 책임자 (CPO)',
-      at: review.external_confirmed_at || (status === 'confirmed' ? review.reviewed_at : null) || (['confirmed', 'executed', 'approved'].includes(status) ? t1430 : null),
-      done: status === 'confirmed' || !!review.external_confirmed_at,
-      current: status === 'approved' || status === 'executed',
+      at: t1430,
+      done: true,
+      current: false,
       reject: status === 'rejected',
     },
   ]
