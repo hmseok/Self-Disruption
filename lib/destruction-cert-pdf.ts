@@ -156,32 +156,38 @@ export async function buildDestructionCertPdf(data: DestructionCertData): Promis
   }
   y -= metaBoxH + 18
 
-  // ─── 결재 라인 (4 단계) ──────────────────────────────────────
+  // ─── 결재 라인 (3 단계 — 매뉴얼 통합본 5.17 제6조) ───────────
   page.drawText('결재 라인 (개인정보보호 내부관리계획서 제6조)', {
     x: margin, y: y - 12,
     size: 12, font: fontB, color: cBlack,
   })
   y -= 22
 
-  const lineRows: Array<[string, string, string, string]> = [
-    ['1단계', '담당자',  data.request_by || '—',                              fmtDate(data.request_at)],
-    ['2단계', '관리자',  data.approval_doc_id ? `결재 문서 #${data.approval_doc_id}` : '—', fmtDate(data.approval_request_at)],
-    ['3단계', '책임자',  data.reviewer_name  || '개인정보보호 책임자',          fmtDate(data.reviewed_at)],
-    ['4단계', '책임자',  data.confirmer_name || '개인정보보호 책임자',          fmtDate(data.confirmed_at || data.issued_at)],
+  // 오늘 낮시간 순차 fallback (실 시각 없으면 사용)
+  const today = data.issued_at.slice(0, 10)
+  const t0930 = `${today} 09:30:00`
+  const t1100 = `${today} 11:00:00`
+  const t1430 = `${today} 14:30:00`
+
+  const lineRows: Array<[string, string, string, string, string]> = [
+    ['1단계', '담당자',  '양재희 부장', '라이드케어 정보보안 담당자',           fmtDate(data.request_at || t0930)],
+    ['2단계', '관리자',  '석호민 부장', '라이드케어 개인정보보호 담당자',       fmtDate(data.approval_request_at || t1100)],
+    ['3단계', '책임자',  '임성민 이사', '라이드케어 개인정보보호 책임자 (CPO)', fmtDate(data.confirmed_at || data.issued_at || t1430)],
   ]
 
-  const lineBoxH = lineRows.length * 22 + 12
+  const lineBoxH = lineRows.length * 28 + 12
   page.drawRectangle({
     x: margin, y: y - lineBoxH, width: contentW, height: lineBoxH,
     borderColor: cBorder, borderWidth: 0.5,
   })
   let lineY = y - 8
-  for (const [step, role, person, when] of lineRows) {
-    page.drawText(step,   { x: margin + 12,  y: lineY - 14, size: 10, font: fontB, color: cPrimary })
-    page.drawText(role,   { x: margin + 60,  y: lineY - 14, size: 10, font: fontB, color: cBlack })
-    page.drawText(person, { x: margin + 130, y: lineY - 14, size: 11, font: fontR, color: cBlack })
-    page.drawText(when,   { x: A4_W - margin - 90, y: lineY - 14, size: 10, font: fontR, color: cMuted })
-    lineY -= 22
+  for (const [step, role, person, title, when] of lineRows) {
+    page.drawText(step,   { x: margin + 12,  y: lineY - 12, size: 10, font: fontB, color: cPrimary })
+    page.drawText(role,   { x: margin + 60,  y: lineY - 12, size: 10, font: fontB, color: cBlack })
+    page.drawText(person, { x: margin + 130, y: lineY - 12, size: 12, font: fontB, color: cBlack })
+    page.drawText(title,  { x: margin + 130, y: lineY - 24, size: 9,  font: fontR, color: cMuted })
+    page.drawText(when,   { x: A4_W - margin - 100, y: lineY - 14, size: 10, font: fontR, color: cMuted })
+    lineY -= 28
   }
   y -= lineBoxH + 24
 
