@@ -27,6 +27,20 @@ import { randomUUID } from 'crypto'
 
 export const maxDuration = 60
 
+// P12-H — 외부 varchar(100) 날짜를 MySQL DATETIME 컬럼이 받는 문자열로 정규화.
+// Prisma $executeRaw 는 Date 객체를 nested JSON 으로 직렬화 → "Expected Flat JSON array" 오류 발생.
+// → 'YYYY-MM-DD HH:MM:SS' 문자열로 넘기면 안전.
+function toDt(v: string | null | undefined): string | null {
+  if (!v) return null
+  const s = String(v).trim()
+  if (s === '') return null
+  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(s)) return s
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return `${s} 00:00:00`
+  const d = new Date(s)
+  if (Number.isNaN(d.getTime())) return null
+  return d.toISOString().slice(0, 19).replace('T', ' ')
+}
+
 export async function POST(req: NextRequest) {
   try {
     const user = await verifyUser(req)
@@ -78,14 +92,14 @@ export async function POST(req: NextRequest) {
           reviewId = existing[0].id
           await prisma.$executeRaw`
             UPDATE ride_compliance_disposal_reviews
-               SET external_request_at      = ${ext.request_at ? new Date(ext.request_at) : null},
+               SET external_request_at      = ${toDt(ext.request_at)},
                    external_request_by      = ${ext.request_by},
                    external_expired_count   = ${ext.expired_count},
                    external_approval_doc_id = ${ext.approval_request_id},
-                   external_approval_at     = ${ext.approval_request_at ? new Date(ext.approval_request_at) : null},
-                   external_deleted_at      = ${ext.deleted_at ? new Date(ext.deleted_at) : null},
+                   external_approval_at     = ${toDt(ext.approval_request_at)},
+                   external_deleted_at      = ${toDt(ext.deleted_at)},
                    external_deleted_by      = ${ext.deleted_by},
-                   external_confirmed_at    = ${ext.confirmed_at ? new Date(ext.confirmed_at) : null},
+                   external_confirmed_at    = ${toDt(ext.confirmed_at)},
                    external_confirmed_by    = ${ext.confirmed_by},
                    last_sync_at             = NOW(),
                    sync_source              = ${mode}
@@ -102,11 +116,11 @@ export async function POST(req: NextRequest) {
                review_status, last_sync_at, sync_source)
             VALUES
               (${reviewId}, ${ext.id},
-               ${ext.request_at ? new Date(ext.request_at) : null}, ${ext.request_by},
+               ${toDt(ext.request_at)}, ${ext.request_by},
                ${ext.expired_count}, ${ext.approval_request_id},
-               ${ext.approval_request_at ? new Date(ext.approval_request_at) : null},
-               ${ext.deleted_at ? new Date(ext.deleted_at) : null}, ${ext.deleted_by},
-               ${ext.confirmed_at ? new Date(ext.confirmed_at) : null}, ${ext.confirmed_by},
+               ${toDt(ext.approval_request_at)},
+               ${toDt(ext.deleted_at)}, ${ext.deleted_by},
+               ${toDt(ext.confirmed_at)}, ${ext.confirmed_by},
                'pending', NOW(), ${mode})
           `
           result.new++
@@ -124,7 +138,7 @@ export async function POST(req: NextRequest) {
               VALUES
                 (${randomUUID()}, ${reviewId}, ${it.external_item_id}, ${it.data_type}, ${it.data_id},
                  ${it.custname}, ${it.carsnums}, ${it.carsodnm}, ${it.imagkind_label}, ${it.imagonam},
-                 ${it.external_deleted_at ? new Date(it.external_deleted_at) : null})
+                 ${toDt(it.external_deleted_at)})
             `
             result.items_inserted++
           }
