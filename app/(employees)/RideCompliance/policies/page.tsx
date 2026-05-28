@@ -131,6 +131,49 @@ export default function PoliciesPage() {
   const [createOpen, setCreateOpen] = useState(false)
   const [reviewing, setReviewing] = useState<Policy | null>(null)
   const [resultPanel, setResultPanel] = useState<{ kind: 'ok' | 'err'; msg: string } | null>(null)
+  // P16 — 체크박스 선택 + 일괄 삭제
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkBusy, setBulkBusy] = useState(false)
+
+  const toggleSelect = (id: string, checked: boolean) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (checked) next.add(id); else next.delete(id)
+      return next
+    })
+  }
+  const selectAllVisible = () => setSelectedIds(new Set(rows.map(r => r.id)))
+  const clearSelection = () => setSelectedIds(new Set())
+
+  const bulkDelete = async () => {
+    const ids = Array.from(selectedIds)
+    if (ids.length === 0) { setResultPanel({ kind: 'err', msg: '선택된 항목이 없습니다.' }); return }
+    if (!confirm(`선택한 ${ids.length}건 삭제할까요? sections 도 함께 삭제됩니다. active 상태는 자동 제외.`)) return
+    setBulkBusy(true)
+    const token = getStoredToken()
+    let deleted = 0, skipped = 0, errors: string[] = []
+    for (const id of ids) {
+      try {
+        const res = await fetch(`/api/ride-compliance/policies/${id}`, {
+          method: 'DELETE',
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        })
+        const json = await res.json()
+        if (res.ok && json.success) deleted++
+        else if (json.error?.includes('active')) skipped++
+        else errors.push(`${id.substring(0, 8)}: ${json.error || res.status}`)
+      } catch (e) {
+        errors.push(`${id.substring(0, 8)}: ${e}`)
+      }
+    }
+    setBulkBusy(false)
+    setSelectedIds(new Set())
+    setResultPanel({
+      kind: errors.length === 0 ? 'ok' : 'err',
+      msg: `삭제 ${deleted}건 / active skip ${skipped}건${errors.length ? ` / 에러 ${errors.length}: ${errors.slice(0, 3).join(', ')}` : ''}`,
+    })
+    fetchList()
+  }
 
   const fetchList = async () => {
     setLoading(true)
@@ -172,7 +215,20 @@ export default function PoliciesPage() {
     ]
   }, [rows])
 
+  const allSelected = rows.length > 0 && rows.every(r => selectedIds.has(r.id))
   const columns: TableColumn<Policy>[] = [
+    {
+      key: 'select', label: allSelected ? '☑' : '☐', width: 40,
+      render: (r) => (
+        <input
+          type="checkbox"
+          checked={selectedIds.has(r.id)}
+          onChange={(e) => toggleSelect(r.id, e.target.checked)}
+          style={{ cursor: 'pointer' }}
+          onClick={(e) => e.stopPropagation()}
+        />
+      ),
+    },
     {
       key: 'code', label: '코드', width: 160,
       sortBy: (r) => `${r.policy_code} ${r.version}`,
@@ -260,6 +316,12 @@ export default function PoliciesPage() {
           stats={stats}
           actions={[
             { label: '+ 새 내규 등록', onClick: () => setCreateOpen(true), variant: 'primary' },
+            ...(selectedIds.size > 0 ? [
+              { label: `🗑 선택 삭제 (${selectedIds.size})`, onClick: bulkDelete, variant: 'secondary' as const },
+              { label: '✕ 선택 해제', onClick: clearSelection, variant: 'secondary' as const },
+            ] : rows.length > 0 ? [
+              { label: '☑ 전체 선택', onClick: selectAllVisible, variant: 'secondary' as const },
+            ] : []),
           ]}
         />
       </div>
