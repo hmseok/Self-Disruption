@@ -17,7 +17,8 @@
  */
 
 import { useEffect, useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
+import Link from 'next/link'
 import { getStoredToken } from '@/lib/auth-client'
 import NeuDataTable, { type TableColumn } from '@/app/components/NeuDataTable'
 import DcStatStrip, { type StatItem } from '@/app/components/DcStatStrip'
@@ -126,6 +127,17 @@ function confidenceBadge(c: number | null): React.ReactNode {
 // ═══════════════════════════════════════════════════════════════
 export default function PoliciesPage() {
   const router = useRouter()
+  const pathname = usePathname()
+  // P22 — 모듈 main 에 임베드된 경우 vs 별도 URL 직접 접속 구분
+  const isStandalone = pathname === '/RideCompliance/policies'
+
+  // P21 — 브라우저 탭 title
+  useEffect(() => {
+    if (isStandalone) {
+      document.title = '내규 마스터 | 정보보안'
+      return () => { document.title = 'ERP' }
+    }
+  }, [isStandalone])
   const [rows, setRows] = useState<Policy[]>([])
   const [loading, setLoading] = useState(false)
   const [migrationPending, setMigrationPending] = useState<string | null>(null)
@@ -299,6 +311,16 @@ export default function PoliciesPage() {
 
   return (
     <div style={{ padding: '0 24px 32px' }}>
+
+      {/* P22 — 별도 URL 접속 시 모듈 main 으로 돌아가는 링크 */}
+      {isStandalone && (
+        <div style={{ marginBottom: 12 }}>
+          <Link href="/RideCompliance" style={{
+            ...GLASS.L2, fontSize: 13, color: COLORS.primary, textDecoration: 'none',
+            padding: '6px 14px', borderRadius: 8, display: 'inline-block',
+          }}>← 🔒 정보보안 모듈로</Link>
+        </div>
+      )}
 
       {/* Phase 2.0+ — 페이지 상단 안내 카드 (모듈 main 헤더와 시각 일관성) */}
       <div style={{

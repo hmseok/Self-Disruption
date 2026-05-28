@@ -16,6 +16,8 @@
  */
 
 import { useEffect, useMemo, useState } from 'react'
+import { usePathname } from 'next/navigation'
+import Link from 'next/link'
 import { getStoredToken } from '@/lib/auth-client'
 import NeuDataTable, { type TableColumn } from '@/app/components/NeuDataTable'
 import DcStatStrip, { type StatItem } from '@/app/components/DcStatStrip'
@@ -117,6 +119,18 @@ function fmtDateTime(s: string | null): string {
 // MAIN
 // ════════════════════════════════════════════════════════════════
 export default function ComplianceDeliverablesPage() {
+  const pathname = usePathname()
+  // P22 — standalone URL 감지
+  const isStandalone = pathname === '/RideCompliance/deliverables'
+
+  // P21 — 브라우저 탭 title
+  useEffect(() => {
+    if (isStandalone) {
+      document.title = '산출물 트래커 | 정보보안'
+      return () => { document.title = 'ERP' }
+    }
+  }, [isStandalone])
+
   const [rows, setRows] = useState<Deliverable[]>([])
   const [loading, setLoading] = useState(false)
   const [migrationPending, setMigrationPending] = useState<string | null>(null)
@@ -254,6 +268,16 @@ export default function ComplianceDeliverablesPage() {
   // ── 렌더 ──
   return (
     <div style={{ padding: '0 24px 32px' }}>
+
+      {/* P22 — 별도 URL 접속 시 모듈 main 으로 돌아가는 링크 */}
+      {isStandalone && (
+        <div style={{ marginBottom: 12 }}>
+          <Link href="/RideCompliance" style={{
+            ...GLASS.L2, fontSize: 13, color: COLORS.primary, textDecoration: 'none',
+            padding: '6px 14px', borderRadius: 8, display: 'inline-block',
+          }}>← 🔒 정보보안 모듈로</Link>
+        </div>
+      )}
 
       {migrationPending && (
         <div style={{
