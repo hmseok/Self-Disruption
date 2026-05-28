@@ -92,7 +92,10 @@ export default function HRMasterPage() {
 
   // 검색 + 필터
   const [searchTerm, setSearchTerm] = useState('')
-  const [statusFilter, setStatusFilter] = useState('all')
+  // PR-HR-12 (2026-05-27) — 디폴트 '재직' (퇴사자 기본 숨김). 「퇴사」 stat 카드 클릭 시 보관함 진입.
+  //   사용자 결정: 옵션 A 숨김 운영 (감사 추적 보존 + 일상 화면 깨끗).
+  //   기존 'all' 디폴트 → 퇴사자가 메인 목록에 노출되어 「완전 삭제 후에도 안 사라짐」 오해 유발.
+  const [statusFilter, setStatusFilter] = useState('active')
 
   // 탭 상태 — 통합 페이지 5 탭 (모두 inline — PR-B7)
   type TopTab = 'employees' | 'org' | 'invitations' | 'external' | 'payroll'
@@ -822,12 +825,16 @@ export default function HRMasterPage() {
   }
 
   // ===== 직원 탈퇴 =====
+  // PR-HR-12 (2026-05-27) — 메시지 정확화:
+  //   실제 동작은 UPDATE is_active=0 + 부서/직급 해제 + withdrawn_at 기록 (soft delete).
+  //   거래/계약/회의록 등 FK 참조 데이터의 감사 추적 보존을 위해 진짜 DELETE 안 함.
+  //   퇴사 직원은 「퇴사」 필터에서 보관함처럼 조회 가능.
   const withdrawEmployee = async (deleteAuth: boolean) => {
     if (!editingEmp) return
     const name = editingEmp.display_name || editingEmp.employee_name || editingEmp.email
     const msg = deleteAuth
-      ? `${name} 직원을 완전 탈퇴(계정 삭제) 처리하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다.`
-      : `${name} 직원을 비활성화하시겠습니까?`
+      ? `${name} 직원을 퇴사 처리하시겠습니까?\n\n• 계정 비활성화 + 인증 차단\n• 부서/직급 연결 해제\n• 거래/계약 등 기존 데이터는 감사 추적용으로 보존\n• 「퇴사」 필터에서 조회 가능`
+      : `${name} 직원을 비활성화하시겠습니까?\n\n• 계정만 비활성화 (목록 숨김, 인증 차단)\n• 부서/직급은 유지`
     if (!confirm(msg)) return
     setWithdrawing(true)
     try {
@@ -2384,21 +2391,27 @@ export default function HRMasterPage() {
             </div>
 
             {/* 직원 탈퇴 — § 기본정보 탭에서만 노출 */}
+            {/* PR-HR-12 (2026-05-27) — 「완전 삭제」 라벨 정확화:
+                 실제 동작은 UPDATE is_active=0 (soft delete) — DB row 보존.
+                 거래/계약/회의록 등 감사 추적 데이터 무결성 유지 위해 진짜 DELETE 불가.
+                 → 「비활성화」 vs 「퇴사 처리」 두 단계로 명명 (「완전 삭제」 → 「퇴사 처리」 변경). */}
             {editSection === 'profile' && editingEmp.id !== user?.uid && editingEmp.role !== 'admin' && (
               <div style={{ padding: '12px 24px', borderTop: '1px solid rgba(239,68,68,0.2)', background: 'rgba(254,242,242,0.6)', flexShrink: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <div>
                     <p style={{ fontSize: 12, fontWeight: 600, color: '#dc2626', margin: 0 }}>직원 탈퇴</p>
-                    <p style={{ fontSize: 11, color: '#f87171', marginTop: 2 }}>회사에서 직원을 제거합니다.</p>
+                    <p style={{ fontSize: 11, color: '#f87171', marginTop: 2 }}>거래/계약 등 기존 데이터는 감사 추적 위해 보존. 보관함에서 조회 가능.</p>
                   </div>
                   <div style={{ display: 'flex', gap: 8 }}>
                     <button onClick={() => withdrawEmployee(false)} disabled={withdrawing}
+                      title="계정만 비활성화 (목록에서 숨김, 인증 차단)"
                       style={{ padding: '6px 12px', fontSize: 12, fontWeight: 600, color: '#dc2626', border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(255,255,255,0.8)', borderRadius: 8, cursor: withdrawing ? 'not-allowed' : 'pointer', opacity: withdrawing ? 0.5 : 1 }}>
                       {withdrawing ? '처리 중...' : '비활성화'}
                     </button>
                     <button onClick={() => withdrawEmployee(true)} disabled={withdrawing}
+                      title="퇴사 처리 — 계정 비활성화 + 인증 차단 + 부서/직급 해제 (DB row 는 감사용 보존)"
                       style={{ padding: '6px 12px', fontSize: 12, fontWeight: 600, color: '#fff', background: '#dc2626', border: 'none', borderRadius: 8, cursor: withdrawing ? 'not-allowed' : 'pointer', opacity: withdrawing ? 0.5 : 1 }}>
-                      {withdrawing ? '처리 중...' : '완전 삭제'}
+                      {withdrawing ? '처리 중...' : '퇴사 처리'}
                     </button>
                   </div>
                 </div>
