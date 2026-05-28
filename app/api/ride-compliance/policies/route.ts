@@ -10,6 +10,7 @@ import { NextResponse } from 'next/server'
 import { verifyUser } from '@/lib/auth-server'
 import { prisma } from '@/lib/prisma'
 import { isManager, getOfficerRole } from '@/lib/ride-compliance-perm'
+import { jsonSafe } from '@/lib/json-safe'
 import { randomUUID } from 'crypto'
 
 interface PolicyRow {
@@ -64,7 +65,7 @@ export async function GET(request: Request) {
        LIMIT 200
     `
     return NextResponse.json({
-      success: true, data: rows,
+      success: true, data: jsonSafe(rows),
       meta: { count: rows.length, my_role: role, filters: { status, q } },
     })
   } catch (e) {
@@ -127,7 +128,7 @@ export async function POST(request: Request) {
         LEFT JOIN profiles u ON u.id = p.uploaded_by
        WHERE p.id = ${id} LIMIT 1
     `
-    return NextResponse.json({ success: true, data: row })
+    return NextResponse.json({ success: true, data: jsonSafe(row) })
   } catch (e) {
     const err = e as { code?: string; message?: string }
     if (err.message?.includes('Duplicate') || err.message?.includes('unique')) {

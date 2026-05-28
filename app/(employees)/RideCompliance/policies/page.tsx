@@ -359,20 +359,47 @@ function CreateModal(props: {
       fd.append('file', file)
       if (code.trim()) fd.append('policy_code', code.trim())
       setPhase('extracting')
+
+      // Phase 2.3 hotfix9 — POST upload 는 즉시 응답 (1~3초). AI 분석은 백그라운드.
       const res = await fetch('/api/ride-compliance/policies/upload', {
         method: 'POST',
         headers: token ? { Authorization: `Bearer ${token}` } : undefined,
         body: fd,
       })
-      setPhase('analyzing')
       const json = await res.json()
       if (!res.ok || !json.success) {
         props.onError(`등록 실패: ${json.error || res.status}`)
         return
       }
       const d = json.data
-      const msg = `등록 + AI 분석 완료 — ${d.policy_code} 「${String(d.policy_title).substring(0, 30)}…」 / 섹션 ${d.sections_inserted}건 (조항 ${d.by_kind.article} / 별첨 ${d.by_kind.attachment} / Playbook ${d.by_kind.playbook_step} / 연간 ${d.by_kind.annual_event} / 화면 ${d.by_kind.screen_spec})`
-      props.onCreated(msg)
+      const policyId = String(d.policy_id)
+
+      // Polling — status='ai_extracted' / 'ai_failed' / 'active' 까지 5초마다
+      setPhase('analyzing')
+      const startedAt = Date.now()
+      const MAX_POLL_MS = 10 * 60 * 1000  // 10분 한계
+      while (Date.now() - startedAt < MAX_POLL_MS) {
+        await new Promise(r => setTimeout(r, 5_000))
+        const pollRes = await fetch(`/api/ride-compliance/policies/${policyId}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        })
+        const pollJson = await pollRes.json()
+        if (!pollRes.ok || !pollJson.success) continue
+        const status = pollJson.data?.status
+        if (status === 'ai_extracted' || status === 'user_reviewing' || status === 'active') {
+          const p = pollJson.data
+          const elapsedSec = ((Date.now() - startedAt) / 1000).toFixed(0)
+          props.onCreated(`등록 + AI 분석 완료 (${elapsedSec}s) — ${p.policy_code} 「${String(p.title).substring(0, 30)}…」 / 검수 모달에서 5 카테고리 섹션 확인`)
+          return
+        }
+        if (status === 'ai_failed') {
+          props.onError(`AI 분석 실패: ${pollJson.data?.ai_summary_md || '서버 로그 확인'} (policy_id=${policyId})`)
+          return
+        }
+        // 'ai_extracting' — 계속 polling
+      }
+      // 10분 timeout
+      props.onError(`AI 분석 시간 초과 (10분) — 백그라운드 계속 진행 중. /RideCompliance/policies 페이지에서 결과 확인 (policy_id=${policyId})`)
     } catch (e) {
       props.onError(`오류: ${e}`)
     } finally {

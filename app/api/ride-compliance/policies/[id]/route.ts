@@ -9,6 +9,7 @@ import { NextResponse } from 'next/server'
 import { verifyUser } from '@/lib/auth-server'
 import { prisma } from '@/lib/prisma'
 import { isManager } from '@/lib/ride-compliance-perm'
+import { jsonSafe } from '@/lib/json-safe'
 
 interface PolicyRow {
   id: string
@@ -41,7 +42,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
        WHERE p.id = ${id} LIMIT 1
     `
     if (!row) return NextResponse.json({ success: false, error: 'not found' }, { status: 404 })
-    return NextResponse.json({ success: true, data: row })
+    return NextResponse.json({ success: true, data: jsonSafe(row) })
   } catch (e) {
     const err = e as { code?: string; message?: string }
     console.error('[/api/ride-compliance/policies/[id] GET]', err.code, err.message)
@@ -88,7 +89,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       SELECT * FROM ride_compliance_policies WHERE id = ${id} LIMIT 1
     `
     if (!row) return NextResponse.json({ success: false, error: 'not found' }, { status: 404 })
-    return NextResponse.json({ success: true, data: row })
+    return NextResponse.json({ success: true, data: jsonSafe(row) })
   } catch (e) {
     const err = e as { code?: string; message?: string }
     console.error('[/api/ride-compliance/policies/[id] PATCH]', err.code, err.message)
