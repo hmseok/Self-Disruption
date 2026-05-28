@@ -565,12 +565,29 @@ model CustomerSignature {
 // ============================================================
 // 회사/사용자 관리
 // ============================================================
+// PR-MULTI-BRAND P1 (2026-05-24) + PR-HR-15 (2026-05-28)
+// migrations/2026-05-24_multi_brand_companies.sql + 2026-05-28_pr_hr_15_companies_meta.sql
+// 회사 마스터 — 멀티 회사 + 브랜드 메타.
+//   FMI = 운영 위탁 호스트 (is_internal_host=true), RIDE = 위탁사 (false).
+//   향후 회사 추가 시 「+ 회사 추가」 UI 로 row 추가 (코드 + 마이그 모두 수정 X).
 model Company {
-  id         String   @id @default(uuid()) @db.Char(36)
-  name       String
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now()) @updatedAt
+  id               String   @id @default(uuid()) @db.Char(36)
+  name             String
+  company_key      String?  @unique @db.VarChar(20)
+  subdomain        String   @default("") @db.VarChar(40)
+  logo_url         String?  @db.VarChar(255)
+  theme_json       Json?
+  label            String?  @db.VarChar(40)
+  primary_color    String?  @db.Char(7)
+  accent_color     String?  @db.Char(7)
+  short_name       String?  @db.VarChar(20)
+  is_active        Boolean  @default(true)
+  is_internal_host Boolean  @default(false)
+  sort_order       Int      @default(100)
+  created_at       DateTime @default(now())
+  updated_at       DateTime @default(now()) @updatedAt
 
+  @@index([is_active, sort_order])
   @@map("companies")
 }
 
@@ -1193,20 +1210,61 @@ model BankAccountMapping {
 // 페이지 권한 (RBAC)
 // ============================================================
 model UserPagePermission {
-  id         String   @id @default(uuid()) @db.Char(36)
-  user_id    String   @db.Char(36)
-  page_path  String   @db.VarChar(255)
-  can_view   Boolean  @default(false)
-  can_create Boolean  @default(false)
-  can_edit   Boolean  @default(false)
-  can_delete Boolean  @default(false)
-  data_scope String   @default("all") // all, department, own
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now()) @updatedAt
+  id                 String   @id @default(uuid()) @db.Char(36)
+  user_id            String   @db.Char(36)
+  page_path          String   @db.VarChar(255)
+  can_view           Boolean  @default(false)
+  can_create         Boolean  @default(false)
+  can_edit           Boolean  @default(false)
+  can_delete         Boolean  @default(false)
+  data_scope         String   @default("all") // all, department, own
+  source_template_id String?  @db.Char(36)   // PR-HR-16 — apply 한 템플릿 추적
+  created_at         DateTime @default(now())
+  updated_at         DateTime @default(now()) @updatedAt
 
   @@unique([user_id, page_path])
   @@index([user_id])
+  @@index([source_template_id])
   @@map("user_page_permissions")
+}
+
+// PR-HR-16 (2026-05-28) — 페이지 권한 템플릿 (회사 × 역할)
+// migrations/2026-05-28_pr_hr_16_role_templates.sql
+// 사용자 「실수할까봐 두려움」 직접 해결.
+//   직원 추가 시 회사 + 역할 선택 → role_template_pages 의 권한 묶음 →
+//   user_page_permissions 에 일괄 INSERT (source_template_id 로 추적).
+//   이후 페이지별 토글 override 가능.
+model RoleTemplate {
+  id          String   @id @default(uuid()) @db.Char(36)
+  company_id  String   @db.Char(36)
+  role_key    String   @db.VarChar(40)
+  label       String   @db.VarChar(80)
+  description String?  @db.VarChar(255)
+  sort_order  Int      @default(100)
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @default(now()) @updatedAt
+
+  @@unique([company_id, role_key])
+  @@index([company_id, is_active, sort_order])
+  @@map("role_templates")
+}
+
+model RoleTemplatePage {
+  id          String   @id @default(uuid()) @db.Char(36)
+  template_id String   @db.Char(36)
+  page_path   String   @db.VarChar(255)
+  can_view    Boolean  @default(false)
+  can_create  Boolean  @default(false)
+  can_edit    Boolean  @default(false)
+  can_delete  Boolean  @default(false)
+  data_scope  String   @default("all") @db.VarChar(20)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @default(now()) @updatedAt
+
+  @@unique([template_id, page_path])
+  @@index([template_id])
+  @@map("role_template_pages")
 }
 
 // ============================================================

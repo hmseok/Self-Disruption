@@ -31,10 +31,15 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const values: any[] = []
 
     // 화이트리스트 — companies 테이블에 허용된 컬럼만
+    // PR-HR-15 (2026-05-28, hr 세션) — multi-tenancy 메타 컬럼 추가:
+    //   company_key / subdomain / label / primary_color / accent_color / short_name /
+    //   is_active / is_internal_host / sort_order
     const ALLOWED_COLS = new Set([
       'name', 'business_number', 'representative', 'address', 'phone',
       'email', 'website', 'industry', 'logo_url', 'fax', 'bank_name',
       'bank_account', 'bank_holder', 'stamp_url', 'memo', 'status',
+      'company_key', 'subdomain', 'label', 'primary_color', 'accent_color',
+      'short_name', 'is_active', 'is_internal_host', 'sort_order', 'theme_json',
     ])
     const SAFE_COL = /^[a-zA-Z_][a-zA-Z0-9_]*$/
 

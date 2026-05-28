@@ -5,6 +5,36 @@
 
 ## 2026-05-28
 
+- **PR-HR-15+16** (hr 세션) — multi-tenancy 회사 마스터 + 페이지 권한 역할 템플릿. ★ 사용자 「실수할까봐 두려움」 직접 해결.
+  - 사용자 요구 (2026-05-28): FMI ↔ 라이드 「구조가 다르다 → 구조 정리 필요」, F = 전면 정리.
+    페인 결론: 회사별 격리 자동화 + 페이지 권한 사람마다 고민 → 템플릿화 (회사+역할 묶음).
+  - 메인 세션 합의 (b 분리 유지) — 본 세션은 HR + 권한 + 사이드바, 메인 세션은 ride_* 본문.
+    활용한 메인 세션 헬퍼: `lib/company-context.ts`, `lib/use-company.ts`, `/api/me/company`, `lib/company-brand.ts`.
+  - **PR-HR-15 — companies 메타 컬럼**:
+    1. `migrations/2026-05-28_pr_hr_15_companies_meta.sql` (멱등) — `label/primary_color/accent_color/short_name/is_active/is_internal_host/sort_order` 7 컬럼 추가 + FMI(internal=1,sort=10) / RIDE(internal=0,sort=20) 시드.
+    2. `prisma/schema.prisma` Company 모델 동기화 (그동안 누락된 `company_key/subdomain/logo_url/theme_json` 포함).
+    3. `app/api/companies/[id]/route.ts` PATCH `ALLOWED_COLS` 확장 (신규 7 컬럼 + `company_key`/`subdomain`/`theme_json`).
+    4. `app/hr/_components/CompanyMasterPanel.tsx` — 회사 목록 (color chip + 호스트/활성/순서) + 인라인 편집 + 「+ 회사 추가」 모달.
+  - **PR-HR-16 — role_templates (페이지 권한 묶음)**:
+    1. `migrations/2026-05-28_pr_hr_16_role_templates.sql` (멱등) — `role_templates` + `role_template_pages` 신설 + `user_page_permissions.source_template_id` 추가 + FMI/RIDE × admin/manager/staff/viewer 8개 기본 템플릿 시드.
+    2. `prisma/schema.prisma` — `RoleTemplate` / `RoleTemplatePage` 모델 신설 + `UserPagePermission.source_template_id` 추가.
+    3. `app/api/role-templates/route.ts` — GET `?company_key=` 목록 / POST 추가.
+    4. `app/api/role-templates/[id]/route.ts` — GET (pages 포함) / PATCH (헤더) / PUT (pages 일괄 교체) / DELETE.
+    5. `app/api/role-templates/[id]/apply/route.ts` — POST `{user_ids, mode: 'replace'|'merge'}` → user_page_permissions 일괄 INSERT (source_template_id 추적).
+    6. `app/hr/_components/RoleTemplatePanel.tsx` — 회사 필터 + 템플릿 목록 + 펼침 트리 (menu-registry MENUS 기반 view/create/edit/delete 체크박스) + 「적용」 모달 (직원 선택 + replace/merge 모드 + 결과 패널).
+  - **/hr 페이지 통합**:
+    · `SubTab` union 확장: `'companies' | 'roles'` (common 안, admin 만).
+    · `TAB_LABEL`: 🏛️ 회사 마스터 / 🎭 역할 템플릿.
+    · `visibleTabs` admin 가드 — admin 아니면 두 탭 자동 숨김.
+    · 렌더 분기: `topCompany === 'common' && topTab === 'companies' && role === 'admin' && <CompanyMasterPanel />` / `roles && <RoleTemplatePanel />`.
+  - 운영 사실 (Rule 25 인터뷰):
+    · 회사 관계: FMI ↔ RIDE = 무관 거래 (B2B 운영 위탁). FMI=내부 호스트.
+    · 권한: 회사별 격리 (자기 회사만). admin = 양사.
+    · 향후: 제 3 회사 추가 가능성 있음 → companies 마이그 없이 「+ 회사 추가」 UI 로 row 추가 (코드 동기화는 별도 deploy 토스트 안내).
+    · 이중 소속: 사용자 본인 1명만 — admin role 로 흡수 (별도 모델 X).
+    · 부서: 회사별 다른 트리 (현재 ride_departments 구조 유지).
+  - 효과: 직원 추가 → 회사 + 역할 선택 1번 → 페이지 권한 일괄 자동. 「사람마다 고민하고 페이지 설정」 페인 해소.
+
 - **PR-HR-14** (hr 세션) — hr 모듈 `useEmployees` SWR hook 도입 (실시간 동기화 1단계).
   - 사용자 요구: 「전체 페이지 사용자 표시 공통화 + 실시간 연동」 — 옵션 A 1단계 hr 모듈 입점 GO.
   - 현재 분산 상태 진단: `/api/profiles` 호출 5개 페이지 (admin/developer / admin / ProtectedRoute / PayrollOps / hr) — 각자 fetch + 캐시 X. 한 페이지 변경 → 다른 페이지 다음 mount 까지 옛 데이터.

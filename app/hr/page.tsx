@@ -14,6 +14,9 @@ import PayrollOps from './_components/PayrollOps'
 import RideOrgPanel from './_components/RideOrgPanel'
 // PR-HR-14 (2026-05-28) — SWR 기반 useEmployees hook (실시간 동기화 1단계)
 import { useEmployees } from '@/lib/hooks/useEmployees'
+// PR-HR-15+16 (2026-05-28) — multi-tenancy 회사 마스터 + 역할 템플릿 (admin 전용)
+import CompanyMasterPanel from './_components/CompanyMasterPanel'
+import RoleTemplatePanel from './_components/RoleTemplatePanel'
 
 // ────────────────────────────────────────────────────────────────
 // Auth Helper
@@ -108,23 +111,25 @@ export default function HRMasterPage() {
   // PR-HR-11a — 회사 토글 (FMI/RIDE/common) + 회사별 하위 탭 (TopTab 폐기).
   type Company = 'FMI' | 'RIDE' | 'common'
   type SubTab =
-    | 'employees' | 'org' | 'payroll'         // FMI / RIDE 공통 직원/조직도 + FMI 전용 payroll
-    | 'invitations' | 'freelancers' | 'admin' // common 전용
+    | 'employees' | 'org' | 'payroll'                 // FMI / RIDE 공통 직원/조직도 + FMI 전용 payroll
+    | 'invitations' | 'freelancers' | 'admin'         // common 전용
+    | 'companies' | 'roles'                            // PR-HR-15+16 — admin 전용 (common 안)
   const COMPANY_LABEL: Record<Company, string> = { FMI: '🏢 FMI', RIDE: '🚗 RIDE', common: '🔧 공통' }
   const TABS_BY_COMPANY: Record<Company, SubTab[]> = {
     FMI:    ['employees', 'org', 'payroll'],
     RIDE:   ['employees', 'org'],
-    common: ['invitations', 'freelancers', 'admin'],
+    // 'companies' / 'roles' 는 admin 만 — visibleTabs 에서 분기
+    common: ['invitations', 'freelancers', 'companies', 'roles', 'admin'],
   }
   // 권한 분기: admin (GOD) 은 전체. 그 외 user/master 는 본인 company_key + common.
   const myCompanyKey: 'FMI' | 'RIDE' = profile?.company_key === 'RIDE' ? 'RIDE' : 'FMI'
   const visibleCompanies: Company[] = role === 'admin'
     ? ['FMI', 'RIDE', 'common']
     : [myCompanyKey, 'common']
-  // common 탭의 「관리자」 서브탭은 admin 만 노출
+  // common 탭의 「관리자」「회사 마스터」「역할 템플릿」 서브탭은 admin 만 노출
   const visibleTabs = (c: Company): SubTab[] => {
     const base = TABS_BY_COMPANY[c]
-    if (c === 'common' && role !== 'admin') return base.filter(t => t !== 'admin')
+    if (c === 'common' && role !== 'admin') return base.filter(t => t !== 'admin' && t !== 'companies' && t !== 'roles')
     return base
   }
   // URL ?company= / ?tab= → 초기 state
@@ -1265,6 +1270,8 @@ export default function HRMasterPage() {
             invitations: '✉️ 초대',
             freelancers: '🤝 프리랜서',
             admin:       '🔧 시스템 관리자',
+            companies:   '🏛️ 회사 마스터',   // PR-HR-15
+            roles:       '🎭 역할 템플릿',  // PR-HR-16
           }
           const empFmiCount   = employees.filter(e => e.company_key !== 'RIDE' && e.role !== 'admin').length
           const empRideCount  = employees.filter(e => e.company_key === 'RIDE').length
@@ -1276,6 +1283,8 @@ export default function HRMasterPage() {
             invitations: invitations.length,
             freelancers: freelancers.length,
             admin:       empAdminCount,
+            companies:   undefined,  // PR-HR-15 (회사 마스터 — 동적 count 별도 fetch 없이 패널 안에서 표시)
+            roles:       undefined,  // PR-HR-16 (역할 템플릿)
           }
           return { key: t, label: TAB_LABEL[t], count: counts[t] }
         })}
@@ -1595,6 +1604,12 @@ export default function HRMasterPage() {
           {/* PR-HR-11a: externalSubTab 폐기 — RIDE 회사 탭의 직원/조직도 양쪽에서 마당 노출.
                 향후 PR-HR-11b 에서 직원/조직도 view 분리 + ERP 접근 컬럼 추가. */}
           {topCompany === 'RIDE' && (topTab === 'employees' || topTab === 'org') && <RideOrgPanel />}
+
+      {/* ─── 탭 (common/companies): 🏛️ 회사 마스터 — PR-HR-15 (admin 전용) ─── */}
+      {topCompany === 'common' && topTab === 'companies' && role === 'admin' && <CompanyMasterPanel />}
+
+      {/* ─── 탭 (common/roles): 🎭 역할 템플릿 — PR-HR-16 (admin 전용) ─── */}
+      {topCompany === 'common' && topTab === 'roles' && role === 'admin' && <RoleTemplatePanel />}
 
       {/* ─── 탭 (FMI/payroll): 💼 급여 운영 (PR-B7 — inline 컴포넌트 렌더) ─── */}
       {topCompany === 'FMI' && topTab === 'payroll' && (
