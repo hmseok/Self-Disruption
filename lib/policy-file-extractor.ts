@@ -14,12 +14,34 @@
  *   - 50MB 크기 제한
  */
 
-const officeParser = require('officeparser') as {
-  parseOfficeAsync: (buffer: Buffer, config?: Record<string, unknown>) => Promise<string>
+// Phase 2.3 hotfix2 (2026-05-28): officeparser ESM/CJS export 구조 다양성 대응.
+// 사용자 진단: "k.parseOfficeAsync is not a function" — root 에 함수 없음.
+type ParseOfficeAsyncFn = (buffer: Buffer, config?: Record<string, unknown>) => Promise<string>
+let _parseFn: ParseOfficeAsyncFn | null = null
+
+async function getParseOfficeAsync(): Promise<ParseOfficeAsyncFn> {
+  if (_parseFn) return _parseFn
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const mod: any = await import('officeparser')
+  // 가능한 모든 export 경로 시도:
+  const candidates: Array<unknown> = [
+    mod.parseOfficeAsync,
+    mod.default?.parseOfficeAsync,
+    mod.default,
+    mod,
+  ]
+  const fn = candidates.find((c) => typeof c === 'function') as ParseOfficeAsyncFn | undefined
+  if (!fn) {
+    const keys = Object.keys(mod || {}).join(',')
+    const defKeys = mod?.default ? Object.keys(mod.default).join(',') : '(no default)'
+    throw new Error(`officeparser parseOfficeAsync 함수 인식 실패. mod keys: [${keys}] / default keys: [${defKeys}]`)
+  }
+  _parseFn = fn
+  return _parseFn
 }
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024  // 50MB
-const TIMEOUT_MS = 30_000
+const TIMEOUT_MS = 60_000  // 60s (Cloud Run + chunk Gemini 여유)
 
 export interface FileExtractionResult {
   text: string
@@ -70,12 +92,24 @@ export async function extractTextFromBuffer(
     }
   }
 
+  // officeparser dynamic load + export 구조 자동 탐지
+  let parseOfficeAsync: ParseOfficeAsyncFn
+  try {
+    parseOfficeAsync = await getParseOfficeAsync()
+  } catch (loadErr) {
+    const lm = loadErr instanceof Error ? loadErr.message : String(loadErr)
+    throw new Error(`officeparser 모듈 로드 실패: ${lm}`)
+  }
+
   // officeparser timeout race
   const extracted = await Promise.race([
-    officeParser.parseOfficeAsync(buffer, {
+    parseOfficeAsync(buffer, {
       newlineDelimiter: '\n',
       ignoreNotes: false,
       putNotesAtLast: true,
+    }).catch((err: unknown) => {
+      const em = err instanceof Error ? err.message : String(err)
+      throw new Error(`officeparser 추출 실패 (.${ext}): ${em}`)
     }),
     new Promise<never>((_, reject) =>
       setTimeout(() => reject(new Error(`텍스트 추출 timeout (${TIMEOUT_MS / 1000}초)`)), TIMEOUT_MS)

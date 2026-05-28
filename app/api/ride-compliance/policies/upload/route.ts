@@ -45,28 +45,47 @@ export async function POST(request: Request) {
   let formData: FormData
   try {
     formData = await request.formData()
-  } catch {
-    return NextResponse.json({ success: false, error: 'multipart/form-data 필수' }, { status: 400 })
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    console.error('[policies/upload] formData parse 실패:', msg)
+    return NextResponse.json({ success: false, error: `multipart parse 실패: ${msg}`, stage: 'formData' }, { status: 400 })
   }
 
   const file = formData.get('file')
+  console.log('[policies/upload] file received:', {
+    isFile: file instanceof File,
+    type: typeof file,
+    name: file && typeof file === 'object' && 'name' in file ? (file as { name: string }).name : null,
+    size: file && typeof file === 'object' && 'size' in file ? (file as { size: number }).size : null,
+  })
   if (!(file instanceof File)) {
-    return NextResponse.json({ success: false, error: 'file 필드 필수 (multipart)' }, { status: 400 })
+    return NextResponse.json({ success: false, error: 'file 필드 필수 (multipart) — 파일이 도착하지 않음', stage: 'file_check' }, { status: 400 })
   }
   const userCode = (formData.get('policy_code') as string || '').trim()
 
   // 1. 파일 → Buffer
-  const arrayBuffer = await file.arrayBuffer()
-  const buffer = Buffer.from(arrayBuffer)
-  const ext = extractExt(file.name)
+  let buffer: Buffer
+  let ext: string
+  try {
+    const arrayBuffer = await file.arrayBuffer()
+    buffer = Buffer.from(arrayBuffer)
+    ext = extractExt(file.name)
+    console.log(`[policies/upload] buffer ${buffer.length} bytes, ext .${ext}`)
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    console.error('[policies/upload] buffer 변환 실패:', msg)
+    return NextResponse.json({ success: false, error: `buffer 변환 실패: ${msg}`, stage: 'buffer' }, { status: 400 })
+  }
 
   // 2. 텍스트 추출
   let extracted
   try {
     extracted = await extractTextFromBuffer(buffer, file.name)
+    console.log(`[policies/upload] extracted ${extracted.text.length} chars, warnings=${extracted.warnings.length}`)
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
-    return NextResponse.json({ success: false, error: `파일 추출 실패: ${msg}` }, { status: 400 })
+    console.error('[policies/upload] 텍스트 추출 실패:', msg)
+    return NextResponse.json({ success: false, error: `파일 추출 실패: ${msg}`, stage: 'extract', file_ext: ext, file_size: buffer.length }, { status: 400 })
   }
 
   if (extracted.text.length < 100) {
