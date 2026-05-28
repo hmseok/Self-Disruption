@@ -2029,8 +2029,37 @@ function AssetModal(props: { onClose: () => void; onSaved: () => void }) {
       props.onSaved()
     } catch (e) { setError(String(e)) } finally { setSaving(false) }
   }
+  // P24 — 매뉴얼 명시 자산 prefill (제10/13/16/17/19조)
+  const MANUAL_ASSETS = [
+    { btn: '🏢 본사 서버실', name: '본사 3F 서버실', asset_type: 'facility', classification: 'confidential', location: '본사 3F', os_or_spec: '', contains_pii: false, access_control: '출입통제 + 잠금장치', encryption_status: 'none', notes: '매뉴얼 제10조 — 보호구역 지정' },
+    { btn: '🗄 고객 DB', name: '고객 개인정보 DB', asset_type: 'database', classification: 'confidential', location: 'GCP Cloud SQL', os_or_spec: 'MySQL 8.0', contains_pii: true, access_control: '2FA + IP 화이트리스트', encryption_status: 'full', notes: '매뉴얼 제13조 — 주민번호·신용카드·계좌번호 암호화' },
+    { btn: '📷 CCTV', name: '본사 출입구 CCTV', asset_type: 'cctv', classification: 'internal', location: '본사 1F 출입구', os_or_spec: '', contains_pii: true, access_control: 'CCTV 관리책임자만', encryption_status: 'none', notes: '매뉴얼 제17조 — 안내판 부착 + 보관기간 운영' },
+    { btn: '💻 직원 PC', name: '직원 업무 PC', asset_type: 'pc', classification: 'internal', location: '본사', os_or_spec: 'Windows 11 + 백신', contains_pii: false, access_control: '비밀번호 8자+, 백신', encryption_status: 'partial', notes: '매뉴얼 제16조 — 보안프로그램 + 제14조 패스워드 정책' },
+    { btn: '🆔 인사 DB', name: '인사 정보 DB (주민번호)', asset_type: 'database', classification: 'confidential', location: 'GCP Cloud SQL', os_or_spec: 'MySQL 8.0', contains_pii: true, access_control: '인사팀만 2FA', encryption_status: 'full', notes: '매뉴얼 제19조 — 주민등록번호 처리 제한' },
+  ] as const
+  const prefillAsset = (m: typeof MANUAL_ASSETS[number]) => {
+    setForm({
+      name: m.name, asset_type: m.asset_type, classification: m.classification,
+      location: m.location, os_or_spec: m.os_or_spec, contains_pii: m.contains_pii,
+      access_control: m.access_control, encryption_status: m.encryption_status,
+      acquired_at: form.acquired_at, notes: m.notes,
+    })
+  }
   return (
     <Modal title="📦 정보자산 등록" onClose={props.onClose}>
+      <div style={{ marginBottom: 8, fontSize: 12, color: COLORS.textSecondary }}>
+        📜 매뉴얼 규정 자산 — 클릭으로 자동 채움
+      </div>
+      <div style={{ display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap' }}>
+        {MANUAL_ASSETS.map((m) => (
+          <button key={m.btn} onClick={() => prefillAsset(m)}
+            style={{
+              ...GLASS.L2, padding: '6px 12px', borderRadius: 6, cursor: 'pointer',
+              border: form.name === m.name ? `2px solid ${COLORS.primary}` : `1px solid ${COLORS.borderSubtle}`,
+              fontSize: 12, color: COLORS.textPrimary, whiteSpace: 'nowrap',
+            }}>{m.btn}</button>
+        ))}
+      </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
         <Field label="자산명 *"><input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} style={inpStyle()} /></Field>
         <Field label="유형 *"><select value={form.asset_type} onChange={e => setForm({ ...form, asset_type: e.target.value })} style={inpStyle()}>
@@ -2081,9 +2110,47 @@ function IncidentModal(props: { assets: Asset[]; onClose: () => void; onSaved: (
       props.onSaved()
     } catch (e) { setError(String(e)) } finally { setSaving(false) }
   }
+  // P24 — 매뉴얼 명시 침해 유형 prefill (제25~27조)
+  const MANUAL_INCIDENTS = [
+    { btn: '👤 내부 유출', incident_type: 'internal_leak', severity: 'high',
+      title: '내부 직원에 의한 개인정보 유출 의심',
+      cause_summary: '내부 임직원이 업무 범위 외 개인정보를 외부 반출한 것으로 의심.',
+      containment_actions: '제25조 ① 단서 — 즉시 접속 차단 + 권한 회수 + 유출 데이터 식별·삭제. 제26조 관리팀 즉시 대응.' },
+    { btn: '🌐 외부 해킹', incident_type: 'external_hack', severity: 'critical',
+      title: '외부 해킹 시도 또는 침입 감지',
+      cause_summary: '비인가 IP 의 접근 / SQL Injection / 권한 상승 시도 감지.',
+      containment_actions: '제25조 ① 단서 — 접속경로 차단 + 취약점 점검·보완 + KISA 신고 검토. 제16조 보안프로그램 긴급 패치.' },
+    { btn: '🦠 바이러스', incident_type: 'virus', severity: 'medium',
+      title: '바이러스·랜섬웨어 감염',
+      cause_summary: '직원 PC 의 바이러스 감염 또는 랜섬웨어 의심 파일 실행.',
+      containment_actions: '제16조 보안프로그램 즉시 실행 + 감염 PC 네트워크 격리 + 백업 복원.' },
+    { btn: '🤝 수탁사 유출', incident_type: 'vendor_leak', severity: 'high',
+      title: '수탁업체 측 개인정보 유출',
+      cause_summary: '제24조 수탁사가 위탁받은 개인정보를 분실·유출·오남용한 것으로 보고됨.',
+      containment_actions: '제24조 ④ — 수탁자 즉시 교육 + 처리현황 점검 + 위탁 계약 위반 시 시정 요구. 정보주체 통지 절차 동시 진행.' },
+  ] as const
+  const prefillIncident = (m: typeof MANUAL_INCIDENTS[number]) => {
+    setForm({
+      ...form,
+      title: m.title, incident_type: m.incident_type, severity: m.severity,
+      cause_summary: m.cause_summary, containment_actions: m.containment_actions,
+    })
+  }
   return (
     <Modal title="🚨 침해사고 신고 (제27조)" onClose={props.onClose}>
-      <NoticeBox color={COLORS.warning} text="매뉴얼 제27조 — 즉시 모든 직원은 관리팀에 사고 접수. 제25조 ① — 정보주체 24시간 이내 통지 의무." />
+      <div style={{ marginBottom: 8, fontSize: 12, color: COLORS.textSecondary }}>
+        📜 매뉴얼 명시 유형 — 클릭으로 자동 채움. <strong style={{ color: COLORS.warning }}>제25조 ① 24시간 이내 통지 의무</strong>
+      </div>
+      <div style={{ display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap' }}>
+        {MANUAL_INCIDENTS.map((m) => (
+          <button key={m.btn} onClick={() => prefillIncident(m)}
+            style={{
+              ...GLASS.L2, padding: '6px 12px', borderRadius: 6, cursor: 'pointer',
+              border: form.incident_type === m.incident_type && form.title === m.title ? `2px solid ${COLORS.primary}` : `1px solid ${COLORS.borderSubtle}`,
+              fontSize: 12, color: COLORS.textPrimary, whiteSpace: 'nowrap',
+            }}>{m.btn}</button>
+        ))}
+      </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
         <Field label="사고 제목 *" full><input value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} style={inpStyle()} /></Field>
         <Field label="유형 *"><select value={form.incident_type} onChange={e => setForm({ ...form, incident_type: e.target.value })} style={inpStyle()}>
@@ -2127,11 +2194,39 @@ function OfficerModal(props: { onClose: () => void; onSaved: () => void }) {
       props.onSaved()
     } catch (e) { setError(String(e)) } finally { setSaving(false) }
   }
+  // P23 — 매뉴얼 명시 3인 prefill (클릭 한 번에 직책/역할/비고 자동 채움)
+  const MANUAL_OFFICERS = [
+    { name: '임성민 이사', role: 'cpo',     display_title: '라이드케어 개인정보보호 책임자 (CPO)', notes: '매뉴얼 통합본 5.17 제6조 명시 — 임성민 이사' },
+    { name: '석호민 부장', role: 'manager', display_title: '라이드케어 개인정보보호 관리자',       notes: '매뉴얼 통합본 5.17 제6조 명시 — 석호민 부장' },
+    { name: '양재희 부장', role: 'manager', display_title: '라이드케어 개인정보보호 관리자',       notes: '매뉴얼 통합본 5.17 제6조 명시 — 양재희 부장' },
+  ]
+  const prefill = (m: typeof MANUAL_OFFICERS[number]) => {
+    setForm({ ...form, role: m.role, display_title: m.display_title, notes: m.notes })
+  }
+
   return (
     <Modal title="👔 임명 등록" onClose={props.onClose}>
-      <NoticeBox color={COLORS.info} text="매뉴얼 통합본 5.17 제6조 명시 인원: 임성민 이사 (CPO), 석호민 부장 (관리자), 양재희 부장 (관리자). user_id 는 profiles 의 cuid." />
+      <div style={{ marginBottom: 12, fontSize: 12, color: COLORS.textSecondary }}>
+        📜 매뉴얼 통합본 5.17 제6조 명시 인원 — 클릭하면 직책·역할·비고 자동 채움. user_id 만 추가 입력.
+      </div>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
+        {MANUAL_OFFICERS.map((m) => (
+          <button key={m.name} onClick={() => prefill(m)}
+            style={{
+              ...GLASS.L2, padding: '10px 14px', borderRadius: 8, cursor: 'pointer',
+              border: form.display_title === m.display_title && form.notes === m.notes
+                ? `2px solid ${COLORS.primary}` : `1px solid ${COLORS.borderSubtle}`,
+              fontSize: 12, color: COLORS.textPrimary, textAlign: 'left',
+            }}>
+            <div style={{ fontWeight: 700 }}>📋 {m.name}</div>
+            <div style={{ fontSize: 11, color: COLORS.textMuted }}>
+              {m.role === 'cpo' ? '🛡 CPO' : '👤 관리자'} · {m.display_title}
+            </div>
+          </button>
+        ))}
+      </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-        <Field label="user_id (cuid) *" full><input value={form.user_id} onChange={e => setForm({ ...form, user_id: e.target.value })} placeholder="profiles.id" style={inpStyle()} /></Field>
+        <Field label="user_id (cuid) *" full><input value={form.user_id} onChange={e => setForm({ ...form, user_id: e.target.value })} placeholder="profiles.id (cuid — 사용자 검색은 추후)" style={inpStyle()} /></Field>
         <Field label="역할 *"><select value={form.role} onChange={e => setForm({ ...form, role: e.target.value })} style={inpStyle()}>
           {Object.entries(ROLE_LABEL).map(([k, v]) => <option key={k} value={k}>{v.emoji} {v.label}</option>)}
         </select></Field>
