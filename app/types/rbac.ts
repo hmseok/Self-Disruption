@@ -28,6 +28,7 @@ export interface Profile {
   role: 'admin' | 'user'
   position_id?: string
   department_id?: string
+  company_id?: string                          // PR-MULTI-BRAND P1 (2026-05-24) — FK to companies
   employee_name?: string
   phone?: string
   email?: string
@@ -36,6 +37,9 @@ export interface Profile {
   // 조인된 데이터
   position?: Position
   department?: Department
+  // PR-HR-7 (2026-05-26) + PR-HR-11a (2026-05-27) — LEFT JOIN companies 평탄화
+  company?: { id: string; key: string | null; name: string | null } | null
+  company_key?: string | null                  // 'FMI' | 'RIDE' | null — getSoSokType / 회사 토글 권한 분기 직접 사용
 }
 
 // ============================================

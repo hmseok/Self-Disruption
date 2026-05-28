@@ -3,6 +3,29 @@
 > Rule 22 (_docs 의무) — 매 PR 한 줄 이상.
 > 세션: peaceful-laughing-volta (hr 세션, 2026-05-16~)
 
+## 2026-05-28
+
+- **PR-HR-11a** (hr 세션) — `/hr` 회사 토글 + 회사별 하위 탭 리뉴얼 (UI 골격).
+  - 사용자 요구 (2026-05-27/28):
+    1. 「company 추가 후 인사 마스터 UI 구조 리뉴얼」 — 옵션 A 회사 토글 + 하위 탭 (사용자 GO).
+    2. 「이중탭 UI 부자연스러움」 (외부 인력 → 프리랜서/라이드 서브탭) — 동일 PR 안에서 해소.
+  - 구조 변경:
+    1. 기존 5 탭 (employees/org/invitations/external/payroll) → 회사 토글 (FMI/RIDE/common) + 회사별 하위 탭.
+       · FMI: 직원 / 조직도 / 급여 운영
+       · RIDE: 직원 / 조직도 (RideOrgPanel — 양쪽 탭에서 마당 노출)
+       · common: 초대 / 프리랜서 / 시스템 관리자 (admin 만)
+    2. `profile.company_key` 기반 권한 분리 — admin GOD = 전체 / user|master = 본인 회사 + common.
+    3. URL `?company=&tab=` sync (새로고침 + 공유 가능).
+    4. 이중탭 (externalSubTab freelancer/ride) **폐기** — freelancer 는 common 탭, ride 는 RIDE 탭으로 마당 흡수.
+    5. 「소속 유형」 필터 (sosokFilter DcToolbar) 폐기 — 회사 토글이 그 역할 대체.
+  - API: `/api/profiles/me` LEFT JOIN companies + `company_key` 평탄화 (PR-HR-7 와 동형 패턴 Rule 14, graceful fallback Rule 23).
+  - types: `app/types/rbac.ts` `Profile` 타입 `company_id` / `company_key` / `company` 필드 추가.
+
+- **PR-HR-12-hotfix** (hr 세션) — `getEmpStatus` TDZ 회피 (filteredEmployees useMemo 위로 이동).
+  - PR-HR-12 가 `statusFilter` 디폴트 'active' 변경 → 첫 렌더 시 useMemo callback 이 즉시 `getEmpStatus(e)` 호출 → const 화살표 함수 미정의 → ReferenceError. 사용자 보고: 「Application error: client-side exception」.
+  - 조치: `type EmpStatus + const getEmpStatus` 정의를 `filteredEmployees` useMemo 보다 위로 이동.
+  - 재발 방지 원칙: const 화살표 함수는 사용 코드보다 위에 정의 의무 (function declaration 만 hoisting).
+
 ## 2026-05-27
 
 - **PR-HR-13** (hr 세션) — InviteModal 페이지 권한 menu-registry 단일 source 동기화.

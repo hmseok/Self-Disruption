@@ -76,7 +76,11 @@ const ROLE_COLORS: Record<string, { bg: string; color: string }> = {
 }
 
 export default function HRMasterPage() {
-  const { user, company, role } = useApp()
+  // PR-HR-11a (2026-05-27, hr 세션) — 회사 토글 + 하위 탭 리뉴얼.
+  //   기존 5 탭 (employees/org/invitations/external/payroll) → 회사 토글 (FMI/RIDE/공통) + 동적 하위 탭.
+  //   profile.company_key (PR-HR-7 + /me LEFT JOIN companies) 기반 권한 분기.
+  //   사용자 새 이슈 「이중탭 부자연스러움」 (external → 프리랜서/라이드 서브탭) 폐기.
+  const { user, profile, company, role } = useApp()
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -97,28 +101,63 @@ export default function HRMasterPage() {
   //   기존 'all' 디폴트 → 퇴사자가 메인 목록에 노출되어 「완전 삭제 후에도 안 사라짐」 오해 유발.
   const [statusFilter, setStatusFilter] = useState('active')
 
-  // 탭 상태 — 통합 페이지 5 탭 (모두 inline — PR-B7)
-  type TopTab = 'employees' | 'org' | 'invitations' | 'external' | 'payroll'
-  const TOP_TABS: TopTab[] = ['employees', 'org', 'invitations', 'external', 'payroll']
-  const initialTab = (() => {
-    const q = searchParams?.get('tab') as TopTab | null
-    if (q && TOP_TABS.includes(q)) return q
-    return 'employees' as TopTab
+  // PR-HR-11a — 회사 토글 (FMI/RIDE/common) + 회사별 하위 탭 (TopTab 폐기).
+  type Company = 'FMI' | 'RIDE' | 'common'
+  type SubTab =
+    | 'employees' | 'org' | 'payroll'         // FMI / RIDE 공통 직원/조직도 + FMI 전용 payroll
+    | 'invitations' | 'freelancers' | 'admin' // common 전용
+  const COMPANY_LABEL: Record<Company, string> = { FMI: '🏢 FMI', RIDE: '🚗 RIDE', common: '🔧 공통' }
+  const TABS_BY_COMPANY: Record<Company, SubTab[]> = {
+    FMI:    ['employees', 'org', 'payroll'],
+    RIDE:   ['employees', 'org'],
+    common: ['invitations', 'freelancers', 'admin'],
+  }
+  // 권한 분기: admin (GOD) 은 전체. 그 외 user/master 는 본인 company_key + common.
+  const myCompanyKey: 'FMI' | 'RIDE' = profile?.company_key === 'RIDE' ? 'RIDE' : 'FMI'
+  const visibleCompanies: Company[] = role === 'admin'
+    ? ['FMI', 'RIDE', 'common']
+    : [myCompanyKey, 'common']
+  // common 탭의 「관리자」 서브탭은 admin 만 노출
+  const visibleTabs = (c: Company): SubTab[] => {
+    const base = TABS_BY_COMPANY[c]
+    if (c === 'common' && role !== 'admin') return base.filter(t => t !== 'admin')
+    return base
+  }
+  // URL ?company= / ?tab= → 초기 state
+  const initialCompany = (() => {
+    const q = searchParams?.get('company') as Company | null
+    if (q && (['FMI','RIDE','common'] as const).includes(q) && visibleCompanies.includes(q)) return q
+    return visibleCompanies[0]
   })()
-  const [topTab, setTopTab] = useState<TopTab>(initialTab)
-  // PR-HR-2b — 「외부 인력」 탭 서브탭 (프리랜서 / 라이드 인력)
-  const [externalSubTab, setExternalSubTab] = useState<'freelancer' | 'ride'>('freelancer')
-  // querystring 변경 시 탭 동기화 + 탭 변경 시 querystring 반영
+  const initialTab = (() => {
+    const q = searchParams?.get('tab') as SubTab | null
+    const allowed = visibleTabs(initialCompany)
+    if (q && allowed.includes(q)) return q
+    return allowed[0]
+  })()
+  const [topCompany, setTopCompany] = useState<Company>(initialCompany)
+  const [topTab, setTopTab] = useState<SubTab>(initialTab)
+  // querystring 변경 시 동기화
   useEffect(() => {
-    const q = searchParams?.get('tab') as TopTab | null
-    if (q && TOP_TABS.includes(q)) setTopTab(q)
+    const c = searchParams?.get('company') as Company | null
+    const t = searchParams?.get('tab') as SubTab | null
+    if (c && (['FMI','RIDE','common'] as const).includes(c) && visibleCompanies.includes(c)) setTopCompany(c)
+    if (t) setTopTab(t)
   }, [searchParams])
-  const changeTab = (next: TopTab) => {
-    setTopTab(next)
-    // querystring 부드럽게 반영 (페이지 reload 없음)
-    const url = next === 'employees' ? '/hr' : `/hr?tab=${next}`
+  // 회사/탭 변경 헬퍼 — URL 부드럽게 반영
+  const changeCompany = (next: Company) => {
+    const allowed = visibleTabs(next)
+    const nextTab = allowed.includes(topTab) ? topTab : allowed[0]
+    setTopCompany(next)
+    setTopTab(nextTab)
     if (typeof window !== 'undefined' && window.history) {
-      window.history.replaceState({}, '', url)
+      window.history.replaceState({}, '', `/hr?company=${next}&tab=${nextTab}`)
+    }
+  }
+  const changeTab = (next: SubTab) => {
+    setTopTab(next)
+    if (typeof window !== 'undefined' && window.history) {
+      window.history.replaceState({}, '', `/hr?company=${topCompany}&tab=${next}`)
     }
   }
   // 옛 권한 master-detail 잔여 코드 호환 (사용 X)
@@ -1193,34 +1232,61 @@ export default function HRMasterPage() {
         ]}
       />
 
-      {/* 통합 페이지 4 탭 */}
+      {/* PR-HR-11a — 회사 토글 (1단계). 사용자 보고 '이중탭 부자연스러움' 해소.
+            company_key 기반 권한 분리 (admin GOD 전체 / user/master 본인 회사 + common).
+            visibleCompanies 가 권한별 표시 제어. */}
       <DcToolbar
         search=""
         onSearchChange={() => {}}
         noSearch
-        filters={[
-          { key: 'employees', label: '👥 직원 관리', count: employees.length },
-          { key: 'org', label: '🏢 부서 · 직급', count: positions.length + departments.length },
-          { key: 'invitations', label: '✉️ 초대 관리', count: invitations.length },
-          { key: 'external', label: '👤 외부 인력', count: freelancers.length + rideEmployees.length },
-          { key: 'payroll', label: '💼 급여 운영' },
-        ]}
+        filters={visibleCompanies.map(c => {
+          const fmiCount = employees.filter(e => e.company_key !== 'RIDE' && e.role !== 'admin').length
+          const rideCount = employees.filter(e => e.company_key === 'RIDE').length
+          const commonCount = invitations.length + freelancers.length
+          const count = c === 'FMI' ? fmiCount : c === 'RIDE' ? rideCount : commonCount
+          return { key: c, label: COMPANY_LABEL[c], count }
+        })}
+        activeFilter={topCompany}
+        onFilterChange={(key) => changeCompany(key as Company)}
+      />
+
+      {/* PR-HR-11a — 회사별 하위 탭 (2단계). 선택된 회사의 TABS_BY_COMPANY 기반. */}
+      <DcToolbar
+        search=""
+        onSearchChange={() => {}}
+        noSearch
+        filters={visibleTabs(topCompany).map(t => {
+          const TAB_LABEL: Record<SubTab, string> = {
+            employees:   '👥 직원',
+            org:         '🏢 조직도',
+            payroll:     '💰 급여 운영',
+            invitations: '✉️ 초대',
+            freelancers: '🤝 프리랜서',
+            admin:       '🔧 시스템 관리자',
+          }
+          const empFmiCount   = employees.filter(e => e.company_key !== 'RIDE' && e.role !== 'admin').length
+          const empRideCount  = employees.filter(e => e.company_key === 'RIDE').length
+          const empAdminCount = employees.filter(e => e.role === 'admin').length
+          const counts: Record<SubTab, number | undefined> = {
+            employees:   topCompany === 'RIDE' ? empRideCount : empFmiCount,
+            org:         topCompany === 'RIDE' ? rideEmployees.length : (positions.length + departments.length),
+            payroll:     undefined,
+            invitations: invitations.length,
+            freelancers: freelancers.length,
+            admin:       empAdminCount,
+          }
+          return { key: t, label: TAB_LABEL[t], count: counts[t] }
+        })}
         activeFilter={topTab}
-        onFilterChange={(key) => changeTab(key as TopTab)}
+        onFilterChange={(key) => changeTab(key as SubTab)}
       />
 
       {/* ─── 탭 1: 직원 관리 ─── */}
-      {topTab === 'employees' && (
+      {/* PR-HR-11a — FMI 직원 / 공통 관리자 — 같은 NeuDataTable UI 재사용.
+            소속 유형 필터 (sosokFilter) DcToolbar 폐기 — 회사 토글이 그 역할 대체.
+            filteredEmployees 가 topCompany/topTab 기반 분기 (아래 useMemo). */}
+      {((topCompany === 'FMI' && topTab === 'employees') || (topCompany === 'common' && topTab === 'admin')) && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {/* 소속 유형 필터 — FMI / RIDE 직원 / 시스템 관리자 구분 */}
-          <DcToolbar
-            search=""
-            onSearchChange={() => {}}
-            noSearch
-            filters={SOSOK_FILTER_ITEMS}
-            activeFilter={sosokFilter}
-            onFilterChange={(key) => setSosokFilter(key as 'all' | SoSokType)}
-          />
           {/* 검색 + 활성/비활성 필터 */}
           <DcToolbar
             search={searchTerm}
@@ -1242,8 +1308,8 @@ export default function HRMasterPage() {
         </div>
       )}
 
-      {/* ─── 탭 2: 부서 · 직급 ─── */}
-      {topTab === 'org' && (
+      {/* ─── 탭 2: 부서 · 직급 (FMI 조직도) ─── PR-HR-11a */}
+      {topCompany === 'FMI' && topTab === 'org' && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           {/* 직급 */}
           <div style={{ ...glassCard, padding: 20 }}>
@@ -1334,7 +1400,7 @@ export default function HRMasterPage() {
       )}
 
       {/* ─── 탭 3: 초대 관리 ─── */}
-      {topTab === 'invitations' && (
+      {topCompany === 'common' && topTab === 'invitations' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
             <button onClick={() => setShowInviteModal(true)}
@@ -1353,30 +1419,13 @@ export default function HRMasterPage() {
         </div>
       )}
 
-      {/* ─── 탭 4: 외부 인력 ─── */}
-      {topTab === 'external' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {/* 안내 */}
-          <div style={{ background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.2)', borderRadius: 10, padding: '8px 14px', fontSize: 12, color: '#2563eb' }}>
-            💡 외부 인력은 직원 (profiles) 과 별개 — 시스템 권한/계정 X. <b>등록/수정은 여기서</b>, <b>월별 지급</b>은 「💼 급여 운영 → 프리랜서 지급」 탭.
-          </div>
+      {/* ─── PR-HR-11a — 외부 인력 wrapping + 이중탭 폐기.
+            기존: {topTab==='external'} 안 서브탭(freelancer/ride) — 사용자 보고 「부자연스러움」.
+            신규: freelancer → 공통 탭의 「프리랜서」 / ride → RIDE 회사의 「직원」 (1단계).
+            안내 메시지는 프리랜서 컨텐츠 안으로 흡수 (등록/지급 위치 안내). ─── */}
 
-          {/* 서브탭 — 프리랜서 / 라이드 인력 (PR-HR-2b) */}
-          <div style={{ display: 'flex', gap: 8 }}>
-            {([['freelancer', `🤝 프리랜서 ${freelancers.length}`], ['ride', `🚗 라이드 인력 ${rideEmployees.length}`]] as const).map(([key, label]) => (
-              <button key={key} onClick={() => setExternalSubTab(key)}
-                style={{
-                  padding: '6px 16px', fontSize: 13, fontWeight: 600, borderRadius: 8, cursor: 'pointer', border: 'none',
-                  background: externalSubTab === key ? '#3b6eb5' : 'transparent',
-                  color: externalSubTab === key ? '#fff' : '#64748b',
-                }}>
-                {label}
-              </button>
-            ))}
-          </div>
-
-          {/* 프리랜서 */}
-          {externalSubTab === 'freelancer' && (
+          {/* ─── 탭 (common/freelancers): 프리랜서 ─── */}
+          {topCompany === 'common' && topTab === 'freelancers' && (
           <div style={{ ...glassCard, padding: 20 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
               <h3 style={{ fontSize: 14, fontWeight: 700, color: '#1e293b', margin: 0 }}>🤝 프리랜서 ({freelancers.length})</h3>
@@ -1540,13 +1589,13 @@ export default function HRMasterPage() {
           </div>
           )}
 
-          {/* 라이드케어 인력 부서 관리 — PR-HR-2 (부서 트리/부서장/일괄변경/focus) */}
-          {externalSubTab === 'ride' && <RideOrgPanel />}
-        </div>
-      )}
+          {/* ─── 탭 (RIDE/employees|org): 라이드 조직 — PR-HR-2 (부서 트리/부서장/일괄변경/focus) ─── */}
+          {/* PR-HR-11a: externalSubTab 폐기 — RIDE 회사 탭의 직원/조직도 양쪽에서 마당 노출.
+                향후 PR-HR-11b 에서 직원/조직도 view 분리 + ERP 접근 컬럼 추가. */}
+          {topCompany === 'RIDE' && (topTab === 'employees' || topTab === 'org') && <RideOrgPanel />}
 
-      {/* ─── 탭 5: 💼 급여 운영 (PR-B7 — inline 컴포넌트 렌더) ─── */}
-      {topTab === 'payroll' && (
+      {/* ─── 탭 (FMI/payroll): 💼 급여 운영 (PR-B7 — inline 컴포넌트 렌더) ─── */}
+      {topCompany === 'FMI' && topTab === 'payroll' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           <PayrollOps />
         </div>
