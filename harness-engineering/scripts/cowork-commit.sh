@@ -101,7 +101,11 @@ echo ""
 #   (a) 5분 이상 묵은 lock — 시간 기반 (기존)
 #   (b) 0-byte lock — disk-full / crash 잔존 (시간 무관 즉시 제거)
 #   (c) unlink 실패 (다른 UID 소유) → mac 터미널 한 줄 안내
-STALE_LOCKS=$(find .git -maxdepth 3 -name "*.lock" \( -mmin +5 -o -empty \) 2>/dev/null)
+# 2026-05-28 hotfix (PR-COORD-15):
+#   exec 9>"$LOCK_FILE" 가 자기 락 파일을 0-byte 로 truncate 함 → find -empty 가
+#   본 락도 잡아서 stale 로 오인 → 자기 락 rm 시도 → FUSE mount .git/ unlink 제한
+#   (mac sandbox 격리) 으로 EPERM → 매번 차단 발생. fix: 자기 락 제외.
+STALE_LOCKS=$(find .git -maxdepth 3 -name "*.lock" \( -mmin +5 -o -empty \) ! -path ".git/cowork-pipeline.lock" 2>/dev/null)
 if [ -n "$STALE_LOCKS" ]; then
   echo "⚠ stale / 0-byte lock 검출 — 제거 시도:"
   echo "$STALE_LOCKS" | sed 's/^/   /'
