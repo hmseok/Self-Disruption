@@ -24,17 +24,10 @@ SELECT UUID(), '기아', '모닝', 2026, 'seed',
   JSON_OBJECT(
     'brand', '기아', 'model', '모닝', 'year', 2026, 'available', true, 'source', 'seed',
     'variants', JSON_ARRAY(
-      JSON_OBJECT('variant_name', '기본', 'fuel_type', '가솔린', 'engine_cc', 998,
+      JSON_OBJECT('variant_name', '가솔린', 'fuel_type', '가솔린', 'engine_cc', 998,
         'trims', JSON_ARRAY(
-          JSON_OBJECT('name', '트렌디', 'base_price', 13500000,
-            'exterior_colors', JSON_ARRAY(JSON_OBJECT('name', '클리어 화이트', 'price', 0), JSON_OBJECT('name', '미드나잇 블랙', 'price', 0)),
-            'interior_colors', JSON_ARRAY(JSON_OBJECT('name', '블랙', 'price', 0)),
-            'options', JSON_ARRAY())),
-          JSON_OBJECT('name', '프레스티지', 'base_price', 15800000,
-            'exterior_colors', JSON_ARRAY(JSON_OBJECT('name', '클리어 화이트', 'price', 0), JSON_OBJECT('name', '미드나잇 블랙', 'price', 0), JSON_OBJECT('name', '실키 실버', 'price', 0)),
-            'interior_colors', JSON_ARRAY(JSON_OBJECT('name', '블랙', 'price', 0)),
-            'options', JSON_ARRAY(JSON_OBJECT('name', '후방카메라', 'price', 0), JSON_OBJECT('name', '내비게이션', 'price', 0)))
-        ))
+          JSON_OBJECT('name', '트렌디', 'base_price', 13500000, 'exterior_colors', JSON_ARRAY(), 'interior_colors', JSON_ARRAY(), 'options', JSON_ARRAY()),
+          JSON_OBJECT('name', '프레스티지', 'base_price', 15800000, 'exterior_colors', JSON_ARRAY(), 'interior_colors', JSON_ARRAY(), 'options', JSON_ARRAY())))
     )),
   NOW(), NOW()
 FROM dual WHERE NOT EXISTS (
