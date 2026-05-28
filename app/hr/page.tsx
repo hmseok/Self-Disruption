@@ -19,6 +19,8 @@ import { useEmployees } from '@/lib/hooks/useEmployees'
 // PR-HR-15+16 (2026-05-28) — multi-tenancy 회사 마스터 + 역할 템플릿 (admin 전용)
 import CompanyMasterPanel from './_components/CompanyMasterPanel'
 import RoleTemplatePanel from './_components/RoleTemplatePanel'
+// PR-HR-20 (2026-05-28) — EmployeeListPanel 추출 (FMI/RIDE/공통 직원 리스트 통일 패널)
+import EmployeeListPanel from './_components/EmployeeListPanel'
 
 // ────────────────────────────────────────────────────────────────
 // Auth Helper
@@ -1295,27 +1297,24 @@ export default function HRMasterPage() {
       {/* PR-HR-11a — FMI 직원 / 공통 관리자 — 같은 NeuDataTable UI 재사용.
             소속 유형 필터 (sosokFilter) DcToolbar 폐기 — 회사 토글이 그 역할 대체.
             filteredEmployees 가 topCompany/topTab 기반 분기 (아래 useMemo). */}
+      {/* PR-HR-20 (2026-05-28) — FMI 직원 탭 / 공통 admin 탭 — EmployeeListPanel 표준 사용 */}
       {((topCompany === 'FMI' && topTab === 'employees') || (topCompany === 'common' && topTab === 'admin')) && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {/* 검색 + 활성/비활성 필터 */}
-          <DcToolbar
-            search={searchTerm}
-            onSearchChange={setSearchTerm}
-            placeholder="이름, 이메일, 부서, 직급 검색..."
-            filters={FILTER_ITEMS}
-            activeFilter={statusFilter}
-            onFilterChange={setStatusFilter}
-          />
-          <NeuDataTable
-            columns={employeeColumns}
-            data={filteredEmployees}
-            rowKey={(emp) => emp.id}
-            onRowClick={openEditModal}
-            emptyMessage="직원이 없습니다 — 「✉️ 초대 관리」 탭에서 새 직원 초대"
-            mobileCard={employeeMobileCard}
-            loading={false}
-          />
-        </div>
+        <EmployeeListPanel
+          companyKey={topCompany}
+          employees={filteredEmployees}
+          searchTerm={searchTerm}
+          onSearchChange={setSearchTerm}
+          filters={FILTER_ITEMS}
+          activeFilter={statusFilter}
+          onFilterChange={setStatusFilter}
+          columns={employeeColumns}
+          rowKey={(emp: any) => emp.id}
+          onRowClick={openEditModal}
+          emptyMessage={topCompany === 'common'
+            ? '시스템 관리자 직원이 없습니다'
+            : '직원이 없습니다 — 「✉️ 초대 관리」 탭에서 새 직원 초대'}
+          mobileCard={employeeMobileCard}
+        />
       )}
 
       {/* ─── 탭 2: 부서 · 직급 (FMI 조직도) ─── PR-HR-11a */}
