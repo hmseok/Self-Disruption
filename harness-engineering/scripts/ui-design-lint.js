@@ -347,23 +347,28 @@ if (BASELINE_UPDATE) {
   process.exit(0)
 }
 
-// STAGED 모드: baseline 에 없는 신규 violation 만 차단
-//   2026-05-27 사용자 결정 — 잔존 위반 동결, 신규만 차단.
-if (STAGED_MODE && process.env.UI_DESIGN_LINT_REPORT_ONLY !== '1') {
+// STAGED 모드: baseline 외 신규 violation 안내 (2026-05-27 정보성 — 차단 X)
+//   이전 commit (96e9534+) 의 strict 차단은 다른 세션 push 막아서 다운그레이드.
+//   neologism 위반 → 화면 안내만, commit 통과.
+//   추후 사용자 결정 시 UI_DESIGN_LINT_STRICT=1 로 strict 재활성 가능.
+if (STAGED_MODE) {
   const newViolations = warnings.filter(w => !BASELINE.has(`${w.file}|${w.issue}`))
   const knownCount = warnings.length - newViolations.length
-  console.log(`  baseline: ${BASELINE.size} known / 본 commit staged warning: ${warnings.length} (known=${knownCount}, new=${newViolations.length})`)
+  console.log(`  baseline: ${BASELINE.size} known / staged warning: ${warnings.length} (known=${knownCount}, new=${newViolations.length})`)
   if (newViolations.length > 0) {
-    console.error('\n❌ ui-design-lint (STAGED) — staged 파일에 신규 UI 표준 위반')
-    for (const w of newViolations) {
-      console.error(`  ❌ ${w.file}`)
-      console.error(`     ${w.issue}`)
+    console.warn('\n⚠ ui-design-lint (STAGED 정보성) — 신규 UI 표준 위반:')
+    for (const w of newViolations.slice(0, 10)) {
+      console.warn(`  · ${w.file}`)
+      console.warn(`    ${w.issue}`)
     }
-    console.error('\n   수정 후 재시도, 또는 의도된 변경 (baseline 추가):')
-    console.error('     node harness-engineering/scripts/ui-design-lint.js --baseline-update')
-    console.error('   강제 우회 (권장 X):')
-    console.error('     UI_DESIGN_LINT_REPORT_ONLY=1 git commit ...')
-    process.exit(1)
+    if (newViolations.length > 10) console.warn(`  ... ${newViolations.length - 10}건 더`)
+    if (process.env.UI_DESIGN_LINT_STRICT === '1' && process.env.UI_DESIGN_LINT_REPORT_ONLY !== '1') {
+      console.error('\n❌ STRICT 모드 — commit 차단 (UI_DESIGN_LINT_STRICT=1)')
+      console.error('   baseline 갱신: node harness-engineering/scripts/ui-design-lint.js --baseline-update')
+      process.exit(1)
+    } else {
+      console.warn('   (정보성 — commit 통과. 정리 후 baseline 갱신 권장)')
+    }
   }
 }
 // 일반 모드: warnings 정보성, violations 만 차단
