@@ -5,6 +5,20 @@
 
 ## 2026-05-28
 
+- **PR-HR-14** (hr 세션) — hr 모듈 `useEmployees` SWR hook 도입 (실시간 동기화 1단계).
+  - 사용자 요구: 「전체 페이지 사용자 표시 공통화 + 실시간 연동」 — 옵션 A 1단계 hr 모듈 입점 GO.
+  - 현재 분산 상태 진단: `/api/profiles` 호출 5개 페이지 (admin/developer / admin / ProtectedRoute / PayrollOps / hr) — 각자 fetch + 캐시 X. 한 페이지 변경 → 다른 페이지 다음 mount 까지 옛 데이터.
+  - 조치:
+    1. 의존성 `swr ^2.4.1` 1개 추가.
+    2. 신규 `lib/hooks/useEmployees.ts` — SWR 기반 `/api/profiles` fetcher + `revalidateOnFocus` + `dedupingInterval=2000` + `mutate` 노출. 모든 사용처가 같은 cache 공유.
+    3. `app/hr/page.tsx` — `employees` state → `useEmployees()` hook 교체. `loadEmployees()` 는 mutate wrapper (호환 유지). 변경 호출처 (saveEdit / withdrawEmployee / InviteModal onSuccess) 그대로 동작 + 다른 사용처 자동 refresh.
+    4. `app/hr/_components/PayrollOps.tsx` — `emps` state → `useEmployees()` 교체. `fetchEmps` 는 mutate wrapper.
+  - 효과:
+    · /hr 와 /admin/payroll 둘 다 열면 같은 cache → 한 번만 fetch.
+    · 한 탭에서 직원 수정 → 다른 탭 클릭 진입 (focus) 시 자동 refresh.
+    · 같은 키 fetch 2초 내 중복 방지 (dedupingInterval).
+  - 향후: RideOrgPanel (ride_employees), admin/employees, admin/developer, ProtectedRoute, CallScheduler 등 다른 모듈은 점진 확장 (별 PR).
+
 - **PR-HR-11a** (hr 세션) — `/hr` 회사 토글 + 회사별 하위 탭 리뉴얼 (UI 골격).
   - 사용자 요구 (2026-05-27/28):
     1. 「company 추가 후 인사 마스터 UI 구조 리뉴얼」 — 옵션 A 회사 토글 + 하위 탭 (사용자 GO).

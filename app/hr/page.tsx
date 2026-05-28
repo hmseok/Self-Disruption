@@ -12,6 +12,8 @@ import NeuDataTable, { TableColumn, MobileCardConfig } from '../components/NeuDa
 import { auth } from '@/lib/auth-client'
 import PayrollOps from './_components/PayrollOps'
 import RideOrgPanel from './_components/RideOrgPanel'
+// PR-HR-14 (2026-05-28) — SWR 기반 useEmployees hook (실시간 동기화 1단계)
+import { useEmployees } from '@/lib/hooks/useEmployees'
 
 // ────────────────────────────────────────────────────────────────
 // Auth Helper
@@ -84,8 +86,10 @@ export default function HRMasterPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
 
-  // 기본 데이터
-  const [employees, setEmployees] = useState<any[]>([])
+  // 기본 데이터 — PR-HR-14: employees 는 useEmployees SWR hook 으로 교체.
+  //   여러 페이지에서 같은 cache 공유 + 변경 후 mutateEmployees() 호출 시 자동 refresh.
+  //   기존 setEmployees 직접 호출 패턴 제거 — 모든 변경은 API → mutate 흐름.
+  const { employees, mutate: mutateEmployees } = useEmployees()
   const [positions, setPositions] = useState<Position[]>([])
   const [departments, setDepartments] = useState<Department[]>([])
   const [activeModules, setActiveModules] = useState<ActiveModule[]>([])
@@ -507,13 +511,11 @@ export default function HRMasterPage() {
     setLoading(false)
   }
 
+  // PR-HR-14 — loadEmployees() 는 SWR mutate wrapper. 기존 호출처 그대로 호환.
+  //   useEmployees hook 이 자동 fetch + cache. mutate 가 refetch 트리거.
+  //   페이지 변경 / 다른 탭 focus / 다른 사용처 mutate 시 자동 동기화.
   const loadEmployees = async () => {
-    try {
-      const res = await fetch('/api/profiles', { headers: await getAuthHeader() })
-      if (!res.ok) { setEmployees([]); return }
-      const json = await res.json()
-      setEmployees(json.data || [])
-    } catch { setEmployees([]) }
+    await mutateEmployees()
   }
 
   // 외부 인력 — freelancers (3.3% 사업소득) + ride_employees (라이드 인력)

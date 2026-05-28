@@ -12,6 +12,8 @@ import {
   ALLOWANCE_TYPES, DEDUCTION_TYPES, EMPLOYMENT_TYPES, SALARY_TYPES,
 } from '../../utils/payroll-calc'
 import { auth } from '@/lib/auth-client'
+// PR-HR-14 (2026-05-28) — SWR 기반 useEmployees hook (실시간 동기화 1단계)
+import { useEmployees } from '@/lib/hooks/useEmployees'
 
 // ────────────────────────────────────────────────────────────────
 // Auth Helper — Custom JWT (fmi_token) 통일
@@ -153,7 +155,9 @@ export default function PayrollOps() {
 
   // ── 탭2: 급여 설정 ──
   const [settings, setSettings] = useState<EmployeeSalary[]>([])
-  const [emps, setEmps] = useState<any[]>([])
+  // PR-HR-14: emps state 폐기 → useEmployees SWR hook 공통 source 공유.
+  //   /hr/page.tsx 와 같은 cache → 한 곳에서 직원 수정 시 자동 동기화.
+  const { employees: emps, mutate: mutateEmps } = useEmployees()
   const [showModal, setShowModal] = useState(false)
   const [editing, setEditing] = useState<any>(null)
   const [mSec, setMSec] = useState(0)
@@ -237,14 +241,12 @@ export default function PayrollOps() {
     setSettings(data || [])
   }, [cid])
 
+  // PR-HR-14 — fetchEmps 는 SWR mutate wrapper. 기존 호출처 그대로 호환.
+  //   useEmployees hook 이 자동 fetch + cache + focus revalidate.
   const fetchEmps = useCallback(async () => {
     if (!cid) return
-    const res = await fetch('/api/profiles', { headers: await getAuthHeader() })
-    const json = await res.json()
-    const { data, error } = json
-    if (error) console.error('emps error:', error.message)
-    setEmps(data || [])
-  }, [cid])
+    await mutateEmps()
+  }, [cid, mutateEmps])
 
   const fetchFreelancers = useCallback(async () => {
     if (!cid) return
