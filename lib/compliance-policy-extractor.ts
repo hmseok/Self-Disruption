@@ -28,7 +28,7 @@ const TIMEOUT_MS = 50_000
 const MAX_OUTPUT_TOKENS = 8192
 
 export interface ExtractedSection {
-  kind: 'article' | 'attachment' | 'playbook_step' | 'annual_event'
+  kind: 'article' | 'attachment' | 'playbook_step' | 'annual_event' | 'screen_spec'
   code: string | null
   title: string
   body: string | null
@@ -86,12 +86,18 @@ function splitChunks(content: string): string[] {
 function buildPrompt(chunk: string, chunkIdx: number, totalChunks: number, policyHint?: string): string {
   return `다음은 회사 「라이드주식회사」의 내규(개인정보보호 내부관리계획서·매뉴얼) 문서의 일부입니다 (chunk ${chunkIdx + 1}/${totalChunks}).
 
-이 chunk 에서 다음 4 종류의 구조를 추출해 JSON 으로 반환해주세요:
+이 chunk 에서 다음 5 종류의 구조를 추출해 JSON 으로 반환해주세요:
 
 1. **article** — 「제N조」 형식의 조항 (예: 제1조 (목적))
 2. **attachment** — 「별첨 N」 또는 「F-NN-NN」 형식의 별첨/서식
 3. **playbook_step** — 운영 가이드 단계 (예: 1단계 책임자 지정)
 4. **annual_event** — 연간 운영 일정 (월별)
+5. **screen_spec** — 본 내규를 운영하려면 시스템에 필요한 화면/탭/모달/대시보드.
+                     예: 「CPO 전용 대시보드 (제6조 책임자 의무 이행 추적)」,
+                          「침해사고 신고 화면 (제25조 24h 통지)」,
+                          「자체감사 결과 입력 모달 (제20~21조)」.
+                     code 예: screen-cpo-dashboard / screen-incident-report.
+                     문서에서 명시적·암묵적으로 시스템 지원이 필요한 부분만 추출.
 
 JSON 스키마 (정확히 이 구조):
 
