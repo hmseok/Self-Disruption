@@ -83,9 +83,19 @@ export async function POST(request: Request) {
     extracted = await extractTextFromBuffer(buffer, file.name)
     console.log(`[policies/upload] extracted ${extracted.text.length} chars, warnings=${extracted.warnings.length}`)
   } catch (e) {
+    // hotfix4: 에러 메시지 전체 응답 (substring X) — 진단용
     const msg = e instanceof Error ? e.message : String(e)
-    console.error('[policies/upload] 텍스트 추출 실패:', msg)
-    return NextResponse.json({ success: false, error: `파일 추출 실패: ${msg}`, stage: 'extract', file_ext: ext, file_size: buffer.length }, { status: 400 })
+    const stack = e instanceof Error && e.stack ? e.stack.split('\n').slice(0, 5).join(' | ') : null
+    console.error('[policies/upload] 텍스트 추출 실패 전체:', e)
+    return NextResponse.json({
+      success: false,
+      error: `파일 추출 실패: ${msg}`,
+      stage: 'extract',
+      file_ext: ext,
+      file_size: buffer.length,
+      error_stack: stack,  // 진단용 stack trace 5줄
+      hint: 'Cloud Run readonly fs 또는 PPTX 형식 문제. /tmp 외 디렉토리 쓰기 불가. error_stack 확인.',
+    }, { status: 400 })
   }
 
   if (extracted.text.length < 100) {

@@ -97,14 +97,23 @@ export async function extractTextFromBuffer(
     throw new Error(`officeparser 모듈 로드 실패: ${lm}`)
   }
 
-  // officeparser timeout race
+  // Phase 2.3 hotfix4 (2026-05-28): Cloud Run readonly fs 대응.
+  // - tempFilesLocation: '/tmp' (Cloud Run 의 유일한 쓰기 가능 디렉토리)
+  // - outputErrorToConsole: true (Cloud Run 로그에 상세 에러)
+  // officeparser 7.x 가 PPTX/PDF 압축해제 시 임시 파일 사용 가능.
   const extracted = await Promise.race([
     parseOffice(buffer, {
       newlineDelimiter: '\n',
       ignoreNotes: false,
       putNotesAtLast: true,
+      outputErrorToConsole: true,
+      tempFilesLocation: '/tmp',
     }).catch((err: unknown) => {
-      const em = err instanceof Error ? err.message : String(err)
+      // 에러 메시지 전체 보존 (substring X)
+      const em = err instanceof Error
+        ? `${err.message}${err.stack ? ' | stack: ' + err.stack.split('\n').slice(0, 3).join(' / ') : ''}`
+        : String(err)
+      console.error(`[policy-file-extractor] officeparser .${ext} 실패:`, err)
       throw new Error(`officeparser 추출 실패 (.${ext}): ${em}`)
     }),
     new Promise<never>((_, reject) =>
