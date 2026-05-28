@@ -581,6 +581,22 @@ export default function HRMasterPage() {
   // sosokFilter: all / fmi / external / admin (소속 유형)
   const [sosokFilter, setSosokFilter] = useState<'all' | SoSokType>('all')
 
+  // PR-HR-12-hotfix (2026-05-28) — getEmpStatus 정의를 filteredEmployees useMemo 보다 위로 이동.
+  //   원인: PR-HR-12 가 statusFilter 디폴트 'active' 로 변경 → 첫 렌더 시 useMemo callback
+  //         즉시 list.filter(e => getEmpStatus(e)) 실행 → const 화살표 함수 미정의 → TDZ.
+  //   증상: 페이지 진입 시 Application error: client-side exception (사용자 보고 2026-05-28).
+  //   재발 방지: const 화살표 함수는 사용 코드보다 위에 정의 의무 (function declaration 만 hoisting).
+  // 재직 상태 헬퍼 (emp_status + 폴백 — 마이그레이션 미적용 환경 대응)
+  type EmpStatus = 'active' | 'on_leave' | 'resigned'
+  const getEmpStatus = (emp: any): EmpStatus => {
+    const s = emp.emp_status as EmpStatus | null
+    if (s === 'active' || s === 'on_leave' || s === 'resigned') return s
+    // 폴백: emp_status 미사용 환경 → resign_date 또는 is_active 로 추정
+    if (emp.resign_date) return 'resigned'
+    if (!emp.is_active) return 'resigned'
+    return 'active'
+  }
+
   const filteredEmployees = useMemo(() => {
     let list = employees
     // 재직 상태 필터 (active / on_leave / resigned)
@@ -600,17 +616,6 @@ export default function HRMasterPage() {
     }
     return list
   }, [employees, searchTerm, statusFilter, sosokFilter])
-
-  // 재직 상태 헬퍼 (emp_status + 폴백 — 마이그레이션 미적용 환경 대응)
-  type EmpStatus = 'active' | 'on_leave' | 'resigned'
-  const getEmpStatus = (emp: any): EmpStatus => {
-    const s = emp.emp_status as EmpStatus | null
-    if (s === 'active' || s === 'on_leave' || s === 'resigned') return s
-    // 폴백: emp_status 미사용 환경 → resign_date 또는 is_active 로 추정
-    if (emp.resign_date) return 'resigned'
-    if (!emp.is_active) return 'resigned'
-    return 'active'
-  }
   const STATUS_LABEL: Record<EmpStatus, string> = { active: '재직', on_leave: '휴직', resigned: '퇴사' }
   const STATUS_STYLE_EMP: Record<EmpStatus, { bg: string; color: string }> = {
     active:   { bg: 'rgba(34,197,94,0.12)', color: '#16a34a' },
