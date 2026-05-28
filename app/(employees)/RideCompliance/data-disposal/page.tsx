@@ -214,11 +214,13 @@ export default function DataDisposalPage() {
       const json = await res.json()
       if (!json.success) { setResultPanel({ kind: 'err', msg: `동기화 실패: ${json.error}` }); return }
       const d = json.data
-      const total = (d.new ?? 0) + (d.updated ?? 0)
-      const errLine = d.errors?.length ? ` · 오류 ${d.errors.length}건` : ''
+      const errLine = d.errors?.length
+        ? `\n오류 ${d.errors.length}건 — ${d.errors.slice(0, 2).map((e: any) => `#${e.external_approval_id}: ${e.error}`).join(' / ')}`
+        : ''
+      const isError = d.errors?.length > 0 && (d.new ?? 0) === 0 && (d.updated ?? 0) === 0
       setResultPanel({
-        kind: 'ok',
-        msg: `동기화 완료 — 신규 ${d.new ?? 0}건, 갱신 ${d.updated ?? 0}건 (대상 항목 ${d.items_inserted ?? 0})${errLine}`,
+        kind: isError ? 'err' : 'ok',
+        msg: `외부 ${d.fetched ?? 0}건 조회 — 신규 ${d.new ?? 0}건, 갱신 ${d.updated ?? 0}건 (대상 항목 ${d.items_inserted ?? 0})${errLine}`,
       })
       await fetchList()
     } catch (e) {
