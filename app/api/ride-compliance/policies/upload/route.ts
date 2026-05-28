@@ -1,26 +1,18 @@
 /**
  * /api/ride-compliance/policies/upload
  *
- * POST (multipart/form-data) — 파일 1개 업로드 → 자동 텍스트 추출 → AI 분석 → policy + sections INSERT.
+ * POST (multipart/form-data) — 파일 1개 업로드 → 자동 텍스트 추출 → AI 분석 → INSERT.
  *
- * Phase 2.3 (2026-05-28) — 사용자 통찰:
- *   「그냥 파일 등록하면 자동 항목 입력되어야 하는데 사용자 입력 너무 많다」
+ * Phase 2.3 hotfix8 (2026-05-28) — Cloudflare first-byte timeout (~100s) 회피.
+ * 사용자 진단: Cloud Run 600s 늘렸지만 Cloudflare 가 앞단에서 컷 → 503.
  *
- * 입력:
- *   FormData {
- *     file: File,                  // PPTX/PDF/DOCX/XLSX/TXT
- *     policy_code?: string,        // 옵션 — 비어있으면 자동 생성
- *   }
+ * 해결 — Streaming response:
+ *   1. 즉시 첫 byte (' ') 보내기 → Cloudflare first-byte timeout 회피
+ *   2. 45초마다 keep-alive ' ' 보내기 → idle timeout 회피
+ *   3. heavy work 완료 후 JSON 결과 enqueue → controller.close()
  *
- * 처리:
- *   1. 파일 → buffer → officeparser 텍스트 추출
- *   2. lib/compliance-policy-extractor → chunk Gemini → JSON (5 카테고리)
- *   3. ride_compliance_policies INSERT (메타 + AI 추출 결과)
- *   4. ride_compliance_policy_sections INSERT (각 section)
- *   5. response: { policy_id, ... } → UI 가 즉시 검수 모달로 이동
- *
- * 응답:
- *   { success, data: { policy_id, policy_title, sections_count, by_kind, ... } }
+ * Client (CreateModal) 는 fetch().then(r => r.json()) 사용 — JSON.parse 가 leading whitespace 무시.
+ * Status code 는 항상 200 — success 필드로 client 가 분기.
  */
 import { NextResponse } from 'next/server'
 import { verifyUser } from '@/lib/auth-server'
@@ -30,16 +22,68 @@ import { extractTextFromBuffer, extractExt } from '@/lib/policy-file-extractor'
 import { extractPolicyFromText, isLlmAvailable } from '@/lib/compliance-policy-extractor'
 import { randomUUID } from 'crypto'
 
-export const maxDuration = 300  // 5분 (큰 PPTX + chunk Gemini)
+export const maxDuration = 600  // 10분 (Cloud Run timeout 600s 와 일치)
+
+type UploadResult = { success: boolean; [k: string]: unknown }
 
 export async function POST(request: Request) {
+  const encoder = new TextEncoder()
+
+  const stream = new ReadableStream({
+    async start(controller) {
+      // 1. 즉시 첫 byte — Cloudflare first-byte timeout (~100s) 회피
+      try { controller.enqueue(encoder.encode(' ')) } catch { /* ignore */ }
+
+      // 2. 45초마다 keep-alive — idle timeout 회피
+      const keepAlive = setInterval(() => {
+        try { controller.enqueue(encoder.encode(' ')) } catch { /* ignore */ }
+      }, 45_000)
+
+      // 3. heavy work
+      let result: UploadResult
+      try {
+        result = await doUpload(request)
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e)
+        const stack = e instanceof Error && e.stack ? e.stack.split('\n').slice(0, 5).join(' | ') : null
+        console.error('[policies/upload] unhandled:', e)
+        result = {
+          success: false,
+          error: `처리 실패: ${msg}`,
+          stage: 'unhandled',
+          error_stack: stack,
+        }
+      }
+
+      // 4. 결과 JSON enqueue + close
+      clearInterval(keepAlive)
+      try {
+        controller.enqueue(encoder.encode(JSON.stringify(result)))
+      } catch { /* ignore */ }
+      controller.close()
+    },
+  })
+
+  return new Response(stream, {
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Content-Type-Options': 'nosniff',
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+    },
+  })
+}
+
+// ════════════════════════════════════════════════════════════════
+// heavy work — Response 객체 대신 응답 body 객체 반환 (stream 안에서 호출)
+// ════════════════════════════════════════════════════════════════
+async function doUpload(request: Request): Promise<UploadResult> {
   const user = await verifyUser(request)
-  if (!user) return NextResponse.json({ success: false, error: 'unauthorized' }, { status: 401 })
+  if (!user) return { success: false, error: 'unauthorized', status: 401 }
   if (!(await isManager(user))) {
-    return NextResponse.json({ success: false, error: 'forbidden — 관리자 이상만 등록 가능' }, { status: 403 })
+    return { success: false, error: 'forbidden — 관리자 이상만 등록 가능', status: 403 }
   }
   if (!isLlmAvailable()) {
-    return NextResponse.json({ success: false, error: 'GEMINI_API_KEY 미설정' }, { status: 503 })
+    return { success: false, error: 'GEMINI_API_KEY 미설정', status: 503 }
   }
 
   let formData: FormData
@@ -48,7 +92,7 @@ export async function POST(request: Request) {
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     console.error('[policies/upload] formData parse 실패:', msg)
-    return NextResponse.json({ success: false, error: `multipart parse 실패: ${msg}`, stage: 'formData' }, { status: 400 })
+    return { success: false, error: `multipart parse 실패: ${msg}`, stage: 'formData' }
   }
 
   const file = formData.get('file')
@@ -59,7 +103,7 @@ export async function POST(request: Request) {
     size: file && typeof file === 'object' && 'size' in file ? (file as { size: number }).size : null,
   })
   if (!(file instanceof File)) {
-    return NextResponse.json({ success: false, error: 'file 필드 필수 (multipart) — 파일이 도착하지 않음', stage: 'file_check' }, { status: 400 })
+    return { success: false, error: 'file 필드 필수 (multipart) — 파일이 도착하지 않음', stage: 'file_check' }
   }
   const userCode = (formData.get('policy_code') as string || '').trim()
 
@@ -74,35 +118,34 @@ export async function POST(request: Request) {
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     console.error('[policies/upload] buffer 변환 실패:', msg)
-    return NextResponse.json({ success: false, error: `buffer 변환 실패: ${msg}`, stage: 'buffer' }, { status: 400 })
+    return { success: false, error: `buffer 변환 실패: ${msg}`, stage: 'buffer' }
   }
 
-  // 2. 텍스트 추출
+  // 2. 텍스트 추출 (officeparser — hotfix7: file path + AST.toText)
   let extracted
   try {
     extracted = await extractTextFromBuffer(buffer, file.name)
     console.log(`[policies/upload] extracted ${extracted.text.length} chars, warnings=${extracted.warnings.length}`)
   } catch (e) {
-    // hotfix4: 에러 메시지 전체 응답 (substring X) — 진단용
     const msg = e instanceof Error ? e.message : String(e)
     const stack = e instanceof Error && e.stack ? e.stack.split('\n').slice(0, 5).join(' | ') : null
     console.error('[policies/upload] 텍스트 추출 실패 전체:', e)
-    return NextResponse.json({
+    return {
       success: false,
       error: `파일 추출 실패: ${msg}`,
       stage: 'extract',
       file_ext: ext,
       file_size: buffer.length,
-      error_stack: stack,  // 진단용 stack trace 5줄
-      hint: 'Cloud Run readonly fs 또는 PPTX 형식 문제. /tmp 외 디렉토리 쓰기 불가. error_stack 확인.',
-    }, { status: 400 })
+      error_stack: stack,
+    }
   }
 
   if (extracted.text.length < 100) {
-    return NextResponse.json({
+    return {
       success: false,
       error: `추출 텍스트가 너무 짧음 (${extracted.text.length} chars) — 이미지/스캔본 PDF 일 가능성. TXT 또는 텍스트 기반 PDF 권장.`,
-    }, { status: 422 })
+      stage: 'extract_short',
+    }
   }
 
   // 3. AI 분석 (chunk Gemini)
@@ -112,10 +155,10 @@ export async function POST(request: Request) {
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     console.error('[policies/upload] AI 추출 실패:', msg)
-    return NextResponse.json({ success: false, error: `AI 분석 실패: ${msg}` }, { status: 500 })
+    return { success: false, error: `AI 분석 실패: ${msg}`, stage: 'ai' }
   }
 
-  // 4. policy 메타 결정 (AI 추출값 우선, 없으면 fallback)
+  // 4. policy 메타 결정
   const policyTitle = (aiResult.policy_title || file.name.replace(/\.[^.]+$/, '')).substring(0, 300)
   const policyVersion = aiResult.policy_version || 'v1.0'
   const currentYear = new Date().getFullYear()
@@ -123,7 +166,6 @@ export async function POST(request: Request) {
   // 5. policy_code 결정
   let policyCode = userCode
   if (!policyCode) {
-    // 자동 생성 — 같은 prefix 시퀀스 카운트
     const prefix = `POLICY-${currentYear}`
     try {
       const [{ next_seq }] = await prisma.$queryRaw<{ next_seq: number }[]>`
@@ -132,7 +174,7 @@ export async function POST(request: Request) {
          WHERE policy_code LIKE ${`${prefix}-%`}
       `
       policyCode = `${prefix}-${String(next_seq || 1).padStart(3, '0')}`
-    } catch (e) {
+    } catch {
       policyCode = `${prefix}-001`
     }
   }
@@ -158,10 +200,10 @@ export async function POST(request: Request) {
   } catch (e) {
     const err = e as { message?: string }
     if (err.message?.includes('Duplicate') || err.message?.includes('unique')) {
-      return NextResponse.json({ success: false, error: `policy_code 중복: ${policyCode}` }, { status: 409 })
+      return { success: false, error: `policy_code 중복: ${policyCode}`, stage: 'insert_policy_dup' }
     }
     console.error('[policies/upload] policy INSERT 실패:', err.message)
-    return NextResponse.json({ success: false, error: String(err.message) }, { status: 500 })
+    return { success: false, error: String(err.message), stage: 'insert_policy' }
   }
 
   // 7. sections INSERT
@@ -188,7 +230,7 @@ export async function POST(request: Request) {
     }
   }
 
-  return NextResponse.json({
+  return {
     success: true,
     data: {
       policy_id: policyId,
@@ -212,5 +254,8 @@ export async function POST(request: Request) {
       warnings: extracted.warnings,
       debug: aiResult.debug,
     },
-  })
+  }
 }
+
+// NextResponse 는 첫 줄 import 만 — streaming 에서는 사용 안 함. 그래도 import 유지 (다른 곳 호환).
+void NextResponse
