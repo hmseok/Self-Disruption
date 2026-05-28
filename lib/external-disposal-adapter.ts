@@ -162,19 +162,126 @@ class MockDisposalAdapter implements DisposalAdapter {
   }
 }
 
-// ── direct (별도 Prisma datasource) — stub ─────────────────────
-// 사용자 결정 후 구현:
-//   1. prisma/schema.prisma 에 datasource yangjaehee 추가
-//   2. prisma generate 후 generated client import
-//   3. 아래 stub 을 실제 쿼리로 교체
+// ── direct (cafe24Db read-only pool) — 실 구현 (2026-05-28 P12-D) ──
+//
+// 기존 lib/cafe24-db.ts (mysql2 pool + read-only enforce) 그대로 사용.
+// 사용자 SQL 명세서 5장 그대로 (expired_approval + expired_data + JOIN pmccarsm/pmccustm/imrimagh).
+//
+// 활성화: 환경변수 DISPOSAL_ADAPTER_MODE=direct
+// 필요 env: CAFE24_DB_HOST / CAFE24_DB_PORT / CAFE24_DB_USER / CAFE24_DB_PASSWORD / CAFE24_DB_NAME
+//          (이미 .env.local / Cloud Run env 에 존재)
 class DirectDbDisposalAdapter implements DisposalAdapter {
   mode = 'direct' as const
 
-  async listApprovals(): Promise<ExternalApproval[]> {
-    throw new Error('direct mode 미구현 — 사용자 결정 후 별도 Prisma datasource 추가 필요')
+  async listApprovals(filter?: {
+    pendingOnly?: boolean
+    sinceDate?: string
+    limit?: number
+  }): Promise<ExternalApproval[]> {
+    const { cafe24Db } = await import('./cafe24-db')
+
+    const wheres: string[] = []
+    const params: unknown[] = []
+    if (filter?.pendingOnly) {
+      wheres.push('(confirmed_at IS NULL OR confirmed_at = "")')
+    }
+    if (filter?.sinceDate) {
+      // request_at 은 varchar(100) 'yyyy-MM-dd HH:mm:ss' — 문자열 비교 OK
+      wheres.push('request_at >= ?')
+      params.push(filter.sinceDate)
+    }
+    const whereSql = wheres.length > 0 ? `WHERE ${wheres.join(' AND ')}` : ''
+    const limit = Math.max(1, Math.min(500, filter?.limit ?? 100))
+
+    const sql = `
+      SELECT id,
+             request_at,
+             request_by,
+             expired_count,
+             approval_request_id,
+             approval_request_at,
+             deleted_at,
+             deleted_by,
+             confirmed_by,
+             confirmed_at
+        FROM expired_approval
+        ${whereSql}
+       ORDER BY request_at DESC
+       LIMIT ${limit}
+    `
+    const rows = await cafe24Db.query<any>(sql, params)
+    return rows.map(r => ({
+      id: Number(r.id),
+      request_at: r.request_at ?? null,
+      request_by: r.request_by ?? null,
+      expired_count: Number(r.expired_count ?? 0),
+      approval_request_id: r.approval_request_id ?? null,
+      approval_request_at: r.approval_request_at ?? null,
+      deleted_at: r.deleted_at ?? null,
+      deleted_by: r.deleted_by ?? null,
+      confirmed_by: r.confirmed_by ?? null,
+      confirmed_at: r.confirmed_at ?? null,
+    }))
   }
-  async listItemsByApproval(): Promise<ExternalDisposalItem[]> {
-    throw new Error('direct mode 미구현')
+
+  async listItemsByApproval(approvalId: number): Promise<ExternalDisposalItem[]> {
+    const { cafe24Db } = await import('./cafe24-db')
+
+    // 사용자 SQL 명세서 그대로 — expired_approval_id 필터 추가.
+    // 두 union (CONTRACT + FILE) — 각 type 별 JOIN.
+    //
+    // 주의: 사용자 SQL 은 expired_data 전체 대상이었으나,
+    //       본 시스템은 결재 단위 (expired_approval_id) 로 좁힌다.
+    const sql = `
+      SELECT 'CONTRACT' AS data_type,
+             ed.id AS external_item_id,
+             ed.data_id AS data_id,
+             ed.deleted_at AS external_deleted_at,
+             cu.custname AS custname,
+             MAX(ca.carsnums) AS carsnums,
+             MAX(ca.carsodnm) AS carsodnm,
+             NULL AS imagkind_label,
+             NULL AS imagonam
+        FROM expired_data ed
+        JOIN pmccarsm ca ON ca.carsidno = ed.data_id
+        JOIN pmccustm cu ON cu.custcode = ca.carscust
+       WHERE ed.expired_approval_id = ?
+         AND ed.data_type = 'CONTRACT'
+       GROUP BY ed.id, ed.data_id, ed.deleted_at, cu.custname
+
+      UNION ALL
+
+      SELECT 'FILE' AS data_type,
+             ed.id AS external_item_id,
+             ed.data_id AS data_id,
+             ed.deleted_at AS external_deleted_at,
+             cu.custname AS custname,
+             ca.carsnums AS carsnums,
+             ca.carsodnm AS carsodnm,
+             get_cbsddesc('IMAGKIND', img.imagkind) AS imagkind_label,
+             img.imagonam AS imagonam
+        FROM expired_data ed
+        JOIN imrimagh img ON img.imagiuid = ed.data_id
+        JOIN pmccarsm ca  ON ca.carsidno = img.imagidno
+                         AND img.imagmddt BETWEEN ca.carsfrdt AND ca.carstodt
+        JOIN pmccustm cu  ON cu.custcode = ca.carscust
+       WHERE ed.expired_approval_id = ?
+         AND ed.data_type = 'FILE'
+
+       ORDER BY data_type, data_id
+    `
+    const rows = await cafe24Db.query<any>(sql, [approvalId, approvalId])
+    return rows.map(r => ({
+      external_item_id: r.external_item_id != null ? Number(r.external_item_id) : null,
+      data_type: (r.data_type as 'CONTRACT' | 'FILE'),
+      data_id: String(r.data_id ?? ''),
+      custname: r.custname ?? null,
+      carsnums: r.carsnums ?? null,
+      carsodnm: r.carsodnm ?? null,
+      imagkind_label: r.imagkind_label ?? null,
+      imagonam: r.imagonam ?? null,
+      external_deleted_at: r.external_deleted_at ?? null,
+    }))
   }
 }
 
