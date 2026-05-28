@@ -387,3 +387,63 @@ SQL `LEFT JOIN users u` 가 "doesn't exist" 로 throw → catch 분기가 마이
 - ✅ Rule 26 페르소나 사전 워크-스루 (5 페르소나)
 - ✅ Rule 27 commit GATE 본 체크리스트
 - ✅ `git commit --no-verify` 사용 안 함
+
+---
+
+## Phase 1.5 — 산출물·외부 송부 트래커 (2026-05-28)
+
+**도메인**: 임명장 / 단말기 반출대장 / 파기 확인서 / 유출 통지서 / 자체감사 결과서 등
+외부 기관·내부 부서 송부 추적. `ride_compliance_form_submissions` (내부 작성본) 과 별개.
+
+### 운영 흐름 (5 상태)
+1. **draft** — 관리자가 코드/제목/내용 등록
+2. **approved** — CPO 가 검토 후 승인 (`approved_by`, `approved_at` 자동)
+3. **sent** — 외부 송부 (수신처/방법/일시 — `sent_method`: email/post/courier/portal/fax/in_person)
+4. **responded** — 답변 수신 (`response_received_at`, `response_note`)
+5. **closed** — 종결 (답변 없이 종료 또는 응답 후 마감)
+
+### 변경 파일
+
+| # | 파일 | 종류 |
+|---|------|------|
+| 1 | `migrations/2026-05-28_ride_compliance_phase15.sql` | DDL — `ride_compliance_deliverables` (22 컬럼, UNIQUE `deliverable_code`, 6 인덱스) |
+| 2 | `app/api/ride-compliance/deliverables/route.ts` | GET list (filter category/status/q/sent_from/sent_to) + POST create (manager+) |
+| 3 | `app/api/ride-compliance/deliverables/[id]/route.ts` | GET / PATCH (상태 전이 자동 타임스탬프) / DELETE (draft 만) |
+| 4 | `app/(employees)/RideCompliance/deliverables/page.tsx` | DcStatStrip(5) + DcToolbar + NeuDataTable + Create/Edit Modal |
+
+### 8 카테고리 (`category` enum)
+- `appointment` 임명장
+- `device_logbook` 단말기 반출대장
+- `destruction_cert` 파기 확인서
+- `breach_notice` 유출 통지서
+- `audit_report` 자체감사 결과서
+- `inspection_request` 점검 의뢰
+- `training_record` 교육 결과 송부
+- `other` 기타
+
+### 매뉴얼 조항 매핑
+- `appointment` ← 제6조 (책임자 지정 임명장)
+- `device_logbook` ← 제18조 (스마트기기 반출 통제)
+- `destruction_cert` ← 제11조 (출력·복사·파기 확인서)
+- `breach_notice` ← 제25조 (24h 외부 통지) — 보호위원회 / KISA
+- `audit_report` ← 제20~21조 (자체감사 결과 → 경영진 보고)
+- `training_record` ← 제22조 (전 임직원 교육 결과)
+
+### 미해결 (메인 세션 위탁 / Rule 21)
+- `app/components/PageTitle.tsx` — `/RideCompliance/deliverables` → `'산출물·외부 송부'` 등록 (공통 파일)
+- 현재 fallback: `/RideCompliance` prefix 매칭으로 `admin-ops` + `'정보보안'` 표시
+- 모듈 main page.tsx 에 「산출물·외부 송부」 탭 또는 카드 링크 추가 (선택)
+
+### Rule 준수 self-check (Rule 27 commit GATE)
+- ✅ Rule 1 풀 파이프라인 (DB + API + UI)
+- ✅ Rule 11 컬럼 사전 검증 (`profiles.name`, `ride_compliance_deliverables` 22 컬럼)
+- ✅ Rule 13 회색 함수 미사용 (COALESCE / LEFT JOIN 만)
+- ✅ Rule 14 동형 패턴 (Phase 1.2 documents API + page 패턴 재사용)
+- ✅ Rule 18 NeuDataTable 모든 컬럼 sortBy (코드/분류/제목/수신처/작성자/승인자/송부일/방법/상태)
+- ✅ Rule 19 줄바꿈 최소화 (whiteSpace: nowrap)
+- ✅ Rule 20 결과 글래스 패널 (`resultPanel` state — alert 최소화)
+- ✅ Rule 21 자기 모듈만 commit (PageTitle 공통 파일은 메인 위탁)
+- ✅ Rule 22 _docs 갱신 (본 CHANGELOG)
+- ✅ Rule 23 graceful fallback (`_migration_pending` banner + API 500 처리)
+- ✅ Rule 24 시드 멱등 (시드 자체 없음 — 운영 중 등록)
+- ✅ `git commit --no-verify` 사용 안 함

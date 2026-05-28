@@ -1575,9 +1575,26 @@ function DocumentsTabContent(props: {
 }) {
   // Phase 1.4-fix13 — 검수 리셋 / 삭제 (CRUD 완성)
   const [busyId, setBusyId] = useState<string | null>(null)
+  // Phase 1.4-fix15 — 체크박스 선택 (id Set)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
 
   // 시드 문서 판별 — 통합본 5.17 「파생서류 목차」 25건 (RIDE-* / F-*)
   const isSeedDoc = (code: string) => /^(RIDE-|F-)/.test(code)
+
+  // Phase 1.4-fix15 — 체크박스 토글
+  const toggleSelect = (id: string, checked: boolean) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (checked) next.add(id); else next.delete(id)
+      return next
+    })
+  }
+  const selectAllVisible = () => {
+    setSelectedIds(new Set(props.rows.map(r => r.id)))
+  }
+  const clearSelection = () => {
+    setSelectedIds(new Set())
+  }
 
   const handleReset = async (d: ComplianceDocument) => {
     if (!confirm(`「${d.doc_code} ${d.title}」 검수 상태를 리셋할까요?\n\n검수 완료 → 검수 대기(pending) 로 되돌립니다. 본문·PDF·버전은 유지됩니다. 재검토 → 승인 흐름을 다시 실행할 수 있습니다.`)) return
@@ -1615,47 +1632,62 @@ function DocumentsTabContent(props: {
     } catch (e) { alert(`삭제 오류: ${e}`) } finally { setBusyId(null) }
   }
 
-  // Phase 1.4-fix14 — 필터 단위 일괄 삭제 (전체 삭제)
+  // Phase 1.4-fix15 — 체크박스 선택 삭제 (fix14 의 필터단위 일괄 삭제 대체)
   const handleBulkDelete = async () => {
-    if (props.rows.length === 0) return
-    const seedRows = props.rows.filter(r => isSeedDoc(r.doc_code))
+    const ids = Array.from(selectedIds)
+    if (ids.length === 0) { alert('선택된 문서가 없습니다.'); return }
+    // 현재 표시된 행 중 선택된 것 메타
+    const selectedRows = props.rows.filter(r => selectedIds.has(r.id))
+    const seedRows = selectedRows.filter(r => isSeedDoc(r.doc_code))
     const seedNote = seedRows.length > 0 ? ` (⚠ 시드 ${seedRows.length}개 포함)` : ''
     // 1차 확인 — cascade 안내 + 시드 강조
     if (!confirm(
-      `표시된 ${props.rows.length}건${seedNote} 모두 삭제할까요?\n\n` +
+      `선택한 ${ids.length}건${seedNote} 삭제할까요?\n\n` +
       `· 버전 이력 + 서식 제출 인스턴스 함께 삭제\n` +
       `· GCS 원본 파일도 삭제\n` +
       `· 연결된 task 는 보존 (출처만 분리)\n\n` +
       `다음 단계에서 한 번 더 확인합니다.`
     )) return
     // 2차 확인 — 되돌릴 수 없음
-    if (!confirm(`되돌릴 수 없습니다. 정말 ${props.rows.length}건 모두 삭제하시겠어요?`)) return
+    if (!confirm(`되돌릴 수 없습니다. 정말 ${ids.length}건 삭제하시겠어요?`)) return
     setBusyId('__bulk__')
     try {
       const token = getStoredToken()
-      const ids = props.rows.map(r => r.id)
       const res = await fetch('/api/ride-compliance/documents/bulk-delete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body: JSON.stringify({ ids }),
       })
       const json = await res.json()
-      if (!res.ok || !json.success) { alert(`전체 삭제 실패: ${json.error || res.status}`); return }
+      if (!res.ok || !json.success) { alert(`선택 삭제 실패: ${json.error || res.status}`); return }
       const d = json.data
       const gcsLine = d.gcs?.failures?.length
         ? `· GCS 파일 ${d.gcs.deleted}건 · 실패 ${d.gcs.failures.length}`
         : `· GCS 파일 ${d.gcs?.deleted ?? 0}건`
       alert(
-        `✅ 전체 삭제 완료\n\n` +
+        `✅ 선택 삭제 완료\n\n` +
         `· 문서 ${d.deleted}건 (요청 ${d.requested})\n` +
         `· 버전 ${d.cascade?.versions ?? 0} · 서식제출 ${d.cascade?.submissions ?? 0} · task 분리 ${d.cascade?.detached_tasks ?? 0}\n` +
         gcsLine
       )
+      clearSelection()
       props.onChanged()
-    } catch (e) { alert(`전체 삭제 오류: ${e}`) } finally { setBusyId(null) }
+    } catch (e) { alert(`선택 삭제 오류: ${e}`) } finally { setBusyId(null) }
   }
 
   const cols: TableColumn<ComplianceDocument>[] = [
+    // Phase 1.4-fix15 — 체크박스 선택 컬럼 (manager+ 만 의미, 그 외에도 표시 시 disabled)
+    { key: 'select', label: '☐', render: r => (
+      <input
+        type="checkbox"
+        checked={selectedIds.has(r.id)}
+        onChange={e => toggleSelect(r.id, e.target.checked)}
+        disabled={!props.isMgr}
+        title={props.isMgr ? '선택' : '관리자(manager+) 만 선택 가능'}
+        style={{ cursor: props.isMgr ? 'pointer' : 'not-allowed' }}
+        onClick={e => e.stopPropagation()}
+      />
+    ) },
     { key: 'doc_code', label: '코드', sortBy: r => r.doc_code, render: r => {
       // Phase 1.3 — 매뉴얼·서식별 페이지로 deep-link
       const href = r.doc_type === 'manual'
@@ -1719,13 +1751,24 @@ function DocumentsTabContent(props: {
             + 신규 문서 등록
           </button>
         )}
-        {/* Phase 1.4-fix14 — 필터 단위 일괄 삭제 */}
+        {/* Phase 1.4-fix15 — 체크박스 선택 삭제 (fix14 의 필터단위 일괄 삭제 대체) */}
         {props.isMgr && props.rows.length > 0 && (
-          <button onClick={handleBulkDelete} disabled={busyId === '__bulk__'}
-            title={`현재 표시된 ${props.rows.length}건 모두 삭제 (필터로 범위 좁힌 후 사용)`}
-            style={{ ...BTN.md, border: `1px solid ${COLORS.danger}`, background: COLORS.bgRed, color: COLORS.danger, cursor: 'pointer', fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0 }}>
-            🗑 표시된 {props.rows.length}건 모두 삭제
-          </button>
+          <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexShrink: 0 }}>
+            <button onClick={selectAllVisible}
+              title={`표시된 ${props.rows.length}건 모두 선택`}
+              style={{ ...BTN.sm, border: `1px solid ${COLORS.borderSubtle}`, background: COLORS.bgGray, color: COLORS.textSecondary, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+              ☑ 전체 선택 ({props.rows.length})
+            </button>
+            <button onClick={clearSelection} disabled={selectedIds.size === 0}
+              style={{ ...BTN.sm, border: `1px solid ${COLORS.borderSubtle}`, background: COLORS.bgGray, color: COLORS.textSecondary, cursor: selectedIds.size === 0 ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap', opacity: selectedIds.size === 0 ? 0.5 : 1 }}>
+              ☐ 해제
+            </button>
+            <button onClick={handleBulkDelete} disabled={selectedIds.size === 0 || busyId === '__bulk__'}
+              title={selectedIds.size === 0 ? '체크박스로 삭제할 문서를 선택하세요' : `선택한 ${selectedIds.size}건 삭제`}
+              style={{ ...BTN.md, border: `1px solid ${COLORS.danger}`, background: COLORS.bgRed, color: COLORS.danger, cursor: selectedIds.size === 0 ? 'not-allowed' : 'pointer', fontWeight: 600, whiteSpace: 'nowrap', opacity: selectedIds.size === 0 ? 0.5 : 1 }}>
+              🗑 선택 삭제 ({selectedIds.size})
+            </button>
+          </div>
         )}
       </div>
       <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginBottom: 16 }}>
