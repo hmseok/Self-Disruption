@@ -315,8 +315,10 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
             {/* 로고 */}
             <span className="text-sm font-bold tracking-tight flex-shrink-0" style={{ color: '#3b6eb5' }}>{orgBrand.primaryLabel}</span>
 
-            {/* 회사 표시 (부서별 동적) */}
-            <span className="ml-auto text-xs font-medium truncate" style={{ color: '#64748b' }}>{orgBrand.companyLabel}</span>
+            {/* 회사 표시 (부서별 동적) — FMI 는 companyLabel='' 로 비표시 (2026-05-27) */}
+            {orgBrand.companyLabel && (
+              <span className="ml-auto text-xs font-medium truncate" style={{ color: '#64748b' }}>{orgBrand.companyLabel}</span>
+            )}
           </div>
         </div>
       )}
@@ -344,11 +346,17 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
           {/* 워크스페이스 */}
           <div className="px-3 py-3">
             <div className="rounded-lg px-3 py-3" style={{ background: 'rgba(0,0,0,0.02)', border: '1px solid rgba(0,0,0,0.06)', boxShadow: 'inset 2px 2px 6px rgba(140,170,210,0.08), inset -2px -2px 6px rgba(255,255,255,0.25)' }}>
-              {/* 회사명 + 플랜 뱃지 */}
-              <div className="flex items-center justify-between gap-2">
-                <div className="font-bold text-sm truncate" style={{ color: '#0f2440' }}>{orgBrand.companyLabel}</div>
-                <span className="text-[9px] font-black px-1.5 py-0.5 rounded text-white flex-shrink-0" style={{ background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)' }}>{orgBrand.brand}</span>
-              </div>
+              {/* 회사명 + 플랜 뱃지 — FMI 는 비표시 (2026-05-27 사용자 결정) */}
+              {(orgBrand.companyLabel || orgBrand.brand === 'RIDE') && (
+                <div className="flex items-center justify-between gap-2">
+                  {orgBrand.companyLabel && (
+                    <div className="font-bold text-sm truncate" style={{ color: '#0f2440' }}>{orgBrand.companyLabel}</div>
+                  )}
+                  {orgBrand.brand === 'RIDE' && (
+                    <span className="text-[9px] font-black px-1.5 py-0.5 rounded text-white flex-shrink-0" style={{ background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)' }}>{orgBrand.brand}</span>
+                  )}
+                </div>
+              )}
               {/* 역할 + 직급 */}
               <div className="mt-2 flex gap-1 flex-wrap">
                 <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${

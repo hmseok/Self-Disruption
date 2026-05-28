@@ -194,11 +194,13 @@ export default function DashboardPage() {
             {currentTime.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })}
           </p>
           <h1 className="text-2xl md:text-3xl font-black text-slate-800 tracking-tight mt-1">
-            {getGreeting()}, <span className="text-blue-600">{orgBrand.companyLabel}</span>
+            {getGreeting()}{orgBrand.companyLabel ? <>, <span className="text-blue-600">{orgBrand.companyLabel}</span></> : ''}
           </h1>
         </div>
         <div className="flex gap-2 items-center">
-          <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-blue-500/10 text-blue-600">{orgBrand.brand}</span>
+          {orgBrand.brand === 'RIDE' && (
+            <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-blue-500/10 text-blue-600">{orgBrand.brand}</span>
+          )}
           {position && (
             <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-600">{position.name}</span>
           )}

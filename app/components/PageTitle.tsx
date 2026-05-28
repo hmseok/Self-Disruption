@@ -180,7 +180,7 @@ const BRAND_BADGE: Record<string, { initial: string; gradient: string }> = {
 interface PageTitleProps {
   dynamicMenuName?: string
   brand?: string         // 'FMI' | 'RIDE' — 로그인 회사 (org-brand)
-  primaryLabel?: string  // 'FMI ERP' | 'RIDE CARE' — 탭 제목 base
+  primaryLabel?: string  // 'ERP' | 'RIDE CARE' — 탭 제목 base
 }
 
 export default function PageTitle({ dynamicMenuName, brand, primaryLabel }: PageTitleProps) {
@@ -208,7 +208,7 @@ export default function PageTitle({ dynamicMenuName, brand, primaryLabel }: Page
   useEffect(() => {
     document.title = pageName
       ? (sectionLabel ? `${sectionLabel} › ${pageName}` : pageName)
-      : (primaryLabel || 'FMI ERP')
+      : (primaryLabel || 'ERP')
   }, [pageName, sectionLabel, primaryLabel])
 
   // ── favicon 동적화 (2026-05-24, hotfix·심볼 2026-05-24) ──
@@ -267,7 +267,7 @@ export default function PageTitle({ dynamicMenuName, brand, primaryLabel }: Page
       {(() => {
         const badge = BRAND_BADGE[brand || 'FMI'] || BRAND_BADGE.FMI
         return (
-          <div title={primaryLabel || 'FMI ERP'} style={{
+          <div title={primaryLabel || 'ERP'} style={{
             width: 22,
             height: 22,
             borderRadius: '50%',

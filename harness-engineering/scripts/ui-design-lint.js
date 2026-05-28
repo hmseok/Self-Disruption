@@ -80,8 +80,48 @@ function topWrapperCentered(content) {
 const violations = []
 const warnings = []
 
-const pageFiles = listPageFiles(APP_DIR)
-console.log(`ui-design-lint: ${pageFiles.length} page.tsx files`)
+// 2026-05-27 사용자 결정 — lint 등급 승격 + baseline:
+//   UI_DESIGN_LINT_STAGED env (comma-sep paths) 가 set 되면 그 파일만 scan.
+//   baseline (known issues) 에 등록 안 된 신규 violation 만 차단.
+//   --baseline-update 로 baseline 재생성.
+const STAGED_LIST_RAW = process.env.UI_DESIGN_LINT_STAGED || ''
+const STAGED_SET = new Set(STAGED_LIST_RAW.split(/[,\n]/).map(s => s.trim()).filter(Boolean))
+const STAGED_MODE = STAGED_SET.size > 0
+const BASELINE_UPDATE = process.argv.includes('--baseline-update')
+const BASELINE_FILE = path.join(ROOT, 'harness-engineering/knowledge/ui-design-lint.baseline.json')
+
+function loadBaseline() {
+  if (!fs.existsSync(BASELINE_FILE)) return new Set()
+  try {
+    const data = JSON.parse(fs.readFileSync(BASELINE_FILE, 'utf-8'))
+    return new Set((data.entries || []).map(e => `${e.file}|${e.issue}`))
+  } catch { return new Set() }
+}
+
+function saveBaseline(allWarnings) {
+  const data = {
+    version: 1,
+    frozen_at: new Date().toISOString().slice(0, 10),
+    note: 'ui-design-lint baseline — 동결된 known issue. STAGED 모드에서 이 셋 외 신규만 차단.',
+    entries: allWarnings.map(w => ({ file: w.file, issue: w.issue })),
+  }
+  fs.writeFileSync(BASELINE_FILE, JSON.stringify(data, null, 2))
+  console.log(`✅ baseline 갱신 — ${allWarnings.length} entries → ${path.relative(ROOT, BASELINE_FILE)}`)
+}
+
+const BASELINE = loadBaseline()
+
+let pageFiles = listPageFiles(APP_DIR)
+if (STAGED_MODE) {
+  // app/ 안 page.tsx (tsx) 만 검사 대상 — staged 와 교차
+  pageFiles = pageFiles.filter(fp => {
+    const rel = path.relative(ROOT, fp)
+    return STAGED_SET.has(rel)
+  })
+  console.log(`ui-design-lint: STAGED 모드 — ${pageFiles.length} staged page (전체 ${listPageFiles(APP_DIR).length}개 중)`)
+} else {
+  console.log(`ui-design-lint: ${pageFiles.length} page.tsx files`)
+}
 console.log('')
 
 for (const fp of pageFiles) {
@@ -297,8 +337,37 @@ console.log('')
 console.log('  💡 기준 페이지: app/finance/settlement/')
 console.log('  📖 가이드: _docs/UI-DESIGN-STANDARD.md')
 
-// warnings 만 있으면 통과 (정보성), violations 가 있으면 차단
-if (violations.length > 0 && process.env.UI_DESIGN_LINT_REPORT_ONLY !== '1') {
+// --baseline-update: 현재 모든 warning 을 baseline 으로 동결
+if (BASELINE_UPDATE) {
+  // STAGED 모드 무시 — 전체 페이지에서 다시 스캔해서 baseline 생성
+  if (STAGED_MODE) {
+    console.warn('⚠ --baseline-update 는 STAGED 모드와 함께 쓰지 마세요. STAGED 무시하고 전체 스캔으로 baseline.')
+  }
+  saveBaseline(warnings)
+  process.exit(0)
+}
+
+// STAGED 모드: baseline 에 없는 신규 violation 만 차단
+//   2026-05-27 사용자 결정 — 잔존 위반 동결, 신규만 차단.
+if (STAGED_MODE && process.env.UI_DESIGN_LINT_REPORT_ONLY !== '1') {
+  const newViolations = warnings.filter(w => !BASELINE.has(`${w.file}|${w.issue}`))
+  const knownCount = warnings.length - newViolations.length
+  console.log(`  baseline: ${BASELINE.size} known / 본 commit staged warning: ${warnings.length} (known=${knownCount}, new=${newViolations.length})`)
+  if (newViolations.length > 0) {
+    console.error('\n❌ ui-design-lint (STAGED) — staged 파일에 신규 UI 표준 위반')
+    for (const w of newViolations) {
+      console.error(`  ❌ ${w.file}`)
+      console.error(`     ${w.issue}`)
+    }
+    console.error('\n   수정 후 재시도, 또는 의도된 변경 (baseline 추가):')
+    console.error('     node harness-engineering/scripts/ui-design-lint.js --baseline-update')
+    console.error('   강제 우회 (권장 X):')
+    console.error('     UI_DESIGN_LINT_REPORT_ONLY=1 git commit ...')
+    process.exit(1)
+  }
+}
+// 일반 모드: warnings 정보성, violations 만 차단
+if (!STAGED_MODE && violations.length > 0 && process.env.UI_DESIGN_LINT_REPORT_ONLY !== '1') {
   console.error('\n❌ ui-design-lint 위반 — commit 차단')
   console.error('   강제 우회 (권장 X): UI_DESIGN_LINT_REPORT_ONLY=1 npm run lint:ui-design')
   process.exit(1)

@@ -232,7 +232,7 @@ export default function MyInfoPage() {
           <div>
             <label style={{ fontSize: 12, fontWeight: 700, color: '#475569', marginBottom: 6, display: 'block' }}>소속 회사</label>
             <input
-              value={orgBrand.companyLabel || company?.name || '미배정'}
+              value={orgBrand.companyLabel || 'ERP'}
               disabled
               style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '1px solid #e2e8f0', fontSize: 14, background: '#f8fafc', color: '#94a3b8', boxSizing: 'border-box' }}
             />

@@ -280,6 +280,36 @@ function main() {
   const reflogR = reflogIntegrity.check()
   console.log(reflogIntegrity.format(reflogR))
 
+  // [평가] 3.12 — ui-design-lint (STAGED 모드) — 2026-05-27 사용자 결정 (등급 승격)
+  //   STAGED_ONLY 모드 (pre-commit) 에선 staged 파일만 검사 + warning 도 차단.
+  //   잔존 위반 정리 안 하고선 commit 불가.
+  if (STAGED_ONLY) {
+    console.log('\n▸ [3.12] ui-design-lint (STAGED 모드) — UI 표준 준수 강제')
+    try {
+      const stagedRaw = require('child_process').execSync('git diff --cached --name-only --diff-filter=ACM', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim()
+      const stagedList = stagedRaw.split('\n').filter(s => s.endsWith('.tsx') && s.startsWith('app/'))
+      if (stagedList.length === 0) {
+        console.log('  staged app/**/*.tsx 0건 — skip')
+      } else {
+        console.log(`  staged: ${stagedList.length} files`)
+        try {
+          require('child_process').execSync(
+            `node harness-engineering/scripts/ui-design-lint.js`,
+            { stdio: 'inherit', env: { ...process.env, UI_DESIGN_LINT_STAGED: stagedList.join(',') } }
+          )
+        } catch (e) {
+          // ui-design-lint exit 1 → critical 로 카운트
+          console.error('  ❌ ui-design-lint 차단')
+          // 이 sub-lint 가 차단했으면 전체 차단
+          process.exitCode = 1
+          return
+        }
+      }
+    } catch (e) {
+      console.warn(`  ⚠ staged 파일 조회 실패: ${e.message}`)
+    }
+  }
+
   // [평가] 4. UI 화면 데이터 정합성
   // STAGED_ONLY: 전체 app/ 스캔이라 cowork-commit 모드에선 skip
   let uiR = { urlGroups: {}, pages: [] }

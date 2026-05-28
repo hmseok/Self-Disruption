@@ -24,11 +24,13 @@ export interface OrgBrandConfig {
   companyLabel: string   // 우측 상단 (법인명)
 }
 
+// 2026-05-27 사용자 결정: FMI 표기 사이드바·헤더에서 제거 (P3+e publicName 정책 확장).
+//   primaryLabel/companyLabel 모두 중립. RIDE 는 자기 브랜드 유지.
 export const ORG_BRAND_CONFIGS: Record<OrgBrand, OrgBrandConfig> = {
   FMI: {
     brand: 'FMI',
-    primaryLabel: 'FMI ERP',
-    companyLabel: '주식회사 에프엠아이',
+    primaryLabel: 'ERP',         // 'FMI ERP' → 'ERP' (중립)
+    companyLabel: '',            // '주식회사 에프엠아이' → '' (사이드바 회사명 비표시)
   },
   RIDE: {
     brand: 'RIDE',
