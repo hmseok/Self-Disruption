@@ -29,6 +29,8 @@ import { getStoredToken, getStoredUser } from '@/lib/auth-client'
 import { usePermission } from '@/app/hooks/usePermission'
 import NeuDataTable, { type TableColumn } from '@/app/components/NeuDataTable'
 import DcStatStrip, { type StatItem } from '@/app/components/DcStatStrip'
+import DcToolbar, { type FilterItem } from '@/app/components/DcToolbar'
+import NeuFilterTabs, { type FilterTab } from '@/app/components/NeuFilterTabs'
 import { COLORS, GLASS, BTN } from '@/app/utils/ui-tokens'
 
 // ── 버튼 스타일 (BTN 은 size 만 — variant 는 인라인) ──────────────
@@ -54,6 +56,63 @@ type TabKey = 'dashboard' | 'guide' | 'policies_master' | 'deliverables_tracker'
 // P17-C/D — 모듈 main 탭 통합. policies/page.tsx + deliverables/page.tsx 컴포넌트 import.
 import PoliciesPage from './policies/page'
 import DeliverablesPage from './deliverables/page'
+
+// ════════════════════════════════════════════════════════════════
+// PR-RC-X (2026-05-28) — 글래스 패널 알림 + 확인 다이얼로그
+//   Rule 20 — alert / confirm 금지. 결과 메시지는 React state + GLASS.
+// ════════════════════════════════════════════════════════════════
+type NoticeTone = 'success' | 'danger' | 'info'
+interface Notice { tone: NoticeTone; title: string; body?: string }
+
+function NoticeBanner({ notice, onClose }: { notice: Notice | null; onClose: () => void }) {
+  if (!notice) return null
+  const color = notice.tone === 'success' ? COLORS.success : notice.tone === 'danger' ? COLORS.danger : COLORS.primary
+  const bg    = notice.tone === 'success' ? COLORS.bgGreen   : notice.tone === 'danger' ? COLORS.bgRed     : COLORS.bgBlue
+  return (
+    <div style={{ ...GLASS.L4, padding: '12px 16px', borderRadius: 10, marginBottom: 12, borderLeft: `4px solid ${color}`, background: bg, display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+      <div style={{ flex: 1, color: COLORS.textPrimary, fontSize: 13, whiteSpace: 'pre-line' }}>
+        <strong style={{ color }}>{notice.title}</strong>
+        {notice.body && <div style={{ marginTop: 4, color: COLORS.textSecondary }}>{notice.body}</div>}
+      </div>
+      <button onClick={onClose} style={{ ...BTN.sm, border: `1px solid ${COLORS.borderSubtle}`, background: 'transparent', color: COLORS.textSecondary, cursor: 'pointer' }}>× 닫기</button>
+    </div>
+  )
+}
+
+interface ConfirmRequest {
+  title: string
+  body: string
+  confirmLabel?: string
+  cancelLabel?: string
+  danger?: boolean
+  onConfirm: () => void
+}
+
+function GlassConfirmDialog({ request, onClose }: { request: ConfirmRequest | null; onClose: () => void }) {
+  if (!request) return null
+  const danger = request.danger ?? false
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 9999,
+      background: 'rgba(0,0,0,0.40)', backdropFilter: 'blur(6px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
+    }} onClick={onClose}>
+      <div onClick={e => e.stopPropagation()} style={{
+        ...GLASS.L5, padding: 24, borderRadius: 14, maxWidth: 480, width: '100%',
+        borderLeft: `4px solid ${danger ? COLORS.danger : COLORS.primary}`,
+      }}>
+        <h3 style={{ margin: 0, fontSize: 16, color: COLORS.textPrimary }}>{request.title}</h3>
+        <div style={{ marginTop: 12, fontSize: 13, color: COLORS.textSecondary, whiteSpace: 'pre-line', lineHeight: 1.6 }}>{request.body}</div>
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 20 }}>
+          <button onClick={onClose} style={btnSecondary}>{request.cancelLabel || '취소'}</button>
+          <button onClick={() => { request.onConfirm(); onClose() }} style={danger ? btnDanger : btnPrimary}>
+            {request.confirmLabel || '확인'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 // ════════════════════════════════════════════════════════════════
 // Phase 1.3-F — 운영 가이드 Step Playbook (9 단계)
@@ -736,55 +795,53 @@ export default function RideCompliancePage() {
         </div>
       )}
 
-      {/* P29 — NavTabs 3 카테고리 그룹화 (규정/운영/산출) */}
-      <div style={{ ...GLASS.L5, padding: '0 16px', borderRadius: 10, marginBottom: 16, overflowX: 'auto' }}>
-        <div style={{ display: 'flex', gap: 0, alignItems: 'center', flexWrap: 'wrap' }}>
-          {([
-            { group: '📜 규정', tabs: [
-              { key: 'policies_master', label: '내규 마스터',  emoji: '📜' },
-              { key: 'documents',       label: '규정 문서',    emoji: '📚' },
-            ] },
-            { group: '⚙ 운영', tabs: [
-              { key: 'dashboard',  label: '대시보드',    emoji: '📊' },
-              { key: 'guide',      label: '운영 가이드', emoji: '📖' },
-              { key: 'officers',   label: '조직 매핑',   emoji: '👔' },
-              { key: 'assets',     label: '정보자산',    emoji: '📦' },
-              { key: 'incidents',  label: '침해사고',    emoji: '🚨' },
-              { key: 'annual_ops', label: '연간 운영',   emoji: '📅' },
-            ] },
-            { group: '📤 산출', tabs: [
-              { key: 'deliverables_tracker', label: '산출물 트래커', emoji: '📤' },
-              { key: 'submissions',          label: '서식 작성',     emoji: '📝' },
-            ] },
-          ] as { group: string; tabs: { key: TabKey; label: string; emoji: string }[] }[]).map((g, gi) => (
-            <div key={g.group} style={{
-              display: 'flex', alignItems: 'center',
-              borderLeft: gi > 0 ? `1px solid ${COLORS.borderSubtle}` : 'none',
-              marginLeft: gi > 0 ? 12 : 0, paddingLeft: gi > 0 ? 12 : 0,
-            }}>
-              <span style={{
-                fontSize: 11, fontWeight: 700, color: COLORS.textMuted,
-                padding: '0 8px', whiteSpace: 'nowrap',
-              }}>{g.group}</span>
-              {g.tabs.map(t => {
-                const active = tab === t.key
-                return (
-                  <button key={t.key} onClick={() => setTab(t.key)}
-                    style={{
-                      background: active ? `${COLORS.primary}18` : 'transparent',
-                      border: 'none',
-                      borderBottom: active ? `2px solid ${COLORS.primary}` : '2px solid transparent',
-                      padding: '14px 14px', fontSize: 13, fontWeight: active ? 700 : 500,
-                      color: active ? COLORS.primary : COLORS.textSecondary,
-                      cursor: 'pointer', whiteSpace: 'nowrap',
-                    }}>
-                    {t.emoji} {t.label}
-                  </button>
-                )
-              })}
+      {/* P29 + PR-RC-X — 3 카테고리 그룹화 (규정/운영/산출) + NeuFilterTabs 공용 컴포넌트 */}
+      <div style={{ ...GLASS.L5, padding: '8px 12px', borderRadius: 10, marginBottom: 16, display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+        {([
+          { group: '📜 규정', tabs: [
+            { key: 'policies_master', label: '📜 내규 마스터' },
+            { key: 'documents',       label: '📚 규정 문서' },
+          ] },
+          { group: '⚙ 운영', tabs: [
+            { key: 'dashboard',  label: '📊 대시보드' },
+            { key: 'guide',      label: '📖 운영 가이드' },
+            { key: 'officers',   label: '👔 조직 매핑' },
+            { key: 'assets',     label: '📦 정보자산' },
+            { key: 'incidents',  label: '🚨 침해사고' },
+            { key: 'annual_ops', label: '📅 연간 운영' },
+          ] },
+          { group: '📤 산출', tabs: [
+            { key: 'deliverables_tracker', label: '📤 산출물 트래커' },
+            { key: 'submissions',          label: '📝 서식 작성' },
+          ] },
+        ] as { group: string; tabs: FilterTab[] }[]).map((g, gi) => (
+          <div key={g.group} style={{
+            display: 'flex', alignItems: 'center', gap: 8,
+            borderLeft: gi > 0 ? `1px solid ${COLORS.borderSubtle}` : 'none',
+            paddingLeft: gi > 0 ? 12 : 0,
+          }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: COLORS.textMuted, whiteSpace: 'nowrap' }}>{g.group}</span>
+            <div style={{ marginBottom: -12 }}>
+              <NeuFilterTabs
+                tabs={g.tabs}
+                activeKey={tab}
+                onSelect={k => setTab(k as TabKey)}
+                compact
+              />
             </div>
-          ))}
-        </div>
+          </div>
+        ))}
+      </div>
+
+      {/* P12-C — 데이터 폐기 결재 quick link (별도 페이지) */}
+      <div style={{ ...GLASS.L3, padding: '10px 14px', borderRadius: 10, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
+        <span style={{ fontSize: 12, color: COLORS.textSecondary }}>
+          🗑 외부 카페24 폐기 결재 — CPO 검토 + 파기확인서 자동 발급
+        </span>
+        <Link href="/RideCompliance/data-disposal"
+          style={{ marginLeft: 'auto', ...BTN.sm, border: `1px solid ${COLORS.borderSubtle}`, background: COLORS.bgBlue, color: COLORS.primary, textDecoration: 'none', fontWeight: 600 }}>
+          데이터 폐기 결재 →
+        </Link>
       </div>
 
       {/* P17-C/D — 내규 마스터 + 산출물 트래커 메인 탭 (페이지 컴포넌트 임베드) */}
@@ -1523,23 +1580,28 @@ function AssetsTabContent(props: {
   ]
   return (
     <div style={{ ...GLASS.L3, padding: 20, borderRadius: 12 }}>
-      <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginBottom: 16 }}>
-        <input placeholder="자산명·코드·위치 검색" value={props.query} onChange={e => props.setQuery(e.target.value)}
-          style={{ flex: '1 1 200px', minWidth: 200, padding: '8px 12px', border: `1px solid ${COLORS.borderSubtle}`, borderRadius: 6, fontSize: 13 }} />
-        <select value={props.typeFilter} onChange={e => props.setTypeFilter(e.target.value)} style={selStyle()}>
-          <option value="">유형: 전체</option>
-          {Object.entries(ASSET_TYPE_LABEL).map(([k, v]) => <option key={k} value={k}>{v.emoji} {v.label}</option>)}
-        </select>
-        <select value={props.classFilter} onChange={e => props.setClassFilter(e.target.value)} style={selStyle()}>
-          <option value="">등급: 전체</option>
-          {Object.entries(CLASSIFICATION_LABEL).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-        </select>
-        <select value={props.statusFilter} onChange={e => props.setStatusFilter(e.target.value)} style={selStyle()}>
-          <option value="">상태: 전체</option>
-          {Object.entries(ASSET_STATUS_LABEL).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-        </select>
-        {props.canEdit && <button onClick={props.onCreate} style={{ ...btnPrimary, marginLeft: 'auto' }}>＋ 자산 등록</button>}
-      </div>
+      <DcToolbar
+        search={props.query}
+        onSearchChange={props.setQuery}
+        placeholder="자산명·코드·위치 검색"
+        trailing={
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <select value={props.typeFilter} onChange={e => props.setTypeFilter(e.target.value)} style={selStyle()}>
+              <option value="">유형: 전체</option>
+              {Object.entries(ASSET_TYPE_LABEL).map(([k, v]) => <option key={k} value={k}>{v.emoji} {v.label}</option>)}
+            </select>
+            <select value={props.classFilter} onChange={e => props.setClassFilter(e.target.value)} style={selStyle()}>
+              <option value="">등급: 전체</option>
+              {Object.entries(CLASSIFICATION_LABEL).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+            </select>
+            <select value={props.statusFilter} onChange={e => props.setStatusFilter(e.target.value)} style={selStyle()}>
+              <option value="">상태: 전체</option>
+              {Object.entries(ASSET_STATUS_LABEL).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+            </select>
+            {props.canEdit && <button onClick={props.onCreate} style={btnPrimary}>＋ 자산 등록</button>}
+          </div>
+        }
+      />
       <div style={{ marginBottom: 8, fontSize: 12, color: COLORS.textSecondary }}>총 {props.allRows.length}건 중 {props.rows.length}건 표시</div>
       <NeuDataTable columns={cols} data={props.rows} rowKey={r => r.id} />
     </div>
@@ -1584,23 +1646,28 @@ function IncidentsTabContent(props: {
   ]
   return (
     <div style={{ ...GLASS.L3, padding: 20, borderRadius: 12 }}>
-      <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginBottom: 16 }}>
-        <input placeholder="제목·번호·경위 검색" value={props.query} onChange={e => props.setQuery(e.target.value)}
-          style={{ flex: '1 1 200px', minWidth: 200, padding: '8px 12px', border: `1px solid ${COLORS.borderSubtle}`, borderRadius: 6, fontSize: 13 }} />
-        <select value={props.typeFilter} onChange={e => props.setTypeFilter(e.target.value)} style={selStyle()}>
-          <option value="">유형: 전체</option>
-          {Object.entries(INCIDENT_TYPE_LABEL).map(([k, v]) => <option key={k} value={k}>{v.emoji} {v.label}</option>)}
-        </select>
-        <select value={props.severityFilter} onChange={e => props.setSeverityFilter(e.target.value)} style={selStyle()}>
-          <option value="">심각도: 전체</option>
-          {Object.entries(SEVERITY_LABEL).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-        </select>
-        <select value={props.statusFilter} onChange={e => props.setStatusFilter(e.target.value)} style={selStyle()}>
-          <option value="">상태: 전체</option>
-          {Object.entries(INCIDENT_STATUS_LABEL).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-        </select>
-        <button onClick={props.onCreate} style={{ ...btnDanger, marginLeft: 'auto' }}>🚨 사고 신고</button>
-      </div>
+      <DcToolbar
+        search={props.query}
+        onSearchChange={props.setQuery}
+        placeholder="제목·번호·경위 검색"
+        trailing={
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <select value={props.typeFilter} onChange={e => props.setTypeFilter(e.target.value)} style={selStyle()}>
+              <option value="">유형: 전체</option>
+              {Object.entries(INCIDENT_TYPE_LABEL).map(([k, v]) => <option key={k} value={k}>{v.emoji} {v.label}</option>)}
+            </select>
+            <select value={props.severityFilter} onChange={e => props.setSeverityFilter(e.target.value)} style={selStyle()}>
+              <option value="">심각도: 전체</option>
+              {Object.entries(SEVERITY_LABEL).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+            </select>
+            <select value={props.statusFilter} onChange={e => props.setStatusFilter(e.target.value)} style={selStyle()}>
+              <option value="">상태: 전체</option>
+              {Object.entries(INCIDENT_STATUS_LABEL).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+            </select>
+            <button onClick={props.onCreate} style={btnDanger}>🚨 사고 신고</button>
+          </div>
+        }
+      />
       <NeuDataTable columns={cols} data={props.rows} rowKey={r => r.id} />
     </div>
   )
@@ -1658,6 +1725,9 @@ function DocumentsTabContent(props: {
   const [busyId, setBusyId] = useState<string | null>(null)
   // Phase 1.4-fix15 — 체크박스 선택 (id Set)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  // PR-RC-X — 글래스 알림 + 확인 다이얼로그 (Rule 20)
+  const [notice, setNotice] = useState<Notice | null>(null)
+  const [confirmReq, setConfirmReq] = useState<ConfirmRequest | null>(null)
 
   // 시드 문서 판별 — 통합본 5.17 「파생서류 목차」 25건 (RIDE-* / F-*)
   const isSeedDoc = (code: string) => /^(RIDE-|F-)/.test(code)
@@ -1677,83 +1747,108 @@ function DocumentsTabContent(props: {
     setSelectedIds(new Set())
   }
 
-  const handleReset = async (d: ComplianceDocument) => {
-    if (!confirm(`「${d.doc_code} ${d.title}」 검수 상태를 리셋할까요?\n\n검수 완료 → 검수 대기(pending) 로 되돌립니다. 본문·PDF·버전은 유지됩니다. 재검토 → 승인 흐름을 다시 실행할 수 있습니다.`)) return
-    setBusyId(d.id)
-    try {
-      const token = getStoredToken()
-      const res = await fetch(`/api/ride-compliance/documents/${d.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-        body: JSON.stringify({ action: 'reset' }),
-      })
-      const json = await res.json()
-      if (!res.ok || !json.success) { alert(`리셋 실패: ${json.error || res.status}`); return }
-      props.onChanged()
-    } catch (e) { alert(`리셋 오류: ${e}`) } finally { setBusyId(null) }
+  // PR-RC-X — alert/confirm 제거 → 글래스 패널 (Rule 20)
+  const handleReset = (d: ComplianceDocument) => {
+    setConfirmReq({
+      title: `검수 상태 리셋 — ${d.doc_code}`,
+      body: `「${d.doc_code} ${d.title}」 검수 상태를 리셋합니다.\n\n검수 완료 → 검수 대기(pending) 로 되돌립니다.\n본문·PDF·버전은 유지됩니다.\n재검토 → 승인 흐름을 다시 실행할 수 있습니다.`,
+      confirmLabel: '리셋',
+      onConfirm: async () => {
+        setBusyId(d.id)
+        try {
+          const token = getStoredToken()
+          const res = await fetch(`/api/ride-compliance/documents/${d.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+            body: JSON.stringify({ action: 'reset' }),
+          })
+          const json = await res.json()
+          if (!res.ok || !json.success) { setNotice({ tone: 'danger', title: '리셋 실패', body: String(json.error || res.status) }); return }
+          setNotice({ tone: 'success', title: '✅ 검수 리셋 완료', body: `${d.doc_code} ${d.title}` })
+          props.onChanged()
+        } catch (e) { setNotice({ tone: 'danger', title: '리셋 오류', body: String(e) }) } finally { setBusyId(null) }
+      },
+    })
   }
 
-  const handleDelete = async (d: ComplianceDocument) => {
+  const handleDelete = (d: ComplianceDocument) => {
     const seedWarn = isSeedDoc(d.doc_code)
-      ? '\n\n⚠ 이 문서는 통합본 5.17 「파생서류 목차」 근거 문서입니다. 삭제 대신 「🔄 리셋」 을 권장합니다.'
+      ? '\n\n⚠ 이 문서는 통합본 5.17 「파생서류 목차」 근거 문서입니다.\n삭제 대신 「🔄 리셋」 을 권장합니다.'
       : ''
-    if (!confirm(`「${d.doc_code} ${d.title}」 을(를) 삭제할까요?\n\n· 버전 이력 + 서식 제출 인스턴스 함께 삭제\n· GCS 원본 파일도 삭제\n· 연결된 task 는 보존 (출처만 분리)${seedWarn}\n\n되돌릴 수 없습니다.`)) return
-    setBusyId(d.id)
-    try {
-      const token = getStoredToken()
-      const res = await fetch(`/api/ride-compliance/documents/${d.id}`, {
-        method: 'DELETE',
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      })
-      const json = await res.json()
-      if (!res.ok || !json.success) { alert(`삭제 실패: ${json.error || res.status}`); return }
-      const c = json.data?.cascade
-      alert(`✅ 삭제 완료 — ${d.doc_code}\n버전 ${c?.versions ?? 0} · 서식제출 ${c?.submissions ?? 0} · task 분리 ${c?.detached_tasks ?? 0}${json.data?.gcs?.deleted ? ' · GCS 파일 삭제' : ''}`)
-      props.onChanged()
-    } catch (e) { alert(`삭제 오류: ${e}`) } finally { setBusyId(null) }
+    setConfirmReq({
+      title: `문서 삭제 — ${d.doc_code}`,
+      body: `「${d.doc_code} ${d.title}」 을(를) 삭제합니다.\n\n· 버전 이력 + 서식 제출 인스턴스 함께 삭제\n· GCS 원본 파일도 삭제\n· 연결된 task 는 보존 (출처만 분리)${seedWarn}\n\n되돌릴 수 없습니다.`,
+      confirmLabel: '영구 삭제',
+      danger: true,
+      onConfirm: async () => {
+        setBusyId(d.id)
+        try {
+          const token = getStoredToken()
+          const res = await fetch(`/api/ride-compliance/documents/${d.id}`, {
+            method: 'DELETE',
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+          })
+          const json = await res.json()
+          if (!res.ok || !json.success) { setNotice({ tone: 'danger', title: '삭제 실패', body: String(json.error || res.status) }); return }
+          const c = json.data?.cascade
+          setNotice({
+            tone: 'success',
+            title: `✅ 삭제 완료 — ${d.doc_code}`,
+            body: `버전 ${c?.versions ?? 0} · 서식제출 ${c?.submissions ?? 0} · task 분리 ${c?.detached_tasks ?? 0}${json.data?.gcs?.deleted ? ' · GCS 파일 삭제' : ''}`,
+          })
+          props.onChanged()
+        } catch (e) { setNotice({ tone: 'danger', title: '삭제 오류', body: String(e) }) } finally { setBusyId(null) }
+      },
+    })
   }
 
   // Phase 1.4-fix15 — 체크박스 선택 삭제 (fix14 의 필터단위 일괄 삭제 대체)
-  const handleBulkDelete = async () => {
+  const handleBulkDelete = () => {
     const ids = Array.from(selectedIds)
-    if (ids.length === 0) { alert('선택된 문서가 없습니다.'); return }
-    // 현재 표시된 행 중 선택된 것 메타
+    if (ids.length === 0) { setNotice({ tone: 'info', title: '선택된 문서가 없습니다.' }); return }
     const selectedRows = props.rows.filter(r => selectedIds.has(r.id))
     const seedRows = selectedRows.filter(r => isSeedDoc(r.doc_code))
     const seedNote = seedRows.length > 0 ? ` (⚠ 시드 ${seedRows.length}개 포함)` : ''
     // 1차 확인 — cascade 안내 + 시드 강조
-    if (!confirm(
-      `선택한 ${ids.length}건${seedNote} 삭제할까요?\n\n` +
-      `· 버전 이력 + 서식 제출 인스턴스 함께 삭제\n` +
-      `· GCS 원본 파일도 삭제\n` +
-      `· 연결된 task 는 보존 (출처만 분리)\n\n` +
-      `다음 단계에서 한 번 더 확인합니다.`
-    )) return
-    // 2차 확인 — 되돌릴 수 없음
-    if (!confirm(`되돌릴 수 없습니다. 정말 ${ids.length}건 삭제하시겠어요?`)) return
-    setBusyId('__bulk__')
-    try {
-      const token = getStoredToken()
-      const res = await fetch('/api/ride-compliance/documents/bulk-delete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-        body: JSON.stringify({ ids }),
-      })
-      const json = await res.json()
-      if (!res.ok || !json.success) { alert(`선택 삭제 실패: ${json.error || res.status}`); return }
-      const d = json.data
-      const gcsLine = d.gcs?.failures?.length
-        ? `· GCS 파일 ${d.gcs.deleted}건 · 실패 ${d.gcs.failures.length}`
-        : `· GCS 파일 ${d.gcs?.deleted ?? 0}건`
-      alert(
-        `✅ 선택 삭제 완료\n\n` +
-        `· 문서 ${d.deleted}건 (요청 ${d.requested})\n` +
-        `· 버전 ${d.cascade?.versions ?? 0} · 서식제출 ${d.cascade?.submissions ?? 0} · task 분리 ${d.cascade?.detached_tasks ?? 0}\n` +
-        gcsLine
-      )
-      clearSelection()
-      props.onChanged()
-    } catch (e) { alert(`선택 삭제 오류: ${e}`) } finally { setBusyId(null) }
+    setConfirmReq({
+      title: `선택한 ${ids.length}건${seedNote} 삭제`,
+      body: `· 버전 이력 + 서식 제출 인스턴스 함께 삭제\n· GCS 원본 파일도 삭제\n· 연결된 task 는 보존 (출처만 분리)\n\n다음 단계에서 한 번 더 확인합니다.`,
+      confirmLabel: '다음',
+      danger: true,
+      onConfirm: () => {
+        // 2차 확인 — 되돌릴 수 없음
+        setConfirmReq({
+          title: '되돌릴 수 없습니다',
+          body: `정말 ${ids.length}건 삭제하시겠어요?`,
+          confirmLabel: '영구 삭제',
+          danger: true,
+          onConfirm: async () => {
+            setBusyId('__bulk__')
+            try {
+              const token = getStoredToken()
+              const res = await fetch('/api/ride-compliance/documents/bulk-delete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+                body: JSON.stringify({ ids }),
+              })
+              const json = await res.json()
+              if (!res.ok || !json.success) { setNotice({ tone: 'danger', title: '선택 삭제 실패', body: String(json.error || res.status) }); return }
+              const d = json.data
+              const gcsLine = d.gcs?.failures?.length
+                ? `· GCS 파일 ${d.gcs.deleted}건 · 실패 ${d.gcs.failures.length}`
+                : `· GCS 파일 ${d.gcs?.deleted ?? 0}건`
+              setNotice({
+                tone: 'success',
+                title: '✅ 선택 삭제 완료',
+                body: `· 문서 ${d.deleted}건 (요청 ${d.requested})\n· 버전 ${d.cascade?.versions ?? 0} · 서식제출 ${d.cascade?.submissions ?? 0} · task 분리 ${d.cascade?.detached_tasks ?? 0}\n${gcsLine}`,
+              })
+              clearSelection()
+              props.onChanged()
+            } catch (e) { setNotice({ tone: 'danger', title: '선택 삭제 오류', body: String(e) }) } finally { setBusyId(null) }
+          },
+        })
+      },
+    })
   }
 
   const cols: TableColumn<ComplianceDocument>[] = [
@@ -1761,11 +1856,11 @@ function DocumentsTabContent(props: {
     { key: 'select', label: '☐', render: r => (
       <input
         type="checkbox"
+        style={{ width: 18, height: 18, accentColor: '#3b6eb5', cursor: props.isMgr ? 'pointer' : 'not-allowed' }}
         checked={selectedIds.has(r.id)}
         onChange={e => toggleSelect(r.id, e.target.checked)}
         disabled={!props.isMgr}
         title={props.isMgr ? '선택' : '관리자(manager+) 만 선택 가능'}
-        style={{ cursor: props.isMgr ? 'pointer' : 'not-allowed' }}
         onClick={e => e.stopPropagation()}
       />
     ) },
@@ -1822,6 +1917,9 @@ function DocumentsTabContent(props: {
   ]
   return (
     <div style={{ ...GLASS.L3, padding: 20, borderRadius: 12 }}>
+      {/* PR-RC-X — 글래스 알림 + 확인 다이얼로그 (Rule 20) */}
+      <NoticeBanner notice={notice} onClose={() => setNotice(null)} />
+      <GlassConfirmDialog request={confirmReq} onClose={() => setConfirmReq(null)} />
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
         <div style={{ flex: 1, padding: '10px 14px', borderRadius: 8, background: COLORS.bgBlue, fontSize: 12, color: COLORS.textSecondary, borderLeft: `4px solid ${COLORS.info}` }}>
           💡 매뉴얼·서식 카탈로그 — 관리자가 원본 등록 → CPO 검수 완료 → 활성화. 「🔄 리셋」 으로 검수 흐름 재실행, 「🗑 삭제」 / 「전체 삭제」 로 문서 제거.
@@ -1852,23 +1950,28 @@ function DocumentsTabContent(props: {
           </div>
         )}
       </div>
-      <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginBottom: 16 }}>
-        <input placeholder="제목·코드·설명 검색" value={props.query} onChange={e => props.setQuery(e.target.value)}
-          style={{ flex: '1 1 200px', minWidth: 200, padding: '8px 12px', border: `1px solid ${COLORS.borderSubtle}`, borderRadius: 6, fontSize: 13 }} />
-        <select value={props.typeFilter} onChange={e => props.setTypeFilter(e.target.value)} style={selStyle()}>
-          <option value="">유형: 전체</option>
-          {Object.entries(DOC_TYPE_LABEL).map(([k, v]) => <option key={k} value={k}>{v.emoji} {v.label}</option>)}
-        </select>
-        <select value={props.statusFilter} onChange={e => props.setStatusFilter(e.target.value)} style={selStyle()}>
-          <option value="">상태: 전체</option>
-          {Object.entries(DOC_STATUS_LABEL).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-        </select>
-        <select value={props.verifiedFilter} onChange={e => props.setVerifiedFilter(e.target.value)} style={selStyle()}>
-          <option value="">검수: 전체</option>
-          <option value="1">✓ 검수완료</option>
-          <option value="0">⚠ 미검수</option>
-        </select>
-      </div>
+      <DcToolbar
+        search={props.query}
+        onSearchChange={props.setQuery}
+        placeholder="제목·코드·설명 검색"
+        trailing={
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <select value={props.typeFilter} onChange={e => props.setTypeFilter(e.target.value)} style={selStyle()}>
+              <option value="">유형: 전체</option>
+              {Object.entries(DOC_TYPE_LABEL).map(([k, v]) => <option key={k} value={k}>{v.emoji} {v.label}</option>)}
+            </select>
+            <select value={props.statusFilter} onChange={e => props.setStatusFilter(e.target.value)} style={selStyle()}>
+              <option value="">상태: 전체</option>
+              {Object.entries(DOC_STATUS_LABEL).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+            </select>
+            <select value={props.verifiedFilter} onChange={e => props.setVerifiedFilter(e.target.value)} style={selStyle()}>
+              <option value="">검수: 전체</option>
+              <option value="1">✓ 검수완료</option>
+              <option value="0">⚠ 미검수</option>
+            </select>
+          </div>
+        }
+      />
       <div style={{ marginBottom: 8, fontSize: 12, color: COLORS.textSecondary }}>총 {props.allRows.length}건 중 {props.rows.length}건 표시</div>
       <NeuDataTable columns={cols} data={props.rows} rowKey={r => r.id} />
     </div>
@@ -2164,7 +2267,7 @@ function AssetModal(props: { onClose: () => void; onSaved: () => void }) {
         <Field label="접근통제 (제12·14조)"><input value={form.access_control} onChange={e => setForm({ ...form, access_control: e.target.value })} placeholder="예: 2FA + IP 화이트리스트" style={inpStyle()} /></Field>
         <Field label="취득일"><input type="date" value={form.acquired_at} onChange={e => setForm({ ...form, acquired_at: e.target.value })} style={inpStyle()} /></Field>
         <Field label="개인정보 포함" full><label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-          <input type="checkbox" checked={form.contains_pii} onChange={e => setForm({ ...form, contains_pii: e.target.checked })} />
+          <input type="checkbox" checked={form.contains_pii} onChange={e => setForm({ ...form, contains_pii: e.target.checked })} style={{ width: 18, height: 18, accentColor: '#3b6eb5' }} />
           <span style={{ fontSize: 13 }}>이 자산은 개인정보를 포함합니다 (제19조 적용)</span>
         </label></Field>
         <Field label="비고" full><textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} rows={3} style={{ ...inpStyle(), resize: 'vertical' }} /></Field>
