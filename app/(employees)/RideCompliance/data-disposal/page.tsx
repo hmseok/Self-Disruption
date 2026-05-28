@@ -111,20 +111,29 @@ function actionRoleLabel(action: string): { role: string; label: string; color: 
 }
 
 // ── 결재 라인 (담당자 → 관리자 → 책임자) — 매뉴얼 통합본 5.17 제6조 ──
-function ApprovalLine({ review }: { review: any }) {
+//   매뉴얼 임명자 이름은 고정 (officers 또는 fallback). 단계별로 액션 상태만 표시.
+function ApprovalLine({ review, officers }: {
+  review: any
+  officers: { cpo: { name: string; display_title: string } | null; manager1: { name: string; display_title: string } | null; manager2: { name: string; display_title: string } | null }
+}) {
   const status = review.review_status || 'pending'
+  const cpoName = officers.cpo?.name || '임성민 이사'
+  const cpoTitle = officers.cpo?.display_title || '개인정보보호 책임자'
+  const mgrName = officers.manager1?.name || '석호민 부장'
+  const mgrTitle = officers.manager1?.display_title || '개인정보보호 관리자'
 
-  // 4 단계 상태 추적
-  // [1] 폐기 요청 (담당자) — request_at + request_by
-  // [2] 결재 상신 (관리자) — external_approval_doc_id (외부 결재 문서)
-  // [3] 검토·승인 (책임자) — reviewed_at + review_status (approved/rejected/executed/confirmed)
-  // [4] 최종 확인 (책임자) — confirmed status
+  // 4 단계
+  // [1] 담당자(취급자) — 폐기 요청 (외부 cafe24 신청자)
+  // [2] 관리자        — 결재 상신 (매뉴얼 임명 — 석호민 부장)
+  // [3] 책임자 (CPO)  — 검토·승인 (매뉴얼 임명 — 임성민 이사)
+  // [4] 책임자 (CPO)  — 최종 확인 (매뉴얼 임명 — 임성민 이사)
   const stages = [
     {
       step: '1',
       role: '담당자',
       title: '폐기 요청',
       person: review.external_request_by || '—',
+      subtitle: '신청자 (외부)',
       at: review.external_request_at,
       done: !!review.external_request_at,
       current: false,
@@ -133,7 +142,8 @@ function ApprovalLine({ review }: { review: any }) {
       step: '2',
       role: '관리자',
       title: '결재 상신',
-      person: review.external_approval_doc_id ? `결재 문서 #${review.external_approval_doc_id}` : '—',
+      person: mgrName,
+      subtitle: mgrTitle,
       at: review.external_approval_at,
       done: !!review.external_approval_at,
       current: !review.external_approval_at && !!review.external_request_at,
@@ -142,7 +152,8 @@ function ApprovalLine({ review }: { review: any }) {
       step: '3',
       role: '책임자',
       title: status === 'rejected' ? '반려' : '검토·승인',
-      person: review.reviewer_id ? `검토자 ${String(review.reviewer_id).slice(0, 8)}` : '개인정보보호 책임자',
+      person: cpoName,
+      subtitle: cpoTitle,
       at: review.reviewed_at,
       done: ['approved', 'executed', 'confirmed', 'rejected'].includes(status),
       current: status === 'pending',
@@ -152,7 +163,8 @@ function ApprovalLine({ review }: { review: any }) {
       step: '4',
       role: '책임자',
       title: '최종 확인',
-      person: review.external_confirmed_by || '개인정보보호 책임자',
+      person: cpoName,
+      subtitle: cpoTitle,
       at: review.external_confirmed_at || (status === 'confirmed' ? review.reviewed_at : null),
       done: status === 'confirmed' || !!review.external_confirmed_at,
       current: status === 'executed' || status === 'approved',
@@ -232,7 +244,14 @@ export default function DataDisposalPage() {
 
   // 선택된 행 + 상세
   const [selectedReviewId, setSelectedReviewId] = useState<string | null>(null)
-  const [detail, setDetail] = useState<{ review: any; items: DisposalItem[]; audits: AuditRow[] } | null>(null)
+  const [detail, setDetail] = useState<{
+    review: any
+    items: DisposalItem[]
+    audits: AuditRow[]
+    deliverable?: { id: string; file_url: string; file_name: string | null; title: string | null } | null
+    officers?: { cpo: { name: string; display_title: string } | null; manager1: { name: string; display_title: string } | null; manager2: { name: string; display_title: string } | null } | null
+    reviewer_name?: string | null
+  } | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
   const [actionBusy, setActionBusy] = useState(false)
   const [actionReason, setActionReason] = useState('')
@@ -447,7 +466,7 @@ export default function DataDisposalPage() {
     },
     {
       key: 'external_approval_doc_id',
-      label: '전자결재 문서',
+      label: '외부 결재 일련번호',
       sortBy: r => r.external_approval_doc_id || '',
       render: r => r.external_approval_doc_id
         ? <span style={{ fontSize: 11, color: COLORS.textSecondary }}>{r.external_approval_doc_id}</span>
@@ -610,8 +629,13 @@ export default function DataDisposalPage() {
               </h3>
             </div>
 
-            {/* 결재 라인 — 담당자 → 관리자 → CPO */}
-            {detail && <ApprovalLine review={detail.review} />}
+            {/* 결재 라인 — 담당자 → 관리자 → 책임자 (매뉴얼 임명 고정) */}
+            {detail && (
+              <ApprovalLine
+                review={detail.review}
+                officers={detail.officers || { cpo: null, manager1: null, manager2: null }}
+              />
+            )}
           </div>
 
             {detailLoading && (
@@ -638,7 +662,7 @@ export default function DataDisposalPage() {
                     <span>{detail.review.external_request_by || '—'}</span>
                     <strong style={{ color: COLORS.textSecondary }}>대상 건수</strong>
                     <span>{detail.review.external_expired_count ?? 0}건</span>
-                    <strong style={{ color: COLORS.textSecondary }}>전자결재 문서</strong>
+                    <strong style={{ color: COLORS.textSecondary }}>외부 결재 일련번호</strong>
                     <span>{detail.review.external_approval_doc_id || <em style={{ color: COLORS.textMuted }}>미상신</em>}</span>
                     <strong style={{ color: COLORS.textSecondary }}>검토일시</strong>
                     <span>{fmtDate(detail.review.reviewed_at)}</span>
@@ -695,7 +719,7 @@ export default function DataDisposalPage() {
                     ]
                     return (
                       <>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8, flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6, flexWrap: 'wrap' }}>
                           <span style={{ fontSize: 13, fontWeight: 700, color: COLORS.textPrimary }}>
                             폐기 대상 — 총 {detail.items.length.toLocaleString()}건
                           </span>
@@ -726,6 +750,31 @@ export default function DataDisposalPage() {
                             })}
                           </div>
                         </div>
+                        {/* 거래처별 카운트 chips (캐피탈/렌탈사 등) */}
+                        {detail.items.length > 0 && (() => {
+                          const byCust = new Map<string, number>()
+                          for (const it of filteredItems) {
+                            const k = it.custname || '미지정'
+                            byCust.set(k, (byCust.get(k) || 0) + 1)
+                          }
+                          const sorted = Array.from(byCust.entries()).sort((a, b) => b[1] - a[1])
+                          return (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
+                              <span style={{ fontSize: 11, color: COLORS.textSecondary, fontWeight: 600, marginRight: 4 }}>거래처별</span>
+                              {sorted.map(([name, cnt]) => (
+                                <span key={name} style={{
+                                  display: 'inline-flex', alignItems: 'center', gap: 4,
+                                  padding: '3px 9px', borderRadius: 999, fontSize: 11,
+                                  background: 'rgba(59,130,246,0.08)', border: `1px solid ${COLORS.borderBlue}`,
+                                  color: COLORS.textPrimary, whiteSpace: 'nowrap',
+                                }}>
+                                  <strong>{name}</strong>
+                                  <span style={{ color: COLORS.primary, fontWeight: 700 }}>{cnt.toLocaleString()}</span>
+                                </span>
+                              ))}
+                            </div>
+                          )
+                        })()}
                         {detail.items.length === 0 ? (
                           <div style={{ padding: 16, fontSize: 12, color: COLORS.textMuted, textAlign: 'center' }}>대상 없음</div>
                         ) : (
@@ -782,8 +831,13 @@ export default function DataDisposalPage() {
 
                 {(detail.review.review_status === 'approved' || detail.review.review_status === 'executed') && (
                   <div style={{ ...GLASS.L3, padding: 12, borderRadius: 8, marginBottom: 12 }}>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: COLORS.textPrimary, marginBottom: 8 }}>
-                      🔒 최종 확인 (파기확인서 발급)
+                    <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.textPrimary, marginBottom: 8 }}>
+                      최종 확인 — 파기확인서 자동 발급
+                    </div>
+                    <div style={{ fontSize: 11, color: COLORS.textSecondary, marginBottom: 8, padding: '8px 10px', background: 'rgba(59,130,246,0.06)', borderRadius: 6, lineHeight: 1.5 }}>
+                      최종 확인 시 「개인정보보호 내부관리계획서」 제11조에 의거 파기확인서가 PDF 로 자동 발급됩니다.
+                      <br />
+                      발급 자료는 산출물 트래커에도 등록되며, 본 화면에서 즉시 다운로드 가능합니다.
                     </div>
                     <textarea
                       value={actionNote}
@@ -797,8 +851,37 @@ export default function DataDisposalPage() {
                       }}
                     />
                     <button onClick={() => handleAction('confirm')} disabled={actionBusy} style={{ ...btnPrimary, width: '100%' }}>
-                      🔒 최종 확인 → 파기확인서 발급
+                      최종 확인 후 파기확인서 발급
                     </button>
+                  </div>
+                )}
+
+                {/* P30-A — 파기확인서 다운로드 */}
+                {detail.deliverable && (
+                  <div style={{ ...GLASS.L4, padding: 14, borderRadius: 10, marginBottom: 12, borderLeft: `4px solid ${COLORS.success}` }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.textPrimary }}>
+                          파기확인서 발급 완료
+                        </div>
+                        <div style={{ fontSize: 11, color: COLORS.textSecondary, marginTop: 2 }}>
+                          {detail.deliverable.title || detail.deliverable.file_name || '파기확인서.pdf'}
+                        </div>
+                        {detail.review.deliverable_issued_at && (
+                          <div style={{ fontSize: 10, color: COLORS.textMuted, marginTop: 2 }}>
+                            발급일시 {fmtDate(detail.review.deliverable_issued_at)}
+                          </div>
+                        )}
+                      </div>
+                      <a
+                        href={detail.deliverable.file_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ ...btnSuccess, textDecoration: 'none', fontWeight: 700, whiteSpace: 'nowrap' }}
+                      >
+                        PDF 열기
+                      </a>
+                    </div>
                   </div>
                 )}
 
@@ -813,12 +896,17 @@ export default function DataDisposalPage() {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                       {detail.audits.map(a => {
                         const r = actionRoleLabel(a.action)
+                        // 매뉴얼 임명자 이름 (role 매핑) — 「누가 처리했는지」 대신 「누가 책임지는지」
+                        const officialName = r.role === '책임자' ? (detail.officers?.cpo?.name || '임성민 이사')
+                                          : r.role === '관리자' ? (detail.officers?.manager1?.name || '석호민 부장')
+                                          : null
+                        const displayName = officialName || a.actor_name || a.actor_id || '시스템'
                         return (
                           <div key={a.id} style={{ padding: '8px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.5)', border: `1px solid ${COLORS.borderSubtle}`, fontSize: 12, color: COLORS.textSecondary, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                             <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 6, fontSize: 10, fontWeight: 700, background: `${r.color}1A`, color: r.color, whiteSpace: 'nowrap' }}>
                               {r.role}
                             </span>
-                            <strong style={{ color: COLORS.textPrimary }}>{a.actor_name || a.actor_id || '시스템'}</strong>
+                            <strong style={{ color: COLORS.textPrimary }}>{displayName}</strong>
                             <span style={{ color: r.color, fontWeight: 600 }}>{r.label}</span>
                             <span style={{ marginLeft: 'auto', fontSize: 11, color: COLORS.textMuted, whiteSpace: 'nowrap' }}>{fmtDate(a.action_at)}</span>
                             {a.note && <div style={{ width: '100%', marginTop: 2, color: COLORS.textMuted, whiteSpace: 'pre-line', fontSize: 11 }}>{a.note}</div>}
