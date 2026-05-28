@@ -23,6 +23,8 @@ import RoleTemplatePanel from './_components/RoleTemplatePanel'
 import EmployeeListPanel from './_components/EmployeeListPanel'
 // PR-HR-21 (2026-05-28) — CompanyOrgPanel 추출 (FMI 조직도 — 직급/부서 카드)
 import CompanyOrgPanel from './_components/CompanyOrgPanel'
+// PR-HR-22 (2026-05-28) — useCompanies hook (companies 테이블 기반 동적 회사 목록)
+import { useCompanies } from '@/lib/hooks/useCompanies'
 
 // ────────────────────────────────────────────────────────────────
 // Auth Helper
@@ -129,8 +131,15 @@ export default function HRMasterPage() {
   }
   // 권한 분기: admin (GOD) 은 전체. 그 외 user/master 는 본인 company_key + common.
   const myCompanyKey: 'FMI' | 'RIDE' = profile?.company_key === 'RIDE' ? 'RIDE' : 'FMI'
+  // PR-HR-22 (2026-05-28) — companies 테이블 기반 동적 회사 목록 (새 회사 추가 시 토글 자동 노출)
+  const { companies: dbCompanies } = useCompanies()
+  const dbCompanyKeys = dbCompanies
+    .filter(c => c.is_active && c.company_key)
+    .map(c => c.company_key as string)
   const visibleCompanies: Company[] = role === 'admin'
-    ? ['FMI', 'RIDE', 'common']
+    // admin: DB 의 모든 활성 회사 + 'common' (가상 회사 — 초대/프리랜서/admin/회사 마스터/역할 템플릿)
+    // DB 가 비어있을 때 (마이그 미적용) 폴백 — 기존 하드코딩
+    ? (dbCompanyKeys.length > 0 ? [...dbCompanyKeys as Company[], 'common'] : ['FMI', 'RIDE', 'common'])
     : [myCompanyKey, 'common']
   // common 탭의 「관리자」「회사 마스터」「역할 템플릿」 서브탭은 admin 만 노출
   const visibleTabs = (c: Company): SubTab[] => {
@@ -1256,7 +1265,13 @@ export default function HRMasterPage() {
           const rideCount = employees.filter(e => e.company_key === 'RIDE').length
           const commonCount = invitations.length + freelancers.length
           const count = c === 'FMI' ? fmiCount : c === 'RIDE' ? rideCount : commonCount
-          return { key: c, label: COMPANY_LABEL[c], count }
+          // PR-HR-22 — 동적 label: 하드코딩 (FMI/RIDE/common) + DB 회사 label 폴백
+          const dynamicLabel = (k: string): string => {
+            if (k in COMPANY_LABEL) return COMPANY_LABEL[k as Company]
+            const dbc = dbCompanies.find(x => x.company_key === k)
+            return dbc?.label || dbc?.short_name || k
+          }
+          return { key: c, label: dynamicLabel(c), count }
         })}
         activeKey={topCompany}
         onSelect={(key) => changeCompany(key as Company)}
