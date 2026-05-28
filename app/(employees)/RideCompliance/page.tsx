@@ -2029,15 +2029,49 @@ function AssetModal(props: { onClose: () => void; onSaved: () => void }) {
       props.onSaved()
     } catch (e) { setError(String(e)) } finally { setSaving(false) }
   }
-  // P24 — 매뉴얼 명시 자산 prefill (제10/13/16/17/19조)
+  // P26 — 매뉴얼 명시 자산 5종 (출처 + 추론 + 확정 3단계 — P25 패턴)
   const MANUAL_ASSETS = [
-    { btn: '🏢 본사 서버실', name: '본사 3F 서버실', asset_type: 'facility', classification: 'confidential', location: '본사 3F', os_or_spec: '', contains_pii: false, access_control: '출입통제 + 잠금장치', encryption_status: 'none', notes: '매뉴얼 제10조 — 보호구역 지정' },
-    { btn: '🗄 고객 DB', name: '고객 개인정보 DB', asset_type: 'database', classification: 'confidential', location: 'GCP Cloud SQL', os_or_spec: 'MySQL 8.0', contains_pii: true, access_control: '2FA + IP 화이트리스트', encryption_status: 'full', notes: '매뉴얼 제13조 — 주민번호·신용카드·계좌번호 암호화' },
-    { btn: '📷 CCTV', name: '본사 출입구 CCTV', asset_type: 'cctv', classification: 'internal', location: '본사 1F 출입구', os_or_spec: '', contains_pii: true, access_control: 'CCTV 관리책임자만', encryption_status: 'none', notes: '매뉴얼 제17조 — 안내판 부착 + 보관기간 운영' },
-    { btn: '💻 직원 PC', name: '직원 업무 PC', asset_type: 'pc', classification: 'internal', location: '본사', os_or_spec: 'Windows 11 + 백신', contains_pii: false, access_control: '비밀번호 8자+, 백신', encryption_status: 'partial', notes: '매뉴얼 제16조 — 보안프로그램 + 제14조 패스워드 정책' },
-    { btn: '🆔 인사 DB', name: '인사 정보 DB (주민번호)', asset_type: 'database', classification: 'confidential', location: 'GCP Cloud SQL', os_or_spec: 'MySQL 8.0', contains_pii: true, access_control: '인사팀만 2FA', encryption_status: 'full', notes: '매뉴얼 제19조 — 주민등록번호 처리 제한' },
+    {
+      btn: '🏢 본사 서버실', name: '본사 3F 서버실', asset_type: 'facility', classification: 'confidential',
+      location: '본사 3F', os_or_spec: '', contains_pii: false, access_control: '출입통제 + 잠금장치', encryption_status: 'none',
+      notes: '매뉴얼 제10조 — 보호구역 지정',
+      source_article: '제10조',
+      source_excerpt: '개인정보보호책임자는 개인정보와 개인정보처리시스템 등을 보관하는 물리적 장소를 보호구역으로 지정하고 이에 대해 출입통제 절차 수립 및 적용, 물리적 잠금장치 등 보호조치를 취하여야 한다.',
+    },
+    {
+      btn: '🗄 고객 DB', name: '고객 개인정보 DB', asset_type: 'database', classification: 'confidential',
+      location: 'GCP Cloud SQL', os_or_spec: 'MySQL 8.0', contains_pii: true, access_control: '2FA + IP 화이트리스트', encryption_status: 'full',
+      notes: '매뉴얼 제13조 — 주민번호·신용카드·계좌번호 암호화',
+      source_article: '제13조',
+      source_excerpt: '주민등록번호, 신용카드번호, 계좌번호는 안전한 암호 알고리즘을 적용하여 저장한다. 비밀번호는 일방향 암호화하여 복호화할 수 없도록 저장한다. 전송 시 안전한 보안서버 구축 등의 조치를 통해 암호화한다.',
+    },
+    {
+      btn: '📷 CCTV', name: '본사 출입구 CCTV', asset_type: 'cctv', classification: 'internal',
+      location: '본사 1F 출입구', os_or_spec: '', contains_pii: true, access_control: 'CCTV 관리책임자만', encryption_status: 'none',
+      notes: '매뉴얼 제17조 — 안내판 부착 + 보관기간 운영',
+      source_article: '제17조',
+      source_excerpt: 'CCTV 안내판은 촬영범위 내에서 정보주체가 인지하기 쉬운 곳에 부착하며 설치 목적·장소·촬영 범위·시간·관리책임자 성명을 포함해야 한다. 수집된 영상정보는 보유기간 만료 시 즉시 삭제하여야 한다.',
+    },
+    {
+      btn: '💻 직원 PC', name: '직원 업무 PC', asset_type: 'pc', classification: 'internal',
+      location: '본사', os_or_spec: 'Windows 11 + 백신', contains_pii: false, access_control: '비밀번호 8자+, 백신', encryption_status: 'partial',
+      notes: '매뉴얼 제16조 — 보안프로그램 + 제14조 패스워드 정책',
+      source_article: '제16조',
+      source_excerpt: '개인정보보호책임자는 개인용 컴퓨터(PC) 등을 이용하여 개인정보를 취급하는 경우 개인정보가 분실·도난·누출·변조 또는 훼손되지 아니하도록 안전성 확보를 위해 보안패치, 공유폴더 제한 등 보호조치와 백신 프로그램 등 보안프로그램 설치 운영을 하여야 한다.',
+    },
+    {
+      btn: '🆔 인사 DB', name: '인사 정보 DB (주민번호)', asset_type: 'database', classification: 'confidential',
+      location: 'GCP Cloud SQL', os_or_spec: 'MySQL 8.0', contains_pii: true, access_control: '인사팀만 2FA', encryption_status: 'full',
+      notes: '매뉴얼 제19조 — 주민등록번호 처리 제한',
+      source_article: '제19조',
+      source_excerpt: '개인정보처리자는 법령에서 구체적으로 주민등록번호의 처리를 요구하거나 허용한 경우 등을 제외하고는 주민등록번호를 처리할 수 없다. 처리하는 경우에도 회원 가입 단계에서는 주민등록번호를 사용하지 아니하고도 가입할 수 있는 방법을 제공하여야 한다.',
+    },
   ] as const
-  const prefillAsset = (m: typeof MANUAL_ASSETS[number]) => {
+
+  type ManualAsset = typeof MANUAL_ASSETS[number]
+  const [selectedAsset, setSelectedAsset] = useState<ManualAsset | null>(null)
+  const selectAsset = (m: ManualAsset) => {
+    setSelectedAsset(m)
     setForm({
       name: m.name, asset_type: m.asset_type, classification: m.classification,
       location: m.location, os_or_spec: m.os_or_spec, contains_pii: m.contains_pii,
@@ -2045,21 +2079,61 @@ function AssetModal(props: { onClose: () => void; onSaved: () => void }) {
       acquired_at: form.acquired_at, notes: m.notes,
     })
   }
+  const clearAsset = () => setSelectedAsset(null)
+
   return (
     <Modal title="📦 정보자산 등록" onClose={props.onClose}>
       <div style={{ marginBottom: 8, fontSize: 12, color: COLORS.textSecondary }}>
-        📜 매뉴얼 규정 자산 — 클릭으로 자동 채움
+        📜 매뉴얼 규정 자산 5종 — 선택 후 출처·추론·확정 단계별 진행
       </div>
       <div style={{ display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap' }}>
         {MANUAL_ASSETS.map((m) => (
-          <button key={m.btn} onClick={() => prefillAsset(m)}
+          <button key={m.btn} onClick={() => selectAsset(m)}
             style={{
               ...GLASS.L2, padding: '6px 12px', borderRadius: 6, cursor: 'pointer',
-              border: form.name === m.name ? `2px solid ${COLORS.primary}` : `1px solid ${COLORS.borderSubtle}`,
+              border: selectedAsset?.btn === m.btn ? `2px solid ${COLORS.primary}` : `1px solid ${COLORS.borderSubtle}`,
               fontSize: 12, color: COLORS.textPrimary, whiteSpace: 'nowrap',
             }}>{m.btn}</button>
         ))}
       </div>
+
+      {/* P26 — 선택된 자산의 「출처 + 추론」 표시 */}
+      {selectedAsset && (
+        <div style={{
+          ...GLASS.L3, padding: 14, borderRadius: 10, marginBottom: 14,
+          borderLeft: `4px solid ${COLORS.primary}`,
+        }}>
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSecondary, marginBottom: 6 }}>
+              📜 1단계 — 매뉴얼 원본 ({selectedAsset.source_article})
+            </div>
+            <div style={{
+              padding: 10, borderRadius: 6, background: 'rgba(0,0,0,0.03)',
+              fontSize: 12, color: COLORS.textPrimary, lineHeight: 1.6, fontStyle: 'italic',
+            }}>「{selectedAsset.source_excerpt}」</div>
+          </div>
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSecondary, marginBottom: 6 }}>
+              🤖 2단계 — AI 추론 액션
+            </div>
+            <div style={{ fontSize: 12, color: COLORS.textPrimary, lineHeight: 1.7 }}>
+              · 자산명: <strong>{selectedAsset.name}</strong><br/>
+              · 위치: <strong>{selectedAsset.location}</strong> {selectedAsset.os_or_spec && `· ${selectedAsset.os_or_spec}`}<br/>
+              · 접근통제: <strong>{selectedAsset.access_control}</strong><br/>
+              · 암호화: <strong>{selectedAsset.encryption_status === 'full' ? '전체' : selectedAsset.encryption_status === 'partial' ? '부분' : '없음'}</strong>{selectedAsset.contains_pii && <span style={{ color: COLORS.warning }}> · 개인정보 포함 (제19조 적용)</span>}<br/>
+              · 비고: <span style={{ color: COLORS.textSecondary }}>{selectedAsset.notes}</span>
+            </div>
+          </div>
+          <div style={{ fontSize: 12, color: COLORS.textMuted }}>
+            ✅ 3단계 — 아래 폼에서 추가 보완 후 「등록」 클릭 시 위 데이터로 확정
+            <button onClick={clearAsset}
+              style={{ marginLeft: 8, fontSize: 11, padding: '2px 8px', background: 'transparent',
+                border: `1px solid ${COLORS.borderSubtle}`, borderRadius: 4, cursor: 'pointer', color: COLORS.textSecondary }}>
+              ✕ 직접 입력
+            </button>
+          </div>
+        </div>
+      )}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
         <Field label="자산명 *"><input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} style={inpStyle()} /></Field>
         <Field label="유형 *"><select value={form.asset_type} onChange={e => setForm({ ...form, asset_type: e.target.value })} style={inpStyle()}>
@@ -2110,47 +2184,106 @@ function IncidentModal(props: { assets: Asset[]; onClose: () => void; onSaved: (
       props.onSaved()
     } catch (e) { setError(String(e)) } finally { setSaving(false) }
   }
-  // P24 — 매뉴얼 명시 침해 유형 prefill (제25~27조)
+  // P27 — 매뉴얼 명시 침해 4 유형 (출처 + 추론 + 확정 — P25 패턴)
   const MANUAL_INCIDENTS = [
-    { btn: '👤 내부 유출', incident_type: 'internal_leak', severity: 'high',
+    {
+      btn: '👤 내부 유출', incident_type: 'internal_leak', severity: 'high',
       title: '내부 직원에 의한 개인정보 유출 의심',
       cause_summary: '내부 임직원이 업무 범위 외 개인정보를 외부 반출한 것으로 의심.',
-      containment_actions: '제25조 ① 단서 — 즉시 접속 차단 + 권한 회수 + 유출 데이터 식별·삭제. 제26조 관리팀 즉시 대응.' },
-    { btn: '🌐 외부 해킹', incident_type: 'external_hack', severity: 'critical',
+      containment_actions: '제25조 ① 단서 — 즉시 접속 차단 + 권한 회수 + 유출 데이터 식별·삭제. 제26조 관리팀 즉시 대응.',
+      source_article: '제25조 + 제26조',
+      source_excerpt: '개인정보보호책임자는 개인정보가 유출되었음을 알게 되었을 때에는 서면 등의 방법으로 24시간 이내에 해당 정보주체에게 (...) 알려야 한다. 다만, 접속경로의 차단, 취약점 점검·보완, 유출된 개인정보의 삭제 등 긴급한 조치가 필요한 경우에는 그 조치를 한 후 지체 없이 정보주체에게 알릴 수 있다.',
+    },
+    {
+      btn: '🌐 외부 해킹', incident_type: 'external_hack', severity: 'critical',
       title: '외부 해킹 시도 또는 침입 감지',
       cause_summary: '비인가 IP 의 접근 / SQL Injection / 권한 상승 시도 감지.',
-      containment_actions: '제25조 ① 단서 — 접속경로 차단 + 취약점 점검·보완 + KISA 신고 검토. 제16조 보안프로그램 긴급 패치.' },
-    { btn: '🦠 바이러스', incident_type: 'virus', severity: 'medium',
+      containment_actions: '제25조 ① 단서 — 접속경로 차단 + 취약점 점검·보완 + KISA 신고 검토. 제16조 보안프로그램 긴급 패치.',
+      source_article: '제25조 + 제16조',
+      source_excerpt: '개인정보보호책임자는 (...) 보안패치, 공유폴더 제한 등 보호조치와 백신 프로그램 등 보안프로그램 설치 운영을 하여야 한다. 유출 시 접속경로의 차단, 취약점 점검·보완 등 긴급한 조치 후 정보주체 통지.',
+    },
+    {
+      btn: '🦠 바이러스', incident_type: 'virus', severity: 'medium',
       title: '바이러스·랜섬웨어 감염',
       cause_summary: '직원 PC 의 바이러스 감염 또는 랜섬웨어 의심 파일 실행.',
-      containment_actions: '제16조 보안프로그램 즉시 실행 + 감염 PC 네트워크 격리 + 백업 복원.' },
-    { btn: '🤝 수탁사 유출', incident_type: 'vendor_leak', severity: 'high',
+      containment_actions: '제16조 보안프로그램 즉시 실행 + 감염 PC 네트워크 격리 + 백업 복원.',
+      source_article: '제16조',
+      source_excerpt: '개인정보보호책임자는 개인용 컴퓨터(PC) 등을 이용하여 개인정보를 취급하는 경우 개인정보가 분실·도난·누출·변조 또는 훼손되지 아니하도록 안전성 확보를 위해 백신 프로그램 등 보안프로그램 설치 운영을 하여야 한다.',
+    },
+    {
+      btn: '🤝 수탁사 유출', incident_type: 'vendor_leak', severity: 'high',
       title: '수탁업체 측 개인정보 유출',
       cause_summary: '제24조 수탁사가 위탁받은 개인정보를 분실·유출·오남용한 것으로 보고됨.',
-      containment_actions: '제24조 ④ — 수탁자 즉시 교육 + 처리현황 점검 + 위탁 계약 위반 시 시정 요구. 정보주체 통지 절차 동시 진행.' },
+      containment_actions: '제24조 ④ — 수탁자 즉시 교육 + 처리현황 점검 + 위탁 계약 위반 시 시정 요구. 정보주체 통지 절차 동시 진행.',
+      source_article: '제24조 ④ + 제25조',
+      source_excerpt: '업무 위탁으로 인하여 개인정보가 분실·도난·유출·변조 또는 훼손되지 아니하도록 수탁자를 교육하고, 처리 현황 점검 등 대통령령으로 정하는 바에 따라 감독하여야 한다.',
+    },
   ] as const
-  const prefillIncident = (m: typeof MANUAL_INCIDENTS[number]) => {
+
+  type ManualIncident = typeof MANUAL_INCIDENTS[number]
+  const [selectedIncident, setSelectedIncident] = useState<ManualIncident | null>(null)
+  const selectIncident = (m: ManualIncident) => {
+    setSelectedIncident(m)
     setForm({
       ...form,
       title: m.title, incident_type: m.incident_type, severity: m.severity,
       cause_summary: m.cause_summary, containment_actions: m.containment_actions,
     })
   }
+  const clearIncident = () => setSelectedIncident(null)
+
   return (
     <Modal title="🚨 침해사고 신고 (제27조)" onClose={props.onClose}>
       <div style={{ marginBottom: 8, fontSize: 12, color: COLORS.textSecondary }}>
-        📜 매뉴얼 명시 유형 — 클릭으로 자동 채움. <strong style={{ color: COLORS.warning }}>제25조 ① 24시간 이내 통지 의무</strong>
+        📜 매뉴얼 명시 4 유형 — 선택 후 출처·추론·확정 단계별. <strong style={{ color: COLORS.warning }}>⏰ 제25조 ① 24h 이내 통지 의무</strong>
       </div>
       <div style={{ display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap' }}>
         {MANUAL_INCIDENTS.map((m) => (
-          <button key={m.btn} onClick={() => prefillIncident(m)}
+          <button key={m.btn} onClick={() => selectIncident(m)}
             style={{
               ...GLASS.L2, padding: '6px 12px', borderRadius: 6, cursor: 'pointer',
-              border: form.incident_type === m.incident_type && form.title === m.title ? `2px solid ${COLORS.primary}` : `1px solid ${COLORS.borderSubtle}`,
+              border: selectedIncident?.btn === m.btn ? `2px solid ${COLORS.primary}` : `1px solid ${COLORS.borderSubtle}`,
               fontSize: 12, color: COLORS.textPrimary, whiteSpace: 'nowrap',
             }}>{m.btn}</button>
         ))}
       </div>
+
+      {/* P27 — 선택된 유형의 「출처 + 추론」 */}
+      {selectedIncident && (
+        <div style={{
+          ...GLASS.L3, padding: 14, borderRadius: 10, marginBottom: 14,
+          borderLeft: `4px solid ${COLORS.danger}`,
+        }}>
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSecondary, marginBottom: 6 }}>
+              📜 1단계 — 매뉴얼 원본 ({selectedIncident.source_article})
+            </div>
+            <div style={{
+              padding: 10, borderRadius: 6, background: 'rgba(0,0,0,0.03)',
+              fontSize: 12, color: COLORS.textPrimary, lineHeight: 1.6, fontStyle: 'italic',
+            }}>「{selectedIncident.source_excerpt}」</div>
+          </div>
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSecondary, marginBottom: 6 }}>
+              🤖 2단계 — AI 추론 액션 (사고 신고 양식)
+            </div>
+            <div style={{ fontSize: 12, color: COLORS.textPrimary, lineHeight: 1.7 }}>
+              · 제목: <strong>{selectedIncident.title}</strong><br/>
+              · 유형: <strong>{INCIDENT_TYPE_LABEL[selectedIncident.incident_type as keyof typeof INCIDENT_TYPE_LABEL]?.emoji} {INCIDENT_TYPE_LABEL[selectedIncident.incident_type as keyof typeof INCIDENT_TYPE_LABEL]?.label}</strong> · 심각도: <strong>{SEVERITY_LABEL[selectedIncident.severity as keyof typeof SEVERITY_LABEL]?.label}</strong><br/>
+              · 원인: <span style={{ color: COLORS.textSecondary }}>{selectedIncident.cause_summary}</span><br/>
+              · 긴급조치: <span style={{ color: COLORS.textSecondary }}>{selectedIncident.containment_actions}</span>
+            </div>
+          </div>
+          <div style={{ fontSize: 12, color: COLORS.textMuted }}>
+            ✅ 3단계 — 발생시점·유출항목·피해자 수 등 추가 입력 후 「🚨 신고」 클릭
+            <button onClick={clearIncident}
+              style={{ marginLeft: 8, fontSize: 11, padding: '2px 8px', background: 'transparent',
+                border: `1px solid ${COLORS.borderSubtle}`, borderRadius: 4, cursor: 'pointer', color: COLORS.textSecondary }}>
+              ✕ 직접 입력
+            </button>
+          </div>
+        </div>
+      )}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
         <Field label="사고 제목 *" full><input value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} style={inpStyle()} /></Field>
         <Field label="유형 *"><select value={form.incident_type} onChange={e => setForm({ ...form, incident_type: e.target.value })} style={inpStyle()}>
