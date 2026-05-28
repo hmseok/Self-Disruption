@@ -1,0 +1,646 @@
+'use client'
+
+/**
+ * /RideCompliance/policies — 내규 마스터 (Phase 2.0)
+ *
+ * 사용자 통찰 (2026-05-28):
+ *   「내규 정책도 등록이 안되었는데 연간 운영이라던가 운영가이드가
+ *    이미 정해져있다는게 이상함」
+ *   → 내규를 1차 데이터로 등록 → AI 추출 → 검수 → 확정.
+ *
+ * 흐름:
+ *   1. 「+ 새 내규 등록」 → 메타 + 본문 텍스트 paste
+ *   2. POST /policies → POST /policies/[id]/extract → chunk Gemini → sections INSERT
+ *   3. 행 클릭 → 검수 모달 (4 탭: 조항 / 별첨 / Playbook / 연간)
+ *   4. 각 section: ✓ 확정 / ✏ 편집 / ✕ 반려
+ *   5. 모두 검수 후 policy status='active' (후속 PR 에서 playbook_steps 등 자동 채움)
+ */
+
+import { useEffect, useMemo, useState } from 'react'
+import { getStoredToken } from '@/lib/auth-client'
+import NeuDataTable, { type TableColumn } from '@/app/components/NeuDataTable'
+import DcStatStrip, { type StatItem } from '@/app/components/DcStatStrip'
+import DcToolbar from '@/app/components/DcToolbar'
+import { COLORS, GLASS, BTN } from '@/app/utils/ui-tokens'
+
+// ── 도메인 ────────────────────────────────────────────────────
+interface Policy {
+  id: string
+  policy_code: string
+  title: string
+  version: string
+  effective_date: string | null
+  source_file_name: string | null
+  source_file_type: string | null
+  uploaded_at: string | null
+  uploaded_by_name: string | null
+  ai_extracted_at: string | null
+  ai_model: string | null
+  ai_confidence: number | null
+  ai_summary_md: string | null
+  status: string
+  notes: string | null
+  created_at: string
+}
+
+interface Section {
+  id: string
+  section_kind: 'article' | 'attachment' | 'playbook_step' | 'annual_event'
+  section_code: string | null
+  title: string
+  body_md: string | null
+  ai_confidence: number | null
+  ai_raw_excerpt: string | null
+  user_status: 'ai_draft' | 'user_edited' | 'user_confirmed' | 'rejected'
+  user_edited_title: string | null
+  user_edited_body_md: string | null
+  sort_order: number
+}
+
+const POLICY_STATUS_LABEL: Record<string, string> = {
+  uploaded:       '업로드됨',
+  ai_extracted:   'AI 추출 완료',
+  user_reviewing: '검수중',
+  active:         '확정',
+  superseded:     '폐기',
+}
+const POLICY_STATUS_COLOR: Record<string, { bg: string; fg: string; bd: string }> = {
+  uploaded:       { bg: 'rgba(148,163,184,0.12)', fg: '#64748b', bd: 'rgba(148,163,184,0.30)' },
+  ai_extracted:   { bg: 'rgba(245,158,11,0.12)',  fg: '#b45309', bd: 'rgba(245,158,11,0.30)' },
+  user_reviewing: { bg: 'rgba(59,130,246,0.12)',  fg: '#2563eb', bd: 'rgba(59,130,246,0.30)' },
+  active:         { bg: 'rgba(16,185,129,0.12)',  fg: '#047857', bd: 'rgba(16,185,129,0.30)' },
+  superseded:     { bg: 'rgba(99,102,241,0.10)',  fg: '#4338ca', bd: 'rgba(99,102,241,0.25)' },
+}
+
+const KIND_LABEL: Record<string, string> = {
+  article:       '조항',
+  attachment:    '별첨',
+  playbook_step: 'Playbook 단계',
+  annual_event:  '연간 운영',
+}
+
+const SECTION_STATUS_LABEL: Record<string, string> = {
+  ai_draft:       'AI 초안',
+  user_edited:    '편집됨',
+  user_confirmed: '확정',
+  rejected:       '반려',
+}
+const SECTION_STATUS_COLOR: Record<string, { bg: string; fg: string }> = {
+  ai_draft:       { bg: 'rgba(148,163,184,0.12)', fg: '#64748b' },
+  user_edited:    { bg: 'rgba(245,158,11,0.12)',  fg: '#b45309' },
+  user_confirmed: { bg: 'rgba(16,185,129,0.12)',  fg: '#047857' },
+  rejected:       { bg: 'rgba(239,68,68,0.12)',   fg: '#b91c1c' },
+}
+
+// ── 버튼 ──────────────────────────────────────────────────────
+const btnPrimary: React.CSSProperties = { ...BTN.md, border: `1px solid ${COLORS.borderSubtle}`, background: COLORS.bgBlue, color: COLORS.primary, cursor: 'pointer' }
+const btnSecondary: React.CSSProperties = { ...BTN.md, border: `1px solid ${COLORS.borderSubtle}`, background: COLORS.bgGray, color: COLORS.textSecondary, cursor: 'pointer' }
+const btnDanger: React.CSSProperties = { ...BTN.md, border: `1px solid ${COLORS.borderSubtle}`, background: COLORS.bgRed, color: COLORS.danger, cursor: 'pointer' }
+const btnSuccess: React.CSSProperties = { ...BTN.md, border: `1px solid ${COLORS.borderSubtle}`, background: COLORS.bgGreen, color: COLORS.success, cursor: 'pointer' }
+
+function fmtDate(s: string | null): string {
+  if (!s) return '—'
+  const d = new Date(s)
+  if (Number.isNaN(d.getTime())) return s
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+function confidenceBadge(c: number | null): React.ReactNode {
+  if (c == null) return <span style={{ fontSize: 11, color: COLORS.textMuted }}>—</span>
+  const val = Number(c)
+  const color = val >= 0.85 ? { bg: 'rgba(16,185,129,0.12)', fg: '#047857' }
+              : val >= 0.5  ? { bg: 'rgba(245,158,11,0.12)', fg: '#b45309' }
+                            : { bg: 'rgba(239,68,68,0.12)',  fg: '#b91c1c' }
+  return (
+    <span style={{
+      display: 'inline-block', padding: '1px 6px', borderRadius: 4, fontSize: 11, fontWeight: 600,
+      background: color.bg, color: color.fg, whiteSpace: 'nowrap',
+    }}>{(val * 100).toFixed(0)}%</span>
+  )
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MAIN PAGE
+// ═══════════════════════════════════════════════════════════════
+export default function PoliciesPage() {
+  const [rows, setRows] = useState<Policy[]>([])
+  const [loading, setLoading] = useState(false)
+  const [migrationPending, setMigrationPending] = useState<string | null>(null)
+  const [q, setQ] = useState('')
+  const [createOpen, setCreateOpen] = useState(false)
+  const [reviewing, setReviewing] = useState<Policy | null>(null)
+  const [resultPanel, setResultPanel] = useState<{ kind: 'ok' | 'err'; msg: string } | null>(null)
+
+  const fetchList = async () => {
+    setLoading(true)
+    try {
+      const token = getStoredToken()
+      const params = new URLSearchParams()
+      if (q) params.set('q', q)
+      const res = await fetch(`/api/ride-compliance/policies?${params.toString()}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      })
+      const json = await res.json()
+      if (json.meta?._migration_pending) {
+        setMigrationPending(json.meta.migration || json.meta._migration_pending)
+        setRows([])
+      } else {
+        setMigrationPending(null)
+        setRows(json.data || [])
+      }
+    } catch (e) {
+      setResultPanel({ kind: 'err', msg: `목록 조회 실패: ${e}` })
+    } finally {
+      setLoading(false)
+    }
+  }
+  useEffect(() => { fetchList() }, [])  // eslint-disable-line react-hooks/exhaustive-deps
+
+  const stats: StatItem[] = useMemo(() => {
+    const total = rows.length
+    const draft = rows.filter(r => r.status === 'uploaded' || r.status === 'ai_extracted').length
+    const reviewing = rows.filter(r => r.status === 'user_reviewing').length
+    const active = rows.filter(r => r.status === 'active').length
+    return [
+      { label: '전체',      value: String(total),     tint: 'blue'  },
+      { label: '검수 대기', value: String(draft),     tint: 'amber' },
+      { label: '검수중',    value: String(reviewing), tint: 'blue'  },
+      { label: '확정',      value: String(active),    tint: 'green' },
+    ]
+  }, [rows])
+
+  const columns: TableColumn<Policy>[] = [
+    {
+      key: 'code', label: '코드', width: 160,
+      sortBy: (r) => `${r.policy_code} ${r.version}`,
+      render: (r) => <span style={{ fontFamily: 'monospace', fontSize: 12, whiteSpace: 'nowrap' }}>{r.policy_code} <span style={{ color: COLORS.textMuted }}>{r.version}</span></span>,
+    },
+    {
+      key: 'title', label: '제목',
+      sortBy: (r) => r.title,
+      render: (r) => <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.title}</span>,
+    },
+    {
+      key: 'file', label: '파일', width: 90,
+      sortBy: (r) => r.source_file_type || '',
+      render: (r) => <span style={{ fontSize: 12, whiteSpace: 'nowrap', color: r.source_file_type ? COLORS.textPrimary : COLORS.textMuted }}>{r.source_file_type || '—'}</span>,
+    },
+    {
+      key: 'effective', label: '시행일', width: 110,
+      sortBy: (r) => r.effective_date ? new Date(r.effective_date).getTime() : 0,
+      render: (r) => <span style={{ fontFamily: 'monospace', fontSize: 12, whiteSpace: 'nowrap' }}>{fmtDate(r.effective_date)}</span>,
+    },
+    {
+      key: 'ai', label: 'AI 신뢰도', width: 90,
+      sortBy: (r) => Number(r.ai_confidence || 0),
+      render: (r) => confidenceBadge(r.ai_confidence),
+    },
+    {
+      key: 'uploader', label: '등록자', width: 100,
+      sortBy: (r) => r.uploaded_by_name || '',
+      render: (r) => <span style={{ whiteSpace: 'nowrap' }}>{r.uploaded_by_name || '—'}</span>,
+    },
+    {
+      key: 'status', label: '상태', width: 120,
+      sortBy: (r) => r.status,
+      render: (r) => {
+        const c = POLICY_STATUS_COLOR[r.status] || POLICY_STATUS_COLOR.uploaded
+        return (
+          <span style={{
+            display: 'inline-block', padding: '2px 8px', borderRadius: 6,
+            background: c.bg, color: c.fg, border: `1px solid ${c.bd}`,
+            fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap',
+          }}>{POLICY_STATUS_LABEL[r.status] || r.status}</span>
+        )
+      },
+    },
+    {
+      key: 'action', label: '액션', width: 100,
+      render: (r) => (
+        <button
+          style={{ ...btnPrimary, padding: '2px 8px', fontSize: 11 }}
+          onClick={() => setReviewing(r)}
+        >📋 검수</button>
+      ),
+    },
+  ]
+
+  return (
+    <div style={{ padding: '0 24px 32px' }}>
+
+      {migrationPending && (
+        <div style={{
+          ...GLASS.L3, padding: '12px 16px', borderRadius: 10, marginBottom: 16,
+          border: '1px solid rgba(245,158,11,0.30)', background: 'rgba(254,243,199,0.40)',
+        }}>
+          <span style={{ fontWeight: 600, color: '#b45309' }}>⚠ 마이그레이션 미적용</span>
+          <span style={{ marginLeft: 8, fontSize: 13, color: '#92400e' }}>{migrationPending}</span>
+        </div>
+      )}
+
+      <div style={{ marginBottom: 16 }}>
+        <DcStatStrip
+          stats={stats}
+          actions={[
+            { label: '+ 새 내규 등록', onClick: () => setCreateOpen(true), variant: 'primary' },
+          ]}
+        />
+      </div>
+
+      <DcToolbar
+        search={q}
+        onSearchChange={setQ}
+        placeholder="제목 / 코드 검색…"
+        trailing={
+          <button style={btnSecondary} onClick={fetchList} disabled={loading}>
+            {loading ? '조회중…' : '🔍 조회'}
+          </button>
+        }
+      />
+
+      {resultPanel && (
+        <div style={{
+          ...GLASS.L3, padding: '12px 16px', borderRadius: 10, marginBottom: 16,
+          border: `1px solid ${resultPanel.kind === 'ok' ? 'rgba(16,185,129,0.30)' : 'rgba(239,68,68,0.30)'}`,
+          background: resultPanel.kind === 'ok' ? 'rgba(220,252,231,0.40)' : 'rgba(254,226,226,0.40)',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12,
+        }}>
+          <span style={{ fontSize: 13, color: resultPanel.kind === 'ok' ? '#047857' : '#b91c1c' }}>
+            {resultPanel.kind === 'ok' ? '✅' : '⚠'} {resultPanel.msg}
+          </span>
+          <button style={{ ...btnSecondary, fontSize: 11, padding: '2px 8px' }} onClick={() => setResultPanel(null)}>× 닫기</button>
+        </div>
+      )}
+
+      <NeuDataTable
+        data={rows} columns={columns} rowKey={(r) => r.id}
+        defaultSort={{ key: 'created_at', dir: 'desc' }}
+        loading={loading}
+        emptyMessage="등록된 내규가 없습니다. 「+ 새 내규 등록」 으로 시작하세요."
+      />
+
+      {createOpen && (
+        <CreateModal
+          onClose={() => setCreateOpen(false)}
+          onCreated={(msg) => {
+            setCreateOpen(false)
+            setResultPanel({ kind: 'ok', msg })
+            fetchList()
+          }}
+          onError={(msg) => setResultPanel({ kind: 'err', msg })}
+        />
+      )}
+
+      {reviewing && (
+        <ReviewModal
+          policy={reviewing}
+          onClose={() => setReviewing(null)}
+          onChanged={(msg) => { setResultPanel({ kind: 'ok', msg }); fetchList() }}
+          onError={(msg) => setResultPanel({ kind: 'err', msg })}
+        />
+      )}
+    </div>
+  )
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Create Modal — 메타 + 본문 텍스트 입력 + AI 추출 트리거
+// ═══════════════════════════════════════════════════════════════
+function CreateModal(props: {
+  onClose: () => void
+  onCreated: (msg: string) => void
+  onError: (msg: string) => void
+}) {
+  const [code, setCode] = useState('')
+  const [title, setTitle] = useState('')
+  const [version, setVersion] = useState('v1.0')
+  const [effectiveDate, setEffectiveDate] = useState('')
+  const [sourceFileName, setSourceFileName] = useState('')
+  const [sourceFileType, setSourceFileType] = useState('pptx')
+  const [contentText, setContentText] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [phase, setPhase] = useState<'form' | 'creating' | 'extracting'>('form')
+
+  const submit = async () => {
+    if (!code.trim() || !title.trim()) {
+      props.onError('policy_code, title 필수')
+      return
+    }
+    if (contentText.length < 100) {
+      props.onError('본문 텍스트가 너무 짧습니다 (100자 이상)')
+      return
+    }
+    setBusy(true)
+    setPhase('creating')
+    try {
+      const token = getStoredToken()
+      // 1. policy 메타 INSERT
+      const createRes = await fetch('/api/ride-compliance/policies', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({
+          policy_code: code.trim(),
+          title: title.trim(),
+          version: version.trim() || 'v1.0',
+          effective_date: effectiveDate || null,
+          source_file_name: sourceFileName.trim() || null,
+          source_file_type: sourceFileType || null,
+        }),
+      })
+      const createJson = await createRes.json()
+      if (!createRes.ok || !createJson.success) {
+        props.onError(`내규 등록 실패: ${createJson.error || createRes.status}`)
+        return
+      }
+      const policyId = createJson.data.id
+
+      // 2. AI 추출 트리거
+      setPhase('extracting')
+      const extractRes = await fetch(`/api/ride-compliance/policies/${policyId}/extract`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ content_text: contentText }),
+      })
+      const extractJson = await extractRes.json()
+      if (!extractRes.ok || !extractJson.success) {
+        props.onError(`등록 완료 / AI 추출 실패: ${extractJson.error || extractRes.status} — 검수 화면에서 재시도 가능`)
+        return
+      }
+      const d = extractJson.data
+      const msg = `등록 + AI 추출 완료 — ${d.inserted_sections}건 (조항 ${d.by_kind.article} / 별첨 ${d.by_kind.attachment} / Playbook ${d.by_kind.playbook_step} / 연간 ${d.by_kind.annual_event})`
+      props.onCreated(msg)
+    } catch (e) {
+      props.onError(`오류: ${e}`)
+    } finally {
+      setBusy(false)
+      setPhase('form')
+    }
+  }
+
+  return (
+    <ModalShell title="+ 새 내규 등록" onClose={busy ? () => {} : props.onClose} wide>
+      <div style={{ fontSize: 12, color: COLORS.textMuted, marginBottom: 12 }}>
+        PPTX/PDF 본문 텍스트를 추출하여 paste 하면 AI 가 조항·별첨·Playbook·연간 운영 4 종류 섹션을 자동 추출합니다.
+      </div>
+
+      <FieldRow label="코드 *"><input value={code} onChange={(e) => setCode(e.target.value)} placeholder="예: RIDE-PMP-2026-001" style={inputStyle} disabled={busy} /></FieldRow>
+      <FieldRow label="제목 *"><input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="예: 개인정보보호 내부관리계획서" style={inputStyle} disabled={busy} /></FieldRow>
+      <FieldRow label="버전"><input value={version} onChange={(e) => setVersion(e.target.value)} placeholder="v1.0" style={inputStyle} disabled={busy} /></FieldRow>
+      <FieldRow label="시행일"><input type="date" value={effectiveDate} onChange={(e) => setEffectiveDate(e.target.value)} style={inputStyle} disabled={busy} /></FieldRow>
+      <FieldRow label="원본 파일명"><input value={sourceFileName} onChange={(e) => setSourceFileName(e.target.value)} placeholder="라이드_개인정보보호 내부계획서.pptx" style={inputStyle} disabled={busy} /></FieldRow>
+      <FieldRow label="원본 형식">
+        <select value={sourceFileType} onChange={(e) => setSourceFileType(e.target.value)} style={inputStyle} disabled={busy}>
+          <option value="pptx">PPTX</option>
+          <option value="pdf">PDF</option>
+          <option value="docx">DOCX</option>
+          <option value="txt">TXT</option>
+        </select>
+      </FieldRow>
+      <FieldRow label="본문 텍스트 *">
+        <textarea value={contentText} onChange={(e) => setContentText(e.target.value)} rows={10}
+          placeholder="PPTX/PDF 추출 텍스트를 붙여넣으세요 (100자 이상)…"
+          style={{ ...inputStyle, fontFamily: 'monospace', resize: 'vertical' }} disabled={busy} />
+      </FieldRow>
+      <div style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 4 }}>
+        텍스트 길이: {contentText.length.toLocaleString()} chars
+        {contentText.length > 60_000 && <span style={{ marginLeft: 8, color: '#b45309' }}>⚠ 5~6 chunk 분할 호출 — 1~3분 소요 예상</span>}
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
+        <button style={btnSecondary} onClick={props.onClose} disabled={busy}>취소</button>
+        <button style={btnPrimary} onClick={submit} disabled={busy}>
+          {phase === 'creating' ? '등록중…' : phase === 'extracting' ? '🤖 AI 추출중… (chunk 분할 처리)' : '🤖 등록 + AI 추출'}
+        </button>
+      </div>
+    </ModalShell>
+  )
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Review Modal — 4 탭 (조항 / 별첨 / Playbook / 연간) 검수
+// ═══════════════════════════════════════════════════════════════
+function ReviewModal(props: {
+  policy: Policy
+  onClose: () => void
+  onChanged: (msg: string) => void
+  onError: (msg: string) => void
+}) {
+  const [sections, setSections] = useState<Section[]>([])
+  const [loading, setLoading] = useState(false)
+  const [kind, setKind] = useState<'article' | 'attachment' | 'playbook_step' | 'annual_event'>('article')
+  const [busyId, setBusyId] = useState<string | null>(null)
+
+  const fetchSections = async () => {
+    setLoading(true)
+    try {
+      const token = getStoredToken()
+      const res = await fetch(`/api/ride-compliance/policies/${props.policy.id}/sections`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      })
+      const json = await res.json()
+      setSections(json.data || [])
+    } catch (e) {
+      props.onError(`섹션 조회 실패: ${e}`)
+    } finally {
+      setLoading(false)
+    }
+  }
+  useEffect(() => { fetchSections() }, [])  // eslint-disable-line react-hooks/exhaustive-deps
+
+  const sectionAction = async (s: Section, action: 'confirm' | 'reject' | 'reset') => {
+    setBusyId(s.id)
+    try {
+      const token = getStoredToken()
+      const res = await fetch(`/api/ride-compliance/policies/${props.policy.id}/sections`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ section_id: s.id, action }),
+      })
+      const json = await res.json()
+      if (!res.ok || !json.success) {
+        props.onError(`${action} 실패: ${json.error || res.status}`)
+        return
+      }
+      await fetchSections()
+    } catch (e) {
+      props.onError(`${action} 오류: ${e}`)
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  const finalizePolicy = async () => {
+    // Rule 20 — 인라인 차단 + onError 안내 (브라우저 dialog 미사용)
+    const draftCount = sections.filter(s => s.user_status === 'ai_draft').length
+    if (draftCount > 0) {
+      props.onError(`검수 미완료 섹션 ${draftCount}건 — 각 행의 ✓확정 또는 ✕반려 처리 후 확정 가능. 4 탭(조항/별첨/Playbook/연간) 모두 확인하세요.`)
+      return
+    }
+    setBusyId('__finalize__')
+    try {
+      const token = getStoredToken()
+      const res = await fetch(`/api/ride-compliance/policies/${props.policy.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ status: 'active' }),
+      })
+      const json = await res.json()
+      if (!res.ok || !json.success) {
+        props.onError(`확정 실패: ${json.error || res.status}`)
+        return
+      }
+      props.onChanged('내규 확정 완료 — Phase 2.1 (Playbook 자동 채움) 대기')
+      props.onClose()
+    } catch (e) {
+      props.onError(`확정 오류: ${e}`)
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  const filtered = sections.filter(s => s.section_kind === kind)
+  const counts = {
+    article:       sections.filter(s => s.section_kind === 'article').length,
+    attachment:    sections.filter(s => s.section_kind === 'attachment').length,
+    playbook_step: sections.filter(s => s.section_kind === 'playbook_step').length,
+    annual_event:  sections.filter(s => s.section_kind === 'annual_event').length,
+  }
+
+  return (
+    <ModalShell
+      title={`📋 ${props.policy.policy_code} ${props.policy.version} 검수`}
+      onClose={props.onClose}
+      wide
+    >
+      <div style={{ fontSize: 12, color: COLORS.textMuted, marginBottom: 12 }}>
+        <strong>{props.policy.title}</strong> —
+        {' '}AI 신뢰도: {props.policy.ai_confidence != null ? `${(props.policy.ai_confidence * 100).toFixed(0)}%` : '—'}
+        {' / '}추출: {props.policy.ai_extracted_at ? new Date(props.policy.ai_extracted_at).toLocaleString() : '—'}
+        {props.policy.ai_summary_md && <div style={{ marginTop: 6, padding: 8, ...GLASS.L2, borderRadius: 6 }}>{props.policy.ai_summary_md}</div>}
+      </div>
+
+      {/* 탭 */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 12, borderBottom: `1px solid ${COLORS.borderSubtle}` }}>
+        {(['article', 'attachment', 'playbook_step', 'annual_event'] as const).map((k) => (
+          <button key={k}
+            onClick={() => setKind(k)}
+            style={{
+              padding: '8px 14px', border: 'none', background: 'transparent', cursor: 'pointer',
+              borderBottom: kind === k ? `2px solid ${COLORS.primary}` : '2px solid transparent',
+              color: kind === k ? COLORS.primary : COLORS.textSecondary,
+              fontWeight: kind === k ? 600 : 400, fontSize: 13, whiteSpace: 'nowrap',
+            }}
+          >
+            {KIND_LABEL[k]} ({counts[k]})
+          </button>
+        ))}
+      </div>
+
+      {loading && <div style={{ textAlign: 'center', padding: 20, color: COLORS.textMuted }}>조회중…</div>}
+
+      {!loading && filtered.length === 0 && (
+        <div style={{ textAlign: 'center', padding: 20, color: COLORS.textMuted }}>
+          이 카테고리에 추출된 섹션이 없습니다.
+        </div>
+      )}
+
+      {!loading && filtered.map((s) => {
+        const sc = SECTION_STATUS_COLOR[s.user_status] || SECTION_STATUS_COLOR.ai_draft
+        return (
+          <div key={s.id} style={{
+            ...GLASS.L2, padding: 12, borderRadius: 8, marginBottom: 8,
+            opacity: s.user_status === 'rejected' ? 0.6 : 1,
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flex: 1, minWidth: 0 }}>
+                {s.section_code && <span style={{ fontFamily: 'monospace', fontSize: 12, color: COLORS.textPrimary, whiteSpace: 'nowrap' }}>{s.section_code}</span>}
+                <span style={{ fontWeight: 600, fontSize: 13, color: COLORS.textPrimary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.title}</span>
+                {confidenceBadge(s.ai_confidence)}
+                <span style={{
+                  padding: '1px 6px', borderRadius: 4, fontSize: 11, fontWeight: 600,
+                  background: sc.bg, color: sc.fg, whiteSpace: 'nowrap',
+                }}>{SECTION_STATUS_LABEL[s.user_status]}</span>
+              </div>
+              <div style={{ display: 'flex', gap: 4 }}>
+                {s.user_status === 'ai_draft' && (
+                  <>
+                    <button style={{ ...btnSuccess, padding: '2px 8px', fontSize: 11 }}
+                      onClick={() => sectionAction(s, 'confirm')} disabled={busyId === s.id}>✓ 확정</button>
+                    <button style={{ ...btnDanger, padding: '2px 8px', fontSize: 11 }}
+                      onClick={() => sectionAction(s, 'reject')} disabled={busyId === s.id}>✕ 반려</button>
+                  </>
+                )}
+                {s.user_status === 'user_confirmed' && (
+                  <button style={{ ...btnSecondary, padding: '2px 8px', fontSize: 11 }}
+                    onClick={() => sectionAction(s, 'reset')} disabled={busyId === s.id}>↺ 다시</button>
+                )}
+                {s.user_status === 'rejected' && (
+                  <button style={{ ...btnSecondary, padding: '2px 8px', fontSize: 11 }}
+                    onClick={() => sectionAction(s, 'reset')} disabled={busyId === s.id}>↺ 복원</button>
+                )}
+              </div>
+            </div>
+            {s.body_md && <div style={{ fontSize: 12, color: COLORS.textSecondary, marginBottom: 4 }}>{s.body_md}</div>}
+            {s.ai_raw_excerpt && (
+              <details style={{ fontSize: 11, color: COLORS.textMuted }}>
+                <summary style={{ cursor: 'pointer' }}>원본 인용 발췌</summary>
+                <div style={{ marginTop: 4, padding: 6, background: 'rgba(0,0,0,0.03)', borderRadius: 4 }}>{s.ai_raw_excerpt}</div>
+              </details>
+            )}
+          </div>
+        )
+      })}
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginTop: 16, paddingTop: 12, borderTop: `1px solid ${COLORS.borderSubtle}` }}>
+        <button style={btnSecondary} onClick={fetchSections}>🔄 새로고침</button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button style={btnSecondary} onClick={props.onClose}>닫기</button>
+          {props.policy.status !== 'active' && (
+            <button style={btnSuccess} onClick={finalizePolicy} disabled={busyId === '__finalize__'}>✅ 내규 확정 (active)</button>
+          )}
+        </div>
+      </div>
+    </ModalShell>
+  )
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Modal shell + 공통
+// ═══════════════════════════════════════════════════════════════
+function ModalShell(props: { title: string; onClose: () => void; children: React.ReactNode; wide?: boolean }) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm animate-fade-in px-4"
+      onClick={props.onClose}
+    >
+      <div
+        style={{
+          ...GLASS.L4, padding: 24, borderRadius: 16,
+          maxWidth: props.wide ? 840 : 640, width: '100%', maxHeight: '90vh', overflow: 'auto',
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+          <div style={{ fontSize: 16, fontWeight: 700, color: COLORS.textPrimary, whiteSpace: 'nowrap' }}>{props.title}</div>
+          <button style={{ ...btnSecondary, fontSize: 12, padding: '2px 10px' }} onClick={props.onClose}>×</button>
+        </div>
+        {props.children}
+      </div>
+    </div>
+  )
+}
+
+function FieldRow(props: { label: string; children: React.ReactNode }) {
+  return (
+    <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', marginBottom: 8 }}>
+      <div style={{ width: 110, fontSize: 12, color: COLORS.textSecondary, whiteSpace: 'nowrap', paddingTop: 8 }}>{props.label}</div>
+      <div style={{ flex: 1 }}>{props.children}</div>
+    </div>
+  )
+}
+
+const inputStyle: React.CSSProperties = {
+  ...GLASS.L1,
+  width: '100%', padding: '6px 10px', borderRadius: 8,
+  border: `1px solid ${COLORS.borderSubtle}`, fontSize: 13,
+}

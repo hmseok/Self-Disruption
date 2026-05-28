@@ -165,17 +165,16 @@ export default function ComplianceDeliverablesPage() {
 
   // ── stats ──
   const stats: StatItem[] = useMemo(() => {
+    // Phase 1.5 hotfix: 5상태 → 「작성중 / 완료」 2상태 표시.
+    // 내규(결재 라인) 부재로 approved/sent/responded 의미 없음 — 모두 「작성중 외」 로 묶음.
+    // DB status enum 자체는 유지, Phase 2.0 확정 후 단계별 표시 재활성화.
     const total = rows.length
     const draft = rows.filter(r => r.status === 'draft').length
-    const approved = rows.filter(r => r.status === 'approved').length
-    const sent = rows.filter(r => r.status === 'sent').length
-    const responded = rows.filter(r => r.status === 'responded').length
+    const done = total - draft
     return [
-      { label: '전체',      value: String(total),     tint: 'blue'   },
-      { label: '작성중',    value: String(draft),     tint: 'slate'  },
-      { label: '승인',      value: String(approved),  tint: 'blue'   },
-      { label: '송부됨',    value: String(sent),      tint: 'amber'  },
-      { label: '응답수신',  value: String(responded), tint: 'green'  },
+      { label: '전체',      value: String(total), tint: 'blue'  },
+      { label: '작성중',    value: String(draft), tint: 'slate' },
+      { label: '완료',      value: String(done),  tint: 'green' },
     ]
   }, [rows])
 
@@ -443,9 +442,8 @@ function CreateModal(props: {
       <FieldRow label="본문 (선택)">
         <textarea value={contentMd} onChange={(e) => setContentMd(e.target.value)} rows={4} style={{ ...inputStyle, fontFamily: 'monospace' }} />
       </FieldRow>
-      <FieldRow label="보유 기한 (선택)">
-        <input type="date" value={retentionUntil} onChange={(e) => setRetentionUntil(e.target.value)} style={inputStyle} />
-      </FieldRow>
+      {/* Phase 1.5 hotfix (2026-05-28): 보유기한 UI 숨김 — 내규(보존정책) 부재.
+          DB 컬럼 retention_until 유지, Phase 2.0 내규 확정 후 UI 재활성화. */}
       <FieldRow label="비고">
         <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} style={inputStyle} />
       </FieldRow>
@@ -532,7 +530,6 @@ function EditModal(props: {
   }
 
   const c = STATUS_COLOR[r.status] || STATUS_COLOR.draft
-  const sentMethodInput = r.sent_method || 'email'
 
   return (
     <ModalShell title={`${r.deliverable_code}`} onClose={props.onClose}>
@@ -543,9 +540,7 @@ function EditModal(props: {
           display: 'inline-block', padding: '1px 6px', borderRadius: 4, fontSize: 11,
           background: c.bg, color: c.fg, border: `1px solid ${c.bd}`,
         }}>{STATUS_LABEL[r.status] || r.status}</span>
-        <span style={{ marginLeft: 12, fontSize: 11, color: COLORS.textMuted }}>
-          승인일: {fmtDateTime(r.approved_at)} · 송부일: {fmtDateTime(r.sent_at)} · 응답: {fmtDateTime(r.response_received_at)}
-        </span>
+        {/* Phase 1.5 hotfix: 승인일/송부일/응답 메타 숨김 — 내규(결재 라인) 부재. Phase 2.0 후 재활성화. */}
       </div>
 
       <FieldRow label="제목">
@@ -560,46 +555,30 @@ function EditModal(props: {
       <FieldRow label="본문">
         <textarea value={contentMd} onChange={(e) => setContentMd(e.target.value)} disabled={!props.isMgr} rows={5} style={{ ...inputStyle, fontFamily: 'monospace' }} />
       </FieldRow>
-      <FieldRow label="보유 기한">
-        <input type="date" value={retentionUntil} onChange={(e) => setRetentionUntil(e.target.value)} disabled={!props.isMgr} style={inputStyle} />
-      </FieldRow>
+      {/* Phase 1.5 hotfix: 보유기한 UI 숨김 — 내규(보존정책) 부재. DB 컬럼 유지. */}
       <FieldRow label="비고">
         <textarea value={notes} onChange={(e) => setNotes(e.target.value)} disabled={!props.isMgr} rows={2} style={inputStyle} />
       </FieldRow>
 
-      {props.isMgr && (
-        <div style={{
-          ...GLASS.L2, marginTop: 12, padding: '10px 12px', borderRadius: 8,
-        }}>
+      {/* Phase 1.5 hotfix: 5상태 전이 박스 (draft→approved→sent→responded→closed) 통째로 숨김.
+          내규(결재 라인) 부재 — Phase 2.0 확정 후 재활성화.
+          현재는 단순화: 행 단위 「✓ 완료」 1버튼만 (closed 직행). */}
+      {props.isMgr && r.status === 'draft' && (
+        <div style={{ ...GLASS.L2, marginTop: 12, padding: '10px 12px', borderRadius: 8 }}>
           <div style={{ fontSize: 12, fontWeight: 600, color: COLORS.textSecondary, marginBottom: 6 }}>
-            상태 전이 (draft → approved → sent → responded → closed)
+            처리
+            <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 400, color: COLORS.textMuted }}>
+              내규(결재 라인) 정립 후 단계별 처리 활성화 예정
+            </span>
           </div>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            {r.status === 'draft' && (
-              <button style={btnPrimary} onClick={() => callPatch({ status: 'approved' })} disabled={busy}>✓ 승인</button>
-            )}
-            {r.status === 'approved' && (
-              <button style={btnPrimary} onClick={() => {
-                const m = prompt('송부 방법 (email/post/courier/portal/fax/in_person)', sentMethodInput) || sentMethodInput
-                callPatch({ status: 'sent', sent_method: m })
-              }} disabled={busy}>📤 송부 완료</button>
-            )}
-            {r.status === 'sent' && (
-              <>
-                <button style={btnPrimary} onClick={() => {
-                  const note = prompt('응답 내용 (선택)', '') || null
-                  callPatch({ status: 'responded', response_note: note })
-                }} disabled={busy}>📩 응답 수신</button>
-                <button style={btnSecondary} onClick={() => callPatch({ status: 'closed' })} disabled={busy}>🔒 응답 없이 종결</button>
-              </>
-            )}
-            {r.status === 'responded' && (
-              <button style={btnPrimary} onClick={() => callPatch({ status: 'closed' })} disabled={busy}>🔒 종결</button>
-            )}
-            {r.status === 'closed' && (
-              <span style={{ fontSize: 12, color: COLORS.textMuted }}>종결됨 (편집은 가능하나 상태 전이는 없음)</span>
-            )}
+            <button style={btnPrimary} onClick={() => callPatch({ status: 'closed' })} disabled={busy}>✓ 완료 처리</button>
           </div>
+        </div>
+      )}
+      {props.isMgr && r.status !== 'draft' && (
+        <div style={{ ...GLASS.L2, marginTop: 12, padding: '10px 12px', borderRadius: 8, fontSize: 12, color: COLORS.textMuted }}>
+          종결됨 — 편집은 가능합니다.
         </div>
       )}
 
