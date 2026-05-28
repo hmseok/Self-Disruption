@@ -9,6 +9,8 @@ import InviteModal from '../components/InviteModal'
 import DcStatStrip, { StatItem, ActionButton } from '../components/DcStatStrip'
 import DcToolbar, { FilterItem } from '../components/DcToolbar'
 import NeuDataTable, { TableColumn, MobileCardConfig } from '../components/NeuDataTable'
+// PR-DESIGN-11 (2026-05-28) — UI-DESIGN-STANDARD § 4: 자체 탭 strip → NeuFilterTabs 의무
+import NeuFilterTabs from '../components/NeuFilterTabs'
 import { auth } from '@/lib/auth-client'
 import PayrollOps from './_components/PayrollOps'
 import RideOrgPanel from './_components/RideOrgPanel'
@@ -1223,7 +1225,8 @@ export default function HRMasterPage() {
 
   return (
     <div className="page-bg">
-      <div className="max-w-[1400px] mx-auto py-4 px-4 md:py-5 md:px-6">
+      {/* PR-DESIGN-11 (2026-05-28) — UI-DESIGN-STANDARD § 1.6: 페이지 최상위 래퍼 중앙정렬 제거 (전체 너비) */}
+      <div className="py-4 px-4 md:py-5 md:px-6">
 
       {/* Stats */}
       <DcStatStrip
@@ -1242,27 +1245,23 @@ export default function HRMasterPage() {
       {/* PR-HR-11a — 회사 토글 (1단계). 사용자 보고 '이중탭 부자연스러움' 해소.
             company_key 기반 권한 분리 (admin GOD 전체 / user/master 본인 회사 + common).
             visibleCompanies 가 권한별 표시 제어. */}
-      <DcToolbar
-        search=""
-        onSearchChange={() => {}}
-        noSearch
-        filters={visibleCompanies.map(c => {
+      {/* PR-DESIGN-11 (2026-05-28) — DcToolbar → NeuFilterTabs (UI-DESIGN-STANDARD § 4) */}
+      <NeuFilterTabs
+        tabs={visibleCompanies.map(c => {
           const fmiCount = employees.filter(e => e.company_key !== 'RIDE' && e.role !== 'admin').length
           const rideCount = employees.filter(e => e.company_key === 'RIDE').length
           const commonCount = invitations.length + freelancers.length
           const count = c === 'FMI' ? fmiCount : c === 'RIDE' ? rideCount : commonCount
           return { key: c, label: COMPANY_LABEL[c], count }
         })}
-        activeFilter={topCompany}
-        onFilterChange={(key) => changeCompany(key as Company)}
+        activeKey={topCompany}
+        onSelect={(key) => changeCompany(key as Company)}
       />
 
       {/* PR-HR-11a — 회사별 하위 탭 (2단계). 선택된 회사의 TABS_BY_COMPANY 기반. */}
-      <DcToolbar
-        search=""
-        onSearchChange={() => {}}
-        noSearch
-        filters={visibleTabs(topCompany).map(t => {
+      {/* PR-DESIGN-11 (2026-05-28) — DcToolbar → NeuFilterTabs (UI-DESIGN-STANDARD § 4) */}
+      <NeuFilterTabs
+        tabs={visibleTabs(topCompany).map(t => {
           const TAB_LABEL: Record<SubTab, string> = {
             employees:   '👥 직원',
             org:         '🏢 조직도',
@@ -1288,8 +1287,8 @@ export default function HRMasterPage() {
           }
           return { key: t, label: TAB_LABEL[t], count: counts[t] }
         })}
-        activeFilter={topTab}
-        onFilterChange={(key) => changeTab(key as SubTab)}
+        activeKey={topTab}
+        onSelect={(key) => changeTab(key as SubTab)}
       />
 
       {/* ─── 탭 1: 직원 관리 ─── */}
@@ -1498,47 +1497,51 @@ export default function HRMasterPage() {
                 )}
                 {bulkData.length > 0 && (
                   <>
-                    <div style={{ overflowX: 'auto', maxHeight: 240 }}>
-                      <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 480, fontSize: 11 }}>
-                        <thead><tr style={{ background: 'rgba(0,0,0,0.04)' }}>
-                          <th style={{ padding: '6px 8px', textAlign: 'left' }}>이름</th>
-                          <th style={{ padding: '6px 8px', textAlign: 'left' }}>연락처</th>
-                          <th style={{ padding: '6px 8px', textAlign: 'left' }}>은행/계좌</th>
-                          <th style={{ padding: '6px 8px' }}>상태</th>
-                        </tr></thead>
-                        <tbody>
-                          {bulkData.map((d, i) => (
-                            <tr key={i} style={{ opacity: d._status === 'duplicate' ? 0.4 : 1, borderBottom: '1px solid rgba(0,0,0,0.04)' }}>
-                              <td style={{ padding: '4px 8px', fontWeight: 600 }}>{d.name}</td>
-                              <td style={{ padding: '4px 8px', color: '#64748b' }}>{d.phone || '-'}</td>
-                              <td style={{ padding: '4px 8px', color: '#64748b' }}>{d.bank_name} {d.account_number}</td>
-                              <td style={{ padding: '4px 8px', textAlign: 'center' }}>
-                                <span style={{
-                                  fontSize: 10, fontWeight: 600, padding: '2px 6px', borderRadius: 4,
-                                  background:
-                                    d._status === 'saved' ? 'rgba(34,197,94,0.15)' :
-                                    d._status === 'update' ? 'rgba(59,130,246,0.15)' :
-                                    d._status === 'duplicate' ? 'rgba(0,0,0,0.04)' :
-                                    d._status === 'error' ? 'rgba(239,68,68,0.15)' :
-                                    'rgba(251,191,36,0.18)',
-                                  color:
-                                    d._status === 'saved' ? '#16a34a' :
-                                    d._status === 'update' ? '#2563eb' :
-                                    d._status === 'duplicate' ? '#94a3b8' :
-                                    d._status === 'error' ? '#dc2626' :
-                                    '#a16207',
-                                }}>
-                                  {d._status === 'saved' ? d._note :
-                                   d._status === 'update' ? '🔄 업데이트' :
-                                   d._status === 'duplicate' ? d._note :
-                                   d._status === 'error' ? '에러' :
-                                   '✨ 신규'}
-                                </span>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                    {/* PR-DESIGN-11 (2026-05-28) — 자체 table → div grid (in-memory 미리보기, NeuDataTable 까지 가긴 과한 영역) */}
+                    <div style={{ overflowX: 'auto', maxHeight: 240, minWidth: 480, fontSize: 11 }}>
+                      <div role="row" style={{
+                        display: 'grid', gridTemplateColumns: '1.2fr 1.2fr 2fr 1fr', gap: 0,
+                        background: 'rgba(0,0,0,0.04)', fontWeight: 600,
+                      }}>
+                        <div role="columnheader" style={{ padding: '6px 8px', textAlign: 'left' }}>이름</div>
+                        <div role="columnheader" style={{ padding: '6px 8px', textAlign: 'left' }}>연락처</div>
+                        <div role="columnheader" style={{ padding: '6px 8px', textAlign: 'left' }}>은행/계좌</div>
+                        <div role="columnheader" style={{ padding: '6px 8px', textAlign: 'center' }}>상태</div>
+                      </div>
+                      {bulkData.map((d, i) => (
+                        <div role="row" key={i} style={{
+                          display: 'grid', gridTemplateColumns: '1.2fr 1.2fr 2fr 1fr', gap: 0,
+                          opacity: d._status === 'duplicate' ? 0.4 : 1,
+                          borderBottom: '1px solid rgba(0,0,0,0.04)',
+                        }}>
+                          <div role="cell" style={{ padding: '4px 8px', fontWeight: 600 }}>{d.name}</div>
+                          <div role="cell" style={{ padding: '4px 8px', color: '#64748b' }}>{d.phone || '-'}</div>
+                          <div role="cell" style={{ padding: '4px 8px', color: '#64748b' }}>{d.bank_name} {d.account_number}</div>
+                          <div role="cell" style={{ padding: '4px 8px', textAlign: 'center' }}>
+                            <span style={{
+                              fontSize: 10, fontWeight: 600, padding: '2px 6px', borderRadius: 4,
+                              background:
+                                d._status === 'saved' ? 'rgba(34,197,94,0.15)' :
+                                d._status === 'update' ? 'rgba(59,130,246,0.15)' :
+                                d._status === 'duplicate' ? 'rgba(0,0,0,0.04)' :
+                                d._status === 'error' ? 'rgba(239,68,68,0.15)' :
+                                'rgba(251,191,36,0.18)',
+                              color:
+                                d._status === 'saved' ? '#16a34a' :
+                                d._status === 'update' ? '#2563eb' :
+                                d._status === 'duplicate' ? '#94a3b8' :
+                                d._status === 'error' ? '#dc2626' :
+                                '#a16207',
+                            }}>
+                              {d._status === 'saved' ? d._note :
+                               d._status === 'update' ? '🔄 업데이트' :
+                               d._status === 'duplicate' ? d._note :
+                               d._status === 'error' ? '에러' :
+                               '✨ 신규'}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                     <div style={{ marginTop: 10, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
                       <button onClick={() => { setBulkData([]); setBulkLogs([]) }}
