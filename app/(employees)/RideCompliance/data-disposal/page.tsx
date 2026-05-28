@@ -186,24 +186,24 @@ export default function DataDisposalPage() {
         body: JSON.stringify({ external_approval_id: extId }),
       })
       const json = await res.json()
-      if (!json.success) { setResultPanel({ kind: 'err', msg: `sync 실패: ${json.error}` }); return }
-      setResultPanel({ kind: 'ok', msg: `✅ 외부 결재 #${extId} sync 완료 — items ${json.data?.items_count ?? 0}건` })
+      if (!json.success) { setResultPanel({ kind: 'err', msg: `갱신 실패: ${json.error}` }); return }
+      setResultPanel({ kind: 'ok', msg: `결재 #${extId} 갱신 완료 — 대상 ${json.data?.items_count ?? 0}건` })
       await fetchList()
       if (json.data?.review_id) {
         setSelectedReviewId(json.data.review_id)
         fetchDetail(json.data.review_id)
       }
     } catch (e) {
-      setResultPanel({ kind: 'err', msg: `sync 네트워크 오류: ${e}` })
+      setResultPanel({ kind: 'err', msg: `갱신 오류: ${e}` })
     } finally {
       setActionBusy(false)
     }
   }
 
-  // ── ETL — 외부에서 전체 가져오기 (관리자 액션) ────────
+  // ── 동기화 (관리자 액션) ─────────────────────────────
   const handleSyncAll = async () => {
     setActionBusy(true)
-    setResultPanel({ kind: 'info', msg: '⏳ 외부 cafe24 결재 전체 가져오는 중... (최대 60초)' })
+    setResultPanel({ kind: 'info', msg: '동기화 중입니다.' })
     try {
       const token = getStoredToken()
       const res = await fetch('/api/ride-compliance/disposal/sync-all', {
@@ -212,16 +212,17 @@ export default function DataDisposalPage() {
         body: JSON.stringify({ limit: 100 }),
       })
       const json = await res.json()
-      if (!json.success) { setResultPanel({ kind: 'err', msg: `전체 sync 실패: ${json.error}` }); return }
+      if (!json.success) { setResultPanel({ kind: 'err', msg: `동기화 실패: ${json.error}` }); return }
       const d = json.data
-      const errLine = d.errors?.length ? `\n⚠ 일부 오류 ${d.errors.length}건` : ''
+      const total = (d.new ?? 0) + (d.updated ?? 0)
+      const errLine = d.errors?.length ? ` · 오류 ${d.errors.length}건` : ''
       setResultPanel({
         kind: 'ok',
-        msg: `✅ 외부 cafe24 전체 sync 완료 (어댑터: ${d.adapter_mode})\n· 외부 fetch ${d.fetched}건\n· 신규 mirror ${d.new}건\n· 갱신 ${d.updated}건\n· items insert ${d.items_inserted}건${errLine}`,
+        msg: `동기화 완료 — 신규 ${d.new ?? 0}건, 갱신 ${d.updated ?? 0}건 (대상 항목 ${d.items_inserted ?? 0})${errLine}`,
       })
       await fetchList()
     } catch (e) {
-      setResultPanel({ kind: 'err', msg: `전체 sync 네트워크 오류: ${e}` })
+      setResultPanel({ kind: 'err', msg: `동기화 오류: ${e}` })
     } finally {
       setActionBusy(false)
     }
@@ -243,14 +244,15 @@ export default function DataDisposalPage() {
         body: JSON.stringify({ action, note: actionNote || null, reason: actionReason || null }),
       })
       const json = await res.json()
-      if (!json.success) { setResultPanel({ kind: 'err', msg: `${action} 실패: ${json.error}` }); return }
-      setResultPanel({ kind: 'ok', msg: `✅ ${action} 완료 — 상태 ${json.data?.review_status}` })
+      const actionLabel = action === 'approve' ? '승인' : action === 'reject' ? '반려' : '확인'
+      if (!json.success) { setResultPanel({ kind: 'err', msg: `${actionLabel} 실패: ${json.error}` }); return }
+      setResultPanel({ kind: 'ok', msg: `${actionLabel} 처리되었습니다.` })
       setActionReason('')
       setActionNote('')
       await fetchList()
       await fetchDetail(selectedReviewId)
     } catch (e) {
-      setResultPanel({ kind: 'err', msg: `${action} 네트워크 오류: ${e}` })
+      setResultPanel({ kind: 'err', msg: `처리 중 오류가 발생했습니다: ${e}` })
     } finally {
       setActionBusy(false)
     }
@@ -378,24 +380,17 @@ export default function DataDisposalPage() {
         </div>
       )}
 
-      {/* 어댑터 모드 안내 + ETL sync 버튼 */}
-      <div style={{ ...GLASS.L3, padding: '10px 14px', borderRadius: 10, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 10, borderLeft: `4px solid ${adapterMode === 'mock' ? COLORS.warning : COLORS.success}` }}>
-        <div style={{ flex: 1, fontSize: 12, color: COLORS.textSecondary }}>
-          💡 외부 cafe24 yangjaehee DB → 본 ERP DB mirror (ETL) — 어댑터: <strong style={{ color: COLORS.textPrimary }}>{adapterMode}</strong>
-          {adapterMode === 'mock' && (
-            <span style={{ color: COLORS.warning, fontWeight: 600 }}> (시연용 — 실 DB 미연결)</span>
-          )}
-          {adapterMode === 'direct' && (
-            <span style={{ color: COLORS.success, fontWeight: 600 }}> (실 cafe24 read-only 연결 — 본 화면은 본 ERP mirror 만 표시)</span>
-          )}
-        </div>
+      {/* 데이터 소스 + 동기화 버튼 */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 12, marginBottom: 12 }}>
+        {adapterMode === 'mock' && (
+          <span style={{ fontSize: 11, color: COLORS.warning, fontWeight: 600 }}>※ 시연 데이터</span>
+        )}
         <button
           onClick={handleSyncAll}
           disabled={actionBusy || loading}
-          title="외부 cafe24 에서 결재 전체를 본 ERP DB 로 가져와 mirror (관리자 액션)"
           style={{ ...btnPrimary, whiteSpace: 'nowrap', fontWeight: 600 }}
         >
-          {actionBusy ? '⏳ 가져오는 중...' : '🔄 외부에서 전체 가져오기 (ETL sync)'}
+          {actionBusy ? '동기화 중…' : '동기화'}
         </button>
       </div>
 
@@ -461,9 +456,7 @@ export default function DataDisposalPage() {
           />
           {filteredRows.length === 0 && !loading && (
             <div style={{ padding: 32, textAlign: 'center', fontSize: 13, color: COLORS.textMuted }}>
-              {rows.length === 0
-                ? '본 ERP mirror 가 비어있습니다 — 상단 「🔄 외부에서 전체 가져오기」 클릭 후 표시됩니다.'
-                : '🔍 검색 결과 없음'}
+              {rows.length === 0 ? '내역이 없습니다.' : '검색 결과가 없습니다.'}
             </div>
           )}
         </div>
