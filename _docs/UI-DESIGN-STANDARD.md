@@ -254,6 +254,53 @@ const tabs: FilterTab[] = [
 
 ---
 
+## 5.1 모달 표준 — Overlay + Body (2026-05-27 사용자 결정 — 옵션 C)
+
+> **사용자 보고 (2026-05-27)**: RideCompliance 모달이 `bg-black/60 + backdrop-blur-xl`
+> 조합으로 뒷 콘텐츠가 거의 안 보여 답답. 「우리 기준 모달」 표준 명문화 요청.
+> 시안 5종 비교 후 **옵션 C** 채택.
+
+```tsx
+{/* Overlay — 표준 (모든 모달 의무) */}
+<div className="fixed inset-0 z-50 flex items-center justify-center
+                bg-black/40 backdrop-blur-sm
+                animate-fade-in px-4">
+  {/* Body — Glass L4 */}
+  <div style={{ ...GLASS.L4, maxWidth: 520, borderRadius: 16, padding: 24 }}>
+    ...
+  </div>
+</div>
+```
+
+**Overlay 표준 값**:
+
+| 속성 | 값 | 의미 |
+|---|---|---|
+| 배경 dimming | `bg-black/40` | 40% — focus 유도, 답답 X |
+| backdrop blur | `backdrop-blur-sm` | 가벼움, 뒷 콘텐츠 형태 인지 가능 |
+| z-index | `z-50` | 사이드바·헤더 위 |
+| 진입 애니메이션 | `animate-fade-in` | 부드러운 등장 |
+
+**Body 표준 값**:
+
+| 속성 | 값 | 의미 |
+|---|---|---|
+| Glass 레벨 | `GLASS.L4` (white/0.72) | 콘텐츠 컨테이너 |
+| max-width | 단순 form 520px / 복합 720px | 가독성 |
+| border-radius | 16px | Glass 카드와 통일 |
+| padding | 24px | 충분한 여백 |
+
+**금지 패턴** (lint 차단 — `ui-design-lint` check 15):
+- ❌ `bg-black/50` 이상 + `backdrop-blur-xl`/`-2xl` 조합 — 뒷 콘텐츠 완전 차단, 답답
+- ❌ `bg-black/90` — 사실상 페이지 차단 (정말 critical confirm 만 예외)
+- ❌ Body 에 자체 `<div>` 구현 — `GLASS.L4` 토큰 의무
+
+**예외**:
+- Data-loss 위험 confirm dialog — `bg-black/60` + alert-style body 허용 (사용자 잠시 stop)
+- 풀스크린 이미지 viewer — `bg-black/90` 허용
+
+---
+
 ## 5. Glass 디자인 시스템 (CLAUDE.md § 10)
 
 5 레벨 glass 사용:

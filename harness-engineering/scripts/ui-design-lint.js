@@ -246,6 +246,26 @@ for (const fp of pageFiles) {
       issue: '자체 <table> 추정 — 공용 NeuDataTable 사용 권장 (§ 0-A [5] — 정렬 + 모바일 카드 자동)',
     })
   }
+
+  // 15) 2026-05-27: 모달 overlay 표준 (UI-DESIGN-STANDARD § 5.1)
+  //   표준: bg-black/40 + backdrop-blur-sm
+  //   금지: bg-black/50 이상 + backdrop-blur-xl/-2xl 조합 (뒷 콘텐츠 차단, 답답)
+  //         bg-black/90 (사실상 페이지 차단 — data-loss confirm 외 예외)
+  // 모달 잠재 패턴: 'fixed inset-0' + 'z-50' + overlay class
+  const hasHeavyOverlay = /\bbg-black\/(5[0-9]|6[0-9]|7[0-9]|8[0-9]|9[0-9])\b/.test(content)
+  const hasHeavyBlur = /\bbackdrop-blur-(xl|2xl|3xl)\b/.test(content)
+  const hasFullPageBlackout = /\bbg-black\/9[0-9]\b/.test(content)
+  if (hasHeavyOverlay && hasHeavyBlur) {
+    warnings.push({
+      file: rel,
+      issue: '모달 overlay 무거움 — bg-black/50+ 와 backdrop-blur-xl+ 조합. 표준 (§ 5.1): bg-black/40 + backdrop-blur-sm',
+    })
+  } else if (hasFullPageBlackout) {
+    warnings.push({
+      file: rel,
+      issue: '모달 overlay 90%+ 검정 — 사실상 페이지 차단. data-loss confirm 외 § 5.1 표준 (bg-black/40) 사용',
+    })
+  }
 }
 
 console.log('═══ 결과 ═══')
