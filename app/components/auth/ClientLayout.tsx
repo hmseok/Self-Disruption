@@ -459,8 +459,9 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
                   ))}
               </div>
 
-              {/* CX팀 sub-section — 권한 있는 사용자만 표시 */}
+              {/* CX팀 sub-section — RIDE 직원 + admin 만 (PR-HR-18 — 사용자 명령: 라이드 중그룹밑이 라이드 용) */}
               {(() => {
+                if (companyKey !== 'RIDE' && role !== 'admin') return null
                 const visibleCxMenus = CX_TEAM_MENUS.filter(item => !item.requirePermission || role === 'admin' || hasPageAccess(item.path))
                 if (visibleCxMenus.length === 0) return null
                 return (
@@ -477,9 +478,10 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
                 )
               })()}
 
-              {/* MT팀 sub-section (PR-MT-OPS-FIX) — 권한 있는 사용자만 */}
+              {/* MT팀 sub-section (PR-MT-OPS-FIX) — RIDE 직원 + admin 만 (PR-HR-18) */}
               {/* 순서: 관리자 운영보다 위 (2026-05-24 사용자 요청) */}
               {(() => {
+                if (companyKey !== 'RIDE' && role !== 'admin') return null
                 const visibleMtTeam = MT_TEAM_MENUS.filter(item => !item.requirePermission || role === 'admin' || hasPageAccess(item.path))
                 if (visibleMtTeam.length === 0) return null
                 return (
@@ -496,8 +498,9 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
                 )
               })()}
 
-              {/* 비전 sub-section (PR-VISION) — 권한 있는 사용자만 */}
+              {/* 비전 sub-section (PR-VISION) — RIDE 직원 + admin 만 (PR-HR-18) */}
               {(() => {
+                if (companyKey !== 'RIDE' && role !== 'admin') return null
                 const visibleVision = VISION_MENUS.filter(item => !item.requirePermission || role === 'admin' || hasPageAccess(item.path))
                 if (visibleVision.length === 0) return null
                 return (

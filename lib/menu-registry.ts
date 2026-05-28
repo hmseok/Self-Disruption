@@ -39,30 +39,41 @@ export interface MenuGroup {
   label: string
   section: 'business' | 'work-essentials' | 'settings' // 사이드바 섹션 분류
   sortOrder: number
+  // PR-HR-18 (2026-05-28) — 사이드바 회사 격리 분류.
+  //   명시 안 함 = 양사 공통 (FMI / RIDE 둘 다 노출)
+  //   ['FMI'] = FMI 직원에게만 사이드바 노출 (admin 은 전체 보임)
+  //   ['RIDE'] = RIDE 직원에게만 사이드바 노출
+  //   사용자 명령 (2026-05-28): "라이드 중그룹밑이 라이드 용"
+  companies?: ('FMI' | 'RIDE')[]
 }
 
 // ─── 그룹 정의 ───────────────────────────────────────────
 // label = 권한 페이지 / 초대 페이지 표시명 (구체적)
 // shortLabel = 사이드바 표시명 (짧음, 미정의 시 label 사용)
 export const GROUPS: MenuGroup[] = [
-  // 비즈니스 메뉴 (admin 권한 부여 대상)
-  { id: 'asset',           label: '차량 자산',     section: 'business',         sortOrder: 1 },
-  { id: 'operation',       label: '차량 운영',     section: 'business',         sortOrder: 2 },
-  { id: 'finance',         label: '재무/경영지원', section: 'business',         sortOrder: 3 },
-  { id: 'sales',           label: '영업/계약',     section: 'business',         sortOrder: 4 },
-  { id: 'admin',           label: '관리',         section: 'business',         sortOrder: 5 },
+  // PR-HR-18 (2026-05-28) — 사이드바 회사 격리 (companies 필드).
+  //   사용자 명령: "라이드 중그룹밑이 라이드 용으로 만들었지만 페이지 권한은 각각 줘야 하고
+  //              설정쪽 메뉴는 아무도 주면 안 됨".
+
+  // 비즈니스 메뉴 (FMI 렌터카 — admin 권한 부여 대상)
+  { id: 'asset',           label: '차량 자산',     section: 'business',         sortOrder: 1,  companies: ['FMI'] },
+  { id: 'operation',       label: '차량 운영',     section: 'business',         sortOrder: 2,  companies: ['FMI'] },
+  { id: 'finance',         label: '재무/경영지원', section: 'business',         sortOrder: 3,  companies: ['FMI'] },
+  { id: 'sales',           label: '영업/계약',     section: 'business',         sortOrder: 4,  companies: ['FMI'] },
+  { id: 'admin',           label: '관리',         section: 'business',         sortOrder: 5,  companies: ['FMI'] },
   // 2026-05-05 PR-B1 — 'hr' 그룹 폐기. 「인사 마스터」 (1개 통합 페이지) 는 settings 그룹 안
-  // 직장인필수 (Employee of Ride Inc. — 모든 로그인 사용자)
+  // 직장인필수 — 양사 공통 (모든 로그인 사용자)
   { id: 'work-essentials', label: '직장인필수',    section: 'work-essentials', sortOrder: 10 },
-  { id: 'cx-team',         label: 'CX팀',         section: 'work-essentials', sortOrder: 11 },
+  // RIDE 라이드 인력 전용 그룹들 (cx-team / mt-team / vision)
+  { id: 'cx-team',         label: 'CX팀',         section: 'work-essentials', sortOrder: 11, companies: ['RIDE'] },
   // PR-MT-OPS (2026-05-11) — MT팀 운영 그룹 (위탁: 다른 세션 작업, 본 세션 단독 commit)
-  { id: 'mt-team',         label: '🔧 MT팀',      section: 'work-essentials', sortOrder: 12 },
+  { id: 'mt-team',         label: '🔧 MT팀',      section: 'work-essentials', sortOrder: 12, companies: ['RIDE'] },
   // PR-VISION (2026-05-24) — 비전 그룹 (로또번호추출기 등 가벼운 유틸)
-  { id: 'vision',          label: '비전',         section: 'work-essentials', sortOrder: 13 },
-  // PR-6.9.b (2026-05-06) — 관리자 운영 그룹 신설 (Employee of Ride Inc. 하위)
+  { id: 'vision',          label: '비전',         section: 'work-essentials', sortOrder: 13, companies: ['RIDE'] },
+  // PR-6.9.b (2026-05-06) — 관리자 운영 그룹 (양사 공통 — admin 관리자)
   // 2026-05-24 — 라이드 하위 그룹 중 항상 최하단 (사용자 요청) → sortOrder 최대
   { id: 'admin-ops',       label: '관리자 운영',   section: 'work-essentials', sortOrder: 14 },
-  // 설정 (admin 전용 — 사이드바 별도 섹션)
+  // 설정 (admin 전용 — 사이드바 별도 섹션, 페이지 권한 부여 대상 X)
   { id: 'settings',        label: '설정',         section: 'settings',         sortOrder: 20 },
 ]
 
