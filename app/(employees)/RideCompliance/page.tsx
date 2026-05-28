@@ -992,6 +992,25 @@ function OperationGuideTabContent(props: {
   annualPlan: AnnualPlan | null
   onTabChange: (key: TabKey) => void
 }) {
+  // Phase 2.1 — 확정 내규 (status='active') 연동 안내.
+  // user_confirmed playbook_step sections 가 있으면 「현재 코드 const 9 step」 과 비교 표시.
+  // 향후 Phase 2.1-B 에서 const 대체 (steps 데이터 풍부화 후).
+  const [activePolicy, setActivePolicy] = useState<{ policy_title: string; policy_id: string; steps_count: number } | null>(null)
+  useEffect(() => {
+    const token = getStoredToken()
+    fetch('/api/ride-compliance/playbook-active', {
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    }).then(r => r.json()).then(j => {
+      if (j?.success && j?.data?.active) {
+        setActivePolicy({
+          policy_title: String(j.data.policy_title || ''),
+          policy_id: String(j.data.policy_id || ''),
+          steps_count: Array.isArray(j.data.steps) ? j.data.steps.length : 0,
+        })
+      }
+    }).catch(() => { /* graceful */ })
+  }, [])
+
   // 각 step 의 진행 상태 자동 계산
   const stepStatus = useMemo(() => {
     const officersActive = props.officers.filter(o => o.is_active === 1)
@@ -1046,6 +1065,43 @@ function OperationGuideTabContent(props: {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* Phase 2.1 — 확정 내규 연동 배너 (없으면 안내) */}
+      {activePolicy ? (
+        <div style={{
+          ...GLASS.L3, padding: 14, borderRadius: 10,
+          border: '1px solid rgba(16,185,129,0.30)', background: 'rgba(220,252,231,0.40)',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap',
+        }}>
+          <div style={{ fontSize: 13, color: '#047857' }}>
+            <strong>📚 활성 내규 연동</strong> — {activePolicy.policy_title}{' '}
+            <span style={{ marginLeft: 6, fontSize: 11, color: COLORS.textMuted }}>
+              · 확정 Playbook {activePolicy.steps_count} 단계 / 코드 const {`9`} 단계
+            </span>
+          </div>
+          <Link href="/RideCompliance/policies" style={{
+            ...GLASS.L1, fontSize: 12, color: COLORS.primary, textDecoration: 'none',
+            padding: '4px 10px', borderRadius: 6,
+          }}>내규 관리 →</Link>
+        </div>
+      ) : (
+        <div style={{
+          ...GLASS.L3, padding: 14, borderRadius: 10,
+          border: '1px solid rgba(245,158,11,0.30)', background: 'rgba(254,243,199,0.40)',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap',
+        }}>
+          <div style={{ fontSize: 13, color: '#b45309' }}>
+            <strong>⚠ 확정 내규 없음</strong>{' '}
+            <span style={{ marginLeft: 6, fontSize: 11, color: COLORS.textMuted }}>
+              아래 9 단계는 코드 const 기본값입니다. 내규 등록 + 확정 시 활성 Playbook 연동.
+            </span>
+          </div>
+          <Link href="/RideCompliance/policies" style={{
+            ...GLASS.L1, fontSize: 12, color: COLORS.primary, textDecoration: 'none',
+            padding: '4px 10px', borderRadius: 6,
+          }}>+ 내규 등록 →</Link>
+        </div>
+      )}
+
       {/* 안내 패널 */}
       <div style={{ ...GLASS.L3, padding: 18, borderRadius: 12, borderLeft: `4px solid ${COLORS.primary}` }}>
         <h2 style={{ margin: '0 0 8px', fontSize: 16, color: COLORS.textPrimary }}>📖 정보보안 운영 9 step — 규정에 맞게 단계별로 확립</h2>
