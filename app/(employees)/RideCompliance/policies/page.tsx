@@ -162,11 +162,13 @@ export default function PoliciesPage() {
     const draft = rows.filter(r => r.status === 'uploaded' || r.status === 'ai_extracted').length
     const reviewing = rows.filter(r => r.status === 'user_reviewing').length
     const active = rows.filter(r => r.status === 'active').length
+    const superseded = rows.filter(r => r.status === 'superseded').length
     return [
-      { label: '전체',      value: String(total),     tint: 'blue'  },
-      { label: '검수 대기', value: String(draft),     tint: 'amber' },
-      { label: '검수중',    value: String(reviewing), tint: 'blue'  },
-      { label: '확정',      value: String(active),    tint: 'green' },
+      { label: '전체',      value: String(total),      tint: 'blue'   },
+      { label: '검수 대기', value: String(draft),      tint: 'amber'  },
+      { label: '검수중',    value: String(reviewing),  tint: 'blue'   },
+      { label: '확정',      value: String(active),     tint: 'green'  },
+      { label: '폐기',      value: String(superseded), tint: 'slate'  },
     ]
   }, [rows])
 
@@ -228,6 +230,20 @@ export default function PoliciesPage() {
 
   return (
     <div style={{ padding: '0 24px 32px' }}>
+
+      {/* Phase 2.0+ — 페이지 상단 안내 카드 (모듈 main 헤더와 시각 일관성) */}
+      <div style={{
+        ...GLASS.L3, padding: 18, borderRadius: 12, marginBottom: 16,
+        borderLeft: `4px solid ${COLORS.primary}`,
+      }}>
+        <h2 style={{ margin: '0 0 6px', fontSize: 16, color: COLORS.textPrimary, whiteSpace: 'nowrap' }}>
+          📜 내규 마스터 — 정보보안 운영의 1차 데이터
+        </h2>
+        <p style={{ margin: 0, fontSize: 12, color: COLORS.textSecondary, lineHeight: 1.6 }}>
+          PPTX/PDF 내규 파일을 등록하면 AI 가 조항·별첨·Playbook·연간 운영·필요 화면 5 카테고리를 자동 추출.
+          검수 → 「✅ 내규 확정」 → 「📅 스케줄 자동 생성」 으로 연간 운영 task 자동 INSERT.
+        </p>
+      </div>
 
       {migrationPending && (
         <div style={{
