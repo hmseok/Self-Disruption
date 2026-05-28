@@ -173,6 +173,13 @@ export async function POST(request: Request) {
   const preparedBy = body.prepared_by ? String(body.prepared_by).trim() : user.id
   const retentionUntil = body.retention_until ? String(body.retention_until).trim() : null
   const notes = body.notes ? String(body.notes) : null
+  // Phase 2.2 — AI 분류 메타 (옵션)
+  const aiModel = body.ai_model ? String(body.ai_model).trim() : null
+  const aiConfidence = body.ai_confidence != null ? Number(body.ai_confidence) : null
+  const aiRawResponse = body.ai_raw_response ? String(body.ai_raw_response).substring(0, 4_000_000) : null
+  const summaryMd = body.summary_md ? String(body.summary_md) : null
+  const playbookStepCodes = Array.isArray(body.playbook_step_codes) ? body.playbook_step_codes : null
+  const aiClassified = aiModel != null  // AI 메타 있으면 ai_classified_at = NOW()
 
   if (!deliverableCode) {
     return NextResponse.json({ success: false, error: 'deliverable_code 필수' }, { status: 400 })
@@ -187,22 +194,53 @@ export async function POST(request: Request) {
 
   try {
     const id = randomUUID()
-    await prisma.$executeRaw`
-      INSERT INTO ride_compliance_deliverables
-        (id, deliverable_code, category, title,
-         source_document_id, source_submission_id,
-         content_md, gcs_object_path,
-         external_recipient, recipient_email,
-         prepared_by, status,
-         retention_until, notes, created_by)
-      VALUES
-        (${id}, ${deliverableCode}, ${category}, ${title},
-         ${sourceDocumentId}, ${sourceSubmissionId},
-         ${contentMd}, ${gcsObjectPath},
-         ${externalRecipient}, ${recipientEmail},
-         ${preparedBy}, 'draft',
-         ${retentionUntil}, ${notes}, ${user.id})
-    `
+    // Phase 2.2 — AI 메타 컬럼은 마이그 적용 시에만 INSERT.
+    // graceful: AI 메타 컬럼 없는 환경은 기본 INSERT 로 fallback.
+    try {
+      await prisma.$executeRaw`
+        INSERT INTO ride_compliance_deliverables
+          (id, deliverable_code, category, title,
+           source_document_id, source_submission_id,
+           content_md, gcs_object_path,
+           external_recipient, recipient_email,
+           prepared_by, status,
+           retention_until, notes, created_by,
+           ai_classified_at, ai_model, ai_confidence, ai_raw_response,
+           summary_md, playbook_step_codes)
+        VALUES
+          (${id}, ${deliverableCode}, ${category}, ${title},
+           ${sourceDocumentId}, ${sourceSubmissionId},
+           ${contentMd}, ${gcsObjectPath},
+           ${externalRecipient}, ${recipientEmail},
+           ${preparedBy}, 'draft',
+           ${retentionUntil}, ${notes}, ${user.id},
+           ${aiClassified ? new Date() : null}, ${aiModel}, ${aiConfidence}, ${aiRawResponse},
+           ${summaryMd}, ${playbookStepCodes ? JSON.stringify(playbookStepCodes) : null})
+      `
+    } catch (innerErr) {
+      const ie = innerErr as { message?: string }
+      // Phase 2.2 마이그 미적용 시 fallback — AI 메타 컬럼 제외
+      if (ie.message?.includes('Unknown column') && (ie.message?.includes('ai_classified_at') || ie.message?.includes('ai_model'))) {
+        await prisma.$executeRaw`
+          INSERT INTO ride_compliance_deliverables
+            (id, deliverable_code, category, title,
+             source_document_id, source_submission_id,
+             content_md, gcs_object_path,
+             external_recipient, recipient_email,
+             prepared_by, status,
+             retention_until, notes, created_by)
+          VALUES
+            (${id}, ${deliverableCode}, ${category}, ${title},
+             ${sourceDocumentId}, ${sourceSubmissionId},
+             ${contentMd}, ${gcsObjectPath},
+             ${externalRecipient}, ${recipientEmail},
+             ${preparedBy}, 'draft',
+             ${retentionUntil}, ${notes}, ${user.id})
+        `
+      } else {
+        throw innerErr
+      }
+    }
     const [row] = await prisma.$queryRaw<DeliverableRow[]>`
       SELECT d.id, d.deliverable_code, d.category, d.title,
              d.source_document_id, d.source_submission_id,

@@ -127,8 +127,9 @@ export default function ComplianceDeliverablesPage() {
   const [status, setStatus] = useState('')
   const [q, setQ] = useState('')
 
-  // 모달 — create / edit
+  // 모달 — create / edit / AI batch
   const [createOpen, setCreateOpen] = useState(false)
+  const [aiBatchOpen, setAiBatchOpen] = useState(false)
   const [editing, setEditing] = useState<Deliverable | null>(null)
 
   // 결과 패널
@@ -270,7 +271,8 @@ export default function ComplianceDeliverablesPage() {
         <DcStatStrip
           stats={stats}
           actions={isMgr ? [
-            { label: '+ 신규 산출물', onClick: () => setCreateOpen(true), variant: 'primary' },
+            { label: '🤖 AI 분석 등록', onClick: () => setAiBatchOpen(true), variant: 'primary' },
+            { label: '+ 직접 등록', onClick: () => setCreateOpen(true), variant: 'secondary' },
           ] : []}
         />
       </div>
@@ -340,6 +342,17 @@ export default function ComplianceDeliverablesPage() {
           onCreated={(d) => {
             setCreateOpen(false)
             setResultPanel({ kind: 'ok', msg: `${d.deliverable_code} 등록 완료` })
+            fetchList()
+          }}
+          onError={(msg) => setResultPanel({ kind: 'err', msg })}
+        />
+      )}
+      {aiBatchOpen && (
+        <AIBatchModal
+          onClose={() => setAiBatchOpen(false)}
+          onAllRegistered={(n) => {
+            setAiBatchOpen(false)
+            setResultPanel({ kind: 'ok', msg: `AI 분류 + 일괄 등록 완료 — ${n}건` })
             fetchList()
           }}
           onError={(msg) => setResultPanel({ kind: 'err', msg })}
@@ -635,4 +648,320 @@ const inputStyle: React.CSSProperties = {
   ...GLASS.L1,
   width: '100%', padding: '6px 10px', borderRadius: 8,
   border: `1px solid ${COLORS.borderSubtle}`, fontSize: 13,
+}
+
+// ════════════════════════════════════════════════════════════════
+// AI Batch Modal — 다중 산출물 텍스트 paste → 각각 AI 분류 → 검수 → 일괄 등록
+// Phase 2.2 (2026-05-30)
+// ════════════════════════════════════════════════════════════════
+
+interface AIItem {
+  uid: string
+  file_label: string             // 사용자가 입력한 파일명 (옵션)
+  content_text: string
+  // 분류 결과 (편집 가능)
+  classified: boolean
+  classifying: boolean
+  category: string
+  category_label: string
+  code: string
+  title: string
+  summary: string
+  external_recipient: string
+  playbook_step_ids: string[]
+  playbook_step_titles: string[]
+  confidence: number
+  ai_raw: string                 // raw JSON (저장용)
+  excluded: boolean              // 사용자가 「제외」 한 항목
+  registered: boolean            // 등록 완료
+  register_error: string | null
+}
+
+function newItem(): AIItem {
+  return {
+    uid: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    file_label: '', content_text: '',
+    classified: false, classifying: false,
+    category: 'other', category_label: '기타',
+    code: '', title: '', summary: '', external_recipient: '',
+    playbook_step_ids: [], playbook_step_titles: [],
+    confidence: 0, ai_raw: '',
+    excluded: false, registered: false, register_error: null,
+  }
+}
+
+function AIBatchModal(props: {
+  onClose: () => void
+  onAllRegistered: (n: number) => void
+  onError: (msg: string) => void
+}) {
+  const [items, setItems] = useState<AIItem[]>([newItem()])
+  const [busy, setBusy] = useState(false)
+
+  const addItem = () => setItems(prev => [...prev, newItem()])
+  const removeItem = (uid: string) => setItems(prev => prev.length > 1 ? prev.filter(it => it.uid !== uid) : prev)
+  const updateItem = (uid: string, patch: Partial<AIItem>) => {
+    setItems(prev => prev.map(it => it.uid === uid ? { ...it, ...patch } : it))
+  }
+
+  const classifyOne = async (uid: string) => {
+    const item = items.find(it => it.uid === uid)
+    if (!item) return
+    if (item.content_text.trim().length < 50) {
+      props.onError(`「${item.file_label || '항목'}」 본문이 너무 짧습니다 (50자 이상)`)
+      return
+    }
+    updateItem(uid, { classifying: true })
+    try {
+      const token = getStoredToken()
+      const res = await fetch('/api/ride-compliance/deliverables/ai-classify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ content_text: item.content_text }),
+      })
+      const json = await res.json()
+      if (!res.ok || !json.success) {
+        props.onError(`분류 실패: ${json.error || res.status}`)
+        updateItem(uid, { classifying: false })
+        return
+      }
+      const d = json.data
+      updateItem(uid, {
+        classifying: false, classified: true,
+        category: d.category, category_label: d.category_label,
+        code: d.code_suggestion, title: d.title_suggestion,
+        summary: d.summary, external_recipient: d.external_recipient_suggestion || '',
+        playbook_step_ids: d.playbook_step_ids || [],
+        playbook_step_titles: d.playbook_step_titles || [],
+        confidence: d.confidence || 0,
+        ai_raw: JSON.stringify(d).substring(0, 4_000_000),
+      })
+    } catch (e) {
+      props.onError(`분류 오류: ${e}`)
+      updateItem(uid, { classifying: false })
+    }
+  }
+
+  const classifyAll = async () => {
+    setBusy(true)
+    for (const it of items) {
+      if (!it.classified && !it.excluded && it.content_text.trim().length >= 50) {
+        await classifyOne(it.uid)
+      }
+    }
+    setBusy(false)
+  }
+
+  const registerAll = async () => {
+    const targets = items.filter(it => it.classified && !it.excluded && !it.registered)
+    if (targets.length === 0) {
+      props.onError('등록 가능한 항목이 없습니다 (분류 완료 + 제외 안 됨 + 미등록)')
+      return
+    }
+    setBusy(true)
+    let successCount = 0
+    for (const it of targets) {
+      try {
+        const token = getStoredToken()
+        const res = await fetch('/api/ride-compliance/deliverables', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+          body: JSON.stringify({
+            deliverable_code: it.code,
+            category: it.category,
+            title: it.title,
+            content_md: it.content_text,
+            summary_md: it.summary,
+            external_recipient: it.external_recipient || null,
+            playbook_step_codes: it.playbook_step_ids,
+            ai_model: 'gemini-2.5-flash',
+            ai_confidence: it.confidence,
+            ai_raw_response: it.ai_raw,
+          }),
+        })
+        const json = await res.json()
+        if (!res.ok || !json.success) {
+          updateItem(it.uid, { register_error: json.error || `HTTP ${res.status}` })
+        } else {
+          updateItem(it.uid, { registered: true, register_error: null })
+          successCount++
+        }
+      } catch (e) {
+        updateItem(it.uid, { register_error: String(e) })
+      }
+    }
+    setBusy(false)
+    if (successCount === targets.length) {
+      props.onAllRegistered(successCount)
+    } else {
+      props.onError(`일부만 등록됨 (성공 ${successCount} / 시도 ${targets.length}) — 실패 항목 표시 확인`)
+    }
+  }
+
+  const totalReady = items.filter(it => it.classified && !it.excluded && !it.registered).length
+  const totalClassified = items.filter(it => it.classified).length
+  const totalText = items.filter(it => it.content_text.trim().length >= 50).length
+
+  return (
+    <ModalShell title="🤖 AI 분석 등록 — 다중 산출물" onClose={busy ? () => {} : props.onClose} wide>
+      <div style={{ fontSize: 12, color: COLORS.textMuted, marginBottom: 12 }}>
+        각 산출물 본문을 paste → 「🤖 분류」 또는 「전체 분류」 → 검수 → 「전체 등록」.
+        AI 가 카테고리·코드·제목·Playbook 매핑을 자동 추론합니다.
+      </div>
+
+      {items.map((it, idx) => (
+        <AIItemRow
+          key={it.uid} idx={idx + 1} item={it}
+          onUpdate={(patch) => updateItem(it.uid, patch)}
+          onClassify={() => classifyOne(it.uid)}
+          onRemove={items.length > 1 ? () => removeItem(it.uid) : undefined}
+          disabled={busy}
+        />
+      ))}
+
+      <div style={{ display: 'flex', justifyContent: 'center', marginTop: 8, marginBottom: 12 }}>
+        <button style={btnSecondary} onClick={addItem} disabled={busy}>+ 행 추가</button>
+      </div>
+
+      <div style={{
+        ...GLASS.L2, padding: 10, borderRadius: 8, marginTop: 12,
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+      }}>
+        <div style={{ fontSize: 12, color: COLORS.textSecondary, whiteSpace: 'nowrap' }}>
+          본문 입력 {totalText} / 분류 완료 {totalClassified} / 등록 가능 {totalReady}
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button style={btnSecondary} onClick={classifyAll} disabled={busy || totalText === 0}>
+            🤖 전체 분류
+          </button>
+          <button style={btnPrimary} onClick={registerAll} disabled={busy || totalReady === 0}>
+            ✓ 전체 등록 ({totalReady}건)
+          </button>
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
+        <button style={btnSecondary} onClick={props.onClose} disabled={busy}>
+          {items.some(it => it.registered) ? '닫기' : '취소'}
+        </button>
+      </div>
+    </ModalShell>
+  )
+}
+
+function AIItemRow(props: {
+  idx: number
+  item: AIItem
+  onUpdate: (patch: Partial<AIItem>) => void
+  onClassify: () => void
+  onRemove?: () => void
+  disabled: boolean
+}) {
+  const { item, idx } = props
+  const conf = item.confidence
+  const confColor = conf >= 0.85 ? { bg: 'rgba(16,185,129,0.12)', fg: '#047857' }
+                  : conf >= 0.5  ? { bg: 'rgba(245,158,11,0.12)', fg: '#b45309' }
+                                 : { bg: 'rgba(239,68,68,0.12)',  fg: '#b91c1c' }
+
+  return (
+    <div style={{
+      ...GLASS.L2, padding: 12, borderRadius: 10, marginBottom: 10,
+      opacity: item.excluded ? 0.4 : item.registered ? 0.7 : 1,
+      border: item.register_error
+        ? '1px solid rgba(239,68,68,0.40)'
+        : item.registered ? '1px solid rgba(16,185,129,0.40)'
+        : 'none',
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.textPrimary, whiteSpace: 'nowrap' }}>
+          #{idx}{item.file_label && ` — ${item.file_label}`}
+          {item.registered && <span style={{ marginLeft: 8, fontSize: 11, color: '#047857' }}>✓ 등록됨</span>}
+          {item.register_error && <span style={{ marginLeft: 8, fontSize: 11, color: '#b91c1c' }}>⚠ {item.register_error}</span>}
+        </div>
+        <div style={{ display: 'flex', gap: 4 }}>
+          {!item.registered && (
+            <>
+              <button style={{ ...btnSecondary, padding: '2px 8px', fontSize: 11 }}
+                onClick={() => props.onUpdate({ excluded: !item.excluded })} disabled={props.disabled}>
+                {item.excluded ? '↺ 복원' : '✕ 제외'}
+              </button>
+              {props.onRemove && (
+                <button style={{ ...btnDanger, padding: '2px 8px', fontSize: 11 }}
+                  onClick={props.onRemove} disabled={props.disabled}>🗑</button>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+
+      {!item.classified && !item.registered && (
+        <>
+          <input
+            type="text" placeholder="파일명 (옵션 — 예: 라이드_임명장_2026.05.21.pdf)"
+            value={item.file_label} onChange={(e) => props.onUpdate({ file_label: e.target.value })}
+            style={{ ...inputStyle, marginBottom: 6 }} disabled={item.excluded || props.disabled}
+          />
+          <textarea
+            placeholder="본문 텍스트 paste (50자 이상)…"
+            value={item.content_text} onChange={(e) => props.onUpdate({ content_text: e.target.value })}
+            rows={5} style={{ ...inputStyle, fontFamily: 'monospace', resize: 'vertical' }}
+            disabled={item.excluded || props.disabled}
+          />
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
+            <span style={{ fontSize: 11, color: COLORS.textMuted }}>{item.content_text.length.toLocaleString()} chars</span>
+            <button style={btnPrimary} onClick={props.onClassify}
+              disabled={item.classifying || item.excluded || props.disabled || item.content_text.trim().length < 50}>
+              {item.classifying ? '🤖 분류중…' : '🤖 분류'}
+            </button>
+          </div>
+        </>
+      )}
+
+      {item.classified && (
+        <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: 6, fontSize: 12 }}>
+          <div style={{ color: COLORS.textSecondary }}>카테고리</div>
+          <div>
+            <select value={item.category} onChange={(e) => {
+              const cat = e.target.value
+              const label = CATEGORY_LABEL[cat] || cat
+              props.onUpdate({ category: cat, category_label: label })
+            }} style={inputStyle} disabled={item.registered || props.disabled}>
+              {Object.entries(CATEGORY_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+            </select>
+          </div>
+
+          <div style={{ color: COLORS.textSecondary }}>코드</div>
+          <input value={item.code} onChange={(e) => props.onUpdate({ code: e.target.value })}
+            style={inputStyle} disabled={item.registered || props.disabled} />
+
+          <div style={{ color: COLORS.textSecondary }}>제목</div>
+          <input value={item.title} onChange={(e) => props.onUpdate({ title: e.target.value })}
+            style={inputStyle} disabled={item.registered || props.disabled} />
+
+          <div style={{ color: COLORS.textSecondary }}>수신처</div>
+          <input value={item.external_recipient} onChange={(e) => props.onUpdate({ external_recipient: e.target.value })}
+            style={inputStyle} placeholder="(AI 추론 — 편집 가능)" disabled={item.registered || props.disabled} />
+
+          <div style={{ color: COLORS.textSecondary }}>요약</div>
+          <textarea value={item.summary} onChange={(e) => props.onUpdate({ summary: e.target.value })}
+            rows={2} style={inputStyle} disabled={item.registered || props.disabled} />
+
+          <div style={{ color: COLORS.textSecondary }}>Playbook 매핑</div>
+          <div style={{ fontSize: 11, color: COLORS.textMuted }}>
+            {item.playbook_step_titles.length > 0
+              ? item.playbook_step_titles.map((t, i) => <div key={i}>· {t}</div>)
+              : <span>매핑된 Playbook 없음 (확정 내규 부재 또는 무관)</span>}
+          </div>
+
+          <div style={{ color: COLORS.textSecondary }}>AI 신뢰도</div>
+          <div>
+            <span style={{
+              display: 'inline-block', padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 600,
+              background: confColor.bg, color: confColor.fg,
+            }}>{(conf * 100).toFixed(0)}%</span>
+          </div>
+        </div>
+      )}
+    </div>
+  )
 }
