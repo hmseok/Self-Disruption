@@ -44,6 +44,7 @@ const PATH_TO_GROUP: Record<string, string> = {
   '/RideAccidents':             'admin-ops',
   '/RideAccidentReports':       'admin-ops',
   '/RideCompliance':            'admin-ops',  // PR-COMPLIANCE (2026-05-11)
+  '/RideCompliance/data-disposal': 'admin-ops',  // P12-C (2026-05-28)
   '/RideAssets':                'admin-ops',  // PR-ASSETS-1.0 (2026-05-14)
   // ── CX팀 (콜센터 등) — Phase N-12 ──
   '/CallScheduler':                                'cx',
@@ -136,6 +137,7 @@ const PAGE_NAMES: Record<string, string> = {
   '/RideAccidentReports':  '라이드 사고접수',
   '/RideAssets':           '라이드 자산',
   '/RideCompliance':       '정보보안',  // PR-COMPLIANCE (2026-05-11)
+  '/RideCompliance/data-disposal': '데이터 폐기 결재',  // P12-C (2026-05-28)
   // CX팀 (Phase N-12)
   '/CallScheduler':                  '스케줄 및 운영',
   '/CallScheduler/schedules':        '월별 스케줄',
