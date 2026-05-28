@@ -2350,13 +2350,12 @@ function SubmitFormModal(props: { doc: ComplianceDocument; task?: ComplianceTask
 // ════════════════════════════════════════════════════════════════
 function Modal(props: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
-    <div onClick={props.onClose} style={{
-      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
-    }}>
+    <div onClick={props.onClose}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm animate-fade-in px-4"
+    >
       <div onClick={e => e.stopPropagation()} style={{
-        ...GLASS.L1, padding: 24, borderRadius: 12,
-        maxWidth: 760, width: '92vw', maxHeight: '92vh', overflowY: 'auto',
+        ...GLASS.L4, padding: 24, borderRadius: 16,
+        maxWidth: 760, width: '100%', maxHeight: '92vh', overflowY: 'auto',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16 }}>
           <h2 style={{ margin: 0, fontSize: 17 }}>{props.title}</h2>

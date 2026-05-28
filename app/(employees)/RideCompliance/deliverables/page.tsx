@@ -623,14 +623,12 @@ function EditModal(props: {
 // ── 공용 modal shell / input row ─────────────────────────────────
 function ModalShell(props: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
-    <div style={{
-      position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.45)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100,
-    }}
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm animate-fade-in px-4"
       onClick={props.onClose}
     >
       <div style={{
-        ...GLASS.L4, padding: 20, borderRadius: 14, maxWidth: 640, width: 'min(640px, 92vw)',
+        ...GLASS.L4, padding: 24, borderRadius: 16, maxWidth: 640, width: '100%',
         maxHeight: '85vh', overflow: 'auto',
       }}
         onClick={(e) => e.stopPropagation()}
