@@ -254,6 +254,61 @@ const tabs: FilterTab[] = [
 
 ---
 
+## 2.3 Stat 카드 사이즈 표준 (2026-05-27 사용자 보고 — RideCompliance 사고)
+
+DcStatStrip 의 카드는 **콘텐츠 자연 높이** — 액션 컬럼이 stacked 라도 카드는 inflate X.
+
+**고정 값** (`app/components/DcStatStrip.tsx`):
+- padding: `16px 14px`
+- 라벨: fontSize 10, fontWeight 700, UPPERCASE letterSpacing 0.06em
+- 값: fontSize 22 (≤5 카드) / 18 (>5)
+- borderRadius: 16
+- minHeight: 자연 — outer grid `alignItems: 'start'` 강제로 액션 컬럼 키에 안 끌려감
+
+**금지**:
+- ❌ `align-items: stretch` (기본값) outer grid — 액션 stacked 시 카드 inflate
+- ❌ 카드 안 `height: 100%` / `flex: 1` — DcStatStrip 내부 token 만 사용
+
+회귀 점검: `npm run lint:ui-design` — DcStatStrip 자체 div 구현 감지 (§ 2 기존).
+
+---
+
+## 6. 체크박스 표준 (2026-05-27 신설)
+
+> **사용자 보고 (2026-05-27)**: RideCompliance 페이지 「전체 선택」 체크박스가
+> 행 체크박스보다 작아 답답. 헤더·행 체크박스 동일 크기 표준 명문화.
+
+**고정 값**:
+```tsx
+<input
+  type="checkbox"
+  style={{
+    width: 18,        // 표준 — 헤더·행 모두 동일
+    height: 18,
+    cursor: 'pointer',
+    accentColor: '#3b6eb5',  // 브랜드 블루 (체크 상태 색)
+  }}
+/>
+```
+
+| 위치 | 사이즈 | 색 |
+|---|---|---|
+| 테이블 헤더 (전체 선택) | 18×18 | accentColor `#3b6eb5` |
+| 테이블 행 (개별) | 18×18 | accentColor `#3b6eb5` |
+| 폼 (단일 토글) | 18×18 (또는 switch) | accentColor `#3b6eb5` |
+| 모달 안 옵션 | 18×18 | accentColor `#3b6eb5` |
+
+**금지**:
+- ❌ 헤더 체크박스만 14px / 16px 같이 더 작게 — 헤더가 더 어렵게 클릭됨
+- ❌ accentColor 미지정 — 브라우저 기본 (강조색 일관성 깨짐)
+- ❌ `<div onClick>` 으로 자체 체크박스 구현 — 접근성·focus ring 깨짐
+
+**lint** (`ui-design-lint` check 16 — 2026-05-27 신설):
+- `<input type="checkbox">` 사용 시 `width:` 또는 `width=` 18 이외 → 경고
+- `accentColor` 미지정 → 경고
+
+---
+
 ## 5.1 모달 표준 — Overlay + Body (2026-05-27 사용자 결정 — 옵션 C)
 
 > **사용자 보고 (2026-05-27)**: RideCompliance 모달이 `bg-black/60 + backdrop-blur-xl`

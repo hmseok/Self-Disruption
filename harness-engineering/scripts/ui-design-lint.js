@@ -287,6 +287,25 @@ for (const fp of pageFiles) {
     })
   }
 
+  // 16) 2026-05-27: 체크박스 표준 (UI-DESIGN-STANDARD § 6)
+  //   type="checkbox" 발견 시 그 부근 300 char 윈도우 에서 width:18 + accentColor 검증.
+  const cbRe = /type=["']checkbox["']/g
+  let cbm, cbViolations = 0
+  while ((cbm = cbRe.exec(content)) !== null) {
+    // 부근 300 char (앞 100 + 뒤 200) — JSX attribute spread 처리
+    const start = Math.max(0, cbm.index - 100)
+    const window = content.slice(start, cbm.index + 200)
+    const hasWidth18 = /\bwidth:\s*18\b|\bwidth=["']?18\b/.test(window)
+    const hasAccent = /accentColor/.test(window)
+    if (!hasWidth18 || !hasAccent) cbViolations++
+  }
+  if (cbViolations > 0) {
+    warnings.push({
+      file: rel,
+      issue: `체크박스 ${cbViolations}건 — § 6 표준 미준수 (width:18 + accentColor:'#3b6eb5' 의무)`,
+    })
+  }
+
   // 15) 2026-05-27: 모달 overlay 표준 (UI-DESIGN-STANDARD § 5.1)
   //   표준: bg-black/40 + backdrop-blur-sm
   //   금지: bg-black/50 이상 + backdrop-blur-xl/-2xl 조합 (뒷 콘텐츠 차단, 답답)

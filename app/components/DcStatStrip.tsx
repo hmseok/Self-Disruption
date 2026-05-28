@@ -87,6 +87,9 @@ export default function DcStatStrip({ stats, actions, fullWidth, defaultTint = '
       gridTemplateColumns: hasActions ? '1fr 260px' : '1fr',
       gap: 16,
       marginBottom: 16,
+      // 2026-05-27 사용자 보고: 액션 컬럼 stacked 시 카드가 stretch 로 inflate.
+      //   alignItems: 'start' 로 자식 cell 자연 높이 유지.
+      alignItems: 'start',
     }}>
       {/* ── 글래스 스탯 카드 그리드 ── */}
       <div style={{
