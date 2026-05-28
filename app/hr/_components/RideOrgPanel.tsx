@@ -19,6 +19,7 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
 import * as XLSX from 'xlsx'
 import DcStatStrip, { StatItem } from '../../components/DcStatStrip'
+import DcToolbar from '../../components/DcToolbar'
 import NeuDataTable, { TableColumn } from '../../components/NeuDataTable'
 import { auth } from '@/lib/auth-client'
 import { GLASS } from '@/app/utils/ui-tokens'
@@ -886,23 +887,27 @@ export default function RideOrgPanel() {
             </div>
           )}
 
-          {/* 툴바 */}
-          <div style={{ ...glassCard, padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-            <input value={search} onChange={(e) => setSearch(e.target.value)}
-              placeholder="🔍 이름·직급·연락처 검색"
-              style={{ fontSize: 12, padding: '5px 10px', borderRadius: 7, border: '1px solid rgba(0,0,0,0.10)',
-                background: GLASS.L1.background, minWidth: 160, flex: 1 }} />
+          {/* PR-HR-20b (2026-05-28) — 검색바 룩앤필 통일 (DcToolbar 사용 — EmployeeListPanel 과 같은 패턴) */}
+          <DcToolbar
+            search={search}
+            onSearchChange={setSearch}
+            placeholder="이름, 직급, 연락처 검색..."
+            filters={[
+              { key: 'active', label: '활성만' },
+              { key: 'all', label: `비활성 포함 (${inactiveCount})` },
+            ]}
+            activeFilter={showInactive ? 'all' : 'active'}
+            onFilterChange={(k) => setShowInactive(k === 'all')}
+          />
+          {/* 부가 옵션 (하위 포함) + bulk action — 검색바 아래 별도 분리 */}
+          <div style={{ ...glassCard, padding: '6px 12px', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             {selectedDept && (
               <label style={{ fontSize: 11, color: '#64748b', display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}>
                 <input type="checkbox" checked={includeSub} onChange={() => setIncludeSub(v => !v)} />
-                하위 포함
+                하위 부서 포함
               </label>
             )}
-            <label style={{ fontSize: 11, color: inactiveCount > 0 ? '#64748b' : '#cbd5e1',
-              display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}>
-              <input type="checkbox" checked={showInactive} onChange={() => setShowInactive(v => !v)} />
-              비활성 포함 ({inactiveCount})
-            </label>
+            <div style={{ flex: 1 }} />
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <span style={{ fontSize: 11, color: checkedIds.size > 0 ? '#2563eb' : '#cbd5e1', fontWeight: 600 }}>
                 {checkedIds.size}명 선택
