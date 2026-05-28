@@ -23,6 +23,8 @@ import RoleTemplatePanel from './_components/RoleTemplatePanel'
 import EmployeeListPanel from './_components/EmployeeListPanel'
 // PR-HR-21 (2026-05-28) — CompanyOrgPanel 추출 (FMI 조직도 — 직급/부서 카드)
 import CompanyOrgPanel from './_components/CompanyOrgPanel'
+// PR-HR-23 (2026-05-28) — CompanyEmployeePanel (회사별 직원 마스터 통일 패널 — 새 회사 자동 노출)
+import CompanyEmployeePanel from './_components/CompanyEmployeePanel'
 // PR-HR-22 (2026-05-28) — useCompanies hook (companies 테이블 기반 동적 회사 목록)
 import { useCompanies } from '@/lib/hooks/useCompanies'
 
@@ -1570,6 +1572,22 @@ export default function HRMasterPage() {
           {/* PR-HR-11a: externalSubTab 폐기 — RIDE 회사 탭의 직원/조직도 양쪽에서 마당 노출.
                 향후 PR-HR-11b 에서 직원/조직도 view 분리 + ERP 접근 컬럼 추가. */}
           {topCompany === 'RIDE' && (topTab === 'employees' || topTab === 'org') && <RideOrgPanel />}
+
+      {/* ─── 탭 (새 회사 / 동적 추가된 회사): CompanyEmployeePanel — PR-HR-23a 스켈레톤 사용 ─── */}
+      {/* FMI/RIDE/common 이 아닌 새 회사 (테스트 회사 등) 가 토글 선택되면 본 패널 자동 노출.
+            companies 테이블 row 추가만으로 즉시 동작 (PR-HR-22 동적 회사 토글 + PR-HR-23 통일 패널).
+            향후 PR-HR-23c/d 에서 FMI/RIDE 도 본 패널로 마이그. */}
+      {topCompany !== 'FMI' && topCompany !== 'RIDE' && topCompany !== 'common' && (topTab === 'employees' || topTab === 'org') && (() => {
+        const dbCompany = dbCompanies.find(c => c.company_key === topCompany)
+        return (
+          <CompanyEmployeePanel
+            companyKey={topCompany as string}
+            companyLabel={dbCompany?.label || dbCompany?.short_name || topCompany}
+            role={role as any}
+            bulkExcel={false}
+          />
+        )
+      })()}
 
       {/* ─── 탭 (common/companies): 🏛️ 회사 마스터 — PR-HR-15 (admin 전용) ─── */}
       {topCompany === 'common' && topTab === 'companies' && role === 'admin' && <CompanyMasterPanel />}
