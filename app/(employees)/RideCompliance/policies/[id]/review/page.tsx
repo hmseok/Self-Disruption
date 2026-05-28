@@ -45,6 +45,20 @@ interface Section {
   sort_order: number
 }
 
+// P19-C — 버전 chain (version-info API 응답)
+interface VersionChainEntry {
+  id: string
+  policy_code: string
+  title: string
+  version: string
+  effective_date: string | null
+  status: string
+  superseded_by_id: string | null
+  change_reason: string | null
+  change_category: string | null
+  announced_at: string | null
+}
+
 const KIND_LABEL: Record<string, string> = {
   article:       '📜 조항',
   attachment:    '📎 별첨',
@@ -52,6 +66,10 @@ const KIND_LABEL: Record<string, string> = {
   annual_event:  '📅 연간 운영',
   screen_spec:   '🖥 필요 화면',
 }
+
+// P19-C — 6번째 sub-탭: 버전 히스토리
+const HISTORY_KIND = '__history__'
+type TabKindOrHistory = Section['section_kind'] | typeof HISTORY_KIND
 
 const SECTION_STATUS_LABEL: Record<string, string> = {
   ai_draft:       'AI 초안',
@@ -97,7 +115,29 @@ export default function PolicyReviewPage() {
   const [policy, setPolicy] = useState<Policy | null>(null)
   const [sections, setSections] = useState<Section[]>([])
   const [loading, setLoading] = useState(false)
-  const [kind, setKind] = useState<Section['section_kind']>('article')
+  const [kind, setKind] = useState<TabKindOrHistory>('article')
+  // P19-C — 버전 chain 로딩
+  const [versionChain, setVersionChain] = useState<VersionChainEntry[]>([])
+  const [versionLoading, setVersionLoading] = useState(false)
+
+  const fetchVersionChain = async () => {
+    setVersionLoading(true)
+    try {
+      const token = getStoredToken()
+      const res = await fetch(`/api/ride-compliance/policies/${policyId}/version-info`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      })
+      const json = await res.json()
+      if (json.success && json.data?.chain) setVersionChain(json.data.chain)
+    } catch (e) {
+      setResultPanel({ kind: 'err', msg: `버전 조회 실패: ${e}` })
+    } finally {
+      setVersionLoading(false)
+    }
+  }
+  useEffect(() => {
+    if (kind === HISTORY_KIND) fetchVersionChain()
+  }, [kind, policyId])  // eslint-disable-line react-hooks/exhaustive-deps
   const [busyId, setBusyId] = useState<string | null>(null)
   const [resultPanel, setResultPanel] = useState<{ kind: 'ok' | 'err'; msg: string } | null>(null)
 
@@ -260,7 +300,7 @@ export default function PolicyReviewPage() {
     screen_spec:   sections.filter(s => s.section_kind === 'screen_spec' && s.user_status === 'user_confirmed').length,
   }), [sections])
 
-  const filtered = sections.filter(s => s.section_kind === kind)
+  const filtered = kind === HISTORY_KIND ? [] : sections.filter(s => s.section_kind === kind)
 
   if (loading && !policy) {
     return <div style={{ padding: 32, textAlign: 'center', color: COLORS.textMuted }}>조회중…</div>
@@ -325,7 +365,23 @@ export default function PolicyReviewPage() {
 
       {/* 5 탭 */}
       <div style={{ display: 'flex', gap: 4, marginBottom: 16, borderBottom: `1px solid ${COLORS.borderSubtle}`, flexWrap: 'wrap' }}>
-        {(['article', 'attachment', 'playbook_step', 'annual_event', 'screen_spec'] as const).map((k) => {
+        {(['article', 'attachment', 'playbook_step', 'annual_event', 'screen_spec', HISTORY_KIND] as const).map((k) => {
+          if (k === HISTORY_KIND) {
+            const active = kind === HISTORY_KIND
+            return (
+              <button key={k}
+                onClick={() => setKind(HISTORY_KIND)}
+                style={{
+                  padding: '10px 16px', border: 'none', background: 'transparent', cursor: 'pointer',
+                  borderBottom: active ? `2px solid ${COLORS.primary}` : '2px solid transparent',
+                  color: active ? COLORS.primary : COLORS.textSecondary,
+                  fontWeight: active ? 600 : 400, fontSize: 14, whiteSpace: 'nowrap',
+                }}>
+                📜 버전 히스토리 <span style={{ fontSize: 12, color: COLORS.textMuted }}>({versionChain.length || '...'})</span>
+              </button>
+            )
+          }
+          // 기존 5 sub-탭 처리
           const c = counts[k]
           const cc = confirmedCounts[k]
           const allConfirmed = c > 0 && cc === c
@@ -345,8 +401,66 @@ export default function PolicyReviewPage() {
         })}
       </div>
 
+      {/* P19-C — 버전 히스토리 탭 */}
+      {kind === HISTORY_KIND && (
+        <div style={{ marginBottom: 16 }}>
+          {versionLoading && <div style={{ ...GLASS.L3, padding: 32, borderRadius: 12, textAlign: 'center', color: COLORS.textMuted }}>조회중…</div>}
+          {!versionLoading && versionChain.length === 0 && (
+            <div style={{ ...GLASS.L3, padding: 32, borderRadius: 12, textAlign: 'center', color: COLORS.textMuted }}>
+              등록된 버전이 없습니다.
+            </div>
+          )}
+          {!versionLoading && versionChain.length > 0 && (
+            <div style={{ ...GLASS.L3, padding: 16, borderRadius: 12 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.textPrimary, marginBottom: 12 }}>
+                📜 {versionChain[0]?.policy_code} 버전 chain ({versionChain.length}건)
+              </div>
+              {versionChain.map((v, idx) => {
+                const isCurrent = v.id === policyId
+                return (
+                  <div key={v.id} style={{
+                    ...GLASS.L2, padding: 12, borderRadius: 8, marginBottom: 8,
+                    border: isCurrent ? `2px solid ${COLORS.primary}` : `1px solid ${COLORS.borderSubtle}`,
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
+                      <div>
+                        <span style={{ fontFamily: 'monospace', fontSize: 13, fontWeight: 700, color: COLORS.textPrimary }}>
+                          {v.version}
+                        </span>
+                        {isCurrent && <span style={{ marginLeft: 8, padding: '1px 6px', background: COLORS.bgBlue, color: COLORS.primary, fontSize: 10, borderRadius: 4 }}>현재</span>}
+                        <span style={{ marginLeft: 8, padding: '1px 6px', background: v.status === 'active' ? COLORS.bgGreen : COLORS.bgGray, color: v.status === 'active' ? COLORS.success : COLORS.textMuted, fontSize: 10, borderRadius: 4 }}>
+                          {v.status}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: 11, color: COLORS.textMuted, whiteSpace: 'nowrap' }}>
+                        시행일: {v.effective_date || '—'}
+                        {v.announced_at && ` · 공표: ${String(v.announced_at).slice(0, 10)}`}
+                      </div>
+                    </div>
+                    <div style={{ marginTop: 6, fontSize: 13, color: COLORS.textPrimary }}>{v.title}</div>
+                    {v.change_reason && (
+                      <div style={{ marginTop: 6, padding: 8, background: 'rgba(0,0,0,0.03)', borderRadius: 6, fontSize: 12, color: COLORS.textSecondary }}>
+                        <strong style={{ color: COLORS.textPrimary }}>변경 사유</strong>
+                        {v.change_category && <span style={{ marginLeft: 6, fontSize: 10, color: COLORS.textMuted }}>[{v.change_category}]</span>}
+                        <div style={{ marginTop: 4, lineHeight: 1.5 }}>{v.change_reason}</div>
+                      </div>
+                    )}
+                    {idx < versionChain.length - 1 && !isCurrent && (
+                      <a href={`/RideCompliance/policies/${policyId}/review?compare=${v.id}`}
+                        style={{ display: 'inline-block', marginTop: 8, fontSize: 11, color: COLORS.primary, textDecoration: 'none' }}>
+                        📊 현재 버전과 비교 →
+                      </a>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* sections list */}
-      {filtered.length === 0 && (
+      {kind !== HISTORY_KIND && filtered.length === 0 && (
         <div style={{ ...GLASS.L3, padding: 32, borderRadius: 12, textAlign: 'center', color: COLORS.textMuted, marginBottom: 16 }}>
           이 카테고리에 추출된 섹션이 없습니다.
         </div>
