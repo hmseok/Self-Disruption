@@ -35,16 +35,21 @@ const emptyForm = {
 
 export default function NewCatalogPage() {
   const router = useRouter()
-  const [registerMode, setRegisterMode] = useState<'manual' | 'ai'>('manual')
+  const [registerMode, setRegisterMode] = useState<'manual' | 'ai' | 'research'>('manual')
   const [form, setForm] = useState({ ...emptyForm })
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
 
-  // AI 캡쳐
+  // AI 캡쳐 / 자동조사 공용 결과
   const [aiUploading, setAiUploading] = useState(false)
   const [aiResult, setAiResult] = useState<any | null>(null)
   const [aiErr, setAiErr] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+
+  // PR-Q5-1: AI 자동 조사 입력 (텍스트 only)
+  const [researchBrand, setResearchBrand] = useState('')
+  const [researchModel, setResearchModel] = useState('')
+  const [researchYear, setResearchYear] = useState(String(new Date().getFullYear()))
 
   // 토스트
   const [toast, setToast] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
@@ -81,6 +86,47 @@ export default function NewCatalogPage() {
       setAiErr((e as Error)?.message || 'AI 파싱 오류')
     } finally { setAiUploading(false) }
   }, [showToast])
+
+  // PR-Q5-1: AI 자동 조사 (텍스트 입력 → Gemini)
+  const runAiResearch = useCallback(async () => {
+    if (!researchBrand.trim() || !researchModel.trim()) {
+      setAiErr('브랜드 / 모델 필수'); return
+    }
+    setAiUploading(true); setAiErr(null); setAiResult(null)
+    try {
+      const headers = { ...(await getAuthHeader()), 'Content-Type': 'application/json' }
+      const res = await fetch('/api/lookup-car-catalog', {
+        method: 'POST', headers,
+        body: JSON.stringify({
+          brand: researchBrand.trim(),
+          model: researchModel.trim(),
+          year: Number(researchYear) || new Date().getFullYear(),
+        }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || json?.error) throw new Error(json?.error || 'AI 조사 실패')
+      const parsed = json.data || json
+      if (parsed.available === false) {
+        setAiErr(parsed.message || 'AI 가 차종 정보를 찾지 못했습니다')
+        return
+      }
+      setAiResult(parsed)
+      setForm((f) => ({
+        ...f,
+        brand: parsed.brand || researchBrand,
+        model: parsed.model || researchModel,
+        year: String(parsed.year || researchYear),
+        source: 'ai-research',
+        fuel_type: parsed.variants?.[0]?.fuel_type || f.fuel_type,
+        engine_cc: String(parsed.variants?.[0]?.engine_cc || f.engine_cc),
+        trim_name: parsed.variants?.[0]?.trims?.[0]?.name || f.trim_name,
+        base_price: String(parsed.variants?.[0]?.trims?.[0]?.base_price || f.base_price),
+      }))
+      showToast({ type: 'ok', text: `AI 조사 완료 — ${parsed.variants?.length || 0} variants` })
+    } catch (e) {
+      setAiErr((e as Error)?.message || 'AI 조사 오류')
+    } finally { setAiUploading(false) }
+  }, [researchBrand, researchModel, researchYear, showToast])
 
   // 우측 트림 카드에서 클릭 → form 채움
   const applyAiTrim = useCallback((vIdx: number, tIdx: number) => {
@@ -178,14 +224,16 @@ export default function NewCatalogPage() {
         )}
 
         {/* 상단 등록 모드 */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
           <h2 style={{ fontSize: 14, fontWeight: 800, color: '#0f2440', margin: 0 }}>🚗 신차 카탈로그 등록</h2>
           <div style={{ display: 'inline-flex', gap: 4, marginLeft: 12 }}>
             {([
-              { k: 'manual' as const, label: '✍️ 수동 등록' },
-              { k: 'ai' as const, label: '🤖 AI 캡쳐' },
+              { k: 'manual' as const, label: '✍️ 수동 등록', hint: '필드 직접 입력' },
+              { k: 'research' as const, label: '🔍 AI 자동 조사', hint: '차종명만 — Gemini 가 트림/가격 추출' },
+              { k: 'ai' as const, label: '🤖 AI 캡쳐', hint: 'PDF/이미지 업로드' },
             ]).map((t) => (
               <button key={t.k} onClick={() => setRegisterMode(t.k)}
+                title={t.hint}
                 style={{ padding: '5px 11px', borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: 'pointer',
                   border: registerMode === t.k ? `1px solid ${COLORS.borderBlue}` : '1px solid rgba(0,0,0,0.08)',
                   background: registerMode === t.k ? COLORS.bgBlue : GLASS.L2.background,
@@ -196,9 +244,41 @@ export default function NewCatalogPage() {
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: registerMode === 'ai' ? 'minmax(0, 1fr) 380px' : '1fr', gap: 16, alignItems: 'flex-start' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: (registerMode === 'ai' || registerMode === 'research') ? 'minmax(0, 1fr) 380px' : '1fr', gap: 16, alignItems: 'flex-start' }}>
           {/* 좌측 — 등록 폼 */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {/* AI 자동 조사 모드 — 차종명 입력 */}
+            {registerMode === 'research' && (
+              <div style={{ ...GLASS.L3, padding: 12, borderRadius: 10, border: '1px solid rgba(59,110,181,0.25)' }}>
+                <div style={{ fontSize: 11, fontWeight: 800, color: COLORS.primary, marginBottom: 8 }}>🔍 AI 자동 조사 (Gemini)</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr auto', gap: 10, alignItems: 'flex-end' }}>
+                  <div><label style={labelStyle}>브랜드 *</label>
+                    <input value={researchBrand} onChange={(e) => setResearchBrand(e.target.value)} placeholder="현대 / BMW…" style={inputStyle}
+                      onKeyDown={(e) => { if (e.key === 'Enter') runAiResearch() }} /></div>
+                  <div><label style={labelStyle}>모델 *</label>
+                    <input value={researchModel} onChange={(e) => setResearchModel(e.target.value)} placeholder="쏘나타 / 520i…" style={inputStyle}
+                      onKeyDown={(e) => { if (e.key === 'Enter') runAiResearch() }} /></div>
+                  <div><label style={labelStyle}>연식</label>
+                    <input type="number" value={researchYear} onChange={(e) => setResearchYear(e.target.value)} placeholder="2026" style={inputStyle}
+                      onKeyDown={(e) => { if (e.key === 'Enter') runAiResearch() }} /></div>
+                  <button onClick={runAiResearch} disabled={aiUploading}
+                    style={{ padding: '9px 16px', borderRadius: 8, border: `1px solid ${COLORS.borderBlue}`, background: COLORS.bgBlue, color: COLORS.primary, cursor: aiUploading ? 'wait' : 'pointer', fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap' }}>
+                    {aiUploading ? '🔄 조사 중…' : '🔍 조사 시작'}
+                  </button>
+                </div>
+                <div style={{ marginTop: 8, fontSize: 10, color: '#94a3b8' }}>
+                  💡 Gemini 2.0 Flash — 한국 시장 출고가 / 트림 / 색상 / 옵션 자동 추출 · ~₩1~3/회 · 결과는 영업 검토 후 저장
+                </div>
+                {aiErr && <div style={{ marginTop: 6, fontSize: 11, color: '#991b1b' }}>⚠ {aiErr}</div>}
+                {aiResult && (
+                  <div style={{ marginTop: 8, fontSize: 11, color: '#475569' }}>
+                    ✓ {aiResult.brand} {aiResult.model} ({aiResult.year}) · variants {aiResult.variants?.length || 0}개 / 트림 {(aiResult.variants || []).reduce((s: number, v: any) => s + (v.trims?.length || 0), 0)}개
+                    <br/><span style={{ color: '#94a3b8' }}>우측 패널의 트림 선택 → 자동 채움 (영업 검토 후 저장)</span>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* AI 캡쳐 모드 — 업로드 버튼 */}
             {registerMode === 'ai' && (
               <div style={{ ...GLASS.L3, padding: 12, borderRadius: 10, border: '1px solid rgba(124,58,237,0.25)' }}>
@@ -276,14 +356,15 @@ export default function NewCatalogPage() {
             </div>
           </div>
 
-          {/* 우측 — AI 결과 트림 리스트 (sticky, AI 모드일 때만) */}
-          {registerMode === 'ai' && (
+          {/* 우측 — AI 결과 트림 리스트 (sticky, AI/자동조사 모드 공용) */}
+          {(registerMode === 'ai' || registerMode === 'research') && (
             <div style={{ position: 'sticky', top: 16, alignSelf: 'flex-start', display: 'flex', flexDirection: 'column', gap: 10 }}>
               <div style={{ fontSize: 12, fontWeight: 800, color: COLORS.primary }}>📋 AI 추출 결과</div>
               {!aiResult && (
                 <div style={{ ...GLASS.L3, padding: 14, borderRadius: 10, fontSize: 11, color: '#64748b', textAlign: 'center' }}>
-                  좌측에서 PDF/이미지 업로드 시<br/>
-                  추출된 트림 리스트가 여기 표시됩니다
+                  {registerMode === 'research'
+                    ? <>좌측 차종명 입력 후<br/>「🔍 조사 시작」 클릭</>
+                    : <>좌측 PDF/이미지 업로드 시<br/>추출된 트림 리스트가 여기 표시</>}
                 </div>
               )}
               {aiResult?.variants?.length > 0 && (
