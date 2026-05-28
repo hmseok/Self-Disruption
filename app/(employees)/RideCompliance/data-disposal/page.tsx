@@ -175,7 +175,7 @@ export default function DataDisposalPage() {
     }
   }
 
-  // ── sync (외부 결재 mirror) ─────────────────────────────
+  // ── sync (외부 결재 mirror) — 단일 ────────────────────
   const handleSync = async (extId: number) => {
     setActionBusy(true)
     try {
@@ -195,6 +195,33 @@ export default function DataDisposalPage() {
       }
     } catch (e) {
       setResultPanel({ kind: 'err', msg: `sync 네트워크 오류: ${e}` })
+    } finally {
+      setActionBusy(false)
+    }
+  }
+
+  // ── ETL — 외부에서 전체 가져오기 (관리자 액션) ────────
+  const handleSyncAll = async () => {
+    setActionBusy(true)
+    setResultPanel({ kind: 'info', msg: '⏳ 외부 cafe24 결재 전체 가져오는 중... (최대 60초)' })
+    try {
+      const token = getStoredToken()
+      const res = await fetch('/api/ride-compliance/disposal/sync-all', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ limit: 100 }),
+      })
+      const json = await res.json()
+      if (!json.success) { setResultPanel({ kind: 'err', msg: `전체 sync 실패: ${json.error}` }); return }
+      const d = json.data
+      const errLine = d.errors?.length ? `\n⚠ 일부 오류 ${d.errors.length}건` : ''
+      setResultPanel({
+        kind: 'ok',
+        msg: `✅ 외부 cafe24 전체 sync 완료 (어댑터: ${d.adapter_mode})\n· 외부 fetch ${d.fetched}건\n· 신규 mirror ${d.new}건\n· 갱신 ${d.updated}건\n· items insert ${d.items_inserted}건${errLine}`,
+      })
+      await fetchList()
+    } catch (e) {
+      setResultPanel({ kind: 'err', msg: `전체 sync 네트워크 오류: ${e}` })
     } finally {
       setActionBusy(false)
     }
@@ -247,14 +274,14 @@ export default function DataDisposalPage() {
   // ── stats ────────────────────────────────────────────────
   const stats: StatItem[] = useMemo(() => {
     const total = rows.length
-    const pending = rows.filter(r => r.review_status === 'pending' || r.review_status === 'not_synced').length
+    const pending = rows.filter(r => r.review_status === 'pending').length
     const approved = rows.filter(r => r.review_status === 'approved' || r.review_status === 'executed').length
     const confirmed = rows.filter(r => r.review_status === 'confirmed').length
     return [
-      { label: '전체 결재', value: total,     tint: 'blue'   },
-      { label: '검토 대기', value: pending,   tint: 'amber'  },
-      { label: '승인·실행', value: approved,  tint: 'green'  },
-      { label: '최종 확인', value: confirmed, tint: 'purple' },
+      { label: 'mirror 전체', value: total,     tint: 'blue'   },
+      { label: '검토 대기',  value: pending,   tint: 'amber'  },
+      { label: '승인·실행',  value: approved,  tint: 'green'  },
+      { label: '최종 확인',  value: confirmed, tint: 'purple' },
     ]
   }, [rows])
 
@@ -322,22 +349,20 @@ export default function DataDisposalPage() {
       label: '액션',
       render: r => (
         <div style={{ display: 'flex', gap: 6, whiteSpace: 'nowrap' }}>
-          {r.needs_sync ? (
-            <button
-              onClick={e => { e.stopPropagation(); handleSync(r.external_approval_id) }}
-              disabled={actionBusy}
-              style={{ ...BTN.sm, border: 'none', background: COLORS.bgBlue, color: COLORS.primary, cursor: actionBusy ? 'wait' : 'pointer', fontWeight: 600 }}
-            >
-              🔄 sync
-            </button>
-          ) : (
-            <button
-              onClick={e => { e.stopPropagation(); if (r.review_id) { setSelectedReviewId(r.review_id); fetchDetail(r.review_id) } }}
-              style={{ ...BTN.sm, border: 'none', background: COLORS.bgGray, color: COLORS.textSecondary, cursor: 'pointer' }}
-            >
-              📋 상세
-            </button>
-          )}
+          <button
+            onClick={e => { e.stopPropagation(); if (r.review_id) { setSelectedReviewId(r.review_id); fetchDetail(r.review_id) } }}
+            style={{ ...BTN.sm, border: 'none', background: COLORS.bgGray, color: COLORS.textSecondary, cursor: 'pointer' }}
+          >
+            📋 상세
+          </button>
+          <button
+            onClick={e => { e.stopPropagation(); handleSync(r.external_approval_id) }}
+            disabled={actionBusy}
+            title="이 결재만 외부에서 다시 가져오기"
+            style={{ ...BTN.sm, border: 'none', background: COLORS.bgBlue, color: COLORS.primary, cursor: actionBusy ? 'wait' : 'pointer' }}
+          >
+            🔄 재sync
+          </button>
         </div>
       ),
     },
@@ -353,12 +378,25 @@ export default function DataDisposalPage() {
         </div>
       )}
 
-      {/* 어댑터 모드 안내 */}
-      <div style={{ ...GLASS.L3, padding: '10px 14px', borderRadius: 10, marginBottom: 12, fontSize: 12, color: COLORS.textSecondary, borderLeft: `4px solid ${adapterMode === 'mock' ? COLORS.warning : COLORS.success}` }}>
-        💡 외부 카페24 폐기 결재 — 어댑터 모드: <strong style={{ color: COLORS.textPrimary }}>{adapterMode}</strong>
-        {adapterMode === 'mock' && (
-          <span style={{ color: COLORS.warning, fontWeight: 600 }}> (시연용 mock 데이터 — 실제 yangjaehee DB 미연결)</span>
-        )}
+      {/* 어댑터 모드 안내 + ETL sync 버튼 */}
+      <div style={{ ...GLASS.L3, padding: '10px 14px', borderRadius: 10, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 10, borderLeft: `4px solid ${adapterMode === 'mock' ? COLORS.warning : COLORS.success}` }}>
+        <div style={{ flex: 1, fontSize: 12, color: COLORS.textSecondary }}>
+          💡 외부 cafe24 yangjaehee DB → 본 ERP DB mirror (ETL) — 어댑터: <strong style={{ color: COLORS.textPrimary }}>{adapterMode}</strong>
+          {adapterMode === 'mock' && (
+            <span style={{ color: COLORS.warning, fontWeight: 600 }}> (시연용 — 실 DB 미연결)</span>
+          )}
+          {adapterMode === 'direct' && (
+            <span style={{ color: COLORS.success, fontWeight: 600 }}> (실 cafe24 read-only 연결 — 본 화면은 본 ERP mirror 만 표시)</span>
+          )}
+        </div>
+        <button
+          onClick={handleSyncAll}
+          disabled={actionBusy || loading}
+          title="외부 cafe24 에서 결재 전체를 본 ERP DB 로 가져와 mirror (관리자 액션)"
+          style={{ ...btnPrimary, whiteSpace: 'nowrap', fontWeight: 600 }}
+        >
+          {actionBusy ? '⏳ 가져오는 중...' : '🔄 외부에서 전체 가져오기 (ETL sync)'}
+        </button>
       </div>
 
       {/* 마이그레이션 미적용 배너 */}
@@ -403,7 +441,6 @@ export default function DataDisposalPage() {
                 background: 'rgba(255,255,255,0.6)', fontSize: 12, color: COLORS.textPrimary, cursor: 'pointer',
               }}>
                 <option value="">상태: 전체</option>
-                <option value="not_synced">🔄 sync 필요</option>
                 <option value="pending">⏳ 검토 대기</option>
                 <option value="approved">✅ 승인</option>
                 <option value="rejected">⛔ 반려</option>
@@ -424,7 +461,9 @@ export default function DataDisposalPage() {
           />
           {filteredRows.length === 0 && !loading && (
             <div style={{ padding: 32, textAlign: 'center', fontSize: 13, color: COLORS.textMuted }}>
-              {rows.length === 0 ? '등록된 결재가 없습니다 — 외부 시스템 sync 후 표시됩니다.' : '🔍 검색 결과 없음'}
+              {rows.length === 0
+                ? '본 ERP mirror 가 비어있습니다 — 상단 「🔄 외부에서 전체 가져오기」 클릭 후 표시됩니다.'
+                : '🔍 검색 결과 없음'}
             </div>
           )}
         </div>

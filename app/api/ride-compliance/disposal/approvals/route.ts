@@ -1,9 +1,11 @@
 /**
  * GET /api/ride-compliance/disposal/approvals
- *   외부 결재 list + 본 시스템 mirror 결재 통합 조회.
- *   - 본 시스템 (ride_compliance_disposal_reviews) 에 sync 된 row 와
- *     아직 mirror 안 된 외부 결재를 합쳐서 list.
- *   - mirror 안 됨 → "신규 (sync 필요)" 마크
+ *   본 ERP DB 의 mirror (ride_compliance_disposal_reviews) 만 조회.
+ *
+ * 사용자 결정 (2026-05-28 P12-E):
+ *   외부 cafe24 평시 직접 호출 X — ETL 패턴.
+ *   외부에서 가져오기는 POST /disposal/sync-all (관리자 액션 또는 일일 cron).
+ *   본 GET 은 본 ERP DB 만 조회 (성능·안정성 ↑, 외부 부하 0).
  *
  * 인증: verifyUser 필요.
  */
@@ -11,7 +13,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyUser } from '@/lib/auth-server'
 import { prisma } from '@/lib/prisma'
-import { getDisposalAdapter, getAdapterMode } from '@/lib/external-disposal-adapter'
+import { getAdapterMode } from '@/lib/external-disposal-adapter'
 
 interface UnifiedRow {
   // identity
@@ -47,16 +49,8 @@ export async function GET(req: NextRequest) {
 
     const mode = getAdapterMode()
 
-    // 1. 외부 어댑터 list (mock / direct / api / etl 모드)
-    const adapter = getDisposalAdapter()
-    let externalApprovals: Awaited<ReturnType<typeof adapter.listApprovals>> = []
-    try {
-      externalApprovals = await adapter.listApprovals({ limit: 100 })
-    } catch (e) {
-      console.warn('[disposal/approvals] adapter listApprovals failed:', e)
-    }
-
-    // 2. 본 시스템 mirror — already-synced
+    // ETL — 본 ERP DB mirror 만 조회 (외부 호출 X).
+    // 외부에서 새로 가져오기는 POST /disposal/sync-all 명시적 호출.
     let mirroredRows: Array<{
       id: string
       external_approval_id: bigint | number | null
@@ -102,17 +96,8 @@ export async function GET(req: NextRequest) {
       throw e
     }
 
-    // 3. mirror 인덱스 (external_approval_id → row)
-    const mirroredMap = new Map<number, (typeof mirroredRows)[number]>()
-    for (const m of mirroredRows) {
-      const key = Number(m.external_approval_id || 0)
-      if (key) mirroredMap.set(key, m)
-    }
-
-    // 4. 통합 list — mirror 우선, 외부에만 있으면 needs_sync
+    // ETL — mirror 만으로 list 구성 (외부 sync 안 된 것은 본 endpoint 에서 안 보임).
     const unified: UnifiedRow[] = []
-
-    // 4-A. mirrored rows (이미 본 시스템에 들어옴)
     for (const m of mirroredRows) {
       unified.push({
         review_id: m.id,
@@ -137,33 +122,7 @@ export async function GET(req: NextRequest) {
       })
     }
 
-    // 4-B. 외부에만 있는 결재 (sync 필요)
-    for (const ext of externalApprovals) {
-      if (mirroredMap.has(ext.id)) continue
-      unified.push({
-        review_id: null,
-        external_approval_id: ext.id,
-        external_request_at: ext.request_at,
-        external_request_by: ext.request_by,
-        external_expired_count: ext.expired_count,
-        external_approval_doc_id: ext.approval_request_id,
-        external_approval_at: ext.approval_request_at,
-        external_deleted_at: ext.deleted_at,
-        external_deleted_by: ext.deleted_by,
-        external_confirmed_at: ext.confirmed_at,
-        external_confirmed_by: ext.confirmed_by,
-        review_status: 'not_synced',
-        reviewer_id: null,
-        reviewed_at: null,
-        review_note: null,
-        deliverable_id: null,
-        deliverable_issued_at: null,
-        needs_sync: true,
-        adapter_mode: mode,
-      })
-    }
-
-    // 5. 정렬: 외부 요청일 desc
+    // 정렬: 외부 요청일 desc
     unified.sort((a, b) => (b.external_request_at || '').localeCompare(a.external_request_at || ''))
 
     return NextResponse.json({
