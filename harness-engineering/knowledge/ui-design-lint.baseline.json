@@ -64,6 +64,10 @@
       "issue": "자체 진행률 state — Rule 16: useAIProgress() / AIProgressFloater 사용 권장 (플로팅 진행률 통일)"
     },
     {
+      "file": "app/(employees)/RideCompliance/manuals/[code]/page.tsx",
+      "issue": "JSX 영어 텍스트 4건 이상 — § 7 한글 100% 의무 (한국어 표시. 기술 약어만 영어 허용)"
+    },
+    {
       "file": "app/(employees)/RideCompliance/page.tsx",
       "issue": "검색바 자체 구현 — DcToolbar 사용 권장"
     },
@@ -81,7 +85,15 @@
     },
     {
       "file": "app/(employees)/RideCompliance/page.tsx",
+      "issue": "JSX 영어 텍스트 2건 이상 — § 7 한글 100% 의무 (한국어 표시. 기술 약어만 영어 허용)"
+    },
+    {
+      "file": "app/(employees)/RideCompliance/page.tsx",
       "issue": "체크박스 2건 — § 6 표준 미준수 (width:18 + accentColor:'#3b6eb5' 의무)"
+    },
+    {
+      "file": "app/(employees)/RideCompliance/policies/[id]/review/page.tsx",
+      "issue": "confirm() 사용 — Rule 20: dialog component 권장 (data-loss 위험 case 만 예외 허용)"
     },
     {
       "file": "app/(employees)/RideCompliance/policies/page.tsx",
@@ -173,11 +185,19 @@
     },
     {
       "file": "app/(employees)/factory-search/cafe24-import/page.tsx",
+      "issue": "JSX 영어 텍스트 1건 이상 — § 7 한글 100% 의무 (한국어 표시. 기술 약어만 영어 허용)"
+    },
+    {
+      "file": "app/(employees)/factory-search/cafe24-import/page.tsx",
       "issue": "체크박스 4건 — § 6 표준 미준수 (width:18 + accentColor:'#3b6eb5' 의무)"
     },
     {
       "file": "app/admin/[id]/page.tsx",
       "issue": "페이지 최상위 래퍼 중앙정렬 (maxWidth + margin:auto) — 전체 너비로 (UI-DESIGN-STANDARD § 1.6). 모달/카드 내부는 제외"
+    },
+    {
+      "file": "app/admin/[id]/page.tsx",
+      "issue": "JSX 영어 텍스트 1건 이상 — § 7 한글 100% 의무 (한국어 표시. 기술 약어만 영어 허용)"
     },
     {
       "file": "app/admin/contract-terms/page.tsx",
@@ -308,6 +328,10 @@
       "issue": "자체 <table> 추정 — 공용 NeuDataTable 사용 권장 (§ 0-A [5] — 정렬 + 모바일 카드 자동)"
     },
     {
+      "file": "app/admin/page.tsx",
+      "issue": "JSX 영어 텍스트 1건 이상 — § 7 한글 100% 의무 (한국어 표시. 기술 약어만 영어 허용)"
+    },
+    {
       "file": "app/admin/payroll/[id]/page.tsx",
       "issue": "페이지 최상위 래퍼 중앙정렬 (maxWidth + margin:auto) — 전체 너비로 (UI-DESIGN-STANDARD § 1.6). 모달/카드 내부는 제외"
     },
@@ -324,6 +348,10 @@
       "issue": "자체 <table> 추정 — 공용 NeuDataTable 사용 권장 (§ 0-A [5] — 정렬 + 모바일 카드 자동)"
     },
     {
+      "file": "app/auth/verified/page.tsx",
+      "issue": "JSX 영어 텍스트 1건 이상 — § 7 한글 100% 의무 (한국어 표시. 기술 약어만 영어 허용)"
+    },
+    {
       "file": "app/call-scheduler/[token]/page.tsx",
       "issue": "페이지 제목 크기 24px+ — 기준 20px (대출 관리)"
     },
@@ -338,6 +366,10 @@
     {
       "file": "app/contracts/[id]/page.tsx",
       "issue": "자체 <table> 추정 — 공용 NeuDataTable 사용 권장 (§ 0-A [5] — 정렬 + 모바일 카드 자동)"
+    },
+    {
+      "file": "app/contracts/[id]/page.tsx",
+      "issue": "JSX 영어 텍스트 2건 이상 — § 7 한글 100% 의무 (한국어 표시. 기술 약어만 영어 허용)"
     },
     {
       "file": "app/contracts/page.tsx",
@@ -426,6 +458,10 @@
     {
       "file": "app/finance/bank-card/page.tsx",
       "issue": "confirm() 사용 — Rule 20: dialog component 권장 (data-loss 위험 case 만 예외 허용)"
+    },
+    {
+      "file": "app/finance/bank-card/page.tsx",
+      "issue": "JSX 영어 텍스트 3건 이상 — § 7 한글 100% 의무 (한국어 표시. 기술 약어만 영어 허용)"
     },
     {
       "file": "app/finance/bank-card/page.tsx",
@@ -608,6 +644,10 @@
       "issue": "자체 <table> 추정 — 공용 NeuDataTable 사용 권장 (§ 0-A [5] — 정렬 + 모바일 카드 자동)"
     },
     {
+      "file": "app/loans/backtrace/page.tsx",
+      "issue": "JSX 영어 텍스트 1건 이상 — § 7 한글 100% 의무 (한국어 표시. 기술 약어만 영어 허용)"
+    },
+    {
       "file": "app/loans/page.tsx",
       "issue": "페이지 최상위 래퍼 중앙정렬 (maxWidth + margin:auto) — 전체 너비로 (UI-DESIGN-STANDARD § 1.6). 모달/카드 내부는 제외"
     },
@@ -700,6 +740,10 @@
       "issue": "자체 <table> 추정 — 공용 NeuDataTable 사용 권장 (§ 0-A [5] — 정렬 + 모바일 카드 자동)"
     },
     {
+      "file": "app/operations/intake-bulk/page.tsx",
+      "issue": "JSX 영어 텍스트 1건 이상 — § 7 한글 100% 의무 (한국어 표시. 기술 약어만 영어 허용)"
+    },
+    {
       "file": "app/operations/page.tsx",
       "issue": "페이지 최상위 래퍼 중앙정렬 (maxWidth + margin:auto) — 전체 너비로 (UI-DESIGN-STANDARD § 1.6). 모달/카드 내부는 제외"
     },
@@ -724,6 +768,10 @@
       "issue": "자체 <table> 추정 — 공용 NeuDataTable 사용 권장 (§ 0-A [5] — 정렬 + 모바일 카드 자동)"
     },
     {
+      "file": "app/page.tsx",
+      "issue": "JSX 영어 텍스트 1건 이상 — § 7 한글 100% 의무 (한국어 표시. 기술 약어만 영어 허용)"
+    },
+    {
       "file": "app/public/lt-quote/[token]/page.tsx",
       "issue": "페이지 제목 크기 24px+ — 기준 20px (대출 관리)"
     },
@@ -738,6 +786,10 @@
     {
       "file": "app/public/lt-quote/[token]/page.tsx",
       "issue": "자체 <table> 추정 — 공용 NeuDataTable 사용 권장 (§ 0-A [5] — 정렬 + 모바일 카드 자동)"
+    },
+    {
+      "file": "app/public/lt-quote/[token]/page.tsx",
+      "issue": "JSX 영어 텍스트 2건 이상 — § 7 한글 100% 의무 (한국어 표시. 기술 약어만 영어 허용)"
     },
     {
       "file": "app/settlement/view/[token]/page.tsx",
@@ -782,6 +834,10 @@
     {
       "file": "app/work-essentials/receipts/page.tsx",
       "issue": "자체 <table> 추정 — 공용 NeuDataTable 사용 권장 (§ 0-A [5] — 정렬 + 모바일 카드 자동)"
+    },
+    {
+      "file": "app/work-essentials/receipts/page.tsx",
+      "issue": "JSX 영어 텍스트 1건 이상 — § 7 한글 100% 의무 (한국어 표시. 기술 약어만 영어 허용)"
     },
     {
       "file": "app/work-essentials/receipts/page.tsx",

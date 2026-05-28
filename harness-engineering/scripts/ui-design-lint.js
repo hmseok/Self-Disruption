@@ -287,6 +287,37 @@ for (const fp of pageFiles) {
     })
   }
 
+  // 17) 2026-05-28: 표시 텍스트 100% 한글 (UI-DESIGN-STANDARD § 7)
+  //   JSX text content (예: <button>Click Me</button>) 안 한글 0 + 영어 단어 6자+
+  //   → 정보성 경고. 기술 약어 화이트리스트 통과.
+  const ENGLISH_ALLOWED = new Set([
+    'API', 'URL', 'ID', 'AI', 'ML', 'PDF', 'CSV', 'XLS', 'XLSX', 'DOC', 'DOCX', 'PPTX',
+    'HTTP', 'HTTPS', 'JSON', 'SQL', 'CRM', 'ERP', 'SMS', 'KPI', 'OK', 'NG', 'OAuth',
+    'DB', 'IP', 'MAC', 'SSL', 'JWT', 'UUID', 'RGB', 'HEX', 'IRR', 'PG', 'CPO',
+    'ADMIN', 'GOD', 'NEW', 'OLD', 'COPY', 'PASTE', 'OFF', 'ON', 'TODO', 'NOTE',
+    'RIDE', 'FMI', 'CARE',
+  ])
+  const jsxTextRe = />[\s\n]*([A-Za-z][A-Za-z\s\-_./]{5,40}?)[\s\n]*</g
+  let jtm, englishOnly = 0
+  while ((jtm = jsxTextRe.exec(content)) !== null) {
+    const text = jtm[1].trim()
+    if (text.length < 6) continue
+    // 짧은 공백 분리 단어가 모두 화이트리스트면 통과
+    const words = text.split(/\s+/).filter(Boolean)
+    const allAllowed = words.every(w => ENGLISH_ALLOWED.has(w.toUpperCase().replace(/[^\w]/g, '')))
+    if (allAllowed) continue
+    if (/[가-힯]/.test(text)) continue   // 한글 포함 → 통과
+    if (/^[A-Z][A-Z0-9-]+$/.test(text)) continue // 페이지 코드 (POLICY-2026-001)
+    englishOnly++
+    if (englishOnly > 3) break   // 한 파일당 3건 까지만 카운트 (시그널만)
+  }
+  if (englishOnly > 0) {
+    warnings.push({
+      file: rel,
+      issue: `JSX 영어 텍스트 ${englishOnly}건 이상 — § 7 한글 100% 의무 (한국어 표시. 기술 약어만 영어 허용)`,
+    })
+  }
+
   // 16) 2026-05-27: 체크박스 표준 (UI-DESIGN-STANDARD § 6)
   //   type="checkbox" 발견 시 그 부근 300 char 윈도우 에서 width:18 + accentColor 검증.
   const cbRe = /type=["']checkbox["']/g

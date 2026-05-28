@@ -273,6 +273,60 @@ DcStatStrip 의 카드는 **콘텐츠 자연 높이** — 액션 컬럼이 stack
 
 ---
 
+## 7. 표시 텍스트 — 100% 한글 (2026-05-28 사용자 결정)
+
+> **사용자 명령**: 「AI 개발이다 보니 코드나 영어가 많이 쓰이는 것 같은데 100% 한글로 했으면 좋겠어」
+
+**원칙**: 사용자에게 보이는 모든 텍스트는 **한글**. 영어는 기술적 식별자 (변수명·파일명·URL·DB 컬럼) 만 허용.
+
+### 7.1 한글 의무 영역 (위반 시 lint 경고)
+
+| 영역 | 한글 의무 | 예외 |
+|---|---|---|
+| 버튼·라벨·헤더 | ✅ | 짧은 기술 약어 (API / ID / AI / URL / PDF / SMS / KPI) 는 허용 |
+| 메뉴·breadcrumb | ✅ | 위와 동일 |
+| 에러 / 안내 메시지 | ✅ | — |
+| 모달 제목·본문 | ✅ | — |
+| 테이블 컬럼 라벨 | ✅ | 단위 (kg / km / hr / % 등) 허용 |
+| 폼 placeholder | ✅ | 이메일 / URL 입력 형식 예시 허용 |
+| 페이지 제목 (PageTitle) | ✅ | — |
+
+### 7.2 영어 허용 영역 (기술적 식별자 — 사용자에게 안 보임)
+
+- 변수·함수·컴포넌트명: `DcStatStrip`, `useMyCompanyKey`, `getCompanyOfProfile`
+- 파일·디렉토리명: `app/(employees)/RideCompliance/policies/page.tsx`
+- URL 경로: `/RideCompliance/policies` (사용자에게는 breadcrumb 의 한글 라벨로 매핑)
+- DB 컬럼·테이블명: `profiles.company_id`
+- 코드 주석 / 커밋 메시지: 한글 권장하되 영어 OK
+
+### 7.3 PageTitle breadcrumb (2026-05-28 적용)
+
+URL segment 가 영어라도 `PAGE_NAMES[path]` 에 등록된 한글 라벨만 표시.
+한글 라벨 없는 segment 는 **표시 안 함** (영어 path fragment 노출 금지).
+
+```ts
+// 잘못된 fallback (수정 전):
+label: isCurrent ? (dynamicMenuName || registered || segments[i]) : registered
+                                                       ↑ 영어 path 누설
+// 표준 (수정 후):
+const koreanLabel = isCurrent ? (dynamicMenuName || registered) : registered
+if (!koreanLabel) continue  // 한글 라벨 없으면 segment skip
+```
+
+### 7.4 검사 (ui-design-lint check 17, 2026-05-28 신설)
+
+JSX text content 안 한글이 0 + 영어 단어가 5자 이상 + 짧은 기술 약어가 아닌 케이스 → 정보성 경고.
+
+**예외 사전** (영어 허용 — 기술 약어):
+```
+API, URL, ID, AI, ML, PDF, CSV, XLS, XLSX, DOC, DOCX, PPTX,
+HTTP, HTTPS, JSON, SQL, CRM, ERP, SMS, KPI, CSV, OK, NG,
+DB, IP, MAC, SSL, OAuth, JWT, UUID, RGB, HEX, IRR, PG,
++ 페이지 코드 (POLICY-2026-001 등 영문+숫자 조합 ID)
+```
+
+---
+
 ## 6. 체크박스 표준 (2026-05-27 신설)
 
 > **사용자 보고 (2026-05-27)**: RideCompliance 페이지 「전체 선택」 체크박스가

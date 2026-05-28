@@ -203,10 +203,15 @@ export default function PageTitle({ dynamicMenuName, brand, primaryLabel }: Page
       //   PAGE_NAMES 에 따로 없으면 부모만 표시).
       //   현재 페이지(마지막) 는 dynamic 라벨 또는 segment 자체 fallback.
       if (!registered && !isCurrent) continue
+      // 2026-05-28 사용자 결정 — 한글 우선:
+      //   영어 URL segment (예: 'RideCompliance', 'policies') 그대로 표시 X.
+      //   PAGE_NAMES 등록된 한글 라벨 또는 dynamicMenuName 만 사용.
+      //   둘 다 없으면 segment 자체 skip (breadcrumb 안 표시).
+      const koreanLabel = isCurrent ? (dynamicMenuName || registered) : registered
+      if (!koreanLabel) continue   // 한글 라벨 없으면 breadcrumb 표시 안 함
       items.push({
         path: segPath,
-        // 현재 페이지(마지막) 는 dynamicMenuName 우선 (페이지가 prop 으로 넘긴 라벨).
-        label: isCurrent ? (dynamicMenuName || registered || segments[i]) : (registered as string),
+        label: koreanLabel as string,
         clickable: !isCurrent && !!registered && segPath !== pathname,
         isCurrent,
       })
