@@ -218,13 +218,13 @@ export default function PoliciesPage() {
   const allSelected = rows.length > 0 && rows.every(r => selectedIds.has(r.id))
   const columns: TableColumn<Policy>[] = [
     {
-      key: 'select', label: allSelected ? '☑' : '☐', width: 40,
+      key: 'select', label: '', width: 40,
       render: (r) => (
         <input
           type="checkbox"
           checked={selectedIds.has(r.id)}
           onChange={(e) => toggleSelect(r.id, e.target.checked)}
-          style={{ cursor: 'pointer' }}
+          style={{ cursor: 'pointer', width: 16, height: 16 }}
           onClick={(e) => e.stopPropagation()}
         />
       ),
@@ -316,12 +316,16 @@ export default function PoliciesPage() {
           stats={stats}
           actions={[
             { label: '+ 새 내규 등록', onClick: () => setCreateOpen(true), variant: 'primary' },
-            ...(selectedIds.size > 0 ? [
-              { label: `🗑 선택 삭제 (${selectedIds.size})`, onClick: bulkDelete, variant: 'secondary' as const },
-              { label: '✕ 선택 해제', onClick: clearSelection, variant: 'secondary' as const },
-            ] : rows.length > 0 ? [
-              { label: '☑ 전체 선택', onClick: selectAllVisible, variant: 'secondary' as const },
-            ] : []),
+            ...(rows.length > 0 ? [{
+              label: allSelected ? '☑ 전체 해제' : '☐ 전체 선택',
+              onClick: allSelected ? clearSelection : selectAllVisible,
+              variant: 'secondary' as const,
+            }] : []),
+            ...(selectedIds.size > 0 ? [{
+              label: `🗑 선택 삭제 (${selectedIds.size})`,
+              onClick: bulkDelete,
+              variant: 'secondary' as const,
+            }] : []),
           ]}
         />
       </div>
