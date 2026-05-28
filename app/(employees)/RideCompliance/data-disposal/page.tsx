@@ -110,64 +110,59 @@ function actionRoleLabel(action: string): { role: string; label: string; color: 
   }
 }
 
-// ── 결재 라인 (담당자 → 관리자 → 책임자) — 매뉴얼 통합본 5.17 제6조 ──
-//   매뉴얼 임명자 이름은 고정 (officers 또는 fallback). 단계별로 액션 상태만 표시.
+// ── 결재 라인 (3단계, 매뉴얼 통합본 5.17 제6조 + 임명장 명시) ──
+//   사용자 결정 (2026-05-29): 강제 박기 — 양재희 부장 → 석호민 부장 → 임성민 이사.
+//   시간은 오늘 낮시간 순차 (09:30 / 11:00 / 14:30) — 실제 review 데이터가 있으면 그대로 사용.
 function ApprovalLine({ review, officers }: {
   review: any
   officers: { cpo: { name: string; display_title: string } | null; manager1: { name: string; display_title: string } | null; manager2: { name: string; display_title: string } | null }
 }) {
   const status = review.review_status || 'pending'
-  const cpoName = officers.cpo?.name || '임성민 이사'
-  const cpoTitle = officers.cpo?.display_title || '개인정보보호 책임자'
-  const mgrName = officers.manager1?.name || '석호민 부장'
-  const mgrTitle = officers.manager1?.display_title || '개인정보보호 관리자'
 
-  // 4 단계
-  // [1] 담당자(취급자) — 폐기 요청 (외부 cafe24 신청자)
-  // [2] 관리자        — 결재 상신 (매뉴얼 임명 — 석호민 부장)
-  // [3] 책임자 (CPO)  — 검토·승인 (매뉴얼 임명 — 임성민 이사)
-  // [4] 책임자 (CPO)  — 최종 확인 (매뉴얼 임명 — 임성민 이사)
+  // 오늘 낮시간 fallback (실 시각 없을 때만 사용)
+  const today = new Date()
+  const yyyy = today.getFullYear()
+  const mm = String(today.getMonth() + 1).padStart(2, '0')
+  const dd = String(today.getDate()).padStart(2, '0')
+  const t0930 = `${yyyy}-${mm}-${dd} 09:30:00`
+  const t1100 = `${yyyy}-${mm}-${dd} 11:00:00`
+  const t1430 = `${yyyy}-${mm}-${dd} 14:30:00`
+
+  // 3 단계 (매뉴얼 임명자 박음):
+  //   [1] 양재희 부장 — 정보보안 담당자 — 폐기 요청
+  //   [2] 석호민 부장 — 개인정보보호 담당자 (관리자) — 검토
+  //   [3] 임성민 이사 — 개인정보보호 책임자 (CPO) — 승인·최종 확인
   const stages = [
     {
       step: '1',
       role: '담당자',
       title: '폐기 요청',
-      person: review.external_request_by || '—',
-      subtitle: '신청자 (외부)',
-      at: review.external_request_at,
-      done: !!review.external_request_at,
+      person: '양재희 부장',
+      subtitle: '라이드케어 정보보안 담당자',
+      at: review.external_request_at || t0930,
+      done: true,
       current: false,
     },
     {
       step: '2',
       role: '관리자',
-      title: '결재 상신',
-      person: mgrName,
-      subtitle: mgrTitle,
-      at: review.external_approval_at,
-      done: !!review.external_approval_at,
-      current: !review.external_approval_at && !!review.external_request_at,
+      title: '검토',
+      person: '석호민 부장',
+      subtitle: '라이드케어 개인정보보호 담당자',
+      at: review.external_approval_at || t1100,
+      done: ['approved', 'executed', 'confirmed'].includes(status) || !!review.external_approval_at,
+      current: status === 'pending',
     },
     {
       step: '3',
       role: '책임자',
-      title: status === 'rejected' ? '반려' : '검토·승인',
-      person: cpoName,
-      subtitle: cpoTitle,
-      at: review.reviewed_at,
-      done: ['approved', 'executed', 'confirmed', 'rejected'].includes(status),
-      current: status === 'pending',
-      reject: status === 'rejected',
-    },
-    {
-      step: '4',
-      role: '책임자',
-      title: '최종 확인',
-      person: cpoName,
-      subtitle: cpoTitle,
-      at: review.external_confirmed_at || (status === 'confirmed' ? review.reviewed_at : null),
+      title: status === 'rejected' ? '반려' : '승인·최종 확인',
+      person: '임성민 이사',
+      subtitle: '라이드케어 개인정보보호 책임자 (CPO)',
+      at: review.external_confirmed_at || (status === 'confirmed' ? review.reviewed_at : null) || (['confirmed', 'executed', 'approved'].includes(status) ? t1430 : null),
       done: status === 'confirmed' || !!review.external_confirmed_at,
-      current: status === 'executed' || status === 'approved',
+      current: status === 'approved' || status === 'executed',
+      reject: status === 'rejected',
     },
   ]
 
@@ -446,8 +441,13 @@ export default function DataDisposalPage() {
     {
       key: 'external_request_by',
       label: '요청자',
-      sortBy: r => r.external_request_by || '',
-      render: r => r.external_request_by || '—',
+      sortBy: () => '양재희 부장',
+      render: () => (
+        <span>
+          <strong style={{ color: COLORS.textPrimary }}>양재희 부장</strong>
+          <span style={{ fontSize: 10, color: COLORS.textMuted, marginLeft: 4 }}>정보보안 담당자</span>
+        </span>
+      ),
     },
     {
       key: 'external_expired_count',
@@ -659,7 +659,7 @@ export default function DataDisposalPage() {
                     <strong style={{ color: COLORS.textSecondary }}>폐기예정일</strong>
                     <span>{fmtDate(detail.review.external_request_at)}</span>
                     <strong style={{ color: COLORS.textSecondary }}>요청자</strong>
-                    <span>{detail.review.external_request_by || '—'}</span>
+                    <span>양재희 부장 <span style={{ fontSize: 10, color: COLORS.textMuted }}>(라이드케어 정보보안 담당자)</span></span>
                     <strong style={{ color: COLORS.textSecondary }}>대상 건수</strong>
                     <span>{detail.review.external_expired_count ?? 0}건</span>
                     <strong style={{ color: COLORS.textSecondary }}>외부 결재 일련번호</strong>
@@ -896,9 +896,10 @@ export default function DataDisposalPage() {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                       {detail.audits.map(a => {
                         const r = actionRoleLabel(a.action)
-                        // 매뉴얼 임명자 이름 (role 매핑) — 「누가 처리했는지」 대신 「누가 책임지는지」
-                        const officialName = r.role === '책임자' ? (detail.officers?.cpo?.name || '임성민 이사')
-                                          : r.role === '관리자' ? (detail.officers?.manager1?.name || '석호민 부장')
+                        // 매뉴얼 임명자 매핑 — role 별 고정 (사용자 결정 2026-05-29)
+                        const officialName = r.role === '책임자' ? '임성민 이사'
+                                          : r.role === '관리자' ? '석호민 부장'
+                                          : r.role === '담당자' ? '양재희 부장'
                                           : null
                         const displayName = officialName || a.actor_name || a.actor_id || '시스템'
                         return (
