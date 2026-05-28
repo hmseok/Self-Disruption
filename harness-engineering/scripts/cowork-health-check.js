@@ -123,8 +123,11 @@ for (const hookName of ['pre-commit', 'pre-push']) {
 }
 
 // 3. stale locks
+// 2026-05-27 강화: 0-byte lock 은 시간 무관 즉시 제거 (disk-full / crash 잔존).
+//   다른 세션 UID 소유로 unlink 실패 시 사용자 안내 메시지.
 console.log('\n▸ .git/*.lock — stale lock 검출')
 const STALE_THRESHOLD_MS = 5 * 60 * 1000 // 5분
+const myUid = (typeof process.getuid === 'function') ? process.getuid() : null
 for (const lockName of ['index.lock', 'HEAD.lock']) {
   const lp = path.join(ROOT, '.git', lockName)
   if (!fs.existsSync(lp)) {
@@ -134,18 +137,37 @@ for (const lockName of ['index.lock', 'HEAD.lock']) {
   const stat = fs.statSync(lp)
   const ageMs = Date.now() - stat.mtimeMs
   const ageMin = Math.round(ageMs / 1000 / 60)
-  if (ageMs > STALE_THRESHOLD_MS) {
+  const isZeroByte = stat.size === 0
+  const isMine = myUid !== null && stat.uid === myUid
+  // 제거 가능 조건:
+  //   (a) 5분 이상 묵음 — 기존 정책
+  //   (b) 0-byte + 본 세션 UID 소유 — disk-full / crash 잔존 (시간 무관)
+  const shouldRemove = ageMs > STALE_THRESHOLD_MS || (isZeroByte && isMine)
+  if (shouldRemove) {
+    const reason = ageMs > STALE_THRESHOLD_MS
+      ? `${ageMin}분 경과 stale`
+      : `0-byte 잔존 (disk-full / crash 의심)`
     check(
-      `${lockName} stale (${ageMin}분 경과)`,
+      `${lockName} (${reason})`,
       false,
-      `다른 세션 crash 가능성 — 자동 제거 권장`,
+      `자동 제거 권장`,
       () => {
-        fs.unlinkSync(lp)
-        console.log(`     ✅ ${lockName} 제거 완료`)
+        try {
+          fs.unlinkSync(lp)
+          console.log(`     ✅ ${lockName} 제거 완료`)
+        } catch (e) {
+          // 다른 UID 소유 — 본 컨테이너에서 unlink 권한 거부
+          console.log(`     ⚠ ${lockName} unlink 실패 (다른 UID 소유):`)
+          console.log(`        mac 터미널에서 직접 실행 부탁드립니다:`)
+          console.log(`          cd ${ROOT}`)
+          console.log(`          rm -f .git/${lockName}`)
+        }
       },
     )
   } else {
-    check(`${lockName} 존재 (${ageMin}분 경과 — 다른 세션 작업 중일 가능성)`, false,
+    // 0-byte 인데 본 UID 아님 → 다른 세션 활동 중일 수 있어 보존, 단 안내
+    const note = isZeroByte ? '0-byte (다른 세션 진행 중일 가능성)' : '다른 세션 작업 중일 가능성'
+    check(`${lockName} 존재 (${ageMin}분 경과 — ${note})`, false,
       `5분 미만 — 잠시 대기 권장 (자동 제거 X)`)
   }
 }

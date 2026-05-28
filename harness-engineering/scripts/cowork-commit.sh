@@ -97,11 +97,35 @@ echo ""
 # ── stale .git/*.lock 정리 (자기 락이 아니면 절대 건드림 X) ──
 # 위 flock 잡았다면 다른 세션 git 명령은 .git/index.lock 못 만듦 (직렬화 됨)
 # 다만 cowork 진입 전 남은 stale 만 점검
-STALE_LOCKS=$(find .git -maxdepth 3 -name "*.lock" -mmin +5 2>/dev/null)
+# 2026-05-27 강화 (PR-COORD-14):
+#   (a) 5분 이상 묵은 lock — 시간 기반 (기존)
+#   (b) 0-byte lock — disk-full / crash 잔존 (시간 무관 즉시 제거)
+#   (c) unlink 실패 (다른 UID 소유) → mac 터미널 한 줄 안내
+STALE_LOCKS=$(find .git -maxdepth 3 -name "*.lock" \( -mmin +5 -o -empty \) 2>/dev/null)
 if [ -n "$STALE_LOCKS" ]; then
-  echo "⚠ 5분 이상 묵은 stale lock 검출 — 제거:"
+  echo "⚠ stale / 0-byte lock 검출 — 제거 시도:"
   echo "$STALE_LOCKS" | sed 's/^/   /'
-  echo "$STALE_LOCKS" | xargs rm -f
+  PERM_DENIED=""
+  for lock in $STALE_LOCKS; do
+    if ! rm -f "$lock" 2>/dev/null; then
+      PERM_DENIED="$PERM_DENIED $lock"
+    fi
+    # rm 성공해도 파일 남아있으면 (실제 권한 거부) PERM_DENIED 에 추가
+    [ -e "$lock" ] && PERM_DENIED="$PERM_DENIED $lock"
+  done
+  if [ -n "$PERM_DENIED" ]; then
+    echo ""
+    echo "❌ 일부 lock 권한 거부 (다른 UID 소유 — 디스크 가득 사고 잔존 가능성):"
+    echo "$PERM_DENIED" | tr ' ' '\n' | sort -u | sed 's/^/   /'
+    echo ""
+    echo "   mac 터미널에서 한 번만 실행 부탁드립니다:"
+    echo "     cd $(pwd)"
+    for lock in $(echo "$PERM_DENIED" | tr ' ' '\n' | sort -u); do
+      [ -n "$lock" ] && echo "     rm -f $lock"
+    done
+    echo ""
+    exit 1
+  fi
 fi
 
 # ── 1. stage (pathspec 명시) ─────────────────────────────────────
