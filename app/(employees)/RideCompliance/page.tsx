@@ -49,7 +49,11 @@ const btnSuccess: React.CSSProperties = {
   background: COLORS.bgGreen, color: COLORS.success, cursor: 'pointer',
 }
 
-type TabKey = 'dashboard' | 'guide' | 'assets' | 'incidents' | 'officers' | 'documents' | 'annual_ops' | 'submissions'
+type TabKey = 'dashboard' | 'guide' | 'policies_master' | 'deliverables_tracker' | 'assets' | 'incidents' | 'officers' | 'documents' | 'annual_ops' | 'submissions'
+
+// P17-C/D — 모듈 main 탭 통합. policies/page.tsx + deliverables/page.tsx 컴포넌트 import.
+import PoliciesPage from './policies/page'
+import DeliverablesPage from './deliverables/page'
 
 // ════════════════════════════════════════════════════════════════
 // Phase 1.3-F — 운영 가이드 Step Playbook (9 단계)
@@ -738,6 +742,9 @@ export default function RideCompliancePage() {
           {([
             { key: 'dashboard',  label: '대시보드',     emoji: '📊' },
             { key: 'guide',      label: '운영 가이드',  emoji: '📖' },
+            // P17-C/D — 내규 1차 데이터 + 산출물 트래커 메인 탭 통합
+            { key: 'policies_master',     label: '내규 마스터',  emoji: '📜' },
+            { key: 'deliverables_tracker', label: '산출물 트래커', emoji: '📤' },
             { key: 'assets',     label: '정보자산',     emoji: '📦' },
             { key: 'incidents',  label: '침해사고',     emoji: '🚨' },
             { key: 'officers',   label: '조직 매핑',    emoji: '👔' },
@@ -765,6 +772,10 @@ export default function RideCompliancePage() {
           })}
         </div>
       </div>
+
+      {/* P17-C/D — 내규 마스터 + 산출물 트래커 메인 탭 (페이지 컴포넌트 임베드) */}
+      {tab === 'policies_master' && <PoliciesPage />}
+      {tab === 'deliverables_tracker' && <DeliverablesPage />}
 
       {/* 대시보드 탭 */}
       {tab === 'dashboard' && (
