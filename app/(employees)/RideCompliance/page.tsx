@@ -736,40 +736,54 @@ export default function RideCompliancePage() {
         </div>
       )}
 
-      {/* NavTabs — 7 탭 */}
+      {/* P29 — NavTabs 3 카테고리 그룹화 (규정/운영/산출) */}
       <div style={{ ...GLASS.L5, padding: '0 16px', borderRadius: 10, marginBottom: 16, overflowX: 'auto' }}>
-        <div style={{ display: 'flex', gap: 0, alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 0, alignItems: 'center', flexWrap: 'wrap' }}>
           {([
-            { key: 'dashboard',  label: '대시보드',     emoji: '📊' },
-            { key: 'guide',      label: '운영 가이드',  emoji: '📖' },
-            // P17-C/D — 내규 1차 데이터 + 산출물 트래커 메인 탭 통합
-            { key: 'policies_master',     label: '내규 마스터',  emoji: '📜' },
-            { key: 'deliverables_tracker', label: '산출물 트래커', emoji: '📤' },
-            { key: 'assets',     label: '정보자산',     emoji: '📦' },
-            { key: 'incidents',  label: '침해사고',     emoji: '🚨' },
-            { key: 'officers',   label: '조직 매핑',    emoji: '👔' },
-            { key: 'documents',  label: '규정 문서 관리',       emoji: '📚' },
-            { key: 'annual_ops', label: '연간 운영',    emoji: '📅' },
-            { key: 'submissions', label: '서식 작성',   emoji: '📝' },
-          ] as { key: TabKey; label: string; emoji: string }[]).map(t => {
-            const active = tab === t.key
-            return (
-              <button
-                key={t.key}
-                onClick={() => setTab(t.key)}
-                style={{
-                  background: active ? `${COLORS.primary}18` : 'transparent',
-                  border: 'none',
-                  borderBottom: active ? `2px solid ${COLORS.primary}` : '2px solid transparent',
-                  padding: '14px 18px', fontSize: 13, fontWeight: active ? 700 : 500,
-                  color: active ? COLORS.primary : COLORS.textSecondary,
-                  cursor: 'pointer', whiteSpace: 'nowrap',
-                }}
-              >
-                {t.emoji} {t.label}
-              </button>
-            )
-          })}
+            { group: '📜 규정', tabs: [
+              { key: 'policies_master', label: '내규 마스터',  emoji: '📜' },
+              { key: 'documents',       label: '규정 문서',    emoji: '📚' },
+            ] },
+            { group: '⚙ 운영', tabs: [
+              { key: 'dashboard',  label: '대시보드',    emoji: '📊' },
+              { key: 'guide',      label: '운영 가이드', emoji: '📖' },
+              { key: 'officers',   label: '조직 매핑',   emoji: '👔' },
+              { key: 'assets',     label: '정보자산',    emoji: '📦' },
+              { key: 'incidents',  label: '침해사고',    emoji: '🚨' },
+              { key: 'annual_ops', label: '연간 운영',   emoji: '📅' },
+            ] },
+            { group: '📤 산출', tabs: [
+              { key: 'deliverables_tracker', label: '산출물 트래커', emoji: '📤' },
+              { key: 'submissions',          label: '서식 작성',     emoji: '📝' },
+            ] },
+          ] as { group: string; tabs: { key: TabKey; label: string; emoji: string }[] }[]).map((g, gi) => (
+            <div key={g.group} style={{
+              display: 'flex', alignItems: 'center',
+              borderLeft: gi > 0 ? `1px solid ${COLORS.borderSubtle}` : 'none',
+              marginLeft: gi > 0 ? 12 : 0, paddingLeft: gi > 0 ? 12 : 0,
+            }}>
+              <span style={{
+                fontSize: 11, fontWeight: 700, color: COLORS.textMuted,
+                padding: '0 8px', whiteSpace: 'nowrap',
+              }}>{g.group}</span>
+              {g.tabs.map(t => {
+                const active = tab === t.key
+                return (
+                  <button key={t.key} onClick={() => setTab(t.key)}
+                    style={{
+                      background: active ? `${COLORS.primary}18` : 'transparent',
+                      border: 'none',
+                      borderBottom: active ? `2px solid ${COLORS.primary}` : '2px solid transparent',
+                      padding: '14px 14px', fontSize: 13, fontWeight: active ? 700 : 500,
+                      color: active ? COLORS.primary : COLORS.textSecondary,
+                      cursor: 'pointer', whiteSpace: 'nowrap',
+                    }}>
+                    {t.emoji} {t.label}
+                  </button>
+                )
+              })}
+            </div>
+          ))}
         </div>
       </div>
 
@@ -2327,26 +2341,30 @@ function OfficerModal(props: { onClose: () => void; onSaved: () => void }) {
       props.onSaved()
     } catch (e) { setError(String(e)) } finally { setSaving(false) }
   }
-  // P25 — 출처 인용 → AI 추론 → 확정 3단계 플로우
-  // 각 매뉴얼 명시 인원에 (출처 원문 + 추론된 액션 데이터)
+  // P25/P28 — 출처 인용 → AI 추론 → 확정 3단계 (임명장 slide 23 정보 반영)
+  // 매뉴얼 시행일/임명일자/직책 모두 매뉴얼 원본에서 가이드
+  const MANUAL_APPOINTED_AT = '2026-05-20'  // 임명장 명시일 + 매뉴얼 시행일
   const MANUAL_OFFICERS = [
     {
-      name: '임성민 이사', role: 'cpo', display_title: '라이드케어 개인정보보호 책임자 (CPO)',
-      notes: '매뉴얼 통합본 5.17 제6조 명시 — 임성민 이사',
-      source_article: '제6조',
-      source_excerpt: '회사는 다음 각 호의 어느 하나에 해당하는 지위에 있는 자 중에서 개인정보보호책임자로 임명한다. (...) 라이드케어 개인정보보호 책임자 (직책: 이사 / 성명: 임성민)',
+      name: '임성민 이사', role: 'cpo',
+      display_title: '라이드케어 개인정보보호 책임자 (CPO)',
+      notes: '매뉴얼 통합본 V1.0 제6조 + 임명장 명시 — 임명일자 2026.05.20 (개인정보보호법 제31조 + 내부관리계획 의거)',
+      source_article: '제6조 + 임명장',
+      source_excerpt: '회사는 다음 각 호의 어느 하나에 해당하는 지위에 있는 자 중에서 개인정보보호책임자로 임명한다. — 라이드케어 개인정보보호 책임자 (직책: 이사 / 성명: 임성민) | 임명장: "위 사람은 (...) 개인정보보호 및 정보보안 관리 업무를 전문적이고 체계적으로 수행하며 (...) 임명한다. 임명 일자: 2026년 05월 20일 / 임명 근거: 개인정보보호법 제31조 및 내부관리계획에 의거"',
     },
     {
-      name: '석호민 부장', role: 'manager', display_title: '라이드케어 개인정보보호 관리자',
-      notes: '매뉴얼 통합본 5.17 제6조 명시 — 석호민 부장',
-      source_article: '제6조',
-      source_excerpt: '라이드케어 개인정보보호 관리자 (직책: 부장 / 성명: 석호민). 단, 필요 시 개인정보보호책임자가 개인정보보호관리자 겸임 가능.',
+      name: '석호민 부장', role: 'manager',
+      display_title: '라이드케어 개인정보보호 담당자',
+      notes: '매뉴얼 통합본 V1.0 제6조 + 임명장 명시 — 임명일자 2026.05.20',
+      source_article: '제6조 + 임명장',
+      source_excerpt: '제6조: 라이드케어 개인정보보호 관리자 (직책: 부장 / 성명: 석호민). | 임명장: "개인정보보호 담당자: 석 호 민 부장". 단, 필요 시 개인정보보호책임자가 개인정보보호관리자 겸임 가능.',
     },
     {
-      name: '양재희 부장', role: 'manager', display_title: '라이드케어 개인정보보호 관리자',
-      notes: '매뉴얼 통합본 5.17 제6조 명시 — 양재희 부장',
-      source_article: '제6조',
-      source_excerpt: '라이드케어 개인정보보호 관리자 (직책: 부장 / 성명: 양재희).',
+      name: '양재희 부장', role: 'manager',
+      display_title: '라이드케어 정보보안 담당자',
+      notes: '매뉴얼 통합본 V1.0 제6조 + 임명장 명시 — 임명일자 2026.05.20 (2023.07.10 수정: 관리자 양재희 추가)',
+      source_article: '제6조 + 임명장',
+      source_excerpt: '제6조: 라이드케어 개인정보보호 관리자 (직책: 부장 / 성명: 양재희). | 임명장: "정보보안 담당자: 양 재 희 부장". | 제·개정 이력 2023.07.10 — 제6조에 관리자 양재희 차장(현 부장) 추가.',
     },
   ] as const
 
@@ -2354,7 +2372,7 @@ function OfficerModal(props: { onClose: () => void; onSaved: () => void }) {
   const [selectedManual, setSelectedManual] = useState<ManualOfficer | null>(null)
   const selectManual = (m: ManualOfficer) => {
     setSelectedManual(m)
-    setForm({ ...form, role: m.role, display_title: m.display_title, notes: m.notes })
+    setForm({ ...form, role: m.role, display_title: m.display_title, notes: m.notes, appointed_at: MANUAL_APPOINTED_AT })
   }
   const clearManual = () => setSelectedManual(null)
 
