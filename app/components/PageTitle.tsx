@@ -1,5 +1,5 @@
 'use client'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { useEffect } from 'react'
 import { GLASS } from '../utils/ui-tokens'
 import { COMPANY_BRANDS } from '@/lib/company-brand'
@@ -185,6 +185,15 @@ interface PageTitleProps {
 
 export default function PageTitle({ dynamicMenuName, brand, primaryLabel }: PageTitleProps) {
   const pathname = usePathname()
+  const router = useRouter()
+
+  // 2026-05-27 사용자 요청 — 브레드크럼 클릭으로 해당 그룹 첫 페이지 이동.
+  // PATH_TO_GROUP 의 역방향: groupId → 그 그룹의 첫 경로.
+  const groupFirstPath = (groupId: string | null): string | null => {
+    if (!groupId) return null
+    const entry = Object.entries(PATH_TO_GROUP).find(([p, g]) => g === groupId && p !== pathname)
+    return entry ? entry[0] : null
+  }
 
   const findBestMatch = (map: Record<string, string>): string | null => {
     if (map[pathname]) return map[pathname]
@@ -286,13 +295,33 @@ export default function PageTitle({ dynamicMenuName, brand, primaryLabel }: Page
           </div>
         )
       })()}
-      {/* 브레드크럼 */}
-      {sectionLabel && (
-        <>
-          <span style={{ fontSize: 12, color: '#64748b', fontWeight: 500 }}>{sectionLabel}</span>
-          <span style={{ color: '#94a3b8', fontSize: 11 }}>›</span>
-        </>
-      )}
+      {/* 브레드크럼 — sectionLabel 클릭으로 그룹 첫 페이지 이동 (2026-05-27) */}
+      {sectionLabel && (() => {
+        const targetPath = groupFirstPath(groupId)
+        const clickable = !!targetPath
+        return (
+          <>
+            <span
+              role={clickable ? 'link' : undefined}
+              tabIndex={clickable ? 0 : undefined}
+              onClick={clickable ? () => router.push(targetPath!) : undefined}
+              onKeyDown={clickable ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); router.push(targetPath!) } } : undefined}
+              title={clickable ? `${sectionLabel} 그룹 첫 페이지로 이동` : undefined}
+              style={{
+                fontSize: 12, color: '#64748b', fontWeight: 500,
+                cursor: clickable ? 'pointer' : 'default',
+                textDecoration: clickable ? 'none' : undefined,
+                transition: 'color 120ms',
+              }}
+              onMouseEnter={(e) => { if (clickable) (e.currentTarget as HTMLElement).style.color = '#3b6eb5' }}
+              onMouseLeave={(e) => { if (clickable) (e.currentTarget as HTMLElement).style.color = '#64748b' }}
+            >
+              {sectionLabel}
+            </span>
+            <span style={{ color: '#94a3b8', fontSize: 11 }}>›</span>
+          </>
+        )
+      })()}
       <span style={{ fontSize: 13, fontWeight: 700, color: '#0f2440' }}>{pageName}</span>
     </div>
   )
