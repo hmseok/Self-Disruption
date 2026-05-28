@@ -97,12 +97,14 @@ export async function extractTextFromBuffer(
     throw new Error(`officeparser 모듈 로드 실패: ${lm}`)
   }
 
-  // Phase 2.3 hotfix4 (2026-05-28): Cloud Run readonly fs 대응.
-  // - tempFilesLocation: '/tmp' (Cloud Run 의 유일한 쓰기 가능 디렉토리)
-  // - outputErrorToConsole: true (Cloud Run 로그에 상세 에러)
-  // officeparser 7.x 가 PPTX/PDF 압축해제 시 임시 파일 사용 가능.
+  // Phase 2.3 hotfix5 (2026-05-28): officeparser 가 buffer 의 magic bytes 자동 감지 못함.
+  // 에러: "Auto-detection of file type from buffer failed.
+  //        Please provide the 'fileType' hint in your configuration"
+  // 해결: fileType 명시 (이미 ext 알고 있음).
+  // (hotfix4 의 tempFilesLocation /tmp + outputErrorToConsole 도 유지)
   const extracted = await Promise.race([
     parseOffice(buffer, {
+      fileType: ext,  // 'pptx' | 'pdf' | 'docx' | 'xlsx' | 'txt' — extractExt 결과
       newlineDelimiter: '\n',
       ignoreNotes: false,
       putNotesAtLast: true,
