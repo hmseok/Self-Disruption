@@ -37,6 +37,9 @@ interface UnifiedRow {
   // 파기확인서
   deliverable_id: string | null
   deliverable_issued_at: string | null
+  // 항목 type 별 카운트 (subquery — 리스트 시각화용)
+  contract_count: number
+  file_count: number
   // 표시용
   needs_sync: boolean                   // true → 본 시스템 row 없음
   adapter_mode: string
@@ -69,16 +72,22 @@ export async function GET(req: NextRequest) {
       review_note: string | null
       deliverable_id: string | null
       deliverable_issued_at: Date | null
+      contract_count: bigint | number | null
+      file_count: bigint | number | null
     }> = []
     try {
       mirroredRows = await prisma.$queryRaw`
-        SELECT id, external_approval_id, external_request_at, external_request_by,
-               external_expired_count, external_approval_doc_id, external_approval_at,
-               external_deleted_at, external_deleted_by, external_confirmed_at, external_confirmed_by,
-               review_status, reviewer_id, reviewed_at, review_note,
-               deliverable_id, deliverable_issued_at
-          FROM ride_compliance_disposal_reviews
-         ORDER BY COALESCE(external_request_at, created_at) DESC
+        SELECT r.id, r.external_approval_id, r.external_request_at, r.external_request_by,
+               r.external_expired_count, r.external_approval_doc_id, r.external_approval_at,
+               r.external_deleted_at, r.external_deleted_by, r.external_confirmed_at, r.external_confirmed_by,
+               r.review_status, r.reviewer_id, r.reviewed_at, r.review_note,
+               r.deliverable_id, r.deliverable_issued_at,
+               (SELECT COUNT(*) FROM ride_compliance_disposal_items i
+                 WHERE i.review_id = r.id AND i.data_type = 'CONTRACT') AS contract_count,
+               (SELECT COUNT(*) FROM ride_compliance_disposal_items i
+                 WHERE i.review_id = r.id AND i.data_type = 'FILE') AS file_count
+          FROM ride_compliance_disposal_reviews r
+         ORDER BY COALESCE(r.external_request_at, r.created_at) DESC
          LIMIT 200
       ` as any[]
     } catch (e: any) {
@@ -117,6 +126,8 @@ export async function GET(req: NextRequest) {
         review_note: m.review_note,
         deliverable_id: m.deliverable_id,
         deliverable_issued_at: m.deliverable_issued_at?.toISOString().slice(0, 19).replace('T', ' ') || null,
+        contract_count: Number(m.contract_count ?? 0),
+        file_count: Number(m.file_count ?? 0),
         needs_sync: false,
         adapter_mode: mode,
       })

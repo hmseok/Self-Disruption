@@ -49,6 +49,8 @@ interface UnifiedRow {
   review_note: string | null
   deliverable_id: string | null
   deliverable_issued_at: string | null
+  contract_count: number
+  file_count: number
   needs_sync: boolean
   adapter_mode: string
 }
@@ -77,7 +79,7 @@ interface AuditRow {
 
 // ── 상태 라벨 ─────────────────────────────────────────────────
 const STATUS_LABEL: Record<string, { label: string; bg: string; fg: string }> = {
-  not_synced: { label: '🔄 sync 필요',   bg: 'rgba(148,163,184,0.12)', fg: '#475569' },
+  not_synced: { label: '미반영',           bg: 'rgba(148,163,184,0.12)', fg: '#475569' },
   pending:    { label: '⏳ 검토 대기',   bg: 'rgba(245,158,11,0.14)',  fg: '#b45309' },
   approved:   { label: '✅ CPO 승인',    bg: 'rgba(59,130,246,0.14)',  fg: '#1d4ed8' },
   rejected:   { label: '⛔ 반려',        bg: 'rgba(239,68,68,0.14)',   fg: '#b91c1c' },
@@ -94,6 +96,117 @@ const btnDanger: React.CSSProperties = { ...BTN.md, border: `1px solid ${COLORS.
 function fmtDate(s: string | null): string {
   if (!s) return '—'
   return s.replace('T', ' ').slice(0, 19)
+}
+
+// ── audit action 별 역할 prefix 매핑 (담당자 / 관리자 / 책임자) ──
+function actionRoleLabel(action: string): { role: string; label: string; color: string } {
+  switch (action) {
+    case 'sync':      return { role: '담당자', label: '자료 갱신',   color: '#475569' }
+    case 'approve':   return { role: '책임자', label: '승인',         color: '#047857' }
+    case 'reject':    return { role: '책임자', label: '반려',         color: '#b91c1c' }
+    case 'confirm':   return { role: '책임자', label: '최종 확인',    color: '#047857' }
+    case 'executed':  return { role: '관리자', label: '실행',         color: '#7c3aed' }
+    default:          return { role: '시스템', label: action,         color: '#64748b' }
+  }
+}
+
+// ── 결재 라인 (담당자 → 관리자 → 책임자) — 매뉴얼 통합본 5.17 제6조 ──
+function ApprovalLine({ review }: { review: any }) {
+  const status = review.review_status || 'pending'
+
+  // 4 단계 상태 추적
+  // [1] 폐기 요청 (담당자) — request_at + request_by
+  // [2] 결재 상신 (관리자) — external_approval_doc_id (외부 결재 문서)
+  // [3] 검토·승인 (책임자) — reviewed_at + review_status (approved/rejected/executed/confirmed)
+  // [4] 최종 확인 (책임자) — confirmed status
+  const stages = [
+    {
+      step: '1',
+      role: '담당자',
+      title: '폐기 요청',
+      person: review.external_request_by || '—',
+      at: review.external_request_at,
+      done: !!review.external_request_at,
+      current: false,
+    },
+    {
+      step: '2',
+      role: '관리자',
+      title: '결재 상신',
+      person: review.external_approval_doc_id ? `결재 문서 #${review.external_approval_doc_id}` : '—',
+      at: review.external_approval_at,
+      done: !!review.external_approval_at,
+      current: !review.external_approval_at && !!review.external_request_at,
+    },
+    {
+      step: '3',
+      role: '책임자',
+      title: status === 'rejected' ? '반려' : '검토·승인',
+      person: review.reviewer_id ? `검토자 ${String(review.reviewer_id).slice(0, 8)}` : '개인정보보호 책임자',
+      at: review.reviewed_at,
+      done: ['approved', 'executed', 'confirmed', 'rejected'].includes(status),
+      current: status === 'pending',
+      reject: status === 'rejected',
+    },
+    {
+      step: '4',
+      role: '책임자',
+      title: '최종 확인',
+      person: review.external_confirmed_by || '개인정보보호 책임자',
+      at: review.external_confirmed_at || (status === 'confirmed' ? review.reviewed_at : null),
+      done: status === 'confirmed' || !!review.external_confirmed_at,
+      current: status === 'executed' || status === 'approved',
+    },
+  ]
+
+  return (
+    <div style={{ display: 'flex', gap: 8, alignItems: 'stretch', flexWrap: 'wrap' }}>
+      {stages.map((s, i) => {
+        const bg = s.reject ? 'rgba(239,68,68,0.10)'
+                : s.done   ? 'rgba(16,185,129,0.10)'
+                : s.current ? 'rgba(59,130,246,0.10)'
+                : 'rgba(148,163,184,0.08)'
+        const border = s.reject ? COLORS.danger
+                     : s.done    ? COLORS.success
+                     : s.current ? COLORS.primary
+                     : COLORS.borderSubtle
+        const fg = s.reject ? COLORS.danger
+                 : s.done    ? COLORS.success
+                 : s.current ? COLORS.primary
+                 : COLORS.textMuted
+        return (
+          <div key={s.step} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <div style={{
+              flex: '0 0 auto', minWidth: 150,
+              padding: '8px 12px', borderRadius: 10,
+              background: bg, border: `1px solid ${border}`,
+            }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: fg, letterSpacing: 0.4 }}>
+                {s.step}단계 · {s.role}
+              </div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.textPrimary, marginTop: 2 }}>
+                {s.title}
+              </div>
+              <div style={{ fontSize: 11, color: COLORS.textSecondary, marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 180 }}>
+                {s.person}
+              </div>
+              {s.at && (
+                <div style={{ fontSize: 10, color: COLORS.textMuted, marginTop: 1 }}>{fmtDate(s.at)}</div>
+              )}
+              {!s.at && (
+                <div style={{ fontSize: 10, color: fg, marginTop: 1, fontWeight: 600 }}>
+                  {s.current ? '진행 중' : s.reject ? '반려' : '대기'}
+                </div>
+              )}
+            </div>
+            {i < stages.length - 1 && (
+              <span style={{ fontSize: 16, color: stages[i + 1].done || stages[i + 1].current ? COLORS.primary : COLORS.textMuted }}>→</span>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -125,6 +238,8 @@ export default function DataDisposalPage() {
   const [actionReason, setActionReason] = useState('')
   const [actionNote, setActionNote] = useState('')
   const [resultPanel, setResultPanel] = useState<{ kind: 'ok' | 'err' | 'info'; msg: string } | null>(null)
+  // 폐기 항목 구분 필터 (CONTRACT / FILE)
+  const [itemTypeFilter, setItemTypeFilter] = useState<'all' | 'CONTRACT' | 'FILE'>('all')
 
   // ── list fetch ───────────────────────────────────────────
   const fetchList = async () => {
@@ -200,10 +315,10 @@ export default function DataDisposalPage() {
     }
   }
 
-  // ── 동기화 (관리자 액션) ─────────────────────────────
+  // ── 자료 갱신 (관리자 액션) ─────────────────────────
   const handleSyncAll = async () => {
     setActionBusy(true)
-    setResultPanel({ kind: 'info', msg: '동기화 중입니다.' })
+    setResultPanel({ kind: 'info', msg: '자료를 가져오는 중입니다.' })
     try {
       const token = getStoredToken()
       const res = await fetch('/api/ride-compliance/disposal/sync-all', {
@@ -212,7 +327,7 @@ export default function DataDisposalPage() {
         body: JSON.stringify({ limit: 100 }),
       })
       const json = await res.json()
-      if (!json.success) { setResultPanel({ kind: 'err', msg: `동기화 실패: ${json.error}` }); return }
+      if (!json.success) { setResultPanel({ kind: 'err', msg: `자료 갱신 실패: ${json.error}` }); return }
       const d = json.data
       const errLine = d.errors?.length
         ? `\n오류 ${d.errors.length}건 — ${d.errors.slice(0, 2).map((e: any) => `#${e.external_approval_id}: ${e.error}`).join(' / ')}`
@@ -220,11 +335,11 @@ export default function DataDisposalPage() {
       const isError = d.errors?.length > 0 && (d.new ?? 0) === 0 && (d.updated ?? 0) === 0
       setResultPanel({
         kind: isError ? 'err' : 'ok',
-        msg: `외부 ${d.fetched ?? 0}건 조회 — 신규 ${d.new ?? 0}건, 갱신 ${d.updated ?? 0}건 (대상 항목 ${d.items_inserted ?? 0})${errLine}`,
+        msg: `조회 ${d.fetched ?? 0}건 · 신규 ${d.new ?? 0}건 · 갱신 ${d.updated ?? 0}건 · 대상 ${d.items_inserted ?? 0}건${errLine}`,
       })
       await fetchList()
     } catch (e) {
-      setResultPanel({ kind: 'err', msg: `동기화 오류: ${e}` })
+      setResultPanel({ kind: 'err', msg: `자료 갱신 오류: ${e}` })
     } finally {
       setActionBusy(false)
     }
@@ -281,11 +396,15 @@ export default function DataDisposalPage() {
     const pending = rows.filter(r => r.review_status === 'pending').length
     const approved = rows.filter(r => r.review_status === 'approved' || r.review_status === 'executed').length
     const confirmed = rows.filter(r => r.review_status === 'confirmed').length
+    const totalContract = rows.reduce((s, r) => s + (r.contract_count || 0), 0)
+    const totalFile     = rows.reduce((s, r) => s + (r.file_count || 0), 0)
     return [
-      { label: 'mirror 전체', value: total,     tint: 'blue'   },
-      { label: '검토 대기',  value: pending,   tint: 'amber'  },
-      { label: '승인·실행',  value: approved,  tint: 'green'  },
-      { label: '최종 확인',  value: confirmed, tint: 'purple' },
+      { label: '전체 결재',   value: total,                            tint: 'blue'   },
+      { label: '검토 대기',   value: pending,                          tint: 'amber'  },
+      { label: '승인·실행',   value: approved,                         tint: 'green'  },
+      { label: '최종 확인',   value: confirmed,                        tint: 'purple' },
+      { label: '계약 폐기',   value: totalContract.toLocaleString(),   unit: '건', tint: 'blue'  },
+      { label: '파일 폐기',   value: totalFile.toLocaleString(),       unit: '건', tint: 'purple' },
     ]
   }, [rows])
 
@@ -293,7 +412,7 @@ export default function DataDisposalPage() {
   const cols: TableColumn<UnifiedRow>[] = [
     {
       key: 'external_approval_id',
-      label: '외부 결재 #',
+      label: '결재 번호',
       sortBy: r => r.external_approval_id,
       render: r => (
         <strong style={{ color: COLORS.textPrimary }}>#{r.external_approval_id}</strong>
@@ -301,7 +420,7 @@ export default function DataDisposalPage() {
     },
     {
       key: 'external_request_at',
-      label: '요청일시',
+      label: '폐기예정일',
       sortBy: r => r.external_request_at || '',
       render: r => <span style={{ fontSize: 12 }}>{fmtDate(r.external_request_at)}</span>,
     },
@@ -313,17 +432,22 @@ export default function DataDisposalPage() {
     },
     {
       key: 'external_expired_count',
-      label: '대상 건수',
+      label: '대상 (계약 · 파일)',
       sortBy: r => r.external_expired_count ?? 0,
       render: r => (
-        <span style={{ fontWeight: 700, color: COLORS.textPrimary }}>
-          {r.external_expired_count ?? 0}건
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}>
+          <strong style={{ color: COLORS.textPrimary }}>{(r.external_expired_count ?? 0).toLocaleString()}건</strong>
+          {(r.contract_count > 0 || r.file_count > 0) && (
+            <span style={{ fontSize: 10, color: COLORS.textSecondary }}>
+              (📄 {r.contract_count.toLocaleString()} · 🖼 {r.file_count.toLocaleString()})
+            </span>
+          )}
         </span>
       ),
     },
     {
       key: 'external_approval_doc_id',
-      label: '외부 결재 문서',
+      label: '전자결재 문서',
       sortBy: r => r.external_approval_doc_id || '',
       render: r => r.external_approval_doc_id
         ? <span style={{ fontSize: 11, color: COLORS.textSecondary }}>{r.external_approval_doc_id}</span>
@@ -344,7 +468,7 @@ export default function DataDisposalPage() {
     },
     {
       key: 'reviewed_at',
-      label: '본 시스템 검토',
+      label: '검토일시',
       sortBy: r => r.reviewed_at || '',
       render: r => r.reviewed_at ? <span style={{ fontSize: 11, color: COLORS.textSecondary }}>{fmtDate(r.reviewed_at)}</span> : <span style={{ fontSize: 11, color: COLORS.textMuted }}>—</span>,
     },
@@ -362,10 +486,10 @@ export default function DataDisposalPage() {
           <button
             onClick={e => { e.stopPropagation(); handleSync(r.external_approval_id) }}
             disabled={actionBusy}
-            title="이 결재만 외부에서 다시 가져오기"
+            title="이 결재만 다시 갱신"
             style={{ ...BTN.sm, border: 'none', background: COLORS.bgBlue, color: COLORS.primary, cursor: actionBusy ? 'wait' : 'pointer' }}
           >
-            🔄 재sync
+            🔄 재갱신
           </button>
         </div>
       ),
@@ -382,8 +506,13 @@ export default function DataDisposalPage() {
         </div>
       )}
 
-      {/* 데이터 소스 + 동기화 버튼 */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 12, marginBottom: 12 }}>
+      {/* 출처 라벨 + 동기화 버튼 */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 11px', background: 'rgba(59,130,246,0.10)', border: `1px solid ${COLORS.borderBlue}`, borderRadius: 999, fontSize: 11, color: COLORS.primary }}>
+          <span style={{ fontWeight: 700 }}>데이터 제공</span>
+          <span style={{ color: COLORS.textPrimary, fontWeight: 600 }}>메리츠 캐피탈</span>
+        </div>
+        <div style={{ flex: 1 }} />
         {adapterMode === 'mock' && (
           <span style={{ fontSize: 11, color: COLORS.warning, fontWeight: 600 }}>※ 시연 데이터</span>
         )}
@@ -392,7 +521,7 @@ export default function DataDisposalPage() {
           disabled={actionBusy || loading}
           style={{ ...btnPrimary, whiteSpace: 'nowrap', fontWeight: 600 }}
         >
-          {actionBusy ? '동기화 중…' : '동기화'}
+          {actionBusy ? '갱신 중…' : '자료 갱신'}
         </button>
       </div>
 
@@ -425,24 +554,24 @@ export default function DataDisposalPage() {
         </button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: detail ? '1.4fr 1fr' : '1fr', gap: 16, marginTop: 16 }}>
-        {/* 결재 list */}
-        <div style={{ ...GLASS.L3, padding: 20, borderRadius: 12 }}>
+      {/* 풀폭 모드: 결재 선택 시 list 숨김 + detail 전체 너비 */}
+      {!selectedReviewId && (
+        <div style={{ ...GLASS.L3, padding: 20, borderRadius: 12, marginTop: 16 }}>
           <DcToolbar
             search={q}
             onSearchChange={setQ}
-            placeholder="외부 결재 # / 요청자 / 결재 문서 검색"
+            placeholder="결재 번호 · 요청자 · 결재 문서 검색"
             trailing={
               <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={{
                 padding: '7px 12px', borderRadius: 8, border: `1px solid ${COLORS.borderSubtle}`,
                 background: 'rgba(255,255,255,0.6)', fontSize: 12, color: COLORS.textPrimary, cursor: 'pointer',
               }}>
                 <option value="">상태: 전체</option>
-                <option value="pending">⏳ 검토 대기</option>
-                <option value="approved">✅ 승인</option>
-                <option value="rejected">⛔ 반려</option>
-                <option value="executed">🗑 삭제 실행</option>
-                <option value="confirmed">🔒 최종 확인</option>
+                <option value="pending">검토 대기</option>
+                <option value="approved">승인</option>
+                <option value="rejected">반려</option>
+                <option value="executed">삭제 실행</option>
+                <option value="confirmed">최종 확인</option>
               </select>
             }
           />
@@ -462,17 +591,28 @@ export default function DataDisposalPage() {
             </div>
           )}
         </div>
+      )}
 
-        {/* 우측 상세 패널 */}
-        {selectedReviewId && (
-          <div style={{ ...GLASS.L4, padding: 20, borderRadius: 12, maxHeight: 800, overflowY: 'auto' }}>
+      {/* 풀폭 상세 — 결재 라인 sticky + items NeuDataTable */}
+      {selectedReviewId && (
+        <div style={{ marginTop: 16 }}>
+          <div style={{
+            position: 'sticky', top: 0, zIndex: 5,
+            ...GLASS.L4, padding: 16, borderRadius: 12, marginBottom: 12,
+          }}>
             <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
-              <h3 style={{ margin: 0, fontSize: 14, color: COLORS.textPrimary }}>📋 결재 상세</h3>
-              <button onClick={() => { setSelectedReviewId(null); setDetail(null) }}
-                style={{ marginLeft: 'auto', ...BTN.sm, background: 'transparent', border: `1px solid ${COLORS.borderSubtle}`, color: COLORS.textSecondary, cursor: 'pointer' }}>
-                × 닫기
+              <button onClick={() => { setSelectedReviewId(null); setDetail(null); setItemTypeFilter('all') }}
+                style={{ ...BTN.sm, background: COLORS.bgGray, border: `1px solid ${COLORS.borderSubtle}`, color: COLORS.textSecondary, cursor: 'pointer', marginRight: 12 }}>
+                ← 목록으로
               </button>
+              <h3 style={{ margin: 0, fontSize: 15, color: COLORS.textPrimary }}>
+                결재 상세 {detail?.review.external_approval_id ? `· #${detail.review.external_approval_id}` : ''}
+              </h3>
             </div>
+
+            {/* 결재 라인 — 담당자 → 관리자 → CPO */}
+            {detail && <ApprovalLine review={detail.review} />}
+          </div>
 
             {detailLoading && (
               <div style={{ padding: 24, textAlign: 'center', fontSize: 13, color: COLORS.textMuted }}>⏳ 상세 로딩 중…</div>
@@ -483,7 +623,7 @@ export default function DataDisposalPage() {
                 {/* 결재 메타 */}
                 <div style={{ ...GLASS.L3, padding: 12, borderRadius: 8, marginBottom: 12, fontSize: 12 }}>
                   <div style={{ display: 'grid', gridTemplateColumns: '110px 1fr', rowGap: 6, columnGap: 8 }}>
-                    <strong style={{ color: COLORS.textSecondary }}>외부 결재 #</strong>
+                    <strong style={{ color: COLORS.textSecondary }}>결재 번호</strong>
                     <span>#{detail.review.external_approval_id}</span>
                     <strong style={{ color: COLORS.textSecondary }}>상태</strong>
                     <span>
@@ -492,15 +632,15 @@ export default function DataDisposalPage() {
                         return <span style={{ padding: '2px 8px', borderRadius: 6, background: s.bg, color: s.fg, fontWeight: 700 }}>{s.label}</span>
                       })()}
                     </span>
-                    <strong style={{ color: COLORS.textSecondary }}>요청일시</strong>
+                    <strong style={{ color: COLORS.textSecondary }}>폐기예정일</strong>
                     <span>{fmtDate(detail.review.external_request_at)}</span>
                     <strong style={{ color: COLORS.textSecondary }}>요청자</strong>
                     <span>{detail.review.external_request_by || '—'}</span>
                     <strong style={{ color: COLORS.textSecondary }}>대상 건수</strong>
                     <span>{detail.review.external_expired_count ?? 0}건</span>
-                    <strong style={{ color: COLORS.textSecondary }}>외부 결재 문서</strong>
+                    <strong style={{ color: COLORS.textSecondary }}>전자결재 문서</strong>
                     <span>{detail.review.external_approval_doc_id || <em style={{ color: COLORS.textMuted }}>미상신</em>}</span>
-                    <strong style={{ color: COLORS.textSecondary }}>본 시스템 검토</strong>
+                    <strong style={{ color: COLORS.textSecondary }}>검토일시</strong>
                     <span>{fmtDate(detail.review.reviewed_at)}</span>
                     {detail.review.review_note && (
                       <>
@@ -517,41 +657,88 @@ export default function DataDisposalPage() {
                   </div>
                 </div>
 
-                {/* 폐기 대상 items */}
+                {/* 폐기 대상 items — 구분 필터 + NeuDataTable (전체 컬럼) */}
                 <div style={{ marginBottom: 12 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: COLORS.textPrimary, marginBottom: 6 }}>
-                    🗂 폐기 대상 ({detail.items.length}건)
-                  </div>
-                  {detail.items.length === 0 ? (
-                    <div style={{ padding: 12, fontSize: 12, color: COLORS.textMuted, textAlign: 'center' }}>대상 없음</div>
-                  ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                      {detail.items.map(it => (
-                        <div key={it.id} style={{
-                          padding: '8px 10px', borderRadius: 8, border: `1px solid ${COLORS.borderSubtle}`,
-                          background: 'rgba(255,255,255,0.4)', fontSize: 12,
-                          display: 'flex', alignItems: 'center', gap: 8,
-                        }}>
+                  {(() => {
+                    const cContract = detail.items.filter(i => i.data_type === 'CONTRACT').length
+                    const cFile     = detail.items.filter(i => i.data_type === 'FILE').length
+                    const filteredItems = itemTypeFilter === 'all'
+                      ? detail.items
+                      : detail.items.filter(i => i.data_type === itemTypeFilter)
+                    const itemCols: TableColumn<DisposalItem>[] = [
+                      {
+                        key: 'data_type', label: '구분',
+                        sortBy: r => r.data_type,
+                        render: r => (
                           <span style={{
-                            padding: '2px 6px', borderRadius: 4, fontSize: 10, fontWeight: 700, whiteSpace: 'nowrap',
-                            background: it.data_type === 'CONTRACT' ? 'rgba(59,130,246,0.14)' : 'rgba(168,85,247,0.14)',
-                            color: it.data_type === 'CONTRACT' ? '#1d4ed8' : '#7c3aed',
+                            display: 'inline-block', padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap',
+                            background: r.data_type === 'CONTRACT' ? 'rgba(59,130,246,0.14)' : 'rgba(168,85,247,0.14)',
+                            color: r.data_type === 'CONTRACT' ? '#1d4ed8' : '#7c3aed',
                           }}>
-                            {it.data_type === 'CONTRACT' ? '📄 계약' : '🖼 파일'}
+                            {r.data_type === 'CONTRACT' ? '📄 계약' : '🖼 파일'}
                           </span>
-                          <strong style={{ color: COLORS.textPrimary, whiteSpace: 'nowrap' }}>{it.custname || '—'}</strong>
-                          <span style={{ color: COLORS.textSecondary, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {it.data_type === 'CONTRACT'
-                              ? `${it.carsnums || '—'} · ${it.carsodnm || ''}`
-                              : `${it.imagkind_label || ''} · ${it.imagonam || ''}`}
+                        ),
+                      },
+                      { key: 'custname', label: '거래처', sortBy: r => r.custname || '', render: r => <strong style={{ color: COLORS.textPrimary }}>{r.custname || '—'}</strong> },
+                      { key: 'carsnums', label: '차량번호', sortBy: r => r.carsnums || '', render: r => r.carsnums || '—' },
+                      { key: 'carsodnm', label: '차종',   sortBy: r => r.carsodnm || '', render: r => r.carsodnm || '—' },
+                      { key: 'imagkind_label', label: '첨부 종류', sortBy: r => r.imagkind_label || '', render: r => r.imagkind_label || '—' },
+                      { key: 'imagonam', label: '파일명', sortBy: r => r.imagonam || '', render: r => <span style={{ fontSize: 11, color: COLORS.textSecondary }}>{r.imagonam || '—'}</span> },
+                      { key: 'data_id',  label: '식별자', sortBy: r => r.data_id || '', render: r => <span style={{ fontSize: 10, color: COLORS.textMuted, fontFamily: 'monospace' }}>{r.data_id}</span> },
+                      {
+                        key: 'external_deleted_at', label: '삭제일시',
+                        sortBy: r => r.external_deleted_at || '',
+                        render: r => r.external_deleted_at
+                          ? <span style={{ fontSize: 11, color: COLORS.success, fontWeight: 600 }}>✓ {fmtDate(r.external_deleted_at)}</span>
+                          : <span style={{ fontSize: 11, color: COLORS.textMuted }}>—</span>,
+                      },
+                    ]
+                    return (
+                      <>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8, flexWrap: 'wrap' }}>
+                          <span style={{ fontSize: 13, fontWeight: 700, color: COLORS.textPrimary }}>
+                            폐기 대상 — 총 {detail.items.length.toLocaleString()}건
                           </span>
-                          {it.external_deleted_at && (
-                            <span style={{ fontSize: 10, color: COLORS.success, whiteSpace: 'nowrap' }}>✓ 삭제됨</span>
-                          )}
+                          <span style={{ fontSize: 11, color: COLORS.textSecondary }}>
+                            (📄 계약 {cContract.toLocaleString()} · 🖼 파일 {cFile.toLocaleString()})
+                          </span>
+                          <div style={{ marginLeft: 'auto', display: 'flex', gap: 4 }}>
+                            {(['all', 'CONTRACT', 'FILE'] as const).map(k => {
+                              const isActive = itemTypeFilter === k
+                              const label = k === 'all' ? `전체 ${detail.items.length}`
+                                          : k === 'CONTRACT' ? `📄 계약 ${cContract}`
+                                          : `🖼 파일 ${cFile}`
+                              return (
+                                <button
+                                  key={k}
+                                  onClick={() => setItemTypeFilter(k)}
+                                  style={{
+                                    padding: '5px 12px', borderRadius: 8, fontSize: 11, fontWeight: 700,
+                                    border: `1px solid ${isActive ? COLORS.primary : COLORS.borderSubtle}`,
+                                    background: isActive ? COLORS.primary : 'transparent',
+                                    color: isActive ? '#fff' : COLORS.textSecondary,
+                                    cursor: 'pointer', whiteSpace: 'nowrap',
+                                  }}
+                                >
+                                  {label}
+                                </button>
+                              )
+                            })}
+                          </div>
                         </div>
-                      ))}
-                    </div>
-                  )}
+                        {detail.items.length === 0 ? (
+                          <div style={{ padding: 16, fontSize: 12, color: COLORS.textMuted, textAlign: 'center' }}>대상 없음</div>
+                        ) : (
+                          <NeuDataTable
+                            columns={itemCols}
+                            data={filteredItems}
+                            rowKey={r => r.id}
+                            defaultSort={{ key: 'data_type', dir: 'asc' }}
+                          />
+                        )}
+                      </>
+                    )
+                  })()}
                 </div>
 
                 {/* 액션 영역 */}
@@ -624,12 +811,20 @@ export default function DataDisposalPage() {
                     <div style={{ padding: 12, fontSize: 12, color: COLORS.textMuted, textAlign: 'center' }}>이력 없음</div>
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                      {detail.audits.map(a => (
-                        <div key={a.id} style={{ padding: '6px 10px', borderRadius: 6, background: 'rgba(255,255,255,0.4)', fontSize: 11, color: COLORS.textSecondary }}>
-                          <strong style={{ color: COLORS.textPrimary }}>{a.action}</strong> · {a.actor_name || a.actor_id || 'system'} · {fmtDate(a.action_at)}
-                          {a.note && <div style={{ marginTop: 2, color: COLORS.textMuted, whiteSpace: 'pre-line' }}>{a.note}</div>}
-                        </div>
-                      ))}
+                      {detail.audits.map(a => {
+                        const r = actionRoleLabel(a.action)
+                        return (
+                          <div key={a.id} style={{ padding: '8px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.5)', border: `1px solid ${COLORS.borderSubtle}`, fontSize: 12, color: COLORS.textSecondary, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                            <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 6, fontSize: 10, fontWeight: 700, background: `${r.color}1A`, color: r.color, whiteSpace: 'nowrap' }}>
+                              {r.role}
+                            </span>
+                            <strong style={{ color: COLORS.textPrimary }}>{a.actor_name || a.actor_id || '시스템'}</strong>
+                            <span style={{ color: r.color, fontWeight: 600 }}>{r.label}</span>
+                            <span style={{ marginLeft: 'auto', fontSize: 11, color: COLORS.textMuted, whiteSpace: 'nowrap' }}>{fmtDate(a.action_at)}</span>
+                            {a.note && <div style={{ width: '100%', marginTop: 2, color: COLORS.textMuted, whiteSpace: 'pre-line', fontSize: 11 }}>{a.note}</div>}
+                          </div>
+                        )
+                      })}
                     </div>
                   )}
                 </div>
@@ -637,7 +832,6 @@ export default function DataDisposalPage() {
             )}
           </div>
         )}
-      </div>
     </div>
   )
 }
