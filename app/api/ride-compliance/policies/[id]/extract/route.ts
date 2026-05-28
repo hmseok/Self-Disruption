@@ -75,7 +75,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   for (let i = 0; i < extracted.sections.length; i++) {
     const s = extracted.sections[i]
     if (!s.title || s.title.trim().length === 0) continue
-    if (!['article', 'attachment', 'playbook_step', 'annual_event'].includes(s.kind)) continue
+    if (!['article', 'attachment', 'playbook_step', 'annual_event', 'screen_spec'].includes(s.kind)) continue
 
     const sid = randomUUID()
     try {

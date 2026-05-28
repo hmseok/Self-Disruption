@@ -45,7 +45,7 @@ interface Policy {
 
 interface Section {
   id: string
-  section_kind: 'article' | 'attachment' | 'playbook_step' | 'annual_event'
+  section_kind: 'article' | 'attachment' | 'playbook_step' | 'annual_event' | 'screen_spec'
   section_code: string | null
   title: string
   body_md: string | null
@@ -77,6 +77,7 @@ const KIND_LABEL: Record<string, string> = {
   attachment:    '별첨',
   playbook_step: 'Playbook 단계',
   annual_event:  '연간 운영',
+  screen_spec:   '🖥 필요 화면',
 }
 
 const SECTION_STATUS_LABEL: Record<string, string> = {
@@ -427,7 +428,7 @@ function ReviewModal(props: {
 }) {
   const [sections, setSections] = useState<Section[]>([])
   const [loading, setLoading] = useState(false)
-  const [kind, setKind] = useState<'article' | 'attachment' | 'playbook_step' | 'annual_event'>('article')
+  const [kind, setKind] = useState<'article' | 'attachment' | 'playbook_step' | 'annual_event' | 'screen_spec'>('article')
   const [busyId, setBusyId] = useState<string | null>(null)
 
   const fetchSections = async () => {
@@ -469,6 +470,34 @@ function ReviewModal(props: {
     }
   }
 
+  // Phase 2.4 — 스케줄 자동 생성 (확정 내규 → annual_plan + tasks INSERT)
+  const generateSchedule = async () => {
+    if (props.policy.status !== 'active') {
+      props.onError('스케줄 자동 생성은 active 내규만 가능 — 먼저 「내규 확정」 버튼으로 active 전이.')
+      return
+    }
+    setBusyId('__schedule__')
+    try {
+      const token = getStoredToken()
+      const res = await fetch(`/api/ride-compliance/policies/${props.policy.id}/generate-schedule`, {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      })
+      const json = await res.json()
+      if (!res.ok || !json.success) {
+        props.onError(`스케줄 생성 실패: ${json.error || res.status}`)
+        return
+      }
+      const d = json.data
+      const msg = `스케줄 자동 생성 완료 — annual_plan ${d.plan_code} (${d.plan_created ? '신규' : '기존'}) / tasks ${d.inserted_tasks}건 INSERT / 월 추정 실패 ${d.skipped_no_month} / 중복 ${d.skipped_duplicate}`
+      props.onChanged(msg)
+    } catch (e) {
+      props.onError(`스케줄 생성 오류: ${e}`)
+    } finally {
+      setBusyId(null)
+    }
+  }
+
   const finalizePolicy = async () => {
     // Rule 20 — 인라인 차단 + onError 안내 (브라우저 dialog 미사용)
     const draftCount = sections.filter(s => s.user_status === 'ai_draft').length
@@ -504,6 +533,7 @@ function ReviewModal(props: {
     attachment:    sections.filter(s => s.section_kind === 'attachment').length,
     playbook_step: sections.filter(s => s.section_kind === 'playbook_step').length,
     annual_event:  sections.filter(s => s.section_kind === 'annual_event').length,
+    screen_spec:   sections.filter(s => s.section_kind === 'screen_spec').length,
   }
 
   return (
@@ -521,7 +551,7 @@ function ReviewModal(props: {
 
       {/* 탭 */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 12, borderBottom: `1px solid ${COLORS.borderSubtle}` }}>
-        {(['article', 'attachment', 'playbook_step', 'annual_event'] as const).map((k) => (
+        {(['article', 'attachment', 'playbook_step', 'annual_event', 'screen_spec'] as const).map((k) => (
           <button key={k}
             onClick={() => setKind(k)}
             style={{
@@ -593,10 +623,15 @@ function ReviewModal(props: {
 
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginTop: 16, paddingTop: 12, borderTop: `1px solid ${COLORS.borderSubtle}` }}>
         <button style={btnSecondary} onClick={fetchSections}>🔄 새로고침</button>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button style={btnSecondary} onClick={props.onClose}>닫기</button>
           {props.policy.status !== 'active' && (
             <button style={btnSuccess} onClick={finalizePolicy} disabled={busyId === '__finalize__'}>✅ 내규 확정 (active)</button>
+          )}
+          {props.policy.status === 'active' && (
+            <button style={btnPrimary} onClick={generateSchedule} disabled={busyId === '__schedule__'}>
+              {busyId === '__schedule__' ? '⏳ 생성중…' : '📅 스케줄 자동 생성'}
+            </button>
           )}
         </div>
       </div>
