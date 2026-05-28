@@ -21,6 +21,8 @@ import CompanyMasterPanel from './_components/CompanyMasterPanel'
 import RoleTemplatePanel from './_components/RoleTemplatePanel'
 // PR-HR-20 (2026-05-28) — EmployeeListPanel 추출 (FMI/RIDE/공통 직원 리스트 통일 패널)
 import EmployeeListPanel from './_components/EmployeeListPanel'
+// PR-HR-21 (2026-05-28) — CompanyOrgPanel 추출 (FMI 조직도 — 직급/부서 카드)
+import CompanyOrgPanel from './_components/CompanyOrgPanel'
 
 // ────────────────────────────────────────────────────────────────
 // Auth Helper
@@ -1318,94 +1320,35 @@ export default function HRMasterPage() {
       )}
 
       {/* ─── 탭 2: 부서 · 직급 (FMI 조직도) ─── PR-HR-11a */}
+      {/* PR-HR-21 (2026-05-28) — FMI 조직도 탭 → CompanyOrgPanel 표준 사용 (90 라인 인라인 → 1줄) */}
       {topCompany === 'FMI' && topTab === 'org' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          {/* 직급 */}
-          <div style={{ ...glassCard, padding: 20 }}>
-            <h3 style={{ fontSize: 14, fontWeight: 700, color: '#1e293b', marginBottom: 12 }}>📊 직급 ({positions.length})</h3>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', marginBottom: 12 }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <label style={{ fontSize: 11, fontWeight: 600, color: '#64748b', display: 'block', marginBottom: 4 }}>직급명</label>
-                <input value={newPositionName} onChange={e => setNewPositionName(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && addPosition()}
-                  style={{ width: '100%', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, padding: '8px 12px', fontSize: 13, outline: 'none', background: 'rgba(255,255,255,0.6)', boxSizing: 'border-box' }} placeholder="예: 과장" />
-              </div>
-              <div style={{ width: 80 }}>
-                <label style={{ fontSize: 11, fontWeight: 600, color: '#64748b', display: 'block', marginBottom: 4 }}>레벨</label>
-                <input type="number" min={1} max={10} value={newPositionLevel}
-                  onChange={e => setNewPositionLevel(Number(e.target.value))}
-                  style={{ width: '100%', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, padding: '8px 12px', fontSize: 13, outline: 'none', background: 'rgba(255,255,255,0.6)', boxSizing: 'border-box' }} />
-              </div>
-              <button onClick={addPosition} style={{ padding: '8px 14px', background: '#3b82f6', color: '#fff', borderRadius: 10, fontWeight: 600, fontSize: 13, border: 'none', cursor: 'pointer', flexShrink: 0 }}>+ 추가</button>
-            </div>
-            <div style={{ border: '1px solid rgba(0,0,0,0.06)', borderRadius: 12, overflow: 'hidden' }}>
-              {positions.map(pos => (
-                <div key={pos.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderBottom: '1px solid rgba(0,0,0,0.04)' }}>
-                  {editingPosId === pos.id ? (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1 }}>
-                      <input value={editPosName} onChange={e => setEditPosName(e.target.value)}
-                        onKeyDown={e => e.key === 'Enter' && savePosition(pos.id)}
-                        style={{ flex: 1, border: '1px solid rgba(59,130,246,0.4)', borderRadius: 6, padding: '4px 8px', fontSize: 13, outline: 'none' }} autoFocus />
-                      <input type="number" min={1} max={10} value={editPosLevel}
-                        onChange={e => setEditPosLevel(Number(e.target.value))}
-                        style={{ width: 48, border: '1px solid rgba(59,130,246,0.4)', borderRadius: 6, padding: '4px 8px', fontSize: 13, outline: 'none' }} />
-                      <button onClick={() => savePosition(pos.id)} style={{ fontSize: 12, fontWeight: 600, color: '#3b82f6', background: 'none', border: 'none', cursor: 'pointer' }}>저장</button>
-                      <button onClick={() => setEditingPosId(null)} style={{ fontSize: 12, fontWeight: 600, color: '#94a3b8', background: 'none', border: 'none', cursor: 'pointer' }}>취소</button>
-                    </div>
-                  ) : (
-                    <>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}
-                        onClick={() => { setEditingPosId(pos.id); setEditPosName(pos.name); setEditPosLevel(pos.level || 0) }}>
-                        <span style={{ background: 'rgba(59,130,246,0.1)', color: '#2563eb', fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 4, width: 48, textAlign: 'center', display: 'inline-block' }}>Lv.{pos.level}</span>
-                        <span style={{ fontWeight: 600, fontSize: 13, color: '#334155' }}>{pos.name}</span>
-                      </div>
-                      <button onClick={() => deletePosition(pos.id)} style={{ fontSize: 12, fontWeight: 600, color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px', borderRadius: 6 }}>삭제</button>
-                    </>
-                  )}
-                </div>
-              ))}
-              {positions.length === 0 && <div style={{ padding: 20, textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>직급이 없습니다.</div>}
-            </div>
-          </div>
-
-          {/* 부서 */}
-          <div style={{ ...glassCard, padding: 20 }}>
-            <h3 style={{ fontSize: 14, fontWeight: 700, color: '#1e293b', marginBottom: 12 }}>🏢 부서 ({departments.length})</h3>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', marginBottom: 12 }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <label style={{ fontSize: 11, fontWeight: 600, color: '#64748b', display: 'block', marginBottom: 4 }}>부서명</label>
-                <input value={newDeptName} onChange={e => setNewDeptName(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && addDepartment()}
-                  style={{ width: '100%', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, padding: '8px 12px', fontSize: 13, outline: 'none', background: 'rgba(255,255,255,0.6)', boxSizing: 'border-box' }} placeholder="예: 영업팀" />
-              </div>
-              <button onClick={addDepartment} style={{ padding: '8px 14px', background: '#3b82f6', color: '#fff', borderRadius: 10, fontWeight: 600, fontSize: 13, border: 'none', cursor: 'pointer', flexShrink: 0 }}>+ 추가</button>
-            </div>
-            <div style={{ border: '1px solid rgba(0,0,0,0.06)', borderRadius: 12, overflow: 'hidden' }}>
-              {departments.map(dept => (
-                <div key={dept.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderBottom: '1px solid rgba(0,0,0,0.04)' }}>
-                  {editingDeptId === dept.id ? (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1 }}>
-                      <input value={editDeptName} onChange={e => setEditDeptName(e.target.value)}
-                        onKeyDown={e => e.key === 'Enter' && saveDepartment(dept.id)}
-                        style={{ flex: 1, border: '1px solid rgba(59,130,246,0.4)', borderRadius: 6, padding: '4px 8px', fontSize: 13, outline: 'none' }} autoFocus />
-                      <button onClick={() => saveDepartment(dept.id)} style={{ fontSize: 12, fontWeight: 600, color: '#3b82f6', background: 'none', border: 'none', cursor: 'pointer' }}>저장</button>
-                      <button onClick={() => setEditingDeptId(null)} style={{ fontSize: 12, fontWeight: 600, color: '#94a3b8', background: 'none', border: 'none', cursor: 'pointer' }}>취소</button>
-                    </div>
-                  ) : (
-                    <>
-                      <span style={{ fontWeight: 600, fontSize: 13, color: '#334155', cursor: 'pointer' }}
-                        onClick={() => { setEditingDeptId(dept.id); setEditDeptName(dept.name) }}>
-                        {dept.name}
-                      </span>
-                      <button onClick={() => deleteDepartment(dept.id)} style={{ fontSize: 12, fontWeight: 600, color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px', borderRadius: 6 }}>삭제</button>
-                    </>
-                  )}
-                </div>
-              ))}
-              {departments.length === 0 && <div style={{ padding: 20, textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>부서가 없습니다.</div>}
-            </div>
-          </div>
-        </div>
+        <CompanyOrgPanel
+          positions={positions}
+          departments={departments}
+          newPositionName={newPositionName}
+          setNewPositionName={setNewPositionName}
+          newPositionLevel={newPositionLevel}
+          setNewPositionLevel={setNewPositionLevel}
+          addPosition={addPosition}
+          editingPosId={editingPosId}
+          setEditingPosId={setEditingPosId}
+          editPosName={editPosName}
+          setEditPosName={setEditPosName}
+          editPosLevel={editPosLevel}
+          setEditPosLevel={setEditPosLevel}
+          savePosition={savePosition}
+          deletePosition={deletePosition}
+          newDeptName={newDeptName}
+          setNewDeptName={setNewDeptName}
+          addDepartment={addDepartment}
+          editingDeptId={editingDeptId}
+          setEditingDeptId={setEditingDeptId}
+          editDeptName={editDeptName}
+          setEditDeptName={setEditDeptName}
+          saveDepartment={saveDepartment}
+          deleteDepartment={deleteDepartment}
+          glassCard={glassCard}
+        />
       )}
 
       {/* ─── 탭 3: 초대 관리 ─── */}
