@@ -22,8 +22,16 @@ if [ -z "$RELEVANT_FILES" ]; then
 fi
 
 echo ""
-echo "▸ harness-lint pre-commit hook 실행 (v2 repo-tracked)..."
-node harness-engineering/scripts/harness-lint.js
+echo "▸ harness-lint pre-commit hook 실행 (v2.2 repo-tracked, staged-only)..."
+# PR-COORD-13 (2026-05-27 사용자 보고):
+#   pre-commit hook 이 broad-scope lint (ui-token / ui-coverage / pagetitle / tab-color)
+#   까지 돌면 다른 세션 working-tree 의 위반까지 검출 → 본 commit 무관하게 차단.
+#   HR 세션 PR-HR-12 가 operations 세션 long-term-rentals/catalog/new/page.tsx 의
+#   ui-token 위반에 막힘 사고.
+# 조치: pre-commit 호출 시 COWORK_LINT_STAGED_ONLY=1 자동 set.
+#   broad-scope UI lint 는 skip (npm run lint:harness 수동 audit 으로 유지).
+#   commit-critical lint (sql / cowork-staging / cowork-reflog 등) 는 그대로 동작.
+COWORK_LINT_STAGED_ONLY=1 node harness-engineering/scripts/harness-lint.js
 RESULT=$?
 
 if [ $RESULT -ne 0 ]; then
