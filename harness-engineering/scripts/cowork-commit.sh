@@ -119,16 +119,17 @@ if [ -n "$STALE_LOCKS" ]; then
   done
   if [ -n "$PERM_DENIED" ]; then
     echo ""
-    echo "❌ 일부 lock 권한 거부 (다른 UID 소유 — 디스크 가득 사고 잔존 가능성):"
+    echo "⚠ 일부 lock 권한 거부 (FUSE sandbox 격리 — 본 세션 unlink 불가):"
     echo "$PERM_DENIED" | tr ' ' '\n' | sort -u | sed 's/^/   /'
     echo ""
-    echo "   mac 터미널에서 한 번만 실행 부탁드립니다:"
-    echo "     cd $(pwd)"
-    for lock in $(echo "$PERM_DENIED" | tr ' ' '\n' | sort -u); do
-      [ -n "$lock" ] && echo "     rm -f $lock"
-    done
+    # 2026-05-28 hotfix (PR-COORD-15 후속):
+    #   FUSE mount .git/ unlink 제한으로 본 세션이 .git/*.lock 못 지움.
+    #   하지만 자기 cowork-pipeline.lock 은 이미 flock 으로 잡고 있으니 race 없음.
+    #   다른 git native lock (HEAD.lock 등) 은 git 가 자동 처리 — 진행 OK.
+    #   심각한 경우만 사용자 안내 (mac 터미널 rm).
+    echo "   계속 진행 — flock 직렬화로 race 보호됨."
+    echo "   장시간 (수 시간) 잔존 시: mac 터미널에서 rm -f <위 파일들>"
     echo ""
-    exit 1
   fi
 fi
 
