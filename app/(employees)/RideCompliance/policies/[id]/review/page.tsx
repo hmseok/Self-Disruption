@@ -122,6 +122,16 @@ export default function PolicyReviewPage() {
   }
   useEffect(() => { fetchAll() }, [policyId])  // eslint-disable-line react-hooks/exhaustive-deps
 
+  // P21 — 브라우저 탭 title 동적
+  useEffect(() => {
+    if (policy) {
+      document.title = `검수 — ${policy.policy_code} | 정보보안`
+    } else {
+      document.title = '검수 | 정보보안'
+    }
+    return () => { document.title = 'ERP' }
+  }, [policy])
+
   const sectionAction = async (s: Section, action: 'confirm' | 'reject' | 'reset') => {
     setBusyId(s.id)
     try {
@@ -174,14 +184,43 @@ export default function PolicyReviewPage() {
     }
   }
 
-  const finalizePolicy = async () => {
-    const draftCount = sections.filter(s => s.user_status === 'ai_draft').length
-    if (draftCount > 0) {
-      setResultPanel({
-        kind: 'err',
-        msg: `검수 미완료 섹션 ${draftCount}건 — 모든 행 ✓ 확정 또는 ✕ 반려 처리 후 가능 (5 탭 모두 확인)`,
-      })
+  // P20 — 남은 ai_draft 일괄 확정
+  const bulkConfirmDrafts = async () => {
+    const drafts = sections.filter(s => s.user_status === 'ai_draft')
+    if (drafts.length === 0) {
+      setResultPanel({ kind: 'ok', msg: '확정할 미검수 섹션이 없습니다.' })
       return
+    }
+    if (!confirm(`남은 ${drafts.length}건을 모두 「확정」 처리할까요?\n\n검수 없이 자동 확정합니다. AI 추출 결과를 그대로 받아들이는 의미입니다.`)) return
+    setBusyId('__bulk_confirm__')
+    let ok = 0, err = 0
+    try {
+      const token = getStoredToken()
+      for (const s of drafts) {
+        try {
+          const res = await fetch(`/api/ride-compliance/policies/${policyId}/sections`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+            body: JSON.stringify({ section_id: s.id, action: 'confirm' }),
+          })
+          if (res.ok) ok++; else err++
+        } catch { err++ }
+      }
+      setResultPanel({ kind: err === 0 ? 'ok' : 'err', msg: `일괄 확정 — 성공 ${ok} / 실패 ${err}` })
+      fetchAll()
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  const finalizePolicy = async (force = false) => {
+    const draftCount = sections.filter(s => s.user_status === 'ai_draft').length
+    if (draftCount > 0 && !force) {
+      const proceed = confirm(`검수 미완료 섹션 ${draftCount}건 — 그래도 「확정 (active)」 으로 전이할까요?\n\n미검수 섹션은 ai_draft 상태로 남으며, 추후 검수 가능합니다.`)
+      if (!proceed) {
+        setResultPanel({ kind: 'err', msg: `검수 미완료 ${draftCount}건 — 「✅ 남은 N건 일괄 확정」 또는 각 탭 직접 검수` })
+        return
+      }
     }
     setBusyId('__finalize__')
     try {
@@ -381,9 +420,15 @@ export default function PolicyReviewPage() {
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button style={btnSecondary} onClick={fetchAll}>🔄 새로고침</button>
           <button style={btnSecondary} onClick={() => router.push('/RideCompliance/policies')}>← 목록</button>
+          {/* P20 — 남은 ai_draft 일괄 확정 */}
+          {policy.status !== 'active' && sections.some(s => s.user_status === 'ai_draft') && (
+            <button style={btnPrimary} onClick={bulkConfirmDrafts} disabled={busyId === '__bulk_confirm__'}>
+              {busyId === '__bulk_confirm__' ? '⏳ 일괄 확정중…' : `✅ 남은 ${sections.filter(s => s.user_status === 'ai_draft').length}건 일괄 확정`}
+            </button>
+          )}
           {policy.status !== 'active' && (
-            <button style={btnSuccess} onClick={finalizePolicy} disabled={busyId === '__finalize__'}>
-              ✅ 내규 확정 (active)
+            <button style={btnSuccess} onClick={() => finalizePolicy(false)} disabled={busyId === '__finalize__'}>
+              {busyId === '__finalize__' ? '⏳ 확정중…' : '✅ 내규 확정 (active)'}
             </button>
           )}
           {policy.status === 'active' && (
