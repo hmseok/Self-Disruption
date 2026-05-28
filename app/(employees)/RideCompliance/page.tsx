@@ -2194,37 +2194,97 @@ function OfficerModal(props: { onClose: () => void; onSaved: () => void }) {
       props.onSaved()
     } catch (e) { setError(String(e)) } finally { setSaving(false) }
   }
-  // P23 — 매뉴얼 명시 3인 prefill (클릭 한 번에 직책/역할/비고 자동 채움)
+  // P25 — 출처 인용 → AI 추론 → 확정 3단계 플로우
+  // 각 매뉴얼 명시 인원에 (출처 원문 + 추론된 액션 데이터)
   const MANUAL_OFFICERS = [
-    { name: '임성민 이사', role: 'cpo',     display_title: '라이드케어 개인정보보호 책임자 (CPO)', notes: '매뉴얼 통합본 5.17 제6조 명시 — 임성민 이사' },
-    { name: '석호민 부장', role: 'manager', display_title: '라이드케어 개인정보보호 관리자',       notes: '매뉴얼 통합본 5.17 제6조 명시 — 석호민 부장' },
-    { name: '양재희 부장', role: 'manager', display_title: '라이드케어 개인정보보호 관리자',       notes: '매뉴얼 통합본 5.17 제6조 명시 — 양재희 부장' },
-  ]
-  const prefill = (m: typeof MANUAL_OFFICERS[number]) => {
+    {
+      name: '임성민 이사', role: 'cpo', display_title: '라이드케어 개인정보보호 책임자 (CPO)',
+      notes: '매뉴얼 통합본 5.17 제6조 명시 — 임성민 이사',
+      source_article: '제6조',
+      source_excerpt: '회사는 다음 각 호의 어느 하나에 해당하는 지위에 있는 자 중에서 개인정보보호책임자로 임명한다. (...) 라이드케어 개인정보보호 책임자 (직책: 이사 / 성명: 임성민)',
+    },
+    {
+      name: '석호민 부장', role: 'manager', display_title: '라이드케어 개인정보보호 관리자',
+      notes: '매뉴얼 통합본 5.17 제6조 명시 — 석호민 부장',
+      source_article: '제6조',
+      source_excerpt: '라이드케어 개인정보보호 관리자 (직책: 부장 / 성명: 석호민). 단, 필요 시 개인정보보호책임자가 개인정보보호관리자 겸임 가능.',
+    },
+    {
+      name: '양재희 부장', role: 'manager', display_title: '라이드케어 개인정보보호 관리자',
+      notes: '매뉴얼 통합본 5.17 제6조 명시 — 양재희 부장',
+      source_article: '제6조',
+      source_excerpt: '라이드케어 개인정보보호 관리자 (직책: 부장 / 성명: 양재희).',
+    },
+  ] as const
+
+  type ManualOfficer = typeof MANUAL_OFFICERS[number]
+  const [selectedManual, setSelectedManual] = useState<ManualOfficer | null>(null)
+  const selectManual = (m: ManualOfficer) => {
+    setSelectedManual(m)
     setForm({ ...form, role: m.role, display_title: m.display_title, notes: m.notes })
   }
+  const clearManual = () => setSelectedManual(null)
 
   return (
     <Modal title="👔 임명 등록" onClose={props.onClose}>
-      <div style={{ marginBottom: 12, fontSize: 12, color: COLORS.textSecondary }}>
-        📜 매뉴얼 통합본 5.17 제6조 명시 인원 — 클릭하면 직책·역할·비고 자동 채움. user_id 만 추가 입력.
+      <div style={{ marginBottom: 10, fontSize: 12, color: COLORS.textSecondary }}>
+        📜 매뉴얼 명시 인원 (제6조) — 선택 후 출처·추론·확정 단계별 진행
       </div>
       <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
         {MANUAL_OFFICERS.map((m) => (
-          <button key={m.name} onClick={() => prefill(m)}
+          <button key={m.name} onClick={() => selectManual(m)}
             style={{
               ...GLASS.L2, padding: '10px 14px', borderRadius: 8, cursor: 'pointer',
-              border: form.display_title === m.display_title && form.notes === m.notes
-                ? `2px solid ${COLORS.primary}` : `1px solid ${COLORS.borderSubtle}`,
+              border: selectedManual?.name === m.name ? `2px solid ${COLORS.primary}` : `1px solid ${COLORS.borderSubtle}`,
               fontSize: 12, color: COLORS.textPrimary, textAlign: 'left',
             }}>
             <div style={{ fontWeight: 700 }}>📋 {m.name}</div>
             <div style={{ fontSize: 11, color: COLORS.textMuted }}>
-              {m.role === 'cpo' ? '🛡 CPO' : '👤 관리자'} · {m.display_title}
+              {m.role === 'cpo' ? '🛡 CPO' : '👤 관리자'}
             </div>
           </button>
         ))}
       </div>
+
+      {/* P25 — 선택된 매뉴얼 인원의 「출처 + 추론」 표시 */}
+      {selectedManual && (
+        <div style={{
+          ...GLASS.L3, padding: 14, borderRadius: 10, marginBottom: 14,
+          borderLeft: `4px solid ${COLORS.primary}`,
+        }}>
+          {/* 1단계 — 매뉴얼 원본 인용 */}
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSecondary, marginBottom: 6 }}>
+              📜 1단계 — 매뉴얼 원본 ({selectedManual.source_article})
+            </div>
+            <div style={{
+              padding: 10, borderRadius: 6, background: 'rgba(0,0,0,0.03)',
+              fontSize: 12, color: COLORS.textPrimary, lineHeight: 1.6, fontStyle: 'italic',
+            }}>「{selectedManual.source_excerpt}」</div>
+          </div>
+          {/* 2단계 — AI 추론 액션 */}
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSecondary, marginBottom: 6 }}>
+              🤖 2단계 — AI 추론 액션
+            </div>
+            <div style={{ fontSize: 12, color: COLORS.textPrimary, lineHeight: 1.7 }}>
+              · 역할: <strong>{selectedManual.role === 'cpo' ? '🛡 책임자 (CPO)' : '👤 관리자'}</strong><br/>
+              · 직책: <strong>{selectedManual.display_title}</strong><br/>
+              · 비고: <span style={{ color: COLORS.textSecondary }}>{selectedManual.notes}</span><br/>
+              · <span style={{ color: COLORS.warning }}>⚠ user_id 만 추가 입력 — profiles 에서 「{selectedManual.name.split(' ')[0]}」 검색</span>
+            </div>
+          </div>
+          {/* 3단계 — 확정 안내 */}
+          <div style={{ fontSize: 12, color: COLORS.textMuted }}>
+            ✅ 3단계 — 아래 user_id 입력 후 「등록」 클릭 시 위 데이터로 확정됩니다.
+            <button onClick={clearManual}
+              style={{ marginLeft: 8, fontSize: 11, padding: '2px 8px', background: 'transparent',
+                border: `1px solid ${COLORS.borderSubtle}`, borderRadius: 4, cursor: 'pointer', color: COLORS.textSecondary }}>
+              ✕ 직접 입력
+            </button>
+          </div>
+        </div>
+      )}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
         <Field label="user_id (cuid) *" full><input value={form.user_id} onChange={e => setForm({ ...form, user_id: e.target.value })} placeholder="profiles.id (cuid — 사용자 검색은 추후)" style={inpStyle()} /></Field>
         <Field label="역할 *"><select value={form.role} onChange={e => setForm({ ...form, role: e.target.value })} style={inpStyle()}>
