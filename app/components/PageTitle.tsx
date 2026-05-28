@@ -187,12 +187,31 @@ export default function PageTitle({ dynamicMenuName, brand, primaryLabel }: Page
   const pathname = usePathname()
   const router = useRouter()
 
-  // 2026-05-27 사용자 요청 — 브레드크럼 클릭으로 해당 그룹 첫 페이지 이동.
-  // PATH_TO_GROUP 의 역방향: groupId → 그 그룹의 첫 경로.
-  const groupFirstPath = (groupId: string | null): string | null => {
-    if (!groupId) return null
-    const entry = Object.entries(PATH_TO_GROUP).find(([p, g]) => g === groupId && p !== pathname)
-    return entry ? entry[0] : null
+  // 2026-05-27 사용자 보고 — 브레드크럼 클릭이 「엉뚱한 페이지」 로 이동.
+  //   기존 groupFirstPath 가 GroupId 의 임의 첫 경로 선택 → 의도 불일치.
+  //   재설계: URL path 세그먼트 기반 breadcrumb. 등록된 path 만 클릭 가능.
+  //   그룹 라벨은 「엉뚱한 데로 갈 거면 아예 안 한다」 — 클릭 불가 (표시만).
+  function buildBreadcrumb() {
+    const segments = pathname.split('/').filter(Boolean)
+    type Item = { path: string; label: string; clickable: boolean; isCurrent: boolean }
+    const items: Item[] = []
+    for (let i = 0; i < segments.length; i++) {
+      const segPath = '/' + segments.slice(0, i + 1).join('/')
+      const isCurrent = i === segments.length - 1
+      const registered = PAGE_NAMES[segPath]
+      // 등록 안 된 중간 segment 는 skip (예: /finance/transactions 일 때 'transactions' 가
+      //   PAGE_NAMES 에 따로 없으면 부모만 표시).
+      //   현재 페이지(마지막) 는 dynamic 라벨 또는 segment 자체 fallback.
+      if (!registered && !isCurrent) continue
+      items.push({
+        path: segPath,
+        // 현재 페이지(마지막) 는 dynamicMenuName 우선 (페이지가 prop 으로 넘긴 라벨).
+        label: isCurrent ? (dynamicMenuName || registered || segments[i]) : (registered as string),
+        clickable: !isCurrent && !!registered && segPath !== pathname,
+        isCurrent,
+      })
+    }
+    return items
   }
 
   const findBestMatch = (map: Record<string, string>): string | null => {
@@ -295,34 +314,41 @@ export default function PageTitle({ dynamicMenuName, brand, primaryLabel }: Page
           </div>
         )
       })()}
-      {/* 브레드크럼 — sectionLabel 클릭으로 그룹 첫 페이지 이동 (2026-05-27) */}
-      {sectionLabel && (() => {
-        const targetPath = groupFirstPath(groupId)
-        const clickable = !!targetPath
-        return (
-          <>
+      {/* 브레드크럼 — URL 경로 기반 (2026-05-27 재설계) */}
+      {/* 그룹 라벨: 클릭 불가 (의도 불일치 회피) */}
+      {sectionLabel && (
+        <>
+          <span style={{ fontSize: 12, color: '#64748b', fontWeight: 500 }}>{sectionLabel}</span>
+          <span style={{ color: '#94a3b8', fontSize: 11 }}>›</span>
+        </>
+      )}
+      {/* URL segment 별 — 등록된 path 만 클릭 가능, 현재 페이지는 강조 */}
+      {(() => {
+        const items = buildBreadcrumb()
+        return items.map((item, i) => (
+          <span key={item.path} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            {i > 0 && <span style={{ color: '#94a3b8', fontSize: 11, marginRight: 6 }}>›</span>}
             <span
-              role={clickable ? 'link' : undefined}
-              tabIndex={clickable ? 0 : undefined}
-              onClick={clickable ? () => router.push(targetPath!) : undefined}
-              onKeyDown={clickable ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); router.push(targetPath!) } } : undefined}
-              title={clickable ? `${sectionLabel} 그룹 첫 페이지로 이동` : undefined}
+              role={item.clickable ? 'link' : undefined}
+              tabIndex={item.clickable ? 0 : undefined}
+              onClick={item.clickable ? () => router.push(item.path) : undefined}
+              onKeyDown={item.clickable ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); router.push(item.path) } } : undefined}
+              title={item.clickable ? `${item.label} 으로 이동 (${item.path})` : undefined}
               style={{
-                fontSize: 12, color: '#64748b', fontWeight: 500,
-                cursor: clickable ? 'pointer' : 'default',
-                textDecoration: clickable ? 'none' : undefined,
+                fontSize: item.isCurrent ? 13 : 12,
+                fontWeight: item.isCurrent ? 700 : 500,
+                color: item.isCurrent ? '#0f2440' : '#64748b',
+                cursor: item.clickable ? 'pointer' : 'default',
                 transition: 'color 120ms',
               }}
-              onMouseEnter={(e) => { if (clickable) (e.currentTarget as HTMLElement).style.color = '#3b6eb5' }}
-              onMouseLeave={(e) => { if (clickable) (e.currentTarget as HTMLElement).style.color = '#64748b' }}
+              onMouseEnter={(e) => { if (item.clickable) (e.currentTarget as HTMLElement).style.color = '#3b6eb5' }}
+              onMouseLeave={(e) => { if (item.clickable) (e.currentTarget as HTMLElement).style.color = item.isCurrent ? '#0f2440' : '#64748b' }}
             >
-              {sectionLabel}
+              {item.label}
             </span>
-            <span style={{ color: '#94a3b8', fontSize: 11 }}>›</span>
-          </>
-        )
+          </span>
+        ))
       })()}
-      <span style={{ fontSize: 13, fontWeight: 700, color: '#0f2440' }}>{pageName}</span>
     </div>
   )
 }
