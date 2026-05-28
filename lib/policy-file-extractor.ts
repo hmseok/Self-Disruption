@@ -48,6 +48,7 @@ export interface FileExtractionResult {
 }
 
 export const SUPPORTED_EXTS = ['pptx', 'pdf', 'docx', 'xlsx', 'txt'] as const
+type OfficeFileType = 'pptx' | 'pdf' | 'docx' | 'xlsx' | 'txt'
 
 /**
  * 파일명에서 확장자 추출 (소문자).
@@ -58,6 +59,82 @@ export function extractExt(fileName: string): string {
 }
 
 /**
+ * Phase 2.3 hotfix6 (2026-05-28) — 견고한 파일 형식 자동 감지.
+ * 사용자 통찰: 「무슨 파일이 오던 인식할 수 있어야죠」.
+ *
+ * 흐름:
+ *   1. magic bytes (첫 8바이트) 로 실제 형식 탐지
+ *   2. 확장자 와 교차 검증
+ *   3. 구버전 (.ppt/.doc/.xls) 은 변환 권장 안내
+ *   4. 확장자 없어도 magic bytes 로 추론
+ *
+ * Magic bytes:
+ *   - ZIP (PPTX/DOCX/XLSX 컨테이너):  50 4B 03 04 (PK..)
+ *   - PDF:                            25 50 44 46 2D (%PDF-)
+ *   - OLE2 (구버전 .ppt/.doc/.xls):   D0 CF 11 E0
+ *   - RTF:                            7B 5C 72 74 ({\rt)
+ *   - TXT/UTF-8 BOM:                  EF BB BF
+ */
+export function detectFileType(buffer: Buffer, fileName: string): { fileType: OfficeFileType; warnings: string[]; raw_detection: string } {
+  const warnings: string[] = []
+  const ext = extractExt(fileName)
+  const head4 = buffer.slice(0, 4).toString('hex').toUpperCase()
+  const head5 = buffer.slice(0, 5).toString('ascii')
+
+  let magicType: 'zip' | 'pdf' | 'ole2' | 'rtf' | 'text' | 'unknown' = 'unknown'
+  if (head4 === '504B0304' || head4 === '504B0506' || head4 === '504B0708') magicType = 'zip'
+  else if (head5 === '%PDF-') magicType = 'pdf'
+  else if (head4 === 'D0CF11E0') magicType = 'ole2'
+  else if (head4.startsWith('7B5C72')) magicType = 'rtf'
+  else {
+    // text 추정 — 첫 200 바이트가 출력 가능 ASCII/UTF-8 인지
+    const sample = buffer.slice(0, 200).toString('utf-8')
+    if (/^[\x09\x0A\x0D\x20-\x7E\xA0-￿]+/.test(sample)) magicType = 'text'
+  }
+
+  const raw_detection = `ext=.${ext || '?'} / magic=${magicType} (${head4})`
+
+  // 확장자 → fileType 매핑 (구버전 fallback 포함)
+  const EXT_MAP: Record<string, OfficeFileType> = {
+    pptx: 'pptx', pdf: 'pdf', docx: 'docx', xlsx: 'xlsx', txt: 'txt',
+    // 구버전 — 변환 시도 (실패 가능 → warning)
+    ppt: 'pptx', doc: 'docx', xls: 'xlsx',
+    // 다른 일반 확장자
+    csv: 'txt', md: 'txt', json: 'txt', xml: 'txt', log: 'txt', html: 'txt',
+  }
+
+  // 1. 확장자 우선 (가장 신뢰)
+  if (ext && EXT_MAP[ext]) {
+    const ft = EXT_MAP[ext]
+    // 구버전 OLE2 경고
+    if ((ext === 'ppt' || ext === 'doc' || ext === 'xls') && magicType === 'ole2') {
+      warnings.push(`구버전 Office 형식 (.${ext}) 감지 — officeparser 지원 제한적. .${ext}x 로 변환 권장.`)
+    }
+    // 확장자 ≠ magic 불일치 경고
+    if (ft === 'pdf' && magicType !== 'pdf') {
+      warnings.push(`확장자 .pdf 인데 magic bytes 는 ${magicType} — 파일 손상 가능성`)
+    }
+    if ((ft === 'pptx' || ft === 'docx' || ft === 'xlsx') && magicType !== 'zip' && magicType !== 'ole2') {
+      warnings.push(`확장자 .${ext} 인데 magic bytes 는 ${magicType} — 파일 손상 가능성`)
+    }
+    return { fileType: ft, warnings, raw_detection }
+  }
+
+  // 2. 확장자 없거나 인식 안 됨 — magic bytes 로 결정
+  warnings.push(`확장자 인식 실패 (.${ext || '?'}) — magic bytes (${magicType}) 로 추론`)
+  if (magicType === 'pdf')  return { fileType: 'pdf',  warnings, raw_detection }
+  if (magicType === 'zip')  return { fileType: 'pptx', warnings: [...warnings, 'ZIP 컨테이너 — PPTX 로 시도 (DOCX/XLSX 가능)'], raw_detection }
+  if (magicType === 'text') return { fileType: 'txt',  warnings, raw_detection }
+  if (magicType === 'ole2') return { fileType: 'docx', warnings: [...warnings, '구버전 OLE2 — DOCX 로 시도 (실패 가능)'], raw_detection }
+  if (magicType === 'rtf')  return { fileType: 'txt',  warnings: [...warnings, 'RTF 형식 — 단순 텍스트 추출만 가능'], raw_detection }
+
+  throw new Error(
+    `파일 형식 인식 실패. ${raw_detection}. ` +
+    `지원 형식: PPTX/PDF/DOCX/XLSX/TXT (구버전 .ppt/.doc/.xls 는 .${ext}x 로 변환 권장).`
+  )
+}
+
+/**
  * Buffer → 텍스트 추출. officeparser 가 PPTX/PDF/DOCX/XLSX 모두 처리.
  * TXT 는 단순 UTF-8 디코딩.
  */
@@ -65,20 +142,22 @@ export async function extractTextFromBuffer(
   buffer: Buffer,
   fileName: string
 ): Promise<FileExtractionResult> {
-  const warnings: string[] = []
-  const ext = extractExt(fileName)
-
   if (buffer.length > MAX_FILE_SIZE) {
     throw new Error(`파일 크기 초과 (${(buffer.length / 1024 / 1024).toFixed(1)}MB > ${MAX_FILE_SIZE / 1024 / 1024}MB)`)
   }
 
-  if (!SUPPORTED_EXTS.includes(ext as typeof SUPPORTED_EXTS[number])) {
-    throw new Error(`지원 안 되는 형식: .${ext} — PPTX/PDF/DOCX/XLSX/TXT 만 가능`)
-  }
+  // Phase 2.3 hotfix6 — 견고한 파일 형식 자동 감지 (magic bytes + 확장자 교차)
+  const detection = detectFileType(buffer, fileName)
+  const fileType = detection.fileType
+  const warnings: string[] = [...detection.warnings]
+  const ext = fileType  // officeparser fileType 으로 사용
 
-  // TXT 는 단순 UTF-8
-  if (ext === 'txt') {
-    const text = buffer.toString('utf-8')
+  console.log(`[policy-file-extractor] ${fileName} — ${detection.raw_detection} → fileType=${fileType}`)
+
+  // TXT 는 단순 UTF-8 (BOM 제거)
+  if (fileType === 'txt') {
+    let text = buffer.toString('utf-8')
+    if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1)  // BOM 제거
     return {
       text,
       size_bytes: buffer.length,
