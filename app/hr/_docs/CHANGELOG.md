@@ -5,7 +5,14 @@
 
 ## 2026-05-27
 
-- **PR-HR-12** (hr 세션) — 퇴사자 숨김 운영 + 「완전 삭제」 라벨 정확화.
+- **PR-HR-13** (hr 세션) — InviteModal 페이지 권한 menu-registry 단일 source 동기화.
+  - 사용자 보고: 「멤버 초대에 아직도 페이지 권한 실제 페이지 항목 동기화가 안되네요 구조적으로 개선해야 실시간 동기화가능할것같은데」.
+  - 진단: `InviteModal.tsx` 안 hardcoded `PAGE_GROUPS` (5 그룹) + `PATH_TO_GROUP` 가 `lib/menu-registry` (12 그룹) 와 별도 정의 → 신규 메뉴/그룹 추가 시 페이지 권한에 자동 반영 X (비전 / MT팀 / CX팀 / admin-ops 그룹 누락).
+  - 조치 (사용자 결정: 옵션 C 공용 API):
+    1. 신설 `GET /api/menus` — `lib/menu-registry` GROUPS + MENUS 한 번에 반환. 쿼리 `?for=permission` (권한 부여 대상만) / `?include_hidden=1` (디버그). 향후 `?company=` 옵션 확장 여지.
+    2. InviteModal hardcoded `PAGE_GROUPS` / `PATH_TO_GROUP` 폐기 → `/api/menus?for=permission` 응답 기반 `groups` + `menus.group` 매칭 자동 그룹화.
+    3. state `activeModules` → `menus + groups` 둘 다 보관.
+  - 효과: 이제 `lib/menu-registry` 한 곳만 수정하면 사이드바 + 권한 페이지 + 초대 모달 모두 자동 동기화 (단일 source).
   - 사용자 보고: 「완전 삭제 해도 삭제되지 않네요?」 + 「기존 연동 데이터 때문에?」 — 정확.
   - 진단: `/api/employees/withdraw` 는 `UPDATE is_active=0` (soft delete) — DB row 보존. 거래/계약/회의록 등 FK 참조 데이터의 감사 추적 무결성을 위해 진짜 DELETE 미사용. 버튼 라벨 「완전 삭제」 가 오해 유발.
   - 조치 (사용자 결정: 옵션 A 숨김 운영):

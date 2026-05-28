@@ -52,6 +52,19 @@ interface DropdownItem {
   name: string
 }
 
+// PR-HR-13 (2026-05-27, hr 세션) — hardcoded PAGE_GROUPS / PATH_TO_GROUP 폐기.
+//   기존 문제: 컴포넌트 안 5 그룹 + 경로 매핑이 menu-registry (12 그룹) 와 불일치.
+//   조치: /api/menus?for=permission 호출 → API 응답의 groups + menus 사용.
+//   효과: menu-registry 한 곳만 수정하면 InviteModal 자동 동기화.
+//
+// /api/menus 응답 타입 (lib/menu-registry MenuGroup/MenuEntry 와 일치)
+type ApiMenuGroup = { id: string; label: string; section: string; sortOrder: number }
+type ApiMenu = {
+  id: string; name: string; displayName?: string; path: string;
+  iconKey: string; group: string; sortOrder: number;
+  hidden?: boolean; sidebarHidden?: boolean; requirePermission?: boolean
+}
+// 기존 ActiveModule 호환 — path/name 만 필요한 곳도 있어 alias 유지
 type ActiveModule = { path: string; name: string }
 
 type PagePerm = {
@@ -61,37 +74,6 @@ type PagePerm = {
   can_edit: boolean
   can_delete: boolean
   data_scope: string
-}
-
-// ── 그룹 정의 (v2 — 사이드바 3그룹과 동기화) ──
-const PAGE_GROUPS = [
-  { id: 'vehicle', label: '차량관리' },
-  { id: 'sales', label: '영업/계약' },
-  { id: 'finance', label: '재무/경영' },
-  { id: 'work', label: 'Employee of Ride Inc.' },
-  { id: 'settings', label: '설정' },
-]
-
-const PATH_TO_GROUP: Record<string, string> = {
-  // 차량관리
-  '/cars': 'vehicle', '/insurance': 'vehicle', '/registration': 'vehicle',
-  '/fleet/vehicle-lookup': 'vehicle',
-  '/operations': 'vehicle', '/operations/intake': 'vehicle', '/maintenance': 'vehicle',
-  '/fleet/factory-mgmt': 'vehicle',
-  '/claims/accident-mgmt': 'vehicle', '/claims/billing-mgmt': 'vehicle',
-  // 영업/계약
-  '/quotes': 'sales', '/contracts': 'sales', '/customers': 'sales',
-  '/finance/collections': 'sales', '/finance/settlement': 'sales',
-  '/db/pricing-standards': 'sales',
-  // 재무/경영
-  '/finance': 'finance', '/finance/fleet': 'finance', '/finance/tax': 'finance',
-  '/finance/upload': 'finance', '/finance/cards': 'finance', '/finance/codef': 'finance',
-  '/admin/payroll': 'finance', '/report': 'finance', '/loans': 'finance',
-  '/db/lotte': 'finance',
-  // 직장인필수
-  '/work-essentials/my-info': 'work', '/work-essentials/receipts': 'work',
-  // 설정
-  '/admin/employees': 'settings', '/admin/contract-terms': 'settings', '/admin/message-templates': 'settings',
 }
 
 export default function InviteModal({ companyName, companyId, isOpen, onClose, onSuccess }: Props) {
@@ -110,8 +92,10 @@ export default function InviteModal({ companyName, companyId, isOpen, onClose, o
   const [departments, setDepartments] = useState<DropdownItem[]>([])
   const [positions, setPositions] = useState<DropdownItem[]>([])
 
-  // 페이지 권한
-  const [activeModules, setActiveModules] = useState<ActiveModule[]>([])
+  // 페이지 권한 — PR-HR-13 (2026-05-27): /api/menus 공용 source 로 교체.
+  //   menus / groups 둘 다 state — API 응답 그대로 받아 그룹화에 사용.
+  const [menus, setMenus] = useState<ApiMenu[]>([])
+  const [groups, setGroups] = useState<ApiMenuGroup[]>([])
   const [pagePerms, setPagePerms] = useState<Record<string, PagePerm>>({})
   const [showPerms, setShowPerms] = useState(false)
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
@@ -156,27 +140,19 @@ export default function InviteModal({ companyName, companyId, isOpen, onClose, o
           console.error('Failed to load positions:', error)
         }
 
-        // 활성 모듈 로드 (system_modules 사용)
+        // 메뉴 로드 — PR-HR-13: /api/menus?for=permission 공용 source.
+        //   lib/menu-registry GROUPS + MENUS 단일 source → 신규 메뉴/그룹 자동 동기화.
+        //   for=permission: 권한 부여 대상 (비즈니스 그룹 + requirePermission=true) 만.
         try {
-          const res = await fetch('/api/system_modules', { headers })
+          const res = await fetch('/api/menus?for=permission', { headers })
           if (res.ok) {
             const json = await res.json()
-            const data = Array.isArray(json) ? json : (json.data || [])
-            if (data.length > 0) {
-              const seen = new Set<string>()
-              const modules = data
-                .filter((m: any) => {
-                  const path = m.module?.path || m.path
-                  if (!path || seen.has(path)) return false
-                  seen.add(path)
-                  return true
-                })
-                .map((m: any) => ({ path: m.module?.path || m.path, name: m.module?.name || m.name }))
-              setActiveModules(modules)
-            }
+            const data = json.data || { groups: [], menus: [] }
+            setGroups(data.groups || [])
+            setMenus(data.menus || [])
           }
         } catch (error) {
-          console.error('Failed to load company modules:', error)
+          console.error('Failed to load menus:', error)
         }
       }
 
@@ -201,13 +177,19 @@ export default function InviteModal({ companyName, companyId, isOpen, onClose, o
     }
   }, [isOpen])
 
-  // ── 그룹별 모듈 분류 ──
+  // ── 그룹별 모듈 분류 ── PR-HR-13:
+  //   menu-registry GROUPS + MENUS 기반 자동 그룹화 (hardcoded 폐기).
+  //   menu.group 필드가 그룹 ID 와 매칭 → API 응답 그대로 활용.
+  //   menu.name 은 사이드바 표시명 (displayName 우선, fallback name).
   const groupedModules = useMemo(() => {
-    return PAGE_GROUPS.map(group => ({
-      ...group,
-      items: activeModules.filter(m => (PATH_TO_GROUP[m.path] || 'etc') === group.id),
+    return groups.map(group => ({
+      id: group.id,
+      label: group.label,
+      items: menus
+        .filter(m => m.group === group.id)
+        .map(m => ({ path: m.path, name: m.displayName || m.name } as ActiveModule)),
     })).filter(g => g.items.length > 0)
-  }, [activeModules])
+  }, [groups, menus])
 
   if (!isOpen) return null
 
@@ -496,7 +478,7 @@ export default function InviteModal({ companyName, companyId, isOpen, onClose, o
             </div>
 
             {/* ★ 페이지 권한 — 그룹별 계층 구조 (일반 직원일 때만) */}
-            {role === 'user' && activeModules.length > 0 && (
+            {role === 'user' && menus.length > 0 && (
               <div>
                 <button type="button" onClick={() => setShowPerms(!showPerms)}
                   className="w-full flex items-center justify-between px-4 py-3 bg-steel-50 border border-steel-200 rounded-xl hover:bg-steel-100 transition-colors">
