@@ -1264,7 +1264,13 @@ export default function HRMasterPage() {
           const fmiCount = employees.filter(e => e.company_key !== 'RIDE' && e.role !== 'admin').length
           const rideCount = employees.filter(e => e.company_key === 'RIDE').length
           const commonCount = invitations.length + freelancers.length
-          const count = c === 'FMI' ? fmiCount : c === 'RIDE' ? rideCount : commonCount
+          // PR-HR-22 hotfix (2026-05-28) — 새 회사 (테스트 회사 등) 의 count 정확화.
+          //   이전 버그: c === 'common' 외 회사 키는 commonCount 로 fallback → 22 잘못 표시.
+          const count =
+            c === 'FMI' ? fmiCount :
+            c === 'RIDE' ? rideCount :
+            c === 'common' ? commonCount :
+            employees.filter(e => e.company_key === c).length  // 동적 회사 — DB company_key 기반 직원 수
           // PR-HR-22 — 동적 label: 하드코딩 (FMI/RIDE/common) + DB 회사 label 폴백
           const dynamicLabel = (k: string): string => {
             if (k in COMPANY_LABEL) return COMPANY_LABEL[k as Company]
