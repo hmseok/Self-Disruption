@@ -71,18 +71,22 @@ export async function POST(request: NextRequest) {
       `
     } else {
       // 신규 프로필 생성 (비밀번호 포함)
+      // hotfix (2026-05-27): profiles 테이블 컬럼은 'name' 뿐 (employee_name 없음).
+      //   이전엔 INSERT 에 employee_name 도 넣어 SQL 에러로 신규 가입이 깨졌음.
       userId = crypto.randomUUID()
       await prisma.$executeRaw`
         INSERT INTO profiles
-        (id, email, role, position_id, department_id, name, employee_name, phone, password_hash, is_active, is_approved, created_at)
-        VALUES (${userId}, ${invite.email}, ${invite.role || 'user'}, ${invite.position_id || null}, ${invite.department_id || null}, ${name}, ${name}, ${phone || null}, ${passwordHash}, 1, 1, NOW())
+        (id, email, role, position_id, department_id, name, phone, password_hash, is_active, is_approved, created_at)
+        VALUES (${userId}, ${invite.email}, ${invite.role || 'user'}, ${invite.position_id || null}, ${invite.department_id || null}, ${name}, ${phone || null}, ${passwordHash}, 1, 1, NOW())
       `
     }
 
-    // PR-MULTI-BRAND P3+c-2 — 회사 컨텍스트 적용
-    //   target_company === 'RIDE' 면 profile.company_id 를 RIDE 로 갱신.
+    // PR-MULTI-BRAND P3+c-2/3 — 회사 컨텍스트 적용 + ride_employees 매핑
+    //   target_company === 'RIDE' 면:
+    //     (1) profile.company_id 를 RIDE 로 갱신
+    //     (2) HR 의 POST /api/ride-employees/upsert-from-invite 호출
+    //         → ride_employees UPSERT (profile_id ↔ ride_department_id 매핑)
     //   FMI(또는 NULL legacy)이면 P1 backfill 이 이미 FMI 로 세팅해 둔 상태 유지.
-    //   ride_employees 매핑(department_id 적용) 은 HR 세션이 별도 write API 통해 처리 예정.
     try {
       if (invite.target_company === 'RIDE') {
         const rideCompanyId = await getCompanyIdByKey('RIDE')
@@ -90,6 +94,28 @@ export async function POST(request: NextRequest) {
           await prisma.$executeRaw`
             UPDATE profiles SET company_id = ${rideCompanyId} WHERE id = ${userId}
           `
+        }
+        // P3+c-3 (2026-05-27) — HR PR-HR-8 upsert-from-invite 연동
+        //   본 accept handler 가 server-side fetch 로 호출 (same-origin).
+        //   실패해도 가입 자체는 성공 처리 (graceful) — HR 매니저가 RideOrgPanel 에서 수동 보정 가능.
+        try {
+          const origin = new URL(request.url).origin
+          const upsertRes = await fetch(`${origin}/api/ride-employees/upsert-from-invite`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              profile_id: userId,
+              ride_department_id: invite.ride_department_id || null,
+              name: name,
+              email: invite.email,
+            }),
+          })
+          if (!upsertRes.ok) {
+            const errText = await upsertRes.text().catch(() => '')
+            console.warn('[member-invite/accept] ride_employees upsert 실패 (가입 성공 유지):', upsertRes.status, errText)
+          }
+        } catch (upsertErr) {
+          console.warn('[member-invite/accept] ride_employees upsert 호출 실패 (가입 성공 유지):', upsertErr)
         }
       }
     } catch (e) {
