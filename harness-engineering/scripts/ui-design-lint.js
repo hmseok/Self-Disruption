@@ -153,9 +153,10 @@ for (const fp of pageFiles) {
     // (#1e293b 등은 데이터 셀 텍스트색으로도 흔해 navy 전용으로 한정 — 오탐 회피)
     hasOffStandardTabColor: /\?\s*'#0f2440'/.test(content),
     // 2026-05-26 — 자체 탭 strip — 공용 NeuFilterTabs 사용 의무
-    //   setActive*Tab / setTop*Tab / setSub*Tab / setTabKey 등 setter 검출.
+    //   setTab / setActiveTab / setTopTab / setSubTab / setTabKey 등 setter 검출.
+    //   2026-05-28 fix: setTab (짧은 setter) 도 잡도록 정규식 보정.
     //   NeuFilterTabs 가 이미 import 되어 있으면 OK (sub-tab 혼용 가능).
-    hasSelfTabSetter: /\bset[A-Z]\w*Tab\w*\s*\(/.test(content),
+    hasSelfTabSetter: /\bset\w*Tab\w*\s*\(/.test(content),
     hasNeuFilterTabs: /NeuFilterTabs/.test(content),
     // 2026-05-26 — alert / confirm — 글래스 패널 사용 의무 (Rule 20)
     //   기계적 message 박스 금지. 결과 메시지는 React state + 글래스.
