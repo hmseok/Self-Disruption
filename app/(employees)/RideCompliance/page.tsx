@@ -2031,8 +2031,28 @@ function AnnualOpsTabContent(props: {
     { key: 'assignee_user_name', label: '담당', sortBy: r => r.assignee_user_name || '', render: r => r.assignee_user_name || '—' },
     { key: 'completed_at', label: '완료', sortBy: r => r.completed_at || '', render: r => r.completed_at ? fmtDate(r.completed_at) : '—' },
   ]
+  // P30-F 게이트: annual_plan 없고 task 도 0이면 「내규 확정 → 스케줄 자동 생성」 안내
+  const isEmpty = !props.plan && props.allRows.length === 0
   return (
     <div style={{ ...GLASS.L3, padding: 20, borderRadius: 12 }}>
+      {isEmpty && (
+        <div style={{ ...GLASS.L4, padding: 24, borderRadius: 12, marginBottom: 16, borderLeft: `4px solid ${COLORS.warning}`, textAlign: 'center' }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: COLORS.textPrimary, marginBottom: 8 }}>
+            연간 운영 계획이 없습니다.
+          </div>
+          <div style={{ fontSize: 13, color: COLORS.textSecondary, lineHeight: 1.6, marginBottom: 14 }}>
+            연간 task 는 내규의 「연간 운영」 조항 기반으로 자동 생성됩니다.<br />
+            먼저 「📜 내규 마스터」 탭에서 내규를 등록·검수·확정한 후,<br />
+            검수 페이지의 「스케줄 자동 생성」 액션을 실행해주세요.
+          </div>
+          <div style={{ display: 'inline-flex', gap: 8, fontSize: 11, color: COLORS.textMuted, padding: '8px 14px', borderRadius: 8, background: 'rgba(245,158,11,0.08)' }}>
+            <span>① 내규 등록</span><span>→</span>
+            <span>② AI 추출·검수</span><span>→</span>
+            <span>③ 확정 (active)</span><span>→</span>
+            <span>④ 스케줄 자동 생성</span>
+          </div>
+        </div>
+      )}
       {props.plan && (
         <div style={{ marginBottom: 16, padding: '14px 18px', borderRadius: 8, background: COLORS.bgBlue, borderLeft: `4px solid ${COLORS.primary}` }}>
           <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.textPrimary }}>📅 {props.plan.title}</div>

@@ -49,43 +49,98 @@ interface PlanRow {
 }
 
 /**
- * section_code 에서 월 번호 추출.
- * 예: "2026-03" → 3 / "3월" → 3 / "2026-Q1" → 1 (분기 첫 월) / 추출 실패 → null.
+ * section_code / title / body 에서 적용 월 배열 추출.
+ *
+ * 우선순위:
+ *   1. section_code 의 "YYYY-MM" / "N월" / "QN" — 단일 월
+ *   2. title 의 "N월" — 단일 월
+ *   3. body / title 의 빈도 키워드:
+ *      · 매월 / 매 월 → [1..12]
+ *      · 분기 / 분기별 / 분기 1회 (1·4·7·10월) → [1,4,7,10]
+ *      · 반기 / 반기별 (1·7월) → [1,7]
+ *      · 연 N회 → N=1: [1] / N=2: [1,7] / N=4: [1,4,7,10]
+ *      · 매년 N월 → [N]
+ *
+ * 추출 실패 → 빈 배열.
  */
-function extractMonth(code: string | null, title: string): number | null {
+function extractMonths(code: string | null, title: string, body: string | null): number[] {
+  // 1. section_code 단일 월
   if (code) {
-    // "YYYY-MM"
     let m = code.match(/^\d{4}-(\d{1,2})/)
     if (m) {
       const mm = parseInt(m[1], 10)
-      if (mm >= 1 && mm <= 12) return mm
+      if (mm >= 1 && mm <= 12) return [mm]
     }
-    // "N월"
     m = code.match(/(\d{1,2})\s*월/)
     if (m) {
       const mm = parseInt(m[1], 10)
-      if (mm >= 1 && mm <= 12) return mm
+      if (mm >= 1 && mm <= 12) return [mm]
     }
-    // 단순 "N" (1~12)
     m = code.match(/^(\d{1,2})$/)
     if (m) {
       const mm = parseInt(m[1], 10)
-      if (mm >= 1 && mm <= 12) return mm
+      if (mm >= 1 && mm <= 12) return [mm]
     }
-    // "Q1" → 1월 / "Q2" → 4월 / "Q3" → 7월 / "Q4" → 10월
     m = code.match(/Q([1-4])/i)
-    if (m) {
-      return (parseInt(m[1], 10) - 1) * 3 + 1
-    }
+    if (m) return [(parseInt(m[1], 10) - 1) * 3 + 1]
   }
-  // title 에서도 시도
+
   const t = title || ''
-  const tm = t.match(/(\d{1,2})\s*월/)
-  if (tm) {
-    const mm = parseInt(tm[1], 10)
-    if (mm >= 1 && mm <= 12) return mm
+  const b = body || ''
+  const combined = `${t}\n${b}`
+
+  // 2. title 의 단일 「N월」 (단 「매년 N월」 / 「연 N회」 패턴 회피)
+  const titleM = t.match(/(?<!매년\s*)(?<!연\s*)(\d{1,2})\s*월(?![별간])/)
+  if (titleM) {
+    const mm = parseInt(titleM[1], 10)
+    if (mm >= 1 && mm <= 12) return [mm]
   }
-  return null
+
+  // 3. 빈도 키워드 (body + title 종합)
+  //    가장 광범위한 것부터 검사 — 매월 > 분기 > 반기 > 연 N회 > 매년 N월
+
+  // 매월 / 매 월 / 매월 1회 / 매월 N회 — body 의 「매월」 키워드
+  if (/매\s*월|월\s*1회|월\s*N회|월별/.test(combined)) {
+    return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+  }
+
+  // 분기 / 분기별 / 분기 1회 / 분기 1회(1·4·7·10) — 1·4·7·10월
+  if (/분기/.test(combined)) {
+    return [1, 4, 7, 10]
+  }
+
+  // 반기 / 반기별 — 1·7월
+  if (/반기/.test(combined)) {
+    return [1, 7]
+  }
+
+  // 연 N회 — N에 따라
+  const yearlyN = combined.match(/연\s*(\d+)\s*회/)
+  if (yearlyN) {
+    const n = parseInt(yearlyN[1], 10)
+    if (n === 1) return [1]
+    if (n === 2) return [1, 7]
+    if (n === 3) return [1, 5, 9]
+    if (n === 4) return [1, 4, 7, 10]
+    if (n === 6) return [1, 3, 5, 7, 9, 11]
+    if (n === 12) return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+    return [1] // 기본 1월
+  }
+
+  // 매년 N월 — 명시된 월
+  const yearlyMonth = combined.match(/매년\s*(\d{1,2})\s*월/)
+  if (yearlyMonth) {
+    const mm = parseInt(yearlyMonth[1], 10)
+    if (mm >= 1 && mm <= 12) return [mm]
+  }
+
+  // 연 1회 변형 — 「연 1회」 / 「연1회」 / 「1년 1회」
+  if (/연\s*1\s*회|1\s*년\s*1\s*회|연차/.test(combined)) {
+    return [1]
+  }
+
+  // 추출 실패
+  return []
 }
 
 /**
@@ -185,59 +240,60 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const s = eventSections[i]
     const effTitle = s.user_edited_title || s.title
     const effBody = s.user_edited_body_md || s.body_md
-    const month = extractMonth(s.section_code, effTitle)
-    if (!month) {
+    const months = extractMonths(s.section_code, effTitle, effBody)
+    if (months.length === 0) {
       skippedNoMonth++
       continue
     }
-    const taskCode = `POLICY-${plan.plan_year}-${String(month).padStart(2, '0')}-${String(i + 1).padStart(2, '0')}`
-    const dueDate = monthEndDate(plan.plan_year, month)
-    const taskId = randomUUID()
-    try {
-      // 기존 INSERT 패턴 (Phase 1.4 source_document_id 컬럼은 graceful)
+    // 각 월별로 task INSERT (멱등 — task_code UNIQUE 로 중복 방지)
+    for (const month of months) {
+      const taskCode = `POLICY-${plan.plan_year}-${String(month).padStart(2, '0')}-S${String(i + 1).padStart(2, '0')}`
+      const dueDate = monthEndDate(plan.plan_year, month)
+      const taskId = randomUUID()
       try {
-        await prisma.$executeRaw`
-          INSERT INTO ride_compliance_tasks
-            (id, annual_plan_id, task_code, scheduled_month, category, title, description,
-             legal_reference, due_date, status, source_document_id, auto_generated)
-          VALUES
-            (${taskId}, ${plan.id}, ${taskCode}, ${month},
-             ${'auto_from_policy'},
-             ${effTitle.substring(0, 200)},
-             ${effBody},
-             ${`내규: ${policy.policy_code} ${policy.version} / section: ${s.id}`},
-             ${dueDate}, 'pending',
-             ${s.id}, 1)
-        `
-      } catch (innerErr) {
-        const ie = innerErr as { message?: string }
-        if (ie.message?.includes('Unknown column')
-            && (ie.message?.includes('source_document_id') || ie.message?.includes('auto_generated'))) {
-          // Phase 1.4 마이그 미적용 — fallback
+        try {
           await prisma.$executeRaw`
             INSERT INTO ride_compliance_tasks
               (id, annual_plan_id, task_code, scheduled_month, category, title, description,
-               legal_reference, due_date, status)
+               legal_reference, due_date, status, source_document_id, auto_generated)
             VALUES
               (${taskId}, ${plan.id}, ${taskCode}, ${month},
                ${'auto_from_policy'},
                ${effTitle.substring(0, 200)},
                ${effBody},
                ${`내규: ${policy.policy_code} ${policy.version} / section: ${s.id}`},
-               ${dueDate}, 'pending')
+               ${dueDate}, 'pending',
+               ${s.id}, 1)
           `
-        } else {
-          throw innerErr
+        } catch (innerErr) {
+          const ie = innerErr as { message?: string }
+          if (ie.message?.includes('Unknown column')
+              && (ie.message?.includes('source_document_id') || ie.message?.includes('auto_generated'))) {
+            await prisma.$executeRaw`
+              INSERT INTO ride_compliance_tasks
+                (id, annual_plan_id, task_code, scheduled_month, category, title, description,
+                 legal_reference, due_date, status)
+              VALUES
+                (${taskId}, ${plan.id}, ${taskCode}, ${month},
+                 ${'auto_from_policy'},
+                 ${effTitle.substring(0, 200)},
+                 ${effBody},
+                 ${`내규: ${policy.policy_code} ${policy.version} / section: ${s.id}`},
+                 ${dueDate}, 'pending')
+            `
+          } else {
+            throw innerErr
+          }
         }
-      }
-      insertedCount++
-      insertedDetails.push({ task_code: taskCode, month, title: effTitle.substring(0, 50) })
-    } catch (e) {
-      const err = e as { message?: string }
-      if (err.message?.includes('Duplicate') || err.message?.includes('unique')) {
-        skippedDuplicate++
-      } else {
-        console.error(`[generate-schedule] section ${s.id} INSERT 실패:`, err.message)
+        insertedCount++
+        insertedDetails.push({ task_code: taskCode, month, title: effTitle.substring(0, 50) })
+      } catch (e) {
+        const err = e as { message?: string }
+        if (err.message?.includes('Duplicate') || err.message?.includes('unique')) {
+          skippedDuplicate++
+        } else {
+          console.error(`[generate-schedule] section ${s.id} month ${month} INSERT 실패:`, err.message)
+        }
       }
     }
   }

@@ -119,15 +119,15 @@ function ApprovalLine({ review, officers }: {
 }) {
   const status = review.review_status || 'pending'
 
-  // 사용자 결정 (2026-05-29) — 결재 라인 시각 5/28 자연 분 박기
-  //   폐기예정일 (external_request_at) 은 6/1 그대로, ApprovalLine 1단계는 신청 시각 별도.
-  const t0930 = '2026-05-28 09:42:18'  // 1단계 양재희 부장 — 폐기 요청 신청
-  const t1100 = '2026-05-28 11:23:47'  // 2단계 석호민 부장 — 검토
-  const t1430 = '2026-05-28 14:36:52'  // 3단계 임성민 이사 — 승인·최종 확인
+  // 운영 모드 (P30-D, 2026-05-29) — 시각은 DB 우선, fallback 만 매뉴얼 박기.
+  //   SQL UPDATE 만으로 결재 시각 변경 가능.
+  const t0930 = '2026-05-28 09:42:18'  // 1단계 fallback
+  const t1100 = '2026-05-28 11:23:47'  // 2단계 fallback
+  const t1430 = '2026-05-28 14:36:52'  // 3단계 fallback
 
-  // 3 단계 (매뉴얼 임명자 박음):
+  // 3 단계 (매뉴얼 임명자 박음 — 시각은 DB 우선):
   //   [1] 양재희 부장 — 정보보안 담당자 — 폐기 요청
-  //   [2] 석호민 부장 — 개인정보보호 담당자 (관리자) — 검토
+  //   [2] 석호민 부장 — 개인정보보호 담당자 — 검토
   //   [3] 임성민 이사 — 개인정보보호 책임자 (CPO) — 승인·최종 확인
   const stages = [
     {
@@ -136,7 +136,7 @@ function ApprovalLine({ review, officers }: {
       title: '폐기 요청',
       person: '양재희 부장',
       subtitle: '라이드케어 정보보안 담당자',
-      at: t0930,
+      at: review.external_request_at || t0930,
       done: true,
       current: false,
     },
@@ -146,9 +146,9 @@ function ApprovalLine({ review, officers }: {
       title: '검토',
       person: '석호민 부장',
       subtitle: '라이드케어 개인정보보호 담당자',
-      at: t1100,
-      done: true,
-      current: false,
+      at: review.external_approval_at || t1100,
+      done: ['approved', 'executed', 'confirmed'].includes(status) || !!review.external_approval_at,
+      current: status === 'pending',
     },
     {
       step: '3',
@@ -156,9 +156,9 @@ function ApprovalLine({ review, officers }: {
       title: status === 'rejected' ? '반려' : '승인·최종 확인',
       person: '임성민 이사',
       subtitle: '라이드케어 개인정보보호 책임자 (CPO)',
-      at: t1430,
-      done: true,
-      current: false,
+      at: review.external_confirmed_at || review.reviewed_at || t1430,
+      done: status === 'confirmed' || !!review.external_confirmed_at,
+      current: status === 'approved' || status === 'executed',
       reject: status === 'rejected',
     },
   ]
