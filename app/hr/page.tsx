@@ -1256,19 +1256,14 @@ export default function HRMasterPage() {
       {/* PR-DESIGN-11 (2026-05-28) — UI-DESIGN-STANDARD § 1.6: 페이지 최상위 래퍼 중앙정렬 제거 (전체 너비) */}
       <div className="py-4 px-4 md:py-5 md:px-6">
 
-      {/* Stats */}
-      <DcStatStrip
-        stats={[
-          { label: '전체', value: employees.length, tint: 'blue' },
-          { label: '재직', value: workingCount, tint: 'green' },
-          { label: '휴직', value: onLeaveCount, tint: 'amber' },
-          { label: '퇴사', value: resignedCount, tint: 'red' },
-          { label: '대기중 초대', value: pendingInvitationCount, tint: 'amber' },
-        ]}
-        actions={[
-          { label: '직원 초대', onClick: () => setShowInviteModal(true), variant: 'primary', icon: '+' },
-        ]}
-      />
+      {/* PR-HR-23b hotfix (2026-05-29) — 옛 외부 DcStatStrip 제거.
+            사용자 명령 「ui 새로 다 걷어내야 하는데 꼼작 안 하네요」 — CompanyEmployeePanel 내부 stat 와 중복.
+            각 회사/탭 패널이 자기 stat 자체 처리:
+              · FMI 직원: CompanyEmployeePanel stats (재직/휴직/퇴사/관리자/초대 5카드)
+              · RIDE 직원: RideOrgPanel 내부 stat (활성/부서/입사/퇴사/승진 5카드)
+              · 새 회사 직원: CompanyEmployeePanel 기본 stats
+              · 공통 탭들 (초대/프리랜서/...): 각 컴포넌트 자체
+            「+ 직원 초대」 액션은 CompanyEmployeePanel actions 로 흡수 또는 별도 위치 (다음 hotfix). */}
 
       {/* PR-HR-11a — 회사 토글 (1단계). 사용자 보고 '이중탭 부자연스러움' 해소.
             company_key 기반 권한 분리 (admin GOD 전체 / user/master 본인 회사 + common).
@@ -1348,7 +1343,9 @@ export default function HRMasterPage() {
           columns={employeeColumns}
           mobileCard={employeeMobileCard}
           onRowClick={openEditModal}
-          actions={[]}
+          actions={[
+            { label: '직원 초대', onClick: () => setShowInviteModal(true), variant: 'primary', icon: '+' },
+          ]}
           filters={FILTER_ITEMS}
           activeFilter={statusFilter}
           onFilterChange={setStatusFilter}
