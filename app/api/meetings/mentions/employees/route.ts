@@ -3,13 +3,21 @@ import { verifyUser } from '@/lib/auth-server'
 import { prisma } from '@/lib/prisma'
 
 // ═══════════════════════════════════════════════════════════════
-// /api/meetings/mentions/employees — @멘션 후보 검색 (PR-MTG-V2-C-Ride)
+// /api/meetings/mentions/employees — @멘션 후보 검색 + 참석자 picker 로스터
 //
 // 데이터 소스: ride_employees (Ride Inc. 인사 마스터 — /hr/people 동일)
 // → 기존 /api/meetings/mentions/profiles 대체 (profiles = 인증 계정 ≠ 직원)
 //
 // GET ?q=&limit= → [{ id, name, department, position, employment_type, color_tone, group_label, profile_id }]
 // 활성 직원만 (is_active = 1), 이름 prefix 우선 + 부서/직책 부분 매칭
+//
+// 호출 패턴:
+//   · @멘션 autocomplete (MentionEmployee.ts) — ?q=홍&limit=10 (검색)
+//   · 참석자 picker / 멘션 캐시 (MeetingsLayoutV2) — ?limit=200 (전체 로스터)
+//
+// hotfix #8 (2026-05-26) — 캡 20 → 500 상향:
+//   기존 Math.min(20, ...) 가 클라이언트 limit=200 요청을 사일런트로 20 으로 깎아서,
+//   인사마스터 인원 20+ 가 되면 참석자 picker 에서 잘리는 잠재 버그. 외부/CX 합치며 늘어날 예정.
 // ═══════════════════════════════════════════════════════════════
 
 function serialize<T>(d: T): T {
@@ -23,7 +31,8 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = request.nextUrl
     const q = (searchParams.get('q') || '').trim()
-    const limit = Math.min(20, Math.max(1, parseInt(searchParams.get('limit') || '10', 10)))
+    // hotfix #8 — 캡 20 → 500 (참석자 picker 전체 로스터 지원)
+    const limit = Math.min(500, Math.max(1, parseInt(searchParams.get('limit') || '10', 10)))
 
     if (!q) {
       const rows = await prisma.$queryRawUnsafe<any[]>(
