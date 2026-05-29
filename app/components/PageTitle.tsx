@@ -344,12 +344,12 @@ export default function PageTitle({ dynamicMenuName, brand, primaryLabel }: Page
               style={{
                 fontSize: item.isCurrent ? 13 : 12,
                 fontWeight: item.isCurrent ? 700 : 500,
-                color: item.isCurrent ? '#0f2440' : '#64748b',
+                color: item.isCurrent ? '#3b6eb5' : '#64748b',  // PR-HR-23b hotfix — tab-color-lint 표준 (UI-DESIGN-STANDARD § 4.1)
                 cursor: item.clickable ? 'pointer' : 'default',
                 transition: 'color 120ms',
               }}
               onMouseEnter={(e) => { if (item.clickable) (e.currentTarget as HTMLElement).style.color = '#3b6eb5' }}
-              onMouseLeave={(e) => { if (item.clickable) (e.currentTarget as HTMLElement).style.color = item.isCurrent ? '#0f2440' : '#64748b' }}
+              onMouseLeave={(e) => { if (item.clickable) (e.currentTarget as HTMLElement).style.color = item.isCurrent ? '#3b6eb5' : '#64748b' }}
             >
               {item.label}
             </span>
