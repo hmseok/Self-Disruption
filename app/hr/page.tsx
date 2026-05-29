@@ -19,11 +19,11 @@ import { useEmployees } from '@/lib/hooks/useEmployees'
 // PR-HR-15+16 (2026-05-28) — multi-tenancy 회사 마스터 + 역할 템플릿 (admin 전용)
 import CompanyMasterPanel from './_components/CompanyMasterPanel'
 import RoleTemplatePanel from './_components/RoleTemplatePanel'
-// PR-HR-20 (2026-05-28) — EmployeeListPanel 추출 (FMI/RIDE/공통 직원 리스트 통일 패널)
-import EmployeeListPanel from './_components/EmployeeListPanel'
-// PR-HR-21 (2026-05-28) — CompanyOrgPanel 추출 (FMI 조직도 — 직급/부서 카드)
-import CompanyOrgPanel from './_components/CompanyOrgPanel'
-// PR-HR-23 (2026-05-28) — CompanyEmployeePanel (회사별 직원 마스터 통일 패널 — 새 회사 자동 노출)
+// PR-HR-23b (2026-05-29) — EmployeeListPanel/CompanyOrgPanel 통합 → CompanyEmployeePanel
+//   FMI 직원/조직도 통합. EmployeeListPanel/CompanyOrgPanel 는 deprecated (다음 세션 제거).
+// import EmployeeListPanel from './_components/EmployeeListPanel'  // deprecated PR-HR-23b
+import CompanyOrgPanel from './_components/CompanyOrgPanel'        // FMI '부서·직급 마스터' 탭 보존
+// PR-HR-23a (2026-05-28) — CompanyEmployeePanel (회사별 직원 마스터 통일 패널)
 import CompanyEmployeePanel from './_components/CompanyEmployeePanel'
 // PR-HR-22 (2026-05-28) — useCompanies hook (companies 테이블 기반 동적 회사 목록)
 import { useCompanies } from '@/lib/hooks/useCompanies'
@@ -125,12 +125,17 @@ export default function HRMasterPage() {
     | 'invitations' | 'freelancers' | 'admin'         // common 전용
     | 'companies' | 'roles'                            // PR-HR-15+16 — admin 전용 (common 안)
   const COMPANY_LABEL: Record<Company, string> = { FMI: '🏢 FMI', RIDE: '🚗 RIDE', common: '🔧 공통' }
+  // PR-HR-23b (2026-05-29) — 회사별 sub-tab 통일.
+  //   사용자 명령 「각 회사별 구조 동일」 (5/29) — RIDE/새 회사의 'org' 제거 (CompanyEmployeePanel 내부에 부서 트리 포함).
+  //   FMI 만 'org' (부서·직급 마스터 CRUD) + 'payroll' 추가. RIDE 의 RideOrgPanel 본격 분해는 다음 세션 (PR-HR-23c2).
   const TABS_BY_COMPANY: Record<Company, SubTab[]> = {
     FMI:    ['employees', 'org', 'payroll'],
-    RIDE:   ['employees', 'org'],
+    RIDE:   ['employees'],  // PR-HR-23b — 'org' 제거 (RideOrgPanel 이 둘 다 같은 화면이라 의미 없었음)
     // 'companies' / 'roles' 는 admin 만 — visibleTabs 에서 분기
     common: ['invitations', 'freelancers', 'companies', 'roles', 'admin'],
   }
+  // 동적 추가 회사 (FMI/RIDE/common 외) 의 기본 sub-tab — 통일 단일 'employees'
+  const DEFAULT_DYNAMIC_TABS: SubTab[] = ['employees']
   // 권한 분기: admin (GOD) 은 전체. 그 외 user/master 는 본인 company_key + common.
   const myCompanyKey: 'FMI' | 'RIDE' = profile?.company_key === 'RIDE' ? 'RIDE' : 'FMI'
   // PR-HR-22 (2026-05-28) — companies 테이블 기반 동적 회사 목록 (새 회사 추가 시 토글 자동 노출)
@@ -145,7 +150,8 @@ export default function HRMasterPage() {
     : [myCompanyKey, 'common']
   // common 탭의 「관리자」「회사 마스터」「역할 템플릿」 서브탭은 admin 만 노출
   const visibleTabs = (c: Company): SubTab[] => {
-    const base = TABS_BY_COMPANY[c]
+    // PR-HR-23b — 동적 회사 (FMI/RIDE/common 외) 도 'employees' 단일 sub-tab 으로 통일
+    const base = TABS_BY_COMPANY[c] ?? DEFAULT_DYNAMIC_TABS
     if (c === 'common' && role !== 'admin') return base.filter(t => t !== 'admin' && t !== 'companies' && t !== 'roles')
     return base
   }
@@ -1044,10 +1050,11 @@ export default function HRMasterPage() {
     )
   }
 
-  // ===== NeuDataTable 컬럼 정의 =====
+  // ===== NeuDataTable 컬럼 정의 (PR-HR-23b — Rule 18: 모든 컬럼 sortBy 의무) =====
   const employeeColumns: TableColumn<any>[] = [
     {
       key: 'name', label: '직원', width: '32%',
+      sortBy: (emp) => emp.display_name || emp.email || '',
       render: (emp) => {
         const sosok = getSoSokType(emp)
         const sty = SOSOK_STYLE[sosok]
@@ -1077,6 +1084,7 @@ export default function HRMasterPage() {
     },
     {
       key: 'role', label: '권한', width: 90, align: 'center',
+      sortBy: (emp) => emp.role || '',
       render: (emp) => {
         const rc = ROLE_COLORS[emp.role] || ROLE_COLORS.user
         const rl = ROLE_LABELS[emp.role] || ROLE_LABELS.user
@@ -1089,18 +1097,21 @@ export default function HRMasterPage() {
     },
     {
       key: 'position', label: '직급', width: 100,
+      sortBy: (emp) => emp.position?.name || '',
       render: (emp) => (
         <span style={{ fontSize: 12, color: '#64748b' }}>{emp.position?.name || '-'}</span>
       ),
     },
     {
       key: 'department', label: '부서', width: 100,
+      sortBy: (emp) => emp.department?.name || '',
       render: (emp) => (
         <span style={{ fontSize: 12, color: '#64748b' }}>{emp.department?.name || '-'}</span>
       ),
     },
     {
       key: 'status', label: '재직상태', width: 80, align: 'center',
+      sortBy: (emp) => getEmpStatus(emp),
       render: (emp) => {
         const s = getEmpStatus(emp)
         const sty = STATUS_STYLE_EMP[s]
@@ -1116,6 +1127,7 @@ export default function HRMasterPage() {
     },
     {
       key: 'hire_date', label: '입사/퇴사', width: 130, align: 'center', hideOnMobile: true,
+      sortBy: (emp) => emp.hire_date || emp.resign_date || '',
       render: (emp) => {
         if (!emp.hire_date && !emp.resign_date) return <span style={{ fontSize: 11, color: '#cbd5e1' }}>-</span>
         return (
@@ -1128,6 +1140,7 @@ export default function HRMasterPage() {
     },
     {
       key: 'created_at', label: '가입일', width: 120, align: 'right', hideOnMobile: true,
+      sortBy: (emp) => emp.created_at ? new Date(emp.created_at).getTime() : 0,
       render: (emp) => <span style={{ fontSize: 12, color: '#94a3b8' }}>{formatDate(emp.created_at)}</span>,
     },
   ]
@@ -1291,7 +1304,7 @@ export default function HRMasterPage() {
         tabs={visibleTabs(topCompany).map(t => {
           const TAB_LABEL: Record<SubTab, string> = {
             employees:   '👥 직원',
-            org:         '🏢 조직도',
+            org:         '🏢 부서·직급 마스터',  // PR-HR-23b — 의미 명확화 (단순 '조직도' → CRUD 마스터)
             payroll:     '💰 급여 운영',
             invitations: '✉️ 초대',
             freelancers: '🤝 프리랜서',
@@ -1322,23 +1335,31 @@ export default function HRMasterPage() {
       {/* PR-HR-11a — FMI 직원 / 공통 관리자 — 같은 NeuDataTable UI 재사용.
             소속 유형 필터 (sosokFilter) DcToolbar 폐기 — 회사 토글이 그 역할 대체.
             filteredEmployees 가 topCompany/topTab 기반 분기 (아래 useMemo). */}
-      {/* PR-HR-20 (2026-05-28) — FMI 직원 탭 / 공통 admin 탭 — EmployeeListPanel 표준 사용 */}
+      {/* PR-HR-23b (2026-05-29) — FMI 직원 탭 / 공통 admin 탭 — CompanyEmployeePanel 표준 사용
+            사용자 명령 (5/29): 「각 회사별로 구조 동일해야 함」 → FMI/RIDE/새 회사 통일.
+            EmployeeListPanel 폐기. customEmployees + columns 외부 주입 패턴으로 FMI 특화 컬럼 유지.
+            부서 트리는 자체 fetch (/api/departments?company_key=FMI&tree=1) — 23d 까지 graceful. */}
       {((topCompany === 'FMI' && topTab === 'employees') || (topCompany === 'common' && topTab === 'admin')) && (
-        <EmployeeListPanel
+        <CompanyEmployeePanel
           companyKey={topCompany}
-          employees={filteredEmployees}
-          searchTerm={searchTerm}
-          onSearchChange={setSearchTerm}
+          companyLabel={topCompany === 'common' ? '시스템 관리자' : 'FMI'}
+          role={role as any}
+          customEmployees={filteredEmployees}
+          columns={employeeColumns}
+          mobileCard={employeeMobileCard}
+          onRowClick={openEditModal}
+          actions={[]}
           filters={FILTER_ITEMS}
           activeFilter={statusFilter}
           onFilterChange={setStatusFilter}
-          columns={employeeColumns}
-          rowKey={(emp: any) => emp.id}
-          onRowClick={openEditModal}
-          emptyMessage={topCompany === 'common'
-            ? '시스템 관리자 직원이 없습니다'
-            : '직원이 없습니다 — 「✉️ 초대 관리」 탭에서 새 직원 초대'}
-          mobileCard={employeeMobileCard}
+          searchPlaceholder="이름, 이메일, 부서, 직급 검색..."
+          stats={[
+            { label: '재직', value: workingCount, unit: '명', tint: 'green', icon: '🟢' },
+            { label: '휴직', value: onLeaveCount, unit: '명', tint: 'amber', icon: '🟡' },
+            { label: '퇴사', value: resignedCount, unit: '명', tint: 'red', icon: '🔴' },
+            { label: '시스템 관리자', value: adminSosokCount, unit: '명', tint: 'blue', icon: '🔧' },
+            { label: '초대 대기', value: pendingInvitationCount, unit: '명', tint: 'purple', icon: '✉️' },
+          ]}
         />
       )}
 
@@ -1568,16 +1589,15 @@ export default function HRMasterPage() {
           </div>
           )}
 
-          {/* ─── 탭 (RIDE/employees|org): 라이드 조직 — PR-HR-2 (부서 트리/부서장/일괄변경/focus) ─── */}
-          {/* PR-HR-11a: externalSubTab 폐기 — RIDE 회사 탭의 직원/조직도 양쪽에서 마당 노출.
-                향후 PR-HR-11b 에서 직원/조직도 view 분리 + ERP 접근 컬럼 추가. */}
-          {topCompany === 'RIDE' && (topTab === 'employees' || topTab === 'org') && <RideOrgPanel />}
+          {/* ─── 탭 (RIDE/employees): 라이드 조직 — PR-HR-23b sub-tab 통일 후 'employees' 단일 ─── */}
+          {/* PR-HR-23b (2026-05-29) — sub-tab 'org' 제거 (RideOrgPanel 이 둘 다 같은 화면이라 무의미).
+                RideOrgPanel 본격 분해 (1,131 라인 → CompanyEmployeePanel 마이그) 는 다음 세션 PR-HR-23c2. */}
+          {topCompany === 'RIDE' && topTab === 'employees' && <RideOrgPanel />}
 
-      {/* ─── 탭 (새 회사 / 동적 추가된 회사): CompanyEmployeePanel — PR-HR-23a 스켈레톤 사용 ─── */}
-      {/* FMI/RIDE/common 이 아닌 새 회사 (테스트 회사 등) 가 토글 선택되면 본 패널 자동 노출.
-            companies 테이블 row 추가만으로 즉시 동작 (PR-HR-22 동적 회사 토글 + PR-HR-23 통일 패널).
-            향후 PR-HR-23c/d 에서 FMI/RIDE 도 본 패널로 마이그. */}
-      {topCompany !== 'FMI' && topCompany !== 'RIDE' && topCompany !== 'common' && (topTab === 'employees' || topTab === 'org') && (() => {
+      {/* ─── 탭 (새 회사 / 동적 추가된 회사): CompanyEmployeePanel 자체 fetch ─── */}
+      {/* PR-HR-22 + PR-HR-23a — companies 테이블 row 추가만으로 즉시 동작.
+            sub-tab 'employees' 단일 (DEFAULT_DYNAMIC_TABS) — 통일 구조. */}
+      {topCompany !== 'FMI' && topCompany !== 'RIDE' && topCompany !== 'common' && topTab === 'employees' && (() => {
         const dbCompany = dbCompanies.find(c => c.company_key === topCompany)
         return (
           <CompanyEmployeePanel

@@ -1,7 +1,27 @@
 # /hr 모듈 — CHANGELOG
 
 > Rule 22 (_docs 의무) — 매 PR 한 줄 이상.
-> 세션: peaceful-laughing-volta (hr 세션, 2026-05-16~)
+> 세션: peaceful-laughing-volta (hr 세션, 2026-05-16~), happy-busy-euler (2026-05-29~)
+
+## 2026-05-29
+
+- **PR-HR-23d** (hr 세션 happy-busy-euler) — FMI `departments` 트리 마이그 + API tree 응답.
+  - `migrations/2026-05-29_pr_hr_23d_departments_tree.sql` — `parent_id` CHAR(36) NULL + `color_tone` VARCHAR(20) + `sort_order` INT 추가 (멱등, information_schema 체크).
+  - `app/api/departments/route.ts` GET — `?tree=1` / `?company_key=` 옵션 + 재귀 트리 build. graceful fallback (parent_id 컬럼 미적용 시 `_migration_pending: true` 응답 + 평면 데이터, Rule 23). POST 도 parent_id 분기.
+  - 사용자 직접 마이그 SQL 실행 필요: `mysql -h ... < migrations/2026-05-29_pr_hr_23d_departments_tree.sql`
+
+- **PR-HR-23b** (hr 세션 happy-busy-euler) — FMI 직원 탭 → CompanyEmployeePanel 마이그 + 회사별 sub-tab 통일.
+  - **사용자 명령 (5/29)**: 「각 회사별 구조가 동일해야 하는데 다르군요」 → Option A 단일 통합 패널 선택.
+  - `app/hr/_components/CompanyEmployeePanel.tsx` props 확장 — `customEmployees / customDepartments / columns / onRowClick / actions / filters / activeFilter / onFilterChange / mobileCard / searchPlaceholder / stats` 외부 주입 옵션. fetch skip 모드 + 기본 columns 의 sortBy 전체 추가 (Rule 18).
+  - `app/hr/page.tsx`:
+    - `EmployeeListPanel` → `CompanyEmployeePanel` 교체 (FMI 직원 / 공통 admin 탭 모두).
+    - `employeeColumns` 모든 컬럼에 `sortBy` 추가 (Rule 18 의무) — name/role/position/department/status/hire_date/created_at.
+    - `TABS_BY_COMPANY` 수정: RIDE `['employees', 'org']` → `['employees']` (RideOrgPanel 이 둘 다 같은 화면이라 무의미). 새 회사 default `DEFAULT_DYNAMIC_TABS = ['employees']` (통일).
+    - `org` 탭 라벨 `'🏢 조직도'` → `'🏢 부서·직급 마스터'` (FMI 의 CRUD 마스터 의미 명확화).
+  - `EmployeeListPanel.tsx` deprecated (즉시 삭제 X — 안정화 1주 후 다음 세션 제거).
+  - **회귀 위험**: RIDE 는 본 PR 에서 RideOrgPanel 그대로 유지 — 본격 분해 (1,131 라인 → CompanyEmployeePanel 마이그) 는 다음 세션 PR-HR-23c2.
+
+- **PR-HR-23bcd 설계서 v2** — `app/hr/_docs/PR-HR-23bcd-DESIGN-V2.md` — 본 PR 시리즈 통합 설계. End-to-End 시뮬레이션 6단계 (Rule 8) + 영향 파일 인덱스 (Rule 11/12) + GATE 체크리스트 (Rule 27) + cowork 영역 (Rule 21).
 
 ## 2026-05-28
 
