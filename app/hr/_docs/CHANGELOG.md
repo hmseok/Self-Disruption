@@ -5,6 +5,19 @@
 
 ## 2026-05-28
 
+- **PR-HR-HANDOVER** (hr 세션) — 본 세션 14 commit 인계 문서 작성. 다음 세션 진입점 명시 (`HANDOVER-2026-05-28-NEXT-SESSION.md`).
+- **PR-HR-23b** (hr 세션) — 새 회사 탭 → CompanyEmployeePanel 자동 노출. `topCompany !== 'FMI/RIDE/common'` (동적 회사) + `employees|org` → 본 패널 자동 사용. FMI/RIDE 는 그대로 (PR-HR-23c/d 에서 마이그).
+- **PR-HR-23a** (hr 세션) — CompanyEmployeePanel 스켈레톤 + 설계서 신설 (`_docs/COMPANY-EMPLOYEE-PANEL.md`). 5층 표준 (DcStatStrip + DcToolbar + 부서 트리 + NeuDataTable). 회사별 data source 분기 (FMI=`/api/employees?company_key=`, RIDE=`/api/ride-employees`).
+- **PR-HR-18** + **PR-HR-22 hotfix** (hr 세션) — 사이드바 회사별 자동 필터 + 토글 카운트 정확화. `lib/menu-registry.ts` MenuGroup interface 에 `companies?: ('FMI'|'RIDE')[]` 추가 / business 그룹=FMI / cx-team/mt-team/vision=RIDE / settings=admin only. ClientLayout 의 라이드 sub-section 3개에 회사 가드. + 동적 회사 토글의 count fallback 버그 (commonCount=22) 해결.
+- **PR-HR-22 hotfix** (hr 세션) — 새 회사 토글 카운트 정확화 (별 commit).
+- **PR-HR-17** (hr 세션) — `withCompanyScope(req, opts)` 헬퍼 + `scopeFilter(user, col)` 신설. API 라우트 회사 격리 + admin 우회. 메인 세션 `lib/company-context.ts` + `verifyUser` 위에 build. 단계적 마이그 (PR-HR-17b 차수).
+- **PR-HR-22** (hr 세션) — `useCompanies()` SWR hook + 회사 토글 동적화. visibleCompanies 가 DB 기반 → 「+ 회사 추가」 UI 로 새 회사 row 추가만으로 토글 자동 노출. `dynamicLabel` 헬퍼 (DB label 폴백).
+- **PR-HR-21** (hr 세션) — CompanyOrgPanel 추출 (FMI 조직도 인라인 90 라인 → 컴포넌트). 직급 + 부서 카드 2개 표준 패널. props 외부 주입.
+- **PR-HR-20b** (hr 세션) — RideOrgPanel 검색바 룩앤필 통일. 자체 input → DcToolbar (EmployeeListPanel 패턴). 「하위 부서 포함」 + bulk action 별도 줄 분리.
+- **PR-HR-20** (hr 세션) — EmployeeListPanel 추출 + FMI 직원 탭 마이그. ★ 사용자 「fmi/ride 탭 정리되어야」 1단계.
+- **PR-HR-DESIGN-FIX** (hr 세션, 메인 세션 요청) — hr/page.tsx UI 표준 위반 3건 정리: max-w-[1400px] 제거 / DcToolbar→NeuFilterTabs / 자체 <table>→div role grid.
+- **PR-HR-16 hotfix** (hr 세션) — role_templates collation utf8mb4_unicode_ci 통일 + 회귀 케이스 등록 (Rule 9/15 — 누적 사고 2회 → 다음 같은 사고 시 `sql-collation-lint.js` 자동화 의무).
+
 - **PR-HR-15+16** (hr 세션) — multi-tenancy 회사 마스터 + 페이지 권한 역할 템플릿. ★ 사용자 「실수할까봐 두려움」 직접 해결.
   - 사용자 요구 (2026-05-28): FMI ↔ 라이드 「구조가 다르다 → 구조 정리 필요」, F = 전면 정리.
     페인 결론: 회사별 격리 자동화 + 페이지 권한 사람마다 고민 → 템플릿화 (회사+역할 묶음).
