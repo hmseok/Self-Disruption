@@ -570,6 +570,9 @@ export default function RideCompliancePage() {
   const [annualPlan, setAnnualPlan] = useState<AnnualPlan | null>(null)
   const [tasks, setTasks] = useState<ComplianceTask[]>([])
   const [submissions, setSubmissions] = useState<FormSubmission[]>([])
+  // P31 — 5단계 진행 상태 (active 내규 + deliverables 카운트)
+  const [activePolicyCount, setActivePolicyCount] = useState<number>(0)
+  const [deliverableCount, setDeliverableCount] = useState<number>(0)
 
   const [migrationPending, setMigrationPending] = useState<{ p11: boolean; p12: boolean }>({ p11: false, p12: false })
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -636,6 +639,15 @@ export default function RideCompliancePage() {
       setAnnualPlan((planJ.data || [])[0] || null)
       setTasks(taskJ.data || [])
       setSubmissions(subJ.data || [])
+      // P31 — 5단계 진행 카운트 (별도 light fetch)
+      fetch('/api/ride-compliance/policies?status=active', { headers, cache: 'no-store' })
+        .then(r => r.json())
+        .then(j => setActivePolicyCount(Array.isArray(j?.data) ? j.data.length : 0))
+        .catch(() => setActivePolicyCount(0))
+      fetch('/api/ride-compliance/deliverables', { headers, cache: 'no-store' })
+        .then(r => r.json())
+        .then(j => setDeliverableCount(Array.isArray(j?.data) ? j.data.length : 0))
+        .catch(() => setDeliverableCount(0))
       setMyRole(ofJ.meta?.my_role || null)
       // _migration_pending 구분: phase11 (officers/assets/incidents) vs phase12 (documents/tasks 등)
       const p11Pending = !!(ofJ.meta?._migration_pending === true)
@@ -794,6 +806,62 @@ export default function RideCompliancePage() {
           ❌ 로드 오류: {loadError}
         </div>
       )}
+
+      {/* P31 — 5단계 진행 상태 패널 */}
+      {(() => {
+        const steps = [
+          { num: '1', label: '내규 등록·확정', done: activePolicyCount > 0, count: activePolicyCount, key: 'policies_master' as TabKey },
+          { num: '2', label: '조직 임명',       done: officers.length > 0,   count: officers.length,   key: 'officers' as TabKey },
+          { num: '3', label: '정보자산 등록',    done: assets.length > 0,    count: assets.length,    key: 'assets' as TabKey },
+          { num: '4', label: '운영 스케줄',      done: tasks.length > 0,     count: tasks.length,     key: 'annual_ops' as TabKey },
+          { num: '5', label: '산출물 발급',      done: deliverableCount > 0,  count: deliverableCount, key: 'deliverables_tracker' as TabKey },
+        ]
+        const completedCount = steps.filter(s => s.done).length
+        return (
+          <div style={{ ...GLASS.L4, padding: '14px 16px', borderRadius: 12, marginBottom: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: COLORS.textPrimary }}>📊 정보보안 운영 진행 상태</span>
+              <span style={{ fontSize: 11, color: COLORS.textSecondary }}>
+                {completedCount === 5
+                  ? '5단계 모두 완료 — 정상 운영 중'
+                  : `${completedCount}/5 단계 완료 — 다음: ${steps.find(s => !s.done)?.label || '—'}`}
+              </span>
+              {/* 진행률 bar */}
+              <div style={{ flex: 1, minWidth: 120, height: 6, background: 'rgba(0,0,0,0.06)', borderRadius: 3, overflow: 'hidden' }}>
+                <div style={{ width: `${(completedCount / 5) * 100}%`, height: '100%', background: completedCount === 5 ? COLORS.success : COLORS.primary, transition: 'width 0.3s' }} />
+              </div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 8 }}>
+              {steps.map((s, i) => {
+                const isCurrent = !s.done && steps.slice(0, i).every(prev => prev.done)
+                const bg = s.done ? 'rgba(16,185,129,0.10)' : isCurrent ? 'rgba(59,130,246,0.10)' : 'rgba(148,163,184,0.06)'
+                const border = s.done ? COLORS.success : isCurrent ? COLORS.primary : COLORS.borderSubtle
+                const fg = s.done ? COLORS.success : isCurrent ? COLORS.primary : COLORS.textMuted
+                return (
+                  <button key={s.num} onClick={() => setTab(s.key)}
+                    style={{
+                      padding: '8px 10px', borderRadius: 8, border: `1px solid ${border}`,
+                      background: bg, cursor: 'pointer', textAlign: 'left',
+                      transition: 'all 0.15s',
+                    }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                      <span style={{ fontSize: 10, fontWeight: 700, color: fg }}>STEP {s.num}</span>
+                      {s.done && <span style={{ fontSize: 11, color: COLORS.success }}>✓</span>}
+                      {isCurrent && <span style={{ fontSize: 9, color: COLORS.primary, fontWeight: 700 }}>● 진행 중</span>}
+                    </div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: COLORS.textPrimary, marginBottom: 2 }}>
+                      {s.label}
+                    </div>
+                    <div style={{ fontSize: 10, color: COLORS.textSecondary }}>
+                      {s.done ? `${s.count.toLocaleString()}건 등록` : '대기'}
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )
+      })()}
 
       {/* P29 + PR-RC-X — 3 카테고리 그룹화 (규정/운영/산출) + NeuFilterTabs 공용 컴포넌트 */}
       <div style={{ ...GLASS.L5, padding: '8px 12px', borderRadius: 10, marginBottom: 16, display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
