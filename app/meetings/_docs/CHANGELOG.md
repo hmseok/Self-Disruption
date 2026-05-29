@@ -4,6 +4,35 @@
 
 ---
 
+## 2026-05-26
+
+### hotfix #8 — 참석자 picker 인원 사일런트 잘림 (mentions/employees 캡 20→500)
+
+**사용자 보고**: 「참석자 확인할려는데 그래도 여긴 인사마스터쪽에서 인원을 다불러와야하지않아요?」
+
+**진단**: `/api/meetings/mentions/employees` 의 limit 처리:
+```ts
+const limit = Math.min(20, Math.max(1, parseInt(... '10', 10)))
+//                  ^^ 클라이언트가 뭘 보내든 20 으로 깎임 (silent clamp)
+```
+이 엔드포인트는 두 패턴으로 호출됨:
+- `MentionEmployee.ts` — `?q=홍&limit=10` (autocomplete, 캡 OK)
+- `MeetingsLayoutV2.tsx:139` — **`?limit=200`** (참석자 picker 전체 로스터 — 캡에 막혀 20 으로 깎임)
+
+현재 ride_employees 16명 < 20 이라 우연히 다 보였지만, 20+ 추가되는 순간 잘림 (외부/CX 통합 예정).
+
+**수정** (`app/api/meetings/mentions/employees/route.ts`):
+- `Math.min(20, ...)` → `Math.min(500, ...)` — 클라이언트 요청 존중
+- 헤더 주석에 호출 패턴 + 캡 상향 사유 명시
+
+**영향**:
+- 참석자 picker: 200 요청 → 200 받음 (인사마스터 늘어나도 안전)
+- @멘션 autocomplete: 10 그대로 (캡 영향 X)
+
+**Rule 21**: api:meetings 단일 모듈 / **Rule 22**: 본 CHANGELOG / `cowork:commit` 사용 (PR-COORD-11)
+
+---
+
 ## 2026-05-24
 
 ### PR-MTG-V2-Todo-D — 개인 TODO 다중 해시태그
