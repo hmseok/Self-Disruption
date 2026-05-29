@@ -163,15 +163,15 @@ export async function buildDestructionCertPdf(data: DestructionCertData): Promis
   })
   y -= 22
 
-  // 사용자 결정 (2026-05-29) — 결재 일자 「2026-05-28」 고정 박기
-  const t0930 = '2026-05-28 09:30:00'
-  const t1100 = '2026-05-28 11:00:00'
-  const t1430 = '2026-05-28 14:30:00'
+  // 운영 모드 (P30-D, 2026-05-29) — 시각은 DB 우선, fallback 만 5/28 박기
+  const t0930 = '2026-05-28 09:42:18'
+  const t1100 = '2026-05-28 11:23:47'
+  const t1430 = '2026-05-28 14:36:52'
 
   const lineRows: Array<[string, string, string, string, string]> = [
-    ['1단계', '담당자',  '양재희 부장', '라이드케어 정보보안 담당자',           fmtDate(t0930)],
-    ['2단계', '관리자',  '석호민 부장', '라이드케어 개인정보보호 담당자',       fmtDate(t1100)],
-    ['3단계', '책임자',  '임성민 이사', '라이드케어 개인정보보호 책임자 (CPO)', fmtDate(t1430)],
+    ['1단계', '담당자',  '양재희 부장', '라이드케어 정보보안 담당자',           fmtDate(data.request_at || t0930)],
+    ['2단계', '관리자',  '석호민 부장', '라이드케어 개인정보보호 담당자',       fmtDate(data.approval_request_at || t1100)],
+    ['3단계', '책임자',  '임성민 이사', '라이드케어 개인정보보호 책임자 (CPO)', fmtDate(data.confirmed_at || t1430)],
   ]
 
   const lineBoxH = lineRows.length * 28 + 12
