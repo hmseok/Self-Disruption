@@ -15,6 +15,19 @@ const withTimeout = <T>(promise: Promise<T>, ms = 5000): Promise<T | null> =>
     new Promise<null>(r => setTimeout(() => r(null), ms))
   ])
 
+// ─── 컬럼 존재 여부 헬퍼 ─────────────────────────────────────────
+async function hasColumn(table: string, column: string): Promise<boolean> {
+  const rows = await withTimeout(
+    prisma.$queryRaw<any[]>`
+      SELECT COUNT(*) AS cnt FROM information_schema.columns
+      WHERE table_schema = DATABASE()
+        AND table_name = ${table}
+        AND column_name = ${column}
+    `
+  )
+  return !!(rows && Number(rows[0]?.cnt || 0) > 0)
+}
+
 // ─── 평면 → 트리 변환 (재귀 build) ──────────────────────────────
 function buildTree(rows: any[]): any[] {
   const map = new Map<string, any>()
@@ -35,7 +48,10 @@ function buildTree(rows: any[]): any[] {
 
 // GET /api/departments
 // PR-HR-23d (2026-05-29) — ?tree=1 / ?company_key= 옵션 + graceful fallback
-//   parent_id 컬럼 미적용 시 평면 응답 + _migration_pending: true (Rule 23)
+// PR-HR-23d hotfix (2026-05-29) — departments.company_id 컬럼 미존재 대응:
+//   사용자 진단 결과 (5/29 21:12): Error 1054 Unknown column 'd.company_id'.
+//   → departments 가 multi-tenancy 마이그 안 됨 (단일 회사 시대 그대로).
+//   → company_id 컬럼 존재 체크 후 SELECT/WHERE 분기 (Rule 23 graceful + Rule 13 호환성).
 export async function GET(request: NextRequest) {
   try {
     const user = await verifyUser(request)
@@ -46,38 +62,41 @@ export async function GET(request: NextRequest) {
     const companyKey = searchParams.get('company_key')
     const treeMode = searchParams.get('tree') === '1'
 
-    // PR-HR-23d — parent_id 컬럼 존재 여부 확인 (graceful)
-    const colCheck = await withTimeout(
-      prisma.$queryRaw<any[]>`
-        SELECT COUNT(*) AS cnt FROM information_schema.columns
-        WHERE table_schema = DATABASE()
-          AND table_name = 'departments'
-          AND column_name = 'parent_id'
-      `
-    )
-    const hasParentId = !!(colCheck && Number(colCheck[0]?.cnt || 0) > 0)
+    // 컬럼 존재 확인 — parent_id (PR-HR-23d 마이그) + company_id (multi-tenancy)
+    const [hasParentId, hasCompanyId, hasColorTone, hasSortOrder] = await Promise.all([
+      hasColumn('departments', 'parent_id'),
+      hasColumn('departments', 'company_id'),
+      hasColumn('departments', 'color_tone'),
+      hasColumn('departments', 'sort_order'),
+    ])
 
-    // company_key → company_id 변환 (선택)
-    let resolvedCompanyId = companyId
-    if (!resolvedCompanyId && companyKey) {
+    // company_key → company_id 변환 (company_id 컬럼 있을 때만 의미)
+    let resolvedCompanyId: string | null = companyId
+    if (!resolvedCompanyId && companyKey && hasCompanyId) {
       const cRows = await withTimeout(
         prisma.$queryRaw<any[]>`SELECT id FROM companies WHERE company_key = ${companyKey} LIMIT 1`
       )
       resolvedCompanyId = cRows?.[0]?.id || null
     }
 
-    // SELECT 쿼리 — parent_id 있으면 포함
-    const selectCols = hasParentId
-      ? 'id, name, parent_id, color_tone, sort_order, company_id, created_at, updated_at'
-      : 'id, name, company_id, created_at, updated_at'
+    // SELECT 컬럼 동적 build (존재하는 컬럼만)
+    const cols = ['id', 'name']
+    if (hasParentId) cols.push('parent_id')
+    if (hasColorTone) cols.push('color_tone')
+    if (hasSortOrder) cols.push('sort_order')
+    if (hasCompanyId) cols.push('company_id')
+    cols.push('created_at', 'updated_at')
 
-    let query = `SELECT ${selectCols} FROM departments`
+    let query = `SELECT ${cols.join(', ')} FROM departments`
     const params: any[] = []
 
-    if (resolvedCompanyId) {
+    // WHERE company_id — 컬럼 존재 + companyId resolve 됐을 때만
+    if (resolvedCompanyId && hasCompanyId) {
       query += ' WHERE company_id = ?'
       params.push(resolvedCompanyId)
     }
+    // company_id 컬럼 없으면 단일 회사 가정 — 모든 부서 반환 (graceful fallback)
+    // → 사용자가 FMI 토글이어도 모든 departments 보임 (multi-tenancy 마이그 전까지)
 
     query += hasParentId
       ? ' ORDER BY sort_order ASC, created_at ASC'
@@ -87,14 +106,24 @@ export async function GET(request: NextRequest) {
 
     if (rawData === null) {
       console.warn('[departments GET] DB 조회 실패 또는 타임아웃 — 빈 배열 반환')
-      return NextResponse.json({ data: [], error: null, _migration_pending: !hasParentId })
+      return NextResponse.json({
+        data: [],
+        error: null,
+        _migration_pending: !hasParentId,
+        _multi_tenancy_pending: !hasCompanyId,
+      })
     }
 
     const data = serialize(rawData)
 
     // ?tree=1 + parent_id 있음 → 재귀 트리 변환
     if (treeMode && hasParentId) {
-      return NextResponse.json({ data: buildTree(data), error: null, _migration_pending: false })
+      return NextResponse.json({
+        data: buildTree(data),
+        error: null,
+        _migration_pending: false,
+        _multi_tenancy_pending: !hasCompanyId,
+      })
     }
 
     // ?tree=1 인데 parent_id 없음 → graceful: 평면 응답 + _migration_pending
@@ -103,11 +132,17 @@ export async function GET(request: NextRequest) {
         data: data.map((r: any) => ({ ...r, parent_id: null, children: [] })),
         error: null,
         _migration_pending: true,
+        _multi_tenancy_pending: !hasCompanyId,
       })
     }
 
     // 일반 평면 응답
-    return NextResponse.json({ data, error: null, _migration_pending: !hasParentId })
+    return NextResponse.json({
+      data,
+      error: null,
+      _migration_pending: !hasParentId,
+      _multi_tenancy_pending: !hasCompanyId,
+    })
   } catch (e: any) {
     console.error('[departments GET] 예외:', e.message)
     return NextResponse.json({ data: [], error: null, _migration_pending: true })
@@ -127,22 +162,21 @@ export async function POST(request: NextRequest) {
     const colorTone = body.color_tone || null
     const sortOrder = Number(body.sort_order || 0)
 
-    // PR-HR-23d — parent_id 컬럼 있는지 확인 후 분기
-    const colCheck = await prisma.$queryRaw<any[]>`
-      SELECT COUNT(*) AS cnt FROM information_schema.columns
-      WHERE table_schema = DATABASE()
-        AND table_name = 'departments'
-        AND column_name = 'parent_id'
-    `
-    const hasParentId = Number(colCheck?.[0]?.cnt || 0) > 0
+    // 컬럼 존재 확인 후 INSERT 컬럼 분기
+    const [hasParentId, hasCompanyId, hasColorTone, hasSortOrder] = await Promise.all([
+      hasColumn('departments', 'parent_id'),
+      hasColumn('departments', 'company_id'),
+      hasColumn('departments', 'color_tone'),
+      hasColumn('departments', 'sort_order'),
+    ])
 
-    if (hasParentId) {
+    if (hasParentId && hasColorTone && hasSortOrder) {
       await prisma.$executeRaw`
         INSERT INTO departments (id, name, parent_id, color_tone, sort_order, created_at, updated_at)
         VALUES (${id}, ${name}, ${parentId}, ${colorTone}, ${sortOrder}, NOW(), NOW())
       `
     } else {
-      // graceful fallback — parent_id 컬럼 없을 때 기존 패턴
+      // graceful fallback — 옛 단순 INSERT
       await prisma.$executeRaw`
         INSERT INTO departments (id, name, created_at, updated_at)
         VALUES (${id}, ${name}, NOW(), NOW())
