@@ -158,6 +158,8 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
   const [coverageMissing, setCoverageMissing] = useState(false)   // 마이그 미적용 시
   // N-5 — 최소 인원 collapsible
   const [coverageExpanded, setCoverageExpanded] = useState(false)
+  // PR-2RR-f (2026-05-28) — 회전 미리보기 매트릭스 하단 collapsible
+  const [matrixExpanded, setMatrixExpanded] = useState(false)
   // N-58 — 우선순위 정책 안내 접기 (기본 접힘 — 공간 절약)
   const [policyExpanded, setPolicyExpanded] = useState(false)
   // N-21-a — 버전 timeline (그룹 설정의 기간별 버전)
@@ -751,8 +753,11 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
         }}>❌ {error}</div>
       )}
 
-      {/* N-5 — 2분할 → 수직 1컬럼 (의미있는 위계) */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      {/* PR-2RR-f (2026-05-28) — 좌(기본 정의) + 우(멤버) 2-col grid + 하단 매트릭스 collapsible */}
+      <div style={{
+        display: 'grid', gridTemplateColumns: 'minmax(360px, 1fr) minmax(360px, 1fr)',
+        gap: 10,
+      }}>
         {/* 1. 그룹 정의 (이름/카테고리/색상/시프트/패턴/전략) */}
         <div style={{ ...GLASS.L4, borderRadius: 12, padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
           {/* PR-2RR-d (2026-05-28) — 이름 + 카테고리 한 행 */}
@@ -1161,55 +1166,14 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
                   ))}
                 </div>
               )}
-              {/* PR-2RR-b (2026-05-28) — 회전 미리보기 매트릭스 (통합 셋팅) */}
-              <RotationPreviewMatrix
-                shifts={rotationShifts.map((slotId, idx) => {
-                  const sl = slots.find(s => s.id === slotId)
-                  return {
-                    shift_slot_id: slotId,
-                    slot_code: sl?.code || '?',
-                    slot_label: sl?.label,
-                    start_time: sl?.start_time,
-                    end_time: sl?.end_time,
-                    is_overnight: sl?.is_overnight,
-                    sort_order: idx,
-                    color: (sl as any)?.color || null,
-                  }
-                })}
-                members={memberIds.map((wId, idx) => {
-                  const w = workers.find(x => x.id === wId)
-                  return {
-                    worker_id: wId,
-                    name: w?.name || '?',
-                    color_tone: (w?.color_tone || 'none') as ColorTone,
-                    priority: idx,
-                    start_index: Number(memberRotCfgs[wId]?.start_index || 0),
-                  }
-                })}
-                startMonth={groupRotationStartMonth}
-                endMonth={groupRotationEndMonth}
-                direction={rotationDirection}
-                periodKind={rotationPeriodKind}
-                periodDays={Math.max(1, Number(rotationCustomDays) || 30)}
-                monthsToShow={12}
-                onShiftReorder={(from, to) => setRotationShifts(arr => {
-                  if (from === to || from < 0 || to < 0 || from >= arr.length || to >= arr.length) return arr
-                  const next = [...arr]; const [m] = next.splice(from, 1); next.splice(to, 0, m); return next
-                })}
-                onShiftRemove={(idx) => setRotationShifts(arr => arr.filter((_, i) => i !== idx))}
-                onMemberReorder={(from, to) => setMemberIds(arr => {
-                  if (from === to || from < 0 || to < 0 || from >= arr.length || to >= arr.length) return arr
-                  const next = [...arr]; const [m] = next.splice(from, 1); next.splice(to, 0, m); return next
-                })}
-                onStartMonthChange={setGroupRotationStartMonth}
-                onEndMonthChange={setGroupRotationEndMonth}
-                onDirectionToggle={setRotationDirection}
-              />
+              {/* PR-2RR-f (2026-05-28) — 매트릭스는 하단 collapsible 로 이동 */}
             </>
           )}
 
-          {/* N-21-a — 버전 timeline (PR-2RR-d 헤더 컴팩트) */}
-          {!isNew && (
+          {/* PR-2RR-f (2026-05-28) — 버전 timeline / 최소 인원 / 우선순위 정책 박스 제거.
+              사용자 명령 「그룹편집에서 버전,최소인원,우선순위 정책음 없어도 될것같고」.
+              데이터는 DB 에 보존 — UI 노출만 끔. 필요 시 별도 admin 화면에서 가능. */}
+          {false && !isNew && (
             <div>
               <button type="button"
                       onClick={() => setVersionsExpanded(p => !p)}
@@ -1339,7 +1303,8 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
             </div>
           )}
 
-          {/* N-5 — 최소 인원 collapsible (PR-2RR-d 헤더 컴팩트) */}
+          {/* PR-2RR-f (2026-05-28) — 최소 인원 collapsible 제거 (사용자 명령). */}
+          {false && (<>
           <button type="button"
                   onClick={() => setCoverageExpanded(p => !p)}
                   style={{
@@ -1434,8 +1399,10 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
             )}
           </Field>
           )}
+          </>)}{/* end 최소 인원 (제거 — false guard) */}
 
-          {/* PR-2SS-Phase-I — 우선순위 정책 (N-58 접기 / PR-2RR-d 컴팩트 헤더) */}
+          {/* PR-2RR-f (2026-05-28) — 우선순위 정책 박스 제거 (사용자 명령). */}
+          {false && (<>
           <div style={{
             ...GLASS.L1, borderRadius: 8, padding: policyExpanded ? 10 : '4px 10px',
             border: `1px solid ${COLORS.borderBlue}`,
@@ -1516,6 +1483,7 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
             </div>
             </>)}
           </div>
+          </>)}{/* end 우선순위 정책 (제거 — false guard) */}
         </div>
 
         {/* 2. 멤버 + 후보 (수직 1컬럼 — 가로 폭 넉넉) */}
@@ -1741,6 +1709,77 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
       </div>
 
       {/* PR-2SS-h-1-fix — 모달 폐기, 인라인 펼침으로 대체 */}
+
+      {/* PR-2RR-f (2026-05-28) — 회전 미리보기 매트릭스 하단 collapsible (기본 접힘) */}
+      {rotationEnabled && rotationShifts.length > 0 && memberIds.length > 0 && (
+        <div style={{
+          marginTop: 10, ...GLASS.L4, borderRadius: 12,
+          padding: matrixExpanded ? 12 : '6px 12px',
+        }}>
+          <button type="button"
+                  onClick={() => setMatrixExpanded(v => !v)}
+                  style={{
+                    width: '100%', padding: 0, background: 'transparent', border: 'none',
+                    cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8,
+                    fontSize: 12, fontWeight: 800, color: COLORS.textPrimary,
+                    marginBottom: matrixExpanded ? 10 : 0,
+                  }}>
+            <span>🔄 회전 미리보기</span>
+            <span style={{ fontSize: 10, fontWeight: 500, color: COLORS.textMuted }}>
+              {rotationShifts.length}시프트 × {memberIds.length}명 × 12개월
+            </span>
+            <div style={{ flex: 1 }} />
+            <span style={{ fontSize: 11, color: COLORS.textMuted }}>
+              {matrixExpanded ? '▼ 접기' : '▶ 펼쳐서 확인'}
+            </span>
+          </button>
+          {matrixExpanded && (
+            <RotationPreviewMatrix
+              shifts={rotationShifts.map((slotId, idx) => {
+                const sl = slots.find(s => s.id === slotId)
+                return {
+                  shift_slot_id: slotId,
+                  slot_code: sl?.code || '?',
+                  slot_label: sl?.label,
+                  start_time: sl?.start_time,
+                  end_time: sl?.end_time,
+                  is_overnight: sl?.is_overnight,
+                  sort_order: idx,
+                  color: (sl as any)?.color || null,
+                }
+              })}
+              members={memberIds.map((wId, idx) => {
+                const w = workers.find(x => x.id === wId)
+                return {
+                  worker_id: wId,
+                  name: w?.name || '?',
+                  color_tone: (w?.color_tone || 'none') as ColorTone,
+                  priority: idx,
+                  start_index: Number(memberRotCfgs[wId]?.start_index || 0),
+                }
+              })}
+              startMonth={groupRotationStartMonth}
+              endMonth={groupRotationEndMonth}
+              direction={rotationDirection}
+              periodKind={rotationPeriodKind}
+              periodDays={Math.max(1, Number(rotationCustomDays) || 30)}
+              monthsToShow={12}
+              onShiftReorder={(from, to) => setRotationShifts(arr => {
+                if (from === to || from < 0 || to < 0 || from >= arr.length || to >= arr.length) return arr
+                const next = [...arr]; const [m] = next.splice(from, 1); next.splice(to, 0, m); return next
+              })}
+              onShiftRemove={(idx) => setRotationShifts(arr => arr.filter((_, i) => i !== idx))}
+              onMemberReorder={(from, to) => setMemberIds(arr => {
+                if (from === to || from < 0 || to < 0 || from >= arr.length || to >= arr.length) return arr
+                const next = [...arr]; const [m] = next.splice(from, 1); next.splice(to, 0, m); return next
+              })}
+              onStartMonthChange={setGroupRotationStartMonth}
+              onEndMonthChange={setGroupRotationEndMonth}
+              onDirectionToggle={setRotationDirection}
+            />
+          )}
+        </div>
+      )}
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8, marginTop: 14 }}>
         {/* 사용자 보고 fix (2026-05-17) — 에러를 저장 버튼 옆에도 표시 (스크롤 X) */}
