@@ -372,6 +372,56 @@ DB, IP, MAC, SSL, OAuth, JWT, UUID, RGB, HEX, IRR, PG,
 
 회귀 후보 시각 검수 (Designer 작업) — 사용자에게 보이는 곳 점검.
 
+### 8.4 개발 메타 식별자 노출 절대 금지 (2026-05-31 강화)
+
+> **사용자 명령**: 「쓸데없이 AI 티 나는 설명이나 네이밍 설정은 하네스 기준으로 못 하게 해 주세요」
+
+화면 본문·헤더·도움말·placeholder 어디에도 다음을 노출 금지:
+
+| 위반 예시 | 문제 |
+|---|---|
+| 「🔧 **Phase 1.3-C 예정**: 서식별 fields 정의」 | Phase 표기 + PR 코드 + 영어 명사 노출 |
+| 「P12-D 에서 추가 예정」 | PR 코드 + 「예정」 = 미완성 메타 노출 |
+| 「Phase 4.0 — 외부 yangjaehee DB 어댑터」 | 버전 + 스키마명 노출 |
+| 「mock 모드 — 시연용 데이터」 | 운영 모드 노출 |
+| 「placeholder — 추후 구현」 | 개발 상태 노출 |
+| 「향후 …에서 …로 대체 예정」 | 로드맵·기술 부채 노출 |
+
+**금지 식별자 (사용자 노출 X)**:
+- `Phase\s+\d+(\.\d+)?(-[A-Z])?` (Phase 1.3-C, Phase 4.0)
+- `PR-[A-Z][A-Z0-9-]+` (PR-MULTI-BRAND, PR-COORD-13)
+- `\bP\d+-[a-z0-9]+` (P12-D, P3+a)
+- `v\d+\.\d+(\.\d+)?` (v1.3, v2.0.1) — UI 버전 라벨 빼고 본문 X
+- `placeholder` / `stub` / `TBD` / `WIP` / `TODO` — 한글 「준비 중」 으로
+- `mock` / `direct` / `etl` 운영 모드명 — UI 보임 X
+- `JSON\s*schema` / `fields\s*정의` / `interface` 같은 코드 개념어
+- 「향후 …」 / 「추후 구현」 / 「대체 예정」 — 미완성 자백 표현
+
+### 8.5 사용자가 보는 「이름」 한글 100% (네이밍 — 2026-05-31 강화)
+
+페이지·메뉴·모달·버튼·탭·섹션 헤더 등 **사용자에게 보이는 모든 「이름」** 은 한글 의무.
+기술 약어 화이트리스트 (API / ID / URL / PDF / SMS / KPI / DB / IP / JWT / OAuth / OK / NG / ERP / CRM / AI / ML / RIDE / FMI / CARE) 만 영어 허용.
+
+| 영역 | 잘못된 예 (영어 단독) | 올바른 예 (한글) |
+|---|---|---|
+| 페이지 제목 | `Disposal Approval` | 「폐기 결재」 |
+| 메뉴 라벨 | `Compliance Forms` | 「개인정보 서식」 |
+| 모달 제목 | `Edit Form Submission` | 「제출 내역 편집」 |
+| 버튼 | `Sync All` | 「전체 동기화」 |
+| 탭 | `Pending / Approved` | 「대기 / 승인 완료」 |
+| 빈 상태 | `No data` | 「등록된 항목이 없습니다」 |
+| 알림 | `Saved successfully` | 「저장됐습니다」 |
+
+**검사**: `ui-design-lint` check 17 (한글 100%) + check 18 (메타 식별자) 동시 작동.
+
+### 8.6 위반 시 페널티 (Rule 0-1 §「위반 누적 횟수」 연동)
+
+| 누적 | 액션 |
+|---|---|
+| 1회 | check 18 정보성 경고 + 자가 기록 |
+| 2회 | 사용자에게 즉시 보고 + hotfix |
+| 3회+ | `UI_DESIGN_LINT_STRICT=1` 강제 활성화 — commit 차단 |
+
 ---
 
 ## 6. 체크박스 표준 (2026-05-27 신설)

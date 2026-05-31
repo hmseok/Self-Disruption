@@ -288,27 +288,42 @@ for (const fp of pageFiles) {
     })
   }
 
-  // 18) 2026-05-28: AI 잔존 표현 금지 (UI-DESIGN-STANDARD § 8)
+  // 18) 2026-05-28: AI 잔존 표현 / 메타 식별자 노출 금지 (UI-DESIGN-STANDARD § 8)
   //   "AI 가 만든 느낌" 패턴 — 💡 + 기술 키워드 / em-dash 기술 부연 / 운영 단계 노출.
-  //   사용자에게 보여서는 안 되는 기술 용어 검출.
-  //   문자열 안 (>/" 뒤) 한정 — 코드 변수명·주석은 무시.
+  //   2026-05-31 강화 — Phase/PR-X/P9-y 메타 식별자 + 「예정」 「향후」 자백 표현 차단.
+  //   JSX 텍스트 영역만 검사 — 코드 주석 (// + 같은 라인) / import / 변수 선언 제외.
   const AI_PATTERNS = [
-    /💡[^<]{0,200}?(?:adapter|direct|proxy|sync|fetch|cache|hash|token|env|adapter|어댑터|동기화)/i,
+    // 기존 § 8.1 (UI 노출 기술 용어)
+    /💡[^<]{0,200}?(?:adapter|direct|proxy|sync|fetch|cache|hash|token|env|어댑터|동기화|placeholder|stub|JSON\s*schema|fields|interface)/i,
     /어댑터\s*모드\s*[:：]/,
     /sync\s*후\s*표시/i,
     /adapter\s*[:：]\s*\w+/i,
-    /(?:fetch|loading)\s*중\.{2,3}/i,   // 'fetch 중...' (한글이지만 영어 동사 노출)
-    /status\s*=\s*\w+\s*[\-—]\s*\w+/i,  // 'status=pending — 검수 대기' 같은 디버그 노출
+    /(?:fetch|loading)\s*중\.{2,3}/i,
+    /status\s*=\s*\w+\s*[\-—]\s*\w+/i,
     /\b(?:INSERT|UPDATE|DELETE)\s+(?:INTO|FROM|TABLE)/i,
+    // 2026-05-31 § 8.4 — 개발 메타 식별자 노출 (JSX 본문 한정 — '>'/'"'/'`' 뒤)
+    /[>"`]\s*[^<"`{}]{0,80}\bPhase\s+\d+(?:\.\d+)?(?:-[A-Z])?\b/,
+    /[>"`]\s*[^<"`{}]{0,80}\bPR-[A-Z][A-Z0-9-]{2,}\b/,
+    /[>"`]\s*[^<"`{}]{0,80}\bP\d+-[a-z0-9]+\b/,
+    /[>"`]\s*[^<"`{}]{0,120}\b(?:placeholder|stub|TBD|WIP|TODO)\b[^<"`{}]{0,30}/i,
+    /[>"`]\s*[^<"`{}]{0,120}\b(?:mock|direct|etl)\s*모드/i,
+    /[>"`]\s*[^<"`{}]{0,120}(?:향후|추후)[^<"`{}]{0,40}(?:구현|대체|예정|진행)/,
+    /[>"`]\s*[^<"`{}]{0,80}\bJSON\s*schema\b/i,
+    /[>"`]\s*[^<"`{}]{0,80}\bfields\s*정의\b/i,
   ]
   let aiHits = 0
-  for (const re of AI_PATTERNS) {
-    if (re.test(content)) aiHits++
+  const aiHitLabels = []
+  for (let i = 0; i < AI_PATTERNS.length; i++) {
+    if (AI_PATTERNS[i].test(content)) {
+      aiHits++
+      if (i >= 7) aiHitLabels.push('메타 식별자')
+    }
   }
   if (aiHits > 0) {
+    const label = aiHitLabels.length > 0 ? `${aiHits}건 (메타 식별자 포함)` : `${aiHits}건`
     warnings.push({
       file: rel,
-      issue: `AI 잔존 표현 ${aiHits}건 — § 8 인간 손길 표준 (어댑터/sync/fetch 등 기술 용어 사용자 노출 금지)`,
+      issue: `AI 잔존 표현 ${label} — § 8 인간 손길 표준 (Phase/PR-X/P9-y 메타 식별자, 어댑터/sync/fetch 기술 용어 사용자 노출 금지)`,
     })
   }
 

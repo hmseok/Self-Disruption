@@ -1227,7 +1227,65 @@ GATE 진행 상태:
    - 위치: harness-engineering/scripts/pr-gate-lint.js (TBD)
 ```
 
-### 본 세션 사고 회고 누적 (2026-05-04)
+### 규칙 28 — AI 잔존 표현 / 네이밍 차단 (2026-05-31 신설, 강력)
+
+> **사용자 명령 (2026-05-31)**: 「쓸데없이 AI 티 나는 설명이나 네이밍 설정은
+> 하네스 기준으로 못 하게 해 주세요」
+>
+> 5-28 § 8 (UI 잔존 표현 금지) 도입 후에도 동형 위반 누적 → 강제 차단으로 격상.
+
+**원칙**: 사용자에게 보이는 모든 화면 텍스트·이름은 **사람이 쓴 것처럼**.
+개발 메타 정보 (Phase / PR-X / P9-y / 향후 …) 와 영어 단독 라벨은 UI 노출 금지.
+
+**다음 중 하나라도 해당하면 본 규칙 발동**:
+
+```
+✓ JSX 본문 / 컴포넌트 텍스트
+✓ 페이지 제목 (PageTitle PAGE_NAMES) / 메뉴 라벨 / 모달 제목
+✓ 버튼 / 탭 / 빈 상태 안내 / placeholder / alert 메시지
+✓ 도움말 박스 / 안내 배너 (💡 🔧 ⚠ 등 박스)
+```
+
+**의무 절차**:
+
+```
+[A] UI 텍스트 작성 시 사전 자가 검토
+   1. Phase / PR-X / P9-y / vN.N 같은 개발 메타 식별자 — 사용자 노출 X
+   2. 「향후 ... 예정」 「추후 구현」 「대체 예정」 — 미완성 자백 표현 X
+   3. placeholder / stub / TBD / WIP / TODO — 한글 「준비 중」 으로
+   4. mock / direct / etl / sync / fetch / adapter / proxy — 운영 모드명 X
+   5. 영어 단독 라벨 — 기술 약어 화이트리스트 (§ 8.5) 만 허용
+
+[B] 검사 자동화
+   1. `npm run lint:ui-design` — check 18 (AI 잔존 + 메타 식별자) 정보성 경고
+   2. `UI_DESIGN_LINT_STRICT=1 npm run lint:ui-design` — 차단 모드
+   3. baseline 동결: 기존 위반은 통과, 신규 위반만 새로 잡힘
+
+[C] PR 시작 시 (Rule 27 GATE 체크리스트 연동)
+   □ UI 텍스트 § 8 검토 — Phase / PR-X / 향후 / mock 등 식별자 0건
+   □ 페이지·메뉴·모달·버튼 이름 한글 100% 확인
+   □ check 18 결과 새 위반 0건
+```
+
+**위반 시 페널티 (Rule 0-1 누적 카운터 연동)**:
+
+| 누적 | 액션 |
+|---|---|
+| 1회 | 정보성 경고 + 자가 기록 (knowledge/ai-residual.md) |
+| 2회 | 사용자에게 즉시 보고 + hotfix |
+| 3회+ | `UI_DESIGN_LINT_STRICT=1` 강제 활성화 — commit 차단 |
+
+**자동화 안전장치**:
+```
+✅ 13. ui-design-lint check 18 (2026-05-28 신설, 2026-05-31 강화)
+   - § 8.1 기술 용어 (adapter / sync / fetch / 어댑터) + 💡 + 기술 박스
+   - § 8.4 메타 식별자 (Phase / PR-X / P9-y / placeholder / mock 모드 / 향후 ... 예정)
+   - § 8.5 영어 단독 라벨 (check 17 한글 100% 와 동시 작동)
+   - 위치: harness-engineering/scripts/ui-design-lint.js check 18
+   - baseline: harness-engineering/knowledge/ui-design-lint.baseline.json
+```
+
+### 본 세션 사고 회고 누적 (2026-05-04 — 2026-05-31)
 
 ```
 사고 1: _docs 갱신 14 PR 누락 → 규칙 22 신설
@@ -1238,6 +1296,9 @@ GATE 진행 상태:
 사고 6: PR-2QQ 시리즈 GATE 3/6/7/8 일괄 누락
         → 일요일 비선호 버그 사용자가 직접 발견
         → 규칙 27 신설 (PR 단위 GATE 체크리스트 + 가시화 의무)
+사고 7 (2026-05-31): § 8 (UI 잔존 표현) 도입 후에도 「Phase 1.3-C 예정」
+        「향후 ... 대체 예정」 류 메타 식별자 통과
+        → 규칙 28 신설 (네이밍 + 메타 식별자 강제 차단)
 ```
 
 향후 같은 부류 사고 발생 시 → 자동화 hook 즉시 신설 (규칙 15 적용).
