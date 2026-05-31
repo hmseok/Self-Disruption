@@ -3,6 +3,36 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-28 (PR-2RR-h) — 다중 채널 배포 모달 (SMS · 메일 · 링크 + 워커별 단일 발송)
+
+> 사용자 명령:
+>   ① 「단일 액션이 아니라 선택에서, 메일도 되고, 문자도 되고, 링크복사도 되게 해줘」
+>   ② 「워커기준으로 옆에 각각도 할수있고 전체도 할수있게 모달구성이 바뀌어야 할것같아」
+>   ③ 메일 채널: 「보류하죠」 — Resend 키 미등록, 모달에서 자동 disable.
+
+- **API 확장** `app/api/call-scheduler/schedules/[id]/distribute/route.ts`:
+  - `body.channel: 'sms' | 'email' | 'link'` (default 'sms' — 하위 호환).
+  - `body.worker_ids?: string[]` — 단일 / 부분 발송 (없으면 전체).
+  - `body.mode: 'preview' | 'test' | 'send'` (기존).
+  - 채널별 graceful: `channel_configured: { sms, email, link }` 응답 (환경변수 감지).
+  - `Recipient` 인터페이스 확장: `email`, `email_valid`, `link`, `email_subject`, `email_html`.
+  - SMS — 알리고 send_mass (기존 흐름 유지).
+  - 메일 — Resend `sendEmail()` 루프, testmode=true 면 첫 1건만.
+  - 링크 — 발송 없이 `links: [{worker_id,name,link}]` 응답 → 클라이언트가 클립보드 복사.
+  - cs_workers.email 컬럼 graceful (구 schema 호환).
+- **모달 재작성** `_components/DistributeModal.tsx` (~440 → ~430 lines, 구조 전면 변경):
+  - **채널 selector** (📱 문자 / 📧 메일 / 🔗 링크 복사) 상단 3-grid. 미설정 채널 자동 disable + 「⚠ 미설정」 라벨.
+  - **워커 list**: 체크박스 + 이름·근무일·연락처 + 「👤 발송」 단일 버튼 + 「👁」 메시지 미리보기 popover.
+  - **전체 선택** 토글 / 선택 N명 카운트.
+  - **footer**: 「🔬 테스트 발송」 (sms/email 만, dry-run) / 「📤 선택 N명 발송」 (인라인 확인 후 실발송).
+  - 링크 채널 — 「복사」 클릭 시 `navigator.clipboard.writeText()` 즉시 (서버 호출 X). 토스트 표시.
+  - 결과 패널 + 에러 안내 (CLAUDE.md 규칙 20 — alert 금지, 글래스 패널).
+- 환경변수 (Cloud Run):
+  - SMS 활성: `ALIGO_API_KEY` / `ALIGO_USER_ID` / `ALIGO_SENDER` (사용자 등록 예정).
+  - 메일 활성 (옵션): `RESEND_API_KEY` (현재 보류 — 메일 채널 자동 disable).
+  - 링크: 환경변수 무관 — 항상 가능.
+- 검증: tsc CallScheduler/distribute 영역 에러 0.
+
 ## 2026-05-28 (PR-2RR-h-1) — RotationPreviewMatrix 반응형 fix (table-layout fixed)
 
 > 사용자 보고: 「매트릭스 보면 반응형이 적용이 안되었나? 좌우스크롤이 왜생기지 마우스로 보기엔 너무 힘들텐데」.
