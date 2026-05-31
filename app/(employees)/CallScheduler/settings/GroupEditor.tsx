@@ -8,6 +8,7 @@ import { TONE_BG, TONE_TEXT } from '@/app/(employees)/CallScheduler/utils/palett
 import { COLOR_TONE_OPTIONS } from '@/app/(employees)/CallScheduler/utils/types'
 import { getAuthHeader } from '@/app/utils/auth-client'
 import type { ShiftSlot, Worker, ColorTone, GroupMemberSkipDate, SkipStatus } from '@/app/(employees)/CallScheduler/utils/types'
+import RotationPreviewMatrix from '@/app/(employees)/CallScheduler/_components/RotationPreviewMatrix'
 
 interface Props {
   groupId: string | null  // null = 신규
@@ -125,7 +126,14 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
   const [rotationPeriodKind, setRotationPeriodKind] = useState<'monthly' | 'days'>('monthly')
   const [rotationCustomDays, setRotationCustomDays] = useState<string>('30')
   const [rotationShifts, setRotationShifts] = useState<string[]>([])  // 시프트 slot_id sequence
+  // PR-2RR (2026-05-28) — 그룹 단위 회전 시작/종료 월
+  const [groupRotationStartMonth, setGroupRotationStartMonth] = useState<string>('')  // YYYY-MM
+  const [groupRotationEndMonth, setGroupRotationEndMonth] = useState<string>('')      // YYYY-MM
+  // PR-2RR-b (2026-05-28) — 회전 방향 'forward' | 'reverse'
+  const [rotationDirection, setRotationDirection] = useState<'forward' | 'reverse'>('forward')
   // 워커별 로테이션 시작 시점 — Record<workerId, { start_date, start_index, end_date }>
+  //  · PR-2RR-b: 그룹 단위 일원화 후 멤버별 override 는 deprecate (저장 시 NULL).
+  //    인터페이스는 호환성 유지 위해 남김. start_index 만 지원.
   interface RotCfg { start_date: string; start_index: number; end_date: string }
   const defaultRotCfg = (): RotCfg => ({ start_date: '', start_index: 0, end_date: '' })
   const [memberRotCfgs, setMemberRotCfgs] = useState<Record<string, RotCfg>>({})
@@ -223,6 +231,11 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
         if (Array.isArray(group.rotation_shifts)) {
           setRotationShifts(group.rotation_shifts.map((s: any) => String(s.shift_slot_id)))
         }
+        // PR-2RR (2026-05-28) — 그룹 단위 회전 시작/종료 월
+        setGroupRotationStartMonth((group.rotation_start_date || '').slice(0, 7))
+        setGroupRotationEndMonth((group.rotation_end_date || '').slice(0, 7))
+        // PR-2RR-b (2026-05-28) — 회전 방향
+        setRotationDirection((group.rotation_direction === 'reverse' ? 'reverse' : 'forward') as 'forward' | 'reverse')
         // 멤버별 로테이션 시작 시점 — members 응답에 같이 들어있음
         const rotCfgs: Record<string, RotCfg> = {}
         for (const m of members) {
@@ -552,6 +565,11 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
         rotation_shifts: rotationEnabled
           ? rotationShifts.map(slotId => ({ shift_slot_id: slotId }))
           : [],
+        // PR-2RR (2026-05-28) — 그룹 단위 회전 시작/종료 월 (YYYY-MM → API normalize)
+        rotation_start_date: rotationEnabled ? (groupRotationStartMonth || '') : '',
+        rotation_end_date:   rotationEnabled ? (groupRotationEndMonth   || '') : '',
+        // PR-2RR-b (2026-05-28) — 회전 방향
+        rotation_direction: rotationEnabled ? rotationDirection : 'forward',
       }
       // K-2 — 멤버 PUT body (8 컬럼 포함)
       const buildMembersPayload = () => memberIds.map(wId => {
@@ -565,10 +583,12 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
           max_days_per_month: cfg.max_days_per_month === '' ? null : Number(cfg.max_days_per_month),
           blocked_slot_ids: Array.from(cfg.blocked_slot_ids),
           work_pattern_text: cfg.work_pattern_text.trim() || null,
-          // N-19-a — 시프트 로테이션 시작 시점
-          rotation_start_date: (memberRotCfgs[wId]?.start_date || '').trim() || null,
+          // N-19-a → PR-2RR-b (2026-05-28) — 그룹 단위 회전으로 일원화.
+          //   멤버별 override 컬럼은 NULL 강제 (그룹 시작/종료가 fallback).
+          //   start_index 만 직접 override 가능 (매트릭스 priority drag 와 별개).
+          rotation_start_date: null,
           rotation_start_index: Number(memberRotCfgs[wId]?.start_index || 0),
-          rotation_end_date: (memberRotCfgs[wId]?.end_date || '').trim() || null,
+          rotation_end_date: null,
           // N-34 — 그룹 분배 비율 (0 = hard exclude)
           target_ratio: cfg.target_ratio === '' ? 1.0 : Math.max(0, Number(cfg.target_ratio) || 0),
           // N-36 — 휴가 커버 우선순위 ('' → null = priority_level 따라감)
@@ -1274,18 +1294,49 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
                 </div>
               </Field>
 
-              {/* N-23 정정 — 자동 분산 버튼 제거: 알고리즘이 priority 기반 자동 분산 */}
-              <div style={{
-                padding: '8px 12px', borderRadius: 8,
-                background: COLORS.bgGreen, border: `1px solid ${COLORS.borderGreen}`,
-                fontSize: 11, color: COLORS.success,
-              }}>
-                ✅ 자동 분산 — 워커는 추가 순서대로 sequence 에 자동 매핑됩니다
-                (1순위→{rotationShifts[0] ? slots.find(s => s.id === rotationShifts[0])?.code : '?'} /
-                 2순위→{rotationShifts[1] ? slots.find(s => s.id === rotationShifts[1])?.code : '?'} /
-                 3순위→{rotationShifts[2] ? slots.find(s => s.id === rotationShifts[2])?.code : '?'} ...)
-                매월 한 칸씩 자동 순환.
-              </div>
+              {/* PR-2RR-b (2026-05-28) — 회전 미리보기 매트릭스 (통합 셋팅) */}
+              <RotationPreviewMatrix
+                shifts={rotationShifts.map((slotId, idx) => {
+                  const sl = slots.find(s => s.id === slotId)
+                  return {
+                    shift_slot_id: slotId,
+                    slot_code: sl?.code || '?',
+                    slot_label: sl?.label,
+                    start_time: sl?.start_time,
+                    end_time: sl?.end_time,
+                    is_overnight: sl?.is_overnight,
+                    sort_order: idx,
+                    color: (sl as any)?.color || null,
+                  }
+                })}
+                members={memberIds.map((wId, idx) => {
+                  const w = workers.find(x => x.id === wId)
+                  return {
+                    worker_id: wId,
+                    name: w?.name || '?',
+                    color_tone: (w?.color_tone || 'none') as ColorTone,
+                    priority: idx,
+                    start_index: Number(memberRotCfgs[wId]?.start_index || 0),
+                  }
+                })}
+                startMonth={groupRotationStartMonth}
+                endMonth={groupRotationEndMonth}
+                direction={rotationDirection}
+                periodKind={rotationPeriodKind}
+                periodDays={Math.max(1, Number(rotationCustomDays) || 30)}
+                monthsToShow={12}
+                onShiftReorder={(from, to) => setRotationShifts(arr => {
+                  if (from === to || from < 0 || to < 0 || from >= arr.length || to >= arr.length) return arr
+                  const next = [...arr]; const [m] = next.splice(from, 1); next.splice(to, 0, m); return next
+                })}
+                onMemberReorder={(from, to) => setMemberIds(arr => {
+                  if (from === to || from < 0 || to < 0 || from >= arr.length || to >= arr.length) return arr
+                  const next = [...arr]; const [m] = next.splice(from, 1); next.splice(to, 0, m); return next
+                })}
+                onStartMonthChange={setGroupRotationStartMonth}
+                onEndMonthChange={setGroupRotationEndMonth}
+                onDirectionToggle={setRotationDirection}
+              />
             </>
           )}
 
@@ -1794,54 +1845,8 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
                             onChange={(patch) => updateMemberCfg(w.id, patch)}
                             slots={slots}
                           />
-                          {/* N-19-a — 시프트 로테이션 시작 시점 (rotation_enabled 일 때만) */}
-                          {rotationEnabled && rotationShifts.length > 0 && (() => {
-                            const rcfg = memberRotCfgs[w.id] || defaultRotCfg()
-                            return (
-                              <div style={{
-                                ...GLASS.L1, borderRadius: 10, padding: 12, marginTop: 8,
-                                border: `1px solid ${COLORS.borderBlue}`,
-                                background: COLORS.bgBlue,
-                              }}>
-                                <div style={{
-                                  display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8,
-                                  fontSize: 12, fontWeight: 800, color: COLORS.info,
-                                }}>
-                                  🔄 시프트 로테이션 시작 (멤버별)
-                                </div>
-                                <div style={{
-                                  display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8,
-                                }}>
-                                  <div>
-                                    <div style={{ fontSize: 11, color: COLORS.textMuted, marginBottom: 4 }}>
-                                      시작일 <span style={{ color: COLORS.textMuted, fontWeight: 400 }}>(빈 칸 = 그룹 활성 시작)</span>
-                                    </div>
-                                    <input type="date" value={rcfg.start_date}
-                                           onChange={(e) => updateMemberRotCfg(w.id, { start_date: e.target.value })}
-                                           style={{
-                                             ...inputStyle, width: '100%', fontSize: 12,
-                                           }} />
-                                  </div>
-                                  <div>
-                                    <div style={{ fontSize: 11, color: COLORS.textMuted, marginBottom: 4 }}>
-                                      종료일 <span style={{ color: COLORS.textMuted, fontWeight: 400 }}>(빈 칸 = 무한)</span>
-                                    </div>
-                                    <input type="date" value={rcfg.end_date}
-                                           onChange={(e) => updateMemberRotCfg(w.id, { end_date: e.target.value })}
-                                           style={{
-                                             ...inputStyle, width: '100%', fontSize: 12,
-                                           }} />
-                                  </div>
-                                </div>
-                                <div style={{
-                                  marginTop: 8, fontSize: 11, color: COLORS.textMuted,
-                                }}>
-                                  💡 멤버 순서가 시프트 매핑 결정: 1순위→{slots.find(s => s.id === rotationShifts[0])?.code || '?'} / 2순위→{slots.find(s => s.id === rotationShifts[1])?.code || '?'} / ... (priority 자동 분산)
-                                  · 시작일부터 매월(또는 N일) 한 칸씩 자동 순환
-                                </div>
-                              </div>
-                            )
-                          })()}
+                          {/* PR-2RR-b (2026-05-28) — 멤버별 회전 시작/종료 input 제거.
+                              그룹 단위 시작/종료 + 매트릭스 미리보기 (회전 ON 그룹) 가 상단에 통합. */}
                         </>
                       )}
                     </div>

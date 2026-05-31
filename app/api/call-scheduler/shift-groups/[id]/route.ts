@@ -25,6 +25,7 @@ const ALLOWED_COLS = new Set([
   'rotation_custom_days',     // N-19-a
   'rotation_start_date',      // PR-2RR (2026-05-28) — 그룹 단위 회전 시작 일자
   'rotation_end_date',        // PR-2RR (2026-05-28) — 그룹 단위 회전 종료 일자
+  'rotation_direction',       // PR-2RR-b (2026-05-28) — 회전 방향 'forward' | 'reverse'
   // N-55 — A/B조 cycle
   'cycle_kind',                // 'squad_rotation' | NULL
   'cycle_days_per_member',     // 각자 N일
@@ -75,6 +76,10 @@ export async function GET(
     let hasGroupRotationDates = true
     try { await prisma.$queryRaw<any[]>`SELECT rotation_start_date FROM cs_shift_groups LIMIT 1` }
     catch { hasGroupRotationDates = false }
+    // PR-2RR-b (2026-05-28) — rotation_direction 컬럼 graceful
+    let hasGroupRotationDirection = true
+    try { await prisma.$queryRaw<any[]>`SELECT rotation_direction FROM cs_shift_groups LIMIT 1` }
+    catch { hasGroupRotationDirection = false }
     let hasGroupShifts = true
     try { await prisma.$queryRaw<any[]>`SELECT 1 FROM cs_group_shifts LIMIT 1` }
     catch { hasGroupShifts = false }
@@ -117,6 +122,8 @@ export async function GET(
     // PR-2RR (2026-05-28)
     let rotationStartDate: string | null = null
     let rotationEndDate: string | null = null
+    // PR-2RR-b (2026-05-28)
+    let rotationDirection: 'forward' | 'reverse' = 'forward'
     if (hasCategory) {
       try {
         const r = await prisma.$queryRaw<any[]>`SELECT category FROM cs_shift_groups WHERE id = ${id} LIMIT 1`
@@ -161,23 +168,26 @@ export async function GET(
     }
     if (hasRotation) {
       try {
-        const r = hasGroupRotationDates
-          ? await prisma.$queryRaw<any[]>`
-              SELECT rotation_enabled, rotation_period_kind, rotation_custom_days,
-                     DATE_FORMAT(rotation_start_date, '%Y-%m-%d') AS rotation_start_date,
-                     DATE_FORMAT(rotation_end_date,   '%Y-%m-%d') AS rotation_end_date
-              FROM cs_shift_groups WHERE id = ${id} LIMIT 1
-            `
-          : await prisma.$queryRaw<any[]>`
-              SELECT rotation_enabled, rotation_period_kind, rotation_custom_days
-              FROM cs_shift_groups WHERE id = ${id} LIMIT 1
-            `
+        const selectDates = hasGroupRotationDates
+          ? `DATE_FORMAT(rotation_start_date, '%Y-%m-%d') AS rotation_start_date,
+             DATE_FORMAT(rotation_end_date,   '%Y-%m-%d') AS rotation_end_date,`
+          : ``
+        const selectDir = hasGroupRotationDirection ? `rotation_direction,` : ``
+        const r = await prisma.$queryRawUnsafe<any[]>(`
+          SELECT rotation_enabled, rotation_period_kind, rotation_custom_days,
+                 ${selectDates} ${selectDir}
+                 1 AS _padding
+          FROM cs_shift_groups WHERE id = ? LIMIT 1
+        `, id)
         rotationEnabled = Boolean(r[0]?.rotation_enabled)
         rotationPeriodKind = String(r[0]?.rotation_period_kind || 'monthly')
         rotationCustomDays = Number(r[0]?.rotation_custom_days || 30)
         if (hasGroupRotationDates) {
           rotationStartDate = r[0]?.rotation_start_date ?? null
           rotationEndDate   = r[0]?.rotation_end_date   ?? null
+        }
+        if (hasGroupRotationDirection && r[0]?.rotation_direction === 'reverse') {
+          rotationDirection = 'reverse'
         }
       } catch { /* graceful */ }
     }
@@ -348,6 +358,8 @@ export async function GET(
       // PR-2RR (2026-05-28) — 그룹 단위 회전 시작/종료
       rotation_start_date: rotationStartDate,
       rotation_end_date:   rotationEndDate,
+      // PR-2RR-b (2026-05-28) — 회전 방향
+      rotation_direction: rotationDirection,
       rotation_shifts: rotationShifts.map(s => ({
         shift_slot_id: s.shift_slot_id,
         sort_order: Number(s.sort_order || 0),
@@ -418,6 +430,11 @@ export async function PATCH(
     try {
       await prisma.$queryRaw<any[]>`SELECT rotation_start_date FROM cs_shift_groups LIMIT 1`
     } catch { hasGroupRotationDates = false }
+    // PR-2RR-b (2026-05-28) — rotation_direction graceful
+    let hasGroupRotationDirection = true
+    try {
+      await prisma.$queryRaw<any[]>`SELECT rotation_direction FROM cs_shift_groups LIMIT 1`
+    } catch { hasGroupRotationDirection = false }
     let hasGroupShifts = true
     try {
       await prisma.$queryRaw<any[]>`SELECT 1 FROM cs_group_shifts LIMIT 1`
@@ -436,6 +453,12 @@ export async function PATCH(
       if (rotationCols.has(k) && !hasRotation) continue  // N-19-a — graceful
       // PR-2RR (2026-05-28) — 그룹 단위 회전 시작/종료
       if ((k === 'rotation_start_date' || k === 'rotation_end_date') && !hasGroupRotationDates) continue
+      // PR-2RR-b (2026-05-28) — 회전 방향
+      if (k === 'rotation_direction' && !hasGroupRotationDirection) continue
+      if (k === 'rotation_direction') {
+        const dv = String(v) === 'reverse' ? 'reverse' : 'forward'
+        sets.push(`rotation_direction = ?`); params.push(dv); continue
+      }
       if (k === 'pattern_type' && !PATTERNS.has(String(v))) continue
       if (k === 'generation_strategy' && !STRATEGIES.has(String(v))) continue
       if (k === 'color_tone' && !COLOR_TONES.has(String(v))) continue

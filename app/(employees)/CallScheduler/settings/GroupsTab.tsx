@@ -46,6 +46,8 @@ export interface ShiftGroup {
   // PR-2RR (2026-05-28) — 그룹 단위 회전 시작/종료 일자 (YYYY-MM-DD)
   rotation_start_date?: string | null
   rotation_end_date?: string | null
+  // PR-2RR-b (2026-05-28) — 회전 방향
+  rotation_direction?: 'forward' | 'reverse'
 }
 
 const PATTERN_LABEL: Record<ShiftGroup['pattern_type'], string> = {
@@ -546,6 +548,18 @@ function GroupRow({ g, onEdit, onMoveUp, onMoveDown, reordering, showOrderContro
               style={inputMonthStyle(saving)}
               title="회전 종료 월 — 빈 값은 무한"
             />
+            {/* PR-2RR-b — 회전 방향 배지 (편집은 그룹 편집 모달 매트릭스에서) */}
+            <span style={{
+              fontSize: 9, fontWeight: 800, padding: '2px 5px', borderRadius: 4,
+              background: g.rotation_direction === 'reverse' ? COLORS.bgViolet : COLORS.bgBlue,
+              color: g.rotation_direction === 'reverse' ? '#7c3aed' : COLORS.info,
+              border: `1px solid ${g.rotation_direction === 'reverse' ? COLORS.borderViolet : COLORS.borderBlue}`,
+              whiteSpace: 'nowrap',
+            }} title={g.rotation_direction === 'reverse'
+              ? '역방향 회전 (편집 모달의 매트릭스에서 변경)'
+              : '정방향 회전 (편집 모달의 매트릭스에서 변경)'}>
+              {g.rotation_direction === 'reverse' ? '↺' : '↻'}
+            </span>
           </>
         ) : (
           <span style={{

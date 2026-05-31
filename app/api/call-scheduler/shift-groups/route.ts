@@ -119,23 +119,29 @@ export async function GET(request: NextRequest) {
     try {
       await prisma.$queryRaw<any[]>`SELECT rotation_start_date FROM cs_shift_groups LIMIT 1`
     } catch { hasGroupRotationDates = false }
+    // PR-2RR-b (2026-05-28) — rotation_direction
+    let hasGroupRotationDirection = true
+    try {
+      await prisma.$queryRaw<any[]>`SELECT rotation_direction FROM cs_shift_groups LIMIT 1`
+    } catch { hasGroupRotationDirection = false }
     const rotationMap = new Map<string, {
       enabled: boolean; period_kind: string; period_days: number
       start_date: string | null; end_date: string | null
+      direction: 'forward' | 'reverse'
     }>()
     if (hasRotation && rows.length > 0) {
       try {
-        const rRows = hasGroupRotationDates
-          ? await prisma.$queryRaw<any[]>`
-              SELECT id, rotation_enabled, rotation_period_kind, rotation_custom_days,
-                     DATE_FORMAT(rotation_start_date, '%Y-%m-%d') AS rotation_start_date,
-                     DATE_FORMAT(rotation_end_date,   '%Y-%m-%d') AS rotation_end_date
-              FROM cs_shift_groups WHERE is_active = 1
-            `
-          : await prisma.$queryRaw<any[]>`
-              SELECT id, rotation_enabled, rotation_period_kind, rotation_custom_days
-              FROM cs_shift_groups WHERE is_active = 1
-            `
+        const selectDates = hasGroupRotationDates
+          ? `DATE_FORMAT(rotation_start_date, '%Y-%m-%d') AS rotation_start_date,
+             DATE_FORMAT(rotation_end_date,   '%Y-%m-%d') AS rotation_end_date,`
+          : ``
+        const selectDir = hasGroupRotationDirection ? `rotation_direction,` : ``
+        const rRows = await prisma.$queryRawUnsafe<any[]>(`
+          SELECT id, rotation_enabled, rotation_period_kind, rotation_custom_days,
+                 ${selectDates} ${selectDir}
+                 1 AS _padding
+          FROM cs_shift_groups WHERE is_active = 1
+        `)
         for (const r of rRows) {
           rotationMap.set(r.id, {
             enabled: Boolean(r.rotation_enabled),
@@ -143,6 +149,7 @@ export async function GET(request: NextRequest) {
             period_days: Number(r.rotation_custom_days || 30),
             start_date: hasGroupRotationDates ? (r.rotation_start_date ?? null) : null,
             end_date:   hasGroupRotationDates ? (r.rotation_end_date   ?? null) : null,
+            direction: hasGroupRotationDirection && r.rotation_direction === 'reverse' ? 'reverse' : 'forward',
           })
         }
       } catch { /* graceful */ }
@@ -306,6 +313,8 @@ export async function GET(request: NextRequest) {
         // PR-2RR (2026-05-28) — 그룹 단위 회전 시작/종료 일자
         rotation_start_date: rot?.start_date ?? null,
         rotation_end_date:   rot?.end_date   ?? null,
+        // PR-2RR-b (2026-05-28) — 회전 방향
+        rotation_direction: rot?.direction ?? 'forward',
       }
     })
     return NextResponse.json({ data: serialize(data), error: null })

@@ -3,6 +3,50 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-28 (PR-2RR-b) — 회전 미리보기 매트릭스 통합 + 회전 방향 (forward/reverse) 컬럼
+
+> 사용자 명령:
+>   ① 「로테이션이랑 선택된 워커가 좀 같이 구성되었어야 ui도 편하고 했을건데」
+>   ② 「위에 회전미리보기랑 통합구성하면되겠네요 기존 설정안에 것들 없애고」
+>   ③ 매트릭스 표시 범위 = 12개월
+> 진단: 박지훈 (6=L07,7=L05 기대) + 정우진 (6=L01,7=L07,8=L05,9=L01 기대) 시퀀스 모두 만족시키려면
+>   회전 방향이 역순 (`baseIdx - elapsed`) 이어야 함 — 기존 정방향 (`baseIdx + elapsed`) 로는 표현 불가.
+
+- **마이그레이션 신규** `2026-05-28_cs_shift_groups_rotation_direction.sql` —
+  - `cs_shift_groups.rotation_direction VARCHAR(8) NOT NULL DEFAULT 'forward'` 추가 (멱등).
+  - 'forward' (baseIdx+elapsed) | 'reverse' (baseIdx-elapsed).
+  - 햇살 그룹 적용 SQL (`UPDATE ... SET rotation_direction='reverse'`) 주석 동봉.
+- **수정** `auto-generate/route.ts` —
+  - `GroupRow` 에 `rotation_direction?: 'forward'|'reverse'` 추가.
+  - `hasGroupRotationDirection` graceful 가드 + 별도 fetch attach (기존 PR-2RR 패턴 재사용).
+  - N-19-b shiftIndex 계산: `const stride = direction==='reverse' ? -elapsed : elapsed` → `((baseIdx+stride) % N + N) % N`.
+- **수정** API `/shift-groups/route.ts` + `[id]/route.ts` —
+  - GET list/single 응답에 `rotation_direction` 포함 (graceful).
+  - ALLOWED_COLS 에 `rotation_direction` 추가 + PATCH normalize ('reverse' 외 전부 'forward').
+- **신규** `_components/RotationPreviewMatrix.tsx` (290+ lines) —
+  - 12개월 × N 멤버 매트릭스 셀 (cell = 시프트 코드 + 색상 배지).
+  - 헤더: 시작/종료 월 input · 방향 토글 (↻ 정방향 / ↺ 역방향).
+  - 워커 column header ◀▶ 버튼 (priority swap), 시프트 footer ◀▶ 버튼 (sort_order swap).
+  - 시프트 색상: `cs_shift_slots.color` 가 있으면 사용 / fallback 6 색 cycle.
+  - 시작 전 / 종료 후 셀은 「—」 회색 표시.
+  - 모든 변경 시 즉시 매트릭스 재계산 (클라이언트 — auto-generate 공식 그대로).
+- **수정** `settings/GroupEditor.tsx` —
+  - `groupRotationStartMonth` / `groupRotationEndMonth` / `rotationDirection` state 신설.
+  - 그룹 load 시 새 컬럼 set, save 시 payload 에 추가.
+  - **멤버별 rotation_start_date / rotation_end_date input 제거** (그룹 단위 일원화).
+  - 「시프트 sequence」 영역 하단 「✅ 자동 분산 안내」 박스 → **`<RotationPreviewMatrix />`** 로 교체.
+  - 멤버 PATCH 의 `rotation_start_date / rotation_end_date` 강제 null (그룹 fallback 우선).
+- **수정** `settings/GroupsTab.tsx` —
+  - `ShiftGroup` 인터페이스에 `rotation_direction?: 'forward'|'reverse'` 추가.
+  - 행의 시작~종료 input 옆에 방향 배지 (↻ / ↺) 표시 (편집은 모달 매트릭스).
+- 알고리즘 변경: forward/reverse 분기 1줄만. 기존 forward 동작 무변 (default).
+- 검증: tsc CallScheduler/GroupEditor/GroupsTab/RotationPreviewMatrix/auto-generate 영역 에러 0.
+- 사용자 적용 순서:
+  1. 마이그 SQL 실행 (rotation_direction 컬럼 추가).
+  2. 그룹 편집 모달 진입 → 매트릭스로 정우진/박지훈 12개월 시퀀스 확인.
+  3. 의도와 다르면 매트릭스 안: 방향 토글 / 시프트 ◀▶ reorder / 워커 ◀▶ reorder / 시작월 변경 — 즉시 미리보기 update.
+  4. 저장 → 7/8/9월 schedule 재생성 → 매트릭스가 보여준 값과 실제 값 일치 확인.
+
 ## 2026-05-28 (PR-2RR) — 그룹 단위 회전 시작/종료 월 + GroupsTab 카드 → 컴팩트 리스트
 
 > 사용자 보고: 「정우진 8월 L05·9월 L01 이 되어야 하는데 실제 8월 L01·9월 L05」.

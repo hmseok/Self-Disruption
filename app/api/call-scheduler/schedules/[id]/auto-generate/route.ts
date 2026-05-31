@@ -73,6 +73,9 @@ interface GroupRow {
   //   fallback chain: member.start_date → group.rotation_start_iso → group.created_iso
   rotation_start_iso?: string | null
   rotation_end_iso?: string | null
+  // PR-2RR-b (2026-05-28) — 회전 방향 ('forward' | 'reverse')
+  //   stride = direction === 'reverse' ? -elapsed : elapsed
+  rotation_direction?: 'forward' | 'reverse'
 }
 interface MemberRow {
   group_id: string
@@ -381,6 +384,11 @@ export async function POST(
     try {
       await prisma.$queryRaw<any[]>`SELECT rotation_start_date FROM cs_shift_groups LIMIT 1`
     } catch { hasGroupRotationDates = false }
+    // PR-2RR-b (2026-05-28) — cs_shift_groups.rotation_direction graceful
+    let hasGroupRotationDirection = true
+    try {
+      await prisma.$queryRaw<any[]>`SELECT rotation_direction FROM cs_shift_groups LIMIT 1`
+    } catch { hasGroupRotationDirection = false }
     try {
       await prisma.$queryRaw<any[]>`SELECT 1 FROM cs_shift_group_versions LIMIT 1`
     } catch { hasGroupVersions = false }
@@ -430,25 +438,36 @@ export async function POST(
           ORDER BY g.sort_order ASC, g.name ASC
         ` as any)
     // PR-2RR (2026-05-28) — 그룹 단위 rotation_start_date / rotation_end_date attach
-    if (hasGroupRotationDates && groups.length > 0) {
+    // PR-2RR-b (2026-05-28) — rotation_direction 도 함께 attach
+    if ((hasGroupRotationDates || hasGroupRotationDirection) && groups.length > 0) {
       try {
-        const grdRows = await prisma.$queryRaw<any[]>`
-          SELECT id,
-                 DATE_FORMAT(rotation_start_date, '%Y-%m-%d') AS rotation_start_iso,
-                 DATE_FORMAT(rotation_end_date,   '%Y-%m-%d') AS rotation_end_iso
+        const selectDates = hasGroupRotationDates
+          ? `DATE_FORMAT(rotation_start_date, '%Y-%m-%d') AS rotation_start_iso,
+             DATE_FORMAT(rotation_end_date,   '%Y-%m-%d') AS rotation_end_iso`
+          : `NULL AS rotation_start_iso, NULL AS rotation_end_iso`
+        const selectDir = hasGroupRotationDirection
+          ? `rotation_direction`
+          : `'forward' AS rotation_direction`
+        const grdRows = await prisma.$queryRawUnsafe<any[]>(`
+          SELECT id, ${selectDates}, ${selectDir}
             FROM cs_shift_groups WHERE is_active = 1
-        `
-        const grdMap = new Map<string, { start: string | null; end: string | null }>()
+        `)
+        const grdMap = new Map<string, {
+          start: string | null; end: string | null
+          direction: 'forward' | 'reverse'
+        }>()
         for (const r of grdRows) {
           grdMap.set(r.id, {
             start: r.rotation_start_iso || null,
             end:   r.rotation_end_iso   || null,
+            direction: (r.rotation_direction === 'reverse' ? 'reverse' : 'forward'),
           })
         }
         for (const g of groups) {
           const v = grdMap.get(g.id)
           g.rotation_start_iso = v?.start ?? null
           g.rotation_end_iso   = v?.end   ?? null
+          g.rotation_direction = v?.direction ?? 'forward'
         }
       } catch { /* graceful */ }
     }
@@ -1910,7 +1929,11 @@ export async function POST(
               }
               if (elapsed < 0) elapsed = 0
             }
-            const shiftIndex = ((baseIdx + elapsed) % rotShifts.length + rotShifts.length) % rotShifts.length
+            // PR-2RR-b (2026-05-28) — 회전 방향 반영
+            //   forward : (baseIdx + elapsed) — 기존 동작
+            //   reverse : (baseIdx - elapsed) — 박지훈 사용자 의도 시퀀스 (6=L07,7=L05) 등
+            const stride = (g.rotation_direction === 'reverse') ? -elapsed : elapsed
+            const shiftIndex = ((baseIdx + stride) % rotShifts.length + rotShifts.length) % rotShifts.length
             const targetSlot = rotShifts[shiftIndex]
             const targetSlotId = targetSlot.shift_slot_id
 
