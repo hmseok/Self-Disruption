@@ -148,6 +148,65 @@ PageTitle 자동 헤더 아래 페이지 본문 구조:
   영역에만 사용. 페이지 본문 최상위 래퍼에는 금지.
 - 검사: `npm run lint:ui-design` — page.tsx 최상위 래퍼 중앙정렬 패턴 경고.
 
+### 1.7 가로 스크롤 금지 — 반응형이 표준 (2026-05-31 신설)
+
+> **사용자 명령 (2026-05-31)**: 「좌우 화면 안 짤리게 반응형 필수」 +
+> 「좌우 스크롤은 없애야죠」 — 가로 스크롤은 회피책이 아니라 그 자체로 위반.
+
+**원칙**: viewport 너비에 맞춰 **컨텐츠가 줄어들거나 재배치** 돼야 한다.
+가로 스크롤 (`overflowX: 'auto'`) 은 **응급 대피용**일 뿐 표준 해결책이 아님.
+
+**금지 패턴**:
+
+```tsx
+{/* ❌ wide content + 가로 스크롤 — 사용자가 스크롤해야 함 */}
+<div style={{ overflowX: 'auto' }}>
+  <table style={{ minWidth: 1000 }}>...</table>
+</div>
+
+{/* ❌ fixed wide grid — 좁은 화면에서 짤림 */}
+<div style={{ display: 'grid', gridTemplateColumns: 'repeat(8, 150px)' }}>...</div>
+
+{/* ❌ minWidth 의존 — 좁아지면 부모 잘림 */}
+<table style={{ minWidth: 1200 }}>...</table>
+
+{/* ❌ 자체 <table> — 모바일 카드 폴백 없음 */}
+<table>...</table>
+```
+
+**올바른 패턴**:
+
+```tsx
+{/* ✅ NeuDataTable — 모바일 카드 자동 폴백 */}
+<NeuDataTable columns={cols} rows={rows} />
+
+{/* ✅ flex-wrap — 좁아지면 줄바꿈 */}
+<div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>...</div>
+
+{/* ✅ minmax grid — 자동 컬럼 수 조정 */}
+<div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12 }}>...</div>
+
+{/* ✅ 컬럼 우선순위 — narrow 에서 부차 컬럼 숨김 */}
+{!isMobile && <td>{secondary}</td>}
+```
+
+**wide content 검출 패턴 (자동 차단 대상)**:
+- `<table>` 직접 사용 (NeuDataTable 사용 의무)
+- `minWidth: 600+` 또는 `min-w-[600px+]` (반응형 단위 X — 600 이상 fixed)
+- `gridTemplateColumns: 'repeat(6+, NNNpx)'` (auto-fit minmax 사용)
+- `overflowX: 'auto' / 'scroll'` (가로 스크롤 자체 금지)
+- `overflow-x-auto` / `overflow-x-scroll` Tailwind 동일
+
+**예외** (명시적 사유 주석 의무):
+- Excel 같은 데이터 그리드 (드릴다운 도구) — `// 가로 스크롤 허용: 데이터 그리드`
+- 코드 블록 (`<pre>`) — 자동 처리됨
+- 차트 / 시각화 — `<svg>` 자체 viewBox 처리
+
+**검사** (ui-design-lint check 19, 2026-05-31 신설):
+- page.tsx 안 wide pattern 검출 → 정보성 경고
+- `overflowX: 'auto'` 도 위반 (회피책 X)
+- baseline 동결: 기존 위반 통과, 신규만 차단
+
 ---
 
 ## 2. Stat Strip — DcStatStrip 사용

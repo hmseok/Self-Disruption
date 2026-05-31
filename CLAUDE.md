@@ -1285,6 +1285,55 @@ GATE 진행 상태:
    - baseline: harness-engineering/knowledge/ui-design-lint.baseline.json
 ```
 
+### 규칙 29 — 가로 스크롤 금지 / 반응형 표준 (2026-05-31 신설)
+
+> **사용자 명령 (2026-05-31)**: 「좌우 화면 안 짤리게 반응형 필수」 +
+> 「좌우 스크롤은 없애야죠」 — 가로 스크롤 (`overflowX:'auto'`) 도 회피책 X.
+
+**원칙**: viewport 너비에 컨텐츠가 **줄어들거나 재배치**돼야 한다.
+가로 스크롤은 응급 대피용일 뿐 표준 해결책이 아님.
+
+**금지 패턴 (자동 검출)**:
+
+```
+✗ <table> 직접 사용 → NeuDataTable 사용 의무 (모바일 카드 자동 폴백)
+✗ minWidth: 600+ inline / min-w-[600px+] Tailwind → fixed wide
+✗ gridTemplateColumns: 'repeat(6+, NNNpx)' → fixed-px 다컬럼
+✗ overflowX: 'auto' / 'scroll' → 가로 스크롤 자체 금지
+✗ overflow-x-auto / overflow-x-scroll Tailwind 동일
+```
+
+**올바른 패턴**:
+
+```
+✓ NeuDataTable             — 모바일 카드 자동 폴백
+✓ flex-wrap                — 좁아지면 줄바꿈
+✓ minmax grid              — repeat(auto-fit, minmax(280px, 1fr))
+✓ 컬럼 우선순위 hide        — narrow 에서 부차 컬럼 숨김
+```
+
+**예외** (명시적 사유 주석 의무):
+- Excel 같은 데이터 그리드 — `// 가로 스크롤 허용: 데이터 그리드`
+- 코드 블록 (`<pre>`) — 자동 처리
+- 차트 (`<svg>` viewBox)
+
+**자동화 안전장치**:
+```
+✅ 14. ui-design-lint check 19 (2026-05-31 신설)
+   - § 1.7 wide content + 가로 스크롤 패턴 검출
+   - page.tsx 안 <table> / minWidth 600+ / repeat(6+, NNNpx) / overflowX:'auto'
+   - baseline 동결: 신규 위반만 알림
+   - 위치: harness-engineering/scripts/ui-design-lint.js check 19
+```
+
+**위반 시 페널티 (Rule 0-1 누적 카운터 연동)**:
+
+| 누적 | 액션 |
+|---|---|
+| 1회 | 정보성 경고 |
+| 2회 | 사용자 보고 + hotfix |
+| 3회+ | `UI_DESIGN_LINT_STRICT=1` 강제 활성화 — commit 차단 |
+
 ### 본 세션 사고 회고 누적 (2026-05-04 — 2026-05-31)
 
 ```

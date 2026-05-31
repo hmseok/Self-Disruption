@@ -20,6 +20,10 @@
       "issue": "자체 <table> 추정 — 공용 NeuDataTable 사용 권장 (§ 0-A [5] — 정렬 + 모바일 카드 자동)"
     },
     {
+      "file": "app/(employees)/CallScheduler/kpi/page.tsx",
+      "issue": "가로 스크롤·wide content (<table>) — § 1.7 반응형이 표준 (NeuDataTable / flex-wrap / minmax-grid 사용)"
+    },
+    {
       "file": "app/(employees)/CallScheduler/new/page.tsx",
       "issue": "체크박스 1건 — § 6 표준 미준수 (width:18 + accentColor:'#3b6eb5' 의무)"
     },
@@ -65,6 +69,10 @@
     },
     {
       "file": "app/(employees)/RideAssets/page.tsx",
+      "issue": "가로 스크롤·wide content (overflowX 가로 스크롤) — § 1.7 반응형이 표준 (NeuDataTable / flex-wrap / minmax-grid 사용)"
+    },
+    {
+      "file": "app/(employees)/RideAssets/page.tsx",
       "issue": "체크박스 1건 — § 6 표준 미준수 (width:18 + accentColor:'#3b6eb5' 의무)"
     },
     {
@@ -78,6 +86,10 @@
     {
       "file": "app/(employees)/RideCompliance/deliverables/page.tsx",
       "issue": "AI 잔존 표현 1건 (메타 식별자 포함) — § 8 인간 손길 표준 (Phase/PR-X/P9-y 메타 식별자, 어댑터/sync/fetch 기술 용어 사용자 노출 금지)"
+    },
+    {
+      "file": "app/(employees)/RideCompliance/forms/[code]/page.tsx",
+      "issue": "AI 잔존 표현 3건 (메타 식별자 포함) — § 8 인간 손길 표준 (Phase/PR-X/P9-y 메타 식별자, 어댑터/sync/fetch 기술 용어 사용자 노출 금지)"
     },
     {
       "file": "app/(employees)/RideCompliance/incidents/[id]/page.tsx",
@@ -140,6 +152,10 @@
       "issue": "AI 잔존 표현 1건 (메타 식별자 포함) — § 8 인간 손길 표준 (Phase/PR-X/P9-y 메타 식별자, 어댑터/sync/fetch 기술 용어 사용자 노출 금지)"
     },
     {
+      "file": "app/(employees)/RideCustomerData/page.tsx",
+      "issue": "가로 스크롤·wide content (<table>) — § 1.7 반응형이 표준 (NeuDataTable / flex-wrap / minmax-grid 사용)"
+    },
+    {
       "file": "app/(employees)/RideEmployees/[id]/page.tsx",
       "issue": "페이지 제목 크기 24px+ — 기준 20px (대출 관리)"
     },
@@ -158,6 +174,10 @@
     {
       "file": "app/(employees)/RideEmployees/page.tsx",
       "issue": "자체 <table> 추정 — 공용 NeuDataTable 사용 권장 (§ 0-A [5] — 정렬 + 모바일 카드 자동)"
+    },
+    {
+      "file": "app/(employees)/RideEmployees/page.tsx",
+      "issue": "가로 스크롤·wide content (<table>) — § 1.7 반응형이 표준 (NeuDataTable / flex-wrap / minmax-grid 사용)"
     },
     {
       "file": "app/(employees)/RideEmployees/page.tsx",
@@ -245,6 +265,10 @@
     },
     {
       "file": "app/(employees)/factory-search/cafe24-import/page.tsx",
+      "issue": "가로 스크롤·wide content (<table>) — § 1.7 반응형이 표준 (NeuDataTable / flex-wrap / minmax-grid 사용)"
+    },
+    {
+      "file": "app/(employees)/factory-search/cafe24-import/page.tsx",
       "issue": "JSX 영어 텍스트 1건 이상 — § 7 한글 100% 의무 (한국어 표시. 기술 약어만 영어 허용)"
     },
     {
@@ -285,6 +309,10 @@
     },
     {
       "file": "app/admin/contract-terms/page.tsx",
+      "issue": "가로 스크롤·wide content (<table>, overflowX 가로 스크롤) — § 1.7 반응형이 표준 (NeuDataTable / flex-wrap / minmax-grid 사용)"
+    },
+    {
+      "file": "app/admin/contract-terms/page.tsx",
       "issue": "체크박스 3건 — § 6 표준 미준수 (width:18 + accentColor:'#3b6eb5' 의무)"
     },
     {
@@ -302,6 +330,10 @@
     {
       "file": "app/admin/developer/page.tsx",
       "issue": "자체 <table> 추정 — 공용 NeuDataTable 사용 권장 (§ 0-A [5] — 정렬 + 모바일 카드 자동)"
+    },
+    {
+      "file": "app/admin/developer/page.tsx",
+      "issue": "가로 스크롤·wide content (<table>, overflowX 가로 스크롤) — § 1.7 반응형이 표준 (NeuDataTable / flex-wrap / minmax-grid 사용)"
     },
     {
       "file": "app/admin/freelancers/page.tsx",
@@ -328,6 +360,10 @@
       "issue": "자체 <table> 추정 — 공용 NeuDataTable 사용 권장 (§ 0-A [5] — 정렬 + 모바일 카드 자동)"
     },
     {
+      "file": "app/admin/freelancers/page.tsx",
+      "issue": "가로 스크롤·wide content (<table>, overflowX 가로 스크롤) — § 1.7 반응형이 표준 (NeuDataTable / flex-wrap / minmax-grid 사용)"
+    },
+    {
       "file": "app/admin/locations/page.tsx",
       "issue": "alert() 사용 — Rule 20: 결과 메시지는 글래스 패널 (React state + GLASS) 로. 기계적 alert 금지"
     },
@@ -338,6 +374,10 @@
     {
       "file": "app/admin/locations/page.tsx",
       "issue": "자체 <table> 추정 — 공용 NeuDataTable 사용 권장 (§ 0-A [5] — 정렬 + 모바일 카드 자동)"
+    },
+    {
+      "file": "app/admin/locations/page.tsx",
+      "issue": "가로 스크롤·wide content (<table>) — § 1.7 반응형이 표준 (NeuDataTable / flex-wrap / minmax-grid 사용)"
     },
     {
       "file": "app/admin/locations/page.tsx",
@@ -368,6 +408,10 @@
       "issue": "AI 잔존 표현 1건 (메타 식별자 포함) — § 8 인간 손길 표준 (Phase/PR-X/P9-y 메타 식별자, 어댑터/sync/fetch 기술 용어 사용자 노출 금지)"
     },
     {
+      "file": "app/admin/message-templates/page.tsx",
+      "issue": "가로 스크롤·wide content (<table>, overflowX 가로 스크롤) — § 1.7 반응형이 표준 (NeuDataTable / flex-wrap / minmax-grid 사용)"
+    },
+    {
       "file": "app/admin/model/page.tsx",
       "issue": "페이지 최상위 래퍼 중앙정렬 (maxWidth + margin:auto) — 전체 너비로 (UI-DESIGN-STANDARD § 1.6). 모달/카드 내부는 제외"
     },
@@ -388,6 +432,10 @@
       "issue": "AI 잔존 표현 1건 (메타 식별자 포함) — § 8 인간 손길 표준 (Phase/PR-X/P9-y 메타 식별자, 어댑터/sync/fetch 기술 용어 사용자 노출 금지)"
     },
     {
+      "file": "app/admin/model/page.tsx",
+      "issue": "가로 스크롤·wide content (<table>) — § 1.7 반응형이 표준 (NeuDataTable / flex-wrap / minmax-grid 사용)"
+    },
+    {
       "file": "app/admin/page.tsx",
       "issue": "페이지 최상위 래퍼 중앙정렬 (maxWidth + margin:auto) — 전체 너비로 (UI-DESIGN-STANDARD § 1.6). 모달/카드 내부는 제외"
     },
@@ -402,6 +450,10 @@
     {
       "file": "app/admin/page.tsx",
       "issue": "자체 <table> 추정 — 공용 NeuDataTable 사용 권장 (§ 0-A [5] — 정렬 + 모바일 카드 자동)"
+    },
+    {
+      "file": "app/admin/page.tsx",
+      "issue": "가로 스크롤·wide content (<table>, overflowX 가로 스크롤) — § 1.7 반응형이 표준 (NeuDataTable / flex-wrap / minmax-grid 사용)"
     },
     {
       "file": "app/admin/page.tsx",
@@ -422,6 +474,10 @@
     {
       "file": "app/admin/payroll/[id]/page.tsx",
       "issue": "자체 <table> 추정 — 공용 NeuDataTable 사용 권장 (§ 0-A [5] — 정렬 + 모바일 카드 자동)"
+    },
+    {
+      "file": "app/admin/payroll/[id]/page.tsx",
+      "issue": "가로 스크롤·wide content (<table>) — § 1.7 반응형이 표준 (NeuDataTable / flex-wrap / minmax-grid 사용)"
     },
     {
       "file": "app/auth/verified/page.tsx",
@@ -442,6 +498,10 @@
     {
       "file": "app/contracts/[id]/page.tsx",
       "issue": "자체 <table> 추정 — 공용 NeuDataTable 사용 권장 (§ 0-A [5] — 정렬 + 모바일 카드 자동)"
+    },
+    {
+      "file": "app/contracts/[id]/page.tsx",
+      "issue": "가로 스크롤·wide content (<table>, overflowX 가로 스크롤) — § 1.7 반응형이 표준 (NeuDataTable / flex-wrap / minmax-grid 사용)"
     },
     {
       "file": "app/contracts/[id]/page.tsx",
@@ -553,6 +613,10 @@
     },
     {
       "file": "app/finance/bank-card/page.tsx",
+      "issue": "가로 스크롤·wide content (<table>, minWidth ≥ 600, overflowX 가로 스크롤) — § 1.7 반응형이 표준 (NeuDataTable / flex-wrap / minmax-grid 사용)"
+    },
+    {
+      "file": "app/finance/bank-card/page.tsx",
       "issue": "JSX 영어 텍스트 3건 이상 — § 7 한글 100% 의무 (한국어 표시. 기술 약어만 영어 허용)"
     },
     {
@@ -592,6 +656,10 @@
       "issue": "자체 <table> 추정 — 공용 NeuDataTable 사용 권장 (§ 0-A [5] — 정렬 + 모바일 카드 자동)"
     },
     {
+      "file": "app/finance/fleet/page.tsx",
+      "issue": "가로 스크롤·wide content (<table>) — § 1.7 반응형이 표준 (NeuDataTable / flex-wrap / minmax-grid 사용)"
+    },
+    {
       "file": "app/finance/investor/page.tsx",
       "issue": "자체 탭 strip 추정 — 공용 NeuFilterTabs 사용 권장 (UI-DESIGN-STANDARD § 4 — 같은 기능 같은 UI)"
     },
@@ -608,6 +676,10 @@
       "issue": "자체 <table> 추정 — 공용 NeuDataTable 사용 권장 (§ 0-A [5] — 정렬 + 모바일 카드 자동)"
     },
     {
+      "file": "app/finance/investor/page.tsx",
+      "issue": "가로 스크롤·wide content (<table>) — § 1.7 반응형이 표준 (NeuDataTable / flex-wrap / minmax-grid 사용)"
+    },
+    {
       "file": "app/finance/sms/page.tsx",
       "issue": "페이지 최상위 래퍼 중앙정렬 (maxWidth + margin:auto) — 전체 너비로 (UI-DESIGN-STANDARD § 1.6). 모달/카드 내부는 제외"
     },
@@ -622,6 +694,10 @@
     {
       "file": "app/finance/sms/page.tsx",
       "issue": "자체 <table> 추정 — 공용 NeuDataTable 사용 권장 (§ 0-A [5] — 정렬 + 모바일 카드 자동)"
+    },
+    {
+      "file": "app/finance/sms/page.tsx",
+      "issue": "가로 스크롤·wide content (<table>) — § 1.7 반응형이 표준 (NeuDataTable / flex-wrap / minmax-grid 사용)"
     },
     {
       "file": "app/finance/tax/page.tsx",
@@ -652,6 +728,10 @@
       "issue": "자체 <table> 추정 — 공용 NeuDataTable 사용 권장 (§ 0-A [5] — 정렬 + 모바일 카드 자동)"
     },
     {
+      "file": "app/finance/tax/page.tsx",
+      "issue": "가로 스크롤·wide content (<table>, minWidth ≥ 600, overflowX 가로 스크롤) — § 1.7 반응형이 표준 (NeuDataTable / flex-wrap / minmax-grid 사용)"
+    },
+    {
       "file": "app/hr/page.tsx",
       "issue": "alert() 사용 — Rule 20: 결과 메시지는 글래스 패널 (React state + GLASS) 로. 기계적 alert 금지"
     },
@@ -662,6 +742,10 @@
     {
       "file": "app/hr/page.tsx",
       "issue": "AI 잔존 표현 1건 (메타 식별자 포함) — § 8 인간 손길 표준 (Phase/PR-X/P9-y 메타 식별자, 어댑터/sync/fetch 기술 용어 사용자 노출 금지)"
+    },
+    {
+      "file": "app/hr/page.tsx",
+      "issue": "가로 스크롤·wide content (overflowX 가로 스크롤) — § 1.7 반응형이 표준 (NeuDataTable / flex-wrap / minmax-grid 사용)"
     },
     {
       "file": "app/hr/page.tsx",
@@ -685,6 +769,10 @@
     },
     {
       "file": "app/insurance/page.tsx",
+      "issue": "가로 스크롤·wide content (<table>) — § 1.7 반응형이 표준 (NeuDataTable / flex-wrap / minmax-grid 사용)"
+    },
+    {
+      "file": "app/insurance/page.tsx",
       "issue": "체크박스 1건 — § 6 표준 미준수 (width:18 + accentColor:'#3b6eb5' 의무)"
     },
     {
@@ -702,6 +790,10 @@
     {
       "file": "app/invest/general/[id]/page.tsx",
       "issue": "AI 잔존 표현 1건 (메타 식별자 포함) — § 8 인간 손길 표준 (Phase/PR-X/P9-y 메타 식별자, 어댑터/sync/fetch 기술 용어 사용자 노출 금지)"
+    },
+    {
+      "file": "app/invest/general/[id]/page.tsx",
+      "issue": "가로 스크롤·wide content (<table>, overflowX 가로 스크롤) — § 1.7 반응형이 표준 (NeuDataTable / flex-wrap / minmax-grid 사용)"
     },
     {
       "file": "app/invite/[token]/page.tsx",
@@ -722,6 +814,10 @@
     {
       "file": "app/jiip/[id]/page.tsx",
       "issue": "AI 잔존 표현 1건 (메타 식별자 포함) — § 8 인간 손길 표준 (Phase/PR-X/P9-y 메타 식별자, 어댑터/sync/fetch 기술 용어 사용자 노출 금지)"
+    },
+    {
+      "file": "app/jiip/[id]/page.tsx",
+      "issue": "가로 스크롤·wide content (<table>, overflowX 가로 스크롤) — § 1.7 반응형이 표준 (NeuDataTable / flex-wrap / minmax-grid 사용)"
     },
     {
       "file": "app/jiip/[id]/page.tsx",
@@ -761,6 +857,10 @@
     },
     {
       "file": "app/loans/backtrace/page.tsx",
+      "issue": "가로 스크롤·wide content (<table>, overflowX 가로 스크롤) — § 1.7 반응형이 표준 (NeuDataTable / flex-wrap / minmax-grid 사용)"
+    },
+    {
+      "file": "app/loans/backtrace/page.tsx",
       "issue": "JSX 영어 텍스트 1건 이상 — § 7 한글 100% 의무 (한국어 표시. 기술 약어만 영어 허용)"
     },
     {
@@ -778,6 +878,10 @@
     {
       "file": "app/loans/page.tsx",
       "issue": "AI 잔존 표현 1건 (메타 식별자 포함) — § 8 인간 손길 표준 (Phase/PR-X/P9-y 메타 식별자, 어댑터/sync/fetch 기술 용어 사용자 노출 금지)"
+    },
+    {
+      "file": "app/loans/page.tsx",
+      "issue": "가로 스크롤·wide content (overflowX 가로 스크롤) — § 1.7 반응형이 표준 (NeuDataTable / flex-wrap / minmax-grid 사용)"
     },
     {
       "file": "app/loans-out/[id]/page.tsx",
@@ -798,6 +902,10 @@
     {
       "file": "app/loans-out/[id]/page.tsx",
       "issue": "AI 잔존 표현 1건 (메타 식별자 포함) — § 8 인간 손길 표준 (Phase/PR-X/P9-y 메타 식별자, 어댑터/sync/fetch 기술 용어 사용자 노출 금지)"
+    },
+    {
+      "file": "app/loans-out/[id]/page.tsx",
+      "issue": "가로 스크롤·wide content (<table>, overflowX 가로 스크롤) — § 1.7 반응형이 표준 (NeuDataTable / flex-wrap / minmax-grid 사용)"
     },
     {
       "file": "app/loans-out/new/page.tsx",
@@ -822,6 +930,10 @@
     {
       "file": "app/loans-out/page.tsx",
       "issue": "자체 <table> 추정 — 공용 NeuDataTable 사용 권장 (§ 0-A [5] — 정렬 + 모바일 카드 자동)"
+    },
+    {
+      "file": "app/loans-out/page.tsx",
+      "issue": "가로 스크롤·wide content (<table>) — § 1.7 반응형이 표준 (NeuDataTable / flex-wrap / minmax-grid 사용)"
     },
     {
       "file": "app/long-term-rentals/catalog/new/page.tsx",
@@ -877,6 +989,10 @@
     },
     {
       "file": "app/operations/intake-bulk/page.tsx",
+      "issue": "가로 스크롤·wide content (<table>, overflowX 가로 스크롤) — § 1.7 반응형이 표준 (NeuDataTable / flex-wrap / minmax-grid 사용)"
+    },
+    {
+      "file": "app/operations/intake-bulk/page.tsx",
       "issue": "JSX 영어 텍스트 1건 이상 — § 7 한글 100% 의무 (한국어 표시. 기술 약어만 영어 허용)"
     },
     {
@@ -908,6 +1024,10 @@
       "issue": "자체 <table> 추정 — 공용 NeuDataTable 사용 권장 (§ 0-A [5] — 정렬 + 모바일 카드 자동)"
     },
     {
+      "file": "app/operations/rentals/page.tsx",
+      "issue": "가로 스크롤·wide content (<table>, overflowX 가로 스크롤) — § 1.7 반응형이 표준 (NeuDataTable / flex-wrap / minmax-grid 사용)"
+    },
+    {
       "file": "app/page.tsx",
       "issue": "AI 잔존 표현 1건 (메타 식별자 포함) — § 8 인간 손길 표준 (Phase/PR-X/P9-y 메타 식별자, 어댑터/sync/fetch 기술 용어 사용자 노출 금지)"
     },
@@ -933,11 +1053,19 @@
     },
     {
       "file": "app/public/lt-quote/[token]/page.tsx",
+      "issue": "가로 스크롤·wide content (<table>) — § 1.7 반응형이 표준 (NeuDataTable / flex-wrap / minmax-grid 사용)"
+    },
+    {
+      "file": "app/public/lt-quote/[token]/page.tsx",
       "issue": "JSX 영어 텍스트 2건 이상 — § 7 한글 100% 의무 (한국어 표시. 기술 약어만 영어 허용)"
     },
     {
       "file": "app/settlement/view/[token]/page.tsx",
       "issue": "자체 <table> 추정 — 공용 NeuDataTable 사용 권장 (§ 0-A [5] — 정렬 + 모바일 카드 자동)"
+    },
+    {
+      "file": "app/settlement/view/[token]/page.tsx",
+      "issue": "가로 스크롤·wide content (<table>) — § 1.7 반응형이 표준 (NeuDataTable / flex-wrap / minmax-grid 사용)"
     },
     {
       "file": "app/work-essentials/my-info/page.tsx",
@@ -978,6 +1106,10 @@
     {
       "file": "app/work-essentials/receipts/page.tsx",
       "issue": "자체 <table> 추정 — 공용 NeuDataTable 사용 권장 (§ 0-A [5] — 정렬 + 모바일 카드 자동)"
+    },
+    {
+      "file": "app/work-essentials/receipts/page.tsx",
+      "issue": "가로 스크롤·wide content (<table>, overflowX 가로 스크롤) — § 1.7 반응형이 표준 (NeuDataTable / flex-wrap / minmax-grid 사용)"
     },
     {
       "file": "app/work-essentials/receipts/page.tsx",

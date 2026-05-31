@@ -327,6 +327,44 @@ for (const fp of pageFiles) {
     })
   }
 
+  // 19) 2026-05-31: 가로 스크롤 금지 — 반응형이 표준 (§ 1.7)
+  //   사용자 명령: "좌우 화면 안 짤리게 반응형 필수" + "좌우 스크롤은 없애야죠"
+  //
+  //   원칙: 가로 스크롤 (overflowX:'auto') 은 회피책 — 표준 X.
+  //   wide content 자체 + overflowX 자체 모두 위반.
+  //
+  //   wide patterns (각각 별도 경고):
+  //     · <table>            — 자체 사용 (NeuDataTable 사용 의무)
+  //     · minWidth: 600+     — fixed wide (반응형 X)
+  //     · min-w-[600+px]     — Tailwind 동일
+  //     · repeat(6+, NNNpx)  — fixed-px 다컬럼 grid
+  //     · overflowX:'auto'/'scroll' — 가로 스크롤 자체
+  //     · overflow-x-auto/scroll Tailwind 동일
+  const widePatterns = []
+  if (/<table\b/.test(content)) widePatterns.push('<table>')
+  const minWidthMatches = content.match(/minWidth:\s*['"]?(\d{3,4})\b/g)
+  if (minWidthMatches?.some(s => parseInt(s.replace(/[^\d]/g, ''), 10) >= 600)) {
+    widePatterns.push('minWidth ≥ 600')
+  }
+  const twMinWMatches = content.match(/\bmin-w-\[(\d{3,4})px\]/g)
+  if (twMinWMatches?.some(s => parseInt(s.match(/\d+/)[0], 10) >= 600)) {
+    widePatterns.push('min-w-[NNNpx] ≥ 600')
+  }
+  if (/gridTemplateColumns:\s*['"`]repeat\(\s*([6-9]|\d{2,})\s*,\s*\d{2,3}px/.test(content)) {
+    widePatterns.push('repeat(6+, NNNpx)')
+  }
+  if (/overflowX:\s*['"`](?:auto|scroll)['"`]/.test(content) ||
+      /\boverflow-x-(?:auto|scroll)\b/.test(content)) {
+    widePatterns.push('overflowX 가로 스크롤')
+  }
+
+  if (widePatterns.length > 0) {
+    warnings.push({
+      file: rel,
+      issue: `가로 스크롤·wide content (${widePatterns.join(', ')}) — § 1.7 반응형이 표준 (NeuDataTable / flex-wrap / minmax-grid 사용)`,
+    })
+  }
+
   // 17) 2026-05-28: 표시 텍스트 100% 한글 (UI-DESIGN-STANDARD § 7)
   //   JSX text content (예: <button>Click Me</button>) 안 한글 0 + 영어 단어 6자+
   //   → 정보성 경고. 기술 약어 화이트리스트 통과.
