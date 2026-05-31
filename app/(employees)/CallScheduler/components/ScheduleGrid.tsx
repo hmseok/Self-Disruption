@@ -596,14 +596,16 @@ export default function ScheduleGrid({ detail, onChanged, myWorkerId }: Props) {
       }}>
         <div style={{ fontSize: 11, color: COLORS.textMuted }}>
           {(() => {
-            // 빈 슬롯 카운트: 슬롯 × 일자 × 모든 셀 중 worker_id NULL 또는 special=off 면 '안 채워진' 으로 카운트
-            // 실제로는 cs_assignments INSERT 안 된 (date, slot) 조합도 빈자리
-            const totalCells = days.length * slots.length
+            // ROT-FIX-AUG (2026-05-28): assignments.length 를 baseline 으로 사용.
+            // 기존: days × slots → 같은 (날짜, 시프트) 에 여러 워커 (예: 야간 L12 부엉+달빛,
+            //   3 햇살 그룹 동일 슬롯 분담) 시 filled > totalCells → 「비어있음 -28」 음수 사고.
+            // 신: 자동 생성이 만든 실제 예상 칸 수 = assignments.length (KPI strip 충원율과 동일).
+            const totalCells = assignments.length
             const filled = assignments.filter(a => a.worker_id && a.special_code !== 'off').length
             const empty = totalCells - filled
             return (
               <>
-                전체 {totalCells} 셀 ·{' '}
+                전체 {totalCells} 칸 ·{' '}
                 <span style={{ color: COLORS.success, fontWeight: 700 }}>채움 {filled}</span> ·{' '}
                 <span style={{ color: empty > 0 ? COLORS.danger : COLORS.textMuted, fontWeight: 700 }}>
                   비어있음 {empty}

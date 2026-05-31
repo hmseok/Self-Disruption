@@ -3,6 +3,24 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-28 (MONTH-NAV + AUG-FIX) — 상세 페이지 월 이동 화살표 + 「비어있음 -28」 음수 표시 보정
+
+> 사용자 보고:
+>   ① 「8월이 좀 잘못된것같은데 그리고 의도된 생성이에요」 — 헤더 카운트 박스 「전체 279 셀 · 채움 307 · 비어있음 -28」 음수 표시.
+>   ② 「몇월 근무표에서 도 이동할수있게 좌우 화살표나 월선택으로 이동할수있게 — 리스트 나가고 다시 누르고 불편하네요」.
+
+- **AUG-FIX** — `components/ScheduleGrid.tsx:601` totalCells 계산 baseline 교체.
+  - 기존: `days.length × slots.length` (= 31×9 = 279). 같은 (날짜, 시프트) 에 여러 워커 (야간 L12 부엉+달빛, 3 햇살 그룹 동일 시프트 분담 등) 시 filled > totalCells → 음수 「비어있음 -28」 사고.
+  - 신: `assignments.length` — 자동 생성이 만든 실제 예상 칸 수 = KPI strip 충원율 (307/307) 과 동일.
+  - 라벨: 「전체 N 셀」 → 「전체 N 칸」 (의미 명확화 — (날짜×시프트) 매트릭스 셀이 아닌 "워커 배정 칸").
+- **MONTH-NAV** — `_components/MonthSwitcher.tsx` 신규.
+  - GET `/api/call-scheduler/schedules` 전체 월 목록 fetch → 현재 id 기준 인접 월 계산.
+  - ◀ 이전 · 「YYYY년 M월 ▼」 드롭다운 · ▶ 다음 — 헤더 좌측 (PageTitle 직 하단, status pill 옆).
+  - 드롭다운: 최신 월이 위(DESC), 현재 ✓ 강조, 초안/공지/보관 상태 배지, 외부 클릭으로 닫힘.
+  - `[id]/page.tsx` 헤더 「{year}년 {month}월」 정적 텍스트 → `<MonthSwitcher />` 교체.
+- 알고리즘·자동 생성 로직 무변. 8월 자동 생성 결과(307/307) 자체는 정상 — 헤더 표시 공식만 보정.
+- 검증: tsc CallScheduler 영역 에러 0 / 시각 검수 — 사용자 스크린샷 (8월 띄운 상태에서 「◀」 클릭 → 7월 이동 확인) 예정.
+
 ## 2026-05-26 (ROT-FIX) — 시프트 로테이션 월간 fallback (멤버 rotation_start_date NULL → group.created_at)
 
 > 사용자 보고: 「6월·7월 근무표 시프트 로테이션 적용 안 됨」.
