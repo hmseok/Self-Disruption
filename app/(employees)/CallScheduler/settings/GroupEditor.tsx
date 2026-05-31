@@ -755,18 +755,20 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {/* 1. 그룹 정의 (이름/카테고리/색상/시프트/패턴/전략) */}
         <div style={{ ...GLASS.L4, borderRadius: 12, padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {/* PR-2RR-d (2026-05-28) — 이름 + 카테고리 한 행 */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, alignItems: 'start' }}>
           <Field label="그룹 이름" required>
             <input type="text" value={name} onChange={(e) => setName(e.target.value)}
                    style={inputStyle} placeholder="예: 주간 09-18" />
           </Field>
 
-          {/* PR-2QQ-a — 카테고리 */}
-          <Field label="카테고리" sub="그룹 분류 — 같은 카테고리끼리 묶여 표시됩니다">
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {/* PR-2QQ-a — 카테고리 (컴팩트) */}
+          <Field label="카테고리">
+            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
               {['주간', '야간', '특수', 'general'].map(cat => (
                 <button key={cat} type="button" onClick={() => setCategory(cat)}
                         style={{
-                          padding: '4px 12px', borderRadius: 999, fontSize: 11, fontWeight: 700,
+                          padding: '3px 10px', borderRadius: 99, fontSize: 11, fontWeight: 700,
                           background: category === cat ? COLORS.bgBlue : 'transparent',
                           border: `1px solid ${category === cat ? COLORS.borderBlue : COLORS.borderFaint}`,
                           color: category === cat ? COLORS.info : COLORS.textSecondary,
@@ -777,24 +779,24 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
               ))}
               <input type="text" value={!['주간','야간','특수','general'].includes(category) ? category : ''}
                      onChange={(e) => setCategory(e.target.value)}
-                     placeholder="직접 입력..."
+                     placeholder="+ 직접 입력"
                      style={{
-                       padding: '4px 10px', borderRadius: 999, fontSize: 11,
-                       border: `1px solid ${COLORS.borderFaint}`,
+                       padding: '3px 10px', borderRadius: 99, fontSize: 11,
+                       border: `1px dashed ${COLORS.borderFaint}`,
                        background: !['주간','야간','특수','general'].includes(category) ? COLORS.bgBlue : 'transparent',
-                       width: 100,
+                       width: 90,
                      }} />
             </div>
           </Field>
+          </div>{/* end 이름+카테고리 2-column */}
 
-          {/* N-23 — rotation ON 시 단일 시프트 영역 hide + 안내 / OFF 시 단일 시프트 선택 표시 */}
-          {!rotationEnabled ? (
-            <Field label="시프트 (시간대)" required
-                   sub="그룹이 어느 시간대에 배정되는지 — 1개 선택 (여러 시간대 순환은 아래 「시프트 로테이션」 ON)">
+          {/* PR-2RR-d (2026-05-28) — OFF 모드만 단일 시프트 선택. ON 모드는 매트릭스가 처리. */}
+          {!rotationEnabled && (
+            <Field label="시프트 (시간대)" required>
               <div style={{
-                display: 'flex', flexWrap: 'wrap', gap: 4,
-                maxHeight: 120, overflowY: 'auto',
-                padding: 4, borderRadius: 8,
+                display: 'flex', flexWrap: 'wrap', gap: 3,
+                maxHeight: 100, overflowY: 'auto',
+                padding: 4, borderRadius: 6,
                 border: `1px solid ${COLORS.borderFaint}`,
               }}>
                 {slots.map(s => {
@@ -805,7 +807,7 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
                       type="button"
                       onClick={() => setSlotId(s.id)}
                       style={{
-                        padding: '4px 8px', borderRadius: 6,
+                        padding: '3px 7px', borderRadius: 5,
                         fontSize: 11, fontWeight: 600,
                         background: active ? COLORS.bgBlue : 'transparent',
                         color: active ? COLORS.info : COLORS.textSecondary,
@@ -813,7 +815,7 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
                         cursor: 'pointer', whiteSpace: 'nowrap',
                       }}
                     >
-                      <span style={{ color: COLORS.textMuted, marginRight: 4, fontFamily: 'monospace' }}>
+                      <span style={{ color: COLORS.textMuted, marginRight: 3, fontFamily: 'monospace' }}>
                         {s.code}
                       </span>
                       {s.label}
@@ -821,30 +823,10 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
                   )
                 })}
                 {slots.length === 0 && (
-                  <div style={{ padding: 12, fontSize: 11, color: COLORS.textMuted }}>
+                  <div style={{ padding: 8, fontSize: 10, color: COLORS.textMuted }}>
                     시프트가 없습니다 — [시프트] 탭에서 먼저 추가하세요.
                   </div>
                 )}
-              </div>
-            </Field>
-          ) : (
-            <Field label="시프트 (시간대)"
-                   sub="🔄 시프트 로테이션 ON — 아래 「시프트 sequence」 사용 (단일 시프트 선택 X)">
-              <div style={{
-                padding: '10px 12px', borderRadius: 8,
-                background: COLORS.bgBlue, border: `1px solid ${COLORS.borderBlue}`,
-                fontSize: 12, color: COLORS.info,
-                display: 'flex', alignItems: 'center', gap: 8,
-              }}>
-                <span style={{ fontWeight: 800 }}>🔄</span>
-                <span>
-                  로테이션 모드 — 워커마다 매월(또는 N일) 자동 순환합니다.
-                  대표 시프트는 sequence 의 첫 번째 (
-                  <code style={{ background: '#fff', padding: '1px 6px', borderRadius: 4 }}>
-                    {slots.find(s => s.id === slotId)?.code || '?'}
-                  </code>
-                  ) 로 자동 지정됩니다.
-                </span>
               </div>
             </Field>
           )}
@@ -910,158 +892,157 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
             )}
           </Field>
 
-          <Field label="식별 색상" sub="14개 색상 중 선택">
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {COLOR_TONE_OPTIONS.map(opt => {
-                const active = colorTone === opt.value
-                return (
-                  <button key={opt.value} type="button" onClick={() => setColorTone(opt.value)}
-                          title={opt.label}
-                          style={{
-                            width: 28, height: 28, borderRadius: '50%',
-                            background: opt.value === 'none' ? '#fff' : opt.hex,
-                            border: active
-                              ? `3px solid ${COLORS.primary}`
-                              : `1px solid ${COLORS.borderFaint}`,
-                            boxShadow: active ? `0 0 0 2px rgba(255,255,255,0.9)` : 'none',
-                            cursor: 'pointer', padding: 0,
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            fontSize: 14, color: opt.value === 'none' ? COLORS.textMuted : '#fff',
-                            fontWeight: 700,
-                          }}>
-                    {opt.value === 'none' ? '∅' : (active ? '✓' : '')}
-                  </button>
-                )
-              })}
-            </div>
-            <div style={{ fontSize: 10, color: COLORS.textMuted, marginTop: 4 }}>
-              현재: {COLOR_TONE_OPTIONS.find(o => o.value === colorTone)?.label || '없음'}
-            </div>
-          </Field>
-
-          <Field label="설명">
-            <input type="text" value={description} onChange={(e) => setDescription(e.target.value)}
-                   style={inputStyle} placeholder="자유 메모" />
-          </Field>
+          {/* PR-2RR-d (2026-05-28) — 식별 색상 + 설명 한 행 (공간 절약) */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: 10, alignItems: 'start' }}>
+            <Field label={`색상: ${COLOR_TONE_OPTIONS.find(o => o.value === colorTone)?.label || '없음'}`}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                {COLOR_TONE_OPTIONS.map(opt => {
+                  const active = colorTone === opt.value
+                  return (
+                    <button key={opt.value} type="button" onClick={() => setColorTone(opt.value)}
+                            title={opt.label}
+                            style={{
+                              width: 22, height: 22, borderRadius: '50%',
+                              background: opt.value === 'none' ? '#fff' : opt.hex,
+                              border: active
+                                ? `2px solid ${COLORS.primary}`
+                                : `1px solid ${COLORS.borderFaint}`,
+                              cursor: 'pointer', padding: 0,
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              fontSize: 11, color: opt.value === 'none' ? COLORS.textMuted : '#fff',
+                              fontWeight: 700,
+                            }}>
+                      {opt.value === 'none' ? '∅' : (active ? '✓' : '')}
+                    </button>
+                  )
+                })}
+              </div>
+            </Field>
+            <Field label="설명">
+              <input type="text" value={description} onChange={(e) => setDescription(e.target.value)}
+                     style={inputStyle} placeholder="자유 메모" />
+            </Field>
+          </div>
 
           {/* N-55 A/B조 cycle UI 는 N-56-b 에서 폐기 — 멤버 cfg work_cycle_pattern 으로 단일화
               · DB 컬럼 (cs_shift_groups.cycle_kind / cs_group_members.squad) 은 안전 유지
               · cycle_kind='squad_rotation' 으로 셋팅된 기존 그룹은 알고리즘이 그대로 작동
               · 새 셋팅은 「멤버 cfg → 🔁 비균등 cycle 패턴」 에서 (그룹마다 다른 출발일 가능) */}
 
-          {/* N-16 — 휴일 자동 제외 (주중 그룹은 ON, 야간/24-365 그룹은 OFF) */}
+          {/* PR-2RR-d (2026-05-28) — 공휴일 처리 통합 (3-way segmented control).
+              skip / include 상호배반 → 단일 select 로 표현. */}
           <Field label="🎌 공휴일 처리"
-                 sub="공휴일에 이 그룹을 자동 배정에서 빼낼지 — 주중 근무 그룹은 ON, 24/365 운영 그룹은 OFF">
-            <label style={{
-              display: 'flex', alignItems: 'center', gap: 10,
-              padding: '10px 12px', borderRadius: 10,
-              background: skipOnHolidays ? COLORS.bgBlue : 'rgba(0,0,0,0.03)',
-              border: `1px solid ${skipOnHolidays ? COLORS.borderBlue : COLORS.borderFaint}`,
-              cursor: 'pointer',
-            }}>
-              <input type="checkbox"
-                     checked={skipOnHolidays}
-                     onChange={(e) => {
-                       const v = e.target.checked
-                       setSkipOnHolidays(v)
-                       if (v) setIncludeHolidaysExtra(false)  // 상호배반 — skip ON 이면 include OFF
-                     }}
-                     style={{ width: 16, height: 16, cursor: 'pointer' }} />
-              <span style={{ fontSize: 12, fontWeight: 600,
-                             color: skipOnHolidays ? COLORS.info : COLORS.textPrimary }}>
-                🎌 휴일에는 자동 배정 제외
-              </span>
-              <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 'auto' }}>
-                {skipOnHolidays ? '주중 근무 그룹' : '휴일에도 정상 배정 (24/365)'}
-              </span>
-            </label>
+                 sub="주중 그룹은 「제외」 · 24/365 운영은 「평소대로」 · 휴일 가중 그룹은 「추가 출근」">
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4 }}>
+              {[
+                { value: 'normal', label: '평소대로', sub: '패턴 그대로' },
+                { value: 'skip',   label: '🎌 제외',   sub: '휴일 자동 제외' },
+                { value: 'extra',  label: '🎉 추가 출근', sub: '패턴 + 모든 휴일' },
+              ].map(opt => {
+                const cur = skipOnHolidays ? 'skip' : (includeHolidaysExtra ? 'extra' : 'normal')
+                const active = cur === opt.value
+                return (
+                  <button key={opt.value} type="button"
+                          onClick={() => {
+                            if (opt.value === 'skip') { setSkipOnHolidays(true);  setIncludeHolidaysExtra(false) }
+                            else if (opt.value === 'extra') { setSkipOnHolidays(false); setIncludeHolidaysExtra(true) }
+                            else { setSkipOnHolidays(false); setIncludeHolidaysExtra(false) }
+                          }}
+                          style={{
+                            padding: '6px 8px', borderRadius: 6, cursor: 'pointer',
+                            background: active ? COLORS.bgBlue : 'transparent',
+                            border: `1px solid ${active ? COLORS.borderBlue : COLORS.borderFaint}`,
+                            color: active ? COLORS.info : COLORS.textSecondary,
+                            textAlign: 'center', lineHeight: 1.2,
+                          }}>
+                    <div style={{ fontSize: 11, fontWeight: 700 }}>{opt.label}</div>
+                    <div style={{ fontSize: 9, color: COLORS.textMuted, marginTop: 1 }}>{opt.sub}</div>
+                  </button>
+                )
+              })}
+            </div>
           </Field>
 
-          {/* N-35 — 같은 날 다른 그룹과 겹침 허용 (시간 안 겹치면 OK) */}
-          <Field label="🤝 다른 그룹 추가 근무 허용"
-                 sub="결원 시 다른 그룹 근무자가 이 그룹에 추가로 들어와 cover 가능 — 자기 그룹 cycle 보호. 「휴가 커버 그룹」 페어와 함께 ON 권장">
-            <label style={{
-              display: 'flex', alignItems: 'center', gap: 10,
-              padding: '10px 12px', borderRadius: 10,
-              background: allowSameDayOtherGroup ? 'rgba(245,158,11,0.10)' : 'rgba(0,0,0,0.03)',
-              border: `1px solid ${allowSameDayOtherGroup ? 'rgba(245,158,11,0.40)' : COLORS.borderFaint}`,
-              cursor: 'pointer',
-            }}>
-              <input type="checkbox"
-                     checked={allowSameDayOtherGroup}
-                     onChange={(e) => setAllowSameDayOtherGroup(e.target.checked)}
-                     style={{ width: 16, height: 16, cursor: 'pointer' }} />
-              <span style={{ fontSize: 12, fontWeight: 600,
-                             color: allowSameDayOtherGroup ? '#d97706' : COLORS.textPrimary }}>
-                🔀 같은 날 다른 그룹과 겹침 허용
-              </span>
-              <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 'auto' }}>
-                {allowSameDayOtherGroup
-                  ? '시간만 안 겹치면 다른 그룹 OK (24/365)'
-                  : '한 사람 하루 1그룹만 (디폴트)'}
-              </span>
-            </label>
-          </Field>
-
-          {/* N-57 — Cross-group cover pairs */}
-          {!isNew && (
-            <Field label="🔗 휴가 커버 그룹 (cross-group cover)"
-                   sub="이 그룹 멤버 휴가 시 다른 그룹의 멤버가 cover 가능. 예: 부엉이 ↔ 서브 (서로 커버)">
-              {coverPairsMissing ? (
+          {/* PR-2RR-d — 「협업 옵션」 묶음: 다른 그룹 추가 근무 + 휴가 커버 그룹 */}
+          {/* 단일 inline 체크박스 + 휴가 커버 collapsible */}
+          <Field label="🤝 협업 옵션"
+                 sub="다른 그룹과의 cover / 추가 근무">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {/* 같은 날 다른 그룹 겹침 (inline 체크박스) */}
+              <label style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                padding: '6px 10px', borderRadius: 8,
+                background: allowSameDayOtherGroup ? 'rgba(245,158,11,0.08)' : 'rgba(0,0,0,0.02)',
+                border: `1px solid ${allowSameDayOtherGroup ? 'rgba(245,158,11,0.30)' : COLORS.borderFaint}`,
+                cursor: 'pointer',
+              }}>
+                <input type="checkbox"
+                       checked={allowSameDayOtherGroup}
+                       onChange={(e) => setAllowSameDayOtherGroup(e.target.checked)}
+                       style={{ width: 14, height: 14, cursor: 'pointer' }} />
+                <span style={{ fontSize: 11, fontWeight: 600,
+                               color: allowSameDayOtherGroup ? '#d97706' : COLORS.textPrimary }}>
+                  🔀 같은 날 다른 그룹 추가 근무 허용
+                </span>
+                <span style={{ fontSize: 10, color: COLORS.textMuted, marginLeft: 'auto' }}>
+                  {allowSameDayOtherGroup ? '시간 안 겹치면 OK' : '하루 1그룹만 (디폴트)'}
+                </span>
+              </label>
+              {/* 휴가 커버 그룹 (cross-group cover) — 본 그룹 저장 후만 */}
+              {!isNew && (coverPairsMissing ? (
                 <div style={{
-                  padding: '10px 12px', borderRadius: 10,
+                  padding: '6px 10px', borderRadius: 8,
                   background: COLORS.bgAmber, border: `1px solid ${COLORS.borderAmber}`,
-                  fontSize: 11, color: COLORS.warning,
+                  fontSize: 10, color: COLORS.warning,
                 }}>
-                  ⚠ 마이그 미적용 — <code>migrations/2026-05-17_cs_group_cover_pairs.sql</code> 실행 후 사용 가능
+                  ⚠ 휴가 커버 마이그 미적용 — <code>2026-05-17_cs_group_cover_pairs.sql</code>
                 </div>
               ) : (
                 <div style={{
-                  padding: '10px 12px', borderRadius: 10,
-                  background: 'rgba(168,85,247,0.06)',
-                  border: `1px solid rgba(168,85,247,0.30)`,
+                  padding: '6px 10px', borderRadius: 8,
+                  background: 'rgba(168,85,247,0.05)',
+                  border: `1px solid rgba(168,85,247,0.25)`,
                 }}>
-                  {coverPairs.length === 0 ? (
-                    <div style={{ fontSize: 11, color: COLORS.textMuted, marginBottom: 8 }}>
-                      이 그룹에서 휴가 발생 시 cover 할 다른 그룹 멤버가 없음 (그룹 내 워커만 cover)
-                    </div>
-                  ) : (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
-                      {coverPairs.map((cp, idx) => (
-                        <div key={cp.id || `${cp.cover_group_id}-${idx}`} style={{
-                          display: 'flex', alignItems: 'center', gap: 4,
-                          padding: '4px 8px', borderRadius: 99,
-                          background: 'rgba(168,85,247,0.12)',
-                          border: '1px solid rgba(168,85,247,0.30)',
-                          fontSize: 11, fontWeight: 700, color: '#7c3aed',
-                        }}>
-                          <span>🔗 {cp.cover_group_name || cp.cover_group_id.slice(0, 8)}</span>
-                          <select value={cp.priority}
-                                  onChange={(e) => {
-                                    const nv = Number(e.target.value)
-                                    setCoverPairs(prev => prev.map((p, i) => i === idx ? { ...p, priority: nv } : p))
-                                  }}
-                                  style={{
-                                    padding: '1px 4px', fontSize: 10, borderRadius: 4,
-                                    border: '1px solid rgba(168,85,247,0.30)',
-                                    background: 'rgba(255,255,255,0.5)',
-                                  }}>
-                            <option value={1}>P1 최우선</option>
-                            <option value={2}>P2 보조</option>
-                            <option value={3}>P3 최후</option>
-                          </select>
-                          <button type="button"
-                                  onClick={() => setCoverPairs(prev => prev.filter((_, i) => i !== idx))}
-                                  style={{
-                                    background: 'transparent', border: 'none', cursor: 'pointer',
-                                    color: COLORS.danger, fontSize: 14, padding: 0, lineHeight: 1,
-                                  }}>×</button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                    <span style={{ fontSize: 11, color: COLORS.textSecondary, fontWeight: 700 }}>+ 추가:</span>
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap',
+                  }}>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: '#7c3aed' }}>🔗 휴가 커버:</span>
+                    {coverPairs.length === 0 && (
+                      <span style={{ fontSize: 10, color: COLORS.textMuted }}>
+                        다른 그룹과 cover 없음
+                      </span>
+                    )}
+                    {coverPairs.map((cp, idx) => (
+                      <span key={cp.id || `${cp.cover_group_id}-${idx}`} style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 3,
+                        padding: '2px 6px', borderRadius: 99,
+                        background: 'rgba(168,85,247,0.12)',
+                        border: '1px solid rgba(168,85,247,0.30)',
+                        fontSize: 10, fontWeight: 700, color: '#7c3aed',
+                      }}>
+                        {cp.cover_group_name || cp.cover_group_id.slice(0, 8)}
+                        <select value={cp.priority}
+                                onChange={(e) => {
+                                  const nv = Number(e.target.value)
+                                  setCoverPairs(prev => prev.map((p, i) => i === idx ? { ...p, priority: nv } : p))
+                                }}
+                                style={{
+                                  padding: '0 2px', fontSize: 9, borderRadius: 3,
+                                  border: '1px solid rgba(168,85,247,0.30)',
+                                  background: 'rgba(255,255,255,0.5)',
+                                }}>
+                          <option value={1}>P1</option>
+                          <option value={2}>P2</option>
+                          <option value={3}>P3</option>
+                        </select>
+                        <button type="button"
+                                onClick={() => setCoverPairs(prev => prev.filter((_, i) => i !== idx))}
+                                style={{
+                                  background: 'transparent', border: 'none', cursor: 'pointer',
+                                  color: COLORS.danger, fontSize: 12, padding: 0, lineHeight: 1,
+                                }}>×</button>
+                      </span>
+                    ))}
                     <select
                       value=""
                       onChange={(e) => {
@@ -1078,15 +1059,14 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
                         }])
                       }}
                       style={{
-                        padding: '4px 8px', fontSize: 11, borderRadius: 6,
-                        border: `1px solid ${COLORS.borderFaint}`,
-                        background: 'rgba(255,255,255,0.6)', flex: 1, maxWidth: 240,
+                        padding: '2px 6px', fontSize: 10, borderRadius: 4,
+                        border: `1px dashed ${COLORS.borderFaint}`,
+                        background: 'rgba(255,255,255,0.6)', maxWidth: 180,
                       }}>
-                      <option value="">— 그룹 선택 —</option>
+                      <option value="">+ 그룹 추가</option>
                       {allGroupsForCover
                         .filter(g => !coverPairs.some(p => p.cover_group_id === g.id))
                         .map(g => {
-                          // N-59 — 같은 이름 그룹 구별: shift 시간 정보 표시
                           const shiftInfo = g.shift_start && g.shift_end
                             ? ` (${g.shift_code || ''} ${String(g.shift_start).slice(0,5)}~${String(g.shift_end).slice(0,5)})`
                             : ''
@@ -1099,68 +1079,31 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
                         })}
                     </select>
                   </div>
-                  <div style={{ fontSize: 10, color: COLORS.textMuted, marginTop: 6, lineHeight: 1.5 }}>
-                    💡 자동 생성 알고리즘이 이 그룹 결원 시 위 그룹의 멤버를 후보에 추가 (priority 순).
-                    상호 cover 는 양쪽 그룹에서 각각 설정 필요 (한 방향).
-                  </div>
                 </div>
-              )}
-            </Field>
-          )}
-
-          {/* N-32 — 공휴일 추가 출근 (skip 과 상호배반) */}
-          <Field label="🎉 공휴일에도 출근"
-                 sub="평소 패턴과 무관하게 공휴일이면 출근 — 「토·일 + 공휴일」 같이 별도 그룹 만들 필요 없음">
-            <label style={{
-              display: 'flex', alignItems: 'center', gap: 10,
-              padding: '10px 12px', borderRadius: 10,
-              background: includeHolidaysExtra ? 'rgba(34,197,94,0.10)' : 'rgba(0,0,0,0.03)',
-              border: `1px solid ${includeHolidaysExtra ? 'rgba(34,197,94,0.40)' : COLORS.borderFaint}`,
-              cursor: skipOnHolidays ? 'not-allowed' : 'pointer',
-              opacity: skipOnHolidays ? 0.5 : 1,
-            }}>
-              <input type="checkbox"
-                     checked={includeHolidaysExtra}
-                     disabled={skipOnHolidays}
-                     onChange={(e) => setIncludeHolidaysExtra(e.target.checked)}
-                     style={{ width: 16, height: 16, cursor: skipOnHolidays ? 'not-allowed' : 'pointer' }} />
-              <span style={{ fontSize: 12, fontWeight: 600,
-                             color: includeHolidaysExtra ? '#16a34a' : COLORS.textPrimary }}>
-                🎉 공휴일에도 추가로 출근
-              </span>
-              <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 'auto' }}>
-                {skipOnHolidays
-                  ? '⚠ 휴일 제외 ON 상태'
-                  : includeHolidaysExtra
-                  ? '패턴 요일 + 모든 공휴일 출근'
-                  : '패턴 요일만 출근 (휴일 무관)'}
-              </span>
-            </label>
+              ))}
+            </div>
           </Field>
 
-          {/* N-19-a — 시프트 로테이션 (그룹 1개 안에 시프트 여러 개 sequence) */}
-          <Field label="🔄 시프트 로테이션"
-                 sub="그룹 안에 시프트 여러 개 (예: 07-16 / 08-17 / 09-18) 를 넣고 워커마다 매월 자동 순환">
-            <label style={{
-              display: 'flex', alignItems: 'center', gap: 10,
-              padding: '10px 12px', borderRadius: 10,
-              background: rotationEnabled ? COLORS.bgBlue : 'rgba(0,0,0,0.03)',
-              border: `1px solid ${rotationEnabled ? COLORS.borderBlue : COLORS.borderFaint}`,
-              cursor: 'pointer',
-            }}>
-              <input type="checkbox"
-                     checked={rotationEnabled}
-                     onChange={(e) => setRotationEnabled(e.target.checked)}
-                     style={{ width: 16, height: 16, cursor: 'pointer' }} />
-              <span style={{ fontSize: 12, fontWeight: 600,
-                             color: rotationEnabled ? COLORS.info : COLORS.textPrimary }}>
-                시프트 로테이션 사용
-              </span>
-              <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 'auto' }}>
-                {rotationEnabled ? `${rotationShifts.length}개 시프트 sequence` : 'OFF — 단일 시프트'}
-              </span>
-            </label>
-          </Field>
+          {/* PR-2RR-d (2026-05-28) — 시프트 로테이션 toggle 컴팩트화 (Field wrapper 제거) */}
+          <label style={{
+            display: 'flex', alignItems: 'center', gap: 8,
+            padding: '6px 10px', borderRadius: 8,
+            background: rotationEnabled ? COLORS.bgBlue : 'rgba(0,0,0,0.02)',
+            border: `1px solid ${rotationEnabled ? COLORS.borderBlue : COLORS.borderFaint}`,
+            cursor: 'pointer',
+          }}>
+            <input type="checkbox"
+                   checked={rotationEnabled}
+                   onChange={(e) => setRotationEnabled(e.target.checked)}
+                   style={{ width: 14, height: 14, cursor: 'pointer' }} />
+            <span style={{ fontSize: 11, fontWeight: 700,
+                           color: rotationEnabled ? COLORS.info : COLORS.textPrimary }}>
+              🔄 시프트 로테이션 (매월 자동 순환)
+            </span>
+            <span style={{ fontSize: 10, color: COLORS.textMuted, marginLeft: 'auto' }}>
+              {rotationEnabled ? `${rotationShifts.length}개 시프트` : 'OFF — 단일 시프트'}
+            </span>
+          </label>
 
           {rotationEnabled && (
             <>
