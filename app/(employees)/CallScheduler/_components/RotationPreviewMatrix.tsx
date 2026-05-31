@@ -53,6 +53,7 @@ export interface RotationPreviewMatrixProps {
   baseMonth?: string                        // YYYY-MM — 매트릭스 row 0 의 월. default = startMonth 또는 현재 월
   // 인터랙션 콜백 (모두 옵션)
   onShiftReorder?: (fromIdx: number, toIdx: number) => void
+  onShiftRemove?: (idx: number) => void
   onMemberReorder?: (fromIdx: number, toIdx: number) => void
   onStartMonthChange?: (next: string) => void
   onEndMonthChange?: (next: string) => void
@@ -110,7 +111,7 @@ export default function RotationPreviewMatrix({
   shifts, members, startMonth, endMonth, direction,
   periodKind, periodDays,
   monthsToShow = 12, baseMonth,
-  onShiftReorder, onMemberReorder,
+  onShiftReorder, onShiftRemove, onMemberReorder,
   onStartMonthChange, onEndMonthChange, onDirectionToggle,
   readOnly,
 }: RotationPreviewMatrixProps) {
@@ -264,9 +265,16 @@ export default function RotationPreviewMatrix({
                       <td key={m.worker_id} style={{
                         ...cellBodyStyle(),
                         background: c.bg, color: c.fg, borderColor: c.border,
-                        fontWeight: 800,
                       }} title={`${m.name} · ${s.slot_code} ${s.slot_label || ''}${s.start_time && s.end_time ? ` (${s.start_time}~${s.end_time})` : ''}`}>
-                        {s.slot_code}
+                        <div style={{ fontWeight: 800, lineHeight: 1.1 }}>{s.slot_code}</div>
+                        {s.start_time && s.end_time && (
+                          <div style={{
+                            fontSize: 9, fontWeight: 600, opacity: 0.78,
+                            marginTop: 1, lineHeight: 1.1,
+                          }}>
+                            {s.start_time}~{s.end_time}
+                          </div>
+                        )}
                       </td>
                     )
                   })}
@@ -303,6 +311,13 @@ export default function RotationPreviewMatrix({
                       #{si}
                     </span>
                     <span>{s.slot_code}</span>
+                    {s.start_time && s.end_time && (
+                      <span style={{
+                        fontSize: 10, fontWeight: 500, opacity: 0.78,
+                      }}>
+                        {s.start_time}~{s.end_time}
+                      </span>
+                    )}
                     <button type="button" disabled={readOnly || si === 0}
                             onClick={() => onShiftReorder?.(si, si - 1)}
                             style={miniBtnStyle(!readOnly && si > 0)}
@@ -311,6 +326,16 @@ export default function RotationPreviewMatrix({
                             onClick={() => onShiftReorder?.(si, si + 1)}
                             style={miniBtnStyle(!readOnly && si < shifts.length - 1)}
                             title="뒤로">▶</button>
+                    {onShiftRemove && (
+                      <button type="button" disabled={readOnly}
+                              onClick={() => onShiftRemove(si)}
+                              style={{
+                                ...miniBtnStyle(!readOnly),
+                                color: readOnly ? COLORS.textMuted : COLORS.danger,
+                                borderColor: readOnly ? COLORS.borderFaint : COLORS.borderRed,
+                              }}
+                              title="시프트 제거">×</button>
+                    )}
                   </div>
                 )
               })}

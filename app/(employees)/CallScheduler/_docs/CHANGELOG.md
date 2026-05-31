@@ -3,6 +3,25 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-28 (PR-2RR-c) — 매트릭스 시간대 표시 + GroupEditor 1차 컴팩트화
+
+> 사용자 명령: 「코드만 주지말고 시간대도 같이 넣어야 보기 좋지」 + 「설정이 너무 ui가 너무 방대하게 많네 이제 정리좀 하자」 + 「심플하고 공간도 좀 줄이고」.
+
+- **수정** `RotationPreviewMatrix.tsx` —
+  - 셀: `<div>{slot_code}</div>` 1줄 → 2줄 (코드 + `start_time~end_time` 9px opacity 78%).
+  - 시프트 footer: 코드 옆에 시간대 inline 표시 + `onShiftRemove` callback (×) 버튼 추가.
+- **수정** `GroupEditor.tsx` (1차 정리) —
+  - `Field` 컴포넌트 컴팩트화: label 11→10px / sub 10→9px / marginBottom 4→2 / label 빈 값 시 div 미렌더.
+  - 그룹 GLASS L4 카드 padding 18→12 / gap 14→8 (전체 적용 — replace_all).
+  - 외곽 그룹 컨테이너 gap 14→10.
+  - **「시프트 sequence」 Field 영역 제거** (~100 라인) — 매트릭스 footer 가 흡수 (◀▶ reorder + × remove).
+  - **「로테이션 주기」 Field 영역 제거** (~30 라인) — 매월 기본 (N일 토글은 향후 매트릭스 안으로).
+  - 매트릭스 진입 전 시프트 0개 시 amber 안내 + 시프트 추가 버튼 칩.
+  - 시프트 1+개 시 매트릭스 위에 작은 dashed 칩으로 「+ 추가」 가능.
+- 알고리즘/스키마 변경 없음 — UI 컴팩트화만.
+- 검증: tsc CallScheduler 영역 에러 0.
+- 다음 (PR-2RR-d): 「공휴일 처리」 + 「공휴일에도 출근」 통합 / 「다른 그룹 추가 근무」 + 「휴가 커버」 묶음 / 2-column grid / 우선순위 정책 안내 기본 접힘 등.
+
 ## 2026-05-28 (PR-2RR-b) — 회전 미리보기 매트릭스 통합 + 회전 방향 (forward/reverse) 컬럼
 
 > 사용자 명령:

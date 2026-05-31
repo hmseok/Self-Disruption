@@ -752,9 +752,9 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
       )}
 
       {/* N-5 — 2분할 → 수직 1컬럼 (의미있는 위계) */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {/* 1. 그룹 정의 (이름/카테고리/색상/시프트/패턴/전략) */}
-        <div style={{ ...GLASS.L4, borderRadius: 12, padding: 18, display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div style={{ ...GLASS.L4, borderRadius: 12, padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
           <Field label="그룹 이름" required>
             <input type="text" value={name} onChange={(e) => setName(e.target.value)}
                    style={inputStyle} placeholder="예: 주간 09-18" />
@@ -1164,136 +1164,60 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
 
           {rotationEnabled && (
             <>
-              {/* 시프트 sequence 선택 + 순서 */}
-              <Field label="시프트 sequence"
-                     sub="배정 순서대로 추가. 워커마다 매월 한 칸씩 이동합니다.">
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  {rotationShifts.length === 0 && (
-                    <div style={{
-                      padding: 10, borderRadius: 8,
-                      background: 'rgba(0,0,0,0.03)',
-                      border: `1px dashed ${COLORS.borderFaint}`,
-                      fontSize: 11, color: COLORS.textMuted, textAlign: 'center',
-                    }}>
-                      아래에서 시프트를 추가하세요.
-                    </div>
-                  )}
-                  {rotationShifts.map((slotId, i) => {
-                    const slot = slots.find(s => s.id === slotId)
-                    return (
-                      <div key={slotId + '_' + i} style={{
-                        display: 'flex', alignItems: 'center', gap: 8,
-                        padding: '8px 12px', borderRadius: 8,
-                        background: COLORS.bgBlue,
-                        border: `1px solid ${COLORS.borderBlue}`,
-                      }}>
-                        <span style={{
-                          fontSize: 11, fontWeight: 800, color: COLORS.info,
-                          minWidth: 22, textAlign: 'center',
-                        }}>{i + 1}.</span>
-                        <span style={{ fontSize: 12, fontWeight: 700, color: COLORS.textPrimary }}>
-                          {slot?.code} {slot?.label}
-                        </span>
-                        <span style={{ fontSize: 11, color: COLORS.textMuted }}>
-                          {slot?.start_time}~{slot?.end_time}
-                        </span>
-                        <div style={{ flex: 1 }} />
-                        <button type="button"
-                                disabled={i === 0}
-                                onClick={() => setRotationShifts(arr => {
-                                  if (i === 0) return arr
-                                  const next = [...arr]; const [m] = next.splice(i, 1); next.splice(i - 1, 0, m); return next
-                                })}
-                                style={{
-                                  fontSize: 11, padding: '3px 8px', borderRadius: 6,
-                                  background: 'transparent',
-                                  border: `1px solid ${COLORS.borderFaint}`,
-                                  cursor: i === 0 ? 'not-allowed' : 'pointer',
-                                  opacity: i === 0 ? 0.4 : 1,
-                                }}>↑</button>
-                        <button type="button"
-                                disabled={i === rotationShifts.length - 1}
-                                onClick={() => setRotationShifts(arr => {
-                                  if (i === arr.length - 1) return arr
-                                  const next = [...arr]; const [m] = next.splice(i, 1); next.splice(i + 1, 0, m); return next
-                                })}
-                                style={{
-                                  fontSize: 11, padding: '3px 8px', borderRadius: 6,
-                                  background: 'transparent',
-                                  border: `1px solid ${COLORS.borderFaint}`,
-                                  cursor: i === rotationShifts.length - 1 ? 'not-allowed' : 'pointer',
-                                  opacity: i === rotationShifts.length - 1 ? 0.4 : 1,
-                                }}>↓</button>
-                        <button type="button"
-                                onClick={() => setRotationShifts(arr => arr.filter((_, idx) => idx !== i))}
-                                style={{
-                                  fontSize: 11, padding: '3px 8px', borderRadius: 6,
-                                  background: 'transparent', color: COLORS.danger,
-                                  border: `1px solid ${COLORS.borderRed}`,
-                                  cursor: 'pointer',
-                                }}>×</button>
-                      </div>
-                    )
-                  })}
-                  {/* 추가 selector */}
-                  <div style={{
-                    display: 'flex', flexWrap: 'wrap', gap: 4,
-                    padding: 8, borderRadius: 8,
-                    background: 'rgba(0,0,0,0.02)',
-                    border: `1px dashed ${COLORS.borderFaint}`,
-                  }}>
-                    {slots.filter(s => !rotationShifts.includes(s.id)).map(s => (
-                      <button key={s.id} type="button"
-                              onClick={() => setRotationShifts(arr => [...arr, s.id])}
-                              style={{
-                                fontSize: 11, fontWeight: 700,
-                                padding: '4px 10px', borderRadius: 99,
-                                background: 'transparent',
-                                border: `1px solid ${COLORS.borderFaint}`,
-                                color: COLORS.textSecondary,
-                                cursor: 'pointer', whiteSpace: 'nowrap',
-                              }}>
-                        + {s.code} {s.start_time}~{s.end_time}
-                      </button>
-                    ))}
-                    {slots.length === rotationShifts.length && (
-                      <span style={{ fontSize: 11, color: COLORS.textMuted, padding: '4px 8px' }}>
-                        모든 시프트가 sequence 에 추가됨
-                      </span>
-                    )}
-                  </div>
+              {/* PR-2RR-c (2026-05-28) — 시프트 sequence + 로테이션 주기 Field 제거.
+                  · 시프트 추가/순서: 매트릭스 footer 「시프트 회전 순서」 영역에서 ◀▶
+                  · 주기: 매트릭스 헤더 (현재 매월 고정 — N일 토글 필요 시 향후 매트릭스 안으로) */}
+              {/* 매트릭스 진입 전 시프트 0 개일 때만 추가 칩 영역 표시 */}
+              {rotationShifts.length === 0 && (
+                <div style={{
+                  padding: 8, borderRadius: 8,
+                  background: COLORS.bgAmber, border: `1px solid ${COLORS.borderAmber}`,
+                  display: 'flex', flexWrap: 'wrap', gap: 4, alignItems: 'center',
+                }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: COLORS.warning, marginRight: 4 }}>
+                    시프트 추가:
+                  </span>
+                  {slots.map(s => (
+                    <button key={s.id} type="button"
+                            onClick={() => setRotationShifts(arr => [...arr, s.id])}
+                            style={{
+                              fontSize: 11, fontWeight: 700,
+                              padding: '3px 8px', borderRadius: 99,
+                              background: 'rgba(255,255,255,0.7)',
+                              border: `1px solid ${COLORS.borderAmber}`,
+                              color: COLORS.warning,
+                              cursor: 'pointer', whiteSpace: 'nowrap',
+                            }}>
+                      + {s.code} {s.start_time}~{s.end_time}
+                    </button>
+                  ))}
                 </div>
-              </Field>
-
-              {/* 주기 선택 */}
-              <Field label="로테이션 주기">
-                <div style={{ display: 'flex', gap: 6 }}>
-                  <button type="button"
-                          onClick={() => setRotationPeriodKind('monthly')}
-                          style={modeBtnStyle(rotationPeriodKind === 'monthly')}>
-                    매월
-                  </button>
-                  <button type="button"
-                          onClick={() => setRotationPeriodKind('days')}
-                          style={modeBtnStyle(rotationPeriodKind === 'days')}>
-                    N일
-                  </button>
-                  {rotationPeriodKind === 'days' && (
-                    <input type="number" min={1} value={rotationCustomDays}
-                           onChange={(e) => setRotationCustomDays(e.target.value)}
-                           style={{
-                             ...inputStyle, width: 80, marginLeft: 6,
-                           }}
-                           placeholder="30" />
-                  )}
-                  {rotationPeriodKind === 'days' && (
-                    <span style={{ fontSize: 11, color: COLORS.textMuted, alignSelf: 'center' }}>
-                      일마다 다음 시프트로
-                    </span>
-                  )}
+              )}
+              {/* 추가 시프트 칩 (매트릭스 옆 — 1개 이상 등록 후) */}
+              {rotationShifts.length > 0 && slots.length > rotationShifts.length && (
+                <div style={{
+                  display: 'flex', flexWrap: 'wrap', gap: 4, alignItems: 'center',
+                  padding: '4px 0',
+                }}>
+                  <span style={{ fontSize: 10, color: COLORS.textMuted, fontWeight: 700 }}>
+                    시프트 추가:
+                  </span>
+                  {slots.filter(s => !rotationShifts.includes(s.id)).map(s => (
+                    <button key={s.id} type="button"
+                            onClick={() => setRotationShifts(arr => [...arr, s.id])}
+                            style={{
+                              fontSize: 10, fontWeight: 700,
+                              padding: '2px 6px', borderRadius: 99,
+                              background: 'transparent',
+                              border: `1px dashed ${COLORS.borderFaint}`,
+                              color: COLORS.textSecondary,
+                              cursor: 'pointer', whiteSpace: 'nowrap',
+                            }}>
+                      + {s.code} {s.start_time}~{s.end_time}
+                    </button>
+                  ))}
                 </div>
-              </Field>
-
+              )}
               {/* PR-2RR-b (2026-05-28) — 회전 미리보기 매트릭스 (통합 셋팅) */}
               <RotationPreviewMatrix
                 shifts={rotationShifts.map((slotId, idx) => {
@@ -1329,6 +1253,7 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
                   if (from === to || from < 0 || to < 0 || from >= arr.length || to >= arr.length) return arr
                   const next = [...arr]; const [m] = next.splice(from, 1); next.splice(to, 0, m); return next
                 })}
+                onShiftRemove={(idx) => setRotationShifts(arr => arr.filter((_, i) => i !== idx))}
                 onMemberReorder={(from, to) => setMemberIds(arr => {
                   if (from === to || from < 0 || to < 0 || from >= arr.length || to >= arr.length) return arr
                   const next = [...arr]; const [m] = next.splice(from, 1); next.splice(to, 0, m); return next
@@ -1656,7 +1581,7 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
         </div>
 
         {/* 2. 멤버 + 후보 (수직 1컬럼 — 가로 폭 넉넉) */}
-        <div style={{ ...GLASS.L4, borderRadius: 12, padding: 18, display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div style={{ ...GLASS.L4, borderRadius: 12, padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
           <div style={{ fontSize: 13, fontWeight: 800, color: COLORS.textPrimary }}>
             멤버 ({memberIds.length}명)
             <span style={{ fontSize: 11, fontWeight: 500, color: COLORS.textMuted, marginLeft: 6 }}>
@@ -1933,10 +1858,12 @@ function Field({ label, sub, required, children }: {
 }) {
   return (
     <div>
-      <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSecondary, marginBottom: 4 }}>
-        {label}{required && <span style={{ color: COLORS.danger, marginLeft: 2 }}>*</span>}
-        {sub && <span style={{ fontSize: 10, color: COLORS.textMuted, marginLeft: 4 }}>{sub}</span>}
-      </div>
+      {label && (
+        <div style={{ fontSize: 10, fontWeight: 700, color: COLORS.textSecondary, marginBottom: 2 }}>
+          {label}{required && <span style={{ color: COLORS.danger, marginLeft: 2 }}>*</span>}
+          {sub && <span style={{ fontSize: 9, color: COLORS.textMuted, marginLeft: 4, fontWeight: 500 }}>{sub}</span>}
+        </div>
+      )}
       {children}
     </div>
   )
