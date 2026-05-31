@@ -3,6 +3,32 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-28 (PR-2RR-g) — 「⚡ 배포」 알리고 SMS 단일 액션 통합
+
+> 사용자 명령: 「배포는 문자는 알리고로 보내주세요. 키는 연결되어있습니다」.
+
+- 기존: 스케줄 상세 페이지에 「⚡ 배포」 (Phase 2 stub — 잠디/이메일/공유 링크/수동 = 실제 SMS 발송 X) 와 「📤 문자 배포」 (CX-KPI-21 알리고 SMS) **두 개 버튼** 분산.
+- 신: **단일 「⚡ 배포 (SMS)」 버튼** = 알리고 SMS 발송 (DistributeModal) 일원화. preview → test (dry-run) → send 3-step.
+- **변경 파일** `app/(employees)/CallScheduler/[id]/page.tsx`:
+  - `DistributionDialog` import 주석 처리 + 렌더 제거 (Phase 2 stub UI 폐기).
+  - `distOpen` state 제거 → `smsOpen` 일원화.
+  - `workers` destructure 제거 (DistributionDialog 전용이었음).
+  - 「📤 문자 배포」 별도 버튼 제거.
+  - 「⚡ 배포」 라벨 → 「⚡ 배포 (SMS)」, 클릭 시 `setSmsOpen(true)` (DistributeModal).
+- 인프라 (이미 완료):
+  - `lib/aligo.ts` — Aligo `send_mass` API (수신자별 다른 메시지, MAX 200, testmode 지원).
+  - `app/api/call-scheduler/schedules/[id]/distribute/route.ts` — POST `{mode: 'preview'|'test'|'send'}`. cs_distributions 이력 기록.
+  - `_components/DistributeModal.tsx` — 미리보기/테스트/실발송 글래스 UI (CLAUDE.md 규칙 20).
+- 환경변수 (Cloud Run 셋팅 완료): `ALIGO_API_KEY` / `ALIGO_USER_ID` / `ALIGO_SENDER`.
+- 폐기 코드 보존: `DistributionDialog.tsx` + `/api/call-scheduler/distributions/route.ts` (다른 곳에서 사용 시 부활 가능 — 일단 import 만 끔).
+- 검증: tsc CallScheduler/[id] 영역 에러 0.
+
+**사용 흐름**:
+1. 스케줄 상세 → 「⚡ 배포 (SMS)」 클릭
+2. 자동 preview — 받는 사람 + 메시지 + 본인 일정 링크 확인
+3. 「test」 — 알리고 testmode_yn=Y (무과금 검증 dry-run)
+4. 「send」 — 실발송 + cs_distributions 이력 기록 (인라인 확인 단계)
+
 ## 2026-05-28 (PR-2RR-f) — GroupEditor 대규모 재구성: 2-col grid + 매트릭스 하단 collapsible + 3박스 제거
 
 > 사용자 명령:
