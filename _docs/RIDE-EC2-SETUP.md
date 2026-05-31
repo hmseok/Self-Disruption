@@ -258,7 +258,9 @@ nano .env.local
 # 환경
 NODE_ENV=production
 PORT=3001                              # Ride-IT 표준 포트
-MODULE_PROFILE=ride                    # 라이드만 활성 (FMI 모듈 비활성)
+# 모듈 프로파일 — 둘 다 같은 값 (서버 + 클라이언트)
+NEXT_PUBLIC_MODULE_PROFILE=ride        # 빌드 인라인 — 사이드바·메뉴·라우트 가드
+MODULE_PROFILE=ride                    # 서버 fallback (API 라우트 등)
 
 # DB
 DATABASE_URL="mysql://ride_app:여기_비밀번호@localhost:3306/ride_op"
@@ -602,34 +604,42 @@ sudo journalctl -u nginx --since "1 week ago" | grep -i error
 
 ---
 
-## 부록 D — `MODULE_PROFILE=ride` 코드 분리 패턴 (별도 PR 필요)
+## 부록 D — MODULE_PROFILE 코드 분리 진행 상황
 
-같은 코드베이스 유지하면서 환경변수로 RIDE 만 노출:
+같은 코드베이스 유지하면서 환경변수로 RIDE 만 노출.
 
-```ts
-// lib/module-profile.ts (신설 예정)
-export type ModuleProfile = 'fmi' | 'ride' | 'all'
-
-export function getProfile(): ModuleProfile {
-  return (process.env.MODULE_PROFILE as ModuleProfile) || 'all'
-}
-
-export function isModuleEnabled(module: string): boolean {
-  const p = getProfile()
-  if (p === 'all') return true
-  if (p === 'ride') return module.startsWith('Ride') || module === 'CallScheduler'
-  if (p === 'fmi')  return !module.startsWith('Ride') && module !== 'CallScheduler'
-  return true
-}
+**환경변수** (둘 다 같은 값 — `.env.local` § 5.2):
+```bash
+NEXT_PUBLIC_MODULE_PROFILE=ride   # 빌드 인라인 — 사이드바·메뉴 (클라이언트)
+MODULE_PROFILE=ride               # 서버 fallback (API 라우트)
 ```
 
-EC2 `ride-care-op-server-*` → `MODULE_PROFILE=ride` → 라이드 메뉴만, 다른 모듈 라우트 404.
-hmseok.com Cloud Run → `MODULE_PROFILE=fmi` → FMI 만.
+**진행 상황**:
 
-**구현 범위** (별도 PR):
-- `lib/module-profile.ts` 신설
-- `app/components/PageTitle.tsx` PAGE_NAMES 필터링
-- `lib/menu-registry.ts` 필터링
+| 단계 | PR | 상태 | 내용 |
+|---|---|---|---|
+| 코어 함수 | PR-RIDE-EC2-1 | ✅ | `lib/module-profile.ts` — getModuleProfile / isModuleEnabled / isPathEnabled / describeProfile |
+| 메뉴 필터 | PR-RIDE-EC2-2 | ✅ | `lib/menu-registry.ts` 의 4개 helper 에 `isPathEnabled` 필터 추가 — 사이드바·권한 페이지 자동 격리 |
+| 라우트 가드 | PR-RIDE-EC2-2-b | 🚧 | URL 직접 접근 시 비활성 모듈 404 — `proxy.ts` 또는 middleware |
+| PageTitle 격리 | PR-RIDE-EC2-2-c | 🚧 | PAGE_NAMES 필터 — 비활성 모듈 path 헤더 노출 X |
+| API 라우트 가드 | PR-RIDE-EC2-2-d | 🚧 | `/api/<prefix>` 비활성 시 404 |
+| 본 ERP 라이드 제거 | PR-RIDE-EC2-3 | 🚧 | 이관 완료 후 hmseok.com 에서 라이드 모듈 폴더 삭제 |
+
+EC2 `ride-care-op-server-*` → `NEXT_PUBLIC_MODULE_PROFILE=ride` → 라이드 메뉴만 노출.
+hmseok.com Cloud Run → `NEXT_PUBLIC_MODULE_PROFILE=fmi` → FMI 만 노출.
+
+**사용 예** (다른 모듈에서):
+```ts
+import { isPathEnabled, getModuleProfile } from '@/lib/module-profile'
+
+if (!isPathEnabled(req.url)) {
+  return NextResponse.json({ error: 'module disabled' }, { status: 404 })
+}
+
+// 진단
+const desc = describeProfile()
+console.log(desc.profile, desc.source)
+```
 - `proxy.ts` 또는 middleware — 비활성 모듈 라우트 404
 - 환경변수 가이드 + 운영 매뉴얼
 

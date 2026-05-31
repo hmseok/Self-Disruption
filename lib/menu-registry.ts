@@ -2,6 +2,13 @@
 // FMI ERP — 메뉴 레지스트리 (단일 SOURCE OF TRUTH)
 // ═══════════════════════════════════════════════════════════════════
 //
+// PR-RIDE-EC2-2 (2026-05-31) — MODULE_PROFILE 환경변수 기반 자동 필터:
+//   · NEXT_PUBLIC_MODULE_PROFILE=ride → 라이드 11 모듈만 helper 반환
+//   · NEXT_PUBLIC_MODULE_PROFILE=fmi  → FMI 모듈만 helper 반환
+//   · 미설정 또는 'all' → 전체 반환 (기존 동작 유지 — hmseok.com 기본)
+//   helper: toSystemModules / getBusinessMenusByGroup / getMenusByGroup / PATH_TO_GROUP
+import { isPathEnabled } from './module-profile'
+//
 // 본 파일이 사이드바 / 권한 페이지 (admin/employees) / 초대 페이지 모두의
 // 단일 source. 새 메뉴 추가 시 ★ 본 파일 한 곳에만 ★ entry 추가하면
 // 모든 곳에 자동 동기화.
@@ -220,10 +227,12 @@ function isRequirePermission(menu: MenuEntry): boolean {
 
 // ─── 헬퍼: system_modules API 응답 형식 ───
 // 권한 페이지 (admin/employees) 가 사용 — 권한 부여 대상만 반환
+// PR-RIDE-EC2-2: MODULE_PROFILE 비활성 모듈 제외
 export function toSystemModules() {
   return MENUS
     .filter(m => !m.hidden)
     .filter(m => isRequirePermission(m))
+    .filter(m => isPathEnabled(m.path))
     .map(m => ({
       id: m.id,
       name: m.name,
@@ -235,16 +244,20 @@ export function toSystemModules() {
 }
 
 // ─── 헬퍼: 그룹별 사이드바 메뉴 (비즈니스 섹션) ───
+// PR-RIDE-EC2-2: MODULE_PROFILE 비활성 모듈 제외
 export function getBusinessMenusByGroup(groupId: string) {
   return MENUS
     .filter(m => !m.hidden && m.group === groupId)
+    .filter(m => isPathEnabled(m.path))
     .sort((a, b) => a.sortOrder - b.sortOrder)
 }
 
 // ─── 헬퍼: 직장인필수 / 설정 섹션 메뉴 ───
+// PR-RIDE-EC2-2: MODULE_PROFILE 비활성 모듈 제외
 export function getMenusByGroup(groupId: string) {
   return MENUS
     .filter(m => !m.hidden && m.group === groupId)
+    .filter(m => isPathEnabled(m.path))
     .sort((a, b) => a.sortOrder - b.sortOrder)
 }
 
@@ -257,7 +270,9 @@ export function getDisplayName(menu: MenuEntry): string {
 }
 
 // ─── 헬퍼: path → group ID 매핑 (legacy PATH_TO_GROUP 호환) ───
+// PR-RIDE-EC2-2: MODULE_PROFILE 비활성 모듈 제외
 export const PATH_TO_GROUP: Record<string, string> = Object.fromEntries(
   MENUS.filter(m => !m.hidden && ['asset', 'operation', 'finance', 'sales', 'admin'].includes(m.group))
+    .filter(m => isPathEnabled(m.path))
     .map(m => [m.path, m.group])
 )

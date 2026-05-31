@@ -49,11 +49,24 @@ export const RIDE_API_PREFIXES: readonly string[] = [
   'call-scheduler',
 ]
 
-/** 현재 프로파일 — process.env.MODULE_PROFILE 기준 */
+/**
+ * 현재 프로파일.
+ *   · 서버 + 클라이언트 모두 동작 — NEXT_PUBLIC_MODULE_PROFILE (빌드 인라인) 우선
+ *   · 서버 only — MODULE_PROFILE (fallback)
+ *   · 미설정 또는 invalid — 'all'
+ *
+ * EC2 운영 시 .env.local 에 둘 다 같은 값 설정 권장:
+ *   NEXT_PUBLIC_MODULE_PROFILE=ride
+ *   MODULE_PROFILE=ride
+ */
 export function getModuleProfile(): ModuleProfile {
-  const raw = (process.env.MODULE_PROFILE || '').toLowerCase().trim()
+  const raw = (
+    process.env.NEXT_PUBLIC_MODULE_PROFILE ||
+    process.env.MODULE_PROFILE ||
+    ''
+  ).toLowerCase().trim()
   if (raw === 'ride' || raw === 'fmi' || raw === 'all') return raw
-  return 'all' // 기본값 — 기존 동작 유지 (전체 노출)
+  return 'all'
 }
 
 /**
@@ -101,15 +114,17 @@ export function isPathEnabled(path: string): boolean {
  */
 export function describeProfile(): {
   profile: ModuleProfile
-  source: 'env' | 'default'
+  source: 'env-public' | 'env-server' | 'default'
   ride_modules: string[]
   ride_api_prefixes: string[]
 } {
-  const raw = (process.env.MODULE_PROFILE || '').toLowerCase().trim()
-  const valid = raw === 'ride' || raw === 'fmi' || raw === 'all'
+  const publicRaw = (process.env.NEXT_PUBLIC_MODULE_PROFILE || '').toLowerCase().trim()
+  const serverRaw = (process.env.MODULE_PROFILE || '').toLowerCase().trim()
+  const validPublic = publicRaw === 'ride' || publicRaw === 'fmi' || publicRaw === 'all'
+  const validServer = serverRaw === 'ride' || serverRaw === 'fmi' || serverRaw === 'all'
   return {
     profile: getModuleProfile(),
-    source: valid ? 'env' : 'default',
+    source: validPublic ? 'env-public' : (validServer ? 'env-server' : 'default'),
     ride_modules: Array.from(RIDE_MODULES),
     ride_api_prefixes: [...RIDE_API_PREFIXES],
   }
