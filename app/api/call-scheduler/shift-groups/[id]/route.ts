@@ -23,6 +23,8 @@ const ALLOWED_COLS = new Set([
   'rotation_enabled',         // N-19-a
   'rotation_period_kind',     // N-19-a — monthly | days
   'rotation_custom_days',     // N-19-a
+  'rotation_start_date',      // PR-2RR (2026-05-28) — 그룹 단위 회전 시작 일자
+  'rotation_end_date',        // PR-2RR (2026-05-28) — 그룹 단위 회전 종료 일자
   // N-55 — A/B조 cycle
   'cycle_kind',                // 'squad_rotation' | NULL
   'cycle_days_per_member',     // 각자 N일
@@ -69,6 +71,10 @@ export async function GET(
     let hasRotation = true
     try { await prisma.$queryRaw<any[]>`SELECT rotation_enabled FROM cs_shift_groups LIMIT 1` }
     catch { hasRotation = false }
+    // PR-2RR (2026-05-28) — 그룹 단위 회전 시작/종료 일자 컬럼 graceful
+    let hasGroupRotationDates = true
+    try { await prisma.$queryRaw<any[]>`SELECT rotation_start_date FROM cs_shift_groups LIMIT 1` }
+    catch { hasGroupRotationDates = false }
     let hasGroupShifts = true
     try { await prisma.$queryRaw<any[]>`SELECT 1 FROM cs_group_shifts LIMIT 1` }
     catch { hasGroupShifts = false }
@@ -108,6 +114,9 @@ export async function GET(
     let rotationEnabled = false
     let rotationPeriodKind = 'monthly'
     let rotationCustomDays = 30
+    // PR-2RR (2026-05-28)
+    let rotationStartDate: string | null = null
+    let rotationEndDate: string | null = null
     if (hasCategory) {
       try {
         const r = await prisma.$queryRaw<any[]>`SELECT category FROM cs_shift_groups WHERE id = ${id} LIMIT 1`
@@ -152,13 +161,24 @@ export async function GET(
     }
     if (hasRotation) {
       try {
-        const r = await prisma.$queryRaw<any[]>`
-          SELECT rotation_enabled, rotation_period_kind, rotation_custom_days
-          FROM cs_shift_groups WHERE id = ${id} LIMIT 1
-        `
+        const r = hasGroupRotationDates
+          ? await prisma.$queryRaw<any[]>`
+              SELECT rotation_enabled, rotation_period_kind, rotation_custom_days,
+                     DATE_FORMAT(rotation_start_date, '%Y-%m-%d') AS rotation_start_date,
+                     DATE_FORMAT(rotation_end_date,   '%Y-%m-%d') AS rotation_end_date
+              FROM cs_shift_groups WHERE id = ${id} LIMIT 1
+            `
+          : await prisma.$queryRaw<any[]>`
+              SELECT rotation_enabled, rotation_period_kind, rotation_custom_days
+              FROM cs_shift_groups WHERE id = ${id} LIMIT 1
+            `
         rotationEnabled = Boolean(r[0]?.rotation_enabled)
         rotationPeriodKind = String(r[0]?.rotation_period_kind || 'monthly')
         rotationCustomDays = Number(r[0]?.rotation_custom_days || 30)
+        if (hasGroupRotationDates) {
+          rotationStartDate = r[0]?.rotation_start_date ?? null
+          rotationEndDate   = r[0]?.rotation_end_date   ?? null
+        }
       } catch { /* graceful */ }
     }
 
@@ -325,6 +345,9 @@ export async function GET(
       rotation_enabled: rotationEnabled,
       rotation_period_kind: rotationPeriodKind,
       rotation_custom_days: rotationCustomDays,
+      // PR-2RR (2026-05-28) — 그룹 단위 회전 시작/종료
+      rotation_start_date: rotationStartDate,
+      rotation_end_date:   rotationEndDate,
       rotation_shifts: rotationShifts.map(s => ({
         shift_slot_id: s.shift_slot_id,
         sort_order: Number(s.sort_order || 0),
@@ -390,6 +413,11 @@ export async function PATCH(
     try {
       await prisma.$queryRaw<any[]>`SELECT rotation_enabled FROM cs_shift_groups LIMIT 1`
     } catch { hasRotation = false }
+    // PR-2RR (2026-05-28) — rotation_start_date / rotation_end_date graceful
+    let hasGroupRotationDates = true
+    try {
+      await prisma.$queryRaw<any[]>`SELECT rotation_start_date FROM cs_shift_groups LIMIT 1`
+    } catch { hasGroupRotationDates = false }
     let hasGroupShifts = true
     try {
       await prisma.$queryRaw<any[]>`SELECT 1 FROM cs_group_shifts LIMIT 1`
@@ -406,6 +434,8 @@ export async function PATCH(
       if (k === 'allow_same_day_other_group' && !hasAllowOverlap) continue  // N-35 — graceful
       if ((k === 'cycle_kind' || k === 'cycle_days_per_member' || k === 'cycle_start_date') && !hasCyclePatch) continue  // N-55
       if (rotationCols.has(k) && !hasRotation) continue  // N-19-a — graceful
+      // PR-2RR (2026-05-28) — 그룹 단위 회전 시작/종료
+      if ((k === 'rotation_start_date' || k === 'rotation_end_date') && !hasGroupRotationDates) continue
       if (k === 'pattern_type' && !PATTERNS.has(String(v))) continue
       if (k === 'generation_strategy' && !STRATEGIES.has(String(v))) continue
       if (k === 'color_tone' && !COLOR_TONES.has(String(v))) continue
@@ -414,6 +444,16 @@ export async function PATCH(
       }
       if (k === 'rotation_custom_days') {
         sets.push(`${k} = ?`); params.push(Math.max(1, Number(v) || 30)); continue
+      }
+      // PR-2RR — YYYY-MM (월 입력) 또는 YYYY-MM-DD 둘 다 허용. 빈 문자열 → NULL.
+      if (k === 'rotation_start_date' || k === 'rotation_end_date') {
+        let dv: string | null = null
+        const s = String(v ?? '').trim()
+        if (/^\d{4}-\d{2}$/.test(s))         dv = `${s}-01`             // 월 입력 → 그 달 1일
+        else if (/^\d{4}-\d{2}-\d{2}$/.test(s)) dv = s                  // 풀 날짜 그대로
+        else if (s === '')                   dv = null                  // clear
+        else continue                                                    // 잘못된 포맷은 skip
+        sets.push(`${k} = ?`); params.push(dv); continue
       }
       sets.push(`${k} = ?`); params.push(v ?? null)
     }

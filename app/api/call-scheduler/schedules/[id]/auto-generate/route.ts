@@ -69,6 +69,10 @@ interface GroupRow {
   // N-19-b fallback — 멤버 rotation_start_date 가 NULL 이면 그룹 생성일 기준
   //   (cs_group_shift_rotation.sql line 69: "NULL 이면 group.created_at 기준")
   created_iso?: string
+  // PR-2RR (2026-05-28) — 그룹 단위 회전 시작/종료 일자
+  //   fallback chain: member.start_date → group.rotation_start_iso → group.created_iso
+  rotation_start_iso?: string | null
+  rotation_end_iso?: string | null
 }
 interface MemberRow {
   group_id: string
@@ -372,6 +376,11 @@ export async function POST(
     try {
       await prisma.$queryRaw<any[]>`SELECT rotation_start_date FROM cs_group_members LIMIT 1`
     } catch { hasMemberRotation = false }
+    // PR-2RR (2026-05-28) — cs_shift_groups.rotation_start_date / rotation_end_date graceful
+    let hasGroupRotationDates = true
+    try {
+      await prisma.$queryRaw<any[]>`SELECT rotation_start_date FROM cs_shift_groups LIMIT 1`
+    } catch { hasGroupRotationDates = false }
     try {
       await prisma.$queryRaw<any[]>`SELECT 1 FROM cs_shift_group_versions LIMIT 1`
     } catch { hasGroupVersions = false }
@@ -420,6 +429,29 @@ export async function POST(
           WHERE g.is_active = 1
           ORDER BY g.sort_order ASC, g.name ASC
         ` as any)
+    // PR-2RR (2026-05-28) — 그룹 단위 rotation_start_date / rotation_end_date attach
+    if (hasGroupRotationDates && groups.length > 0) {
+      try {
+        const grdRows = await prisma.$queryRaw<any[]>`
+          SELECT id,
+                 DATE_FORMAT(rotation_start_date, '%Y-%m-%d') AS rotation_start_iso,
+                 DATE_FORMAT(rotation_end_date,   '%Y-%m-%d') AS rotation_end_iso
+            FROM cs_shift_groups WHERE is_active = 1
+        `
+        const grdMap = new Map<string, { start: string | null; end: string | null }>()
+        for (const r of grdRows) {
+          grdMap.set(r.id, {
+            start: r.rotation_start_iso || null,
+            end:   r.rotation_end_iso   || null,
+          })
+        }
+        for (const g of groups) {
+          const v = grdMap.get(g.id)
+          g.rotation_start_iso = v?.start ?? null
+          g.rotation_end_iso   = v?.end   ?? null
+        }
+      } catch { /* graceful */ }
+    }
     const targetGroups = groupFilter
       ? groups.filter(g => groupFilter.includes(g.id))
       : groups
@@ -1853,11 +1885,12 @@ export async function POST(
 
             // 멤버별 시작일 / 종료일 (start_index 는 priority 기반 자동 — 사용자 명시 override 가능)
             const mrot = memberRotMap.get(`${g.id}_${wId}`)
-            // N-19-b fallback (2026-05-26 fix) — 멤버 rotation_start_date 가 NULL 이면
-            //   그룹 생성일 기준 (스키마 주석 의도 — cs_group_shift_rotation.sql line 69).
-            //   기존엔 null 그대로라 elapsed=0 영구 → 매월 같은 시프트 반복 버그.
-            const startDate = mrot?.start_date || g.created_iso || null
-            const endDate = mrot?.end_date || null
+            // N-19-b fallback chain (PR-2RR 2026-05-28 강화):
+            //   1) member.rotation_start_date  (cs_group_members — 멤버 override)
+            //   2) group.rotation_start_iso    (cs_shift_groups — PR-2RR 그룹 셋팅)
+            //   3) group.created_iso           (group.created_at — 최종 fallback / ROT-FIX 2026-05-26)
+            const startDate = mrot?.start_date || g.rotation_start_iso || g.created_iso || null
+            const endDate   = mrot?.end_date   || g.rotation_end_iso   || null
             // N-23 — start_index 가 명시적으로 0 보다 크면 그것 사용, 아니면 priority (memberIdx) 자동
             const baseIdx = (mrot && mrot.start_index > 0) ? mrot.start_index : memberIdx
             if (startDate && isoDate < startDate) continue  // 시작 전 → skip

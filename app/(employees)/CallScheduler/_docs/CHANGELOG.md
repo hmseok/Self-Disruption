@@ -3,6 +3,41 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-28 (PR-2RR) — 그룹 단위 회전 시작/종료 월 + GroupsTab 카드 → 컴팩트 리스트
+
+> 사용자 보고: 「정우진 8월 L05·9월 L01 이 되어야 하는데 실제 8월 L01·9월 L05」.
+> 진단: 멤버 `cs_group_members.rotation_start_date` 가 UI에 표출 없어 사용자 설정 못 함 → fallback `group.created_at = 2026-05-16` 으로 elapsed 계산 → 사용자 의도와 다름.
+> 사용자 명령: 「그룹이 시작종료로 가야되네」, 「그룹 카드도 좀 작게해서 리스트 형식으로」, 「컬럼에 시작 종료월」, 「기존 중복되는 내용은 삭제」.
+
+- **마이그레이션 신규** `2026-05-28_cs_shift_groups_rotation_dates.sql` —
+  - `cs_shift_groups` 에 `rotation_start_date DATE NULL`, `rotation_end_date DATE NULL` 추가 (멱등).
+  - 주석: NULL = group.created_at fallback / NULL = 무한.
+  - 햇살 그룹 데이터 이전 SQL (시프트 sort_order swap + start_date='2026-06-01') 주석으로 동봉.
+- **수정** `auto-generate/route.ts` —
+  - `GroupRow` 에 `rotation_start_iso?: string|null`, `rotation_end_iso?: string|null` 추가.
+  - `hasGroupRotationDates` graceful 가드 + 그룹 list 후 별도 fetch 로 attach (3개 SELECT 변형 안 건드림).
+  - N-19-b fallback chain 강화: `mrot?.start_date || g.rotation_start_iso || g.created_iso || null` (3단계 우선순위).
+  - endDate: `mrot?.end_date || g.rotation_end_iso || null`.
+- **수정** API GET·PATCH 라우트 (`/shift-groups/route.ts`, `/shift-groups/[id]/route.ts`) —
+  - GET list / GET single: `rotation_start_date` / `rotation_end_date` graceful 읽기 + 응답 포함.
+  - ALLOWED_COLS 에 두 컬럼 추가 (PATCH 화이트리스트).
+  - PATCH 입력 normalize: YYYY-MM (월 단위 input) → YYYY-MM-01 / YYYY-MM-DD 직접 / 빈 문자열 → NULL.
+- **수정** `settings/GroupsTab.tsx` (카드 → 리스트 대대적 리팩토링) —
+  - `GroupCard` → `GroupRow` (가로 컴팩트 행). `GroupGrid` (auto-fill 380px) → 단일 컬럼 테이블 + 헤더 row.
+  - 컬럼: 순서(▲▼) / 그룹(이름·카테고리) / 시간·시프트 / 패턴·전략 / 멤버 / **🔄 회전 시작 ~ 종료** / 편집.
+  - 회전 ON 그룹만 `<input type="month">` 시작·종료 입력 (onBlur 시 즉시 PATCH).
+  - 회전 OFF 그룹은 「회전 비활성」 라벨 (자리 보존).
+  - 좌측 색상 강조 바 (3px) 유지. zebra 줄무늬. 멤버 chip 영역·description 영역 제거 (편집 들어가서 확인).
+  - 제거된 import: `TONE_BG`, `TONE_BORDER` (행 모드에서 chip 미사용).
+  - ShiftGroup 인터페이스에 `rotation_enabled / rotation_period_kind / rotation_custom_days / rotation_start_date / rotation_end_date` 추가.
+- 알고리즘 변경 없음 — fallback chain 1단계 추가만. 기존 멤버 단위 설정 (`cs_group_members.rotation_start_date`) 은 deprecate 하지 않고 override 용으로 유지.
+- 검증: tsc CallScheduler 영역 에러 0. 시각 검수 — 사용자 직접 셋팅 화면 스크린샷 (배포 후 예정).
+- 사용자 적용 순서:
+  1. 마이그레이션 SQL 실행 (cs_shift_groups 컬럼 2개 추가).
+  2. 햇살 그룹 시프트 순서 swap (L05 ↔ L07) — 마이그 파일 하단 주석 SQL.
+  3. 햇살 그룹 「회전 시작」 = 2026-06 입력 (UI 또는 SQL).
+  4. 7월/8월/9월 schedule 재생성.
+
 ## 2026-05-28 (MONTH-NAV + AUG-FIX) — 상세 페이지 월 이동 화살표 + 「비어있음 -28」 음수 표시 보정
 
 > 사용자 보고:

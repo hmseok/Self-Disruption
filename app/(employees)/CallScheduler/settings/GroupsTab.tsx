@@ -5,7 +5,7 @@
 // ═══════════════════════════════════════════════════════════════════
 import { useEffect, useMemo, useState } from 'react'
 import { COLORS, GLASS, BTN, pillStyle } from '@/app/utils/ui-tokens'
-import { TONE_BG, TONE_BORDER, TONE_TEXT, TONE_SOLID } from '@/app/(employees)/CallScheduler/utils/palette'
+import { TONE_TEXT, TONE_SOLID } from '@/app/(employees)/CallScheduler/utils/palette'
 import { getAuthHeader } from '@/app/utils/auth-client'
 import GroupEditor from './GroupEditor'
 import type { ShiftSlot, Worker, ColorTone } from '@/app/(employees)/CallScheduler/utils/types'
@@ -39,6 +39,13 @@ export interface ShiftGroup {
   is_overnight: boolean
   member_count: number
   members: GroupMemberChip[]  // PR-2QQ-a — 워커 chip 정보
+  // N-19-a — 시프트 로테이션
+  rotation_enabled?: boolean
+  rotation_period_kind?: 'monthly' | 'days'
+  rotation_custom_days?: number
+  // PR-2RR (2026-05-28) — 그룹 단위 회전 시작/종료 일자 (YYYY-MM-DD)
+  rotation_start_date?: string | null
+  rotation_end_date?: string | null
 }
 
 const PATTERN_LABEL: Record<ShiftGroup['pattern_type'], string> = {
@@ -284,6 +291,7 @@ export default function GroupsTab() {
                 onMove={moveGroup}
                 reordering={reordering}
                 showOrderControls={sortKey === 'sort_order'}
+                onReload={load}
               />
             </div>
           ))}
@@ -295,6 +303,7 @@ export default function GroupsTab() {
           onMove={moveGroup}
           reordering={reordering}
           showOrderControls={sortKey === 'sort_order'}
+          onReload={load}
         />
       )}
     </div>
@@ -322,194 +331,254 @@ export default function GroupsTab() {
   }
 }
 
-function GroupGrid({ groups, onEdit, onMove, reordering, showOrderControls }: {
+// PR-2RR (2026-05-28) — 카드 → 컴팩트 리스트 테이블.
+//   컬럼: [↕] [이름·카테고리] [시간·시프트] [패턴·전략] [멤버 N명] [회전 시작~종료] [편집]
+//   회전 ON 그룹만 「시작 / 종료」 월 input 활성. 그 외 그룹은 회색 「—」.
+//   YYYY-MM 형식 (월 단위). 빈 값 = 그룹 생성일 fallback / 무한.
+function GroupGrid({ groups, onEdit, onMove, reordering, showOrderControls, onReload }: {
   groups: ShiftGroup[]
   onEdit: (id: string | 'new') => void
   onMove: (id: string, dir: 'up' | 'down') => void
   reordering: boolean
   showOrderControls: boolean
+  onReload: () => void
 }) {
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(380px, 1fr))', gap: 12 }}>
-      {groups.map((g, idx) => (
-        <GroupCard
-          key={g.id}
-          g={g}
-          onEdit={() => onEdit(g.id)}
-          onMoveUp={idx > 0 && showOrderControls ? () => onMove(g.id, 'up') : undefined}
-          onMoveDown={idx < groups.length - 1 && showOrderControls ? () => onMove(g.id, 'down') : undefined}
-          reordering={reordering}
-        />
-      ))}
+    <div style={{
+      ...GLASS.L4, borderRadius: 10, overflow: 'hidden',
+      border: `1px solid ${COLORS.borderFaint}`,
+    }}>
+      {/* 헤더 */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: `${showOrderControls ? '48px ' : ''}minmax(140px,1.4fr) minmax(140px,1.3fr) minmax(160px,1.4fr) 70px minmax(220px,1.3fr) 90px`,
+        gap: 6, alignItems: 'center',
+        padding: '8px 12px',
+        background: 'rgba(0,0,0,0.025)',
+        borderBottom: `1px solid ${COLORS.borderFaint}`,
+        fontSize: 10, fontWeight: 800, color: COLORS.textMuted, letterSpacing: 0.3,
+      }}>
+        {showOrderControls && <span>순서</span>}
+        <span>그룹</span>
+        <span>시간 · 시프트</span>
+        <span>패턴 · 전략</span>
+        <span style={{ textAlign: 'right' }}>멤버</span>
+        <span>🔄 회전 시작 ~ 종료</span>
+        <span style={{ textAlign: 'center' }}>편집</span>
+      </div>
+      {/* 행 */}
+      <div style={{ display: 'flex', flexDirection: 'column' }}>
+        {groups.map((g, idx) => (
+          <GroupRow
+            key={g.id}
+            g={g}
+            onEdit={() => onEdit(g.id)}
+            onMoveUp={idx > 0 && showOrderControls ? () => onMove(g.id, 'up') : undefined}
+            onMoveDown={idx < groups.length - 1 && showOrderControls ? () => onMove(g.id, 'down') : undefined}
+            reordering={reordering}
+            showOrderControls={showOrderControls}
+            onReload={onReload}
+            zebra={idx % 2 === 1}
+          />
+        ))}
+      </div>
     </div>
   )
 }
 
-function GroupCard({ g, onEdit, onMoveUp, onMoveDown, reordering }: {
+function GroupRow({ g, onEdit, onMoveUp, onMoveDown, reordering, showOrderControls, onReload, zebra }: {
   g: ShiftGroup
   onEdit: () => void
   onMoveUp?: () => void
   onMoveDown?: () => void
   reordering: boolean
+  showOrderControls: boolean
+  onReload: () => void
+  zebra: boolean
 }) {
-  // 색상 토큰 — 그룹 자체 색
   const tone = g.color_tone || 'none'
-  const cardBg = tone !== 'none' ? TONE_BG[tone] : 'rgba(255,255,255,0.72)'
-  const cardBorder = tone !== 'none' ? TONE_BORDER[tone] : COLORS.borderFaint
   const accent = TONE_SOLID[tone]
 
-  // 패턴 상세 — custom 일 때 요일 명시
   const patternDetail = g.pattern_type === 'custom' && g.custom_days
     ? g.custom_days.split(',').map(s => DOW_LABEL[Number(s.trim())] || '').filter(Boolean).join('·')
     : null
 
+  // 회전 시작/종료 — 그룹 단위 (PR-2RR). YYYY-MM 표시.
+  const rotEnabled = Boolean(g.rotation_enabled)
+  const startMonth = (g.rotation_start_date || '').slice(0, 7)  // YYYY-MM
+  const endMonth = (g.rotation_end_date || '').slice(0, 7)
+
+  const [localStart, setLocalStart] = useState(startMonth)
+  const [localEnd, setLocalEnd] = useState(endMonth)
+  const [saving, setSaving] = useState(false)
+  // server 값 변경 시 sync (다른 행 reload 후 동기화)
+  useEffect(() => { setLocalStart(startMonth); setLocalEnd(endMonth) }, [startMonth, endMonth])
+
+  const saveDates = async (next: { start?: string; end?: string }) => {
+    setSaving(true)
+    try {
+      const auth = await getAuthHeader()
+      // YYYY-MM → API 는 그대로 받음 (서버에서 YYYY-MM-01 normalize)
+      const body: Record<string, string> = {}
+      if (next.start !== undefined) body.rotation_start_date = next.start
+      if (next.end   !== undefined) body.rotation_end_date   = next.end
+      const res = await fetch(`/api/call-scheduler/shift-groups/${g.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...auth },
+        body: JSON.stringify(body),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json?.error || '저장 실패')
+      onReload()
+    } catch (e: any) {
+      alert(e?.message || '저장 실패')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
     <div style={{
-      ...GLASS.L4,
-      borderRadius: 12, padding: 0, textAlign: 'left',
-      border: `1px solid ${cardBorder}`,
-      background: cardBg,
-      display: 'flex', flexDirection: 'column',
-      overflow: 'hidden',
+      display: 'grid',
+      gridTemplateColumns: `${showOrderControls ? '48px ' : ''}minmax(140px,1.4fr) minmax(140px,1.3fr) minmax(160px,1.4fr) 70px minmax(220px,1.3fr) 90px`,
+      gap: 6, alignItems: 'center',
+      padding: '10px 12px',
+      borderBottom: `1px solid ${COLORS.borderFaint}`,
+      background: zebra ? 'rgba(0,0,0,0.012)' : 'transparent',
       position: 'relative',
     }}>
-      {/* 좌측 색상 바 */}
+      {/* 좌측 색상 강조 바 */}
       <div style={{
-        position: 'absolute', left: 0, top: 0, bottom: 0,
-        width: 4, background: accent,
+        position: 'absolute', left: 0, top: 4, bottom: 4, width: 3,
+        background: accent, borderRadius: 2,
       }} />
 
-      {/* 헤더 — 이름 + 멤버수 + 정렬 컨트롤 */}
-      <div style={{
-        padding: '12px 14px 8px 18px',
-        display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8,
-      }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{
-            fontSize: 15, fontWeight: 800, color: TONE_TEXT[tone],
-            display: 'flex', alignItems: 'center', gap: 6,
-          }}>
-            <span style={{
-              display: 'inline-block', width: 8, height: 8, borderRadius: '50%',
-              background: accent, flexShrink: 0,
-            }} />
-            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {g.name}
-            </span>
-          </div>
-          <div style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 2, fontWeight: 600 }}>
-            {(g.category && g.category !== 'general') ? g.category : '일반'}
-            {' · '}
-            <span style={{ color: COLORS.textSecondary }}>{g.slot_code}</span>
-          </div>
+      {/* 순서 컨트롤 */}
+      {showOrderControls && (
+        <div style={{ display: 'flex', gap: 2, paddingLeft: 4 }}>
+          <button type="button"
+                  onClick={(e) => { e.stopPropagation(); onMoveUp?.() }}
+                  disabled={!onMoveUp || reordering}
+                  style={iconBtnStyle(!!onMoveUp && !reordering)}
+                  title="위로">▲</button>
+          <button type="button"
+                  onClick={(e) => { e.stopPropagation(); onMoveDown?.() }}
+                  disabled={!onMoveDown || reordering}
+                  style={iconBtnStyle(!!onMoveDown && !reordering)}
+                  title="아래로">▼</button>
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
-          <span style={{
-            ...pillStyle('neutral'),
-            background: 'rgba(255,255,255,0.85)',
-            border: `1px solid ${COLORS.borderFaint}`,
-          }}>
-            {g.member_count}명
-          </span>
-          {(onMoveUp || onMoveDown) && (
-            <div style={{ display: 'flex', gap: 2 }}>
-              <button type="button"
-                      onClick={(e) => { e.stopPropagation(); onMoveUp?.() }}
-                      disabled={!onMoveUp || reordering}
-                      style={iconBtnStyle(!!onMoveUp && !reordering)}
-                      title="위로 이동">▲</button>
-              <button type="button"
-                      onClick={(e) => { e.stopPropagation(); onMoveDown?.() }}
-                      disabled={!onMoveDown || reordering}
-                      style={iconBtnStyle(!!onMoveDown && !reordering)}
-                      title="아래로 이동">▼</button>
-            </div>
-          )}
+      )}
+
+      {/* 그룹 이름 + 카테고리 */}
+      <div style={{ minWidth: 0, paddingLeft: 4 }}>
+        <div style={{
+          fontSize: 13, fontWeight: 800, color: TONE_TEXT[tone],
+          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+        }} title={g.name}>
+          {g.name}
+        </div>
+        <div style={{ fontSize: 10, color: COLORS.textMuted, fontWeight: 600 }}>
+          {(g.category && g.category !== 'general') ? g.category : '일반'}
         </div>
       </div>
 
-      {/* 본문 — 시간 / 패턴 / 전략 */}
-      <div style={{ padding: '0 14px 8px 18px', display: 'flex', flexDirection: 'column', gap: 6 }}>
-        <div style={{ fontSize: 12, color: COLORS.textPrimary, fontWeight: 600 }}>
-          🕐 {g.start_time} ~ {g.end_time}
+      {/* 시간 · 시프트 */}
+      <div style={{ minWidth: 0 }}>
+        <div style={{
+          fontSize: 12, color: COLORS.textPrimary, fontWeight: 700,
+          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+        }}>
+          🕐 {g.start_time}~{g.end_time}
           {g.is_overnight && (
             <span style={{
-              marginLeft: 6, fontSize: 9, padding: '1px 5px', borderRadius: 4,
+              marginLeft: 4, fontSize: 9, padding: '0 4px', borderRadius: 3,
               background: COLORS.bgViolet, color: '#7c3aed', fontWeight: 700,
             }}>익일</span>
           )}
         </div>
-        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-          <span style={pillStyle('info')}>
-            {PATTERN_LABEL[g.pattern_type]}
-            {patternDetail && ` (${patternDetail})`}
-          </span>
-          <span style={pillStyle('primary')}>
-            {STRATEGY_LABEL[g.generation_strategy]}
-            {g.generation_strategy === 'rotation' && g.rotation_size
-              ? ` ${g.rotation_size}명/${g.rotation_period_days}일`
-              : ''}
-          </span>
+        <div style={{ fontSize: 10, color: COLORS.textSecondary, fontWeight: 600 }}>
+          {g.slot_code}
         </div>
       </div>
 
-      {/* 멤버 chip 영역 */}
-      {g.members && g.members.length > 0 && (
-        <div style={{
-          padding: '8px 14px 10px 18px',
-          borderTop: `1px solid ${COLORS.borderFaint}`,
-          background: 'rgba(255,255,255,0.4)',
-        }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: COLORS.textMuted, marginBottom: 4 }}>
-            멤버 ({g.members.length}명)
-          </div>
-          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-            {g.members.slice(0, 12).map(m => (
-              <span key={m.id} style={{
-                fontSize: 11, padding: '2px 8px', borderRadius: 99,
-                background: TONE_BG[m.color_tone] !== 'transparent' ? TONE_BG[m.color_tone] : 'rgba(255,255,255,0.7)',
-                color: TONE_TEXT[m.color_tone],
-                border: `1px solid ${TONE_BORDER[m.color_tone]}`,
-                fontWeight: 600, whiteSpace: 'nowrap',
-              }}>
-                {m.name}
-              </span>
-            ))}
-            {g.members.length > 12 && (
-              <span style={{
-                fontSize: 11, padding: '2px 8px', borderRadius: 99,
-                background: 'rgba(0,0,0,0.05)', color: COLORS.textMuted, fontWeight: 600,
-              }}>
-                +{g.members.length - 12}
-              </span>
-            )}
-          </div>
-        </div>
-      )}
+      {/* 패턴 · 전략 */}
+      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', minWidth: 0 }}>
+        <span style={{ ...pillStyle('info'), whiteSpace: 'nowrap' }}>
+          {PATTERN_LABEL[g.pattern_type]}{patternDetail && ` (${patternDetail})`}
+        </span>
+        <span style={{ ...pillStyle('primary'), whiteSpace: 'nowrap' }}>
+          {STRATEGY_LABEL[g.generation_strategy]}
+          {rotEnabled && (g.rotation_period_kind === 'days'
+            ? ` ${g.rotation_custom_days}일`
+            : ' 월간')}
+        </span>
+      </div>
 
-      {/* 설명 */}
-      {g.description && (
-        <div style={{
-          padding: '6px 14px 8px 18px',
-          fontSize: 11, color: COLORS.textMuted, fontStyle: 'italic',
-          borderTop: `1px solid ${COLORS.borderFaint}`,
-        }}>
-          {g.description}
-        </div>
-      )}
+      {/* 멤버 수 */}
+      <div style={{ textAlign: 'right' }}>
+        <span style={{
+          fontSize: 12, fontWeight: 800, color: COLORS.textPrimary,
+        }}>{g.member_count}명</span>
+      </div>
+
+      {/* 회전 시작 ~ 종료 (월 단위) */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 4, minWidth: 0,
+      }}>
+        {rotEnabled ? (
+          <>
+            <input
+              type="month"
+              value={localStart}
+              disabled={saving}
+              onChange={e => setLocalStart(e.target.value)}
+              onBlur={() => { if (localStart !== startMonth) saveDates({ start: localStart }) }}
+              style={inputMonthStyle(saving)}
+              title="회전 시작 월 — 빈 값은 그룹 생성일"
+            />
+            <span style={{ color: COLORS.textMuted, fontSize: 11 }}>~</span>
+            <input
+              type="month"
+              value={localEnd}
+              disabled={saving}
+              onChange={e => setLocalEnd(e.target.value)}
+              onBlur={() => { if (localEnd !== endMonth) saveDates({ end: localEnd }) }}
+              style={inputMonthStyle(saving)}
+              title="회전 종료 월 — 빈 값은 무한"
+            />
+          </>
+        ) : (
+          <span style={{
+            fontSize: 10, color: COLORS.textMuted, fontStyle: 'italic',
+          }}>회전 비활성</span>
+        )}
+      </div>
 
       {/* 편집 버튼 */}
-      <button type="button" onClick={onEdit}
-              style={{
-                margin: '0 12px 12px 18px', padding: '6px 10px',
-                borderRadius: 6, border: `1px solid ${COLORS.borderFaint}`,
-                background: 'rgba(255,255,255,0.7)', cursor: 'pointer',
-                fontSize: 12, fontWeight: 600, color: COLORS.textSecondary,
-              }}>
-        ✏️ 편집 / 멤버 관리
-      </button>
+      <div style={{ textAlign: 'center' }}>
+        <button type="button" onClick={onEdit}
+                style={{
+                  padding: '5px 12px', borderRadius: 6,
+                  border: `1px solid ${COLORS.borderFaint}`,
+                  background: 'rgba(255,255,255,0.85)', cursor: 'pointer',
+                  fontSize: 11, fontWeight: 700, color: COLORS.textSecondary,
+                  whiteSpace: 'nowrap',
+                }}
+                title="편집 / 멤버 관리">
+          ✏️ 편집
+        </button>
+      </div>
     </div>
   )
+}
+
+function inputMonthStyle(disabled: boolean): React.CSSProperties {
+  return {
+    width: 100, fontSize: 11, padding: '3px 6px',
+    border: `1px solid ${COLORS.borderFaint}`, borderRadius: 5,
+    background: disabled ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.85)',
+    color: COLORS.textPrimary, cursor: disabled ? 'wait' : 'text',
+  }
 }
 
 function iconBtnStyle(enabled: boolean): React.CSSProperties {

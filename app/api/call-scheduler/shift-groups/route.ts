@@ -114,20 +114,35 @@ export async function GET(request: NextRequest) {
       } catch { /* graceful */ }
     }
     // N-19-a — rotation 설정 별도 조회 (graceful)
+    // PR-2RR (2026-05-28) — 그룹 단위 rotation_start_date / rotation_end_date 추가
+    let hasGroupRotationDates = true
+    try {
+      await prisma.$queryRaw<any[]>`SELECT rotation_start_date FROM cs_shift_groups LIMIT 1`
+    } catch { hasGroupRotationDates = false }
     const rotationMap = new Map<string, {
       enabled: boolean; period_kind: string; period_days: number
+      start_date: string | null; end_date: string | null
     }>()
     if (hasRotation && rows.length > 0) {
       try {
-        const rRows = await prisma.$queryRaw<any[]>`
-          SELECT id, rotation_enabled, rotation_period_kind, rotation_custom_days
-          FROM cs_shift_groups WHERE is_active = 1
-        `
+        const rRows = hasGroupRotationDates
+          ? await prisma.$queryRaw<any[]>`
+              SELECT id, rotation_enabled, rotation_period_kind, rotation_custom_days,
+                     DATE_FORMAT(rotation_start_date, '%Y-%m-%d') AS rotation_start_date,
+                     DATE_FORMAT(rotation_end_date,   '%Y-%m-%d') AS rotation_end_date
+              FROM cs_shift_groups WHERE is_active = 1
+            `
+          : await prisma.$queryRaw<any[]>`
+              SELECT id, rotation_enabled, rotation_period_kind, rotation_custom_days
+              FROM cs_shift_groups WHERE is_active = 1
+            `
         for (const r of rRows) {
           rotationMap.set(r.id, {
             enabled: Boolean(r.rotation_enabled),
             period_kind: String(r.rotation_period_kind || 'monthly'),
             period_days: Number(r.rotation_custom_days || 30),
+            start_date: hasGroupRotationDates ? (r.rotation_start_date ?? null) : null,
+            end_date:   hasGroupRotationDates ? (r.rotation_end_date   ?? null) : null,
           })
         }
       } catch { /* graceful */ }
@@ -288,6 +303,9 @@ export async function GET(request: NextRequest) {
         rotation_period_kind: rot?.period_kind || 'monthly',
         rotation_custom_days: rot?.period_days || 30,
         rotation_shifts: groupShiftsMap.get(r.id) || [],
+        // PR-2RR (2026-05-28) — 그룹 단위 회전 시작/종료 일자
+        rotation_start_date: rot?.start_date ?? null,
+        rotation_end_date:   rot?.end_date   ?? null,
       }
     })
     return NextResponse.json({ data: serialize(data), error: null })
