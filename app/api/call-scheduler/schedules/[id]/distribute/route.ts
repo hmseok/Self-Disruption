@@ -90,44 +90,38 @@ export async function POST(
 
     // ── 배정된 워커 + 근무 요약 ──
     // 근무일수 = special_code='none' 셀 수, 첫 근무일 = MIN(work_date)
-    // PR-2RR-h — email 컬럼 graceful (구 schema 도 호환)
+    // PR-2RR-h — email / view_token 컬럼 graceful (구 schema 도 호환)
     let hasEmailColumn = true
     try {
       await prisma.$queryRaw<any[]>`SELECT email FROM cs_workers LIMIT 1`
     } catch { hasEmailColumn = false }
-    const rows = hasEmailColumn
-      ? await prisma.$queryRaw<any[]>`
-          SELECT
-            w.id                                   AS worker_id,
-            w.name                                 AS name,
-            w.phone                                AS phone,
-            w.email                                AS email,
-            w.view_token                           AS view_token,
-            COUNT(CASE WHEN a.special_code = 'none' THEN 1 END) AS work_days,
-            DATE_FORMAT(MIN(a.work_date), '%c/%e')  AS first_day
-          FROM cs_assignments a
-          JOIN cs_workers w ON w.id = a.worker_id
-          WHERE a.schedule_id = ${scheduleId}
-            AND a.worker_id IS NOT NULL
-          GROUP BY w.id, w.name, w.phone, w.email, w.view_token
-          ORDER BY w.name ASC
-        `
-      : await prisma.$queryRaw<any[]>`
-          SELECT
-            w.id                                   AS worker_id,
-            w.name                                 AS name,
-            w.phone                                AS phone,
-            NULL                                   AS email,
-            w.view_token                           AS view_token,
-            COUNT(CASE WHEN a.special_code = 'none' THEN 1 END) AS work_days,
-            DATE_FORMAT(MIN(a.work_date), '%c/%e')  AS first_day
-          FROM cs_assignments a
-          JOIN cs_workers w ON w.id = a.worker_id
-          WHERE a.schedule_id = ${scheduleId}
-            AND a.worker_id IS NOT NULL
-          GROUP BY w.id, w.name, w.phone, w.view_token
-          ORDER BY w.name ASC
-        `
+    // PR-2RR-h hotfix (2026-05-28) — view_token 컬럼 graceful (마이그 2026-05-23 미적용 시)
+    let hasViewTokenColumn = true
+    try {
+      await prisma.$queryRaw<any[]>`SELECT view_token FROM cs_workers LIMIT 1`
+    } catch { hasViewTokenColumn = false }
+    // SELECT 문 동적 조립 — 컬럼 누락 시 NULL 대입
+    const emailSel = hasEmailColumn ? 'w.email' : 'NULL'
+    const viewTokenSel = hasViewTokenColumn ? 'w.view_token' : 'NULL'
+    const emailGrp = hasEmailColumn ? ', w.email' : ''
+    const viewTokenGrp = hasViewTokenColumn ? ', w.view_token' : ''
+    const workerSql = `
+      SELECT
+        w.id                                   AS worker_id,
+        w.name                                 AS name,
+        w.phone                                AS phone,
+        ${emailSel}                            AS email,
+        ${viewTokenSel}                        AS view_token,
+        COUNT(CASE WHEN a.special_code = 'none' THEN 1 END) AS work_days,
+        DATE_FORMAT(MIN(a.work_date), '%c/%e')  AS first_day
+      FROM cs_assignments a
+      JOIN cs_workers w ON w.id = a.worker_id
+      WHERE a.schedule_id = ?
+        AND a.worker_id IS NOT NULL
+      GROUP BY w.id, w.name, w.phone${emailGrp}${viewTokenGrp}
+      ORDER BY w.name ASC
+    `
+    const rows = await prisma.$queryRawUnsafe<any[]>(workerSql, scheduleId)
     if (rows.length === 0) {
       return NextResponse.json(
         { error: '이 근무표에 배정된 직원이 없습니다.' }, { status: 400 },
@@ -135,18 +129,22 @@ export async function POST(
     }
 
     // ── view_token 없는 워커 토큰 생성 (멱등) ──
-    for (const r of rows) {
-      if (!r.view_token || String(r.view_token).trim() === '') {
-        const tok = randomUUID().replace(/-/g, '')
-        try {
-          await prisma.$executeRaw`
-            UPDATE cs_workers SET view_token = ${tok}, updated_at = NOW()
-            WHERE id = ${String(r.worker_id)}
-          `
-          r.view_token = tok
-        } catch { /* graceful — 토큰 생성 실패 시 링크 빈값 */ }
+    // PR-2RR-h hotfix — 컬럼 자체 미적용 시 (마이그 2026-05-23) UPDATE skip
+    if (hasViewTokenColumn) {
+      for (const r of rows) {
+        if (!r.view_token || String(r.view_token).trim() === '') {
+          const tok = randomUUID().replace(/-/g, '')
+          try {
+            await prisma.$executeRaw`
+              UPDATE cs_workers SET view_token = ${tok}, updated_at = NOW()
+              WHERE id = ${String(r.worker_id)}
+            `
+            r.view_token = tok
+          } catch { /* graceful — 토큰 생성 실패 시 링크 빈값 */ }
+        }
       }
     }
+    // 컬럼 미적용 시 안내 — preview 응답에 _migration_pending 플래그
 
     // ── 수신자별 메시지 빌드 (SMS 본문 + 메일 본문) ──
     let recipients: Recipient[] = rows.map((r) => {
@@ -247,6 +245,10 @@ export async function POST(
           invalid_count: invalid.length,
           recipients,
           max_recipients: ALIGO_MAX_RECIPIENTS,
+          // PR-2RR-h hotfix — DB 마이그 미적용 안내
+          _migration_pending: !hasViewTokenColumn
+            ? '2026-05-23_cs_workers_view_token.sql (직원 일정 공개 링크 토큰)'
+            : null,
         }),
         error: null,
       })

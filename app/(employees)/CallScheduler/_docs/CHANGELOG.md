@@ -3,6 +3,26 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-28 (PR-2RR-h-fix1) — distribute view_token graceful + 마이그 안내 배너
+
+> 사용자 보고: 모달 진입 시 `Error 1054: Unknown column 'w.view_token' in 'field list'`.
+> 진단: 마이그 `2026-05-23_cs_workers_view_token.sql` 사용자 DB 미적용. CLAUDE.md Rule 23 위반 — 본 코드가 graceful 가드 누락.
+
+- **수정** `distribute/route.ts` —
+  - `hasViewTokenColumn` graceful 가드 추가 (information_schema 체크 대신 SELECT LIMIT 1 try/catch).
+  - SELECT 문 동적 SQL 빌드 (`emailSel`/`viewTokenSel`) — 컬럼 누락 시 NULL.
+  - UPDATE cs_workers SET view_token 도 `if (hasViewTokenColumn)` 가드.
+  - preview 응답에 `_migration_pending: '2026-05-23_...sql'` 플래그 (UI 안내용).
+- **수정** `DistributeModal.tsx` —
+  - `PreviewData._migration_pending?: string | null` 추가.
+  - 채널 미설정 안내 위에 amber 배너 표시: 「⚠ DB 마이그레이션 미적용 — 공개 링크가 비어있을 수 있습니다」.
+- 마이그 미적용 상태에서도 SMS / 메일 발송은 계속 작동 (링크만 빈 BASE_URL). 마이그 적용 후 자동 정상화.
+
+**사용자 적용 SQL** (선택 — 공개 링크 필요 시):
+```bash
+mysql -h 34.47.105.219 -u <user> -p fmi_op < migrations/2026-05-23_cs_workers_view_token.sql
+```
+
 ## 2026-05-28 (PR-2RR-h) — 다중 채널 배포 모달 (SMS · 메일 · 링크 + 워커별 단일 발송)
 
 > 사용자 명령:

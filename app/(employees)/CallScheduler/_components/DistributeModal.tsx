@@ -45,6 +45,7 @@ interface PreviewData {
   invalid_count: number
   recipients: Recipient[]
   max_recipients: number
+  _migration_pending?: string | null
 }
 
 interface SendData {
@@ -312,6 +313,20 @@ export default function DistributeModal({ open, onClose, scheduleId }: Props) {
               </span>
             </div>
 
+            {/* PR-2RR-h hotfix — 마이그 미적용 안내 */}
+            {preview._migration_pending && (
+              <div style={{
+                ...GLASS.L3, background: COLORS.bgAmber, border: `1px solid ${COLORS.borderAmber}`,
+                borderRadius: 8, padding: '8px 12px', fontSize: 11, color: COLORS.warning,
+                lineHeight: 1.5,
+              }}>
+                ⚠ DB 마이그레이션 미적용 — <code style={{
+                  background: 'rgba(255,255,255,0.7)', padding: '1px 5px', borderRadius: 3,
+                }}>{preview._migration_pending}</code>
+                <br/>
+                공개 링크 (본인 일정 페이지) 가 비어있을 수 있습니다. 마이그 적용 후 정상 작동.
+              </div>
+            )}
             {/* 채널 미설정 안내 */}
             {!channelOk && (
               <div style={{
