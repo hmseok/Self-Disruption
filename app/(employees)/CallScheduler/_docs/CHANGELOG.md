@@ -3,6 +3,17 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-28 (PR-2RR-e) — GroupEditor 2차 정리 (collapsible 헤더 컴팩트 · 큰 안내 박스 축소)
+
+> 사용자 명령: 「그룹 편집상세 화면 정리좀 하시죠」.
+
+- **🎯 우선순위 정책 박스** — 큰 헤더 (fontSize 13, padding 14) → 작은 collapsed bar (fontSize 11, padding 4·10). 「ⓘ 자세히」 버튼 제거, 헤더 전체가 toggle button.
+- **⚖️ 최소 인원 collapsible** — padding 8·12 → 4·10, fontSize 12 → 11, 「(자동 생성용)」 sub 제거.
+- **📅 버전 timeline collapsible** — padding 8·12 → 4·10, fontSize 12 → 11, 「(기간별 그룹 설정 — 분기/시즌별 다른 sequence)」 → 「분기/시즌별 다른 sequence」 단축.
+- **💡 회피일/연차 안내 박스** — 큰 파란 박스 → 작은 회색 hint 한 줄 (padding 6·10 → 3·8, fontSize 11 → 10, color info → muted).
+- **👥 멤버 헤더** — fontSize 13 → 12, sub 「순서 중요 — 로테이션은 위에서부터」 → 「순서대로 로테이션」.
+- 알고리즘/스키마 변경 없음. tsc CallScheduler 영역 에러 0.
+
 ## 2026-05-28 (PR-2RR-d) — GroupEditor 본격 정리 (중복 통합 · 공간 절약)
 
 > 사용자 명령: 「비슷한내용이면 정리하고 하나로 하고 공간도 활용좀 잘하고 스크롤도 많이 줄일수있을것같은데」.

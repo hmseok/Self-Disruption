@@ -1208,26 +1208,26 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
             </>
           )}
 
-          {/* N-21-a — 버전 timeline (그룹 설정의 기간별 버전) */}
+          {/* N-21-a — 버전 timeline (PR-2RR-d 헤더 컴팩트) */}
           {!isNew && (
             <div>
               <button type="button"
                       onClick={() => setVersionsExpanded(p => !p)}
                       style={{
                         width: '100%', textAlign: 'left',
-                        padding: '8px 12px', borderRadius: 8,
-                        background: versionsExpanded ? COLORS.bgBlue : 'rgba(0,0,0,0.03)',
+                        padding: '4px 10px', borderRadius: 6,
+                        background: versionsExpanded ? COLORS.bgBlue : 'rgba(0,0,0,0.025)',
                         border: `1px solid ${versionsExpanded ? COLORS.borderBlue : COLORS.borderFaint}`,
                         cursor: 'pointer',
                         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                        fontSize: 12, fontWeight: 700,
+                        fontSize: 11, fontWeight: 700,
                         color: versionsExpanded ? COLORS.info : COLORS.textPrimary,
                       }}>
-                <span>📅 버전 timeline <span style={{ fontSize: 11, fontWeight: 500, color: COLORS.textMuted }}>
-                  (기간별 그룹 설정 — 분기/시즌별 다른 sequence)
+                <span>📅 버전 timeline <span style={{ fontSize: 9, fontWeight: 500, color: COLORS.textMuted }}>
+                  분기/시즌별 다른 sequence
                 </span></span>
-                <span style={{ fontSize: 11, fontWeight: 500, color: COLORS.textMuted }}>
-                  {versions.length}개 버전 {versionsExpanded ? '▼' : '▶'}
+                <span style={{ fontSize: 10, fontWeight: 500, color: COLORS.textMuted }}>
+                  {versions.length}개 {versionsExpanded ? '▼' : '▶'}
                 </span>
               </button>
               {versionsExpanded && (
@@ -1339,31 +1339,29 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
             </div>
           )}
 
-          {/* N-5 — 최소 인원 collapsible (자주 안 만지는 셋팅 접기) */}
-          <div>
-            <button type="button"
-                    onClick={() => setCoverageExpanded(p => !p)}
-                    style={{
-                      width: '100%', textAlign: 'left',
-                      padding: '8px 12px', borderRadius: 8,
-                      background: coverageExpanded ? COLORS.bgBlue : 'rgba(0,0,0,0.03)',
-                      border: `1px solid ${coverageExpanded ? COLORS.borderBlue : COLORS.borderFaint}`,
-                      cursor: 'pointer',
-                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                      fontSize: 12, fontWeight: 700,
-                      color: coverageExpanded ? COLORS.info : COLORS.textPrimary,
-                    }}>
-              <span>⚖️ 최소 인원 (자동 생성용)</span>
-              <span style={{ fontSize: 11, fontWeight: 500, color: COLORS.textMuted }}>
-                {(() => {
-                  const set = (defaultMin && Number(defaultMin) > 0)
-                    || Object.values(dowMin).some(v => Number(v) > 0)
-                  return set ? '셋팅됨' : '미설정'
-                })()}
-                {' '}{coverageExpanded ? '▼' : '▶'}
-              </span>
-            </button>
-          </div>
+          {/* N-5 — 최소 인원 collapsible (PR-2RR-d 헤더 컴팩트) */}
+          <button type="button"
+                  onClick={() => setCoverageExpanded(p => !p)}
+                  style={{
+                    width: '100%', textAlign: 'left',
+                    padding: '4px 10px', borderRadius: 6,
+                    background: coverageExpanded ? COLORS.bgBlue : 'rgba(0,0,0,0.025)',
+                    border: `1px solid ${coverageExpanded ? COLORS.borderBlue : COLORS.borderFaint}`,
+                    cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    fontSize: 11, fontWeight: 700,
+                    color: coverageExpanded ? COLORS.info : COLORS.textPrimary,
+                  }}>
+            <span>⚖️ 최소 인원</span>
+            <span style={{ fontSize: 10, fontWeight: 500, color: COLORS.textMuted }}>
+              {(() => {
+                const set = (defaultMin && Number(defaultMin) > 0)
+                  || Object.values(dowMin).some(v => Number(v) > 0)
+                return set ? '셋팅됨' : '미설정'
+              })()}
+              {' '}{coverageExpanded ? '▼' : '▶'}
+            </span>
+          </button>
           {coverageExpanded && (
           <Field label=""
                  sub="매일 디폴트를 입력하고, 요일별로 다르면 따로 입력. 빈 칸 = 디폴트 사용.">
@@ -1437,31 +1435,28 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
           </Field>
           )}
 
-          {/* PR-2SS-Phase-I — 우선순위 정책 표출 (매니저 판단 도구) — N-58 접기 */}
+          {/* PR-2SS-Phase-I — 우선순위 정책 (N-58 접기 / PR-2RR-d 컴팩트 헤더) */}
           <div style={{
-            ...GLASS.L1, borderRadius: 10, padding: policyExpanded ? 14 : '8px 14px',
+            ...GLASS.L1, borderRadius: 8, padding: policyExpanded ? 10 : '4px 10px',
             border: `1px solid ${COLORS.borderBlue}`,
-            background: 'rgba(219,234,254,0.45)',
+            background: 'rgba(219,234,254,0.35)',
           }}>
-            <div style={{
-              fontSize: 13, fontWeight: 800, color: COLORS.textPrimary,
-              display: 'flex', alignItems: 'center', gap: 6,
-              marginBottom: policyExpanded ? 10 : 0,
-            }}>
-              🎯 우선순위 정책 <span style={{
-                fontSize: 10, fontWeight: 500, color: COLORS.textMuted,
-                background: 'rgba(255,255,255,0.7)', padding: '1px 6px', borderRadius: 99,
-              }}>자동 생성 시 7단계 ranking 적용</span>
+            <button type="button" onClick={() => setPolicyExpanded(v => !v)}
+                    style={{
+                      width: '100%', padding: 0, background: 'transparent', border: 'none',
+                      cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
+                      fontSize: 11, fontWeight: 700, color: COLORS.textPrimary,
+                      marginBottom: policyExpanded ? 8 : 0,
+                    }}>
+              <span>🎯 우선순위 정책</span>
+              <span style={{ fontSize: 9, fontWeight: 500, color: COLORS.textMuted }}>
+                자동 생성 7단계 ranking
+              </span>
               <div style={{ flex: 1 }} />
-              <button type="button" onClick={() => setPolicyExpanded(v => !v)}
-                      style={{
-                        padding: '1px 8px', fontSize: 11, fontWeight: 700, borderRadius: 99,
-                        cursor: 'pointer', background: 'transparent', color: COLORS.textMuted,
-                        border: `1px solid ${COLORS.borderFaint}`,
-                      }}>
-                {policyExpanded ? 'ⓘ 접기' : 'ⓘ 자세히'}
-              </button>
-            </div>
+              <span style={{ fontSize: 10, color: COLORS.textMuted }}>
+                {policyExpanded ? '▼' : '▶'}
+              </span>
+            </button>
             {policyExpanded && (<>
             <div style={{
               background: 'rgba(255,255,255,0.85)', borderRadius: 8, padding: 10,
@@ -1525,10 +1520,10 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
 
         {/* 2. 멤버 + 후보 (수직 1컬럼 — 가로 폭 넉넉) */}
         <div style={{ ...GLASS.L4, borderRadius: 12, padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <div style={{ fontSize: 13, fontWeight: 800, color: COLORS.textPrimary }}>
-            멤버 ({memberIds.length}명)
-            <span style={{ fontSize: 11, fontWeight: 500, color: COLORS.textMuted, marginLeft: 6 }}>
-              순서 중요 — 로테이션은 위에서부터
+          <div style={{ fontSize: 12, fontWeight: 800, color: COLORS.textPrimary }}>
+            👥 멤버 ({memberIds.length}명)
+            <span style={{ fontSize: 10, fontWeight: 500, color: COLORS.textMuted, marginLeft: 6 }}>
+              순서대로 로테이션
             </span>
           </div>
 
@@ -1697,11 +1692,10 @@ export default function GroupEditor({ groupId, slots, workers, onClose, onSaved 
                               "동기화 안 되어서 그룹 내 설정 삭제" → 등록은 「직원 요청 검토」 페이지에서만
                               여기는 회피일 list 읽기 전용 표시 */}
                           <div style={{
-                            padding: '6px 10px', borderRadius: 6,
-                            background: COLORS.bgBlue, border: `1px solid ${COLORS.borderBlue}`,
-                            fontSize: 11, color: COLORS.info, lineHeight: 1.5,
+                            padding: '3px 8px', borderRadius: 4,
+                            fontSize: 10, color: COLORS.textMuted,
                           }}>
-                            💡 회피일/연차 등록은 <strong>「직원 요청 검토」 페이지</strong>에서만 가능 (단일 등록 위치)
+                            💡 회피일/연차 등록 → <strong>직원 요청 검토</strong> 페이지
                           </div>
                         </div>
                       )}
