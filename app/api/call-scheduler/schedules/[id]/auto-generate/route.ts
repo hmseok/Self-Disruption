@@ -66,6 +66,9 @@ interface GroupRow {
   cycle_kind?: string | null
   cycle_days_per_member?: number | null
   cycle_start_date?: string | null
+  // N-19-b fallback — 멤버 rotation_start_date 가 NULL 이면 그룹 생성일 기준
+  //   (cs_group_shift_rotation.sql line 69: "NULL 이면 group.created_at 기준")
+  created_iso?: string
 }
 interface MemberRow {
   group_id: string
@@ -383,7 +386,8 @@ export async function POST(
                  s.max_consecutive_days   AS slot_max_consecutive_days,
                  TIME_FORMAT(s.night_period_start, '%H:%i:%s') AS slot_night_period_start,
                  TIME_FORMAT(s.night_period_end,   '%H:%i:%s') AS slot_night_period_end,
-                 s.night_premium_rate AS slot_night_premium_rate
+                 s.night_premium_rate AS slot_night_premium_rate,
+                 DATE_FORMAT(g.created_at, '%Y-%m-%d') AS created_iso
           FROM cs_shift_groups g
           JOIN cs_shift_slots s ON s.id = g.shift_slot_id
           WHERE g.is_active = 1
@@ -397,7 +401,8 @@ export async function POST(
                  TIME_FORMAT(s.end_time, '%H:%i:%s')   AS slot_end,
                  s.is_overnight AS slot_overnight,
                  s.next_day_blocking_hours AS slot_next_day_blocking_hours,
-                 s.max_consecutive_days   AS slot_max_consecutive_days
+                 s.max_consecutive_days   AS slot_max_consecutive_days,
+                 DATE_FORMAT(g.created_at, '%Y-%m-%d') AS created_iso
           FROM cs_shift_groups g
           JOIN cs_shift_slots s ON s.id = g.shift_slot_id
           WHERE g.is_active = 1
@@ -408,7 +413,8 @@ export async function POST(
                  g.generation_strategy, g.rotation_size, g.rotation_period_days,
                  TIME_FORMAT(s.start_time, '%H:%i:%s') AS slot_start,
                  TIME_FORMAT(s.end_time, '%H:%i:%s')   AS slot_end,
-                 s.is_overnight AS slot_overnight
+                 s.is_overnight AS slot_overnight,
+                 DATE_FORMAT(g.created_at, '%Y-%m-%d') AS created_iso
           FROM cs_shift_groups g
           JOIN cs_shift_slots s ON s.id = g.shift_slot_id
           WHERE g.is_active = 1
@@ -1847,7 +1853,10 @@ export async function POST(
 
             // 멤버별 시작일 / 종료일 (start_index 는 priority 기반 자동 — 사용자 명시 override 가능)
             const mrot = memberRotMap.get(`${g.id}_${wId}`)
-            const startDate = mrot?.start_date || null
+            // N-19-b fallback (2026-05-26 fix) — 멤버 rotation_start_date 가 NULL 이면
+            //   그룹 생성일 기준 (스키마 주석 의도 — cs_group_shift_rotation.sql line 69).
+            //   기존엔 null 그대로라 elapsed=0 영구 → 매월 같은 시프트 반복 버그.
+            const startDate = mrot?.start_date || g.created_iso || null
             const endDate = mrot?.end_date || null
             // N-23 — start_index 가 명시적으로 0 보다 크면 그것 사용, 아니면 priority (memberIdx) 자동
             const baseIdx = (mrot && mrot.start_index > 0) ? mrot.start_index : memberIdx

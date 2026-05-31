@@ -3,6 +3,19 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-26 (ROT-FIX) — 시프트 로테이션 월간 fallback (멤버 rotation_start_date NULL → group.created_at)
+
+> 사용자 보고: 「6월·7월 근무표 시프트 로테이션 적용 안 됨」.
+> 진단: `cs_group_member_rotations.rotation_start_date` 가 7명 전원 NULL → `auto-generate` N-19-b legacy path 가 `elapsed=0` 영구 → 매월 `shift[baseIdx]` 동일 → 회전 멈춤.
+> 마이그 주석 의도(`NULL 이면 group.created_at 기준`)와 코드 불일치. 활성 버전 path(line 1783)는 `activeVersion.valid_from` fallback 이 있으나 legacy path 누락.
+
+- **수정** `auto-generate/route.ts` —
+  - `GroupRow` 인터페이스에 `created_iso?: string` 추가.
+  - 그룹 SELECT 3개 변형(`hasSlotSafety` 분기) 모두 `DATE_FORMAT(g.created_at, '%Y-%m-%d') AS created_iso` 추가.
+  - line 1850: `const startDate = mrot?.start_date || g.created_iso || null` — 멤버 NULL 시 그룹 생성일 fallback.
+- monthly: `elapsed = (cur.year-start.year)*12 + (cur.month-start.month)` — 5월(group.created_at) elapsed=0 → 6월 1 → 7월 2 → 자연 매월 회전.
+- 검증: ROT-FIX 푸시 후 6월/7월 schedule 재생성 → 멤버별 시프트가 월마다 1칸씩 shift 확인.
+
 ## 2026-05-24 (Phase W-1e) — 대시보드 + 스케줄 화면 날씨 위젯
 
 > KPI 대시보드 상단에 권역별 날씨 카드 + 통합 보정율 배지. CallScheduler 「오늘」 카드 헤더에 거점 권역 날씨 인라인 표시.
