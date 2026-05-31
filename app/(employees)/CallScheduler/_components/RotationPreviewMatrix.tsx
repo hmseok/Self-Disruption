@@ -207,11 +207,17 @@ export default function RotationPreviewMatrix({
           {N === 0 ? '시프트가 셋팅되지 않았습니다.' : '워커가 셋팅되지 않았습니다.'}
         </div>
       ) : (
-        <div style={{ overflowX: 'auto' }}>
+        // PR-2RR-h (2026-05-28) — 반응형: minWidth 제거, table-layout fixed, 컨테이너 폭 100%
+        <div style={{ width: '100%', overflowX: 'auto' }}>
           <table style={{
             borderCollapse: 'separate', borderSpacing: 0,
-            fontSize: 11, width: '100%', minWidth: members.length * 80 + 100,
+            fontSize: 11, width: '100%',
+            tableLayout: 'fixed',
           }}>
+            <colgroup>
+              <col style={{ width: 64 }} />
+              {members.map(m => <col key={m.worker_id} />)}
+            </colgroup>
             <thead>
               <tr>
                 <th style={cellHeadStyle()}>월</th>
@@ -355,19 +361,21 @@ const smallInputStyle: React.CSSProperties = {
 
 function cellHeadStyle(): React.CSSProperties {
   return {
-    padding: '6px 8px',
+    padding: '4px 6px',
     background: 'rgba(0,0,0,0.025)',
     border: `1px solid ${COLORS.borderFaint}`,
     fontWeight: 800, color: COLORS.textSecondary,
-    fontSize: 11, whiteSpace: 'nowrap',
+    fontSize: 11,
     textAlign: 'center',
+    overflow: 'hidden',
   }
 }
 function cellBodyStyle(): React.CSSProperties {
   return {
-    padding: '6px 8px',
+    padding: '4px 6px',
     border: `1px solid ${COLORS.borderFaint}`,
-    textAlign: 'center', whiteSpace: 'nowrap',
+    textAlign: 'center',
+    overflow: 'hidden',
   }
 }
 function miniBtnStyle(enabled: boolean): React.CSSProperties {

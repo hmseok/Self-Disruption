@@ -3,6 +3,14 @@
 > 매 PR 종료 시 한 줄 이상 기록 의무 (CLAUDE.md 규칙 22)
 > 본 세션 (2026-05-03 ~ 05-04) 의 PR 누적
 
+## 2026-05-28 (PR-2RR-h-1) — RotationPreviewMatrix 반응형 fix (table-layout fixed)
+
+> 사용자 보고: 「매트릭스 보면 반응형이 적용이 안되었나? 좌우스크롤이 왜생기지 마우스로 보기엔 너무 힘들텐데」.
+
+- 기존: `minWidth: members.length × 80 + 100` 으로 워커 많으면 가로 스크롤 발생.
+- 신: `minWidth` 제거 + `tableLayout: 'fixed'` + `colgroup` 으로 월 라벨 col 고정 64px / 워커 col 균등 분배 → 컨테이너 폭 100% 활용.
+- 셀 padding 6·8 → 4·6, whiteSpace nowrap 제거, overflow hidden 추가 (좁은 셀에서 ellipsis 자연 처리).
+
 ## 2026-05-28 (PR-2RR-g) — 「⚡ 배포」 알리고 SMS 단일 액션 통합
 
 > 사용자 명령: 「배포는 문자는 알리고로 보내주세요. 키는 연결되어있습니다」.
