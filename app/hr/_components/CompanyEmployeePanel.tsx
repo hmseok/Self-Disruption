@@ -93,13 +93,12 @@ interface CompanyEmployeePanelProps {
 
 // ─── 회사별 data source 분기 helper ────────────────────────────
 function getEmployeesUrl(companyKey: string): string {
-  if (companyKey === 'RIDE') return '/api/ride-employees'
+  // PR-FMI-ONLY-PURGE Phase 3c (2026-06-02) — 라이드 분리: RIDE 분기 제거 (단독회사 FMI).
   return `/api/employees?company_key=${encodeURIComponent(companyKey)}`
 }
 
 function getDepartmentsTreeUrl(companyKey: string): string {
-  if (companyKey === 'RIDE') return '/api/ride-departments/tree'
-  // PR-HR-23d — FMI tree endpoint (?tree=1) — graceful fallback 으로 평면도 처리
+  // PR-FMI-ONLY-PURGE Phase 3c (2026-06-02) — 라이드 분리: RIDE 분기 제거.
   return `/api/departments?company_key=${encodeURIComponent(companyKey)}&tree=1`
 }
 

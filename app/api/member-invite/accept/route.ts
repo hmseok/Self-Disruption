@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getCompanyIdByKey } from '@/lib/company-context'
 
 const bcrypt = require('bcryptjs')
 const crypto = require('crypto')
@@ -81,46 +80,8 @@ export async function POST(request: NextRequest) {
       `
     }
 
-    // PR-MULTI-BRAND P3+c-2/3 — 회사 컨텍스트 적용 + ride_employees 매핑
-    //   target_company === 'RIDE' 면:
-    //     (1) profile.company_id 를 RIDE 로 갱신
-    //     (2) HR 의 POST /api/ride-employees/upsert-from-invite 호출
-    //         → ride_employees UPSERT (profile_id ↔ ride_department_id 매핑)
-    //   FMI(또는 NULL legacy)이면 P1 backfill 이 이미 FMI 로 세팅해 둔 상태 유지.
-    try {
-      if (invite.target_company === 'RIDE') {
-        const rideCompanyId = await getCompanyIdByKey('RIDE')
-        if (rideCompanyId) {
-          await prisma.$executeRaw`
-            UPDATE profiles SET company_id = ${rideCompanyId} WHERE id = ${userId}
-          `
-        }
-        // P3+c-3 (2026-05-27) — HR PR-HR-8 upsert-from-invite 연동
-        //   본 accept handler 가 server-side fetch 로 호출 (same-origin).
-        //   실패해도 가입 자체는 성공 처리 (graceful) — HR 매니저가 RideOrgPanel 에서 수동 보정 가능.
-        try {
-          const origin = new URL(request.url).origin
-          const upsertRes = await fetch(`${origin}/api/ride-employees/upsert-from-invite`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              profile_id: userId,
-              ride_department_id: invite.ride_department_id || null,
-              name: name,
-              email: invite.email,
-            }),
-          })
-          if (!upsertRes.ok) {
-            const errText = await upsertRes.text().catch(() => '')
-            console.warn('[member-invite/accept] ride_employees upsert 실패 (가입 성공 유지):', upsertRes.status, errText)
-          }
-        } catch (upsertErr) {
-          console.warn('[member-invite/accept] ride_employees upsert 호출 실패 (가입 성공 유지):', upsertErr)
-        }
-      }
-    } catch (e) {
-      console.error('[member-invite/accept] 회사 컨텍스트 적용 실패 (무시):', e)
-    }
+    // PR-FMI-ONLY-PURGE Phase 3c (2026-06-02) — 라이드 분리: 단독회사 FMI.
+    //   RIDE 회사 컨텍스트 갱신 + ride_employees upsert 매핑 제거 (invite.target_company 는 항상 FMI).
 
   // 4. 페이지 권한 자동 생성 (초대 시 설정된 권한이 있는 경우)
   try {

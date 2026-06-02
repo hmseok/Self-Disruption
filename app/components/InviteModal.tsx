@@ -111,19 +111,12 @@ export default function InviteModal({ companyName, companyId, isOpen, onClose, o
       const loadData = async () => {
         const headers = await getAuthHeader()
 
-        // 부서 로드 — inviteCompany 별 다른 API
+        // 부서 로드 (PR-FMI-ONLY-PURGE Phase 3c — 라이드 분리: FMI 부서 API 단일)
         try {
-          const deptUrl = inviteCompany === 'RIDE' ? '/api/ride-departments/tree' : '/api/departments'
-          const res = await fetch(deptUrl, { headers })
+          const res = await fetch('/api/departments', { headers })
           if (res.ok) {
             const json = await res.json()
-            const raw = json.data || json || []
-            if (inviteCompany === 'RIDE') {
-              const { roots, byParent } = buildTreeIfFlat(raw)
-              setDepartments(flattenDeptTree(roots, 0, byParent))
-            } else {
-              setDepartments(raw)
-            }
+            setDepartments(json.data || json || [])
           }
         } catch (error) {
           console.error('Failed to load departments:', error)

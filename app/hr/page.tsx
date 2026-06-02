@@ -13,7 +13,7 @@ import NeuDataTable, { TableColumn, MobileCardConfig } from '../components/NeuDa
 import NeuFilterTabs from '../components/NeuFilterTabs'
 import { auth } from '@/lib/auth-client'
 import PayrollOps from './_components/PayrollOps'
-import RideOrgPanel from './_components/RideOrgPanel'
+// PR-FMI-ONLY-PURGE Phase 3c (2026-06-02) — 라이드 분리: RideOrgPanel import 제거 (단독회사 FMI)
 // PR-HR-14 (2026-05-28) — SWR 기반 useEmployees hook (실시간 동기화 1단계)
 import { useEmployees } from '@/lib/hooks/useEmployees'
 // PR-HR-15+16 (2026-05-28) — multi-tenancy 회사 마스터 + 역할 템플릿 (admin 전용)
@@ -108,7 +108,7 @@ export default function HRMasterPage() {
   const [activeModules, setActiveModules] = useState<ActiveModule[]>([])
   const [invitations, setInvitations] = useState<any[]>([])
   const [freelancers, setFreelancers] = useState<any[]>([])
-  const [rideEmployees, setRideEmployees] = useState<any[]>([])
+  const rideEmployees: any[] = []  // PR-FMI-ONLY-PURGE Phase 3c — 라이드 분리: 항상 빈 배열 (RIDE stat 죽은 경로)
   const [loading, setLoading] = useState(true)
 
   // 검색 + 필터
@@ -546,19 +546,15 @@ export default function HRMasterPage() {
     await mutateEmployees()
   }
 
-  // 외부 인력 — freelancers (3.3% 사업소득) + ride_employees (라이드 인력)
+  // 외부 인력 — freelancers (3.3% 사업소득)
+  // PR-FMI-ONLY-PURGE Phase 3c (2026-06-02) — 라이드 분리: ride_employees fetch 제거 (단독회사 FMI).
   const loadExternal = async () => {
     try {
-      const [flRes, riRes] = await Promise.all([
-        fetch('/api/freelancers?order=name', { headers: await getAuthHeader() }),
-        fetch('/api/ride-employees', { headers: await getAuthHeader() }),
-      ])
+      const flRes = await fetch('/api/freelancers?order=name', { headers: await getAuthHeader() })
       const flJson = await flRes.json().catch(() => ({}))
-      const riJson = await riRes.json().catch(() => ({}))
       setFreelancers(flJson.data || [])
-      setRideEmployees(riJson.data || [])
     } catch {
-      setFreelancers([]); setRideEmployees([])
+      setFreelancers([])
     }
   }
 
@@ -1587,9 +1583,7 @@ export default function HRMasterPage() {
           )}
 
           {/* ─── 탭 (RIDE/employees): 라이드 조직 — PR-HR-23b sub-tab 통일 후 'employees' 단일 ─── */}
-          {/* PR-HR-23b (2026-05-29) — sub-tab 'org' 제거 (RideOrgPanel 이 둘 다 같은 화면이라 무의미).
-                RideOrgPanel 본격 분해 (1,131 라인 → CompanyEmployeePanel 마이그) 는 다음 세션 PR-HR-23c2. */}
-          {topCompany === 'RIDE' && topTab === 'employees' && <RideOrgPanel />}
+          {/* PR-FMI-ONLY-PURGE Phase 3c (2026-06-02) — 라이드 분리: RideOrgPanel 렌더 제거 (단독회사 FMI) */}
 
       {/* ─── 탭 (새 회사 / 동적 추가된 회사): CompanyEmployeePanel 자체 fetch ─── */}
       {/* PR-HR-22 + PR-HR-23a — companies 테이블 row 추가만으로 즉시 동작.
