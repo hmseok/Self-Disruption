@@ -70,13 +70,7 @@ const isSidebarVisible = (m: typeof REGISTRY_MENUS[number]) => !m.sidebarHidden
 
 // 직장인필수 / CX팀 / 설정 메뉴 — menu-registry 에서 자동 추출
 const WORK_ESSENTIALS_MENUS = getMenusByGroup('work-essentials').filter(isSidebarVisible).map(toMenuItem)
-const CX_TEAM_MENUS = getMenusByGroup('cx-team').filter(isSidebarVisible).map(toMenuItem)
-// PR-6.9.b (2026-05-06) — 관리자 운영 그룹 (Employee of Ride Inc. 하위)
-const ADMIN_OPS_MENUS = getMenusByGroup('admin-ops').filter(isSidebarVisible).map(toMenuItem)
-// PR-MT-OPS-FIX (2026-05-19) — MT팀 그룹 (메인 세션 ClientLayout 렌더링 누락 보완)
-const MT_TEAM_MENUS = getMenusByGroup('mt-team').filter(isSidebarVisible).map(toMenuItem)
-// PR-VISION (2026-05-24) — 비전 그룹 (로또번호추출기 등 가벼운 유틸)
-const VISION_MENUS = getMenusByGroup('vision').filter(isSidebarVisible).map(toMenuItem)
+// PR-FMI-ONLY-PURGE Phase 3d (2026-06-02) — 라이드 분리: cx-team/admin-ops/mt-team/vision 그룹 변수 제거 (단독회사 FMI)
 const SETTINGS_MENUS_ALL = getMenusByGroup('settings').filter(isSidebarVisible).map(toMenuItem)
 // 「회사 정보」를 첫 entry 로 분리 (legacy COMPANY_INFO_MENU 호환)
 const COMPANY_INFO_MENU = SETTINGS_MENUS_ALL.find(m => m.path === '/db/codes')
@@ -459,82 +453,7 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
                   ))}
               </div>
 
-              {/* CX팀 sub-section — RIDE 직원 + admin 만 (PR-HR-18 — 사용자 명령: 라이드 중그룹밑이 라이드 용) */}
-              {(() => {
-                if (companyKey !== 'RIDE' && role !== 'admin') return null
-                const visibleCxMenus = CX_TEAM_MENUS.filter(item => !item.requirePermission || role === 'admin' || hasPageAccess(item.path))
-                if (visibleCxMenus.length === 0) return null
-                return (
-                  <>
-                    <div className="px-4 mt-2 mb-0.5">
-                      <span className="text-[9px] font-semibold text-slate-500 tracking-wider">▸ CX팀</span>
-                    </div>
-                    <div className="space-y-0.5 ml-2">
-                      {visibleCxMenus.map(item => (
-                        <MenuItem key={item.path} item={item} pathname={pathname} allPaths={allMenuPaths} />
-                      ))}
-                    </div>
-                  </>
-                )
-              })()}
-
-              {/* MT팀 sub-section (PR-MT-OPS-FIX) — RIDE 직원 + admin 만 (PR-HR-18) */}
-              {/* 순서: 관리자 운영보다 위 (2026-05-24 사용자 요청) */}
-              {(() => {
-                if (companyKey !== 'RIDE' && role !== 'admin') return null
-                const visibleMtTeam = MT_TEAM_MENUS.filter(item => !item.requirePermission || role === 'admin' || hasPageAccess(item.path))
-                if (visibleMtTeam.length === 0) return null
-                return (
-                  <>
-                    <div className="px-4 mt-2 mb-0.5">
-                      <span className="text-[9px] font-semibold text-slate-500 tracking-wider">▸ MT팀</span>
-                    </div>
-                    <div className="space-y-0.5 ml-2">
-                      {visibleMtTeam.map(item => (
-                        <MenuItem key={item.path} item={item} pathname={pathname} allPaths={allMenuPaths} />
-                      ))}
-                    </div>
-                  </>
-                )
-              })()}
-
-              {/* 비전 sub-section (PR-VISION) — RIDE 직원 + admin 만 (PR-HR-18) */}
-              {(() => {
-                if (companyKey !== 'RIDE' && role !== 'admin') return null
-                const visibleVision = VISION_MENUS.filter(item => !item.requirePermission || role === 'admin' || hasPageAccess(item.path))
-                if (visibleVision.length === 0) return null
-                return (
-                  <>
-                    <div className="px-4 mt-2 mb-0.5">
-                      <span className="text-[9px] font-semibold text-slate-500 tracking-wider">▸ 비전</span>
-                    </div>
-                    <div className="space-y-0.5 ml-2">
-                      {visibleVision.map(item => (
-                        <MenuItem key={item.path} item={item} pathname={pathname} allPaths={allMenuPaths} />
-                      ))}
-                    </div>
-                  </>
-                )
-              })()}
-
-              {/* 관리자 운영 sub-section (PR-6.9.b) — 권한 있는 사용자만 */}
-              {/* 순서: 라이드 하위 그룹 중 항상 최하단 (2026-05-24 사용자 요청) */}
-              {(() => {
-                const visibleAdminOps = ADMIN_OPS_MENUS.filter(item => !item.requirePermission || role === 'admin' || hasPageAccess(item.path))
-                if (visibleAdminOps.length === 0) return null
-                return (
-                  <>
-                    <div className="px-4 mt-2 mb-0.5">
-                      <span className="text-[9px] font-semibold text-slate-500 tracking-wider">▸ 관리자 운영</span>
-                    </div>
-                    <div className="space-y-0.5 ml-2">
-                      {visibleAdminOps.map(item => (
-                        <MenuItem key={item.path} item={item} pathname={pathname} allPaths={allMenuPaths} />
-                      ))}
-                    </div>
-                  </>
-                )
-              })()}
+              {/* PR-FMI-ONLY-PURGE Phase 3d (2026-06-02) — 라이드 분리: CX팀/MT팀/비전/관리자운영 라이드 sub-section 제거 (단독회사 FMI) */}
             </div>
 
             {/* 구분선 + 관리 영역 */}
