@@ -1,7 +1,0 @@
-[
-  { "accidentNo": "A2026042901", "accidentDate": "20260428", "accidentTime": "0930", "accidentType": "P", "faultRate": "20", "accidentLocation": "서울특별시 강남구 테헤란로 152", "driverName": "홍길동", "carPlateNo": "12가3456", "status": "2", "factcode": "F0001", "lat": 37.5021, "lng": 127.0420 },
-  { "accidentNo": "A2026042902", "accidentDate": "20260428", "accidentTime": "1410", "accidentType": "G", "faultRate": "100", "accidentLocation": "경기도 성남시 분당구 황새울로 200", "driverName": "이몽룡", "carPlateNo": "34나5678", "status": "3", "factcode": "F0003", "lat": 37.3787, "lng": 127.1184 },
-  { "accidentNo": "A2026042801", "accidentDate": "20260427", "accidentTime": "1715", "accidentType": "J", "faultRate": "50", "accidentLocation": "인천광역시 중구 공항로 50", "driverName": "성춘향", "carPlateNo": "56다7890", "status": "1", "factcode": "F0004", "lat": 37.4830, "lng": 126.4521 },
-  { "accidentNo": "A2026042701", "accidentDate": "20260426", "accidentTime": "1100", "accidentType": "P", "faultRate": "0", "accidentLocation": "부산광역시 해운대구 마린시티1로 30", "driverName": "변학도", "carPlateNo": "78라9012", "status": "4", "factcode": "F0007", "lat": 35.1547, "lng": 129.1453 },
-  { "accidentNo": "A2026042601", "accidentDate": "20260425", "accidentTime": "0820", "accidentType": "S", "faultRate": "100", "accidentLocation": "수원시 영통구 광교중앙로 145", "driverName": "임꺽정", "carPlateNo": "90마1234", "status": "9", "factcode": "F0005", "lat": 37.2828, "lng": 127.0457 }
-]

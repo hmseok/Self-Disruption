@@ -71,15 +71,7 @@ export const GROUPS: MenuGroup[] = [
   // 2026-05-05 PR-B1 — 'hr' 그룹 폐기. 「인사 마스터」 (1개 통합 페이지) 는 settings 그룹 안
   // 직장인필수 — 양사 공통 (모든 로그인 사용자)
   { id: 'work-essentials', label: '직장인필수',    section: 'work-essentials', sortOrder: 10 },
-  // RIDE 라이드 인력 전용 그룹들 (cx-team / mt-team / vision)
-  { id: 'cx-team',         label: 'CX팀',         section: 'work-essentials', sortOrder: 11, companies: ['RIDE'] },
-  // PR-MT-OPS (2026-05-11) — MT팀 운영 그룹 (위탁: 다른 세션 작업, 본 세션 단독 commit)
-  { id: 'mt-team',         label: '🔧 MT팀',      section: 'work-essentials', sortOrder: 12, companies: ['RIDE'] },
-  // PR-VISION (2026-05-24) — 비전 그룹 (로또번호추출기 등 가벼운 유틸)
-  { id: 'vision',          label: '비전',         section: 'work-essentials', sortOrder: 13, companies: ['RIDE'] },
-  // PR-6.9.b (2026-05-06) — 관리자 운영 그룹 (양사 공통 — admin 관리자)
-  // 2026-05-24 — 라이드 하위 그룹 중 항상 최하단 (사용자 요청) → sortOrder 최대
-  { id: 'admin-ops',       label: '관리자 운영',   section: 'work-essentials', sortOrder: 14 },
+  // PR-FMI-ONLY-PURGE (2026-06-02) — 라이드 분리: cx-team/mt-team/vision/admin-ops 그룹 제거 (단독회사 FMI)
   // 설정 (admin 전용 — 사이드바 별도 섹션, 페이지 권한 부여 대상 X)
   { id: 'settings',        label: '설정',         section: 'settings',         sortOrder: 20 },
 ]
@@ -128,37 +120,10 @@ export const MENUS: MenuEntry[] = [
   { id: 'mod-meetings',        name: '회의록', displayName: '📋 회의록', path: '/meetings', iconKey: 'Doc', group: 'work-essentials', sortOrder: 52, requirePermission: true },
   { id: 'mod-meetings-me',     name: '내 TODO', displayName: '✓ 내 TODO', path: '/meetings/me', iconKey: 'Clipboard', group: 'work-essentials', sortOrder: 53, requirePermission: true },
 
-  // ── CX팀 (cx-team) ── Employee of Ride Inc. > CX팀 — 권한 부여 대상 (CX팀원만)
-  // PR-6.3.c (2026-05-05) — 카페24 ERP (skyautosvc.co.kr) read-only 연동
-  // PR-6.7 (2026-05-06) — 라벨 정정: aceesosh = 긴급출동 / acrotpth = 사고접수 분리
-  { id: 'mod-ride-accidents',     name: '라이드 긴급출동',  displayName: '🚨 라이드 긴급출동',  path: '/RideAccidents',         iconKey: 'Clipboard', group: 'cx-team', sortOrder: 63, requirePermission: true },
-  { id: 'mod-ride-accident-rep',  name: '라이드 사고접수',  displayName: '🚗 라이드 사고접수',  path: '/RideAccidentReports',   iconKey: 'Wrench',    group: 'cx-team', sortOrder: 64, requirePermission: true },
-  // PR-6.13 (2026-05-09) — 라이드 운영 통합 (NavTabs 1개 메뉴 + 3 sub-page)
-  // 사이드바 메뉴 1개 (mod-ride-vehicle-reg) → /RideVehicleRegistry 진입 → 페이지 내 NavTabs 로 sub-route
-  // path 중복 회피 — 기존 entry 의 displayName 만 「라이드 운영」 으로 변경
-  { id: 'mod-ride-vehicle-reg',   name: '라이드 운영',       displayName: '🚗 라이드 운영',         path: '/RideVehicleRegistry',   iconKey: 'Car',       group: 'admin-ops', sortOrder: 80, requirePermission: true },
-  // sub-page 들 — 사이드바 hidden (NavTabs 로만 진입)
-  { id: 'mod-ride-customer-data', name: '라이드 고객사 데이터', displayName: '🏢 고객사 데이터',  path: '/RideCustomerData',      iconKey: 'Building',  group: 'admin-ops', sortOrder: 81, requirePermission: true, sidebarHidden: true },
-  { id: 'mod-ride-settlements',   name: '고객사 마감자료',    displayName: '💰 마감자료',          path: '/RideSettlements',       iconKey: 'Money',     group: 'admin-ops', sortOrder: 82, requirePermission: true, sidebarHidden: true },
-  // PR-COMPLIANCE (2026-05-11) — 정보보안 (개인정보 + 정보자산 + 보안사고 + 규정준수 + 직원교육)
-  { id: 'mod-ride-compliance',    name: '정보보안',           displayName: '🔒 정보보안',           path: '/RideCompliance',        iconKey: 'Shield',    group: 'admin-ops', sortOrder: 83, requirePermission: true },
-  // PR-ASSETS-1.0 (2026-05-14) — 라이드 자산 관리 (QR 스티커 자산 대장 — 차량/사무비품/IT장비/법인카드)
-  { id: 'mod-ride-assets',        name: '라이드 자산',        displayName: '📦 라이드 자산',        path: '/RideAssets',            iconKey: 'Clipboard', group: 'admin-ops', sortOrder: 84, requirePermission: true },
-  { id: 'mod-call-scheduler',  name: '스케줄 및 운영', displayName: '📅 스케줄 및 운영', path: '/CallScheduler', iconKey: 'Setting', group: 'cx-team', sortOrder: 60, requirePermission: true },
-  // 직원 마스터 — 사이드바 숨김. 근무스케줄 페이지 안에서 sub-nav 로 접근 (권한 페이지에는 노출 유지)
-  { id: 'mod-ride-employees',  name: '직원 마스터',   path: '/RideEmployees',  iconKey: 'Users',   group: 'cx-team', sortOrder: 61, requirePermission: true, sidebarHidden: true },
-  // 협력공장 추천 — 사고 발생 시 가까운 공장 추천이 메인. 서브: /factory-search/{map,mgmt,groups} (SubNav 진입)
-  { id: 'mod-factory-search',  name: '협력공장 추천', displayName: '🚨 협력공장 추천', path: '/factory-search', iconKey: 'Wrench', group: 'cx-team', sortOrder: 62, requirePermission: true },
-
-  // PR-MT-OPS (2026-05-11) — MT팀 운영 (위탁: 다른 세션 작업, 본 세션 단독 commit — Rule 21 § 2.1)
-  // 사이드바 메뉴 1개 (mod-mt-tours) → /RideMTOps/maintenance-tours 진입 → NavTabs 로 3 sub-page
-  // path 중복 회피 — 다른 sub-page 는 sidebarHidden: true (menu-path-duplicate-lint 통과)
-  { id: 'mod-mt-tours',    name: '순회정비', displayName: '🚗 순회정비', path: '/RideMTOps/maintenance-tours', iconKey: 'Wrench',    group: 'mt-team', sortOrder: 50, requirePermission: true },
-  { id: 'mod-mt-inspect',  name: '법정검사', displayName: '📋 법정검사', path: '/RideMTOps/legal-inspections', iconKey: 'Clipboard', group: 'mt-team', sortOrder: 51, requirePermission: true, sidebarHidden: true },
-  { id: 'mod-mt-chargers', name: '충전기',   displayName: '🔌 충전기',   path: '/RideMTOps/chargers',          iconKey: 'Bolt',      group: 'mt-team', sortOrder: 52, requirePermission: true, sidebarHidden: true },
-
-  // PR-VISION (2026-05-24) — 비전 그룹 (가벼운 유틸). 페이지: 별도 세션 PR-VISION-1
-  { id: 'mod-lotto', name: '믿을 건 로또 뿐', displayName: '🎰 믿을 건 로또 뿐', path: '/RideVision/lotto', iconKey: 'Doc', group: 'vision', sortOrder: 90, requirePermission: true },
+  // ── 협력공장 추천 (operation) ── 사고대차 시 가까운 공장 추천. 서브: /factory-search/{map,mgmt,groups}
+  //   PR-FMI-ONLY-PURGE (2026-06-02) — 라이드 분리: CX팀/admin-ops/MT팀/비전 라이드 메뉴 13개 제거.
+  //   factory-search 는 비라이드(사고대차 공장 추천)라 보존 — operation 그룹으로 이동.
+  { id: 'mod-factory-search',  name: '협력공장 추천', displayName: '🚨 협력공장 추천', path: '/factory-search', iconKey: 'Wrench', group: 'operation', sortOrder: 12, requirePermission: true },
 
   // ── 설정 (settings) ── admin 전용 (사이드바 별도 섹션)
   // 권한 부여 대상 — 일부 사용자에게 회사 정보 / 메시지 센터 등 위임 가능

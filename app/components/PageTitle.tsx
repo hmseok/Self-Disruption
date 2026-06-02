@@ -37,32 +37,8 @@ const PATH_TO_GROUP: Record<string, string> = {
   '/meetings': 'work',
   '/meetings/new': 'work',
   '/meetings/me': 'work',
-  // ── 관리자 운영 (admin-ops) ── (PR-6.13.c)
-  '/RideVehicleRegistry':       'admin-ops',
-  '/RideCustomerData':          'admin-ops',
-  '/RideSettlements':           'admin-ops',
-  '/RideAccidents':             'admin-ops',
-  '/RideAccidentReports':       'admin-ops',
-  '/RideCompliance':            'admin-ops',  // PR-COMPLIANCE (2026-05-11)
-  '/RideCompliance/data-disposal': 'admin-ops',  // P12-C (2026-05-28)
-  '/RideAssets':                'admin-ops',  // PR-ASSETS-1.0 (2026-05-14)
-  // ── CX팀 (콜센터 등) — Phase N-12 ──
-  '/CallScheduler':                                'cx',
-  '/CallScheduler/schedules':                      'cx',
-  '/CallScheduler/new':                            'cx',
-  '/CallScheduler/settings':                       'cx',
-  '/CallScheduler/requests':                       'cx',
-  '/CallScheduler/skips':                          'cx',
-  '/CallScheduler/me':                             'cx',
-  '/CallScheduler/kpi':                            'cx',
-  '/factory-search':                               'cx',  // PR-PT-COV (2026-05-24)
-  '/RideEmployees':                                'cx',  // PR-PT-COV — 하위 경로 자동 커버
-  // ── MT팀 운영 — PR-MT-OPS (2026-05-11) ──
-  '/RideMTOps/maintenance-tours':                  'mt-team',
-  '/RideMTOps/legal-inspections':                  'mt-team',
-  '/RideMTOps/chargers':                           'mt-team',
-  // ── 비전 — PR-VISION (2026-05-24) ──
-  '/RideVision/lotto':                             'vision',
+  // PR-FMI-ONLY-PURGE (2026-06-02) — 라이드 분리: Ride*/CallScheduler/MT/비전 경로 매핑 제거 (단독회사 FMI)
+  '/factory-search':            'vehicle',  // 사고대차 공장 추천 (비라이드 — 보존)
 }
 
 // 그룹 ID → 섹션 라벨
@@ -70,12 +46,8 @@ const GROUP_LABELS: Record<string, string> = {
   vehicle: '차량관리',
   sales: '영업/계약',
   finance: '재무/경영',
-  work: 'Employee of Ride Inc.',
+  work: '직장인필수',
   settings: '설정',
-  'admin-ops': '관리자 운영',  // PR-6.13.c
-  cx: 'CX팀',                  // N-12 — CallScheduler 등
-  'mt-team': 'MT팀',           // PR-MT-OPS (2026-05-11)
-  vision: '비전',              // PR-VISION (2026-05-24)
 }
 
 // 경로 → 페이지 이름 (사이드바 NAME_OVERRIDES와 동기화)
@@ -129,33 +101,8 @@ const PAGE_NAMES: Record<string, string> = {
   '/admin/employees': '조직/권한 관리',
   '/admin/contract-terms': '계약 약관 관리',
   '/admin/message-templates': '메시지 센터',
-  // 관리자 운영 (PR-6.13.c)
-  '/RideVehicleRegistry':  '라이드 운영',
-  '/RideCustomerData':     '라이드 고객사 데이터',
-  '/RideSettlements':      '고객사 마감자료',
-  '/RideAccidents':        '라이드 긴급출동',
-  '/RideAccidentReports':  '라이드 사고접수',
-  '/RideAssets':           '라이드 자산',
-  '/RideCompliance':       '정보보안',  // PR-COMPLIANCE (2026-05-11)
-  '/RideCompliance/data-disposal': '데이터 폐기 결재',  // P12-C (2026-05-28)
-  // CX팀 (Phase N-12)
-  '/CallScheduler':                  '스케줄 및 운영',
-  '/CallScheduler/schedules':        '월별 스케줄',
-  '/CallScheduler/new':              '새 월 만들기',
-  '/CallScheduler/settings':         '설정',
-  '/CallScheduler/requests':         '직원 요청 검토',
-  '/CallScheduler/skips':            '회피일 검토',
-  '/CallScheduler/me':               '내 시간표',
-  '/CallScheduler/kpi':              'CX KPI',
-  // MT팀 운영 (PR-MT-OPS — 2026-05-11)
-  '/RideMTOps/maintenance-tours':    '순회정비',
-  '/RideMTOps/legal-inspections':    '법정검사',
-  '/RideMTOps/chargers':             '충전기',
-  // 비전 (PR-VISION — 2026-05-24)
-  '/RideVision/lotto':               '믿을 건 로또 뿐',
-  // PR-PT-COV (2026-05-24) — menu-registry 엔 있으나 PageTitle 누락이던 활성 페이지
-  '/factory-search':                 '협력공장 추천',
-  '/RideEmployees':                  '직원 마스터',
+  // PR-FMI-ONLY-PURGE (2026-06-02) — 라이드 분리: Ride*/CallScheduler/MT/비전 페이지명 제거 (단독회사 FMI)
+  '/factory-search':                 '협력공장 추천',  // 사고대차 공장 추천 (비라이드 — 보존)
   '/hr':                             '인사 마스터',
   '/hr/payroll':                     '급여 운영',
   '/db/codes':                       '회사 정보',
