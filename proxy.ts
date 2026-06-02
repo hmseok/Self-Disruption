@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { getModuleProfile, isPathEnabled } from '@/lib/module-profile'
 
 // ============================================
 // 프록시 미들웨어 (Next.js 16 — proxy.ts)
@@ -26,6 +27,20 @@ export async function proxy(req: NextRequest) {
     res.headers.set('Cloudflare-CDN-Cache-Control', 'no-store')
     res.headers.set('Pragma', 'no-cache')
     res.headers.set('Expires', '0')
+  }
+
+  // ── ②a 모듈 프로파일 가드 (PR-FMI-ONLY-RUNTIME Phase 1) ──
+  //   profile=fmi (hmseok.com) 에서만 라이드 경로 직접 접근 차단 (URL 직접 입력 방지).
+  //   profile=fmi 일 때 !isPathEnabled = "ride 전용 경로"(shared·global 제외) → 그것만 차단.
+  //   profile=ride/all 이면 무동작 — ride 앱의 전역경로(auth/dashboard 등) 오차단 방지 + 기존 동작 유지.
+  if (!isStaticAsset && getModuleProfile() === 'fmi' && !isPathEnabled(pathname)) {
+    if (pathname.startsWith('/api/')) {
+      return NextResponse.json(
+        { error: 'not_available', message: '이 배포에서는 제공되지 않는 기능입니다.' },
+        { status: 404 },
+      )
+    }
+    return NextResponse.redirect(new URL('/', req.url))
   }
 
   // ── ② 서브도메인 → company_key 쿠키 (PR-MULTI-BRAND P2) ──

@@ -28,7 +28,13 @@ export const RIDE_MODULES: ReadonlySet<string> = new Set([
   'RideVehicleRegistry',
   'RideVision',
   'CallScheduler',
-  // 2026-06-02 — 공통 모듈 (라이드 회사 운영 필요)
+])
+
+/**
+ * 공유 모듈 — fmi·ride 양쪽 모두 노출 (각 인스턴스가 자기 데이터로 사용).
+ * 프로파일 무관하게 항상 enabled. 예: 회의록(meetings).
+ */
+export const SHARED_MODULES: ReadonlySet<string> = new Set([
   'meetings',
 ])
 
@@ -49,7 +55,10 @@ export const RIDE_API_PREFIXES: readonly string[] = [
   'ride-vehicle',
   'ride-vision',
   'call-scheduler',
-  // 2026-06-02 — 공통 모듈 (라이드 회사 운영 필요)
+]
+
+/** 공유 API prefix — fmi·ride 양쪽 노출. 프로파일 무관. */
+export const SHARED_API_PREFIXES: readonly string[] = [
   'meetings',
 ]
 
@@ -83,6 +92,7 @@ export function getModuleProfile(): ModuleProfile {
 export function isModuleEnabled(moduleName: string): boolean {
   const profile = getModuleProfile()
   if (profile === 'all') return true
+  if (SHARED_MODULES.has(moduleName)) return true   // 공유 모듈 — 양쪽 노출
   const isRide = RIDE_MODULES.has(moduleName)
   return profile === 'ride' ? isRide : !isRide
 }
@@ -101,6 +111,7 @@ export function isPathEnabled(path: string): boolean {
   // /api/<prefix> 매칭
   if (path.startsWith('/api/')) {
     const apiTail = path.slice(5).split('/')[0] || ''
+    if (SHARED_API_PREFIXES.some(p => apiTail.startsWith(p))) return true   // 공유 API — 양쪽
     const isRideApi = RIDE_API_PREFIXES.some(p => apiTail.startsWith(p))
     return profile === 'ride' ? isRideApi : !isRideApi
   }
@@ -109,6 +120,7 @@ export function isPathEnabled(path: string): boolean {
   const segments = path.split('/').filter(Boolean)
   // route group 통과: '(employees)', '(admin)', '(public)' 무시
   const firstReal = segments.find(s => !s.startsWith('(')) || ''
+  if (SHARED_MODULES.has(firstReal)) return true   // 공유 모듈 — 양쪽
   const isRidePath = RIDE_MODULES.has(firstReal)
   return profile === 'ride' ? isRidePath : !isRidePath
 }
@@ -121,6 +133,8 @@ export function describeProfile(): {
   source: 'env-public' | 'env-server' | 'default'
   ride_modules: string[]
   ride_api_prefixes: string[]
+  shared_modules: string[]
+  shared_api_prefixes: string[]
 } {
   const publicRaw = (process.env.NEXT_PUBLIC_MODULE_PROFILE || '').toLowerCase().trim()
   const serverRaw = (process.env.MODULE_PROFILE || '').toLowerCase().trim()
@@ -131,5 +145,7 @@ export function describeProfile(): {
     source: validPublic ? 'env-public' : (validServer ? 'env-server' : 'default'),
     ride_modules: Array.from(RIDE_MODULES),
     ride_api_prefixes: [...RIDE_API_PREFIXES],
+    shared_modules: Array.from(SHARED_MODULES),
+    shared_api_prefixes: [...SHARED_API_PREFIXES],
   }
 }
