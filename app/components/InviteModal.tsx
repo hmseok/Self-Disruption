@@ -387,7 +387,8 @@ export default function InviteModal({ companyName, companyId, isOpen, onClose, o
             <div>
               <label className="block text-xs font-bold text-gray-500 mb-1.5 ml-1">초대 대상 회사</label>
               <div className="flex gap-2">
-                {(['FMI', 'RIDE'] as const).map(key => {
+                {/* PR-FMI-ONLY-PURGE Phase 3e (2026-06-02) — 라이드 분리: RIDE 회사 옵션 제거 (단독회사 FMI) */}
+                {(['FMI'] as const).map(key => {
                   const b = COMPANY_BRANDS[key]
                   return (
                     <button key={key} type="button" onClick={() => setInviteCompany(key)} disabled={loading}
