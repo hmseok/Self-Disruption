@@ -28,6 +28,8 @@ export const RIDE_MODULES: ReadonlySet<string> = new Set([
   'RideVehicleRegistry',
   'RideVision',
   'CallScheduler',
+  // 2026-06-02 — 공통 모듈 (라이드 회사 운영 필요)
+  'meetings',
 ])
 
 /** RIDE 영역 API prefix — `/api/<prefix>` 매칭용 */
@@ -47,6 +49,8 @@ export const RIDE_API_PREFIXES: readonly string[] = [
   'ride-vehicle',
   'ride-vision',
   'call-scheduler',
+  // 2026-06-02 — 공통 모듈 (라이드 회사 운영 필요)
+  'meetings',
 ]
 
 /**
