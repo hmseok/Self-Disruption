@@ -20,9 +20,6 @@ COPY . .
 ENV NEXT_TELEMETRY_DISABLED 1
 
 ENV NEXT_PUBLIC_BASE_URL=https://hmseok.com
-# 단독회사 FMI 전용 — 빌드타임 인라인 (PR-FMI-ONLY-RUNTIME Phase 1)
-# hmseok.com Cloud Run 전용 Dockerfile. 라이드는 EC2 npm 빌드(.env.local=ride) — 영향 없음.
-ENV NEXT_PUBLIC_MODULE_PROFILE=fmi
 ENV NEXT_PUBLIC_KAKAO_MAP_KEY='135d9cd3a7f586bb1aaa95384ef41434'
 ENV KAKAO_REST_API_KEY='d7cbfaa843b0f20c627d9bbd558ff7a0'
 # Prisma 클라이언트 생성 (빌드 전 필수)
@@ -36,9 +33,6 @@ WORKDIR /app
 
 ENV NODE_ENV production
 ENV NEXT_TELEMETRY_DISABLED 1
-
-# 단독회사 FMI 전용 — 서버 런타임 프로파일 (PR-FMI-ONLY-RUNTIME Phase 1)
-ENV MODULE_PROFILE=fmi
 
 # Cafe24 DB 연동
 ENV CAFE24_DB_HOST=skyautosvc.co.kr

@@ -84,9 +84,8 @@ export const RIDE_THEME = {
 
 // 클라이언트: company_key 쿠키 → CompanyKey (P2 미들웨어가 세팅)
 export function readCompanyKey(): CompanyKey {
-  if (typeof document === 'undefined') return 'FMI'
-  const m = document.cookie.match(/(?:^|;\s*)company_key=([^;]+)/)
-  return m && m[1] === 'RIDE' ? 'RIDE' : 'FMI'
+  // PR-FMI-ONLY-PURGE Phase 3b (2026-06-02) — 라이드 분리: 단독회사 FMI 고정.
+  return 'FMI'
 }
 
 // 현재 회사 브랜드 (인자 없으면 쿠키에서 자동 판별)

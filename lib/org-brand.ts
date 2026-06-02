@@ -80,9 +80,8 @@ export function isRideEmail(email?: string | null): boolean {
  * org_brand 결정 — 부서명 OR 이메일 도메인 매칭.
  * 둘 중 하나라도 라이드 소속이면 RIDE.
  */
-export function detectOrgBrand(deptName?: string | null, email?: string | null): OrgBrand {
-  if (isRideDepartment(deptName)) return 'RIDE'
-  if (isRideEmail(email)) return 'RIDE'
+export function detectOrgBrand(_deptName?: string | null, _email?: string | null): OrgBrand {
+  // PR-FMI-ONLY-PURGE Phase 3b (2026-06-02) — 라이드 분리: 단독회사 FMI 고정.
   return 'FMI'
 }
 

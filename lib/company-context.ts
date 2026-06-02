@@ -40,20 +40,9 @@ export async function getCompanyIdByKey(key: CompanyKey): Promise<string | null>
  * profiles.company_id JOIN companies.company_key 가 RIDE 이면 RIDE,
  * 그 외(NULL / FMI / 조회 실패) 모두 FMI 로 폴백.
  */
-export async function getCompanyOfProfile(profileId: string): Promise<CompanyKey> {
-  try {
-    const rows = await prisma.$queryRaw<{ company_key: string | null }[]>`
-      SELECT c.company_key
-        FROM profiles p
-        LEFT JOIN companies c ON c.id = p.company_id
-       WHERE p.id = ${profileId}
-       LIMIT 1
-    `
-    if (rows.length > 0 && rows[0].company_key === 'RIDE') return 'RIDE'
-    return 'FMI'
-  } catch {
-    return 'FMI'
-  }
+export async function getCompanyOfProfile(_profileId: string): Promise<CompanyKey> {
+  // PR-FMI-ONLY-PURGE Phase 3b (2026-06-02) — 라이드 분리: 단독회사 FMI 고정.
+  return 'FMI'
 }
 
 /**

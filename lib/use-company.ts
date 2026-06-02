@@ -35,18 +35,9 @@ function clearCache() {
   try { sessionStorage.removeItem(CACHE_KEY) } catch {}
 }
 
-async function fetchCompany(token: string): Promise<CompanyKey> {
-  try {
-    const res = await fetch('/api/me/company', {
-      headers: { Authorization: `Bearer ${token}` },
-      cache: 'no-store',
-    })
-    if (!res.ok) return 'FMI'
-    const json = await res.json()
-    return json.company === 'RIDE' ? 'RIDE' : 'FMI'
-  } catch {
-    return 'FMI'
-  }
+async function fetchCompany(_token: string): Promise<CompanyKey> {
+  // PR-FMI-ONLY-PURGE Phase 3b (2026-06-02) — 라이드 분리: 단독회사 FMI 고정 (/api/me/company 호출 제거).
+  return 'FMI'
 }
 
 /**
