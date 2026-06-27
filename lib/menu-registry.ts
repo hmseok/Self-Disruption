@@ -102,6 +102,8 @@ export const MENUS: MenuEntry[] = [
   // PR-Q2-5 (2026-05-26) — 폐기: mod-quotes, mod-operational-learning
   //   장기렌트 견적은 /long-term-rentals 안 견적 탭 (mod-long-term)으로 통합.
   { id: 'mod-contracts',               name: '계약/고객', displayName: '📑 계약/고객', path: '/contracts',                   iconKey: 'Doc',   group: 'sales', sortOrder: 32 },
+  // 2026-06-27 — 장기렌트 견적 원가 기준표 (간접비율/마진/감가/보험/세금/금융). 견적 엔진의 단일 source. (이전 HIDDEN_PATHS 에서 노출 복구)
+  { id: 'mod-pricing-standards',       name: '요금 기준표', displayName: '📐 요금 기준표', path: '/db/pricing-standards',        iconKey: 'Chart', group: 'sales', sortOrder: 33, requirePermission: true },
 
   // ── 관리 (admin) ──
   // ※ 대시보드 — 사이드바에서 ClientLayout 별도 코드로 최상단 렌더 (그룹 무관)
@@ -153,7 +155,6 @@ export const HIDDEN_PATHS = new Set<string>([
   // PR-Q2-5 폐기: '/quotes/pricing', '/quotes/short-term' (hidden 도 제거)
   '/customers',
   '/finance/collections',
-  '/db/pricing-standards',
   '/finance', '/finance/transactions',
   '/finance/upload', '/finance/uploads',
   '/finance/codef', '/finance/cards',

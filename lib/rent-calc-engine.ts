@@ -1101,7 +1101,10 @@ export function calculateRentCost(input: CalcInput): CalcResult {
   const INDUSTRY_AVG_RENT_RATIO = n(rules.INDUSTRY_AVG_RENT_RATIO, 2.2)
   const competitiveIndex = INDUSTRY_AVG_RENT_RATIO > 0 ? Math.round(rentToPriceRatio / INDUSTRY_AVG_RENT_RATIO * 100) / 100 : 1.0
   const monthlyNetIncome = suggestedRent - totalMonthlyCost
-  const breakevenMonths = monthlyNetIncome > 0 ? Math.ceil(costBase / monthlyNetIncome) : 999
+  // 손익분기(월): 취득원가 ÷ 월 순현금흐름. 감가는 비현금 비용이라 현금 회수액에 가산
+  //   (구버전: 감가 포함 원가를 뺀 월마진만으로 나눠 비현실적으로 큰 값 → 수정)
+  const monthlyNetCashFlow = monthlyNetIncome + monthlyDepreciation
+  const breakevenMonths = monthlyNetCashFlow > 0 ? Math.ceil(costBase / monthlyNetCashFlow) : 999
 
   const marketAnalysis = {
     rent_to_price_ratio: rentToPriceRatio,

@@ -217,7 +217,7 @@ export function calculateQuoteCost(input: QuoteCostInput, ref: CostReference): Q
     suggested_rent_with_vat: Math.round(n(result.rent_with_vat)),
     vat_amount: Math.round(n(result.vat_amount)),
     margin_rate: Math.round(n(result.market_analysis?.margin_rate) * 10) / 10,
-    irr_annual: Math.round(n(result.irr_result?.annualIRR) * 1000) / 10,  // 0.085 → 8.5
+    irr_annual: Math.round(n(result.irr_result?.annualIRR) * 10) / 10,  // calcIRR.annualIRR 은 이미 % (예: 19.7) — 소수1자리 반올림만 (구버전 ×100 → 100배 과대 버그 수정)
     breakeven_months: Math.round(n(result.market_analysis?.breakeven_months)),
     competitive_index: Math.round(n(result.market_analysis?.competitive_index) * 100) / 100,
     rent_to_price_ratio: Math.round(n(result.market_analysis?.rent_to_price_ratio) * 100) / 100,
