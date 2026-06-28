@@ -258,9 +258,17 @@ export default function BankCardPage() {
   const [showAdvTabs, setShowAdvTabs] = useState(false)
   // 대차료 입금현황 탭
   const [payRows, setPayRows] = useState<any[]>([])
-  const [paySummary, setPaySummary] = useState<{ total: number; paid_count: number; unpaid_count: number; paid_sum: number } | null>(null)
-  const [payFilter, setPayFilter] = useState<'all' | 'paid' | 'unpaid'>('all')
+  const [paySummary, setPaySummary] = useState<{ total: number; paid_count: number; candidate_count: number; unpaid_count: number; paid_sum: number } | null>(null)
+  const [payFilter, setPayFilter] = useState<'all' | 'paid' | 'candidate' | 'unpaid'>('candidate')
   const [payLoading, setPayLoading] = useState(false)
+  // 후보 입금을 대차건에 수동 연결
+  const linkPaymentCandidate = useCallback(async (txId: string, rentalId: string) => {
+    setPayLoading(true)
+    try {
+      await fetchWithAuth(`/api/transactions/${txId}`, { method: 'PATCH', body: { related_type: 'fmi_rental', related_id: rentalId } })
+    } catch {}
+    await loadPayments()
+  }, [])
   const loadPayments = useCallback(async () => {
     setPayLoading(true)
     try {
@@ -3635,24 +3643,25 @@ export default function BankCardPage() {
                 <div style={{ fontSize: 22, fontWeight: 800, color: COLORS.success }}>{paySummary?.paid_count ?? 0}건</div>
                 <div style={{ fontSize: 11, color: COLORS.textMuted }}>{nf(paySummary?.paid_sum ?? 0)}원</div>
               </div>
-              <div style={{ flex: 1, minWidth: 150, background: COLORS.bgAmber, border: `1px solid ${COLORS.borderAmber}`, borderRadius: 12, padding: '12px 16px' }}>
-                <div style={{ fontSize: 12, color: COLORS.warning, fontWeight: 700 }}>⏳ 미입금</div>
-                <div style={{ fontSize: 22, fontWeight: 800, color: COLORS.warning }}>{paySummary?.unpaid_count ?? 0}건</div>
-                <div style={{ fontSize: 11, color: COLORS.textMuted }}>보험사 입금 대기 / 미매칭</div>
+              <div style={{ flex: 1, minWidth: 150, background: COLORS.bgBlue, border: `1px solid ${COLORS.borderBlue}`, borderRadius: 12, padding: '12px 16px' }}>
+                <div style={{ fontSize: 12, color: COLORS.primary, fontWeight: 700 }}>🔗 매칭 필요</div>
+                <div style={{ fontSize: 22, fontWeight: 800, color: COLORS.primary }}>{paySummary?.candidate_count ?? 0}건</div>
+                <div style={{ fontSize: 11, color: COLORS.textMuted }}>통장에 입금 있음 — 연결만 하면 됨</div>
               </div>
-              <div style={{ flex: 1, minWidth: 150, background: '#fff', border: '0.5px solid rgba(0,0,0,0.08)', borderRadius: 12, padding: '12px 16px' }}>
-                <div style={{ fontSize: 12, color: COLORS.textSecondary, fontWeight: 700 }}>📋 전체 대차건</div>
-                <div style={{ fontSize: 22, fontWeight: 800, color: COLORS.primary }}>{paySummary?.total ?? 0}건</div>
+              <div style={{ flex: 1, minWidth: 150, background: COLORS.bgAmber, border: `1px solid ${COLORS.borderAmber}`, borderRadius: 12, padding: '12px 16px' }}>
+                <div style={{ fontSize: 12, color: COLORS.warning, fontWeight: 700 }}>⏳ 진짜 미입금</div>
+                <div style={{ fontSize: 22, fontWeight: 800, color: COLORS.warning }}>{paySummary?.unpaid_count ?? 0}건</div>
+                <div style={{ fontSize: 11, color: COLORS.textMuted }}>보험사 입금 전 (통장에도 없음)</div>
               </div>
             </div>
 
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10, flexWrap: 'wrap' }}>
-              {(['all', 'paid', 'unpaid'] as const).map((k) => (
+              {(['all', 'candidate', 'paid', 'unpaid'] as const).map((k) => (
                 <button key={k} onClick={() => setPayFilter(k)} style={{
                   padding: '6px 12px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer',
                   border: payFilter === k ? 'none' : '1px solid rgba(0,0,0,0.1)',
                   background: payFilter === k ? COLORS.primary : '#fff', color: payFilter === k ? '#fff' : COLORS.textSecondary,
-                }}>{k === 'all' ? '전체' : k === 'paid' ? '입금 확인' : '미입금'}</button>
+                }}>{k === 'all' ? '전체' : k === 'candidate' ? '🔗 매칭 필요' : k === 'paid' ? '입금 확인' : '미입금'}</button>
               ))}
               <span style={{ flex: 1 }} />
               <button onClick={async () => {
@@ -3668,29 +3677,35 @@ export default function BankCardPage() {
             {payLoading ? (
               <div style={{ padding: 30, textAlign: 'center', color: COLORS.textMuted }}>불러오는 중…</div>
             ) : (() => {
-              const rows = payFilter === 'all' ? payRows
-                : payFilter === 'paid' ? payRows.filter((r) => r.status !== 'unpaid')
-                : payRows.filter((r) => r.status === 'unpaid')
+              const rows = payFilter === 'all' ? payRows : payRows.filter((r) => r.status === payFilter)
               if (rows.length === 0) return <div style={{ padding: 30, textAlign: 'center', color: COLORS.textMuted }}>해당 건이 없습니다.</div>
-              const GC = '92px minmax(0,1fr) 88px 96px 96px 78px'
+              const GC = '90px minmax(0,1fr) 84px minmax(0,150px) 96px'
               return (
                 <div style={{ background: '#fff', border: '0.5px solid rgba(0,0,0,0.08)', borderRadius: 12, overflow: 'hidden' }}>
                   <div style={{ display: 'grid', gridTemplateColumns: GC, gap: 8, padding: '10px 14px', fontSize: 11, fontWeight: 700, color: COLORS.textMuted, borderBottom: '0.5px solid rgba(0,0,0,0.06)' }}>
-                    <span>배차일</span><span>사고차량 · 대차차량 · 고객</span><span>보험사</span><span style={{ textAlign: 'right' }}>입금액</span><span>입금일</span><span style={{ textAlign: 'center' }}>상태</span>
+                    <span>배차일</span><span>사고차량 · 대차차량 · 고객</span><span>보험사</span><span>입금 / 후보</span><span style={{ textAlign: 'center' }}>상태</span>
                   </div>
-                  {rows.slice(0, 500).map((r) => (
+                  {rows.slice(0, 500).map((r) => {
+                    const cand = r.candidates && r.candidates[0]
+                    return (
                     <div key={r.id} onClick={() => { window.location.href = `/operations/rentals/${r.id}` }}
                       style={{ display: 'grid', gridTemplateColumns: GC, gap: 8, padding: '9px 14px', fontSize: 12, borderBottom: '0.5px solid rgba(0,0,0,0.04)', cursor: 'pointer', alignItems: 'center' }}>
                       <span style={{ color: COLORS.textSecondary, whiteSpace: 'nowrap' }}>{fmtDate(r.dispatch_date)}</span>
                       <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: COLORS.textPrimary }}>{r.customer_car_number || '-'} · 🚗{r.vehicle_car_number || '-'} · {r.customer_name || '-'}</span>
                       <span style={{ color: COLORS.textSecondary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.insurance_company || '-'}</span>
-                      <span style={{ textAlign: 'right', fontWeight: 700, color: r.paid_amount > 0 ? COLORS.income : COLORS.textMuted }}>{r.paid_amount > 0 ? nf(r.paid_amount) : '-'}</span>
-                      <span style={{ color: COLORS.textSecondary, whiteSpace: 'nowrap' }}>{r.paid_date ? fmtDate(r.paid_date) : '-'}</span>
-                      <span style={{ textAlign: 'center' }}>{r.status === 'unpaid'
-                        ? <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 10, background: COLORS.bgAmber, color: COLORS.warning, whiteSpace: 'nowrap' }}>미입금</span>
-                        : <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 10, background: COLORS.bgGreen, color: COLORS.success, whiteSpace: 'nowrap' }}>입금확인</span>}</span>
+                      <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {r.status === 'paid' ? <span style={{ fontWeight: 700, color: COLORS.income }}>{nf(r.paid_amount)} <span style={{ fontSize: 10, color: COLORS.textMuted }}>{r.paid_date ? fmtDate(r.paid_date) : ''}</span></span>
+                          : r.status === 'candidate' && cand ? <span style={{ color: COLORS.primary }}>후보: {cand.client_name} {nf(cand.amount)}{r.candidates.length > 1 ? ` 외 ${r.candidates.length - 1}` : ''}</span>
+                          : <span style={{ color: COLORS.textMuted }}>-</span>}
+                      </span>
+                      <span style={{ textAlign: 'center' }}>{
+                        r.status === 'paid' ? <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 10, background: COLORS.bgGreen, color: COLORS.success, whiteSpace: 'nowrap' }}>입금확인</span>
+                        : r.status === 'candidate' && cand ? <button onClick={(e) => { e.stopPropagation(); linkPaymentCandidate(cand.id, r.id) }} style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 9, border: 'none', background: COLORS.primary, color: '#fff', cursor: 'pointer', whiteSpace: 'nowrap' }}>🔗 연결</button>
+                        : <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 10, background: COLORS.bgAmber, color: COLORS.warning, whiteSpace: 'nowrap' }}>미입금</span>
+                      }</span>
                     </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )
             })()}
