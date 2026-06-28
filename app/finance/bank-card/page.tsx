@@ -15,7 +15,7 @@ import * as XLSX from 'xlsx'
 // 4탭: 통장 거래 | 카드 거래 | 자동매칭 | 정산 연결
 // ═══════════════════════════════════════════════════════════════
 
-type TabKey = 'bank' | 'card' | 'matching' | 'settlement' | 'sms' | 'mapping'
+type TabKey = 'bank' | 'card' | 'workflow' | 'classify' | 'matchreview' | 'settlement' | 'sms' | 'mapping' | 'rules' | 'system'
 
 interface Transaction {
   id: string
@@ -254,6 +254,8 @@ export default function BankCardPage() {
   const [activeTab, setActiveTab] = useState<TabKey>('bank')
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  // 페이지 단순화 — 평소엔 큰 구성(통장·카드·정산)만, 분석용 탭은 「고급」으로 접기 (사용자 명령 2026-06-28)
+  const [showAdvTabs, setShowAdvTabs] = useState(false)
 
   // 데이터
   const [transactions, setTransactions] = useState<Transaction[]>([])
@@ -3043,20 +3045,23 @@ export default function BankCardPage() {
 
   // ═══ 탭 콘텐츠 ═════════════════════════════════════════
 
-  const tabs = [
+  // 큰 구성(평소 사용) = 통장·카드·정산. 나머지(분석·관리)는 adv=true → 「고급」 토글로 접힘.
+  const allTabs = [
     { key: 'bank', label: '통장 거래', count: summary?.transactions.bank },
     { key: 'card', label: '카드 거래', count: summary?.transactions.card },
-    // PR-UX5 (2026-05-09): 운영 흐름 통합 탭 — 분류 검수 + 매칭 검수 한 화면
-    { key: 'workflow', label: '🌊 운영 흐름', count: (summary?.transactions.classified || 0) + (summary?.transactions.unclassified || 0) },
-    // 분류 검수 / 매칭 검수 — 개별 탭 (advanced — 운영 흐름이 통합 view)
-    { key: 'classify', label: '분류 검수', count: (summary?.transactions.classified || 0) + (summary?.transactions.unclassified || 0) },
-    { key: 'matchreview', label: '매칭 검수', count: summary?.transactions.classified || 0 },
     { key: 'settlement', label: '정산 연결', count: summary?.settlement.total },
-    { key: 'sms', label: 'SMS 수집', count: summary?.sms?.total || 0 },
-    { key: 'mapping', label: '매핑 관리' },
-    { key: 'rules', label: '분류 룰' },
-    { key: 'system', label: '⚙ 시스템' },
+    // ── 아래는 분석·관리용 (평소 숨김) ──
+    { key: 'workflow', label: '🌊 운영 흐름', count: (summary?.transactions.classified || 0) + (summary?.transactions.unclassified || 0), adv: true },
+    { key: 'classify', label: '분류 검수', count: (summary?.transactions.classified || 0) + (summary?.transactions.unclassified || 0), adv: true },
+    { key: 'matchreview', label: '매칭 검수', count: summary?.transactions.classified || 0, adv: true },
+    { key: 'sms', label: 'SMS 수집', count: summary?.sms?.total || 0, adv: true },
+    { key: 'mapping', label: '매핑 관리', adv: true },
+    { key: 'rules', label: '분류 룰', adv: true },
+    { key: 'system', label: '⚙ 시스템', adv: true },
   ]
+  // 평소엔 큰 구성만. 고급 펼침 또는 현재 고급탭 활성 시 전체 표시.
+  const advActive = allTabs.some(t => t.adv && t.key === activeTab)
+  const tabs = (showAdvTabs || advActive) ? allTabs : allTabs.filter(t => !t.adv)
 
   // ── 통계 카드 ─────────────────────────────────────────
 
@@ -3493,13 +3498,27 @@ export default function BankCardPage() {
       {/* 상단 통계 */}
       {summary && <div style={{ padding: '0 16px 12px' }}><DcStatStrip stats={stats} /></div>}
 
-      {/* 탭 */}
-      <div style={{ padding: '0 16px 8px' }}>
-        <NeuFilterTabs
-          tabs={tabs}
-          activeKey={activeTab}
-          onSelect={(k) => { setActiveTab(k as TabKey); setSearch('') }}
-        />
+      {/* 탭 — 큰 구성(통장·카드·정산)만 평소 표시, 분석·관리는 「고급」 토글로 접힘 */}
+      <div style={{ padding: '0 16px 8px', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <NeuFilterTabs
+            tabs={tabs}
+            activeKey={activeTab}
+            onSelect={(k) => { setActiveTab(k as TabKey); setSearch('') }}
+          />
+        </div>
+        <button
+          onClick={() => setShowAdvTabs(v => !v)}
+          style={{
+            padding: '6px 12px', borderRadius: 9, fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap',
+            cursor: 'pointer', border: '1px solid rgba(0,0,0,0.1)',
+            background: showAdvTabs ? 'rgba(100,116,139,0.12)' : '#fff',
+            color: '#475569',
+          }}
+          title="운영 흐름·분류·매칭·SMS·매핑·룰·시스템 등 분석·관리 탭"
+        >
+          {showAdvTabs ? '▲ 고급 접기' : '⚙️ 고급'}
+        </button>
       </div>
 
       {/* ──── BulkActionBar — 선택된 거래 일괄 작업 (floating bottom — 거래 row 근처) ──── */}
