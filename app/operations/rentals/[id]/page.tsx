@@ -52,7 +52,7 @@ export default function RentalDetailPage() {
       const fields = ['customer_name', 'customer_phone', 'customer_birth', 'vehicle_car_number', 'vehicle_car_type',
         'customer_car_number', 'customer_car_type', 'insurance_company', 'insurance_claim_no', 'adjuster_name', 'adjuster_phone',
         'dispatch_location', 'repair_factory', 'dispatch_date', 'expected_return_date', 'actual_return_date',
-        'claim_type', 'final_claim_amount', 'fault_rate', 'claim_rate', 'payment_memo', 'status', 'dispatch_seq', 'notes',
+        'claim_type', 'final_claim_amount', 'fault_rate', 'claim_rate', 'payment_memo', 'status', 'dispatch_seq', 'notes', 'consultation_note',
         'sales_order', 'sales_deposit_date', 'sales_deposit_amount', 'sales_payout_rate', 'vat_invoice_date', 'vat_paid_date']
       for (const k of fields) if (f[k] !== undefined) body[k] = f[k] === '' ? null : f[k]
       for (const k of ['self_vehicle_yn', 'vat_incl_yn', 'vat_invoice_issued_yn', 'vat_billed_yn', 'vat_paid_yn', 'sales_support_yn'])
@@ -186,6 +186,13 @@ export default function RentalDetailPage() {
               <Field k="sales_payout_rate" label="지급율(%)" type="number" />
             </div>
           )}
+        </div>
+
+        <div style={card}>
+          <label style={lab}>💬 상담 내용</label>
+          <textarea value={f.consultation_note ?? ''} onChange={(e) => set('consultation_note', e.target.value)} rows={4}
+            placeholder="고객 요청·차종 협의·일정·특이사항 등 상담 내용을 기록하세요"
+            style={{ ...inp, resize: 'vertical', fontFamily: 'inherit' } as any} />
         </div>
 
         <div style={card}>

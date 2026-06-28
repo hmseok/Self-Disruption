@@ -65,23 +65,45 @@ export async function POST(
       ? returnMileage - dispatchMileage
       : null
 
+    // ── 1) 핵심 반납 UPDATE (모든 DB에 확실히 존재하는 컬럼만 — 반드시 성공) ──────
+    //   status / actual_return_date / notes / updated_at 만 → 반납 상태 전환은 무조건 통과.
     await prisma.$executeRaw`
       UPDATE fmi_rentals SET
         actual_return_date = ${actualReturnDate},
-        return_mileage = ${returnMileage},
-        driven_km = ${drivenKm},
-        return_fuel_level = ${body.return_fuel_level || null},
-        return_condition = ${body.return_condition || null},
-        return_damage_yn = ${body.return_damage_yn || null},
-        return_damage_memo = ${body.return_damage_memo || null},
-        additional_charges = ${body.additional_charges != null ? Number(body.additional_charges) : null},
-        deduction_amount = ${body.deduction_amount != null ? Number(body.deduction_amount) : null},
-        final_claim_amount = ${body.final_claim_amount != null ? Number(body.final_claim_amount) : null},
         notes = COALESCE(${body.notes || null}, notes),
         status = 'returned',
         updated_at = NOW()
       WHERE id = ${id}
     `
+
+    // ── 2) 옵션 반납 상세 (주행거리·연료·파손·정산금 등 — 컬럼 미존재 시 graceful skip) ──
+    //   return_mileage / driven_km / return_fuel_level 등 일부 컬럼은 라이브 DB 미적용 가능.
+    //   try/catch 로 분리 — 없어도 1) 핵심 반납은 이미 성공 (Rule 23 graceful fallback).
+    const hasDetail =
+      returnMileage != null || drivenKm != null ||
+      body.return_fuel_level != null || body.return_condition != null ||
+      body.return_damage_yn != null || body.return_damage_memo != null ||
+      body.additional_charges != null || body.deduction_amount != null ||
+      body.final_claim_amount != null
+    if (hasDetail) {
+      try {
+        await prisma.$executeRaw`
+          UPDATE fmi_rentals SET
+            return_mileage = COALESCE(${returnMileage}, return_mileage),
+            driven_km = COALESCE(${drivenKm}, driven_km),
+            return_fuel_level = COALESCE(${body.return_fuel_level || null}, return_fuel_level),
+            return_condition = COALESCE(${body.return_condition || null}, return_condition),
+            return_damage_yn = COALESCE(${body.return_damage_yn ?? null}, return_damage_yn),
+            return_damage_memo = COALESCE(${body.return_damage_memo || null}, return_damage_memo),
+            additional_charges = COALESCE(${body.additional_charges != null ? Number(body.additional_charges) : null}, additional_charges),
+            deduction_amount = COALESCE(${body.deduction_amount != null ? Number(body.deduction_amount) : null}, deduction_amount),
+            final_claim_amount = COALESCE(${body.final_claim_amount != null ? Number(body.final_claim_amount) : null}, final_claim_amount)
+          WHERE id = ${id}
+        `
+      } catch (e) {
+        console.warn('[fmi-rentals return] 옵션 반납상세 UPDATE skip (컬럼 미존재 가능):', (e as Error)?.message)
+      }
+    }
 
     // PR-K (2026-05-16) 차량 통합: 반납 시 차량 cars.status = 'returned' (반납·점검대기)
     if (rental.vehicle_id) {

@@ -4985,3 +4985,93 @@
 - sql-fn-lint: total=0
 - api-trace: broken=25, newBroken=0
 - ui-coverage: warnings=36
+
+## 2026-06-27 13:17:40
+- sql-lint: total=48, new=0, known=48
+- sql-fn-lint: total=0
+- api-trace: broken=25, newBroken=0
+- ui-coverage: warnings=0
+
+## 2026-06-28 00:55:15
+- sql-lint: total=48, new=0, known=48
+- sql-fn-lint: total=0
+- api-trace: broken=25, newBroken=0
+- ui-coverage: warnings=0
+
+## 2026-06-28 03:24:17
+- sql-lint: total=48, new=0, known=48
+- sql-fn-lint: total=0
+- api-trace: broken=25, newBroken=0
+- ui-coverage: warnings=0
+
+## 2026-06-28 03:24:28
+- sql-lint: total=48, new=0, known=48
+- sql-fn-lint: total=0
+- api-trace: broken=25, newBroken=0
+- ui-coverage: warnings=0
+
+## 2026-06-28 03:58:27
+- sql-lint: total=48, new=0, known=48
+- sql-fn-lint: total=0
+- api-trace: broken=26, newBroken=1
+- ui-coverage: warnings=0
+
+## 2026-06-28 04:04:05
+- sql-lint: total=48, new=0, known=48
+- sql-fn-lint: total=0
+- api-trace: broken=25, newBroken=0
+- ui-coverage: warnings=0
+
+## 2026-06-28 04:26:22
+- sql-lint: total=48, new=0, known=48
+- sql-fn-lint: total=0
+- api-trace: broken=25, newBroken=0
+- ui-coverage: warnings=0
+
+## 2026-06-28 05:42:14
+- sql-lint: total=48, new=0, known=48
+- sql-fn-lint: total=0
+- api-trace: broken=25, newBroken=0
+- ui-coverage: warnings=0
+
+## 2026-06-28 06:12:06
+- sql-lint: total=48, new=0, known=48
+- sql-fn-lint: total=0
+- api-trace: broken=25, newBroken=0
+- ui-coverage: warnings=0
+
+## 2026-06-28 07:14:44
+- sql-lint: total=48, new=0, known=48
+- sql-fn-lint: total=0
+- api-trace: broken=25, newBroken=0
+- ui-coverage: warnings=0
+
+## 2026-06-28 07:31:41
+- sql-lint: total=48, new=0, known=48
+- sql-fn-lint: total=0
+- api-trace: broken=25, newBroken=0
+- ui-coverage: warnings=0
+
+## 2026-06-28 07:58:23
+- sql-lint: total=48, new=0, known=48
+- sql-fn-lint: total=0
+- api-trace: broken=25, newBroken=0
+- ui-coverage: warnings=20
+
+## 2026-06-28 07:58:50
+- sql-lint: total=48, new=0, known=48
+- sql-fn-lint: total=0
+- api-trace: broken=25, newBroken=0
+- ui-coverage: warnings=20
+
+## 2026-06-28 07:59:54
+- sql-lint: total=48, new=0, known=48
+- sql-fn-lint: total=0
+- api-trace: broken=25, newBroken=0
+- ui-coverage: warnings=20
+
+## 2026-06-28 08:00:12
+- sql-lint: total=48, new=0, known=48
+- sql-fn-lint: total=0
+- api-trace: broken=25, newBroken=0
+- ui-coverage: warnings=20

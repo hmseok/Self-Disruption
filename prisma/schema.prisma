@@ -142,6 +142,7 @@ model FmiRental {
   handler_name         String?
   dispatcher_name      String?
   notes                String?   @db.Text
+  consultation_note    String?   @db.Text   // V5 (2026-06-28) — 상담 내용(메모와 분리)
   // PR-V1 (2026-06-28) — 부가세 + 영업지원(따봉) 건별 관리
   vat_amount            Decimal?  @db.Decimal(12, 0)
   vat_incl_yn           Boolean?  @default(false)   // 청구액 부가세 포함 여부 (1=포함÷1.1, 0=별도+10%)

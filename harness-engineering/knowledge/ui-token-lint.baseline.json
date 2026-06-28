@@ -1,438 +1,6 @@
 {
   "violations": [
     {
-      "file": "app/(employees)/CallScheduler/components/DayView.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "81f31f899e01",
-      "occ": 0,
-      "line": 125,
-      "snippet": "background: isWeekend ? COLORS.bgRed : 'rgba(255,255,255,0.6)',"
-    },
-    {
-      "file": "app/(employees)/CallScheduler/components/DayView.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "5688890001a9",
-      "occ": 0,
-      "line": 419,
-      "snippet": "background: TONE_BG[w.tone] !== 'transparent' ? TONE_BG[w.tone] : 'rgba(255,255,255,0.7)',"
-    },
-    {
-      "file": "app/(employees)/CallScheduler/components/MyScheduleView.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "9075a6b394a0",
-      "occ": 0,
-      "line": 313,
-      "snippet": "background: viewMode === opt.v ? COLORS.primary : 'rgba(255,255,255,0.7)',"
-    },
-    {
-      "file": "app/(employees)/CallScheduler/components/ScheduleGrid.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "c38aa8e8cb8e",
-      "occ": 0,
-      "line": 984,
-      "snippet": "background: 'rgba(255,255,255,0.95)',"
-    },
-    {
-      "file": "app/(employees)/CallScheduler/components/ScheduleGrid.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "4bdb20dec6dc",
-      "occ": 0,
-      "line": 1067,
-      "snippet": "borderLeft: `1px dashed rgba(255,255,255,0.7)`,"
-    },
-    {
-      "file": "app/(employees)/CallScheduler/components/SkipRequestDialog.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "ff581d8e005c",
-      "occ": 0,
-      "line": 146,
-      "snippet": "background: active ? COLORS.bgBlue : 'rgba(255,255,255,0.6)',"
-    },
-    {
-      "file": "app/(employees)/CallScheduler/components/SkipRequestDialog.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "06ef3a724d25",
-      "occ": 0,
-      "line": 222,
-      "snippet": "background: 'rgba(255,255,255,0.85)',"
-    },
-    {
-      "file": "app/(employees)/CallScheduler/components/WeekView.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "85fdc2d5022c",
-      "occ": 0,
-      "line": 211,
-      "snippet": "background: 'rgba(255,255,255,0.95)', color: COLORS.textPrimary,"
-    },
-    {
-      "file": "app/(employees)/CallScheduler/components/WeekView.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "4bdb20dec6dc",
-      "occ": 0,
-      "line": 247,
-      "snippet": "borderLeft: `1px dashed rgba(255,255,255,0.7)`,"
-    },
-    {
-      "file": "app/(employees)/CallScheduler/settings/GroupEditor.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "d976f079a883",
-      "occ": 0,
-      "line": 906,
-      "snippet": "boxShadow: active ? `0 0 0 2px rgba(255,255,255,0.9)` : 'none',"
-    },
-    {
-      "file": "app/(employees)/CallScheduler/settings/GroupEditor.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "21cdcd360633",
-      "occ": 0,
-      "line": 1027,
-      "snippet": "background: 'rgba(255,255,255,0.5)',"
-    },
-    {
-      "file": "app/(employees)/CallScheduler/settings/GroupEditor.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "ee261ecf8492",
-      "occ": 0,
-      "line": 1063,
-      "snippet": "background: 'rgba(255,255,255,0.6)', flex: 1, maxWidth: 240,"
-    },
-    {
-      "file": "app/(employees)/CallScheduler/settings/GroupEditor.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "06ef3a724d25",
-      "occ": 0,
-      "line": 1476,
-      "snippet": "background: 'rgba(255,255,255,0.85)',"
-    },
-    {
-      "file": "app/(employees)/CallScheduler/settings/GroupEditor.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "59215599f807",
-      "occ": 0,
-      "line": 1507,
-      "snippet": "background: isWeekend ? COLORS.bgGray : 'rgba(255,255,255,0.85)',"
-    },
-    {
-      "file": "app/(employees)/CallScheduler/settings/GroupEditor.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "c9113a3cac9e",
-      "occ": 0,
-      "line": 1534,
-      "snippet": "background: 'rgba(255,255,255,0.7)', padding: '1px 6px', borderRadius: 99,"
-    },
-    {
-      "file": "app/(employees)/CallScheduler/settings/GroupEditor.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "1e67d3b5f523",
-      "occ": 0,
-      "line": 1548,
-      "snippet": "background: 'rgba(255,255,255,0.85)', borderRadius: 8, padding: 10,"
-    },
-    {
-      "file": "app/(employees)/CallScheduler/settings/GroupEditor.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "21cdcd360633",
-      "occ": 1,
-      "line": 1592,
-      "snippet": "background: 'rgba(255,255,255,0.5)',"
-    },
-    {
-      "file": "app/(employees)/CallScheduler/settings/GroupEditor.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "90cbc119f612",
-      "occ": 0,
-      "line": 1664,
-      "snippet": "background: expandedCfgWorkerId === w.id ? COLORS.bgBlue : 'rgba(255,255,255,0.5)',"
-    },
-    {
-      "file": "app/(employees)/CallScheduler/settings/GroupEditor.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "7f15a717ac33",
-      "occ": 0,
-      "line": 1680,
-      "snippet": ": 'rgba(255,255,255,0.5)',"
-    },
-    {
-      "file": "app/(employees)/CallScheduler/settings/GroupEditor.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "c726cf396a68",
-      "occ": 0,
-      "line": 1707,
-      "snippet": "background: 'rgba(255,255,255,0.96)',"
-    },
-    {
-      "file": "app/(employees)/CallScheduler/settings/GroupEditor.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "afd7cdabc68e",
-      "occ": 0,
-      "line": 2002,
-      "snippet": "? (kind === 'prefer' ? COLORS.bgGreen : COLORS.bgRed) : 'rgba(255,255,255,0.7)',"
-    },
-    {
-      "file": "app/(employees)/CallScheduler/settings/GroupEditor.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "c726cf396a68",
-      "occ": 1,
-      "line": 2024,
-      "snippet": "background: 'rgba(255,255,255,0.96)',"
-    },
-    {
-      "file": "app/(employees)/CallScheduler/settings/GroupEditor.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "98c87953624c",
-      "occ": 0,
-      "line": 2042,
-      "snippet": ": 'rgba(255,255,255,0.7)',"
-    },
-    {
-      "file": "app/(employees)/CallScheduler/settings/GroupEditor.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "98c87953624c",
-      "occ": 1,
-      "line": 2137,
-      "snippet": ": 'rgba(255,255,255,0.7)',"
-    },
-    {
-      "file": "app/(employees)/CallScheduler/settings/GroupSkipDatesModal.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "4c8b546ff896",
-      "occ": 0,
-      "line": 141,
-      "snippet": "background: 'rgba(255,255,255,0.7)',"
-    },
-    {
-      "file": "app/(employees)/CallScheduler/settings/GroupSkipDatesModal.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "ed17c4f86e6e",
-      "occ": 0,
-      "line": 234,
-      "snippet": "background: 'rgba(255,255,255,0.85)', marginTop: 2,"
-    },
-    {
-      "file": "app/(employees)/CallScheduler/settings/GroupsTab.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "05b86fbd6c52",
-      "occ": 0,
-      "line": 240,
-      "snippet": "fontSize: 12, background: 'rgba(255,255,255,0.8)', cursor: 'pointer',"
-    },
-    {
-      "file": "app/(employees)/CallScheduler/settings/GroupsTab.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "df8da569e05a",
-      "occ": 0,
-      "line": 314,
-      "snippet": "background: active ? COLORS.primary : 'rgba(255,255,255,0.8)',"
-    },
-    {
-      "file": "app/(employees)/CallScheduler/settings/GroupsTab.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "bdd666978d4a",
-      "occ": 0,
-      "line": 357,
-      "snippet": "const cardBg = tone !== 'none' ? TONE_BG[tone] : 'rgba(255,255,255,0.72)'"
-    },
-    {
-      "file": "app/(employees)/CallScheduler/settings/GroupsTab.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "06ef3a724d25",
-      "occ": 0,
-      "line": 409,
-      "snippet": "background: 'rgba(255,255,255,0.85)',"
-    },
-    {
-      "file": "app/(employees)/CallScheduler/settings/GroupsTab.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "07a528764ba2",
-      "occ": 0,
-      "line": 461,
-      "snippet": "background: 'rgba(255,255,255,0.4)',"
-    },
-    {
-      "file": "app/(employees)/CallScheduler/settings/GroupsTab.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "871429fc8ef9",
-      "occ": 0,
-      "line": 470,
-      "snippet": "background: TONE_BG[m.color_tone] !== 'transparent' ? TONE_BG[m.color_tone] : 'rgba(255,255,255,0.7)',"
-    },
-    {
-      "file": "app/(employees)/CallScheduler/settings/GroupsTab.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "ba567a5235aa",
-      "occ": 0,
-      "line": 506,
-      "snippet": "background: 'rgba(255,255,255,0.7)', cursor: 'pointer',"
-    },
-    {
-      "file": "app/(employees)/CallScheduler/settings/GroupsTab.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "5544974d7ce7",
-      "occ": 0,
-      "line": 519,
-      "snippet": "background: enabled ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.3)',"
-    },
-    {
-      "file": "app/(employees)/CallScheduler/settings/LeaveBulkUploadDialog.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "e080b1fa765d",
-      "occ": 0,
-      "line": 359,
-      "snippet": "neutral: { bg: 'rgba(255,255,255,0.6)', color: COLORS.textPrimary },"
-    },
-    {
-      "file": "app/(employees)/CallScheduler/settings/WorkersTab.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "21cdcd360633",
-      "occ": 0,
-      "line": 601,
-      "snippet": "background: 'rgba(255,255,255,0.5)',"
-    },
-    {
-      "file": "app/(employees)/CallScheduler/settings/WorkersTab.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "d8f0788fada4",
-      "occ": 0,
-      "line": 728,
-      "snippet": "background: 'rgba(255,255,255,0.6)', color: COLORS.textPrimary,"
-    },
-    {
-      "file": "app/(employees)/CallScheduler/skips/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "8c4b68c5ce30",
-      "occ": 0,
-      "line": 101,
-      "snippet": "background: filterStatus === s ? COLORS.primary : 'rgba(255,255,255,0.6)',"
-    },
-    {
-      "file": "app/(employees)/RideAccidentReports/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "be8eaeffb63a",
-      "occ": 0,
-      "line": 526,
-      "snippet": "background: rgstFilter === v ? COLORS.bgBlue : 'rgba(255,255,255,0.6)',"
-    },
-    {
-      "file": "app/(employees)/RideAccidentReports/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "2c8e6569e673",
-      "occ": 0,
-      "line": 564,
-      "snippet": "background: 'rgba(255,255,255,0.6)',"
-    },
-    {
-      "file": "app/(employees)/RideAccidentReports/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "2c8e6569e673",
-      "occ": 1,
-      "line": 703,
-      "snippet": "background: 'rgba(255,255,255,0.6)',"
-    },
-    {
-      "file": "app/(employees)/RideAccidents/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "be8eaeffb63a",
-      "occ": 0,
-      "line": 492,
-      "snippet": "background: rgstFilter === v ? COLORS.bgBlue : 'rgba(255,255,255,0.6)',"
-    },
-    {
-      "file": "app/(employees)/RideAccidents/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "2c8e6569e673",
-      "occ": 0,
-      "line": 530,
-      "snippet": "background: 'rgba(255,255,255,0.6)',"
-    },
-    {
-      "file": "app/(employees)/RideAccidents/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "2c8e6569e673",
-      "occ": 1,
-      "line": 674,
-      "snippet": "background: 'rgba(255,255,255,0.6)',"
-    },
-    {
-      "file": "app/(employees)/RideCustomerData/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "bb2f097e1951",
-      "occ": 0,
-      "line": 578,
-      "snippet": "background: tab === id ? COLORS.primary : 'rgba(255,255,255,0.50)',"
-    },
-    {
-      "file": "app/(employees)/RideCustomerData/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "e2c84ef3af64",
-      "occ": 0,
-      "line": 1301,
-      "snippet": "background: hover ? 'rgba(59,110,181,0.08)' : 'rgba(255,255,255,0.40)',"
-    },
-    {
-      "file": "app/(employees)/RideCustomerData/page.tsx",
-      "label": "primary-hardcode",
-      "hash": "e2c84ef3af64",
-      "occ": 0,
-      "line": 1301,
-      "snippet": "background: hover ? 'rgba(59,110,181,0.08)' : 'rgba(255,255,255,0.40)',"
-    },
-    {
-      "file": "app/(employees)/RideCustomerData/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "f2659e8420c2",
-      "occ": 0,
-      "line": 1489,
-      "snippet": "<div style={{ overflow: 'auto', maxHeight: 200, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 6, background: 'rgba"
-    },
-    {
-      "file": "app/(employees)/RideCustomerData/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "2c8e6569e673",
-      "occ": 0,
-      "line": 1639,
-      "snippet": "background: 'rgba(255,255,255,0.6)',"
-    },
-    {
-      "file": "app/(employees)/RideEmployees/components/BulkUploadDialog.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "e080b1fa765d",
-      "occ": 0,
-      "line": 333,
-      "snippet": "neutral: { bg: 'rgba(255,255,255,0.6)', color: COLORS.textPrimary },"
-    },
-    {
-      "file": "app/(employees)/RideVehicleRegistry/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "9d9215b9278a",
-      "occ": 0,
-      "line": 351,
-      "snippet": "background: statusFilter === v ? COLORS.bgBlue : 'rgba(255,255,255,0.6)',"
-    },
-    {
-      "file": "app/(employees)/RideVehicleRegistry/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "2c8e6569e673",
-      "occ": 0,
-      "line": 382,
-      "snippet": "background: 'rgba(255,255,255,0.6)',"
-    },
-    {
-      "file": "app/(employees)/RideVehicleRegistry/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "2c8e6569e673",
-      "occ": 1,
-      "line": 806,
-      "snippet": "background: 'rgba(255,255,255,0.6)',"
-    },
-    {
-      "file": "app/(employees)/RideVehicleRegistry/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "2c8e6569e673",
-      "occ": 2,
-      "line": 957,
-      "snippet": "background: 'rgba(255,255,255,0.6)',"
-    },
-    {
       "file": "app/(employees)/factory-search/_components/ui.tsx",
       "label": "glass-bg-hardcode",
       "hash": "cb86934b100e",
@@ -923,17 +491,17 @@
     {
       "file": "app/components/DcStatStrip.tsx",
       "label": "glass-bg-hardcode",
-      "hash": "e7e2c2f8302f",
+      "hash": "70f59c52b412",
       "occ": 0,
-      "line": 114,
-      "snippet": "boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -2px -2px 8px rgba(255,255,255,0.6)',"
+      "line": 125,
+      "snippet": ": '6px 6px 16px rgba(140,170,210,0.12), -2px -2px 8px rgba(255,255,255,0.6)',"
     },
     {
       "file": "app/components/DcStatStrip.tsx",
       "label": "glass-bg-hardcode",
       "hash": "c72162d132f3",
       "occ": 0,
-      "line": 204,
+      "line": 215,
       "snippet": ": 'rgba(255,255,255,0.72)',"
     },
     {
@@ -941,7 +509,7 @@
       "label": "glass-bg-hardcode",
       "hash": "a168c952badc",
       "occ": 0,
-      "line": 215,
+      "line": 226,
       "snippet": "? '4px 4px 12px rgba(59,110,181,0.25), -2px -2px 6px rgba(255,255,255,0.3)'"
     },
     {
@@ -949,7 +517,7 @@
       "label": "primary-hardcode",
       "hash": "a168c952badc",
       "occ": 0,
-      "line": 215,
+      "line": 226,
       "snippet": "? '4px 4px 12px rgba(59,110,181,0.25), -2px -2px 6px rgba(255,255,255,0.3)'"
     },
     {
@@ -957,7 +525,7 @@
       "label": "glass-bg-hardcode",
       "hash": "55afb614b29c",
       "occ": 0,
-      "line": 216,
+      "line": 227,
       "snippet": ": '4px 4px 10px rgba(140,170,210,0.15), -2px -2px 6px rgba(255,255,255,0.6)',"
     },
     {
@@ -1221,7 +789,7 @@
       "label": "glass-bg-hardcode",
       "hash": "e85618606388",
       "occ": 0,
-      "line": 113,
+      "line": 107,
       "snippet": "boxShadow: '3px 3px 8px rgba(140,170,210,0.19), -1px -1px 4px rgba(255,255,255,0.47)',"
     },
     {
@@ -1229,7 +797,7 @@
       "label": "glass-bg-hardcode",
       "hash": "a48895ab13ce",
       "occ": 0,
-      "line": 305,
+      "line": 299,
       "snippet": "<div className=\"fixed top-0 left-0 right-0 z-30 safe-top\" style={{ background: 'rgba(255,255,255,0.85)', backdropFilter:"
     },
     {
@@ -1237,7 +805,7 @@
       "label": "glass-bg-hardcode",
       "hash": "8e26b31a8f62",
       "occ": 0,
-      "line": 331,
+      "line": 327,
       "snippet": "<aside className={`${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} w-60 transition-transform duration-300 overf"
     },
     {
@@ -1245,7 +813,7 @@
       "label": "glass-bg-hardcode",
       "hash": "798a926214bf",
       "occ": 0,
-      "line": 346,
+      "line": 342,
       "snippet": "<div className=\"rounded-lg px-3 py-3\" style={{ background: 'rgba(0,0,0,0.02)', border: '1px solid rgba(0,0,0,0.06)', box"
     },
     {
@@ -1253,7 +821,7 @@
       "label": "glass-bg-hardcode",
       "hash": "e85618606388",
       "occ": 1,
-      "line": 386,
+      "line": 388,
       "snippet": "boxShadow: '3px 3px 8px rgba(140,170,210,0.19), -1px -1px 4px rgba(255,255,255,0.47)',"
     },
     {
@@ -1261,7 +829,7 @@
       "label": "glass-bg-hardcode",
       "hash": "77d288765500",
       "occ": 0,
-      "line": 404,
+      "line": 406,
       "snippet": "boxShadow: '3px 3px 8px rgba(16,185,129,0.22), -1px -1px 4px rgba(255,255,255,0.47)',"
     },
     {
@@ -1269,7 +837,7 @@
       "label": "glass-bg-hardcode",
       "hash": "b44153c4de72",
       "occ": 0,
-      "line": 411,
+      "line": 413,
       "snippet": "'4px 4px 12px rgba(16,185,129,0.30), -1px -1px 4px rgba(255,255,255,0.55)'"
     },
     {
@@ -1277,7 +845,7 @@
       "label": "glass-bg-hardcode",
       "hash": "6e2f29a0b50b",
       "occ": 0,
-      "line": 416,
+      "line": 418,
       "snippet": "'3px 3px 8px rgba(16,185,129,0.22), -1px -1px 4px rgba(255,255,255,0.47)'"
     },
     {
@@ -1285,7 +853,7 @@
       "label": "glass-bg-hardcode",
       "hash": "45ec62a1c8c5",
       "occ": 0,
-      "line": 598,
+      "line": 528,
       "snippet": "boxShadow: '12px 12px 30px rgba(140,170,210,0.25), -8px -8px 20px rgba(255,255,255,0.5)',"
     },
     {
@@ -1293,7 +861,7 @@
       "label": "glass-bg-hardcode",
       "hash": "3a2d3fd06b93",
       "occ": 0,
-      "line": 691,
+      "line": 621,
       "snippet": "<div style={{ width: 14, height: 14, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '5"
     },
     {
@@ -1301,7 +869,7 @@
       "label": "glass-bg-hardcode",
       "hash": "97ebe2a9bf9d",
       "occ": 0,
-      "line": 709,
+      "line": 639,
       "snippet": "background: 'rgba(22,32,54,0.97)', backdropFilter: 'blur(16px)', boxShadow: '0 8px 32px rgba(0,0,0,0.4), 0 0 0 1px rgba("
     },
     {
@@ -1309,7 +877,7 @@
       "label": "glass-bg-hardcode",
       "hash": "53e54badd5eb",
       "occ": 0,
-      "line": 723,
+      "line": 653,
       "snippet": "<div style={{ width: 16, height: 16, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '5"
     },
     {
@@ -1317,7 +885,7 @@
       "label": "glass-bg-hardcode",
       "hash": "13629b69e033",
       "occ": 0,
-      "line": 733,
+      "line": 663,
       "snippet": "<span style={{ fontSize: 11, fontWeight: 700, color: '#fff', background: 'rgba(255,255,255,0.2)', padding: '2px 8px', bo"
     },
     {
@@ -1325,7 +893,7 @@
       "label": "glass-bg-hardcode",
       "hash": "c33f4fd939c1",
       "occ": 0,
-      "line": 738,
+      "line": 668,
       "snippet": "<span style={{ fontSize: 11, fontWeight: 700, color: '#fff', background: 'rgba(255,255,255,0.25)', padding: '2px 8px', b"
     },
     {
@@ -1333,7 +901,7 @@
       "label": "glass-bg-hardcode",
       "hash": "0d11243732f8",
       "occ": 0,
-      "line": 743,
+      "line": 673,
       "snippet": "style={{ background: 'rgba(255,255,255,0.15)', border: 'none', cursor: 'pointer', borderRadius: 6, padding: '2px 6px', c"
     },
     {
@@ -1341,7 +909,7 @@
       "label": "glass-bg-hardcode",
       "hash": "0d11243732f8",
       "occ": 1,
-      "line": 749,
+      "line": 679,
       "snippet": "style={{ background: 'rgba(255,255,255,0.15)', border: 'none', cursor: 'pointer', borderRadius: 6, padding: '2px 6px', c"
     },
     {
@@ -1349,7 +917,7 @@
       "label": "glass-bg-hardcode",
       "hash": "bbe2a9a5821b",
       "occ": 0,
-      "line": 761,
+      "line": 691,
       "snippet": "<div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 6, height: 5, overflow: 'hidden', marginBottom: 8 }}>"
     },
     {
@@ -1485,7 +1053,7 @@
       "label": "glass-bg-hardcode",
       "hash": "ea4351c15cce",
       "occ": 0,
-      "line": 216,
+      "line": 218,
       "snippet": "<div className=\"si-card rounded-2xl p-5 border border-black/[0.06]\" style={{ background: 'linear-gradient(135deg, rgba(2"
     },
     {
@@ -1493,7 +1061,7 @@
       "label": "glass-bg-hardcode",
       "hash": "ea4351c15cce",
       "occ": 1,
-      "line": 277,
+      "line": 279,
       "snippet": "<div className=\"si-card rounded-2xl p-5 border border-black/[0.06]\" style={{ background: 'linear-gradient(135deg, rgba(2"
     },
     {
@@ -1501,7 +1069,7 @@
       "label": "glass-bg-hardcode",
       "hash": "ea4351c15cce",
       "occ": 2,
-      "line": 304,
+      "line": 306,
       "snippet": "<div className=\"si-card rounded-2xl p-5 border border-black/[0.06]\" style={{ background: 'linear-gradient(135deg, rgba(2"
     },
     {
@@ -1509,7 +1077,7 @@
       "label": "glass-bg-hardcode",
       "hash": "96a17717ff11",
       "occ": 0,
-      "line": 348,
+      "line": 350,
       "snippet": "<div className=\"si-card rounded-2xl p-5 border border-red-500/20\" style={{ background: 'linear-gradient(135deg, rgba(255"
     },
     {
@@ -1517,23 +1085,15 @@
       "label": "glass-bg-hardcode",
       "hash": "cb6169ee3dce",
       "occ": 0,
-      "line": 367,
+      "line": 369,
       "snippet": "<div className=\"si-card rounded-2xl p-5 border border-emerald-500/20\" style={{ background: 'linear-gradient(135deg, rgba"
-    },
-    {
-      "file": "app/dashboard/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "ea4351c15cce",
-      "occ": 3,
-      "line": 378,
-      "snippet": "<div className=\"si-card rounded-2xl p-5 border border-black/[0.06]\" style={{ background: 'linear-gradient(135deg, rgba(2"
     },
     {
       "file": "app/dashboard/page.tsx",
       "label": "glass-bg-hardcode",
       "hash": "b7f2014a825d",
       "occ": 0,
-      "line": 406,
+      "line": 379,
       "snippet": "<div className=\"si-card rounded-2xl p-6 border border-black/[0.06] text-center\" style={{ background: 'linear-gradient(13"
     },
     {
@@ -2469,7 +2029,7 @@
       "label": "glass-bg-hardcode",
       "hash": "3dd1208727af",
       "occ": 0,
-      "line": 1211,
+      "line": 1237,
       "snippet": "background: 'rgba(255,255,255,0.72)',"
     },
     {
@@ -2477,7 +2037,7 @@
       "label": "glass-bg-hardcode",
       "hash": "b5be36070a8e",
       "occ": 0,
-      "line": 1214,
+      "line": 1240,
       "snippet": "boxShadow: '6px 6px 18px rgba(140,170,210,0.14), -6px -6px 18px rgba(255,255,255,0.47)',"
     },
     {
@@ -2485,39 +2045,15 @@
       "label": "glass-bg-hardcode",
       "hash": "bd0488806939",
       "occ": 0,
-      "line": 1221,
+      "line": 1247,
       "snippet": "background: 'rgba(255,255,255,0.40)',"
-    },
-    {
-      "file": "app/hr/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "76f34d8f68c5",
-      "occ": 0,
-      "line": 1333,
-      "snippet": "style={{ width: '100%', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, padding: '8px 12px', fontSize: 13, outli"
-    },
-    {
-      "file": "app/hr/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "3c7bd37fea71",
-      "occ": 0,
-      "line": 1339,
-      "snippet": "style={{ width: '100%', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, padding: '8px 12px', fontSize: 13, outli"
-    },
-    {
-      "file": "app/hr/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "b92b50880bc4",
-      "occ": 0,
-      "line": 1381,
-      "snippet": "style={{ width: '100%', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, padding: '8px 12px', fontSize: 13, outli"
     },
     {
       "file": "app/hr/page.tsx",
       "label": "glass-bg-hardcode",
       "hash": "9a3b09670f64",
       "occ": 0,
-      "line": 1469,
+      "line": 1447,
       "snippet": "background: isDragging ? 'rgba(59,130,246,0.05)' : aiParsing ? 'rgba(34,197,94,0.04)' : 'rgba(255,255,255,0.4)',"
     },
     {
@@ -2525,23 +2061,23 @@
       "label": "glass-bg-hardcode",
       "hash": "8cee720663dc",
       "occ": 0,
-      "line": 1493,
+      "line": 1471,
       "snippet": "<div style={{ background: 'rgba(255,255,255,0.6)', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 10, padding: 12, "
     },
     {
       "file": "app/hr/page.tsx",
       "label": "glass-bg-hardcode",
       "hash": "76f34d8f68c5",
-      "occ": 1,
-      "line": 1668,
+      "occ": 0,
+      "line": 1663,
       "snippet": "style={{ width: '100%', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, padding: '8px 12px', fontSize: 13, outli"
     },
     {
       "file": "app/hr/page.tsx",
       "label": "glass-bg-hardcode",
       "hash": "3c7bd37fea71",
-      "occ": 1,
-      "line": 1674,
+      "occ": 0,
+      "line": 1669,
       "snippet": "style={{ width: '100%', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, padding: '8px 12px', fontSize: 13, outli"
     },
     {
@@ -2549,15 +2085,15 @@
       "label": "glass-bg-hardcode",
       "hash": "d76940608471",
       "occ": 0,
-      "line": 1680,
+      "line": 1675,
       "snippet": "<div style={{ padding: '10px 16px', borderBottom: '1px solid rgba(0,0,0,0.06)', background: 'rgba(255,255,255,0.40)' }}>"
     },
     {
       "file": "app/hr/page.tsx",
       "label": "glass-bg-hardcode",
       "hash": "b92b50880bc4",
-      "occ": 1,
-      "line": 1723,
+      "occ": 0,
+      "line": 1718,
       "snippet": "style={{ width: '100%', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, padding: '8px 12px', fontSize: 13, outli"
     },
     {
@@ -2565,7 +2101,7 @@
       "label": "glass-bg-hardcode",
       "hash": "d76940608471",
       "occ": 1,
-      "line": 1729,
+      "line": 1724,
       "snippet": "<div style={{ padding: '10px 16px', borderBottom: '1px solid rgba(0,0,0,0.06)', background: 'rgba(255,255,255,0.40)' }}>"
     },
     {
@@ -2573,7 +2109,7 @@
       "label": "glass-bg-hardcode",
       "hash": "fda20ea83daa",
       "occ": 0,
-      "line": 1903,
+      "line": 1898,
       "snippet": "<div style={{ padding: '10px 16px', background: 'rgba(255,255,255,0.40)', borderBottom: '1px solid rgba(0,0,0,0.06)', po"
     },
     {
@@ -2581,7 +2117,7 @@
       "label": "glass-bg-hardcode",
       "hash": "25daf2d078b9",
       "occ": 0,
-      "line": 1937,
+      "line": 1932,
       "snippet": "style={{ fontSize: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 6, padding: '2px 6px', background: 'rgba(255,"
     },
     {
@@ -2589,7 +2125,7 @@
       "label": "glass-bg-hardcode",
       "hash": "a86ad253eda8",
       "occ": 0,
-      "line": 1981,
+      "line": 1976,
       "snippet": "style={{ background: 'rgba(255,255,255,0.92)', borderRadius: 20, width: '100%', maxWidth: 560, boxShadow: '0 25px 50px r"
     },
     {
@@ -2597,7 +2133,7 @@
       "label": "glass-bg-hardcode",
       "hash": "1ddb36809ba3",
       "occ": 0,
-      "line": 1982,
+      "line": 1977,
       "snippet": "<div style={{ padding: '20px 24px', borderBottom: '1px solid rgba(0,0,0,0.06)', background: 'rgba(255,255,255,0.40)', di"
     },
     {
@@ -2605,7 +2141,7 @@
       "label": "glass-bg-hardcode",
       "hash": "ff3f338a412e",
       "occ": 0,
-      "line": 1994,
+      "line": 1989,
       "snippet": "style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none"
     },
     {
@@ -2613,7 +2149,7 @@
       "label": "glass-bg-hardcode",
       "hash": "ff3f338a412e",
       "occ": 1,
-      "line": 2000,
+      "line": 1995,
       "snippet": "style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none"
     },
     {
@@ -2621,7 +2157,7 @@
       "label": "glass-bg-hardcode",
       "hash": "ff3f338a412e",
       "occ": 2,
-      "line": 2007,
+      "line": 2002,
       "snippet": "style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none"
     },
     {
@@ -2629,7 +2165,7 @@
       "label": "glass-bg-hardcode",
       "hash": "ff3f338a412e",
       "occ": 3,
-      "line": 2012,
+      "line": 2007,
       "snippet": "style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none"
     },
     {
@@ -2637,7 +2173,7 @@
       "label": "glass-bg-hardcode",
       "hash": "456bc9bed16f",
       "occ": 0,
-      "line": 2019,
+      "line": 2014,
       "snippet": "style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none"
     },
     {
@@ -2645,7 +2181,7 @@
       "label": "glass-bg-hardcode",
       "hash": "456bc9bed16f",
       "occ": 1,
-      "line": 2026,
+      "line": 2021,
       "snippet": "style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none"
     },
     {
@@ -2653,7 +2189,7 @@
       "label": "glass-bg-hardcode",
       "hash": "456bc9bed16f",
       "occ": 2,
-      "line": 2037,
+      "line": 2032,
       "snippet": "style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none"
     },
     {
@@ -2661,7 +2197,7 @@
       "label": "glass-bg-hardcode",
       "hash": "ff3f338a412e",
       "occ": 4,
-      "line": 2044,
+      "line": 2039,
       "snippet": "style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none"
     },
     {
@@ -2669,7 +2205,7 @@
       "label": "glass-bg-hardcode",
       "hash": "ff3f338a412e",
       "occ": 5,
-      "line": 2050,
+      "line": 2045,
       "snippet": "style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none"
     },
     {
@@ -2677,7 +2213,7 @@
       "label": "glass-bg-hardcode",
       "hash": "456bc9bed16f",
       "occ": 3,
-      "line": 2060,
+      "line": 2055,
       "snippet": "style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none"
     },
     {
@@ -2685,7 +2221,7 @@
       "label": "glass-bg-hardcode",
       "hash": "c99a02e1088c",
       "occ": 0,
-      "line": 2073,
+      "line": 2068,
       "snippet": "style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none"
     },
     {
@@ -2693,7 +2229,7 @@
       "label": "glass-bg-hardcode",
       "hash": "d04dc81df5cb",
       "occ": 0,
-      "line": 2076,
+      "line": 2071,
       "snippet": "<div style={{ padding: '14px 20px', borderTop: '1px solid rgba(0,0,0,0.06)', background: 'rgba(255,255,255,0.40)', displ"
     },
     {
@@ -2701,7 +2237,7 @@
       "label": "glass-bg-hardcode",
       "hash": "6020ba79df25",
       "occ": 0,
-      "line": 2078,
+      "line": 2073,
       "snippet": "style={{ flex: 1, padding: '10px 0', border: '1px solid rgba(0,0,0,0.08)', background: 'rgba(255,255,255,0.8)', color: '"
     },
     {
@@ -2709,7 +2245,7 @@
       "label": "glass-bg-hardcode",
       "hash": "797b7ebcd146",
       "occ": 0,
-      "line": 2095,
+      "line": 2090,
       "snippet": "style={{ background: 'rgba(255,255,255,0.92)', borderRadius: 20, width: '100%', maxWidth: 880, boxShadow: '0 25px 50px r"
     },
     {
@@ -2717,7 +2253,7 @@
       "label": "glass-bg-hardcode",
       "hash": "1ddb36809ba3",
       "occ": 1,
-      "line": 2098,
+      "line": 2093,
       "snippet": "<div style={{ padding: '20px 24px', borderBottom: '1px solid rgba(0,0,0,0.06)', background: 'rgba(255,255,255,0.40)', di"
     },
     {
@@ -2725,7 +2261,7 @@
       "label": "glass-bg-hardcode",
       "hash": "fbcdea437a7c",
       "occ": 0,
-      "line": 2117,
+      "line": 2112,
       "snippet": "<div style={{ display: 'flex', borderBottom: '1px solid rgba(0,0,0,0.06)', background: 'rgba(255,255,255,0.30)', flexShr"
     },
     {
@@ -2733,7 +2269,7 @@
       "label": "glass-bg-hardcode",
       "hash": "2c0d77434752",
       "occ": 0,
-      "line": 2144,
+      "line": 2139,
       "snippet": "style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, outline: 'non"
     },
     {
@@ -2741,7 +2277,7 @@
       "label": "glass-bg-hardcode",
       "hash": "fc91e66dd923",
       "occ": 0,
-      "line": 2149,
+      "line": 2144,
       "snippet": "style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, outline: 'non"
     },
     {
@@ -2749,7 +2285,7 @@
       "label": "glass-bg-hardcode",
       "hash": "395b3c9f3c02",
       "occ": 0,
-      "line": 2155,
+      "line": 2150,
       "snippet": "style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, background: '"
     },
     {
@@ -2757,7 +2293,7 @@
       "label": "glass-bg-hardcode",
       "hash": "395b3c9f3c02",
       "occ": 1,
-      "line": 2164,
+      "line": 2159,
       "snippet": "style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, background: '"
     },
     {
@@ -2765,7 +2301,7 @@
       "label": "glass-bg-hardcode",
       "hash": "395b3c9f3c02",
       "occ": 2,
-      "line": 2175,
+      "line": 2170,
       "snippet": "style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, background: '"
     },
     {
@@ -2773,7 +2309,7 @@
       "label": "glass-bg-hardcode",
       "hash": "395b3c9f3c02",
       "occ": 3,
-      "line": 2183,
+      "line": 2178,
       "snippet": "style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, background: '"
     },
     {
@@ -2781,7 +2317,7 @@
       "label": "glass-bg-hardcode",
       "hash": "66ef0fed0143",
       "occ": 0,
-      "line": 2199,
+      "line": 2194,
       "snippet": "style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, outline: 'non"
     },
     {
@@ -2789,7 +2325,7 @@
       "label": "glass-bg-hardcode",
       "hash": "395b3c9f3c02",
       "occ": 4,
-      "line": 2213,
+      "line": 2208,
       "snippet": "style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, background: '"
     },
     {
@@ -2797,7 +2333,7 @@
       "label": "glass-bg-hardcode",
       "hash": "5df15be31152",
       "occ": 0,
-      "line": 2227,
+      "line": 2222,
       "snippet": "style={{ width: '100%', padding: 10, border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, fontSize: 13, outline: 'n"
     },
     {
@@ -2805,7 +2341,7 @@
       "label": "glass-bg-hardcode",
       "hash": "5df15be31152",
       "occ": 1,
-      "line": 2234,
+      "line": 2229,
       "snippet": "style={{ width: '100%', padding: 10, border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, fontSize: 13, outline: 'n"
     },
     {
@@ -2813,7 +2349,7 @@
       "label": "glass-bg-hardcode",
       "hash": "9a015f050b3c",
       "occ": 0,
-      "line": 2244,
+      "line": 2239,
       "snippet": "<div style={{ background: 'rgba(255,255,255,0.40)', borderRadius: 10, padding: 12, border: '1px solid rgba(0,0,0,0.05)',"
     },
     {
@@ -2821,7 +2357,7 @@
       "label": "glass-bg-hardcode",
       "hash": "ae27ae0e0a76",
       "occ": 0,
-      "line": 2269,
+      "line": 2264,
       "snippet": "style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, outline: 'non"
     },
     {
@@ -2829,7 +2365,7 @@
       "label": "glass-bg-hardcode",
       "hash": "ae27ae0e0a76",
       "occ": 1,
-      "line": 2284,
+      "line": 2279,
       "snippet": "style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, outline: 'non"
     },
     {
@@ -2837,7 +2373,7 @@
       "label": "glass-bg-hardcode",
       "hash": "fbf625b14a4d",
       "occ": 0,
-      "line": 2310,
+      "line": 2305,
       "snippet": "<div key={k} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, padding: 8, background: 'rgba(255,"
     },
     {
@@ -2845,7 +2381,7 @@
       "label": "glass-bg-hardcode",
       "hash": "d3637894a242",
       "occ": 0,
-      "line": 2318,
+      "line": 2313,
       "snippet": "style={{ width: 130, padding: 8, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none', b"
     },
     {
@@ -2853,7 +2389,7 @@
       "label": "glass-bg-hardcode",
       "hash": "395b3c9f3c02",
       "occ": 5,
-      "line": 2362,
+      "line": 2357,
       "snippet": "style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, background: '"
     },
     {
@@ -2861,7 +2397,7 @@
       "label": "glass-bg-hardcode",
       "hash": "66ef0fed0143",
       "occ": 1,
-      "line": 2374,
+      "line": 2369,
       "snippet": "style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, outline: 'non"
     },
     {
@@ -2869,7 +2405,7 @@
       "label": "glass-bg-hardcode",
       "hash": "66ef0fed0143",
       "occ": 2,
-      "line": 2381,
+      "line": 2376,
       "snippet": "style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, outline: 'non"
     },
     {
@@ -2877,7 +2413,7 @@
       "label": "glass-bg-hardcode",
       "hash": "ae27ae0e0a76",
       "occ": 2,
-      "line": 2389,
+      "line": 2384,
       "snippet": "style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, outline: 'non"
     },
     {
@@ -2885,7 +2421,7 @@
       "label": "glass-bg-hardcode",
       "hash": "fec8e93769dc",
       "occ": 0,
-      "line": 2414,
+      "line": 2409,
       "snippet": "<div style={{ padding: '8px 14px', background: 'rgba(255,255,255,0.40)', borderBottom: '1px solid rgba(0,0,0,0.06)', pos"
     },
     {
@@ -2893,7 +2429,7 @@
       "label": "glass-bg-hardcode",
       "hash": "f6fb6571e1ac",
       "occ": 0,
-      "line": 2447,
+      "line": 2442,
       "snippet": "style={{ fontSize: 11, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 6, padding: '2px 6px', background: 'rgba(255,"
     },
     {
@@ -2901,7 +2437,7 @@
       "label": "glass-bg-hardcode",
       "hash": "579ced093e3c",
       "occ": 0,
-      "line": 2479,
+      "line": 2474,
       "snippet": "style={{ padding: '6px 12px', fontSize: 12, fontWeight: 600, color: '#dc2626', border: '1px solid rgba(239,68,68,0.3)', "
     },
     {
@@ -2909,7 +2445,7 @@
       "label": "glass-bg-hardcode",
       "hash": "16377be50be0",
       "occ": 0,
-      "line": 2493,
+      "line": 2488,
       "snippet": "<div style={{ padding: '16px 24px', borderTop: '1px solid rgba(0,0,0,0.06)', background: 'rgba(255,255,255,0.40)', displ"
     },
     {
@@ -2917,7 +2453,7 @@
       "label": "glass-bg-hardcode",
       "hash": "4b77fc8b0c1e",
       "occ": 0,
-      "line": 2495,
+      "line": 2490,
       "snippet": "style={{ flex: 1, padding: '10px 0', border: '1px solid rgba(0,0,0,0.08)', background: 'rgba(255,255,255,0.8)', color: '"
     },
     {
@@ -3105,6 +2641,86 @@
       "snippet": "background: 'rgba(255,255,255,0.7)', color: COLORS.textPrimary,"
     },
     {
+      "file": "app/operations/_tabs/ClaimsTab.tsx",
+      "label": "primary-hardcode",
+      "hash": "90e2b35c1542",
+      "occ": 0,
+      "line": 640,
+      "snippet": "<div style={{ ...GLASS.L2, padding: 11, borderRadius: 10, border: '1px solid rgba(59,110,181,0.18)' }}>"
+    },
+    {
+      "file": "app/operations/dispatch/[idno]/[mddt]/[srno]/page.tsx",
+      "label": "primary-hardcode",
+      "hash": "48e82bbf81f0",
+      "occ": 0,
+      "line": 1609,
+      "snippet": "<button onClick={() => searchAddr(setDeliveryOrigin)} style={{ padding: '7px 10px', borderRadius: 7, border: '1px solid "
+    },
+    {
+      "file": "app/operations/dispatch/[idno]/[mddt]/[srno]/page.tsx",
+      "label": "primary-hardcode",
+      "hash": "9eb68cbc825e",
+      "occ": 0,
+      "line": 1614,
+      "snippet": "<button onClick={() => searchAddr((v) => setDeliveryWaypoints((ws) => ws.map((x, j) => j === i ? { ...x, addr: v } : x))"
+    },
+    {
+      "file": "app/operations/dispatch/[idno]/[mddt]/[srno]/page.tsx",
+      "label": "primary-hardcode",
+      "hash": "23eacc36fea8",
+      "occ": 0,
+      "line": 1619,
+      "snippet": "<button onClick={() => setDeliveryWaypoints((ws) => [...ws, { addr: '', memo: '' }])} style={{ alignSelf: 'flex-start', "
+    },
+    {
+      "file": "app/operations/dispatch/[idno]/[mddt]/[srno]/page.tsx",
+      "label": "primary-hardcode",
+      "hash": "ab76692a113c",
+      "occ": 0,
+      "line": 1622,
+      "snippet": "<button onClick={() => searchAddr(setDeliveryDest)} style={{ padding: '7px 10px', borderRadius: 7, border: '1px solid rg"
+    },
+    {
+      "file": "app/operations/page.tsx",
+      "label": "primary-hardcode",
+      "hash": "4e16ed828ba6",
+      "occ": 0,
+      "line": 69,
+      "snippet": "boxShadow: active ? '0 6px 16px rgba(59,110,181,0.3)' : 'none', transition: 'all 0.2s',"
+    },
+    {
+      "file": "app/operations/page.tsx",
+      "label": "glass-bg-hardcode",
+      "hash": "4631d594b959",
+      "occ": 0,
+      "line": 71,
+      "snippet": "<span style={{ width: 22, height: 22, borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent:"
+    },
+    {
+      "file": "app/operations/page.tsx",
+      "label": "primary-hardcode",
+      "hash": "4631d594b959",
+      "occ": 0,
+      "line": 71,
+      "snippet": "<span style={{ width: 22, height: 22, borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent:"
+    },
+    {
+      "file": "app/operations/rentals/[id]/page.tsx",
+      "label": "primary-hardcode",
+      "hash": "a53876492e1c",
+      "occ": 0,
+      "line": 100,
+      "snippet": "<div style={{ fontSize: 11, fontWeight: 700, color: '#1d4ed8', background: 'rgba(59,110,181,0.1)', padding: '3px 10px', "
+    },
+    {
+      "file": "app/operations/rentals/[id]/page.tsx",
+      "label": "primary-hardcode",
+      "hash": "a23c86597e38",
+      "occ": 0,
+      "line": 160,
+      "snippet": "<div style={{ ...card, border: '1px solid rgba(59,110,181,0.25)' }}>"
+    },
+    {
       "file": "app/report/ReportDashboard.tsx",
       "label": "glass-bg-hardcode",
       "hash": "92c788930a0b",
@@ -3241,6 +2857,6 @@
       "snippet": "boxShadow: '6px 6px 18px rgba(140,170,210,0.14), -6px -6px 18px rgba(255,255,255,0.47)',"
     }
   ],
-  "generatedAt": "2026-05-28T05:29:35.257Z",
+  "generatedAt": "2026-06-28T07:59:38.766Z",
   "note": "UI 토큰 hardcode (inline rgba). baseline 키 = file:label:contentHash:occurrence (line 번호 비의존 — PR-COORD-7 2026-05-22). 기존 위반 동결, 새 위반만 차단."
 }

@@ -69,6 +69,15 @@
 - V3(빌려타 533 enrich) — 적용 완료 (고객명·보험사 등 채움)
 - V4(operations_dispatch_orders.delivery_json) — 탁송 배차지시 구조화
 
+## 6.7 반납 오류 + 상담 입력 (2026-06-28 추가)
+- **반납 오류 fix**: `/api/fmi-rentals/[id]/return` — UPDATE 를 핵심(status·actual_return_date·notes)과
+  옵션(return_mileage·driven_km·fuel·condition·damage·정산금)으로 분리. 옵션은 try/catch graceful skip.
+  → `return_fuel_level`/`return_condition` 등이 라이브 DB 미적용이어도 반납 status 전환은 무조건 성공.
+- **상담 입력**: fmi_rentals 에 `consultation_note TEXT` 추가(V5, 멱등). 배차 상세페이지(/operations/rentals/[id])
+  에 '💬 상담 내용' 섹션(메모와 분리). PATCH ALLOWED_FIELDS += consultation_note, dispatch_seq.
+  배차 확정 시 입력은 배차 페이지 consultations 기능이 이미 담당.
+- **적용 필요**: `migrations/2026-06-28_V5_fmi_rentals_consultation_note.sql` (Cloud SQL 실행).
+
 ## 7. 산출물 위치
 - 파싱 검증본: outputs/billyeota_normalized.json (810행 정제 결과)
 - 5월 import: migrations/2026-05-22_N3c_bilryeota_import.sql (533 INSERT, 멱등)
