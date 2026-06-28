@@ -49,6 +49,7 @@ export async function POST(
       adjuster_name,
       adjuster_phone,
       mode,                         // PR-L — 'reserve'(예약) | 'now'(바로 배차)
+      consultation_note,            // V5 — 배차하기 단계 상담 내용 → fmi_rental 전파
     } = body || {}
 
     // PR-L (2026-05-16) — 예약 vs 바로 배차 분기
@@ -170,6 +171,20 @@ export async function POST(
         finalDispatchDate, finalReturnDate, daily_rate || null,
         rentalStatus,
       )
+    }
+
+    // 3.5 상담 내용 전파 (배차하기 단계 입력 → fmi_rental.consultation_note)
+    //   body 우선, 없으면 dispatch_order 에 저장된 값. 컬럼 신규(V5) → graceful skip.
+    const finalConsultation = (consultation_note ?? order.consultation_note) || null
+    if (finalConsultation) {
+      try {
+        await prisma.$executeRawUnsafe(
+          `UPDATE fmi_rentals SET consultation_note = ? WHERE id = ?`,
+          finalConsultation, fmiRentalId,
+        )
+      } catch (e) {
+        console.warn('[confirm] consultation_note 전파 skip (컬럼 미존재 가능):', (e as Error)?.message)
+      }
     }
 
     // 4. dispatch_order 연결 + status (예약=scheduled / 바로=dispatched)

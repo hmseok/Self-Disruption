@@ -168,6 +168,7 @@ export default function DispatchDetailPage({
   const [deliveryWaypoints, setDeliveryWaypoints] = useState<{ addr: string; memo: string }[]>([])
   const [deliveryCost, setDeliveryCost] = useState('')
   const [deliveryNote, setDeliveryNote] = useState('')
+  const [consultation, setConsultation] = useState('')  // V5 — 상담 내용 (배차하기 단계)
   const [copied, setCopied] = useState(false)
   const openPostcode = useDaumPostcodePopup()
   const searchAddr = (set: (v: string) => void) =>
@@ -406,6 +407,7 @@ export default function DispatchDetailPage({
         setExpDispatch(found.expected_dispatch_date || '')
         setExpReturn(found.expected_return_date || '')
         setStatus(found.status)
+        setConsultation(found.consultation_note || '')
         // PR-V4 — delivery_json 우선, 없으면 customer_request 메모 backward-compat
         const dj = (() => { try { return typeof found.delivery_json === 'string' ? JSON.parse(found.delivery_json) : found.delivery_json } catch { return null } })()
         if (dj && typeof dj === 'object') {
@@ -538,6 +540,7 @@ export default function DispatchDetailPage({
             expected_dispatch_date: expDispatch || null,
             expected_return_date: expReturn || null,
             status,
+            consultation_note: consultation || null,  // V5 — 상담 내용
             // PR-V4 — 탁송 지시 구조화 (delivery_json) + customer_request 요약(backward-compat)
             customer_request: buildDelivery(deliveryType, deliveryNote),
             delivery_json: deliveryType ? JSON.stringify({
@@ -619,6 +622,7 @@ export default function DispatchDetailPage({
             ? expDispatch
             : new Date().toISOString().slice(0, 10),
           expected_return_date: expReturn || null,
+          consultation_note: consultation || null,  // V5 — 상담 내용 → fmi_rental 전파
         }),
       })
       const json = await res.json()
@@ -1641,6 +1645,13 @@ export default function DispatchDetailPage({
                   ) : (
                     <div style={{ fontSize: 11, color: '#94a3b8' }}>탁송요청 또는 외부오더를 선택하면 출발·도착·경유지·비용 입력이 열립니다.</div>
                   )}
+                  <div style={{ marginTop: 12 }}>
+                    <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#475569', marginBottom: 4 }}>💬 상담 내용</label>
+                    <textarea value={consultation} onChange={(e) => setConsultation(e.target.value)} rows={3}
+                      placeholder="고객 요청·차종 협의·일정·픽업 특이사항 등 상담 내용을 기록하세요"
+                      style={{ ...GLASS.L1, width: '100%', padding: '8px 10px', borderRadius: 7, fontSize: 12, color: '#1e293b', resize: 'vertical', fontFamily: 'inherit', boxSizing: 'border-box' }} />
+                    <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 3 }}>저장하면 배차에 기록되고, 배차 확정 시 대차 상세로 함께 넘어갑니다.</div>
+                  </div>
                 </div>
                 {/* PR-N7.2 — 청구 정보 (청구유형·과실율·청구율) */}
                 <div style={{ gridColumn: '1 / -1' }}>
