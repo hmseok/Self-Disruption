@@ -158,9 +158,16 @@ export default function DispatchDetailPage({
   const [vehicleSearch, setVehicleSearch] = useState('')
   const [selectedVehicle, setSelectedVehicle] = useState<WaitingVehicle | null>(null)
 
-  // ── 탁송/외부오더 (PR-C2c) — operations_dispatch_orders.customer_request 에 저장 ──
+  // ── 탁송/외부오더 배차 지시 (PR-V4) — operations_dispatch_orders.delivery_json ──
   const [deliveryType, setDeliveryType] = useState<'self' | 'external' | ''>('')
-  const [deliveryMemo, setDeliveryMemo] = useState('')
+  const [deliveryVendor, setDeliveryVendor] = useState('')
+  const [deliveryPhone, setDeliveryPhone] = useState('')
+  const [deliveryOrigin, setDeliveryOrigin] = useState('')
+  const [deliveryDest, setDeliveryDest] = useState('')
+  const [deliveryWaypoints, setDeliveryWaypoints] = useState<{ addr: string; memo: string }[]>([])
+  const [deliveryCost, setDeliveryCost] = useState('')
+  const [deliveryNote, setDeliveryNote] = useState('')
+  const [copied, setCopied] = useState(false)
 
   // ── 출고 처리 (PR-C3) — fmi_rentals dispatch_mileage/dispatch_photos/dispatch_memo ──
   const [releaseModalOpen, setReleaseModalOpen] = useState(false)
@@ -395,10 +402,22 @@ export default function DispatchDetailPage({
         setExpDispatch(found.expected_dispatch_date || '')
         setExpReturn(found.expected_return_date || '')
         setStatus(found.status)
-        // PR-C2c — customer_request 에서 탁송/외부오더 파싱
-        const d = parseDelivery(found.customer_request)
-        setDeliveryType(d.type)
-        setDeliveryMemo(d.memo)
+        // PR-V4 — delivery_json 우선, 없으면 customer_request 메모 backward-compat
+        const dj = (() => { try { return typeof found.delivery_json === 'string' ? JSON.parse(found.delivery_json) : found.delivery_json } catch { return null } })()
+        if (dj && typeof dj === 'object') {
+          setDeliveryType(dj.type || '')
+          setDeliveryVendor(dj.vendor || '')
+          setDeliveryPhone(dj.phone || '')
+          setDeliveryOrigin(dj.origin || '')
+          setDeliveryDest(dj.dest || '')
+          setDeliveryWaypoints(Array.isArray(dj.waypoints) ? dj.waypoints : [])
+          setDeliveryCost(dj.cost != null ? String(dj.cost) : '')
+          setDeliveryNote(dj.note || '')
+        } else {
+          const d = parseDelivery(found.customer_request)
+          setDeliveryType(d.type)
+          setDeliveryNote(d.memo)  // 기존 메모 → 요청내용으로 이관
+        }
         // PR-H (2026-05-16) — 재진입 시 배차된 차량 복원
         //   fmi_rental_id → fmi_rentals.vehicle_id (cars.id) → cars 정보
         if (found.fmi_rental_id) {
@@ -515,8 +534,14 @@ export default function DispatchDetailPage({
             expected_dispatch_date: expDispatch || null,
             expected_return_date: expReturn || null,
             status,
-            // PR-C2c — 탁송/외부오더 메모
-            customer_request: buildDelivery(deliveryType, deliveryMemo),
+            // PR-V4 — 탁송 지시 구조화 (delivery_json) + customer_request 요약(backward-compat)
+            customer_request: buildDelivery(deliveryType, deliveryNote),
+            delivery_json: deliveryType ? JSON.stringify({
+              type: deliveryType, vendor: deliveryVendor, phone: deliveryPhone,
+              origin: deliveryOrigin, dest: deliveryDest,
+              waypoints: deliveryWaypoints.filter((w) => w.addr || w.memo),
+              cost: deliveryCost === '' ? null : Number(deliveryCost), note: deliveryNote,
+            }) : null,
           }),
         })
         const json = await res.json()
@@ -1569,20 +1594,42 @@ export default function DispatchDetailPage({
                       </span>
                     )}
                   </div>
-                  <textarea
-                    value={deliveryMemo}
-                    onChange={(e) => setDeliveryMemo(e.target.value)}
-                    placeholder={
-                      deliveryType === 'self' ? '탁송 기사 / 일시 / 픽업 장소 등 메모…'
-                      : deliveryType === 'external' ? '외주 업체명 / 연락처 / 요청 내용 등 메모…'
-                      : '배차 특이사항 메모…'
-                    }
-                    rows={2}
-                    style={{
-                      ...GLASS.L1, width: '100%', padding: '8px 10px', borderRadius: 8, fontSize: 12, color: '#1e293b',
-                      resize: 'vertical', fontFamily: 'inherit',
-                    }}
-                  />
+                  {deliveryType ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, ...GLASS.L1, padding: 10, borderRadius: 8 }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                        <input value={deliveryVendor} onChange={(e) => setDeliveryVendor(e.target.value)} placeholder={deliveryType === 'self' ? '탁송 기사명' : '외주 업체명'} style={{ ...GLASS.L1, padding: '7px 9px', borderRadius: 7, fontSize: 12, color: '#1e293b' }} />
+                        <input value={deliveryPhone} onChange={(e) => setDeliveryPhone(e.target.value)} placeholder="연락처" style={{ ...GLASS.L1, padding: '7px 9px', borderRadius: 7, fontSize: 12, color: '#1e293b' }} />
+                      </div>
+                      <input value={deliveryOrigin} onChange={(e) => setDeliveryOrigin(e.target.value)} placeholder="🟢 출발지" style={{ ...GLASS.L1, padding: '7px 9px', borderRadius: 7, fontSize: 12, color: '#1e293b' }} />
+                      {deliveryWaypoints.map((w, i) => (
+                        <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                          <input value={w.addr} onChange={(e) => setDeliveryWaypoints((ws) => ws.map((x, j) => j === i ? { ...x, addr: e.target.value } : x))} placeholder={`🔵 경유지 ${i + 1}`} style={{ ...GLASS.L1, padding: '7px 9px', borderRadius: 7, fontSize: 12, color: '#1e293b', flex: 2 }} />
+                          <input value={w.memo} onChange={(e) => setDeliveryWaypoints((ws) => ws.map((x, j) => j === i ? { ...x, memo: e.target.value } : x))} placeholder="메모" style={{ ...GLASS.L1, padding: '7px 9px', borderRadius: 7, fontSize: 12, color: '#1e293b', flex: 1 }} />
+                          <button onClick={() => setDeliveryWaypoints((ws) => ws.filter((_, j) => j !== i))} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#ef4444', fontSize: 16 }}>×</button>
+                        </div>
+                      ))}
+                      <button onClick={() => setDeliveryWaypoints((ws) => [...ws, { addr: '', memo: '' }])} style={{ alignSelf: 'flex-start', padding: '4px 10px', borderRadius: 7, border: '1px dashed rgba(59,110,181,0.4)', background: 'transparent', cursor: 'pointer', fontSize: 11, fontWeight: 700, color: '#1d4ed8' }}>+ 경유지 추가</button>
+                      <input value={deliveryDest} onChange={(e) => setDeliveryDest(e.target.value)} placeholder="🔴 도착지" style={{ ...GLASS.L1, padding: '7px 9px', borderRadius: 7, fontSize: 12, color: '#1e293b' }} />
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 6 }}>
+                        <input type="number" value={deliveryCost} onChange={(e) => setDeliveryCost(e.target.value)} placeholder="비용(원)" style={{ ...GLASS.L1, padding: '7px 9px', borderRadius: 7, fontSize: 12, color: '#1e293b' }} />
+                        <input value={deliveryNote} onChange={(e) => setDeliveryNote(e.target.value)} placeholder="요청 메모" style={{ ...GLASS.L1, padding: '7px 9px', borderRadius: 7, fontSize: 12, color: '#1e293b' }} />
+                      </div>
+                      <button onClick={() => {
+                        const lines = ['[배차 요청]']
+                        if (deliveryOrigin) lines.push('출발: ' + deliveryOrigin)
+                        deliveryWaypoints.forEach((w, i) => { if (w.addr) lines.push(`경유${deliveryWaypoints.length > 1 ? i + 1 : ''}: ${w.addr}${w.memo ? ' (' + w.memo + ')' : ''}`) })
+                        if (deliveryDest) lines.push('도착: ' + deliveryDest)
+                        if (deliveryCost) lines.push('비용: ' + Number(deliveryCost).toLocaleString('ko-KR') + '원')
+                        if (deliveryVendor || deliveryPhone) lines.push(`업체: ${deliveryVendor} ${deliveryPhone}`.trim())
+                        if (deliveryNote) lines.push('요청: ' + deliveryNote)
+                        navigator.clipboard?.writeText(lines.join('\n')).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000) })
+                      }} style={{ alignSelf: 'flex-start', padding: '7px 14px', borderRadius: 8, border: 'none', background: copied ? '#10b981' : '#3b6eb5', color: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 800 }}>
+                        {copied ? '✅ 복사됨' : '📋 복사 (카톡 전송용)'}
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: 11, color: '#94a3b8' }}>탁송요청 또는 외부오더를 선택하면 출발·도착·경유지·비용 입력이 열립니다.</div>
+                  )}
                 </div>
                 {/* PR-N7.2 — 청구 정보 (청구유형·과실율·청구율) */}
                 <div style={{ gridColumn: '1 / -1' }}>

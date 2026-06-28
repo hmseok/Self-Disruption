@@ -31,6 +31,7 @@ export type DispatchOrder = {
   ride_accident_id: number
   consultation_note: string | null
   customer_request: string | null
+  delivery_json: string | null  // PR-V4 — 탁송 지시 구조 (JSON 문자열)
   expected_dispatch_date: string | null
   expected_return_date: string | null
   status: 'new' | 'consulting' | 'scheduled' | 'dispatched' | 'done' | 'cancelled'

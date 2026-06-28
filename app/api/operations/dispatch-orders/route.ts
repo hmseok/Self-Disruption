@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
     // P2.1c-1: cafe24_otpt_* 컬럼이 있을 수도, 없을 수도 (마이그 미적용 케이스)
     // Try with new columns; if fail, fallback.
     const baseSqlWithCafe24 = `SELECT
-         o.id, o.ride_accident_id, o.consultation_note, o.customer_request,
+         o.id, o.ride_accident_id, o.consultation_note, o.customer_request, o.delivery_json,
          o.expected_dispatch_date, o.expected_return_date,
          o.status, o.assigned_to, o.fmi_rental_id,
          o.created_at, o.updated_at, o.created_by, o.updated_by,
@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
        FROM operations_dispatch_orders o
        LEFT JOIN ride_accidents a ON a.id = o.ride_accident_id`
     const baseSqlLegacy = `SELECT
-         o.id, o.ride_accident_id, o.consultation_note, o.customer_request,
+         o.id, o.ride_accident_id, o.consultation_note, o.customer_request, o.delivery_json,
          o.expected_dispatch_date, o.expected_return_date,
          o.status, o.assigned_to, o.fmi_rental_id,
          o.created_at, o.updated_at, o.created_by, o.updated_by,

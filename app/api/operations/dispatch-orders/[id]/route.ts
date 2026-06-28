@@ -81,6 +81,7 @@ export async function PATCH(
     const {
       consultation_note,
       customer_request,
+      delivery_json,
       expected_dispatch_date,
       expected_return_date,
       status,
@@ -96,6 +97,9 @@ export async function PATCH(
     }
     if (customer_request !== undefined) {
       sets.push('customer_request = ?'); vals.push(customer_request || null)
+    }
+    if (delivery_json !== undefined) {
+      sets.push('delivery_json = ?'); vals.push(delivery_json || null)  // JSON 문자열 (탁송 지시 구조)
     }
     if (expected_dispatch_date !== undefined) {
       sets.push('expected_dispatch_date = ?'); vals.push(expected_dispatch_date || null)
