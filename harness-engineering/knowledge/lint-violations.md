@@ -5117,3 +5117,41 @@
 - sql-fn-lint: total=0
 - api-trace: broken=25, newBroken=0
 - ui-coverage: warnings=20
+
+## 2026-06-28 11:26:58
+- sql-lint: total=48, new=0, known=48
+- sql-fn-lint: total=0
+- api-trace: broken=25, newBroken=0
+- ui-coverage: warnings=0
+
+## 2026-06-28 11:32:48
+- sql-lint: total=48, new=0, known=48
+- sql-fn-lint: total=0
+- api-trace: broken=25, newBroken=0
+- ui-coverage: warnings=20
+
+## 2026-06-28 11:41:51
+- sql-lint: total=51, new=3, known=48
+- sql-fn-lint: total=0
+- api-trace: broken=25, newBroken=0
+- ui-coverage: warnings=20
+  - **새 SQL 컬럼 위반**:
+    - `app/api/finance/fmi-rental-payments/route.ts:30` related_type (unprefixed) (table `fmi_rentals` 에 `related_type` 없음)
+    - `app/api/finance/fmi-rental-payments/route.ts:30` type (unprefixed) (table `fmi_rentals` 에 `type` 없음)
+    - `app/api/finance/fmi-rental-payments/route.ts:30` deleted_at (unprefixed) (table `fmi_rentals` 에 `deleted_at` 없음)
+
+## 2026-06-28 11:42:21
+- sql-lint: total=51, new=3, known=48
+- sql-fn-lint: total=0
+- api-trace: broken=25, newBroken=0
+- ui-coverage: warnings=20
+  - **새 SQL 컬럼 위반**:
+    - `app/api/finance/fmi-rental-payments/route.ts:30` related_type (unprefixed) (table `fmi_rentals` 에 `related_type` 없음)
+    - `app/api/finance/fmi-rental-payments/route.ts:30` type (unprefixed) (table `fmi_rentals` 에 `type` 없음)
+    - `app/api/finance/fmi-rental-payments/route.ts:30` deleted_at (unprefixed) (table `fmi_rentals` 에 `deleted_at` 없음)
+
+## 2026-06-28 11:43:03
+- sql-lint: total=48, new=0, known=48
+- sql-fn-lint: total=0
+- api-trace: broken=25, newBroken=0
+- ui-coverage: warnings=20

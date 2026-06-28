@@ -15,7 +15,7 @@ import * as XLSX from 'xlsx'
 // 4탭: 통장 거래 | 카드 거래 | 자동매칭 | 정산 연결
 // ═══════════════════════════════════════════════════════════════
 
-type TabKey = 'bank' | 'card' | 'workflow' | 'classify' | 'matchreview' | 'settlement' | 'sms' | 'mapping' | 'rules' | 'system'
+type TabKey = 'bank' | 'card' | 'payments' | 'workflow' | 'classify' | 'matchreview' | 'settlement' | 'sms' | 'mapping' | 'rules' | 'system'
 
 interface Transaction {
   id: string
@@ -256,6 +256,19 @@ export default function BankCardPage() {
   const [search, setSearch] = useState('')
   // 페이지 단순화 — 평소엔 큰 구성(통장·카드·정산)만, 분석용 탭은 「고급」으로 접기 (사용자 명령 2026-06-28)
   const [showAdvTabs, setShowAdvTabs] = useState(false)
+  // 대차료 입금현황 탭
+  const [payRows, setPayRows] = useState<any[]>([])
+  const [paySummary, setPaySummary] = useState<{ total: number; paid_count: number; unpaid_count: number; paid_sum: number } | null>(null)
+  const [payFilter, setPayFilter] = useState<'all' | 'paid' | 'unpaid'>('all')
+  const [payLoading, setPayLoading] = useState(false)
+  const loadPayments = useCallback(async () => {
+    setPayLoading(true)
+    try {
+      const { json } = await fetchWithAuth(`/api/finance/fmi-rental-payments?status=all`)
+      setPayRows(Array.isArray(json?.data) ? json.data : [])
+      setPaySummary(json?.summary || null)
+    } catch { setPayRows([]) } finally { setPayLoading(false) }
+  }, [])
 
   // 데이터
   const [transactions, setTransactions] = useState<Transaction[]>([])
@@ -1206,11 +1219,12 @@ export default function BankCardPage() {
   useEffect(() => {
     if (activeTab === 'sms') loadSmsData()
     if (activeTab === 'mapping') loadMappings()
+    if (activeTab === 'payments') loadPayments()
     if (activeTab === 'matchreview' || activeTab === 'workflow') {
       loadMatchReview()
       loadProcessingStatus()
     }
-  }, [activeTab, loadSmsData, loadMappings, loadMatchReview])
+  }, [activeTab, loadSmsData, loadMappings, loadMatchReview, loadPayments])
 
   // 실패 건 재파싱
   const [reparsing, setReparsing] = useState(false)
@@ -3049,6 +3063,7 @@ export default function BankCardPage() {
   const allTabs = [
     { key: 'bank', label: '통장 거래', count: summary?.transactions.bank },
     { key: 'card', label: '카드 거래', count: summary?.transactions.card },
+    { key: 'payments', label: '💰 대차료 입금현황' },
     { key: 'settlement', label: '정산 연결', count: summary?.settlement.total },
     // ── 아래는 분석·관리용 (평소 숨김) ──
     { key: 'workflow', label: '🌊 운영 흐름', count: (summary?.transactions.classified || 0) + (summary?.transactions.unclassified || 0), adv: true },
@@ -3069,9 +3084,7 @@ export default function BankCardPage() {
     { label: '전체 거래', value: nf(summary.transactions.total), tint: 'blue', icon: '📊' },
     { label: '통장', value: nf(summary.transactions.bank), tint: 'green', icon: '🏦' },
     { label: '카드', value: nf(summary.transactions.card), tint: 'purple', icon: '💳' },
-    { label: '분류완료', value: nf(summary.transactions.classified), tint: 'green', icon: '✓',
-      subValue: summary.transactions.total > 0 ? `${Math.round(summary.transactions.classified / summary.transactions.total * 100)}%` : '0%', subTone: 'up' as const },
-    { label: '미분류', value: nf(summary.transactions.unclassified), tint: summary.transactions.unclassified > 0 ? 'amber' : 'green', icon: summary.transactions.unclassified > 0 ? '⚠' : '✓' },
+    // 분류완료·미분류는 분석성 지표 → 「고급」 탭에서 확인 (상단 단순화, 2026-06-28)
   ] : []
 
   // ── 통장 거래 탭 ──────────────────────────────────────
@@ -3612,6 +3625,77 @@ export default function BankCardPage() {
 
       {/* 탭별 콘텐츠 */}
       <div style={{ padding: '0 16px' }}>
+
+        {/* ──── 대차료 입금현황 탭 (단순화 — 청구 대비 입금/미입금 한눈에) ──── */}
+        {activeTab === 'payments' && (
+          <div style={{ padding: '0 16px 16px' }}>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
+              <div style={{ flex: 1, minWidth: 150, background: COLORS.bgGreen, border: `1px solid ${COLORS.borderGreen}`, borderRadius: 12, padding: '12px 16px' }}>
+                <div style={{ fontSize: 12, color: COLORS.success, fontWeight: 700 }}>✅ 입금 확인</div>
+                <div style={{ fontSize: 22, fontWeight: 800, color: COLORS.success }}>{paySummary?.paid_count ?? 0}건</div>
+                <div style={{ fontSize: 11, color: COLORS.textMuted }}>{nf(paySummary?.paid_sum ?? 0)}원</div>
+              </div>
+              <div style={{ flex: 1, minWidth: 150, background: COLORS.bgAmber, border: `1px solid ${COLORS.borderAmber}`, borderRadius: 12, padding: '12px 16px' }}>
+                <div style={{ fontSize: 12, color: COLORS.warning, fontWeight: 700 }}>⏳ 미입금</div>
+                <div style={{ fontSize: 22, fontWeight: 800, color: COLORS.warning }}>{paySummary?.unpaid_count ?? 0}건</div>
+                <div style={{ fontSize: 11, color: COLORS.textMuted }}>보험사 입금 대기 / 미매칭</div>
+              </div>
+              <div style={{ flex: 1, minWidth: 150, background: '#fff', border: '0.5px solid rgba(0,0,0,0.08)', borderRadius: 12, padding: '12px 16px' }}>
+                <div style={{ fontSize: 12, color: COLORS.textSecondary, fontWeight: 700 }}>📋 전체 대차건</div>
+                <div style={{ fontSize: 22, fontWeight: 800, color: COLORS.primary }}>{paySummary?.total ?? 0}건</div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10, flexWrap: 'wrap' }}>
+              {(['all', 'paid', 'unpaid'] as const).map((k) => (
+                <button key={k} onClick={() => setPayFilter(k)} style={{
+                  padding: '6px 12px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                  border: payFilter === k ? 'none' : '1px solid rgba(0,0,0,0.1)',
+                  background: payFilter === k ? COLORS.primary : '#fff', color: payFilter === k ? '#fff' : COLORS.textSecondary,
+                }}>{k === 'all' ? '전체' : k === 'paid' ? '입금 확인' : '미입금'}</button>
+              ))}
+              <span style={{ flex: 1 }} />
+              <button onClick={async () => {
+                setPayLoading(true)
+                try { await fetchWithAuth('/api/finance/transactions/auto-match-fmi-rental', { method: 'POST', body: { mode: 'insurance', dryRun: false } }) } catch {}
+                await loadPayments()
+              }} disabled={payLoading} style={{
+                padding: '7px 14px', borderRadius: 9, border: 'none', background: COLORS.primary, color: '#fff',
+                fontSize: 12, fontWeight: 800, cursor: payLoading ? 'wait' : 'pointer',
+              }}>{payLoading ? '처리 중…' : '🔄 자동매칭 실행'}</button>
+            </div>
+
+            {payLoading ? (
+              <div style={{ padding: 30, textAlign: 'center', color: COLORS.textMuted }}>불러오는 중…</div>
+            ) : (() => {
+              const rows = payFilter === 'all' ? payRows
+                : payFilter === 'paid' ? payRows.filter((r) => r.status !== 'unpaid')
+                : payRows.filter((r) => r.status === 'unpaid')
+              if (rows.length === 0) return <div style={{ padding: 30, textAlign: 'center', color: COLORS.textMuted }}>해당 건이 없습니다.</div>
+              const GC = '92px minmax(0,1fr) 88px 96px 96px 78px'
+              return (
+                <div style={{ background: '#fff', border: '0.5px solid rgba(0,0,0,0.08)', borderRadius: 12, overflow: 'hidden' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: GC, gap: 8, padding: '10px 14px', fontSize: 11, fontWeight: 700, color: COLORS.textMuted, borderBottom: '0.5px solid rgba(0,0,0,0.06)' }}>
+                    <span>배차일</span><span>사고차량 · 대차차량 · 고객</span><span>보험사</span><span style={{ textAlign: 'right' }}>입금액</span><span>입금일</span><span style={{ textAlign: 'center' }}>상태</span>
+                  </div>
+                  {rows.slice(0, 500).map((r) => (
+                    <div key={r.id} onClick={() => { window.location.href = `/operations/rentals/${r.id}` }}
+                      style={{ display: 'grid', gridTemplateColumns: GC, gap: 8, padding: '9px 14px', fontSize: 12, borderBottom: '0.5px solid rgba(0,0,0,0.04)', cursor: 'pointer', alignItems: 'center' }}>
+                      <span style={{ color: COLORS.textSecondary, whiteSpace: 'nowrap' }}>{fmtDate(r.dispatch_date)}</span>
+                      <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: COLORS.textPrimary }}>{r.customer_car_number || '-'} · 🚗{r.vehicle_car_number || '-'} · {r.customer_name || '-'}</span>
+                      <span style={{ color: COLORS.textSecondary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.insurance_company || '-'}</span>
+                      <span style={{ textAlign: 'right', fontWeight: 700, color: r.paid_amount > 0 ? COLORS.income : COLORS.textMuted }}>{r.paid_amount > 0 ? nf(r.paid_amount) : '-'}</span>
+                      <span style={{ color: COLORS.textSecondary, whiteSpace: 'nowrap' }}>{r.paid_date ? fmtDate(r.paid_date) : '-'}</span>
+                      <span style={{ textAlign: 'center' }}>{r.status === 'unpaid'
+                        ? <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 10, background: COLORS.bgAmber, color: COLORS.warning, whiteSpace: 'nowrap' }}>미입금</span>
+                        : <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 10, background: COLORS.bgGreen, color: COLORS.success, whiteSpace: 'nowrap' }}>입금확인</span>}</span>
+                    </div>
+                  ))}
+                </div>
+              )
+            })()}
+          </div>
+        )}
 
         {/* ──── 통장 거래 탭 ──── */}
         {activeTab === 'bank' && (
