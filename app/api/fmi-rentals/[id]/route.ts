@@ -36,12 +36,25 @@ const ALLOWED_FIELDS = new Set([
   'repair_factory', 'customer_birth', 'paid_amount', 'payment_status', 'payment_memo',
   // PR-N7.1 (2026-05-24) — 과실율 / 청구율
   'fault_rate', 'claim_rate',
+  // PR-V1 (2026-06-28) — 부가세 + 영업지원(따봉) 건별
+  'vat_amount', 'vat_incl_yn', 'vat_invoice_issued_yn', 'vat_invoice_date',
+  'vat_billed_yn', 'vat_paid_yn', 'vat_paid_date',
+  'sales_support_yn', 'sales_order', 'sales_deposit_date', 'sales_deposit_amount', 'sales_payout_rate',
 ])
-const DATE_FIELDS = new Set(['dispatch_date', 'expected_return_date', 'actual_return_date'])
+const DATE_FIELDS = new Set([
+  'dispatch_date', 'expected_return_date', 'actual_return_date',
+  'vat_invoice_date', 'vat_paid_date', 'sales_deposit_date',
+])
 const NUMBER_FIELDS = new Set([
   'rental_days', 'dispatch_mileage', 'return_mileage', 'driven_km',
   'daily_rate', 'total_rental_fee', 'additional_charges', 'deduction_amount', 'final_claim_amount',
   'paid_amount', 'fault_rate', 'claim_rate',
+  'vat_amount', 'sales_deposit_amount', 'sales_payout_rate',
+])
+// TINYINT(1) — true/false/1/0 → 1/0 정규화
+const BOOL_FIELDS = new Set([
+  'vat_incl_yn', 'vat_invoice_issued_yn', 'vat_billed_yn', 'vat_paid_yn', 'sales_support_yn',
+  'return_damage_yn', 'vat_extra_billing',
 ])
 
 export async function GET(
@@ -84,9 +97,9 @@ export async function PATCH(
     if (!id) return NextResponse.json({ error: 'id 필수' }, { status: 400 })
     const body = await request.json()
 
-    // 현재 상태 로드 (차량 상태 동기화 판단용)
+    // 현재 상태 로드 (차량 상태 동기화 + 부가세 자동계산용)
     const existing = await prisma.$queryRaw<any[]>`
-      SELECT id, vehicle_id, status FROM fmi_rentals WHERE id = ${id} LIMIT 1
+      SELECT id, vehicle_id, status, final_claim_amount, vat_incl_yn FROM fmi_rentals WHERE id = ${id} LIMIT 1
     `
     if (!existing || existing.length === 0) {
       return NextResponse.json({ error: 'not found' }, { status: 404 })
@@ -96,15 +109,33 @@ export async function PATCH(
     // 화이트리스트 필드만 UPDATE 구성
     const setFrags: string[] = []
     const values: any[] = []
+    const toBool01 = (x: any) => (x === true || x === 1 || x === '1' || x === 'true') ? 1 : 0
     for (const [key, raw] of Object.entries(body)) {
       if (!ALLOWED_FIELDS.has(key)) continue
+      if (key === 'vat_amount') continue   // 서버 자동계산 (아래) — 클라이언트 값 무시
       let v: any = raw
       if (v === undefined) continue
       if (DATE_FIELDS.has(key)) v = toMySqlDt(v as any)
+      else if (BOOL_FIELDS.has(key)) v = toBool01(v)
       else if (NUMBER_FIELDS.has(key)) v = v === null || v === '' ? null : Number(v)
       setFrags.push(`${key} = ?`)
       values.push(v)
     }
+
+    // 부가세 자동계산 — final_claim_amount 또는 vat_incl_yn 변경 시 (공급가×10% / 포함분÷1.1)
+    if ('final_claim_amount' in body || 'vat_incl_yn' in body) {
+      const claim = ('final_claim_amount' in body)
+        ? (body.final_claim_amount === null || body.final_claim_amount === '' ? null : Number(body.final_claim_amount))
+        : (prev.final_claim_amount !== null ? Number(prev.final_claim_amount) : null)
+      const incl = ('vat_incl_yn' in body) ? toBool01(body.vat_incl_yn) : toBool01(prev.vat_incl_yn)
+      let vat: number | null = null
+      if (claim !== null && Number.isFinite(claim) && claim > 0) {
+        vat = incl ? (claim - Math.round(claim / 1.1)) : Math.round(claim * 0.1)
+      }
+      setFrags.push('vat_amount = ?')
+      values.push(vat)
+    }
+
     if (setFrags.length === 0) {
       return NextResponse.json({ error: '변경할 필드가 없습니다' }, { status: 400 })
     }

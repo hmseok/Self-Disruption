@@ -56,6 +56,19 @@ type ClaimRow = {
   // PR-N7.1 — 과실율 / 청구율
   fault_rate: number | null
   claim_rate: number | null
+  // PR-V1 (2026-06-28) — 부가세 + 영업지원(따봉)
+  vat_amount: number | null
+  vat_incl_yn: number | boolean | null
+  vat_invoice_issued_yn: number | boolean | null
+  vat_invoice_date: string | null
+  vat_billed_yn: number | boolean | null
+  vat_paid_yn: number | boolean | null
+  vat_paid_date: string | null
+  sales_support_yn: number | boolean | null
+  sales_order: string | null
+  sales_deposit_date: string | null
+  sales_deposit_amount: number | null
+  sales_payout_rate: number | null
 }
 
 type FilterKey = 'active' | 'all' | 'returned' | 'claiming' | 'settled'
@@ -99,6 +112,19 @@ export default function ClaimsTab() {
   const [lotteDays, setLotteDays] = useState<string>('')        // PR-N7 — 산출 대여일수
   const [faultRate, setFaultRate] = useState<string>('')        // PR-N7.1 — 과실율(%)
   const [claimRate, setClaimRate] = useState<string>('')        // PR-N7.1 — 청구율(%)
+  // PR-V1 — 부가세 + 영업지원(따봉)
+  const b01 = (x: any) => (x === true || x === 1 || x === '1')
+  const [vatIncl, setVatIncl] = useState(false)
+  const [vatInvoiceIssued, setVatInvoiceIssued] = useState(false)
+  const [vatInvoiceDate, setVatInvoiceDate] = useState('')
+  const [vatBilled, setVatBilled] = useState(false)
+  const [vatPaid, setVatPaid] = useState(false)
+  const [vatPaidDate, setVatPaidDate] = useState('')
+  const [salesSupport, setSalesSupport] = useState(false)
+  const [salesOrder, setSalesOrder] = useState('')
+  const [salesDepositDate, setSalesDepositDate] = useState('')
+  const [salesDepositAmount, setSalesDepositAmount] = useState('')
+  const [salesPayoutRate, setSalesPayoutRate] = useState('')
   const [claimBusy, setClaimBusy] = useState(false)
   const [claimMsg, setClaimMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
 
@@ -144,6 +170,17 @@ export default function ClaimsTab() {
     setLotteDays(r.rental_days != null ? String(r.rental_days) : '')
     setFaultRate(r.fault_rate != null ? String(r.fault_rate) : '')
     setClaimRate(r.claim_rate != null ? String(r.claim_rate) : '')
+    setVatIncl(b01(r.vat_incl_yn))
+    setVatInvoiceIssued(b01(r.vat_invoice_issued_yn))
+    setVatInvoiceDate(r.vat_invoice_date ? String(r.vat_invoice_date).slice(0, 10) : '')
+    setVatBilled(b01(r.vat_billed_yn))
+    setVatPaid(b01(r.vat_paid_yn))
+    setVatPaidDate(r.vat_paid_date ? String(r.vat_paid_date).slice(0, 10) : '')
+    setSalesSupport(b01(r.sales_support_yn))
+    setSalesOrder(r.sales_order || '')
+    setSalesDepositDate(r.sales_deposit_date ? String(r.sales_deposit_date).slice(0, 10) : '')
+    setSalesDepositAmount(r.sales_deposit_amount != null ? String(r.sales_deposit_amount) : '')
+    setSalesPayoutRate(r.sales_payout_rate != null ? String(r.sales_payout_rate) : '')
     setClaimMsg(null)
     setClaimModalOpen(true)
   }, [])
@@ -190,6 +227,17 @@ export default function ClaimsTab() {
           payment_memo: paymentMemo || null,
           fault_rate: faultRate === '' ? null : Number(faultRate),
           claim_rate: claimRate === '' ? null : Number(claimRate),
+          vat_incl_yn: vatIncl ? 1 : 0,
+          vat_invoice_issued_yn: vatInvoiceIssued ? 1 : 0,
+          vat_invoice_date: vatInvoiceDate || null,
+          vat_billed_yn: vatBilled ? 1 : 0,
+          vat_paid_yn: vatPaid ? 1 : 0,
+          vat_paid_date: vatPaidDate || null,
+          sales_support_yn: salesSupport ? 1 : 0,
+          sales_order: salesOrder || null,
+          sales_deposit_date: salesDepositDate || null,
+          sales_deposit_amount: salesDepositAmount === '' ? null : Number(salesDepositAmount),
+          sales_payout_rate: salesPayoutRate === '' ? null : Number(salesPayoutRate),
           status: nextStatus,
         }),
       })
@@ -203,7 +251,9 @@ export default function ClaimsTab() {
     } finally {
       setClaimBusy(false)
     }
-  }, [selectedClaim, claimAmount, claimNo, claimType, paymentMemo, faultRate, claimRate, refresh])
+  }, [selectedClaim, claimAmount, claimNo, claimType, paymentMemo, faultRate, claimRate,
+      vatIncl, vatInvoiceIssued, vatInvoiceDate, vatBilled, vatPaid, vatPaidDate,
+      salesSupport, salesOrder, salesDepositDate, salesDepositAmount, salesPayoutRate, refresh])
 
   // 청구관리 영역 (returned/claiming/settled) — 부가세 필터 적용
   const claimRows = useMemo(() => {
@@ -571,6 +621,61 @@ export default function ClaimsTab() {
                   style={{ ...GLASS.L1, width: '100%', padding: '9px 12px', borderRadius: 8, fontSize: 13, color: '#1e293b' }}
                 />
               </div>
+
+              {/* PR-V1 — 부가세 */}
+              {(() => {
+                const claimN = Number(claimAmount) || 0
+                const supply = vatIncl ? Math.round(claimN / 1.1) : claimN
+                const vat = vatIncl ? (claimN - supply) : Math.round(claimN * 0.1)
+                const total = supply + vat
+                const chk = (label: string, val: boolean, on: (v: boolean) => void) => (
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#475569', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={val} onChange={(e) => on(e.target.checked)} style={{ width: 14, height: 14, accentColor: '#3b6eb5', cursor: 'pointer' }} />
+                    {label}
+                  </label>
+                )
+                return (
+                  <div style={{ ...GLASS.L2, padding: 11, borderRadius: 10, border: '1px solid rgba(59,110,181,0.18)' }}>
+                    <div style={{ fontSize: 12, fontWeight: 800, color: '#1d4ed8', marginBottom: 8 }}>🧾 부가세</div>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#475569', cursor: 'pointer', marginBottom: 8 }}>
+                      <input type="checkbox" checked={vatIncl} onChange={(e) => setVatIncl(e.target.checked)} style={{ width: 14, height: 14, accentColor: '#3b6eb5', cursor: 'pointer' }} />
+                      청구액에 부가세 포함 (체크 시 ÷1.1 / 미체크 시 +10%)
+                    </label>
+                    <div style={{ display: 'flex', gap: 14, fontSize: 12, marginBottom: 9, flexWrap: 'wrap' }}>
+                      <span style={{ color: '#64748b' }}>공급가 <b style={{ color: '#0f2440' }}>{supply.toLocaleString('ko-KR')}원</b></span>
+                      <span style={{ color: '#64748b' }}>부가세 <b style={{ color: '#1d4ed8' }}>{vat.toLocaleString('ko-KR')}원</b></span>
+                      <span style={{ color: '#64748b' }}>합계 <b style={{ color: '#0f2440' }}>{total.toLocaleString('ko-KR')}원</b></span>
+                    </div>
+                    <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'center' }}>
+                      {chk('세금계산서 발행', vatInvoiceIssued, setVatInvoiceIssued)}
+                      {vatInvoiceIssued && <input type="date" value={vatInvoiceDate} onChange={(e) => setVatInvoiceDate(e.target.value)} style={{ ...GLASS.L1, padding: '5px 8px', borderRadius: 6, fontSize: 12, color: '#1e293b' }} />}
+                      {chk('부가세 청구', vatBilled, setVatBilled)}
+                      {chk('지급(입금)', vatPaid, setVatPaid)}
+                      {vatPaid && <input type="date" value={vatPaidDate} onChange={(e) => setVatPaidDate(e.target.value)} style={{ ...GLASS.L1, padding: '5px 8px', borderRadius: 6, fontSize: 12, color: '#1e293b' }} />}
+                    </div>
+                    {!vatBilled && (
+                      <div style={{ fontSize: 11, color: '#b45309', marginTop: 7 }}>※ 부가세 청구 미체크 — 미회수(법인 등). 회수 대상에서 제외</div>
+                    )}
+                  </div>
+                )
+              })()}
+
+              {/* PR-V1 — 영업지원(따봉) */}
+              <div style={{ ...GLASS.L2, padding: 11, borderRadius: 10, border: '1px solid rgba(16,185,129,0.18)' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 800, color: '#047857', cursor: 'pointer' }}>
+                  <input type="checkbox" checked={salesSupport} onChange={(e) => setSalesSupport(e.target.checked)} style={{ width: 14, height: 14, accentColor: '#10b981', cursor: 'pointer' }} />
+                  📌 영업지원 (따봉)
+                </label>
+                {salesSupport && (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, marginTop: 9 }}>
+                    <div><label style={{ fontSize: 11, color: '#475569' }}>오더</label><input value={salesOrder} onChange={(e) => setSalesOrder(e.target.value)} style={{ ...GLASS.L1, width: '100%', padding: '7px 10px', borderRadius: 7, fontSize: 12, color: '#1e293b' }} /></div>
+                    <div><label style={{ fontSize: 11, color: '#475569' }}>입금일</label><input type="date" value={salesDepositDate} onChange={(e) => setSalesDepositDate(e.target.value)} style={{ ...GLASS.L1, width: '100%', padding: '7px 10px', borderRadius: 7, fontSize: 12, color: '#1e293b' }} /></div>
+                    <div><label style={{ fontSize: 11, color: '#475569' }}>입금액</label><input type="number" value={salesDepositAmount} onChange={(e) => setSalesDepositAmount(e.target.value)} style={{ ...GLASS.L1, width: '100%', padding: '7px 10px', borderRadius: 7, fontSize: 12, color: '#1e293b' }} /></div>
+                    <div><label style={{ fontSize: 11, color: '#475569' }}>지급율(%)</label><input type="number" value={salesPayoutRate} onChange={(e) => setSalesPayoutRate(e.target.value)} style={{ ...GLASS.L1, width: '100%', padding: '7px 10px', borderRadius: 7, fontSize: 12, color: '#1e293b' }} /></div>
+                  </div>
+                )}
+              </div>
+
               {claimMsg && (
                 <div style={{ fontSize: 12, fontWeight: 700, color: claimMsg.type === 'ok' ? '#15803d' : '#991b1b' }}>
                   {claimMsg.type === 'ok' ? '✅' : '⚠️'} {claimMsg.text}

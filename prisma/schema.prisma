@@ -142,6 +142,19 @@ model FmiRental {
   handler_name         String?
   dispatcher_name      String?
   notes                String?   @db.Text
+  // PR-V1 (2026-06-28) — 부가세 + 영업지원(따봉) 건별 관리
+  vat_amount            Decimal?  @db.Decimal(12, 0)
+  vat_incl_yn           Boolean?  @default(false)   // 청구액 부가세 포함 여부 (1=포함÷1.1, 0=별도+10%)
+  vat_invoice_issued_yn Boolean?  @default(false)   // 세금계산서 발행
+  vat_invoice_date      DateTime? @db.Date
+  vat_billed_yn         Boolean?  @default(false)   // 부가세 청구
+  vat_paid_yn           Boolean?  @default(false)   // 부가세 지급(입금)
+  vat_paid_date         DateTime? @db.Date
+  sales_support_yn      Boolean?  @default(false)   // 영업지원(따봉)
+  sales_order           String?   @db.VarChar(50)
+  sales_deposit_date    DateTime? @db.Date
+  sales_deposit_amount  Decimal?  @db.Decimal(12, 0)
+  sales_payout_rate     Decimal?  @db.Decimal(5, 2)
   created_at           DateTime  @default(now())
   updated_at           DateTime  @default(now()) @updatedAt
 
