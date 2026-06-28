@@ -155,6 +155,9 @@ model FmiRental {
   sales_deposit_date    DateTime? @db.Date
   sales_deposit_amount  Decimal?  @db.Decimal(12, 0)
   sales_payout_rate     Decimal?  @db.Decimal(5, 2)
+  // PR-V2 (2026-06-28) — 배차 정제 import
+  dispatch_seq          Int?
+  self_vehicle_yn       Boolean?  @default(false)
   created_at           DateTime  @default(now())
   updated_at           DateTime  @default(now()) @updatedAt
 

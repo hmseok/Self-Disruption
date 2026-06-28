@@ -5,6 +5,7 @@ import AccidentIntakeTab from './_tabs/AccidentIntakeTab'
 import WaitingTab from './_tabs/WaitingTab'
 import RentalListTab from './_tabs/RentalListTab'
 import ClaimsTab from './_tabs/ClaimsTab'
+import DispatchImportModal from './DispatchImportModal'
 
 // ═══════════════════════════════════════════════════════════════════
 // /operations — 「대차업무」 통합 페이지
@@ -39,6 +40,7 @@ const TAB_KEYS: SubTab[] = ['intake', 'available', 'dispatched', 'claims']
 
 export default function OperationsPage() {
   const [tab, setTab] = useState<SubTab>('intake')  // default: 접수·상담 (업무 진입점)
+  const [importOpen, setImportOpen] = useState(false)
 
   // ?tab= 쿼리로 초기 탭 지정 — 레거시 링크 매핑
   //   schedule/rentals → 배차중,  accident → 접수·상담,  waiting → 사용가능
@@ -84,6 +86,13 @@ export default function OperationsPage() {
               </button>
             )
           })}
+          <div style={{ flex: 1 }} />
+          <button
+            onClick={() => setImportOpen(true)}
+            style={{ padding: '10px 16px', borderRadius: 10, border: '1px solid rgba(59,110,181,0.3)', cursor: 'pointer', fontSize: 13, fontWeight: 700, background: 'rgba(59,110,181,0.08)', color: '#1d4ed8', whiteSpace: 'nowrap' }}
+          >
+            📥 배차 가져오기
+          </button>
         </div>
 
         {/* Tab content */}
@@ -94,6 +103,8 @@ export default function OperationsPage() {
         {tab === 'dispatched' && <RentalListTab scope="dispatch" />}
 
         {tab === 'claims' && <ClaimsTab />}
+
+        <DispatchImportModal open={importOpen} onClose={() => setImportOpen(false)} />
       </div>
     </div>
   )
