@@ -7,10 +7,28 @@
 const TOKEN_KEY = 'fmi_token'
 const USER_KEY = 'fmi_user'
 
+// ── 토큰 만료(exp) 디코드 ────────────────────────────────────
+//   JWT payload.exp(초) 가 현재보다 과거면 만료. 디코드 실패 = 손상 = 만료 처리.
+export function isTokenExpired(token: string): boolean {
+  try {
+    const part = token.split('.')[1]
+    if (!part) return true
+    const payload = JSON.parse(atob(part.replace(/-/g, '+').replace(/_/g, '/')))
+    if (!payload?.exp) return false  // exp 없으면 만료 판단 보류
+    return payload.exp * 1000 < Date.now()
+  } catch { return true }
+}
+
 // ── 토큰 저장/조회/삭제 ──────────────────────────────────────
 export function getStoredToken(): string | null {
   if (typeof window === 'undefined') return null
-  return localStorage.getItem(TOKEN_KEY)
+  const token = localStorage.getItem(TOKEN_KEY)
+  // 만료 토큰은 즉시 정리 → currentUser=null → 로그인 가드 작동 (스테일 데이터 방지)
+  if (token && isTokenExpired(token)) {
+    clearAuth()
+    return null
+  }
+  return token
 }
 
 export function getStoredUser(): any | null {

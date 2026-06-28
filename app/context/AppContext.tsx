@@ -1,7 +1,7 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState, useRef } from 'react'
-import { auth, getStoredUser } from '../../lib/auth-client'
+import { auth, getStoredUser, clearAuth } from '../../lib/auth-client'
 import type { Profile, UserPagePermission, Position, Department } from '../types/rbac'
 
 // ============================================
@@ -86,6 +86,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       // 프로필 로드
       const profileRes = await fetch(`/api/profiles/me`, { headers })
+      // ★ 세션 무효/만료(401) → 옛 localStorage 폴백(스테일) 대신 깔끔히 로그아웃 + 재로그인
+      if (profileRes.status === 401) {
+        console.warn('AppContext: 세션 만료(401) — 자동 로그아웃')
+        clearAuth()
+        if (typeof window !== 'undefined') window.location.href = '/'
+        return
+      }
       const profileJson = await profileRes.json()
       const profileData = profileJson.data
 
