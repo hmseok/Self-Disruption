@@ -42,6 +42,11 @@ const FUELS = [
 ]
 const TERMS = [24, 36, 48, 60]
 const ANNUAL_KMS = [10000, 15000, 20000, 30000]
+const DRIVER_AGES = [
+  { value: '26세이상', label: '만 26세 이상 (표준)' },
+  { value: '21세이상', label: '만 21세 이상 (+40%)' },
+  { value: '전연령', label: '전 연령 (+65%)' },
+]
 
 const emptyForm = {
   quote_no: '', contract_type: '기존차량', rent_type: 'return',
@@ -55,7 +60,7 @@ const emptyForm = {
   start_date: '', months: '36', end_date: '',
   annual_km: '20000', residual_rate: '',
   monthly_fee: '', deposit: '', upfront_months: '', delivery_fee: '',
-  insurance_option: '',
+  insurance_option: '', driver_age: '26세이상',
   valid_until: '', owner_name: '',
   memo: '',
 }
@@ -106,6 +111,10 @@ export default function NewQuotePage() {
           term_months: Number(form.months),
           annual_km: Number(form.annual_km),
           rent_type: form.rent_type,
+          driver_age: form.driver_age || undefined,
+          residual_rate: form.residual_rate !== '' ? Number(form.residual_rate) : undefined,
+          deposit: form.deposit !== '' ? Number(form.deposit) : undefined,
+          upfront_months: form.upfront_months !== '' ? Number(form.upfront_months) : undefined,
         }),
       })
       const json = await res.json().catch(() => ({}))
@@ -118,7 +127,8 @@ export default function NewQuotePage() {
       setCalcResult(null); setCalcErr((e as Error)?.message || '산출 오류')
     } finally { setCalcLoading(false) }
   }, [form.purchase_price, form.vehicle_brand, form.vehicle_model, form.vehicle_fuel,
-       form.vehicle_engine_cc, form.months, form.annual_km, form.rent_type])
+       form.vehicle_engine_cc, form.months, form.annual_km, form.rent_type,
+       form.driver_age, form.residual_rate, form.deposit, form.upfront_months])
 
   useEffect(() => {
     if (calcDebounceRef.current) clearTimeout(calcDebounceRef.current)
@@ -403,8 +413,12 @@ export default function NewQuotePage() {
                 <input type="number" value={form.upfront_months} onChange={(e) => fld('upfront_months', e.target.value)} style={inputStyle} /></div>
               <div><label style={labelStyle}>인도비</label>
                 <input type="number" value={form.delivery_fee} onChange={(e) => fld('delivery_fee', e.target.value)} style={inputStyle} /></div>
-              <div style={{ gridColumn: 'span 2' }}><label style={labelStyle}>보험 옵션</label>
+              <div><label style={labelStyle}>보험 옵션</label>
                 <input value={form.insurance_option} onChange={(e) => fld('insurance_option', e.target.value)} placeholder="자차/대물/대인" style={inputStyle} /></div>
+              <div><label style={labelStyle}>운전자 연령 (보험)</label>
+                <select value={form.driver_age} onChange={(e) => fld('driver_age', e.target.value)} style={inputStyle}>
+                  {DRIVER_AGES.map((a) => <option key={a.value} value={a.value}>{a.label}</option>)}
+                </select></div>
               <div><label style={labelStyle}>잔존가율 (%)</label>
                 <input type="number" value={form.residual_rate} onChange={(e) => fld('residual_rate', e.target.value)} placeholder="인수형" style={inputStyle} /></div>
               <div><label style={labelStyle}>유효기간</label>

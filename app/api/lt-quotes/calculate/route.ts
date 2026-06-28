@@ -63,6 +63,8 @@ function validateInput(body: any): { ok: true; input: QuoteCostInput } | { ok: f
       upfront_months: body.upfront_months != null ? Number(body.upfront_months) : undefined,
       year: body.year != null ? Number(body.year) : undefined,
       registration_region: body.registration_region || undefined,
+      driver_age: ['26세이상', '21세이상', '전연령'].includes(String(body.driver_age)) ? body.driver_age : undefined,
+      residual_rate: (body.residual_rate != null && Number.isFinite(Number(body.residual_rate))) ? Number(body.residual_rate) : undefined,
     },
   }
 }

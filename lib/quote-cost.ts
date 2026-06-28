@@ -38,6 +38,8 @@ export interface QuoteCostInput {
   upfront_months?: number             // 선납월수 (할인 적용)
   year?: number                       // 연식 (default: 올해)
   registration_region?: string        // 등록 지역 (default: '서울')
+  driver_age?: '26세이상' | '21세이상' | '전연령'  // 운전자 연령 (보험료) — 기본 26세이상
+  residual_rate?: number              // 잔존가율 % 직접 지정 (미지정 시 rent_type 기본)
 }
 
 // ── 출력 ─────────────────────────────────────────────
@@ -64,6 +66,16 @@ export interface QuoteCostResult {
 
   // 부가 — 영업이 협상가 입력 시 마진 재산출용
   acquisition_total: number       // 취득원가 합계 (매입가+취득세+공채+탁송 등)
+
+  // 원가 상세 (작성자용 접기 박스 — 각 항목 산출 근거)
+  cost_detail: Array<{ key: string; label: string; monthly: number; formula: string; source: string }>
+  // 시장 표준가 참고 (영업 비교 가이드)
+  market_reference: {
+    monthly: number               // 시장 평균 월렌트료 (VAT 별도)
+    monthly_with_vat: number      // 시장 평균 월렌트료 (VAT 포함)
+    ratio_pct: number             // 업계 평균 월렌트료/매입가 비율 (%)
+    diff_pct: number              // 우리 견적 vs 시장 평균 (%, +면 비쌈)
+  }
 }
 
 // ── 한국어 연료명 ↔ ENUM 매핑 ──────────────────────────
@@ -123,7 +135,10 @@ export function calculateQuoteCost(input: QuoteCostInput, ref: CostReference): Q
       car_age_mode: 'new',
       custom_car_age: 0,
       contract_type: input.rent_type,
-      residual_rate: input.rent_type === 'buyout' ? 60 : 100,
+      // 잔존가율: 직접 지정 시 우선, 미지정 시 rent_type 기본 (인수형 60 / 반납형 100)
+      residual_rate: (input.residual_rate != null && Number.isFinite(input.residual_rate))
+        ? input.residual_rate
+        : (input.rent_type === 'buyout' ? 60 : 100),
       buyout_premium: 0,
       annual_mileage: input.annual_km / 10000,  // 만 단위
       baseline_km: 2.0,
@@ -140,7 +155,7 @@ export function calculateQuoteCost(input: QuoteCostInput, ref: CostReference): Q
     insurance: {
       auto_mode: true,
       monthly_cost: 0,
-      driver_age: '26세이상',
+      driver_age: input.driver_age || '26세이상',
       deductible: n(r.DEDUCTIBLE_AMOUNT, 500_000),
       own_damage_ratio: 100,
     },
@@ -201,6 +216,36 @@ export function calculateQuoteCost(input: QuoteCostInput, ref: CostReference): Q
     n(bd.maintenance.monthly) + n(bd.tax_inspection.monthly) + n(bd.risk.monthly) +
     n(bd.overhead.monthly) + n(bd.discount.monthly)
 
+  // 원가 상세 (산출 근거 — 작성자용 접기 박스)
+  const detailOf = (key: string, item: any, fallbackLabel: string) => ({
+    key,
+    label: (item && item.label) || fallbackLabel,
+    monthly: Math.round(n(item?.monthly)),
+    formula: String(item?.formula || ''),
+    source: String(item?.source || ''),
+  })
+  const cost_detail = [
+    detailOf('depreciation', bd.depreciation, '감가상각'),
+    detailOf('finance', bd.finance, '금융비용'),
+    detailOf('insurance', bd.insurance, '보험료'),
+    detailOf('maintenance', bd.maintenance, '정비비'),
+    detailOf('tax_inspection', bd.tax_inspection, '세금·검사'),
+    detailOf('risk', bd.risk, '리스크'),
+    detailOf('overhead', bd.overhead, '간접비'),
+  ]
+  if (n(bd.discount?.monthly) < 0) cost_detail.push(detailOf('discount', bd.discount, '보증금·선납 할인'))
+
+  // 시장 표준가 참고 (업계 평균 월렌트료/매입가 비율 기준)
+  const industryRatio = n(r.INDUSTRY_AVG_RENT_RATIO, 2.2)
+  const marketMonthly = Math.round(input.purchase_price * industryRatio / 100)
+  const suggestedExclVat = Math.round(n(result.suggested_rent))
+  const market_reference = {
+    monthly: marketMonthly,
+    monthly_with_vat: Math.round(marketMonthly * 1.1),
+    ratio_pct: industryRatio,
+    diff_pct: marketMonthly > 0 ? Math.round((suggestedExclVat - marketMonthly) / marketMonthly * 1000) / 10 : 0,
+  }
+
   return {
     cost_breakdown: {
       depreciation: Math.round(n(bd.depreciation.monthly)),
@@ -222,6 +267,8 @@ export function calculateQuoteCost(input: QuoteCostInput, ref: CostReference): Q
     competitive_index: Math.round(n(result.market_analysis?.competitive_index) * 100) / 100,
     rent_to_price_ratio: Math.round(n(result.market_analysis?.rent_to_price_ratio) * 100) / 100,
     acquisition_total: Math.round(acq.total),
+    cost_detail,
+    market_reference,
   }
 }
 
