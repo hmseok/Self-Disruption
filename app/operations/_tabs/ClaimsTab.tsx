@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
 import DcStatStrip, { StatItem, ActionButton } from '@/app/components/DcStatStrip'
 import DcToolbar, { FilterItem } from '@/app/components/DcToolbar'
 import NeuDataTable, { TableColumn, MobileCardConfig } from '@/app/components/NeuDataTable'
@@ -93,6 +94,7 @@ function fmtDate(s: string | null | undefined): string {
 }
 
 export default function ClaimsTab() {
+  const router = useRouter()
   const [filter, setFilter] = useState<FilterKey>('active')  // PR-S: 기본 = 처리 대상(회차완료+청구중)
   const [search, setSearch] = useState('')
   const [vatOnly, setVatOnly] = useState(false)
@@ -432,7 +434,7 @@ export default function ClaimsTab() {
         columns={columns}
         data={filtered}
         rowKey={(r) => r.id}
-        onRowClick={openClaim}
+        onRowClick={(r) => router.push(`/operations/rentals/${r.id}`)}
         loading={loading}
         emptyIcon="💰"
         emptyMessage="청구 대상 (회차 완료) 건이 없습니다"
