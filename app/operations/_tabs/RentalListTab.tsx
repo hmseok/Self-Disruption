@@ -383,8 +383,12 @@ export default function RentalListTab({ scope = 'all' }: { scope?: 'all' | 'disp
     }
   }, [confirmTarget, refresh, showResult])
 
-  // 행 클릭 — 상담미진행/상담중 건은 배차 상세로 진입
+  // 행 클릭 — 배차완료(rental)는 대차 상세페이지, 상담미진행/상담중은 배차 상세로 진입
   const onRowClick = useCallback((r: Row) => {
+    if (r.kind === 'rental') {
+      router.push(`/operations/rentals/${r.id}`)
+      return
+    }
     if ((r.kind === 'request' || r.kind === 'order') && r.cafe24_idno && r.cafe24_mddt && r.cafe24_srno != null) {
       router.push(`/operations/dispatch/${r.cafe24_idno}/${r.cafe24_mddt}/${r.cafe24_srno}?mode=schedule`)
     }
