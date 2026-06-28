@@ -80,7 +80,7 @@ export default function InvestorPage() {
 
   const load = useCallback(async () => {
     setLoading(true)
-    const h = getAuthHeader()
+    const h = await getAuthHeader()  // ★ await 누락 버그 수정 — 미인증 fetch(401)로 정산목록이 빈 화면이던 원인
     try {
       const [settleRes, pnlRes, reportRes] = await Promise.all([
         fetch(`/api/finance/investor-settlement?month=${month}`, { headers: h }),
@@ -114,7 +114,7 @@ export default function InvestorPage() {
     try {
       const res = await fetch('/api/finance/investor-report', {
         method: 'POST',
-        headers: { ...getAuthHeader(), 'Content-Type': 'application/json' },
+        headers: { ...(await getAuthHeader()), 'Content-Type': 'application/json' },
         body: JSON.stringify({ month }),
       })
       const data = await res.json()

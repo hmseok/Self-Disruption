@@ -78,7 +78,7 @@ export default function ClassifyPage() {
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
-      const h = getAuthHeader()
+      const h = await getAuthHeader()  // ★ await 누락 수정 (미인증 fetch 방지)
       const [statsRes, queueRes] = await Promise.all([
         fetch('/api/finance/classify-sms', { headers: h }),
         fetch('/api/classification-queue?status=pending&limit=200', { headers: h }),
@@ -103,7 +103,7 @@ export default function ClassifyPage() {
     try {
       const res = await fetch('/api/finance/classify-sms', {
         method: 'POST',
-        headers: { ...getAuthHeader(), 'Content-Type': 'application/json' },
+        headers: { ...(await getAuthHeader()), 'Content-Type': 'application/json' },
       })
       const data = await res.json()
       setClassifyResult(data)
@@ -120,7 +120,7 @@ export default function ClassifyPage() {
     try {
       await fetch('/api/classification-queue', {
         method: 'POST',
-        headers: { ...getAuthHeader(), 'Content-Type': 'application/json' },
+        headers: { ...(await getAuthHeader()), 'Content-Type': 'application/json' },
         body: JSON.stringify({ queue_id: item.id, action: 'approve' }),
       })
       setQueue(prev => prev.filter(q => q.id !== item.id))
@@ -134,7 +134,7 @@ export default function ClassifyPage() {
     try {
       await fetch('/api/classification-queue', {
         method: 'POST',
-        headers: { ...getAuthHeader(), 'Content-Type': 'application/json' },
+        headers: { ...(await getAuthHeader()), 'Content-Type': 'application/json' },
         body: JSON.stringify({ queue_id: editItem.id, action: 'edit', final_category: editCategory }),
       })
       setQueue(prev => prev.filter(q => q.id !== editItem.id))
@@ -148,7 +148,7 @@ export default function ClassifyPage() {
     try {
       await fetch('/api/classification-queue', {
         method: 'POST',
-        headers: { ...getAuthHeader(), 'Content-Type': 'application/json' },
+        headers: { ...(await getAuthHeader()), 'Content-Type': 'application/json' },
         body: JSON.stringify({ queue_id: item.id, action: 'dismiss' }),
       })
       setQueue(prev => prev.filter(q => q.id !== item.id))
@@ -162,7 +162,7 @@ export default function ClassifyPage() {
     try {
       await fetch('/api/classification-queue', {
         method: 'PATCH',
-        headers: { ...getAuthHeader(), 'Content-Type': 'application/json' },
+        headers: { ...(await getAuthHeader()), 'Content-Type': 'application/json' },
         body: JSON.stringify({ queue_ids: Array.from(selectedIds) }),
       })
       setQueue(prev => prev.filter(q => !selectedIds.has(q.id)))
