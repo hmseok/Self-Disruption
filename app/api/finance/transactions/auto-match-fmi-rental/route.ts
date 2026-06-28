@@ -238,7 +238,7 @@ export async function POST(request: NextRequest) {
          AND type = 'income'
          AND (related_type IS NULL OR related_id IS NULL)
          AND (client_name REGEXP '[0-9]{3,4}' OR description REGEXP '[0-9]{3,4}')
-         AND (imported_from LIKE 'excel_bank%' OR imported_from = 'sms_bank')
+         AND (imported_from LIKE 'excel_bank%' OR imported_from = 'sms_bank' OR imported_from = 'codef_bank')
        ORDER BY transaction_date DESC
        LIMIT 5000
     `

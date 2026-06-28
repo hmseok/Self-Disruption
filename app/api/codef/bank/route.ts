@@ -99,10 +99,33 @@ export async function POST(req: NextRequest) {
       },
     })
 
+    // 발생시 자동매칭 — 새 입금 들어오면 대차 보험 매칭 자동 실행 (HIGH/MEDIUM만 자동, 애매한 건 「매칭 필요」로)
+    let autoMatched: number | null = null
+    if (insertedCount > 0) {
+      try {
+        const proto = req.headers.get('x-forwarded-proto') || 'https'
+        const host = req.headers.get('host') || req.headers.get('x-forwarded-host') || ''
+        const auth = req.headers.get('authorization') || ''
+        const cookie = req.headers.get('cookie') || ''
+        if (host && (auth || cookie)) {
+          const mr = await fetch(`${proto}://${host}/api/finance/transactions/auto-match-fmi-rental`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...(auth ? { Authorization: auth } : {}), ...(cookie ? { Cookie: cookie } : {}) },
+            body: JSON.stringify({ mode: 'insurance', dryRun: false }),
+          })
+          const mj = await mr.json().catch(() => ({}))
+          autoMatched = Number(mj?.applied ?? 0)
+        }
+      } catch (e) {
+        console.warn('[codef/bank] 자동매칭 호출 skip:', (e as Error)?.message)
+      }
+    }
+
     return NextResponse.json({
       success: true,
       fetched: txList.length,
       inserted: insertedCount,
+      auto_matched: autoMatched,
     }, { status: 200 })
 
   } catch (error) {
