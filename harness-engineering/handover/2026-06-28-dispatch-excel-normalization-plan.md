@@ -55,7 +55,21 @@
 - 보유차량 → fleet 마스터 대조
 - 출고예약,대기 → 배차 예약 큐 (선택)
 
-## 6. 산출물 위치
+## 6.5 사고대차 화면 사용성 개선 (2026-06-28 사용자 피드백 — 진행중)
+사용자: 「쓰기가 편해보이지 않는다」 — 4개 개선 요청.
+- [x] **stat 카드 클릭 → 리스트 필터** — DcStatStrip 에 onClick/active 추가(하위호환), ClaimsTab 카드 클릭 시 filter 전환 + 활성 강조. ← 완료
+- [ ] **RentalListTab(배차중)·WaitingTab 도 카드 클릭 필터** 동일 적용 — 같은 패턴 (StatItem onClick) 복제
+- [ ] **흐름 탭 재구성** — 사고접수 → 대차요청 → 배차중 → 반납·청구 순서/단계로. (현재 접수·상담/사용가능/배차중/반납·청구)
+- [ ] **상세페이지 사고접수 매칭 표출** — /operations/rentals/[id] 에서 customer_car_number(사고차량번호)로 cafe24 사고접수(cafe24-accidents) 조회 → 「이 배차 = ○○ 사고」 + 링크. (지금 메모만 있고 매칭 표시 없음)
+- [ ] **메모 잘못된 값 정제** — 일부 행 담당자 칸에 차종("6인승 반납") 등 소스 오류. 상세페이지에서 수정 가능하나, 검수 도구/일괄정리 검토.
+- 데이터 quirk: V3 enrich 가 소스 엑셀 그대로 → 담당자/고객명에 비정상값 섞임. 검수 필요.
+
+## 6.6 운영 DB 적용 완료 (2026-06-28)
+- V2(dispatch_seq, self_vehicle_yn) — 이미 존재(중복) → skip
+- V3(빌려타 533 enrich) — 적용 완료 (고객명·보험사 등 채움)
+- V4(operations_dispatch_orders.delivery_json) — 탁송 배차지시 구조화
+
+## 7. 산출물 위치
 - 파싱 검증본: outputs/billyeota_normalized.json (810행 정제 결과)
 - 5월 import: migrations/2026-05-22_N3c_bilryeota_import.sql (533 INSERT, 멱등)
 - 부가세 컬럼: migrations/2026-06-28_V1_fmi_rentals_vat_sales.sql

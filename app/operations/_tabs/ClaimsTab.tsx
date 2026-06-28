@@ -304,10 +304,10 @@ export default function ClaimsTab() {
   )
 
   const statItems: StatItem[] = [
-    { label: '💰 청구 대상 전체', value: counts.all, unit: '건', tint: 'blue' },
-    { label: '📥 회차완료', value: counts.returned, unit: '건', tint: 'amber' },
-    { label: '📤 청구중', value: counts.claiming, unit: '건', tint: 'purple' },
-    { label: '🧾 부가세 추가청구', value: vatCount, unit: '건', tint: 'amber' },
+    { label: '💰 청구 대상 전체', value: counts.all, unit: '건', tint: 'blue', onClick: () => { setVatOnly(false); setFilter('all') }, active: filter === 'all' && !vatOnly },
+    { label: '📥 회차완료', value: counts.returned, unit: '건', tint: 'amber', onClick: () => { setVatOnly(false); setFilter('returned') }, active: filter === 'returned' && !vatOnly },
+    { label: '📤 청구중', value: counts.claiming, unit: '건', tint: 'purple', onClick: () => { setVatOnly(false); setFilter('claiming') }, active: filter === 'claiming' && !vatOnly },
+    { label: '🧾 부가세 추가청구', value: vatCount, unit: '건', tint: 'amber', onClick: () => { setFilter('all'); setVatOnly(true) }, active: vatOnly },
     { label: '🧮 청구액 합계', value: Math.round(totalClaim / 10000), unit: '만원', tint: 'green' },
   ]
   const statActions: ActionButton[] = [

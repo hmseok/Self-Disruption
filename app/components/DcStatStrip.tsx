@@ -24,6 +24,10 @@ export type StatItem = {
   subValue?: string | number
   /** 선택: 보조값 톤 (기본 neutral) */
   subTone?: 'up' | 'down' | 'neutral'
+  /** 선택: 클릭 시 동작 (예: 리스트 필터) — 있으면 카드가 클릭 가능 */
+  onClick?: () => void
+  /** 선택: 활성(선택됨) 강조 */
+  active?: boolean
 }
 
 export type ActionButton = {
@@ -104,17 +108,21 @@ export default function DcStatStrip({ stats, actions, fullWidth, defaultTint = '
           return (
             <div
               key={i}
+              onClick={s.onClick}
               style={{
                 // GLASS.L3 — 스탯카드 전용 (background + backdropFilter)
                 background: GLASS.L3.background,
                 backdropFilter: GLASS.L3.backdropFilter,
                 WebkitBackdropFilter: GLASS.L3.WebkitBackdropFilter,
-                border: `1px solid ${t.border}`,
+                border: s.active ? `2px solid ${t.labelColor}` : `1px solid ${t.border}`,
                 borderRadius: 16,
                 padding: '16px 14px',
                 textAlign: 'center',
                 minWidth: 0,
-                boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -2px -2px 8px rgba(255,255,255,0.6)',
+                cursor: s.onClick ? 'pointer' : 'default',
+                boxShadow: s.active
+                  ? `0 0 0 3px ${t.border}, 6px 6px 16px rgba(140,170,210,0.2)`
+                  : '6px 6px 16px rgba(140,170,210,0.12), -2px -2px 8px rgba(255,255,255,0.6)',
                 transition: 'all 0.2s',
               }}
             >
