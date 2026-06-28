@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, use, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { useDaumPostcodePopup } from 'react-daum-postcode'
 import { GLASS } from '@/app/utils/ui-tokens'
 import type {
   DispatchRequestRow,
@@ -168,6 +169,9 @@ export default function DispatchDetailPage({
   const [deliveryCost, setDeliveryCost] = useState('')
   const [deliveryNote, setDeliveryNote] = useState('')
   const [copied, setCopied] = useState(false)
+  const openPostcode = useDaumPostcodePopup()
+  const searchAddr = (set: (v: string) => void) =>
+    openPostcode({ onComplete: (d: any) => set(`${d.address}${d.buildingName ? ' (' + d.buildingName + ')' : ''}`) })
 
   // ── 출고 처리 (PR-C3) — fmi_rentals dispatch_mileage/dispatch_photos/dispatch_memo ──
   const [releaseModalOpen, setReleaseModalOpen] = useState(false)
@@ -1600,16 +1604,23 @@ export default function DispatchDetailPage({
                         <input value={deliveryVendor} onChange={(e) => setDeliveryVendor(e.target.value)} placeholder={deliveryType === 'self' ? '탁송 기사명' : '외주 업체명'} style={{ ...GLASS.L1, padding: '7px 9px', borderRadius: 7, fontSize: 12, color: '#1e293b' }} />
                         <input value={deliveryPhone} onChange={(e) => setDeliveryPhone(e.target.value)} placeholder="연락처" style={{ ...GLASS.L1, padding: '7px 9px', borderRadius: 7, fontSize: 12, color: '#1e293b' }} />
                       </div>
-                      <input value={deliveryOrigin} onChange={(e) => setDeliveryOrigin(e.target.value)} placeholder="🟢 출발지" style={{ ...GLASS.L1, padding: '7px 9px', borderRadius: 7, fontSize: 12, color: '#1e293b' }} />
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <input value={deliveryOrigin} onChange={(e) => setDeliveryOrigin(e.target.value)} placeholder="🟢 출발지" style={{ ...GLASS.L1, padding: '7px 9px', borderRadius: 7, fontSize: 12, color: '#1e293b', flex: 1 }} />
+                        <button onClick={() => searchAddr(setDeliveryOrigin)} style={{ padding: '7px 10px', borderRadius: 7, border: '1px solid rgba(59,110,181,0.3)', background: 'rgba(59,110,181,0.08)', color: '#1d4ed8', cursor: 'pointer', fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap' }}>🔍 주소</button>
+                      </div>
                       {deliveryWaypoints.map((w, i) => (
                         <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                           <input value={w.addr} onChange={(e) => setDeliveryWaypoints((ws) => ws.map((x, j) => j === i ? { ...x, addr: e.target.value } : x))} placeholder={`🔵 경유지 ${i + 1}`} style={{ ...GLASS.L1, padding: '7px 9px', borderRadius: 7, fontSize: 12, color: '#1e293b', flex: 2 }} />
+                          <button onClick={() => searchAddr((v) => setDeliveryWaypoints((ws) => ws.map((x, j) => j === i ? { ...x, addr: v } : x)))} style={{ padding: '7px 9px', borderRadius: 7, border: '1px solid rgba(59,110,181,0.3)', background: 'rgba(59,110,181,0.08)', color: '#1d4ed8', cursor: 'pointer', fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap' }}>🔍</button>
                           <input value={w.memo} onChange={(e) => setDeliveryWaypoints((ws) => ws.map((x, j) => j === i ? { ...x, memo: e.target.value } : x))} placeholder="메모" style={{ ...GLASS.L1, padding: '7px 9px', borderRadius: 7, fontSize: 12, color: '#1e293b', flex: 1 }} />
                           <button onClick={() => setDeliveryWaypoints((ws) => ws.filter((_, j) => j !== i))} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#ef4444', fontSize: 16 }}>×</button>
                         </div>
                       ))}
                       <button onClick={() => setDeliveryWaypoints((ws) => [...ws, { addr: '', memo: '' }])} style={{ alignSelf: 'flex-start', padding: '4px 10px', borderRadius: 7, border: '1px dashed rgba(59,110,181,0.4)', background: 'transparent', cursor: 'pointer', fontSize: 11, fontWeight: 700, color: '#1d4ed8' }}>+ 경유지 추가</button>
-                      <input value={deliveryDest} onChange={(e) => setDeliveryDest(e.target.value)} placeholder="🔴 도착지" style={{ ...GLASS.L1, padding: '7px 9px', borderRadius: 7, fontSize: 12, color: '#1e293b' }} />
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <input value={deliveryDest} onChange={(e) => setDeliveryDest(e.target.value)} placeholder="🔴 도착지" style={{ ...GLASS.L1, padding: '7px 9px', borderRadius: 7, fontSize: 12, color: '#1e293b', flex: 1 }} />
+                        <button onClick={() => searchAddr(setDeliveryDest)} style={{ padding: '7px 10px', borderRadius: 7, border: '1px solid rgba(59,110,181,0.3)', background: 'rgba(59,110,181,0.08)', color: '#1d4ed8', cursor: 'pointer', fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap' }}>🔍 주소</button>
+                      </div>
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 6 }}>
                         <input type="number" value={deliveryCost} onChange={(e) => setDeliveryCost(e.target.value)} placeholder="비용(원)" style={{ ...GLASS.L1, padding: '7px 9px', borderRadius: 7, fontSize: 12, color: '#1e293b' }} />
                         <input value={deliveryNote} onChange={(e) => setDeliveryNote(e.target.value)} placeholder="요청 메모" style={{ ...GLASS.L1, padding: '7px 9px', borderRadius: 7, fontSize: 12, color: '#1e293b' }} />

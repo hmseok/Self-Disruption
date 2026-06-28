@@ -28,11 +28,11 @@ import ClaimsTab from './_tabs/ClaimsTab'
 
 type SubTab = 'intake' | 'available' | 'dispatched' | 'claims'
 
-const TAB_LIST: Array<{ key: SubTab; label: string; icon: string }> = [
-  { key: 'intake',      label: '접수·상담', icon: '📋' },
-  { key: 'available',   label: '사용가능', icon: '🟢' },
-  { key: 'dispatched',  label: '배차중',   icon: '🚗' },
-  { key: 'claims',      label: '반납·청구', icon: '💰' },
+// 업무 흐름: ① 접수·상담 → ② 배차중 → ③ 반납·청구 (사용가능 차량은 자원 뷰)
+const FLOW_TABS: Array<{ key: SubTab; label: string; icon: string; step: number }> = [
+  { key: 'intake',      label: '접수·상담', icon: '📋', step: 1 },
+  { key: 'dispatched',  label: '배차중',   icon: '🚗', step: 2 },
+  { key: 'claims',      label: '반납·청구', icon: '💰', step: 3 },
 ]
 
 const TAB_KEYS: SubTab[] = ['intake', 'available', 'dispatched', 'claims']
@@ -53,37 +53,35 @@ export default function OperationsPage() {
   return (
     <div className="page-bg">
       <div className="max-w-[1800px] mx-auto py-4 px-4 md:py-5 md:px-6">
-        {/* Sub-tab nav */}
-        <div style={{
-          display: 'flex',
-          gap: 6,
-          marginBottom: 16,
-          flexWrap: 'wrap',
-        }}>
-          {TAB_LIST.map((t) => {
+        {/* 업무 흐름 탭 (① → ② → ③) + 사용가능 차량(자원) */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+          {FLOW_TABS.map((t, i) => {
             const active = tab === t.key
             return (
-              <button
-                key={t.key}
-                onClick={() => setTab(t.key)}
-                style={{
-                  padding: '10px 18px',
-                  borderRadius: 10,
-                  border: 'none',
-                  cursor: 'pointer',
-                  fontSize: 13,
-                  fontWeight: active ? 800 : 600,
-                  whiteSpace: 'nowrap',
-                  background: active ? '#3b6eb5' : 'transparent',
+              <div key={t.key} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                {i > 0 && <span style={{ color: '#cbd5e1', fontSize: 18, fontWeight: 700 }}>→</span>}
+                <button onClick={() => setTab(t.key)} style={{
+                  display: 'flex', alignItems: 'center', gap: 8, padding: '9px 16px', borderRadius: 12,
+                  border: active ? 'none' : '1px solid rgba(0,0,0,0.08)', cursor: 'pointer',
+                  fontSize: 13, fontWeight: active ? 800 : 600, whiteSpace: 'nowrap',
+                  background: active ? 'linear-gradient(135deg, #3b6eb5, #5a8fd4)' : '#fff',
                   color: active ? '#fff' : '#475569',
-                  boxShadow: active ? '0 4px 12px rgba(15,36,64,0.2)' : 'none',
-                  transition: 'all 0.2s',
-                }}
-              >
-                {t.icon} {t.label}
-              </button>
+                  boxShadow: active ? '0 6px 16px rgba(59,110,181,0.3)' : 'none', transition: 'all 0.2s',
+                }}>
+                  <span style={{ width: 22, height: 22, borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, background: active ? 'rgba(255,255,255,0.25)' : 'rgba(59,110,181,0.12)', color: active ? '#fff' : '#3b6eb5' }}>{t.step}</span>
+                  {t.icon} {t.label}
+                </button>
+              </div>
             )
           })}
+          <div style={{ width: 1, height: 26, background: 'rgba(0,0,0,0.1)', margin: '0 6px' }} />
+          <button onClick={() => setTab('available')} style={{
+            padding: '9px 16px', borderRadius: 12, cursor: 'pointer', fontSize: 13,
+            fontWeight: tab === 'available' ? 800 : 600, whiteSpace: 'nowrap',
+            border: tab === 'available' ? 'none' : '1px solid rgba(16,185,129,0.3)',
+            background: tab === 'available' ? '#10b981' : 'rgba(16,185,129,0.06)',
+            color: tab === 'available' ? '#fff' : '#047857', transition: 'all 0.2s',
+          }}>🟢 사용가능 차량</button>
         </div>
 
         {/* Tab content */}
