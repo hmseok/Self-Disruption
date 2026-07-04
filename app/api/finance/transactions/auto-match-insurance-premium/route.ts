@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
        WHERE deleted_at IS NULL
          AND type = 'expense'
          AND (related_type IS NULL OR related_id IS NULL)
-         AND (imported_from LIKE 'excel_bank%' OR imported_from = 'sms_bank')
+         AND (imported_from LIKE 'excel_bank%' OR imported_from = 'sms_bank' OR imported_from = 'codef_bank')
          AND client_name IS NOT NULL AND client_name != ''
        ORDER BY transaction_date DESC
        LIMIT 5000

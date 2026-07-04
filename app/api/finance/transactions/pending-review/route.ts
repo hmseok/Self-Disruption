@@ -250,7 +250,7 @@ export async function GET(request: NextRequest) {
         sourceDetail = cardAlias || '카드 미매핑'
         if (holder && !sourceDetail.includes(holder)) sourceDetail += ` · ${holder}`
         if (it.sms_transaction_type === 'canceled') sourceDetail += ' (취소)'
-      } else if (importedFrom.startsWith('excel_bank') || importedFrom === 'sms_bank') {
+      } else if (importedFrom.startsWith('excel_bank') || importedFrom === 'sms_bank' || importedFrom === 'codef_bank') {
         sourceType = 'bank'
         sourceLabel = '🏦 통장'
         const accAlias = it.bank_account_alias || ''

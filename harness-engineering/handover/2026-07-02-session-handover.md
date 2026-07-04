@@ -40,7 +40,10 @@ app/api/finance/fmi-rental-payments/route.ts              (codef_bank 필터)
 ---
 
 ## 4. 다음 작업 (우선순위)
-1. **[Rule 14 동형] 같은 codef_bank 누락**이 `auto-match-investor-jiip`, `auto-match-freelancer` 에도 있음 → 같은 한 줄 수정 필요. **투자자 정산 수익측에 직접 영향.**
+1. ~~**[Rule 14 동형] 같은 codef_bank 누락**~~ ✅ **완료 (2026-07-04)** — 5곳 수정 (커밋 대기):
+   - 매처 3곳: `auto-match-investor-jiip:130` / `auto-match-freelancer:108` / `auto-match-insurance-premium:76` (전수조사 추가 발견)
+   - 표시 2곳: `summary:22` (bank_count 집계) / `pending-review:253` (통장 라벨 분류)
+   - 검증: tsc 수정 파일 에러 0 / lint:harness 새 위반 0
 2. **A 안전망 스케줄**: `api/finance/auto-match-schedule` 기본 steps에 `match-fmi-rental` 이미 포함(enabled=false). UI에서 켜기 + Cloud Scheduler가 `/api/finance/auto-match-schedule/run` 주기 호출하는지 확인(현재 트리거 미확인).
 3. **청구액(final_claim_amount)** 엑셀 import에 없음 → 입금현황이 "매칭 유무" 중심. 요금표(정비대차요금계산 시트)로 청구액 넣으면 "부분입금/완납" 판정 가능.
 4. **투자자 정산 완성** (원래 목표): 차량수익(대차료 입금, 사고차량번호 매칭) − 차량비용(카드 차량매칭+수동) → 투자자 지급.
