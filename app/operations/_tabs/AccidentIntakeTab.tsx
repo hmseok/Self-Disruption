@@ -235,24 +235,14 @@ export default function AccidentIntakeTab() {
       render: (r) => <span style={{ fontWeight: 700, color: '#0f2440', whiteSpace: 'nowrap' }}>🚗 {r.cars_no || '-'}</span>,
     },
     {
-      key: 'cars_model', label: '차종', width: 240,
+      key: 'cars_model', label: '차종', width: 170,
       sortBy: (r) => r.cars_model || '',
-      render: (r) => <span style={{ fontSize: 12, color: '#475569', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: 240 }}>{r.cars_model || '-'}</span>,
-    },
-    {
-      key: 'capital_co_name', label: '캐피탈사', width: 120,
-      sortBy: (r) => r.capital_co_name || '',
-      render: (r) => <span style={{ fontSize: 12, color: '#475569', whiteSpace: 'nowrap' }}>{r.capital_co_name || '-'}</span>,
+      render: (r) => <span style={{ fontSize: 12, color: '#475569', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: 170 }}>{r.cars_model || '-'}</span>,
     },
     {
       key: 'cars_user', label: '고객', width: 160,
       sortBy: (r) => r.cars_user || '',
       render: (r) => <span style={{ fontWeight: 600, color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: 160 }}>{r.cars_user || '-'}</span>,
-    },
-    {
-      key: 'otptcanm', label: '통보자', width: 130,
-      sortBy: (r) => r.otptcanm || '',
-      render: (r) => <span style={{ whiteSpace: 'nowrap', fontSize: 12 }}>{r.otptcanm || '-'}{r.otptcahp && <span style={{ marginLeft: 4, fontSize: 11, color: '#64748b' }}>{r.otptcahp}</span>}</span>,
     },
     {
       key: 'otptdcyn', label: '대차', width: 100, align: 'center',
@@ -307,28 +297,12 @@ export default function AccidentIntakeTab() {
       },
     },
     {
-      key: 'rental_vendor', label: '대차업체', width: 140,
-      sortBy: (r) => r.rental_vendor || '',
-      render: (r) => <span style={{ fontSize: 12, color: '#0f2440', whiteSpace: 'nowrap' }}>{r.rental_vendor || '-'}</span>,
-    },
-    {
-      key: 'factory_names', label: '배정공장', width: 160,
-      sortBy: (r) => r.factory_names || '',
-      render: (r) => r.factory_names
-        ? <span style={{ fontSize: 12, color: '#0f2440', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: 160 }}>🔧 {r.factory_names}</span>
-        : <span style={{ fontSize: 11, color: '#cbd5e1', whiteSpace: 'nowrap' }}>—</span>,
-    },
-    {
-      key: 'otptacmo', label: '사고내용', width: 320,
+      key: 'otptacmo', label: '사고내용', width: 300,
       sortBy: (r) => r.otptacmo || '',
-      render: (r) => <span style={{ fontSize: 11, color: '#475569', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: 320 }}>{r.otptacmo || '-'}</span>,
-    },
-    {
-      key: 'gnus_name', label: '접수자', width: 100,
-      sortBy: (r) => r.gnus_name || '',
-      render: (r) => <span style={{ fontSize: 11, color: '#64748b', whiteSpace: 'nowrap' }}>{r.gnus_name || r.otptgnus || '-'}</span>,
+      render: (r) => <span style={{ fontSize: 11, color: '#475569', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: 300 }}>{r.otptacmo || '-'}</span>,
     },
   ]
+  // PR-UX-SIMPLE — 캐피탈사·통보자·대차업체·배정공장·접수자 컬럼 제거 (상세 화면에서 확인, 검색은 계속 지원)
 
   const mobileCard: MobileCardConfig<DispatchRequestRow> = {
     title: (r) => <span style={{ whiteSpace: 'nowrap' }}>🚗 {r.cars_no || r.otptcanm || r.otptidno}</span>,

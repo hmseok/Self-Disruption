@@ -29,10 +29,13 @@ import ClaimsTab from './_tabs/ClaimsTab'
 type SubTab = 'intake' | 'available' | 'dispatched' | 'claims'
 
 // 업무 흐름: ① 접수·상담 → ② 배차중 → ③ 반납·청구 (사용가능 차량은 자원 뷰)
+// PR-UX-SIMPLE (2026-07-04) — 사용자 명시: 「접수-배차-청구 로 깔끔하게 필요정보만」
+//   사용가능 차량 탭 제거 — 배차하기 화면이 이미 사용가능 차량에서 선택 (waiting-vehicles).
+//   ?tab=available 레거시 링크는 계속 동작 (탭 버튼만 없음).
 const FLOW_TABS: Array<{ key: SubTab; label: string; icon: string; step: number }> = [
-  { key: 'intake',      label: '접수·상담', icon: '📋', step: 1 },
-  { key: 'dispatched',  label: '배차중',   icon: '🚗', step: 2 },
-  { key: 'claims',      label: '반납·청구', icon: '💰', step: 3 },
+  { key: 'intake',      label: '접수', icon: '📋', step: 1 },
+  { key: 'dispatched',  label: '배차', icon: '🚗', step: 2 },
+  { key: 'claims',      label: '청구', icon: '💰', step: 3 },
 ]
 
 const TAB_KEYS: SubTab[] = ['intake', 'available', 'dispatched', 'claims']
@@ -84,14 +87,6 @@ export default function OperationsPage() {
               </div>
             )
           })}
-          <div style={{ width: 1, height: 26, background: 'rgba(0,0,0,0.1)', margin: '0 6px' }} />
-          <button onClick={() => setTab('available')} style={{
-            padding: '9px 16px', borderRadius: 12, cursor: 'pointer', fontSize: 13,
-            fontWeight: tab === 'available' ? 800 : 600, whiteSpace: 'nowrap',
-            border: tab === 'available' ? 'none' : '1px solid rgba(16,185,129,0.3)',
-            background: tab === 'available' ? '#10b981' : 'rgba(16,185,129,0.06)',
-            color: tab === 'available' ? '#fff' : '#047857', transition: 'all 0.2s',
-          }}>🟢 사용가능 차량</button>
         </div>
 
         {/* Tab content */}

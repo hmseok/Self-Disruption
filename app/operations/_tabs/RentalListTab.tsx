@@ -413,7 +413,7 @@ export default function RentalListTab({ scope = 'all' }: { scope?: 'all' | 'disp
     }
   }, [router])
 
-  const columns: TableColumn<Row>[] = [
+  const allColumns: TableColumn<Row>[] = [
     {
       key: 'dispatch', label: '출고/접수일시', width: 138,
       sortBy: (r) => r.dispatch_date || '',
@@ -515,6 +515,10 @@ export default function RentalListTab({ scope = 'all' }: { scope?: 'all' | 'disp
       ),
     },
   ]
+  // PR-UX-SIMPLE — 배차 탭은 핵심 컬럼만 (플릿·입고공장·보험사는 드로어에서 확인)
+  const columns = isDispatch
+    ? allColumns.filter((c) => !['fleet', 'repair_factory', 'insurance'].includes(String(c.key)))
+    : allColumns
 
   const mobileCard: MobileCardConfig<Row> = {
     title: (r) => <span style={{ whiteSpace: 'nowrap' }}>🚗 {r.vehicle_car_number || r.customer_car_number || r.customer_name || r.id.slice(0, 12)}</span>,

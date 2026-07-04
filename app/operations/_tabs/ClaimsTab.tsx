@@ -160,6 +160,8 @@ export default function ClaimsTab() {
   const [salesPayoutRate, setSalesPayoutRate] = useState('')
   const [claimBusy, setClaimBusy] = useState(false)
   const [claimMsg, setClaimMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
+  // PR-UX-SIMPLE — 부가세·지급·영업지원은 접기 (값 있으면 자동 펼침)
+  const [moreOpen, setMoreOpen] = useState(false)
 
   const fetchAll = useCallback(async () => {
     setLoading(true)
@@ -217,6 +219,7 @@ export default function ClaimsTab() {
     setSalesDepositAmount(r.sales_deposit_amount != null ? String(r.sales_deposit_amount) : '')
     setSalesPayoutRate(r.sales_payout_rate != null ? String(r.sales_payout_rate) : '')
     setClaimMsg(null)
+    setMoreOpen(Boolean(b01(r.vat_incl_yn) || b01(r.vat_invoice_issued_yn) || b01(r.vat_billed_yn) || b01(r.vat_paid_yn) || b01(r.sales_support_yn) || r.payment_memo))
     setClaimModalOpen(true)
   }, [])
 
@@ -414,23 +417,9 @@ export default function ClaimsTab() {
       render: (r) => <span style={{ fontWeight: 600, color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: 128 }}>{r.customer_name || '-'}</span>,
     },
     {
-      key: 'repair_factory', label: '입고공장', width: 124,
-      sortBy: (r) => r.repair_factory || '',
-      render: (r) => r.repair_factory
-        ? <span style={{ fontSize: 12, color: '#0f2440', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: 124 }}>🔧 {r.repair_factory}</span>
-        : <span style={{ fontSize: 11, color: '#cbd5e1' }}>-</span>,
-    },
-    {
       key: 'insurance_company', label: '보험사', width: 116,
       sortBy: (r) => r.insurance_company || '',
       render: (r) => <span style={{ fontSize: 12, color: '#475569', whiteSpace: 'nowrap' }}>{r.insurance_company || '-'}</span>,
-    },
-    {
-      key: 'insurance_claim_no', label: '보험접수번호', width: 140,
-      sortBy: (r) => r.insurance_claim_no || '',
-      render: (r) => r.insurance_claim_no
-        ? <span style={{ fontSize: 11, color: '#475569', whiteSpace: 'nowrap', fontFamily: 'ui-monospace, monospace' }}>{r.insurance_claim_no}</span>
-        : <span style={{ fontSize: 11, color: '#cbd5e1' }}>미입력</span>,
     },
     {
       key: 'period', label: '대여기간', width: 86, align: 'center',
@@ -444,12 +433,8 @@ export default function ClaimsTab() {
         ? <span style={{ fontWeight: 800, color: '#0f2440', whiteSpace: 'nowrap' }}>{fmtWon(r.final_claim_amount)}</span>
         : <span style={{ fontSize: 11, color: '#cbd5e1', whiteSpace: 'nowrap' }}>미작성</span>,
     },
-    {
-      key: 'handler_name', label: '담당자', width: 88,
-      sortBy: (r) => r.handler_name || '',
-      render: (r) => <span style={{ fontSize: 11, color: '#64748b', whiteSpace: 'nowrap' }}>{r.handler_name || '-'}</span>,
-    },
   ]
+  // PR-UX-SIMPLE — 입고공장·보험접수번호·담당자 컬럼 제거 (청구 카드·전체 편집에서 확인)
 
   const mobileCard: MobileCardConfig<ClaimRow> = {
     title: (r) => <span style={{ whiteSpace: 'nowrap' }}>🚗 {r.vehicle_car_number || r.customer_name || r.rental_no}</span>,
@@ -486,7 +471,7 @@ export default function ClaimsTab() {
         columns={columns}
         data={filtered}
         rowKey={(r) => r.id}
-        onRowClick={(r) => router.push(`/operations/rentals/${r.id}?from=claims`)}
+        onRowClick={(r) => openClaim(r)}
         loading={loading}
         emptyIcon="💰"
         emptyMessage="청구 대상 (회차 완료) 건이 없습니다"
@@ -524,6 +509,10 @@ export default function ClaimsTab() {
                 🚗 {selectedClaim.vehicle_car_number || '-'} · {selectedClaim.customer_name || '-'}
               </span>
               <div style={{ flex: 1 }} />
+              <button
+                onClick={() => router.push(`/operations/rentals/${selectedClaim.id}?from=claims`)}
+                style={{ padding: '5px 11px', borderRadius: 7, border: '1px solid rgba(0,0,0,0.1)', background: 'transparent', cursor: 'pointer', fontSize: 11, fontWeight: 700, color: '#64748b', whiteSpace: 'nowrap' }}
+              >전체 편집 →</button>
               <button onClick={() => !claimBusy && setClaimModalOpen(false)}
                 style={{ padding: '5px 10px', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 16, color: '#64748b' }}>✕</button>
             </div>
@@ -668,6 +657,13 @@ export default function ClaimsTab() {
                   style={{ ...GLASS.L1, width: '100%', padding: '9px 12px', borderRadius: 8, fontSize: 13, color: '#1e293b' }}
                 />
               </div>
+              {/* PR-UX-SIMPLE — 부가세·지급·영업지원 접기 */}
+              <button
+                onClick={() => setMoreOpen((v) => !v)}
+                style={{ alignSelf: 'flex-start', padding: '6px 12px', borderRadius: 8, border: '1px solid rgba(0,0,0,0.1)', background: 'transparent', cursor: 'pointer', fontSize: 12, fontWeight: 700, color: '#64748b' }}
+              >{moreOpen ? '▴ 부가세 · 지급 · 영업지원 접기' : '▾ 부가세 · 지급 · 영업지원'}</button>
+
+              {moreOpen && (<>
               {/* 지급여부 — 재무 통장/카드 매칭 자동 반영 (조회 전용) */}
               <div>
                 <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#475569', marginBottom: 5 }}>
@@ -741,6 +737,7 @@ export default function ClaimsTab() {
                   </div>
                 )}
               </div>
+              </>)}
 
               {claimMsg && (
                 <div style={{ fontSize: 12, fontWeight: 700, color: claimMsg.type === 'ok' ? '#15803d' : '#991b1b' }}>
