@@ -50,6 +50,16 @@ export default function OperationsPage() {
     if (t && (TAB_KEYS as string[]).includes(t)) setTab(t as SubTab)
   }, [])
 
+  // PR-UX-CLAIM — 탭 내부에서 탭 전환 요청 (예: 반납 확정 → 청구 작성 직행)
+  useEffect(() => {
+    const h = (e: Event) => {
+      const t = (e as CustomEvent)?.detail?.tab
+      if (t && (TAB_KEYS as string[]).includes(t)) setTab(t as SubTab)
+    }
+    window.addEventListener('operations:switch-tab', h)
+    return () => window.removeEventListener('operations:switch-tab', h)
+  }, [])
+
   return (
     <div className="page-bg">
       <div className="max-w-[1800px] mx-auto py-4 px-4 md:py-5 md:px-6">

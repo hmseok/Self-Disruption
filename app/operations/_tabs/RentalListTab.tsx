@@ -102,11 +102,12 @@ export default function RentalListTab({ scope = 'all' }: { scope?: 'all' | 'disp
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState<string | null>(null)
 
-  // 결과 토스트 — PR-M 패턴: 화면 고정
-  const [resultMsg, setResultMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
-  const showResult = useCallback((m: { type: 'ok' | 'err'; text: string }) => {
+  // 결과 토스트 — PR-M 패턴: 화면 고정 (PR-UX-CLAIM: 액션 버튼 지원)
+  type ResultMsg = { type: 'ok' | 'err'; text: string; action?: { label: string; onClick: () => void } }
+  const [resultMsg, setResultMsg] = useState<ResultMsg | null>(null)
+  const showResult = useCallback((m: ResultMsg) => {
     setResultMsg(m)
-    setTimeout(() => setResultMsg(null), 5000)
+    setTimeout(() => setResultMsg(null), m.action ? 10000 : 5000)
   }, [])
 
   // 배차 드로어 (PR-UX-DRAWER) — 행 클릭 시 페이지 이동 없이 상담·일정 입력
@@ -347,8 +348,22 @@ export default function RentalListTab({ scope = 'all' }: { scope?: 'all' | 'disp
       })
       const j = await res.json().catch(() => ({}))
       if (!res.ok || j?.error) throw new Error(j?.error || '반납 처리 실패')
+      const returnedId = returnModal.id
       setReturnModal(null)
-      showResult({ type: 'ok', text: '반납 처리 완료 — 청구관리 탭으로 넘어갑니다' })
+      // PR-UX-CLAIM — 반납 확정 → 청구 작성 직행 (탭 이동 + 해당 건 모달 자동 오픈)
+      showResult({
+        type: 'ok',
+        text: '반납 처리 완료 — 이 건은 반납·청구 탭으로 넘어갔습니다',
+        action: {
+          label: '→ 바로 청구 작성',
+          onClick: () => {
+            try { sessionStorage.setItem('operations_open_claim', returnedId) } catch {}
+            try { window.history.replaceState(null, '', '/operations?tab=claims') } catch {}
+            window.dispatchEvent(new CustomEvent('operations:switch-tab', { detail: { tab: 'claims' } }))
+            setResultMsg(null)
+          },
+        },
+      })
       refresh()
     } catch (e: any) {
       showResult({ type: 'err', text: e?.message || '반납 처리 오류' })
@@ -525,6 +540,12 @@ export default function RentalListTab({ scope = 'all' }: { scope?: 'all' | 'disp
         >
           <span style={{ fontSize: 16, lineHeight: 1 }}>{resultMsg.type === 'ok' ? '✅' : '⚠️'}</span>
           <span style={{ flex: 1, lineHeight: 1.45 }}>{resultMsg.text}</span>
+          {resultMsg.action && (
+            <button
+              onClick={resultMsg.action.onClick}
+              style={{ padding: '6px 12px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)', color: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 800, whiteSpace: 'nowrap', flexShrink: 0 }}
+            >{resultMsg.action.label}</button>
+          )}
           <button onClick={() => setResultMsg(null)} aria-label="닫기"
             style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 15, lineHeight: 1, padding: 2, flexShrink: 0, color: resultMsg.type === 'ok' ? '#047857' : '#b91c1c' }}>×</button>
         </div>

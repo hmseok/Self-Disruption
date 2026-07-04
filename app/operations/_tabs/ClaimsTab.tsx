@@ -48,6 +48,8 @@ type ClaimRow = {
   claim_type: string | null
   vat_extra_billing: string | null
   capital_company: string | null
+  // PR-UX-CLAIM — 반납 메모 표시용
+  notes: string | null
   // PR-N6c — 입고공장 / 지급 추적
   repair_factory: string | null
   customer_birth: string | null
@@ -91,6 +93,35 @@ function fmtWon(n: number | null | undefined): string {
 function fmtDate(s: string | null | undefined): string {
   if (!s) return '-'
   return String(s).slice(0, 10)
+}
+
+// PR-UX-CLAIM (2026-07-04) — 반납→청구 재입력 제거: 자동 계산/매칭 헬퍼
+// 대여일수 자동 — 출고일~반납일 (올림, 최소 1일)
+function calcRentalDays(dispatch: string | null, ret: string | null): number | null {
+  if (!dispatch || !ret) return null
+  const a = new Date(dispatch).getTime()
+  const b = new Date(ret).getTime()
+  if (!Number.isFinite(a) || !Number.isFinite(b) || b < a) return null
+  return Math.max(1, Math.ceil((b - a) / 86400000))
+}
+// 롯데 요금표 차종 자동 매칭 — 대차 차종 문자열 ↔ vehicle_names 부분 일치 (가장 긴 이름 우선)
+function matchLotteRateIdx(carType: string | null): number {
+  if (!carType) return -1
+  const t = String(carType).replace(/\s+/g, '').toLowerCase()
+  if (!t) return -1
+  let best = -1
+  let bestLen = 0
+  LOTTE_SHORT_TERM_RATES.forEach((r, idx) => {
+    for (const raw of r.vehicle_names.split(',')) {
+      const name = raw.trim().split('(')[0].replace(/\s+/g, '').toLowerCase()
+      if (!name) continue
+      if ((t.includes(name) || name.includes(t)) && name.length > bestLen) {
+        best = idx
+        bestLen = name.length
+      }
+    }
+  })
+  return best
 }
 
 export default function ClaimsTab() {
@@ -168,8 +199,10 @@ export default function ClaimsTab() {
     setClaimNo(r.insurance_claim_no || '')
     setClaimType(r.claim_type || '')
     setPaymentMemo(r.payment_memo || '')
-    setLotteRateIdx(-1)
-    setLotteDays(r.rental_days != null ? String(r.rental_days) : '')
+    // PR-UX-CLAIM — 자동 프리필: 차종은 요금표 매칭, 일수는 출고~반납 자동 계산
+    setLotteRateIdx(matchLotteRateIdx(r.vehicle_car_type))
+    const autoDays = r.rental_days != null ? Number(r.rental_days) : calcRentalDays(r.dispatch_date, r.actual_return_date)
+    setLotteDays(autoDays != null ? String(autoDays) : '')
     setFaultRate(r.fault_rate != null ? String(r.fault_rate) : '')
     setClaimRate(r.claim_rate != null ? String(r.claim_rate) : '')
     setVatIncl(b01(r.vat_incl_yn))
@@ -256,6 +289,25 @@ export default function ClaimsTab() {
   }, [selectedClaim, claimAmount, claimNo, claimType, paymentMemo, faultRate, claimRate,
       vatIncl, vatInvoiceIssued, vatInvoiceDate, vatBilled, vatPaid, vatPaidDate,
       salesSupport, salesOrder, salesDepositDate, salesDepositAmount, salesPayoutRate, refresh])
+
+  // PR-UX-CLAIM — 반납 직후 「바로 청구 작성」 직행 / ?claim= 링크 자동 오픈
+  useEffect(() => {
+    if (!rows || rows.length === 0) return
+    let target: string | null = null
+    try { target = sessionStorage.getItem('operations_open_claim') } catch {}
+    if (!target) {
+      try { target = new URLSearchParams(window.location.search).get('claim') } catch {}
+    }
+    if (!target) return
+    try { sessionStorage.removeItem('operations_open_claim') } catch {}
+    try {
+      const u = new URL(window.location.href)
+      if (u.searchParams.has('claim')) { u.searchParams.delete('claim'); window.history.replaceState(null, '', u.toString()) }
+    } catch {}
+    const row = rows.find((r) => String(r.id) === String(target))
+    if (row) openClaim(row)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows])
 
   // 청구관리 영역 (returned/claiming/settled) — 부가세 필터 적용
   const claimRows = useMemo(() => {
@@ -482,7 +534,13 @@ export default function ClaimsTab() {
                 <span style={{ color: '#94a3b8', fontWeight: 700 }}>보험사</span>
                 <span style={{ color: '#1e293b', fontWeight: 600 }}>{selectedClaim.insurance_company || '-'}</span>
                 <span style={{ color: '#94a3b8', fontWeight: 700 }}>대여기간</span>
-                <span style={{ color: '#1e293b', fontWeight: 600 }}>{selectedClaim.rental_days != null ? `${selectedClaim.rental_days}일` : '-'}</span>
+                <span style={{ color: '#1e293b', fontWeight: 600 }}>
+                  {fmtDate(selectedClaim.dispatch_date)} ~ {fmtDate(selectedClaim.actual_return_date)}
+                  {(() => {
+                    const d = selectedClaim.rental_days ?? calcRentalDays(selectedClaim.dispatch_date, selectedClaim.actual_return_date)
+                    return d != null ? <b style={{ color: '#0f2440' }}> · {d}일</b> : null
+                  })()}
+                </span>
                 <span style={{ color: '#94a3b8', fontWeight: 700 }}>일대여료</span>
                 <span style={{ color: '#1e293b', fontWeight: 600 }}>{fmtWon(selectedClaim.daily_rate)}</span>
                 <span style={{ color: '#94a3b8', fontWeight: 700 }}>대여료 합계</span>
@@ -494,6 +552,12 @@ export default function ClaimsTab() {
                   {fmtWon(selectedClaim.paid_amount)}
                   <span style={{ fontSize: 10, color: '#94a3b8', marginLeft: 5 }}>재무 통장/카드 자동매칭</span>
                 </span>
+                {selectedClaim.notes && (
+                  <>
+                    <span style={{ color: '#94a3b8', fontWeight: 700 }}>반납 메모</span>
+                    <span style={{ color: '#1e293b', fontWeight: 600, whiteSpace: 'pre-wrap' }}>{selectedClaim.notes}</span>
+                  </>
+                )}
                 {selectedClaim.vat_extra_billing === 'Y' && (
                   <>
                     <span style={{ color: '#b45309', fontWeight: 700 }}>부가세</span>
