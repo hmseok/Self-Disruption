@@ -6,6 +6,7 @@ import DcStatStrip, { StatItem, ActionButton } from '@/app/components/DcStatStri
 import DcToolbar, { FilterItem } from '@/app/components/DcToolbar'
 import NeuDataTable, { TableColumn, MobileCardConfig } from '@/app/components/NeuDataTable'
 import { GLASS } from '@/app/utils/ui-tokens'
+import RentalDrawer from '../RentalDrawer'
 
 // ═══════════════════════════════════════════════════════════════════
 // RentalListTab — 대차리스트 (대차 업무 전 구간: 상담미진행 → 배차완료)
@@ -107,6 +108,9 @@ export default function RentalListTab({ scope = 'all' }: { scope?: 'all' | 'disp
     setResultMsg(m)
     setTimeout(() => setResultMsg(null), 5000)
   }, [])
+
+  // 배차 드로어 (PR-UX-DRAWER) — 행 클릭 시 페이지 이동 없이 상담·일정 입력
+  const [drawerId, setDrawerId] = useState<string | null>(null)
 
   // 반납 처리 모달
   const [returnModal, setReturnModal] = useState<Row | null>(null)
@@ -383,10 +387,10 @@ export default function RentalListTab({ scope = 'all' }: { scope?: 'all' | 'disp
     }
   }, [confirmTarget, refresh, showResult])
 
-  // 행 클릭 — 배차완료(rental)는 대차 상세페이지, 상담미진행/상담중은 배차 상세로 진입
+  // 행 클릭 — 배차(rental)는 드로어(빠른 상담·일정 입력), 상담미진행/상담중은 배차 상세로 진입
   const onRowClick = useCallback((r: Row) => {
     if (r.kind === 'rental') {
-      router.push(`/operations/rentals/${r.id}`)
+      setDrawerId(r.id)
       return
     }
     if ((r.kind === 'request' || r.kind === 'order') && r.cafe24_idno && r.cafe24_mddt && r.cafe24_srno != null) {
@@ -606,6 +610,17 @@ export default function RentalListTab({ scope = 'all' }: { scope?: 'all' | 'disp
           ? '💡 현재 배차 나가 있는 대차입니다 (배차예정 + 배차완료). 반납하면 「반납·청구」 탭으로 넘어갑니다.'
           : '💡 「상담미진행」(대차요청건)은 위 📅 기간에 해당하는 건만 표시됩니다 — 기본 오늘. · 상담중·배차예정·배차완료는 기간과 무관하게 항상 표시됩니다. · 행을 클릭하면 배차 상세에서 상담·배차를 진행하고, 반납하면 청구관리 탭으로 넘어갑니다.'}
       </div>
+
+      {/* 배차 드로어 — PR-UX-DRAWER */}
+      <RentalDrawer
+        rentalId={drawerId}
+        onClose={() => setDrawerId(null)}
+        onChanged={refresh}
+        onRequestReturn={(d: any) => {
+          const row = (rows || []).find((r) => r.kind === 'rental' && r.id === String(d.id))
+          if (row) openReturn(row)
+        }}
+      />
 
       {/* 반납 처리 모달 */}
       {returnModal && (

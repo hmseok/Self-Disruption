@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { getAuthHeader } from '@/app/utils/auth-client'
+import ConsultationTimeline from '../../ConsultationTimeline'
 
 // ═══════════════════════════════════════════════════════════════════
 // /operations/rentals/[id] — 배차(대차) 상세·편집 (PR-V2)
@@ -23,6 +24,12 @@ export default function RentalDetailPage() {
   const params = useParams()
   const id = params?.id as string
   const [f, setF] = useState<any>(null)
+  // 복귀 탭 — 진입 시 ?from= 으로 전달 (배차중/반납·청구), 없으면 claims
+  const [fromTab] = useState<string>(() => {
+    if (typeof window === 'undefined') return 'claims'
+    const t = new URLSearchParams(window.location.search).get('from')
+    return t && ['intake', 'available', 'dispatched', 'claims'].includes(t) ? t : 'claims'
+  })
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
@@ -95,7 +102,7 @@ export default function RentalDetailPage() {
       <div style={{ maxWidth: 1000, margin: '0 auto', padding: '18px 16px 60px' }}>
         {/* 헤더 */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
-          <button onClick={() => router.push('/operations?tab=claims')} style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid rgba(0,0,0,0.12)', background: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 700, color: '#475569' }}>← 목록</button>
+          <button onClick={() => router.push(`/operations?tab=${fromTab}`)} style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid rgba(0,0,0,0.12)', background: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 700, color: '#475569' }}>← 목록</button>
           <div style={{ fontSize: 17, fontWeight: 800, color: '#0f2440' }}>🚗 {f.vehicle_car_number} <span style={{ fontSize: 13, color: '#94a3b8' }}>↔ 사고 {f.customer_car_number || '-'}</span></div>
           <div style={{ fontSize: 11, fontWeight: 700, color: '#1d4ed8', background: 'rgba(59,110,181,0.1)', padding: '3px 10px', borderRadius: 20 }}>{STATUS_LABEL[f.status] || f.status}</div>
           <span style={{ fontSize: 11, color: '#94a3b8' }}>{f.rental_no}</span>
@@ -189,10 +196,13 @@ export default function RentalDetailPage() {
         </div>
 
         <div style={card}>
-          <label style={lab}>💬 상담 내용</label>
-          <textarea value={f.consultation_note ?? ''} onChange={(e) => set('consultation_note', e.target.value)} rows={4}
-            placeholder="고객 요청·차종 협의·일정·특이사항 등 상담 내용을 기록하세요"
-            style={{ ...inp, resize: 'vertical', fontFamily: 'inherit' } as any} />
+          <label style={lab}>💬 상담 기록</label>
+          <ConsultationTimeline
+            value={f.consultation_note}
+            onAppend={(next) => set('consultation_note', next)}
+            onRawChange={(raw) => set('consultation_note', raw)}
+            pendingHint
+          />
         </div>
 
         <div style={card}>

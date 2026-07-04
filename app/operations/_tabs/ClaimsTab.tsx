@@ -434,7 +434,7 @@ export default function ClaimsTab() {
         columns={columns}
         data={filtered}
         rowKey={(r) => r.id}
-        onRowClick={(r) => router.push(`/operations/rentals/${r.id}`)}
+        onRowClick={(r) => router.push(`/operations/rentals/${r.id}?from=claims`)}
         loading={loading}
         emptyIcon="💰"
         emptyMessage="청구 대상 (회차 완료) 건이 없습니다"
