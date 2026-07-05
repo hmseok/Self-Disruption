@@ -4,6 +4,9 @@ import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { GLASS, COLORS } from '@/app/utils/ui-tokens'
 import ConsultationTimeline from './ConsultationTimeline'
+import QuoteCalc, { QuoteResult, calcRentalDays } from './QuoteCalc'
+
+const CLAIM_TYPES = ['보험', '라이드', '고객유상', '유상대차', '정비대차', '사고대차']
 
 // ═══════════════════════════════════════════════════════════════════
 // RentalDrawer — 배차중 리스트 우측 드로어 (PR-UX-DRAWER, 2026-07-04)
@@ -65,6 +68,12 @@ export default function RentalDrawer({
   const [adjPhone, setAdjPhone] = useState('')
   const [dirty, setDirty] = useState(false)
 
+  // PR-QUOTE — 청구 정보·견적 (fmi_rentals 직접 저장)
+  const [claimType, setClaimType] = useState('')
+  const [claimNo, setClaimNo] = useState('')
+  const [quoteResult, setQuoteResult] = useState<QuoteResult | null>(null)
+  const [quoteDraft, setQuoteDraft] = useState<{ days: string; faultRate: string; claimRate: string; rateIdx: number } | null>(null)
+
   const load = useCallback(async () => {
     if (!rentalId) return
     setLoading(true); setErr(null); setF(null); setDirty(false)
@@ -77,6 +86,8 @@ export default function RentalDrawer({
       setRetDate(toLocalInput(j.data.expected_return_date))
       setAdjName(j.data.adjuster_name || '')
       setAdjPhone(j.data.adjuster_phone || '')
+      setClaimType(j.data.claim_type || '')
+      setClaimNo(j.data.insurance_claim_no || '')
     } catch (e: any) { setErr(e?.message || '오류') }
     finally { setLoading(false) }
   }, [rentalId])
@@ -113,6 +124,17 @@ export default function RentalDrawer({
     const ok = await patch({ consultation_note: next }, '상담 기록됨')
     if (!ok) throw new Error('저장 실패')
   }, [patch])
+
+  // 청구 정보·견적 저장
+  const saveQuote = useCallback(async () => {
+    await patch({
+      claim_type: claimType || null,
+      insurance_claim_no: claimNo || null,
+      fault_rate: quoteDraft?.faultRate ? Number(quoteDraft.faultRate) : null,
+      claim_rate: quoteDraft?.claimRate ? Number(quoteDraft.claimRate) : null,
+      ...(quoteResult ? { final_claim_amount: quoteResult.amount } : {}),
+    }, '청구 정보 저장됨 — 청구 카드에 프리필됩니다')
+  }, [patch, claimType, claimNo, quoteDraft, quoteResult])
 
   // 일정/담당 저장
   const saveSchedule = useCallback(async () => {
@@ -192,6 +214,33 @@ export default function RentalDrawer({
               <div style={{ ...GLASS.L3, borderRadius: 10, padding: 12, marginBottom: 14 }}>
                 <div style={{ ...secTitle, color: '#0f2440' }}>💬 상담 기록</div>
                 <ConsultationTimeline value={f.consultation_note} onAppend={appendNote} busy={busy} />
+              </div>
+
+              {/* 청구 정보 · 견적 — PR-QUOTE */}
+              <div style={{ ...GLASS.L3, borderRadius: 10, padding: 12, marginBottom: 14 }}>
+                <div style={{ ...secTitle, color: '#4338ca' }}>💰 청구 정보 · 견적</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                    <select value={claimType} onChange={(e) => setClaimType(e.target.value)} style={inp as any}>
+                      <option value="">— 청구유형 —</option>
+                      {CLAIM_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                    <input value={claimNo} onChange={(e) => setClaimNo(e.target.value)} placeholder="보험 접수번호" style={inp} />
+                  </div>
+                  <QuoteCalc
+                    key={String(rentalId)}
+                    carType={f.vehicle_car_type}
+                    initialDays={f.rental_days ?? calcRentalDays(f.dispatch_date, f.expected_return_date) ?? ''}
+                    initialFaultRate={f.fault_rate ?? ''}
+                    initialClaimRate={f.claim_rate ?? ''}
+                    onResult={setQuoteResult}
+                    onDraft={setQuoteDraft}
+                  />
+                  <button onClick={saveQuote} disabled={busy}
+                    style={{ alignSelf: 'flex-end', padding: '8px 16px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg, #4338ca, #6366f1)', color: '#fff', cursor: busy ? 'wait' : 'pointer', fontWeight: 800, fontSize: 12, opacity: busy ? 0.5 : 1 }}>
+                    {busy ? '저장 중…' : '💾 청구 정보 저장'}
+                  </button>
+                </div>
               </div>
 
               {/* 일정 / 담당 편집 */}

@@ -7,6 +7,7 @@ import DcToolbar, { FilterItem } from '@/app/components/DcToolbar'
 import NeuDataTable, { TableColumn, MobileCardConfig } from '@/app/components/NeuDataTable'
 import { GLASS } from '@/app/utils/ui-tokens'
 import { LOTTE_SHORT_TERM_RATES, computeLotteClaim } from '@/lib/lotte-short-term-rates'
+import { calcRentalDays, matchLotteRateIdx } from '../QuoteCalc'
 
 // ═══════════════════════════════════════════════════════════════════
 // ClaimsTab — 청구관리 (회차완료 → 청구 → 정산)
@@ -95,34 +96,7 @@ function fmtDate(s: string | null | undefined): string {
   return String(s).slice(0, 10)
 }
 
-// PR-UX-CLAIM (2026-07-04) — 반납→청구 재입력 제거: 자동 계산/매칭 헬퍼
-// 대여일수 자동 — 출고일~반납일 (올림, 최소 1일)
-function calcRentalDays(dispatch: string | null, ret: string | null): number | null {
-  if (!dispatch || !ret) return null
-  const a = new Date(dispatch).getTime()
-  const b = new Date(ret).getTime()
-  if (!Number.isFinite(a) || !Number.isFinite(b) || b < a) return null
-  return Math.max(1, Math.ceil((b - a) / 86400000))
-}
-// 롯데 요금표 차종 자동 매칭 — 대차 차종 문자열 ↔ vehicle_names 부분 일치 (가장 긴 이름 우선)
-function matchLotteRateIdx(carType: string | null): number {
-  if (!carType) return -1
-  const t = String(carType).replace(/\s+/g, '').toLowerCase()
-  if (!t) return -1
-  let best = -1
-  let bestLen = 0
-  LOTTE_SHORT_TERM_RATES.forEach((r, idx) => {
-    for (const raw of r.vehicle_names.split(',')) {
-      const name = raw.trim().split('(')[0].replace(/\s+/g, '').toLowerCase()
-      if (!name) continue
-      if ((t.includes(name) || name.includes(t)) && name.length > bestLen) {
-        best = idx
-        bestLen = name.length
-      }
-    }
-  })
-  return best
-}
+// PR-UX-CLAIM / PR-QUOTE — 자동 계산·매칭 헬퍼는 QuoteCalc 공용 모듈에서 (규칙 14 단일 소스)
 
 export default function ClaimsTab() {
   const router = useRouter()

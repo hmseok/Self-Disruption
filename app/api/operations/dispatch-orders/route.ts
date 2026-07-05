@@ -41,12 +41,9 @@ export async function GET(request: NextRequest) {
     // graceful fallback: 테이블 미적용 시 빈 배열
     // P2.1c-1: cafe24_otpt_* 컬럼이 있을 수도, 없을 수도 (마이그 미적용 케이스)
     // Try with new columns; if fail, fallback.
+    // PR-QUOTE (V8): o.* — 견적 컬럼 등 신규 o 컬럼 자동 포함 (명시 목록은 1054 위험)
     const baseSqlWithCafe24 = `SELECT
-         o.id, o.ride_accident_id, o.consultation_note, o.customer_request, o.delivery_json,
-         o.expected_dispatch_date, o.expected_return_date,
-         o.status, o.assigned_to, o.fmi_rental_id,
-         o.created_at, o.updated_at, o.created_by, o.updated_by,
-         o.cafe24_otpt_idno, o.cafe24_otpt_mddt, o.cafe24_otpt_srno,
+         o.*,
          a.id              AS acc_id,
          a.accident_date   AS acc_date,
          a.accident_location AS acc_location,
@@ -60,10 +57,7 @@ export async function GET(request: NextRequest) {
        FROM operations_dispatch_orders o
        LEFT JOIN ride_accidents a ON a.id = o.ride_accident_id`
     const baseSqlLegacy = `SELECT
-         o.id, o.ride_accident_id, o.consultation_note, o.customer_request, o.delivery_json,
-         o.expected_dispatch_date, o.expected_return_date,
-         o.status, o.assigned_to, o.fmi_rental_id,
-         o.created_at, o.updated_at, o.created_by, o.updated_by,
+         o.*,
          a.id              AS acc_id,
          a.accident_date   AS acc_date,
          a.accident_location AS acc_location,

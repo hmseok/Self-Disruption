@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef, use, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useDaumPostcodePopup } from 'react-daum-postcode'
-import { GLASS } from '@/app/utils/ui-tokens'
+import { GLASS, COLORS } from '@/app/utils/ui-tokens'
 import type {
   DispatchRequestRow,
   Consultation,
@@ -16,6 +16,7 @@ import type {
   Cafe24SmsRow,
 } from '@/app/operations/intake/types'
 import { CATEGORY_META, describeAccidentTypes, fmtCafe24DateTime, fmtCafe24DateOnly, sanitizeSmsBody } from '@/app/operations/intake/types'
+import QuoteCalc, { QuoteResult } from '@/app/operations/QuoteCalc'
 
 // ═══════════════════════════════════════════════════════════════════
 // /operations/dispatch/[idno]/[mddt]/[srno] — PR-OPS-1.5c
@@ -228,6 +229,12 @@ export default function DispatchDetailPage({
   const [claimType, setClaimType] = useState('')
   const [claimFaultRate, setClaimFaultRate] = useState('')
   const [claimClaimRate, setClaimClaimRate] = useState('')
+  // PR-QUOTE — 상담 단계 견적 (V8: dispatch_orders 저장 → 배차 확정 시 fmi_rentals 전파)
+  const [insClaimNo, setInsClaimNo] = useState('')
+  const [quoteResult, setQuoteResult] = useState<QuoteResult | null>(null)
+  const [quoteDraft, setQuoteDraft] = useState<{ days: string; faultRate: string; claimRate: string; rateIdx: number } | null>(null)
+  const [quoteBusy, setQuoteBusy] = useState(false)
+  const [quoteMigPending, setQuoteMigPending] = useState(false)
   const [claimInfoBusy, setClaimInfoBusy] = useState(false)
 
   // ── 상담 ──
@@ -423,6 +430,13 @@ export default function DispatchDetailPage({
           const d = parseDelivery(found.customer_request)
           setDeliveryType(d.type)
           setDeliveryNote(d.memo)  // 기존 메모 → 요청내용으로 이관
+        }
+        // PR-QUOTE — 상담 단계 견적 복원 (V8 컬럼; 미적용 DB 면 undefined → 빈값)
+        setInsClaimNo((found as any).insurance_claim_no || '')
+        if (!found.fmi_rental_id) {
+          setClaimType((found as any).claim_type || '')
+          setClaimFaultRate((found as any).fault_rate != null ? String(Number((found as any).fault_rate)) : '')
+          setClaimClaimRate((found as any).claim_rate != null ? String(Number((found as any).claim_rate)) : '')
         }
         // PR-H (2026-05-16) — 재진입 시 배차된 차량 복원
         //   fmi_rental_id → fmi_rentals.vehicle_id (cars.id) → cars 정보
@@ -691,6 +705,41 @@ export default function DispatchDetailPage({
       showResult({ type: 'err', text: e?.message || '청구 정보 저장 오류' })
     } finally {
       setClaimInfoBusy(false)
+    }
+  }
+
+  // PR-QUOTE — 상담 단계 견적 저장 (dispatch_orders V8 → 배차 확정 시 fmi_rentals 전파)
+  const saveQuoteToOrder = async () => {
+    if (!dispatchOrder?.id) return
+    setQuoteBusy(true)
+    try {
+      const headers = { ...(await getAuthHeader()), 'Content-Type': 'application/json' }
+      const res = await fetch(`/api/operations/dispatch-orders/${dispatchOrder.id}`, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({
+          claim_type: claimType || null,
+          insurance_claim_no: insClaimNo || null,
+          fault_rate: quoteDraft?.faultRate ? Number(quoteDraft.faultRate) : null,
+          claim_rate: quoteDraft?.claimRate ? Number(quoteDraft.claimRate) : null,
+          quote_days: quoteDraft?.days ? Number(quoteDraft.days) : null,
+          quote_vehicle_category: quoteResult?.categoryLabel || null,
+          quote_amount: quoteResult?.amount ?? null,
+        }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || json?.error) throw new Error(json?.error || '저장 실패')
+      setQuoteMigPending(!!json?._migration_pending)
+      showResult({
+        type: json?._migration_pending ? 'err' : 'ok',
+        text: json?._migration_pending
+          ? '견적 저장은 V8 마이그레이션 적용 후 가능합니다 (migrations/2026-07-04_V8)'
+          : '견적 저장됨 — 배차 확정 시 청구 정보로 전파됩니다',
+      })
+    } catch (e: any) {
+      showResult({ type: 'err', text: e?.message || '견적 저장 오류' })
+    } finally {
+      setQuoteBusy(false)
     }
   }
 
@@ -1683,9 +1732,50 @@ export default function DispatchDetailPage({
                         {claimInfoBusy ? '저장 중…' : '청구정보 저장'}
                       </button>
                     </div>
+                  ) : dispatchOrder?.id ? (
+                    /* PR-QUOTE — 상담 단계 견적: 청구유형·접수번호·요금 산출 → dispatch_orders 저장 */
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        <select value={claimType} onChange={(e) => setClaimType(e.target.value)}
+                          style={{ ...GLASS.L1, padding: '8px 10px', borderRadius: 8, fontSize: 12, color: '#1e293b', flex: '1 1 130px' }}>
+                          <option value="">— 청구유형 —</option>
+                          {CLAIM_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                        </select>
+                        <input value={insClaimNo} onChange={(e) => setInsClaimNo(e.target.value)} placeholder="보험 접수번호"
+                          style={{ ...GLASS.L1, padding: '8px 10px', borderRadius: 8, fontSize: 12, color: '#1e293b', flex: '1 1 150px' }} />
+                      </div>
+                      <QuoteCalc
+                        key={dispatchOrder.id}
+                        carType={selectedVehicle?.model || row?.cars_model || null}
+                        initialDays={(dispatchOrder as any).quote_days ?? ''}
+                        initialFaultRate={(dispatchOrder as any).fault_rate ?? ''}
+                        initialClaimRate={(dispatchOrder as any).claim_rate ?? ''}
+                        initialCategoryLabel={(dispatchOrder as any).quote_vehicle_category || null}
+                        onResult={setQuoteResult}
+                        onDraft={setQuoteDraft}
+                      />
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                        <button onClick={saveQuoteToOrder} disabled={quoteBusy}
+                          style={{ padding: '7px 14px', borderRadius: 8, border: 'none', cursor: quoteBusy ? 'wait' : 'pointer', fontSize: 12, fontWeight: 800, background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)', color: '#fff', opacity: quoteBusy ? 0.5 : 1 }}>
+                          {quoteBusy ? '저장 중…' : '💾 견적 저장'}
+                        </button>
+                        {quoteResult && (
+                          <button
+                            onClick={() => setConsultation((prev) => (prev ? prev + '\n' : '') + `견적: ${quoteResult.formula}`)}
+                            style={{ padding: '7px 12px', borderRadius: 8, border: `1px solid ${COLORS.borderBlue}`, background: COLORS.bgBlue, color: COLORS.primary, cursor: 'pointer', fontSize: 11, fontWeight: 700 }}
+                          >↳ 상담 내용에 추가</button>
+                        )}
+                        <span style={{ fontSize: 10, color: '#94a3b8' }}>배차 확정 시 청구 정보로 자동 전파</span>
+                      </div>
+                      {quoteMigPending && (
+                        <div style={{ ...GLASS.L1, padding: '7px 10px', borderRadius: 8, fontSize: 11, color: '#b45309', border: '1px solid rgba(245,158,11,0.35)' }}>
+                          ⚠ 견적 저장에는 V8 마이그레이션 적용이 필요합니다 — migrations/2026-07-04_V8_dispatch_order_quote.sql
+                        </div>
+                      )}
+                    </div>
                   ) : (
                     <div style={{ ...GLASS.L1, padding: '8px 12px', borderRadius: 8, fontSize: 11, color: '#94a3b8' }}>
-                      배차 확정 후 입력할 수 있습니다 — 청구유형·과실율·청구율은 청구 모달과 동기화됩니다.
+                      상담 시작(저장) 후 견적을 입력할 수 있습니다.
                     </div>
                   )}
                 </div>

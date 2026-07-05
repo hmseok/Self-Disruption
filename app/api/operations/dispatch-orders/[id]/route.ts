@@ -117,24 +117,54 @@ export async function PATCH(
       sets.push('assigned_to = ?'); vals.push(assigned_to || null)
     }
 
-    if (sets.length === 0) {
+    // PR-QUOTE (V8) — 상담 단계 견적 필드. 컬럼 미적용 DB 는 아래 1054 fallback 처리.
+    const quoteSets: string[] = []
+    const quoteVals: any[] = []
+    const q = body || {}
+    if (q.claim_type !== undefined) { quoteSets.push('claim_type = ?'); quoteVals.push(q.claim_type || null) }
+    if (q.insurance_claim_no !== undefined) { quoteSets.push('insurance_claim_no = ?'); quoteVals.push(q.insurance_claim_no || null) }
+    if (q.fault_rate !== undefined) { quoteSets.push('fault_rate = ?'); quoteVals.push(q.fault_rate === null || q.fault_rate === '' ? null : Number(q.fault_rate)) }
+    if (q.claim_rate !== undefined) { quoteSets.push('claim_rate = ?'); quoteVals.push(q.claim_rate === null || q.claim_rate === '' ? null : Number(q.claim_rate)) }
+    if (q.quote_vehicle_category !== undefined) { quoteSets.push('quote_vehicle_category = ?'); quoteVals.push(q.quote_vehicle_category || null) }
+    if (q.quote_days !== undefined) { quoteSets.push('quote_days = ?'); quoteVals.push(q.quote_days === null || q.quote_days === '' ? null : Number(q.quote_days)) }
+    if (q.quote_amount !== undefined) { quoteSets.push('quote_amount = ?'); quoteVals.push(q.quote_amount === null || q.quote_amount === '' ? null : Number(q.quote_amount)) }
+
+    if (sets.length === 0 && quoteSets.length === 0) {
       return NextResponse.json({ error: '변경 필드 없음' }, { status: 400 })
     }
 
     // updated_by 자동 추가
     sets.push('updated_by = ?'); vals.push(user.id || null)
 
-    // 마지막에 WHERE id
-    vals.push(id)
+    const runUpdate = async (withQuote: boolean) => {
+      const s = withQuote ? [...quoteSets, ...sets] : sets
+      const v = withQuote ? [...quoteVals, ...vals, id] : [...vals, id]
+      const sql = `UPDATE operations_dispatch_orders SET ${s.join(', ')} WHERE id = ?`
+      return prisma.$executeRawUnsafe(sql, ...v)
+    }
 
-    const sql = `UPDATE operations_dispatch_orders SET ${sets.join(', ')} WHERE id = ?`
-    const result = await prisma.$executeRawUnsafe(sql, ...vals)
+    let migrationPending = false
+    let result: any
+    try {
+      result = await runUpdate(quoteSets.length > 0)
+    } catch (e: any) {
+      // V8 미적용 DB — 견적 필드 빼고 재시도 (규칙 23 graceful fallback)
+      if (quoteSets.length > 0 && /Unknown column/i.test(e?.message || '')) {
+        migrationPending = true
+        result = await runUpdate(false)
+      } else {
+        throw e
+      }
+    }
 
     return NextResponse.json({
       ok: true,
       id,
       affected: Number(result),
-      message: result > 0 ? 'dispatch_order 수정 완료' : 'id 매칭 row 없음',
+      _migration_pending: migrationPending || undefined,
+      message: migrationPending
+        ? '기본 필드만 저장 — 견적 필드는 V8 마이그레이션 적용 후 저장됩니다'
+        : (result > 0 ? 'dispatch_order 수정 완료' : 'id 매칭 row 없음'),
     })
   } catch (e: any) {
     console.error('[dispatch-orders PATCH id]', e)

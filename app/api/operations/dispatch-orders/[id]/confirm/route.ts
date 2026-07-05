@@ -83,7 +83,7 @@ export async function POST(
     const finalCustomerName  = customer_name  || order.acc_driver_name  || null
     const finalCustomerPhone = customer_phone || order.acc_driver_phone || null
     const finalInsuranceCo   = insurance_company   || order.acc_insurance_company || null
-    const finalClaimNo       = insurance_claim_no  || order.acc_claim_no || null
+    const finalClaimNo       = insurance_claim_no  || order.insurance_claim_no || order.acc_claim_no || null  // PR-QUOTE: 상담 저장분(V8) 우선
     const finalDispatchDate  = dispatch_date      || order.expected_dispatch_date || new Date().toISOString().slice(0, 10)
     const finalReturnDate    = expected_return_date || order.expected_return_date || null
 
@@ -185,6 +185,25 @@ export async function POST(
       } catch (e) {
         console.warn('[confirm] consultation_note 전파 skip (컬럼 미존재 가능):', (e as Error)?.message)
       }
+    }
+
+    // 3.6 견적 전파 (PR-QUOTE V8) — 상담 단계 견적 → fmi_rentals 청구 필드 초기값.
+    //   V8 미적용 DB 면 order 의 해당 키가 undefined → 자연 skip. 기존 값 있으면 유지(COALESCE).
+    try {
+      const quoteSets: string[] = []
+      const quoteVals: any[] = []
+      if (order.claim_type != null && order.claim_type !== '') { quoteSets.push('claim_type = COALESCE(claim_type, ?)'); quoteVals.push(order.claim_type) }
+      if (order.fault_rate != null) { quoteSets.push('fault_rate = COALESCE(fault_rate, ?)'); quoteVals.push(Number(order.fault_rate)) }
+      if (order.claim_rate != null) { quoteSets.push('claim_rate = COALESCE(claim_rate, ?)'); quoteVals.push(Number(order.claim_rate)) }
+      if (order.quote_amount != null) { quoteSets.push('final_claim_amount = COALESCE(final_claim_amount, ?)'); quoteVals.push(Number(order.quote_amount)) }
+      if (quoteSets.length > 0) {
+        await prisma.$executeRawUnsafe(
+          `UPDATE fmi_rentals SET ${quoteSets.join(', ')} WHERE id = ?`,
+          ...quoteVals, fmiRentalId,
+        )
+      }
+    } catch (e) {
+      console.warn('[confirm] 견적 전파 skip (컬럼 미존재 가능):', (e as Error)?.message)
     }
 
     // 4. dispatch_order 연결 + status (예약=scheduled / 바로=dispatched)
