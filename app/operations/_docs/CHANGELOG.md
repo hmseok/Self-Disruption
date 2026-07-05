@@ -2,6 +2,11 @@
 
 > 규칙 22 — 매 PR 한 줄 이상. 이전 이력은 `harness-engineering/handover/` 참조.
 
+## 2026-07-05 PR-PAY-SYNC — 입금 자동 반영 + 완납 자동 청구완료
+- 그간 매처는 transactions 링크만 걸고 `fmi_rentals.paid_amount`는 아무도 안 써서 항상 빈값이었음 (지급금액·💰 표시 무의미) — 근본 해소.
+- **paid_amount 실시간 파생**: fmi-rentals GET에 매칭 입금합계 LEFT JOIN (저장 안 함 — 언링크에도 항상 정합, 규칙 12). payment_status 파생: 완납/부분입금/입금.
+- **완납 자동 청구완료**: 청구중 + 입금합계 ≥ 청구액 → settled 자동 전이. 두 진입점 동형(규칙 14): ① auto-match-fmi-rental 적용 직후(결과에 「완납 청구완료 N건」 보고) ② 수동 1클릭 연결(transactions PATCH). 부분입금은 전이 없이 💰 표시만.
+
 ## 2026-07-05 PR-STATUS-LANG — 상태 라벨 업무 언어화
 - 사용자 명시: 「배차는 상담완료·배차완료, 청구는 청구전·청구중·청구완료, 청구완료에 금액이나 정산 체크」.
 - DB status 불변, 라벨만: pending→상담완료 / returned→청구전 / settled→청구완료.

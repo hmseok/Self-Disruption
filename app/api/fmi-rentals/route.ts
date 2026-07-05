@@ -60,27 +60,42 @@ export async function GET(request: NextRequest) {
          r.created_at, r.updated_at,
          r.claim_type, r.vat_extra_billing, r.capital_company,
          r.repair_factory, r.customer_birth, r.dispatch_location,
-         r.paid_amount, r.payment_status, r.payment_memo,
+         COALESCE(p.paid_sum, r.paid_amount) AS paid_amount, r.payment_status, r.payment_memo,
          r.fault_rate, r.claim_rate,
          COALESCE(r.fleet_group, v.ownership_type) AS fleet_group,
          v.status AS vehicle_status
        FROM fmi_rentals r
        LEFT JOIN cars v ON v.id = r.vehicle_id
+       LEFT JOIN (
+         SELECT t.related_id, SUM(t.amount) AS paid_sum
+           FROM transactions t
+          WHERE t.related_type = 'fmi_rental' AND t.type = 'income' AND t.deleted_at IS NULL
+          GROUP BY t.related_id
+       ) p ON p.related_id = r.id
        ${whereClause}
        ORDER BY r.dispatch_date DESC
        LIMIT ${limit}`,
       ...params
     )
 
-    const data = rows.map((r: any) => ({
-      ...r,
-      daily_rate: r.daily_rate !== null ? Number(r.daily_rate) : null,
-      total_rental_fee: r.total_rental_fee !== null ? Number(r.total_rental_fee) : null,
-      final_claim_amount: r.final_claim_amount !== null ? Number(r.final_claim_amount) : null,
-      paid_amount: r.paid_amount !== null && r.paid_amount !== undefined ? Number(r.paid_amount) : null,
-      fault_rate: r.fault_rate !== null && r.fault_rate !== undefined ? Number(r.fault_rate) : null,
-      claim_rate: r.claim_rate !== null && r.claim_rate !== undefined ? Number(r.claim_rate) : null,
-    }))
+    const data = rows.map((r: any) => {
+      const paid = r.paid_amount !== null && r.paid_amount !== undefined ? Number(r.paid_amount) : null
+      const claim = r.final_claim_amount !== null ? Number(r.final_claim_amount) : null
+      // PR-PAY-SYNC — 지급여부 파생: 매칭 입금 합계 기준 (저장 안 함 — 항상 정합, 규칙 12)
+      const paymentStatus = paid && paid > 0
+        ? (claim && claim > 0 ? (paid >= claim ? '완납' : '부분입금') : '입금')
+        : r.payment_status
+      return {
+        ...r,
+        daily_rate: r.daily_rate !== null ? Number(r.daily_rate) : null,
+        total_rental_fee: r.total_rental_fee !== null ? Number(r.total_rental_fee) : null,
+        final_claim_amount: claim,
+        paid_amount: paid,
+        payment_status: paymentStatus,
+        fault_rate: r.fault_rate !== null && r.fault_rate !== undefined ? Number(r.fault_rate) : null,
+        claim_rate: r.claim_rate !== null && r.claim_rate !== undefined ? Number(r.claim_rate) : null,
+      }
+    })
 
     let stats: any = null
     if (includeStats) {

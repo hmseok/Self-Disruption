@@ -61,6 +61,29 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const sql = `UPDATE transactions SET ${setParts.join(', ')} WHERE id = ?`
     await prisma.$executeRawUnsafe(sql, ...args)
 
+    // PR-PAY-SYNC — 대차건에 입금 수동 연결 시 완납 자동 청구완료 (auto-match-fmi-rental 과 동형, 규칙 14)
+    //   청구중 + 매칭 입금합계 ≥ 청구액 → settled. 실패해도 링크 자체는 성공 (graceful).
+    if (allowed.related_type === 'fmi_rental' && allowed.related_id) {
+      try {
+        await prisma.$executeRaw`
+          UPDATE fmi_rentals r
+            JOIN (
+              SELECT related_id, SUM(amount) AS s
+                FROM transactions
+               WHERE related_type = 'fmi_rental' AND type = 'income' AND deleted_at IS NULL
+               GROUP BY related_id
+            ) p ON p.related_id = r.id
+             SET r.status = 'settled', r.updated_at = NOW()
+           WHERE r.id = ${allowed.related_id}
+             AND r.status = 'claiming'
+             AND r.final_claim_amount IS NOT NULL AND r.final_claim_amount > 0
+             AND p.s >= r.final_claim_amount
+        `
+      } catch (e) {
+        console.warn('[transactions PATCH] 완납 전이 skip:', (e as Error)?.message)
+      }
+    }
+
     // 업데이트된 행 반환
     const rows = await prisma.$queryRaw<any[]>`
       SELECT * FROM transactions WHERE id = ${id} LIMIT 1

@@ -496,6 +496,30 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // ── 5.5) 완납 자동 청구완료 (PR-PAY-SYNC) ──
+    //   청구중(claiming) + 매칭 입금합계 ≥ 청구액 → settled 전이. 부분입금은 전이 X (표시만).
+    let settledTransitions = 0
+    if (!dryRun && result.applied > 0) {
+      try {
+        const res = await prisma.$executeRaw`
+          UPDATE fmi_rentals r
+            JOIN (
+              SELECT related_id, SUM(amount) AS s
+                FROM transactions
+               WHERE related_type = 'fmi_rental' AND type = 'income' AND deleted_at IS NULL
+               GROUP BY related_id
+            ) p ON p.related_id = r.id
+             SET r.status = 'settled', r.updated_at = NOW()
+           WHERE r.status = 'claiming'
+             AND r.final_claim_amount IS NOT NULL AND r.final_claim_amount > 0
+             AND p.s >= r.final_claim_amount
+        `
+        settledTransitions = Number(res)
+      } catch (e) {
+        console.warn('[auto-match-fmi-rental] 완납 전이 skip:', (e as Error)?.message)
+      }
+    }
+
     // ── 6) 자가 검증 (CLAUDE.md 규칙 10) ──
     let verifiedCount = 0
     if (!dryRun && result.applied > 0) {
@@ -513,11 +537,12 @@ export async function POST(request: NextRequest) {
       ...result,
       dry_run: dryRun,
       verified_recently: verifiedCount,
+      settled_transitions: settledTransitions,
       dynamic_abbrs_count: dynamicAbbrs.length,
       dynamic_abbrs_sample: dynamicAbbrs.slice(0, 20),
       message: dryRun
         ? `dry-run — 매칭 가능 ${result.matched}건 (적용 안 함)`
-        : `${result.applied}건 매칭 적용 (검증: ${verifiedCount}건)`,
+        : `${result.applied}건 매칭 적용 (검증: ${verifiedCount}건${settledTransitions > 0 ? ` / 완납 청구완료 ${settledTransitions}건` : ''})`,
     })
   } catch (e: any) {
     console.error('[auto-match-fmi-rental POST]', e)
