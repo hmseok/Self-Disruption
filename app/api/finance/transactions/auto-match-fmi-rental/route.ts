@@ -84,6 +84,8 @@ interface ParsedClient {
   abbr: string
   last4: string
   insurerKeywords: string[]
+  /** PR-AUTO-LINK — 입금자명에 차량번호 전체가 있으면 (예: 69서0895) 완전 일치 승격용 */
+  vehicleFull?: string
 }
 
 /**
@@ -120,10 +122,10 @@ function parseClientName(raw: string | null | undefined, dynamicAbbrs: string[])
       const abbr = prefixMatch[1]
       if (NON_INSURER_PREFIXES.has(abbr)) return null
       const keywords = INSURER_ABBR[abbr] || [abbr]
-      return { abbr, last4: carInfo.last4, insurerKeywords: keywords }
+      return { abbr, last4: carInfo.last4, insurerKeywords: keywords, vehicleFull: carInfo.vehicle }
     }
-    // prefix 없는 경우 — 차량번호 자체로 LOW 매칭 시도 (insurer 정보 없음 → LOW confidence)
-    return { abbr: '?', last4: carInfo.last4, insurerKeywords: [] }
+    // prefix 없는 경우 — 차량번호 자체로 매칭 시도 (완전 일치 유일 건은 HIGH 승격 — PR-AUTO-LINK)
+    return { abbr: '?', last4: carInfo.last4, insurerKeywords: [], vehicleFull: carInfo.vehicle }
   }
 
   for (const abbr of dictAbbrs) {
@@ -266,17 +268,60 @@ export async function POST(request: NextRequest) {
       const descRaw = String(tx.description || '').trim()
       // client_name 우선, 못 잡으면 description
       const parsed = parseClientName(clientRaw, dynamicAbbrs) || parseClientName(descRaw, dynamicAbbrs)
+
+      let pick: any = null
+      let confidence: 'HIGH' | 'MEDIUM' | 'LOW' | 'NONE' = 'NONE'
+
       if (!parsed) {
-        result.no_pattern++
-        if (result.failed_samples.length < 100) {
-          result.failed_samples.push({
-            tx_id: tx.id,
-            client_name: clientRaw || descRaw,
-            reason: '패턴 미일치 — 약어+4자리숫자 형태 아님',
-          })
+        // PR-AUTO-LINK — 고객명축 + 예상입금자명축(V9): 입금자명 정규화 일치 (유일 건)
+        //   고객명 일치 → MEDIUM / 미리 입력한 expected_payer 일치 → HIGH (사용자가 지정한 값)
+        const nm = clientRaw.replace(/[\s\-_()·.,*]+/g, '')
+        if (/^[가-힣A-Za-z]{2,20}$/.test(nm)) {
+          const baseSelect = `SELECT id, vehicle_id, customer_car_number, vehicle_car_number, insurance_company,
+                      final_claim_amount, total_rental_fee, dispatch_date, status`
+          // ① 예상 입금자명 (V9 — 컬럼 미적용 DB 는 1054 → skip)
+          try {
+            const byPayer = await prisma.$queryRawUnsafe<Array<any>>(
+              `${baseSelect} FROM fmi_rentals
+                WHERE REPLACE(REPLACE(expected_payer, ' ', ''), '-', '') = ?
+                LIMIT 2`,
+              nm,
+            )
+            if (byPayer.length === 1) {
+              pick = byPayer[0]
+              confidence = 'HIGH'
+            }
+          } catch { /* V9 미적용 — 고객명축으로 */ }
+          // ② 고객명
+          if (!pick) {
+            try {
+              const byName = await prisma.$queryRawUnsafe<Array<any>>(
+                `${baseSelect} FROM fmi_rentals
+                  WHERE REPLACE(REPLACE(customer_name, ' ', ''), '-', '') = ?
+                  LIMIT 2`,
+                nm,
+              )
+              if (byName.length === 1) {
+                pick = byName[0]
+                confidence = 'MEDIUM'
+              }
+            } catch { /* 이름축 실패 — no_pattern 으로 */ }
+          }
         }
-        continue
+        if (!pick) {
+          result.no_pattern++
+          if (result.failed_samples.length < 100) {
+            result.failed_samples.push({
+              tx_id: tx.id,
+              client_name: clientRaw || descRaw,
+              reason: '패턴 미일치 — 약어+4자리·차량번호·고객명 어느 축도 아님',
+            })
+          }
+          continue
+        }
       }
+
+      if (!pick && parsed) {
 
       // ── 3) fmi_rentals 검색 — 차량 우선 + 보험사 점수 ──
       // 1단계: customer_car_number LIKE '%[last4]' 모든 차량 후보 검색
@@ -323,9 +368,6 @@ export async function POST(request: NextRequest) {
       const insurerMatched = candidates.filter((c: any) => Number(c.insurer_match) === 1)
       const insurerOnly = candidates.filter((c: any) => Number(c.insurer_match) === 0)
 
-      let pick: any = null
-      let confidence: 'HIGH' | 'MEDIUM' | 'LOW' | 'NONE' = 'NONE'
-
       if (insurerMatched.length === 1) {
         pick = insurerMatched[0]
         confidence = 'HIGH'
@@ -355,22 +397,39 @@ export async function POST(request: NextRequest) {
           continue
         }
       } else if (insurerOnly.length > 0) {
-        // 보험사 mismatch 케이스 — LOW confidence (자동 매칭 안 함, 사용자 검수용)
-        result.low_confidence++
-        const sample = insurerOnly[0]
-        if (result.low_confidence_samples.length < 100) {
-          result.low_confidence_samples.push({
-            tx_id: tx.id,
-            client_name: clientRaw,
-            parsed_insurer: parsed.abbr,
-            actual_insurer: String(sample.insurance_company || '-'),
-            customer_car_number: String(sample.customer_car_number || '-'),
-          })
+        // PR-AUTO-LINK — 차량번호 완전 일치 승격: 입금자명에 차량번호 전체가 있고
+        //   그 번호의 대차건이 유일하면 보험사 정보 없어도 HIGH (차량번호 = 유일 식별자)
+        const vf = String(parsed.vehicleFull || '').replace(/\s+/g, '')
+        if (vf) {
+          const exact = insurerOnly.filter((c: any) =>
+            String(c.customer_car_number || '').replace(/\s+/g, '') === vf ||
+            String(c.vehicle_car_number || '').replace(/\s+/g, '') === vf)
+          if (exact.length === 1) {
+            pick = exact[0]
+            confidence = 'HIGH'
+          }
         }
-        confidence = 'LOW'
-        // ★ LOW 는 적용 안 함 — 사용자가 dry-run 결과 보고 결정
-        continue
+        if (!pick) {
+          // 보험사 mismatch / 뒤4자리만 일치 — LOW confidence (자동 매칭 안 함, 사용자 검수용)
+          result.low_confidence++
+          const sample = insurerOnly[0]
+          if (result.low_confidence_samples.length < 100) {
+            result.low_confidence_samples.push({
+              tx_id: tx.id,
+              client_name: clientRaw,
+              parsed_insurer: parsed.abbr,
+              actual_insurer: String(sample.insurance_company || '-'),
+              customer_car_number: String(sample.customer_car_number || '-'),
+            })
+          }
+          confidence = 'LOW'
+          // ★ LOW 는 적용 안 함 — 사용자가 dry-run 결과 보고 결정
+          continue
+        }
       }
+      } // ← if (!pick && parsed) 블록 종료 (PR-AUTO-LINK)
+
+      if (!pick) continue
 
       // ── 5) 매칭 적용 ──
       // 1차 (fmi_rental) 매칭은 항상 진행 — 사고 대차건 자체는 매칭됨
@@ -427,7 +486,7 @@ export async function POST(request: NextRequest) {
         result.samples.push({
           tx_id: tx.id,
           client_name: clientRaw,
-          parsed,
+          parsed: parsed || { abbr: '이름일치', last4: '', insurerKeywords: [] },
           rental_id: pick.id,
           vehicle_id: pick.vehicle_id,
           customer_car_number: pick.customer_car_number,

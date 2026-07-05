@@ -1,4 +1,14 @@
-# Cowork 세션 인수인계 — 사고대차 UX 단순화 + 견적 파이프라인 (2026-07-04~05)
+# Cowork 세션 인수인계 — 사고대차 UX 단순화 + 견적·입금 파이프라인 (2026-07-04~05)
+
+## 0. 7-05 오후 추가분 (상세는 `app/operations/_docs/CHANGELOG.md`)
+- **PR-STATUS-LANG**: 라벨 업무 언어화 (상담/배차완료 · 청구전→청구대상 통합→청구완료).
+- **PR-FLOW-CONSULT v1/v2**: 배차 탭 = 통합 뷰 (cafe24 대차요청 자동 유입 「상담대기」), 필터 상담대기/배차 2개. 접수 탭 = 사고접수 원장 (N건 「대차 전환」만). 청구 필터 = 전체/청구대상/청구완료.
+- **PR-PAY-SYNC**: paid_amount 실시간 파생 + 완납 자동 청구완료 (매처+수동링크 동형).
+- **PR-PAY-CRON**: `lib/cron-auth.ts` X-Cron-Secret 체인 (codef/sync→bank→매처). GCP: CRON_SECRET env ✅ + Cloud Scheduler `codef-sync-30min` (30분) ✅ 가동 확인 (status 200).
+- **PR-LIST-INFO**: 배차 「청구정보」·청구 「과실·청구율」 컬럼.
+- **PR-PAY-REVIEW/AUTO-LINK/PAYER**: 청구 탭 「입금 연결 필요」 패널 (3축 후보: 입금자명/차량/이름 배지 + 1클릭 연결). 매처 자동 축 4개 — 보험사+4자리 / 차량번호 완전일치(HIGH) / 고객명 유일(MEDIUM) / **expected_payer(V9, HIGH)**. 매칭 저조 원인 = 과거 입금 DB 부재 (codef 백필 결정 대기 — 과금 확인 필요).
+- **마이그레이션**: V8 ✅ 적용 / **V9 (fmi_rentals.expected_payer) ⏳ 적용 대기**.
+
 
 > 새 세션: **이 파일 + CLAUDE.md + `app/operations/_docs/`(CHANGELOG·DATA-MODEL) 먼저 읽고** 이어서.
 > 작업 영역: `app/operations/*` + `app/api/operations/dispatch-orders/*` (+ finance 매처 1건).

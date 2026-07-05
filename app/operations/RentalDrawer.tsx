@@ -71,6 +71,7 @@ export default function RentalDrawer({
   // PR-QUOTE — 청구 정보·견적 (fmi_rentals 직접 저장)
   const [claimType, setClaimType] = useState('')
   const [claimNo, setClaimNo] = useState('')
+  const [expectedPayer, setExpectedPayer] = useState('')  // V9 — 예상 입금자명 (자동매칭 축)
   const [quoteResult, setQuoteResult] = useState<QuoteResult | null>(null)
   const [quoteDraft, setQuoteDraft] = useState<{ days: string; faultRate: string; claimRate: string; rateIdx: number } | null>(null)
 
@@ -88,6 +89,7 @@ export default function RentalDrawer({
       setAdjPhone(j.data.adjuster_phone || '')
       setClaimType(j.data.claim_type || '')
       setClaimNo(j.data.insurance_claim_no || '')
+      setExpectedPayer(j.data.expected_payer || '')
     } catch (e: any) { setErr(e?.message || '오류') }
     finally { setLoading(false) }
   }, [rentalId])
@@ -130,11 +132,12 @@ export default function RentalDrawer({
     await patch({
       claim_type: claimType || null,
       insurance_claim_no: claimNo || null,
+      expected_payer: expectedPayer || null,
       fault_rate: quoteDraft?.faultRate ? Number(quoteDraft.faultRate) : null,
       claim_rate: quoteDraft?.claimRate ? Number(quoteDraft.claimRate) : null,
       ...(quoteResult ? { final_claim_amount: quoteResult.amount } : {}),
-    }, '청구 정보 저장됨 — 청구 카드에 프리필됩니다')
-  }, [patch, claimType, claimNo, quoteDraft, quoteResult])
+    }, '청구 정보 저장됨 — 입금자명이 오면 자동매칭됩니다')
+  }, [patch, claimType, claimNo, expectedPayer, quoteDraft, quoteResult])
 
   // 일정/담당 저장
   const saveSchedule = useCallback(async () => {
@@ -226,6 +229,10 @@ export default function RentalDrawer({
                       {CLAIM_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
                     </select>
                     <input value={claimNo} onChange={(e) => setClaimNo(e.target.value)} placeholder="보험 접수번호" style={inp} />
+                  </div>
+                  <div>
+                    <label style={lab}>예상 입금자명 <span style={{ fontWeight: 500, color: '#94a3b8' }}>— 입금되면 자동매칭</span></label>
+                    <input value={expectedPayer} onChange={(e) => setExpectedPayer(e.target.value)} placeholder="예: 삼성화재, 홍길동" style={inp} />
                   </div>
                   <QuoteCalc
                     key={String(rentalId)}

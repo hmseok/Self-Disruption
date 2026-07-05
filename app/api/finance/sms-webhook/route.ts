@@ -211,6 +211,11 @@ export async function POST(req: NextRequest) {
       // description = 가맹점 그대로 (prefix 없음 — UI 가 sms.transaction_type 으로 [취소] 표시)
       const description = parsed.merchant || parsed.issuer
 
+      // PR-SMS-BANK (2026-07-05) — 은행 SMS 는 'sms_bank' (매처 후보 풀 규칙과 동형).
+      //   기존: 'sms' 하드코딩 → 통장 입금이 대차/투자자 매칭 풀에서 제외되던 버그.
+      //   rebuild/link-cards 와 동일 규칙: issuer 가 BANK 로 끝나면 은행.
+      const importedFrom = /BANK$/i.test(String(parsed.issuer || '')) ? 'sms_bank' : 'sms'
+
       await prisma.$executeRaw`
         INSERT INTO transactions (
           id, transaction_date, type, amount, description, client_name,
@@ -219,7 +224,7 @@ export async function POST(req: NextRequest) {
         ) VALUES (
           ${transactionId}, ${txDate}, ${txType}, ${parsed.amount},
           ${description}, ${await resolveClientName(parsed.holder || '')},
-          ${parsed.issuer}, 'sms',
+          ${parsed.issuer}, ${importedFrom},
           ${carId ? 'car' : null}, ${carId},
           ${ruleResult && ruleResult.tier === 'auto' ? ruleResult.category : null},
           'completed', NOW(), NOW()
@@ -229,6 +234,20 @@ export async function POST(req: NextRequest) {
       await prisma.$executeRaw`
         UPDATE card_sms_transactions SET transaction_id = ${transactionId} WHERE id = ${id}
       `
+
+      // PR-SMS-BANK — 은행 입금이면 대차 자동매칭 즉시 트리거 (fire-and-forget, CRON_SECRET 체인)
+      //   codef/bank 훅과 동형 (규칙 14). 실패해도 30분 주기 cron 이 재시도.
+      if (importedFrom === 'sms_bank' && txType === 'income' && process.env.CRON_SECRET) {
+        try {
+          const proto = req.headers.get('x-forwarded-proto') || 'https'
+          const host = req.headers.get('host') || ''
+          fetch(`${proto}://${host}/api/finance/transactions/auto-match-fmi-rental`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Cron-Secret': process.env.CRON_SECRET },
+            body: JSON.stringify({ mode: 'insurance', dryRun: false }),
+          }).catch(() => {})
+        } catch { /* 매칭 트리거 실패 무시 */ }
+      }
     } catch (e) {
       // 거래 생성 실패해도 SMS 저장은 유지
       transactionId = null

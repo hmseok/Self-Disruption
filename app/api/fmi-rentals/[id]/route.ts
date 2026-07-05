@@ -42,6 +42,8 @@ const ALLOWED_FIELDS = new Set([
   'sales_support_yn', 'sales_order', 'sales_deposit_date', 'sales_deposit_amount', 'sales_payout_rate',
   // V5 (2026-06-28) — 차량별 순번 / 상담 내용(메모와 분리)
   'dispatch_seq', 'consultation_note',
+  // V9 (2026-07-05) — 예상 입금자명 (자동매칭 축)
+  'expected_payer',
 ])
 const DATE_FIELDS = new Set([
   'dispatch_date', 'expected_return_date', 'actual_return_date',

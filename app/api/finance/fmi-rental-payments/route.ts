@@ -43,9 +43,11 @@ export async function GET(request: NextRequest) {
     const limit = Math.min(5000, Math.max(1, Number(url.searchParams.get('limit')) || 2000))
 
     // 1) 대차건 + 매칭 입금 집계 (LEFT JOIN — 미입금도 포함)
-    const rows = await prisma.$queryRawUnsafe<Array<any>>(
+    //   V9: expected_payer 포함 시도 → 컬럼 미적용 DB 는 fallback (규칙 23 graceful)
+    const buildSql = (withPayer: boolean) =>
       `SELECT r.id, r.dispatch_date, r.vehicle_car_number, r.customer_car_number,
               r.customer_name, r.insurance_company, r.final_claim_amount AS claim_amount,
+              ${withPayer ? 'r.expected_payer,' : ''}
               COALESCE(p.paid_amount, 0) AS paid_amount, p.paid_date, COALESCE(p.paid_count, 0) AS paid_count
          FROM fmi_rentals r
          LEFT JOIN (
@@ -57,9 +59,15 @@ export async function GET(request: NextRequest) {
         WHERE r.fleet_group = '빌려타'
           ${q ? `AND (r.customer_name LIKE ? OR r.customer_car_number LIKE ? OR r.vehicle_car_number LIKE ? OR r.insurance_company LIKE ?)` : ''}
         ORDER BY (COALESCE(p.paid_amount,0) > 0) ASC, r.dispatch_date DESC
-        LIMIT ${limit}`,
-      ...(q ? [`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`] : []),
-    )
+        LIMIT ${limit}`
+    const qParams = q ? [`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`] : []
+    const rows = await prisma.$queryRawUnsafe<Array<any>>(buildSql(true), ...qParams)
+      .catch(async (e: any) => {
+        if (/Unknown column/i.test(e?.message || '')) {
+          return prisma.$queryRawUnsafe<Array<any>>(buildSql(false), ...qParams)
+        }
+        throw e
+      })
 
     // 2) 미매칭 통장 입금 (후보 대조용)
     //   PR-PAY-REVIEW v2 (2026-07-05 사용자 명시): 「보험사건이나 일반 사용자명 다 체크,
@@ -108,12 +116,15 @@ export async function GET(request: NextRequest) {
       if (paid > 0) {
         status = 'paid'
       } else {
-        // 두 축 병합 — 차량번호 후보 우선, 고객명 후보 이어서. id 중복 제거, 최대 4
+        // 세 축 병합 — 예상입금자명(V9) > 차량번호 > 고객명. id 중복 제거, 최대 4
         const byCar = (l4 && candByLast4.get(l4)) ? candByLast4.get(l4)! : []
         const nm = normName(r.customer_name)
+        const pm = normName(r.expected_payer)
         const byName = (nm.length >= 2 && candByName.get(nm)) ? candByName.get(nm)! : []
+        const byPayer = (pm.length >= 2 && candByName.get(pm)) ? candByName.get(pm)! : []
         const seen = new Set<string>()
         candidates = [
+          ...byPayer.map((c: any) => ({ ...c, match_by: 'payer' })),
           ...byCar.map((c: any) => ({ ...c, match_by: 'car' })),
           ...byName.map((c: any) => ({ ...c, match_by: 'name' })),
         ].filter((c: any) => (seen.has(c.id) ? false : (seen.add(c.id), true))).slice(0, 4)

@@ -113,7 +113,7 @@ export default function ClaimsTab() {
 
   // PR-PAY-REVIEW (2026-07-05 사용자 명시) — 입금 연결 필요 건 검수 패널
   //   엑셀/SMS/오픈뱅킹 미매칭 입금 중 사고차량 뒤4자리 후보 탐지 → 수동 1클릭 연결
-  type PayCandidate = { id: string; client_name: string | null; amount: number; transaction_date: string | null; match_by?: 'car' | 'name' }
+  type PayCandidate = { id: string; client_name: string | null; amount: number; transaction_date: string | null; match_by?: 'car' | 'name' | 'payer' }
   type PayRow = { id: string; customer_car_number: string | null; customer_name: string | null; insurance_company: string | null; claim_amount: number | null; candidates: PayCandidate[] }
   const [payCand, setPayCand] = useState<PayRow[]>([])
   const [linkBusyId, setLinkBusyId] = useState<string | null>(null)
@@ -496,8 +496,8 @@ export default function ClaimsTab() {
                   <span style={{ flex: 1 }} />
                   {row.candidates.map((c) => (
                     <span key={c.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}>
-                      <span style={{ fontSize: 10, fontWeight: 800, padding: '2px 6px', borderRadius: 6, background: c.match_by === 'name' ? 'rgba(16,185,129,0.12)' : COLORS.bgBlue, color: c.match_by === 'name' ? '#047857' : COLORS.primary }}>
-                        {c.match_by === 'name' ? '이름' : '차량'}
+                      <span style={{ fontSize: 10, fontWeight: 800, padding: '2px 6px', borderRadius: 6, background: c.match_by === 'name' ? 'rgba(16,185,129,0.12)' : c.match_by === 'payer' ? 'rgba(124,58,237,0.12)' : COLORS.bgBlue, color: c.match_by === 'name' ? '#047857' : c.match_by === 'payer' ? '#6d28d9' : COLORS.primary }}>
+                        {c.match_by === 'name' ? '이름' : c.match_by === 'payer' ? '입금자명' : '차량'}
                       </span>
                       <span style={{ fontSize: 12, color: '#1e293b' }}>{c.client_name || '-'} · <b>{fmtWon(c.amount)}</b> · {fmtDate(c.transaction_date)}</span>
                       <button
