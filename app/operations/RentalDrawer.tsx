@@ -17,7 +17,7 @@ const CLAIM_TYPES = ['보험', '라이드', '고객유상', '유상대차', '정
 // ═══════════════════════════════════════════════════════════════════
 
 const STATUS_LABEL: Record<string, string> = {
-  pending: '배차예정', dispatched: '배차완료', returned: '회차완료', claiming: '청구중', settled: '정산완료',
+  pending: '상담완료', dispatched: '배차완료', returned: '청구전', claiming: '청구중', settled: '청구완료',
 }
 
 async function getAuthHeader(): Promise<Record<string, string>> {

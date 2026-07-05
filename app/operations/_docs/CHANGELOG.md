@@ -2,6 +2,12 @@
 
 > 규칙 22 — 매 PR 한 줄 이상. 이전 이력은 `harness-engineering/handover/` 참조.
 
+## 2026-07-05 PR-STATUS-LANG — 상태 라벨 업무 언어화
+- 사용자 명시: 「배차는 상담완료·배차완료, 청구는 청구전·청구중·청구완료, 청구완료에 금액이나 정산 체크」.
+- DB status 불변, 라벨만: pending→상담완료 / returned→청구전 / settled→청구완료.
+- 청구완료 행 상태 셀에 재무 자동매칭 입금액 표시 (`💰 N만`, 없으면 「입금 대기」) — 입금 = 정산 체크.
+- 동형 적용 (규칙 14): ClaimsTab · RentalListTab · RentalDrawer · rentals/[id] · rentals/page.
+
 ## 2026-07-04 PR-QUOTE — 상담 단계 견적 저장 + 청구 전파
 - **업무 분석 근거**: 청구액 변수 5개(유형·접수번호·과실·청구율·차종군) 중 4개가 상담 단계 확정 — 저장할 자리가 없어 청구 때 재입력하던 구조 해소. (과실=케이스바이케이스, 청구율=보험사별 관행, 견적=상담 대략+청구 최종 — 사용자 확인)
 - **V8 마이그레이션**: `operations_dispatch_orders`에 견적 7컬럼 (⏳ 적용 대기 — DATA-MODEL.md).

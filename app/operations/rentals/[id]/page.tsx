@@ -12,8 +12,8 @@ import ConsultationTimeline from '../../ConsultationTimeline'
 
 const STATUSES = ['request', 'consulting', 'new', 'pending', 'dispatched', 'returned', 'claiming', 'settled']
 const STATUS_LABEL: Record<string, string> = {
-  request: '대차요청', consulting: '상담중', new: '신규', pending: '배차예정',
-  dispatched: '배차완료', returned: '회차완료', claiming: '청구중', settled: '정산완료',
+  request: '대차요청', consulting: '상담중', new: '신규', pending: '상담완료',
+  dispatched: '배차완료', returned: '청구전', claiming: '청구중', settled: '청구완료',
 }
 
 const b01 = (x: any) => (x === true || x === 1 || x === '1')

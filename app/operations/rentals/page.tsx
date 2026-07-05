@@ -47,11 +47,11 @@ type Stats = {
 }
 
 const STATUS_LABEL: Record<string, string> = {
-  pending: '대기',
-  dispatched: '배차중',
-  returned: '반차완료',
+  pending: '상담완료',
+  dispatched: '배차완료',
+  returned: '청구전',
   claiming: '청구중',
-  settled: '정산완료',
+  settled: '청구완료',
   cancelled: '취소',
 }
 

@@ -81,10 +81,13 @@ type FilterKey = 'active' | 'all' | 'returned' | 'claiming' | 'settled'
 const VISIBLE_STATUS = ['returned', 'claiming', 'settled']
 const CLAIM_TYPES = ['보험', '라이드', '고객유상', '유상대차', '정비대차', '사고대차']
 
+// PR-STATUS-LANG (2026-07-05 사용자 명시): 「청구는 청구전·청구중·청구완료,
+//   청구완료에 상태값에 금액이나 정산완료로 체크되면」 — DB status 는 불변, 라벨만 업무 언어.
+//   정산(입금)은 재무 자동매칭 paid_amount 가 붙으면 상태 셀에 금액 체크로 표시.
 const STATUS_META: Record<string, { label: string; bg: string; fg: string }> = {
-  returned: { label: '📥 회차완료', bg: 'rgba(245,158,11,0.12)', fg: '#b45309' },
+  returned: { label: '📥 청구전',   bg: 'rgba(245,158,11,0.12)', fg: '#b45309' },
   claiming: { label: '📤 청구중',   bg: 'rgba(99,102,241,0.12)', fg: '#4338ca' },
-  settled:  { label: '✅ 정산완료', bg: 'rgba(34,197,94,0.12)',  fg: '#15803d' },
+  settled:  { label: '✅ 청구완료', bg: 'rgba(34,197,94,0.12)',  fg: '#15803d' },
 }
 
 function fmtWon(n: number | null | undefined): string {
@@ -255,7 +258,7 @@ export default function ClaimsTab() {
       })
       const json = await res.json().catch(() => ({}))
       if (json?.error) throw new Error(json.error)
-      setClaimMsg({ type: 'ok', text: nextStatus === 'settled' ? '정산 완료 처리됨' : '청구 확정 저장됨' })
+      setClaimMsg({ type: 'ok', text: nextStatus === 'settled' ? '청구완료 처리됨 — 입금되면 상태에 금액이 표시됩니다' : '청구 확정 저장됨' })
       setClaimModalOpen(false)
       refresh()
     } catch (e: any) {
@@ -334,7 +337,7 @@ export default function ClaimsTab() {
 
   const statItems: StatItem[] = [
     { label: '💰 청구 대상 전체', value: counts.all, unit: '건', tint: 'blue', onClick: () => { setVatOnly(false); setFilter('all') }, active: filter === 'all' && !vatOnly },
-    { label: '📥 회차완료', value: counts.returned, unit: '건', tint: 'amber', onClick: () => { setVatOnly(false); setFilter('returned') }, active: filter === 'returned' && !vatOnly },
+    { label: '📥 청구전', value: counts.returned, unit: '건', tint: 'amber', onClick: () => { setVatOnly(false); setFilter('returned') }, active: filter === 'returned' && !vatOnly },
     { label: '📤 청구중', value: counts.claiming, unit: '건', tint: 'purple', onClick: () => { setVatOnly(false); setFilter('claiming') }, active: filter === 'claiming' && !vatOnly },
     { label: '🧾 부가세 추가청구', value: vatCount, unit: '건', tint: 'amber', onClick: () => { setFilter('all'); setVatOnly(true) }, active: vatOnly },
     { label: '🧮 청구액 합계', value: Math.round(totalClaim / 10000), unit: '만원', tint: 'green' },
@@ -344,9 +347,9 @@ export default function ClaimsTab() {
   ]
   const filterItems: FilterItem[] = [
     { key: 'active', label: '🔔 처리 대상', count: counts.active },
-    { key: 'returned', label: '📥 회차완료', count: counts.returned },
+    { key: 'returned', label: '📥 청구전', count: counts.returned },
     { key: 'claiming', label: '📤 청구중', count: counts.claiming },
-    { key: 'settled', label: '✅ 정산완료', count: counts.settled },
+    { key: 'settled', label: '✅ 청구완료', count: counts.settled },
     { key: 'all', label: '💰 전체', count: counts.all },
   ]
 
@@ -357,11 +360,21 @@ export default function ClaimsTab() {
       render: (r) => <span style={{ whiteSpace: 'nowrap', fontWeight: 700, color: '#1e293b', fontSize: 12 }}>{fmtDate(r.actual_return_date)}</span>,
     },
     {
-      key: 'status', label: '상태', width: 116, align: 'center',
+      key: 'status', label: '상태', width: 150, align: 'center',
       sortBy: (r) => r.status || '',
       render: (r) => {
         const meta = STATUS_META[r.status || ''] || { label: r.status || '-', bg: 'rgba(148,163,184,0.15)', fg: '#475569' }
-        return <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: 8, fontSize: 11, fontWeight: 800, whiteSpace: 'nowrap', background: meta.bg, color: meta.fg }}>{meta.label}</span>
+        const paid = Number(r.paid_amount || 0)
+        return (
+          <span style={{ whiteSpace: 'nowrap' }}>
+            <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: 8, fontSize: 11, fontWeight: 800, whiteSpace: 'nowrap', background: meta.bg, color: meta.fg }}>{meta.label}</span>
+            {r.status === 'settled' && (
+              paid > 0
+                ? <span style={{ marginLeft: 4, fontSize: 10, fontWeight: 800, color: '#15803d' }}>💰 {Math.round(paid / 10000).toLocaleString('ko-KR')}만</span>
+                : <span style={{ marginLeft: 4, fontSize: 10, fontWeight: 700, color: '#94a3b8' }}>입금 대기</span>
+            )}
+          </span>
+        )
       },
     },
     {
@@ -453,7 +466,7 @@ export default function ClaimsTab() {
         defaultSort={{ key: 'actual_return_date', dir: 'desc' }}
       />
       <div style={{ marginTop: 12, fontSize: 12, color: '#64748b' }}>
-        💡 행을 클릭하면 청구 작성(청구유형·청구액·보험접수번호 / 청구 확정 / 정산 완료)이 열립니다. 입금 확인은 재무(통장)에서 — 여기선 정산완료로 반영됩니다.
+        💡 흐름: 청구전(반납됨) → 청구중(청구서 발송) → 청구완료. 입금은 재무 자동매칭으로 상태에 💰 금액이 붙습니다. 행 클릭 = 청구 작성.
       </div>
 
       {/* 청구 작성 모달 */}
@@ -750,7 +763,7 @@ export default function ClaimsTab() {
                   opacity: claimBusy ? 0.5 : 1,
                 }}
               >
-                ✅ 정산 완료
+                ✅ 청구 완료
               </button>
             </div>
           </div>

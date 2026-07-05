@@ -61,7 +61,7 @@ const STATUS_META: Record<string, { label: string; bg: string; fg: string }> = {
   request:    { label: '상담미진행', bg: 'rgba(239,68,68,0.12)',   fg: '#b91c1c' },
   new:        { label: '상담중',     bg: 'rgba(245,158,11,0.12)',  fg: '#b45309' },
   consulting: { label: '상담중',     bg: 'rgba(245,158,11,0.12)',  fg: '#b45309' },
-  pending:    { label: '배차예정',   bg: 'rgba(99,102,241,0.12)',  fg: '#4338ca' },
+  pending:    { label: '상담완료',   bg: 'rgba(99,102,241,0.12)',  fg: '#4338ca' },
   dispatched: { label: '배차완료',   bg: 'rgba(59,130,246,0.12)',  fg: '#1d4ed8' },
 }
 
@@ -301,7 +301,7 @@ export default function RentalListTab({ scope = 'all' }: { scope?: 'all' | 'disp
   const statItems: StatItem[] = isDispatch
     ? [
         { label: '📋 전체', value: counts.all, unit: '건', tint: 'blue' },
-        { label: '📅 배차예정', value: counts.pending, unit: '건', tint: 'amber' },
+        { label: '📞 상담완료', value: counts.pending, unit: '건', tint: 'amber' },
         { label: '🚐 배차완료', value: counts.dispatched, unit: '건', tint: 'green' },
         { label: '🔍 검색결과', value: filtered.length, unit: '건', tint: 'blue' },
       ]
@@ -318,7 +318,7 @@ export default function RentalListTab({ scope = 'all' }: { scope?: 'all' | 'disp
   const filterItems: FilterItem[] = isDispatch
     ? [
         { key: 'all', label: '📋 전체', count: counts.all },
-        { key: 'pending', label: '📅 배차예정', count: counts.pending },
+        { key: 'pending', label: '📞 상담완료', count: counts.pending },
         { key: 'dispatched', label: '🚐 배차완료', count: counts.dispatched },
       ]
     : [
@@ -632,7 +632,7 @@ export default function RentalListTab({ scope = 'all' }: { scope?: 'all' | 'disp
       />
       <div style={{ marginTop: 12, fontSize: 12, color: '#64748b' }}>
         {isDispatch
-          ? '💡 현재 배차 나가 있는 대차입니다 (배차예정 + 배차완료). 반납하면 「반납·청구」 탭으로 넘어갑니다.'
+          ? '💡 상담완료(차량 배정, 출고 전) → 배차완료(출고) 흐름입니다. 반납하면 「청구」 탭으로 넘어갑니다.'
           : '💡 「상담미진행」(대차요청건)은 위 📅 기간에 해당하는 건만 표시됩니다 — 기본 오늘. · 상담중·배차예정·배차완료는 기간과 무관하게 항상 표시됩니다. · 행을 클릭하면 배차 상세에서 상담·배차를 진행하고, 반납하면 청구관리 탭으로 넘어갑니다.'}
       </div>
 
