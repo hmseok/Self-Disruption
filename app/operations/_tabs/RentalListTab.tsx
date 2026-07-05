@@ -48,6 +48,10 @@ type Row = {
   status: string                       // request / new / consulting / pending / dispatched
   notes: string | null
   fleet_group: string | null
+  // PR-LIST-INFO — 청구 주요정보 리스트 표출
+  claim_type?: string | null
+  fault_rate?: number | null
+  final_claim_amount?: number | null
   repair_factory?: string | null       // PR-N6c — 입고공장 (사고차량 수리처)
   order_id?: string
   cafe24_idno?: string | null
@@ -55,7 +59,8 @@ type Row = {
   cafe24_srno?: string | number | null
 }
 
-type FilterKey = 'all' | 'consult' | 'dispatched'
+// PR-FLOW-CONSULT v2 (2026-07-05 사용자 명시): 「상담 및 배차는 상담대기하고 배차 두개 탭만」
+type FilterKey = 'consult' | 'dispatched'
 
 // PR-FLOW-CONSULT (2026-07-05 사용자 명시): 「접수 → 상담(대차요청은 자동, 미요청은 수동
 //   대차 진행) → 배차입력 → 배차완료」. 배차 탭 = 상담 + 배차완료 두 그룹.
@@ -91,7 +96,7 @@ function dateStr(daysAgo: number): string {
 //   배차완료 그룹 = 배차예정(pending) + 배차완료(dispatched)
 export default function RentalListTab() {
   const router = useRouter()
-  const [filter, setFilter] = useState<FilterKey>('all')
+  const [filter, setFilter] = useState<FilterKey>('consult')
   const [search, setSearch] = useState('')
   const [fleet, setFleet] = useState<string>('all')
   // PR-V: 「상담미진행」(cafe24 대차요청건) 조회 기간 — 기본 오늘
@@ -159,6 +164,9 @@ export default function RentalListTab() {
           notes: r.notes ?? null,
           fleet_group: r.fleet_group ?? null,
           repair_factory: r.repair_factory ?? null,
+          claim_type: r.claim_type ?? null,
+          fault_rate: r.fault_rate ?? null,
+          final_claim_amount: r.final_claim_amount ?? null,
         }))
 
       // 상담중 = fmi_rental 아직 없고 done/cancelled 아닌 dispatch_order
@@ -263,9 +271,8 @@ export default function RentalListTab() {
     return rows.filter((r) => (r.fleet_group || '') === fleet)
   }, [rows, fleet])
 
-  // PR-FLOW-CONSULT — 두 그룹: 상담(대기+진행) / 배차완료(예정+출고)
+  // PR-FLOW-CONSULT v2 — 두 그룹만: 상담대기(대기+상담중) / 배차(예정+출고)
   const data = useMemo(() => ({
-    all: fleetScoped,
     consult: fleetScoped.filter((r) => ['request', 'new', 'consulting'].includes(r.status)),
     dispatched: fleetScoped.filter((r) => ['pending', 'dispatched'].includes(r.status)),
   }), [fleetScoped])
@@ -286,26 +293,24 @@ export default function RentalListTab() {
   }, [activeData, search])
 
   const counts = useMemo(() => ({
-    all: fleetScoped.length,
     consult: data.consult.length,
     waiting: data.consult.filter((r) => r.status === 'request').length,
+    consulting: data.consult.filter((r) => r.status !== 'request').length,
     dispatched: data.dispatched.length,
-  }), [fleetScoped, data])
+  }), [data])
 
   const statItems: StatItem[] = [
-    { label: '📋 전체', value: counts.all, unit: '건', tint: 'blue' },
     { label: '🔔 상담대기', value: counts.waiting, unit: '건', tint: 'red' },
-    { label: '📞 상담', value: counts.consult, unit: '건', tint: 'amber' },
-    { label: '🚐 배차완료', value: counts.dispatched, unit: '건', tint: 'green' },
+    { label: '📞 상담중', value: counts.consulting, unit: '건', tint: 'amber' },
+    { label: '🚐 배차', value: counts.dispatched, unit: '건', tint: 'green' },
     { label: '🔍 검색결과', value: filtered.length, unit: '건', tint: 'blue' },
   ]
   const statActions: ActionButton[] = [
     { label: '새로고침', onClick: refresh, variant: 'secondary', icon: '🔄' },
   ]
   const filterItems: FilterItem[] = [
-    { key: 'all', label: '📋 전체', count: counts.all },
-    { key: 'consult', label: '📞 상담', count: counts.consult },
-    { key: 'dispatched', label: '🚐 배차완료', count: counts.dispatched },
+    { key: 'consult', label: '📞 상담대기', count: counts.consult },
+    { key: 'dispatched', label: '🚐 배차', count: counts.dispatched },
   ]
 
   // 반납 처리 (배차완료 건)
@@ -453,6 +458,23 @@ export default function RentalListTab() {
       render: (r) => <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: 160, fontSize: 12, color: '#475569' }}>
         {r.insurance_company || '-'}{r.insurance_claim_no ? ` · #${r.insurance_claim_no}` : ''}
       </span>,
+    },
+    {
+      // PR-LIST-INFO — 청구 주요정보 (유형·과실·견적액) 리스트 표출
+      key: 'claim_info', label: '청구정보', width: 150,
+      sortBy: (r) => r.claim_type || '',
+      render: (r) => {
+        if (r.kind !== 'rental' || (!r.claim_type && r.fault_rate == null && r.final_claim_amount == null)) {
+          return <span style={{ fontSize: 11, color: '#cbd5e1' }}>-</span>
+        }
+        return (
+          <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: 150, fontSize: 12 }}>
+            {r.claim_type && <span style={{ fontWeight: 700, color: '#4338ca' }}>{r.claim_type}</span>}
+            {r.fault_rate != null && <span style={{ color: '#475569' }}> {Number(r.fault_rate)}%</span>}
+            {r.final_claim_amount != null && <span style={{ color: '#0f2440', fontWeight: 700 }}> · {Math.round(Number(r.final_claim_amount) / 10000).toLocaleString('ko-KR')}만</span>}
+          </span>
+        )
+      },
     },
     {
       key: 'status', label: '상태', width: 100, align: 'center',

@@ -3,6 +3,7 @@ import { verifyUser } from '@/lib/auth-server'
 import { prisma } from '@/lib/prisma'
 import { randomUUID } from 'crypto'
 import { extractCarNumber } from '@/lib/match-helpers'
+import { isCronAuthorized } from '@/lib/cron-auth'
 
 /**
  * /api/finance/transactions/auto-match-fmi-rental
@@ -192,8 +193,10 @@ interface MatchResult {
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await verifyUser(request)
-    if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
+    // PR-PAY-CRON — 사용자 토큰 또는 X-Cron-Secret (codef 주기 동기화 → 자동매칭 체인)
+    const isCron = isCronAuthorized(request)
+    const user = isCron ? null : await verifyUser(request)
+    if (!user && !isCron) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
 
     const body = await request.json().catch(() => ({}))
     const mode: 'insurance' | 'general' = body.mode || 'insurance'

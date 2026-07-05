@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { codefRequest } from '../lib/auth'
 import { verifyUser } from '@/lib/auth-server'
+import { isCronAuthorized, cronForwardHeaders } from '@/lib/cron-auth'
 
 // Bank organization codes
 const BANK_CODES = {
@@ -11,8 +12,10 @@ const BANK_CODES = {
 
 export async function POST(req: NextRequest) {
   try {
-    const user = await verifyUser(req)
-    if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
+    // PR-PAY-CRON — 사용자 토큰 또는 X-Cron-Secret (codef/sync 주기 체인)
+    const isCron = isCronAuthorized(req)
+    const user = isCron ? null : await verifyUser(req)
+    if (!user && !isCron) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
     const { connectedId, orgCode, account, startDate, endDate } = await req.json()
 
     if (!connectedId || !orgCode || !account || !startDate || !endDate) {
@@ -110,7 +113,7 @@ export async function POST(req: NextRequest) {
         if (host && (auth || cookie)) {
           const mr = await fetch(`${proto}://${host}/api/finance/transactions/auto-match-fmi-rental`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', ...(auth ? { Authorization: auth } : {}), ...(cookie ? { Cookie: cookie } : {}) },
+            headers: { 'Content-Type': 'application/json', ...(auth ? { Authorization: auth } : {}), ...(cookie ? { Cookie: cookie } : {}), ...cronForwardHeaders(req) },
             body: JSON.stringify({ mode: 'insurance', dryRun: false }),
           })
           const mj = await mr.json().catch(() => ({}))

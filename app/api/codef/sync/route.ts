@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verifyUser } from '@/lib/auth-server'
+import { isCronAuthorized, cronForwardHeaders } from '@/lib/cron-auth'
 
 // ============================================================
 // Codef 동기화 API (Prisma)
@@ -10,13 +11,18 @@ import { verifyUser } from '@/lib/auth-server'
 
 export async function POST(req: NextRequest) {
   try {
-    const user = await verifyUser(req)
-    if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
-    const { startDate, endDate } = await req.json()
+    // PR-PAY-CRON — 사용자 토큰 또는 X-Cron-Secret (Cloud Scheduler 주기 동기화)
+    const isCron = isCronAuthorized(req)
+    const user = isCron ? null : await verifyUser(req)
+    if (!user && !isCron) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
 
-    if (!startDate || !endDate) {
-      return NextResponse.json({ error: 'Missing required parameters' }, { status: 400 })
-    }
+    const body = await req.json().catch(() => ({}))
+    // cron 호출 시 날짜 미지정 → 최근 3일 (지연 입금 커버)
+    const fmt = (d: Date) => d.toISOString().slice(0, 10).replace(/-/g, '')
+    const today = new Date()
+    const threeDaysAgo = new Date(today.getTime() - 3 * 86400000)
+    const startDate = body.startDate || fmt(threeDaysAgo)
+    const endDate = body.endDate || fmt(today)
 
     // 연동된 모든 계좌 조회
     const connections = await prisma.codefConnection.findMany({
@@ -38,7 +44,12 @@ export async function POST(req: NextRequest) {
           new URL('/api/codef/bank', process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'),
           {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              // PR-PAY-CRON — 인증 전달 (사용자 토큰 또는 cron 시크릿)
+              ...(req.headers.get('authorization') ? { Authorization: req.headers.get('authorization')! } : {}),
+              ...cronForwardHeaders(req),
+            },
             body: JSON.stringify({
               connectedId: connection.connected_id,
               orgCode: connection.org_code,

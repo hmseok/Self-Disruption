@@ -259,26 +259,21 @@ export default function AccidentIntakeTab() {
       },
     },
     {
-      // PR-F — 우리 진행 상태 / 진행 버튼
-      key: 'progress', label: '진행', width: 130, align: 'center',
+      // PR-FLOW-CONSULT v2 (2026-07-05) — 접수 탭은 사고접수 원장.
+      //   대차요청(Y)·진행중 건은 배차 탭에 자동 유입 — 여기선 배지/버튼 중복 표출 X.
+      //   대차 미요청(N) 건의 수동 「대차 전환」 진입점만 유지.
+      key: 'progress', label: '액션', width: 110, align: 'center',
       sortBy: (r) => {
         const o = orderMap.get(`${r.otptidno}|${r.otptmddt}|${r.otptsrno}`)
-        return o ? o.status : 'zzz'  // 미진행을 뒤로
+        return (r.otptdcyn !== 'Y' && !o) ? 'a' : 'z'  // 전환 가능 건을 앞으로
       },
       render: (r) => {
         const key = `${r.otptidno}|${r.otptmddt}|${r.otptsrno}`
         const o = orderMap.get(key)
-        if (o) {
-          const meta = ORDER_STATUS_META[o.status] || { label: o.status, bg: 'rgba(148,163,184,0.15)', fg: '#475569' }
-          return (
-            <span style={{
-              display: 'inline-block', padding: '3px 10px', borderRadius: 8, fontSize: 11, fontWeight: 800,
-              whiteSpace: 'nowrap', background: meta.bg, color: meta.fg,
-            }}>{meta.label}</span>
-          )
-        }
-        // 미진행 — 진행 버튼 (대차사용/미사용 따라 라벨)
         const isY = r.otptdcyn === 'Y'
+        if (isY || o) {
+          return <span style={{ fontSize: 11, color: '#94a3b8', whiteSpace: 'nowrap' }}>배차 탭</span>
+        }
         const busy = startingKey === key
         return (
           <button
@@ -287,11 +282,11 @@ export default function AccidentIntakeTab() {
             style={{
               padding: '4px 10px', borderRadius: 7, border: 'none', cursor: busy ? 'wait' : 'pointer',
               fontSize: 11, fontWeight: 800, whiteSpace: 'nowrap',
-              background: isY ? 'linear-gradient(135deg, #ef4444, #dc2626)' : 'linear-gradient(135deg, #3b6eb5, #5a8fd4)',
+              background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)',
               color: '#fff', opacity: busy ? 0.5 : 1,
             }}
           >
-            {busy ? '⏳' : isY ? '🚗 대차 진행' : '→ 대차 전환'}
+            {busy ? '⏳' : '→ 대차 전환'}
           </button>
         )
       },

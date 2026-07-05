@@ -404,6 +404,14 @@ export default function ClaimsTab() {
       render: (r) => <span style={{ fontSize: 12, color: '#475569', whiteSpace: 'nowrap' }}>{r.insurance_company || '-'}</span>,
     },
     {
+      // PR-LIST-INFO (2026-07-05) — 과실·청구율 리스트 표출
+      key: 'rates', label: '과실·청구율', width: 96, align: 'center',
+      sortBy: (r) => Number(r.fault_rate ?? -1),
+      render: (r) => (r.fault_rate != null || r.claim_rate != null)
+        ? <span style={{ fontSize: 12, color: '#475569', whiteSpace: 'nowrap' }}>{r.fault_rate != null ? `${Number(r.fault_rate)}%` : '-'} · {r.claim_rate != null ? `${Number(r.claim_rate)}%` : '-'}</span>
+        : <span style={{ fontSize: 11, color: '#cbd5e1' }}>-</span>,
+    },
+    {
       key: 'period', label: '대여기간', width: 86, align: 'center',
       sortBy: (r) => r.rental_days ?? 0,
       render: (r) => <span style={{ fontSize: 12, color: '#475569', whiteSpace: 'nowrap' }}>{r.rental_days != null ? `${r.rental_days}일` : '-'}</span>,
