@@ -457,11 +457,22 @@ export default function ClaimsTab() {
       render: (r) => <span style={{ fontSize: 12, color: '#475569', whiteSpace: 'nowrap' }}>{r.rental_days != null ? `${r.rental_days}일` : '-'}</span>,
     },
     {
-      key: 'final_claim_amount', label: '청구액', width: 124, align: 'right',
+      key: 'final_claim_amount', label: '청구액', width: 110, align: 'right',
       sortBy: (r) => Number(r.final_claim_amount || 0),
-      render: (r) => r.final_claim_amount != null
+      render: (r) => Number(r.final_claim_amount) > 0
         ? <span style={{ fontWeight: 800, color: '#0f2440', whiteSpace: 'nowrap' }}>{fmtWon(r.final_claim_amount)}</span>
         : <span style={{ fontSize: 11, color: '#cbd5e1', whiteSpace: 'nowrap' }}>미작성</span>,
+    },
+    {
+      // PR-PAY-COL (2026-07-05) — 지급액(매칭 입금 합계) 리스트 표출
+      key: 'paid_amount', label: '지급액', width: 116, align: 'right',
+      sortBy: (r) => Number(r.paid_amount || 0),
+      render: (r) => Number(r.paid_amount) > 0
+        ? <span style={{ whiteSpace: 'nowrap' }}>
+            <span style={{ fontWeight: 800, color: '#15803d' }}>{fmtWon(r.paid_amount)}</span>
+            {r.payment_status && <span style={{ marginLeft: 4, fontSize: 10, color: '#94a3b8' }}>{r.payment_status}</span>}
+          </span>
+        : <span style={{ fontSize: 11, color: '#cbd5e1', whiteSpace: 'nowrap' }}>-</span>,
     },
   ]
   // PR-UX-SIMPLE — 입고공장·보험접수번호·담당자 컬럼 제거 (청구 카드·전체 편집에서 확인)

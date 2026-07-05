@@ -464,14 +464,15 @@ export default function RentalListTab() {
       key: 'claim_info', label: '청구정보', width: 150,
       sortBy: (r) => r.claim_type || '',
       render: (r) => {
-        if (r.kind !== 'rental' || (!r.claim_type && r.fault_rate == null && r.final_claim_amount == null)) {
+        const hasClaimAmt = Number(r.final_claim_amount) > 0
+        if (r.kind !== 'rental' || (!r.claim_type && r.fault_rate == null && !hasClaimAmt)) {
           return <span style={{ fontSize: 11, color: '#cbd5e1' }}>-</span>
         }
         return (
           <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: 150, fontSize: 12 }}>
             {r.claim_type && <span style={{ fontWeight: 700, color: '#4338ca' }}>{r.claim_type}</span>}
             {r.fault_rate != null && <span style={{ color: '#475569' }}> {Number(r.fault_rate)}%</span>}
-            {r.final_claim_amount != null && <span style={{ color: '#0f2440', fontWeight: 700 }}> · {Math.round(Number(r.final_claim_amount) / 10000).toLocaleString('ko-KR')}만</span>}
+            {hasClaimAmt && <span style={{ color: '#0f2440', fontWeight: 700 }}> · {Math.round(Number(r.final_claim_amount) / 10000).toLocaleString('ko-KR')}만</span>}
           </span>
         )
       },
