@@ -75,7 +75,8 @@ type ClaimRow = {
   sales_payout_rate: number | null
 }
 
-type FilterKey = 'active' | 'all' | 'returned' | 'claiming' | 'settled'
+// PR-FLOW-CONSULT (2026-07-05 사용자 명시): 필터 = 전체(맨앞) / 청구대상(청구전+청구중 통합) / 청구완료
+type FilterKey = 'all' | 'target' | 'settled'
 
 // 청구관리 영역 = 회차 후 단계
 const VISIBLE_STATUS = ['returned', 'claiming', 'settled']
@@ -103,7 +104,7 @@ function fmtDate(s: string | null | undefined): string {
 
 export default function ClaimsTab() {
   const router = useRouter()
-  const [filter, setFilter] = useState<FilterKey>('active')  // PR-S: 기본 = 처리 대상(회차완료+청구중)
+  const [filter, setFilter] = useState<FilterKey>('all')
   const [search, setSearch] = useState('')
   const [vatOnly, setVatOnly] = useState(false)
   const [rows, setRows] = useState<ClaimRow[] | null>(null)
@@ -298,9 +299,7 @@ export default function ClaimsTab() {
 
   const data = useMemo(() => ({
     all: claimRows,
-    active: claimRows.filter((r) => r.status === 'returned' || r.status === 'claiming'),
-    returned: claimRows.filter((r) => r.status === 'returned'),
-    claiming: claimRows.filter((r) => r.status === 'claiming'),
+    target: claimRows.filter((r) => r.status === 'returned' || r.status === 'claiming'),
     settled: claimRows.filter((r) => r.status === 'settled'),
   }), [claimRows])
 
@@ -320,9 +319,7 @@ export default function ClaimsTab() {
 
   const counts = {
     all: claimRows.length,
-    active: data.active.length,
-    returned: data.returned.length,
-    claiming: data.claiming.length,
+    target: data.target.length,
     settled: data.settled.length,
   }
   const vatCount = useMemo(
@@ -336,9 +333,9 @@ export default function ClaimsTab() {
   )
 
   const statItems: StatItem[] = [
-    { label: '💰 청구 대상 전체', value: counts.all, unit: '건', tint: 'blue', onClick: () => { setVatOnly(false); setFilter('all') }, active: filter === 'all' && !vatOnly },
-    { label: '📥 청구전', value: counts.returned, unit: '건', tint: 'amber', onClick: () => { setVatOnly(false); setFilter('returned') }, active: filter === 'returned' && !vatOnly },
-    { label: '📤 청구중', value: counts.claiming, unit: '건', tint: 'purple', onClick: () => { setVatOnly(false); setFilter('claiming') }, active: filter === 'claiming' && !vatOnly },
+    { label: '💰 전체', value: counts.all, unit: '건', tint: 'blue', onClick: () => { setVatOnly(false); setFilter('all') }, active: filter === 'all' && !vatOnly },
+    { label: '📤 청구대상', value: counts.target, unit: '건', tint: 'amber', onClick: () => { setVatOnly(false); setFilter('target') }, active: filter === 'target' && !vatOnly },
+    { label: '✅ 청구완료', value: counts.settled, unit: '건', tint: 'green', onClick: () => { setVatOnly(false); setFilter('settled') }, active: filter === 'settled' && !vatOnly },
     { label: '🧾 부가세 추가청구', value: vatCount, unit: '건', tint: 'amber', onClick: () => { setFilter('all'); setVatOnly(true) }, active: vatOnly },
     { label: '🧮 청구액 합계', value: Math.round(totalClaim / 10000), unit: '만원', tint: 'green' },
   ]
@@ -346,11 +343,9 @@ export default function ClaimsTab() {
     { label: '새로고침', onClick: refresh, variant: 'secondary', icon: '🔄' },
   ]
   const filterItems: FilterItem[] = [
-    { key: 'active', label: '🔔 처리 대상', count: counts.active },
-    { key: 'returned', label: '📥 청구전', count: counts.returned },
-    { key: 'claiming', label: '📤 청구중', count: counts.claiming },
-    { key: 'settled', label: '✅ 청구완료', count: counts.settled },
     { key: 'all', label: '💰 전체', count: counts.all },
+    { key: 'target', label: '📤 청구대상', count: counts.target },
+    { key: 'settled', label: '✅ 청구완료', count: counts.settled },
   ]
 
   const columns: TableColumn<ClaimRow>[] = [

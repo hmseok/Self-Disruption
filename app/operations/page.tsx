@@ -94,7 +94,7 @@ export default function OperationsPage() {
 
         {tab === 'available' && <WaitingTab lockStatus="available" />}
 
-        {tab === 'dispatched' && <RentalListTab scope="dispatch" />}
+        {tab === 'dispatched' && <RentalListTab />}
 
         {tab === 'claims' && <ClaimsTab />}
       </div>

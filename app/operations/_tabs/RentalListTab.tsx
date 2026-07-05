@@ -55,13 +55,15 @@ type Row = {
   cafe24_srno?: string | number | null
 }
 
-type FilterKey = 'all' | 'request' | 'consulting' | 'pending' | 'dispatched'
+type FilterKey = 'all' | 'consult' | 'dispatched'
 
+// PR-FLOW-CONSULT (2026-07-05 사용자 명시): 「접수 → 상담(대차요청은 자동, 미요청은 수동
+//   대차 진행) → 배차입력 → 배차완료」. 배차 탭 = 상담 + 배차완료 두 그룹.
 const STATUS_META: Record<string, { label: string; bg: string; fg: string }> = {
-  request:    { label: '상담미진행', bg: 'rgba(239,68,68,0.12)',   fg: '#b91c1c' },
+  request:    { label: '상담대기',   bg: 'rgba(239,68,68,0.12)',   fg: '#b91c1c' },
   new:        { label: '상담중',     bg: 'rgba(245,158,11,0.12)',  fg: '#b45309' },
   consulting: { label: '상담중',     bg: 'rgba(245,158,11,0.12)',  fg: '#b45309' },
-  pending:    { label: '상담완료',   bg: 'rgba(99,102,241,0.12)',  fg: '#4338ca' },
+  pending:    { label: '배차예정',   bg: 'rgba(99,102,241,0.12)',  fg: '#4338ca' },
   dispatched: { label: '배차완료',   bg: 'rgba(59,130,246,0.12)',  fg: '#1d4ed8' },
 }
 
@@ -84,13 +86,11 @@ function dateStr(daysAgo: number): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
-// PR-Y1 (2026-05-23) — scope prop:
-//   'all'      = 상담미진행 + 상담중 + 배차예정 + 배차완료 (구 통합 뷰)
-//   'dispatch' = 배차예정 + 배차완료 만 (「배차중」 탭 전용 — cafe24/dispatch_order
-//                fetch skip → 빠름, 상담미진행 날짜필터 숨김)
-export default function RentalListTab({ scope = 'all' }: { scope?: 'all' | 'dispatch' }) {
+// PR-FLOW-CONSULT (2026-07-05) — 배차 탭 = 통합 뷰 단일 모드:
+//   상담 그룹 = cafe24 대차요청(자동 유입) + 수동 대차 진행(dispatch_order)
+//   배차완료 그룹 = 배차예정(pending) + 배차완료(dispatched)
+export default function RentalListTab() {
   const router = useRouter()
-  const isDispatch = scope === 'dispatch'
   const [filter, setFilter] = useState<FilterKey>('all')
   const [search, setSearch] = useState('')
   const [fleet, setFleet] = useState<string>('all')
@@ -132,12 +132,8 @@ export default function RentalListTab({ scope = 'all' }: { scope?: 'all' | 'disp
       // scope='dispatch' 면 fmi_rentals 만 — 상담미진행(cafe24)·상담중(dispatch_order) skip
       const [rRes, oRes, cRes] = await Promise.all([
         fetch('/api/fmi-rentals?include_stats=1&limit=2000', { headers }).then((r) => r.json()).catch(() => ({})),
-        isDispatch
-          ? Promise.resolve({})
-          : fetch('/api/operations/dispatch-orders?limit=500', { headers }).then((r) => r.json()).catch(() => ({})),
-        isDispatch
-          ? Promise.resolve({})
-          : fetch(`/api/operations/cafe24-dispatch-requests?from=${fromDate.replace(/-/g, '')}&to=${toDate.replace(/-/g, '')}&dcyn=Y&rgst=R&limit=2000`, { headers }).then((r) => r.json()).catch(() => ({})),
+        fetch('/api/operations/dispatch-orders?limit=500', { headers }).then((r) => r.json()).catch(() => ({})),
+        fetch(`/api/operations/cafe24-dispatch-requests?from=${fromDate.replace(/-/g, '')}&to=${toDate.replace(/-/g, '')}&dcyn=Y&rgst=R&limit=2000`, { headers }).then((r) => r.json()).catch(() => ({})),
       ])
       if (rRes?.error) throw new Error(rRes.error)
 
@@ -236,7 +232,7 @@ export default function RentalListTab({ scope = 'all' }: { scope?: 'all' | 'disp
     } finally {
       setLoading(false)
     }
-  }, [fromDate, toDate, isDispatch])
+  }, [fromDate, toDate])
 
   useEffect(() => {
     if (rows === null && !loading) fetchAll()
@@ -267,12 +263,11 @@ export default function RentalListTab({ scope = 'all' }: { scope?: 'all' | 'disp
     return rows.filter((r) => (r.fleet_group || '') === fleet)
   }, [rows, fleet])
 
+  // PR-FLOW-CONSULT — 두 그룹: 상담(대기+진행) / 배차완료(예정+출고)
   const data = useMemo(() => ({
     all: fleetScoped,
-    request: fleetScoped.filter((r) => r.status === 'request'),
-    consulting: fleetScoped.filter((r) => r.status === 'consulting' || r.status === 'new'),
-    pending: fleetScoped.filter((r) => r.status === 'pending'),
-    dispatched: fleetScoped.filter((r) => r.status === 'dispatched'),
+    consult: fleetScoped.filter((r) => ['request', 'new', 'consulting'].includes(r.status)),
+    dispatched: fleetScoped.filter((r) => ['pending', 'dispatched'].includes(r.status)),
   }), [fleetScoped])
 
   const activeData = data[filter]
@@ -292,42 +287,26 @@ export default function RentalListTab({ scope = 'all' }: { scope?: 'all' | 'disp
 
   const counts = useMemo(() => ({
     all: fleetScoped.length,
-    request: data.request.length,
-    consulting: data.consulting.length,
-    pending: data.pending.length,
+    consult: data.consult.length,
+    waiting: data.consult.filter((r) => r.status === 'request').length,
     dispatched: data.dispatched.length,
   }), [fleetScoped, data])
 
-  const statItems: StatItem[] = isDispatch
-    ? [
-        { label: '📋 전체', value: counts.all, unit: '건', tint: 'blue' },
-        { label: '📞 상담완료', value: counts.pending, unit: '건', tint: 'amber' },
-        { label: '🚐 배차완료', value: counts.dispatched, unit: '건', tint: 'green' },
-        { label: '🔍 검색결과', value: filtered.length, unit: '건', tint: 'blue' },
-      ]
-    : [
-        { label: '📋 전체', value: counts.all, unit: '건', tint: 'blue' },
-        { label: '🔔 상담미진행', value: counts.request, unit: '건', tint: 'red' },
-        { label: '📞 상담중', value: counts.consulting, unit: '건', tint: 'amber' },
-        { label: '🚐 배차완료', value: counts.dispatched, unit: '건', tint: 'green' },
-        { label: '🔍 검색결과', value: filtered.length, unit: '건', tint: 'blue' },
-      ]
+  const statItems: StatItem[] = [
+    { label: '📋 전체', value: counts.all, unit: '건', tint: 'blue' },
+    { label: '🔔 상담대기', value: counts.waiting, unit: '건', tint: 'red' },
+    { label: '📞 상담', value: counts.consult, unit: '건', tint: 'amber' },
+    { label: '🚐 배차완료', value: counts.dispatched, unit: '건', tint: 'green' },
+    { label: '🔍 검색결과', value: filtered.length, unit: '건', tint: 'blue' },
+  ]
   const statActions: ActionButton[] = [
     { label: '새로고침', onClick: refresh, variant: 'secondary', icon: '🔄' },
   ]
-  const filterItems: FilterItem[] = isDispatch
-    ? [
-        { key: 'all', label: '📋 전체', count: counts.all },
-        { key: 'pending', label: '📞 상담완료', count: counts.pending },
-        { key: 'dispatched', label: '🚐 배차완료', count: counts.dispatched },
-      ]
-    : [
-        { key: 'all', label: '📋 전체', count: counts.all },
-        { key: 'request', label: '🔔 상담미진행', count: counts.request },
-        { key: 'consulting', label: '📞 상담중', count: counts.consulting },
-        { key: 'pending', label: '📅 배차예정', count: counts.pending },
-        { key: 'dispatched', label: '🚐 배차완료', count: counts.dispatched },
-      ]
+  const filterItems: FilterItem[] = [
+    { key: 'all', label: '📋 전체', count: counts.all },
+    { key: 'consult', label: '📞 상담', count: counts.consult },
+    { key: 'dispatched', label: '🚐 배차완료', count: counts.dispatched },
+  ]
 
   // 반납 처리 (배차완료 건)
   const openReturn = useCallback((r: Row) => {
@@ -515,10 +494,8 @@ export default function RentalListTab({ scope = 'all' }: { scope?: 'all' | 'disp
       ),
     },
   ]
-  // PR-UX-SIMPLE — 배차 탭은 핵심 컬럼만 (플릿·입고공장·보험사는 드로어에서 확인)
-  const columns = isDispatch
-    ? allColumns.filter((c) => !['fleet', 'repair_factory', 'insurance'].includes(String(c.key)))
-    : allColumns
+  // PR-UX-SIMPLE — 핵심 컬럼만 (플릿·입고공장·보험사는 드로어/상세에서 확인)
+  const columns = allColumns.filter((c) => !['fleet', 'repair_factory', 'insurance'].includes(String(c.key)))
 
   const mobileCard: MobileCardConfig<Row> = {
     title: (r) => <span style={{ whiteSpace: 'nowrap' }}>🚗 {r.vehicle_car_number || r.customer_car_number || r.customer_name || r.id.slice(0, 12)}</span>,
@@ -573,9 +550,7 @@ export default function RentalListTab({ scope = 'all' }: { scope?: 'all' | 'disp
               <option value="all">🚙 플릿 전체</option>
               {fleetOptions.map((f) => <option key={f} value={f}>{f}</option>)}
             </select>
-            {/* PR-V: 「상담미진행」 조회 기간 — 기본 오늘 (배차중 탭에서는 숨김) */}
-            {!isDispatch && (
-              <>
+            {/* PR-V: 「상담대기」(cafe24 대차요청) 조회 기간 — 기본 오늘 */}
                 <div style={{ ...GLASS.L1, display: 'flex', alignItems: 'center', gap: 5, padding: '5px 8px', borderRadius: 8 }}>
                   <span style={{ fontSize: 12, flexShrink: 0 }}>📅</span>
                   <input
@@ -609,8 +584,6 @@ export default function RentalListTab({ scope = 'all' }: { scope?: 'all' | 'disp
                     >{q.label}</button>
                   )
                 })}
-              </>
-            )}
           </div>
         }
       />
@@ -631,9 +604,7 @@ export default function RentalListTab({ scope = 'all' }: { scope?: 'all' | 'disp
         defaultSort={{ key: 'dispatch', dir: 'desc' }}
       />
       <div style={{ marginTop: 12, fontSize: 12, color: '#64748b' }}>
-        {isDispatch
-          ? '💡 상담완료(차량 배정, 출고 전) → 배차완료(출고) 흐름입니다. 반납하면 「청구」 탭으로 넘어갑니다.'
-          : '💡 「상담미진행」(대차요청건)은 위 📅 기간에 해당하는 건만 표시됩니다 — 기본 오늘. · 상담중·배차예정·배차완료는 기간과 무관하게 항상 표시됩니다. · 행을 클릭하면 배차 상세에서 상담·배차를 진행하고, 반납하면 청구관리 탭으로 넘어갑니다.'}
+        {'💡 흐름: 상담(대차요청은 자동 유입, 미요청은 접수 탭에서 대차 진행) → 배차 입력 → 배차완료. 반납하면 「청구」 탭으로. · 상담대기(대차요청)는 위 📅 기간 해당 건만 — 기본 오늘, 나머지는 항상 표시.'}
       </div>
 
       {/* 배차 드로어 — PR-UX-DRAWER */}
