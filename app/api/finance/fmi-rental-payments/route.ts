@@ -61,8 +61,13 @@ export async function GET(request: NextRequest) {
       ...(q ? [`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`] : []),
     )
 
-    // 2) 미매칭 통장 입금 (후보 대조용) — 사고차량 뒤4자리 → 입금 인덱스
+    // 2) 미매칭 통장 입금 (후보 대조용)
+    //   PR-PAY-REVIEW v2 (2026-07-05 사용자 명시): 「보험사건이나 일반 사용자명 다 체크,
+    //   엑셀은 그냥 타이핑되어 있을 수 있으니 분리분석」
+    //   → 두 축 탐지: ① 차량번호 뒤4자리 토큰  ② 고객명(입금자명 정규화 일치)
     const candByLast4 = new Map<string, Array<any>>()
+    const candByName = new Map<string, Array<any>>()
+    const normName = (s: any) => String(s || '').replace(/[\s\-_()·.,*]+/g, '').trim()
     try {
       const deposits = await prisma.$queryRawUnsafe<Array<any>>(
         `SELECT id, client_name, description, amount, transaction_date
@@ -70,16 +75,23 @@ export async function GET(request: NextRequest) {
           WHERE deleted_at IS NULL AND type = 'income'
             AND (related_type IS NULL OR related_id IS NULL)
             AND (imported_from LIKE 'excel_bank%' OR imported_from = 'sms_bank' OR imported_from = 'codef_bank')
-            AND (client_name REGEXP '[0-9]{3,4}' OR description REGEXP '[0-9]{3,4}')
           LIMIT 5000`,
       )
       for (const d of deposits) {
+        const item = { id: d.id, client_name: d.client_name, amount: Number(d.amount || 0), transaction_date: d.transaction_date }
+        // ① 뒤4자리 토큰 (차량번호축)
         const toks = new Set([...digitTokens(d.client_name), ...digitTokens(d.description)])
         for (const tok of toks) {
           if (tok.length < 3) continue
           const key = tok.slice(-4)
           if (!candByLast4.has(key)) candByLast4.set(key, [])
-          candByLast4.get(key)!.push({ id: d.id, client_name: d.client_name, amount: Number(d.amount || 0), transaction_date: d.transaction_date })
+          candByLast4.get(key)!.push(item)
+        }
+        // ② 입금자명 정규화 (고객명축 — 개인 입금·자차·고객유상, 엑셀 자유 타이핑 포함)
+        const nm = normName(d.client_name)
+        if (nm.length >= 2 && !/^\d+$/.test(nm)) {
+          if (!candByName.has(nm)) candByName.set(nm, [])
+          candByName.get(nm)!.push(item)
         }
       }
     } catch (e) {
@@ -96,7 +108,15 @@ export async function GET(request: NextRequest) {
       if (paid > 0) {
         status = 'paid'
       } else {
-        candidates = (l4 && candByLast4.get(l4)) ? candByLast4.get(l4)!.slice(0, 3) : []
+        // 두 축 병합 — 차량번호 후보 우선, 고객명 후보 이어서. id 중복 제거, 최대 4
+        const byCar = (l4 && candByLast4.get(l4)) ? candByLast4.get(l4)! : []
+        const nm = normName(r.customer_name)
+        const byName = (nm.length >= 2 && candByName.get(nm)) ? candByName.get(nm)! : []
+        const seen = new Set<string>()
+        candidates = [
+          ...byCar.map((c: any) => ({ ...c, match_by: 'car' })),
+          ...byName.map((c: any) => ({ ...c, match_by: 'name' })),
+        ].filter((c: any) => (seen.has(c.id) ? false : (seen.add(c.id), true))).slice(0, 4)
         status = candidates.length > 0 ? 'candidate' : 'unpaid'
       }
       return {

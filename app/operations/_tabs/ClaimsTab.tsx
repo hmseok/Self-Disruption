@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import DcStatStrip, { StatItem, ActionButton } from '@/app/components/DcStatStrip'
 import DcToolbar, { FilterItem } from '@/app/components/DcToolbar'
 import NeuDataTable, { TableColumn, MobileCardConfig } from '@/app/components/NeuDataTable'
-import { GLASS } from '@/app/utils/ui-tokens'
+import { GLASS, COLORS } from '@/app/utils/ui-tokens'
 import { LOTTE_SHORT_TERM_RATES, computeLotteClaim } from '@/lib/lotte-short-term-rates'
 import { calcRentalDays, matchLotteRateIdx } from '../QuoteCalc'
 
@@ -111,6 +111,45 @@ export default function ClaimsTab() {
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState<string | null>(null)
 
+  // PR-PAY-REVIEW (2026-07-05 사용자 명시) — 입금 연결 필요 건 검수 패널
+  //   엑셀/SMS/오픈뱅킹 미매칭 입금 중 사고차량 뒤4자리 후보 탐지 → 수동 1클릭 연결
+  type PayCandidate = { id: string; client_name: string | null; amount: number; transaction_date: string | null; match_by?: 'car' | 'name' }
+  type PayRow = { id: string; customer_car_number: string | null; customer_name: string | null; insurance_company: string | null; claim_amount: number | null; candidates: PayCandidate[] }
+  const [payCand, setPayCand] = useState<PayRow[]>([])
+  const [linkBusyId, setLinkBusyId] = useState<string | null>(null)
+  const [linkPanelOpen, setLinkPanelOpen] = useState(true)
+
+  const fetchPayCandidates = useCallback(async () => {
+    try {
+      const headers = await getAuthHeader()
+      const res = await fetch('/api/finance/fmi-rental-payments?limit=3000', { headers })
+      const j = await res.json().catch(() => ({}))
+      const list = Array.isArray(j?.data) ? j.data : []
+      setPayCand(list.filter((x: any) => x.status === 'candidate'))
+    } catch { setPayCand([]) }
+  }, [])
+
+  const linkDeposit = useCallback(async (txId: string, rentalId: string) => {
+    setLinkBusyId(txId)
+    try {
+      const headers = { ...(await getAuthHeader()), 'Content-Type': 'application/json' }
+      const res = await fetch(`/api/transactions/${txId}`, {
+        method: 'PATCH', headers,
+        body: JSON.stringify({ related_type: 'fmi_rental', related_id: rentalId }),
+      })
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok || j?.error) throw new Error(j?.error || '연결 실패')
+      // 연결 성공 — 입금 반영 + 완납 자동 청구완료(transactions PATCH 훅) → 목록 갱신
+      fetchPayCandidates()
+      refresh()
+    } catch (e: any) {
+      setErr(e?.message || '입금 연결 오류')
+    } finally {
+      setLinkBusyId(null)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fetchPayCandidates])
+
   // 청구 작성 모달
   const [claimModalOpen, setClaimModalOpen] = useState(false)
   const [selectedClaim, setSelectedClaim] = useState<ClaimRow | null>(null)
@@ -164,6 +203,7 @@ export default function ClaimsTab() {
 
   useEffect(() => {
     if (rows === null && !loading) fetchAll()
+    fetchPayCandidates()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -434,6 +474,48 @@ export default function ClaimsTab() {
   return (
     <div>
       <DcStatStrip stats={statItems} actions={statActions} />
+
+      {/* PR-PAY-REVIEW — 입금 연결 검수 패널 (차량번호축 + 고객명축 후보) */}
+      {payCand.length > 0 && (
+        <div style={{ ...GLASS.L3, marginBottom: 12, borderRadius: 12, border: '1px solid rgba(245,158,11,0.35)', overflow: 'hidden' }}>
+          <button
+            onClick={() => setLinkPanelOpen((v) => !v)}
+            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '11px 14px', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left' }}
+          >
+            <span style={{ fontSize: 13, fontWeight: 800, color: '#b45309' }}>🔗 입금 연결 필요 {payCand.length}건</span>
+            <span style={{ fontSize: 11, color: '#94a3b8' }}>미매칭 입금 중 차량번호·고객명이 닿는 후보 — 확인 후 연결하세요</span>
+            <span style={{ flex: 1 }} />
+            <span style={{ fontSize: 12, color: '#b45309' }}>{linkPanelOpen ? '▴ 접기' : '▾ 펼치기'}</span>
+          </button>
+          {linkPanelOpen && (
+            <div style={{ padding: '0 14px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {payCand.slice(0, 20).map((row) => (
+                <div key={row.id} style={{ ...GLASS.L1, borderRadius: 9, padding: '9px 12px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 12, fontWeight: 800, color: '#0f2440', whiteSpace: 'nowrap' }}>🚗 {row.customer_car_number || '-'}</span>
+                  <span style={{ fontSize: 12, color: '#475569', whiteSpace: 'nowrap' }}>{row.customer_name || '-'}{row.insurance_company ? ` · ${row.insurance_company}` : ''}</span>
+                  <span style={{ flex: 1 }} />
+                  {row.candidates.map((c) => (
+                    <span key={c.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}>
+                      <span style={{ fontSize: 10, fontWeight: 800, padding: '2px 6px', borderRadius: 6, background: c.match_by === 'name' ? 'rgba(16,185,129,0.12)' : COLORS.bgBlue, color: c.match_by === 'name' ? '#047857' : COLORS.primary }}>
+                        {c.match_by === 'name' ? '이름' : '차량'}
+                      </span>
+                      <span style={{ fontSize: 12, color: '#1e293b' }}>{c.client_name || '-'} · <b>{fmtWon(c.amount)}</b> · {fmtDate(c.transaction_date)}</span>
+                      <button
+                        onClick={() => linkDeposit(c.id, row.id)}
+                        disabled={linkBusyId === c.id}
+                        style={{ padding: '4px 10px', borderRadius: 7, border: 'none', background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)', color: '#fff', cursor: linkBusyId === c.id ? 'wait' : 'pointer', fontSize: 11, fontWeight: 800, opacity: linkBusyId === c.id ? 0.5 : 1 }}
+                      >{linkBusyId === c.id ? '연결 중…' : '🔗 연결'}</button>
+                    </span>
+                  ))}
+                </div>
+              ))}
+              {payCand.length > 20 && (
+                <div style={{ fontSize: 11, color: '#94a3b8' }}>외 {payCand.length - 20}건 — 재무 → 통장/카드 → 대차료 입금현황에서 전체 확인</div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
       <DcToolbar
         search={search}
         onSearchChange={setSearch}
