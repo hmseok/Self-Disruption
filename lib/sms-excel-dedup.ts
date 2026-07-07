@@ -77,8 +77,9 @@ export async function loadDedupCandidates(): Promise<{
   const smsRows = await prisma.$queryRawUnsafe<DedupTransaction[]>(
     sql.replace('?', "imported_from IN ('sms', 'sms_bank')")
   )
+  // codef_bank(오픈뱅킹) 포함 — 같은 계좌 이중 수집·쌍둥이 정리 대상
   const excelRows = await prisma.$queryRawUnsafe<DedupTransaction[]>(
-    sql.replace('?', "imported_from LIKE 'excel_%'")
+    sql.replace('?', "(imported_from LIKE 'excel_%' OR imported_from = 'codef_bank')")
   )
   return { smsRows, excelRows }
 }
@@ -99,7 +100,7 @@ function matchPair(sms: DedupTransaction, excel: DedupTransaction): { match: boo
   // PR-BANK-DEDUP — 은행 쌍 (sms_bank ↔ excel_bank): 엑셀은 날짜만 있어 ±3분 불가
   //   → 같은 날 + 같은 금액 + 입금자명/적요 토큰 겹침 필수 (오탐 방지)
   const smsIsBank = sms.imported_from === 'sms_bank'
-  const excelIsBank = String(excel.imported_from || '').startsWith('excel_bank')
+  const excelIsBank = String(excel.imported_from || '').startsWith('excel_bank') || excel.imported_from === 'codef_bank'
   if (smsIsBank !== excelIsBank) return { match: false, diff: diffMin, score: 0 }  // 카드↔통장 교차 금지
 
   if (smsIsBank && excelIsBank) {
@@ -205,6 +206,45 @@ export function findUniquePairs(
   }
 
   return result
+}
+
+// ─── 같은 출처 쌍둥이 정리 (PR-BANK-DEDUP v2, 2026-07-07) ─────
+//   통장 계열(excel_bank% / codef_bank) 안에서 같은 날 + 같은 금액 +
+//   같은 이름 + 같은 적요가 2행 이상 → 1행만 보존.
+//   보존 우선순위: 매칭(related_id) 있는 행 > codef(은행 원본) > 첫 행.
+//   final_category 있는 행은 삭제 대상에서 제외 (수동 분류 보호).
+export function findBankSelfDuplicates(rows: DedupTransaction[]): {
+  delete_ids: string[]
+  group_count: number
+} {
+  const bankRows = rows.filter((r) =>
+    String(r.imported_from || '').startsWith('excel_bank') || r.imported_from === 'codef_bank')
+  const nm = (s: any) => String(s || '').replace(/\s+/g, '').trim()
+  const groups = new Map<string, DedupTransaction[]>()
+  for (const r of bankRows) {
+    const d = new Date(r.transaction_date as any)
+    if (!isFinite(d.getTime())) continue
+    const day = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`
+    const key = `${day}|${Number(r.amount)}|${r.type}|${nm(r.client_name)}|${nm(r.description)}`
+    if (!groups.has(key)) groups.set(key, [])
+    groups.get(key)!.push(r)
+  }
+  const deleteIds: string[] = []
+  let groupCount = 0
+  for (const list of groups.values()) {
+    if (list.length < 2) continue
+    groupCount++
+    const keep =
+      list.find((r) => r.related_id) ||
+      list.find((r) => r.imported_from === 'codef_bank') ||
+      list[0]
+    for (const r of list) {
+      if (r.id === keep.id) continue
+      if (r.final_category) continue  // 수동 분류 보호
+      deleteIds.push(r.id)
+    }
+  }
+  return { delete_ids: deleteIds, group_count: groupCount }
 }
 
 // ─── 단건 SMS 매칭 — 엑셀 업로드 시 사용 ─────────────────────

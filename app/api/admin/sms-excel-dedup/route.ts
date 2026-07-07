@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyUser } from '@/lib/auth-server'
 import { prisma } from '@/lib/prisma'
-import { loadDedupCandidates, findUniquePairs } from '@/lib/sms-excel-dedup'
+import { loadDedupCandidates, findUniquePairs, findBankSelfDuplicates } from '@/lib/sms-excel-dedup'
 
 // ═══════════════════════════════════════════════════════════════════
 // SMS ↔ Excel 중복 거래 정리 API (관리자 전용)
@@ -36,12 +36,14 @@ export async function GET(request: NextRequest) {
   try {
     const { smsRows, excelRows } = await loadDedupCandidates()
     const result = findUniquePairs(smsRows, excelRows)
+    const selfDup = findBankSelfDuplicates(excelRows)  // 같은 출처 쌍둥이 (PR-BANK-DEDUP v2)
 
     return NextResponse.json({
       dryRun: true,
       total_sms: result.total_sms,
       total_excel: result.total_excel,
-      will_delete_excel: result.pairs.length,
+      self_dup: selfDup.delete_ids.length,
+      will_delete_excel: result.pairs.length + selfDup.delete_ids.length,
       ambiguous: result.ambiguous,
       protected: result.protected,
       sample: serialize(result.pairs.slice(0, 5).map(p => ({
@@ -90,12 +92,26 @@ export async function POST(request: NextRequest) {
 
     const { smsRows, excelRows } = await loadDedupCandidates()
     const result = findUniquePairs(smsRows, excelRows)
+    const selfDup = findBankSelfDuplicates(excelRows)  // 같은 출처 쌍둥이 (PR-BANK-DEDUP v2)
 
     let deleted = 0
     const errors: Array<{ id: string; reason: string }> = []
     const samples: any[] = []
 
-    for (let i = 0; i < Math.min(result.pairs.length, max); i++) {
+    // 쌍둥이 삭제 (max 한도 공유)
+    for (const id of selfDup.delete_ids.slice(0, max)) {
+      try {
+        await prisma.$executeRaw`
+          UPDATE transactions SET deleted_at = NOW(), updated_at = NOW()
+          WHERE id = ${id} AND deleted_at IS NULL
+        `
+        deleted++
+      } catch (e: any) {
+        errors.push({ id, reason: e?.message || 'unknown' })
+      }
+    }
+
+    for (let i = 0; i < Math.min(result.pairs.length, Math.max(0, max - deleted)); i++) {
       const pair = result.pairs[i]
       // PR-BANK-DEDUP — delete_side 에 따라 삭제 (카드=excel 기존 동작, 은행=매칭·정보량 기준)
       const deleteId = pair.delete_side === 'sms' ? pair.sms.id : pair.excel.id

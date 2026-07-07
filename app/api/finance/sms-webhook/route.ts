@@ -216,18 +216,58 @@ export async function POST(req: NextRequest) {
       //   rebuild/link-cards 와 동일 규칙: issuer 가 BANK 로 끝나면 은행.
       const importedFrom = /BANK$/i.test(String(parsed.issuer || '')) ? 'sms_bank' : 'sms'
 
+      // PR-SOURCE-ONE (2026-07-07 사용자 명시 「자료가 맞나 의심」) — 계좌 정본 입구 하나:
+      //   오픈뱅킹(codef) 연동 은행의 문자는 거래로 저장하지 않음 (중복 원천 차단).
+      //   문자는 알림 역할 — 즉시 오픈뱅킹 동기화를 깨워서 정본(codef_bank)으로 들어오게 함.
+      if (importedFrom === 'sms_bank') {
+        const ORG_BY_ISSUER: Record<string, string> = { WOORI_BANK: '0020', KB_BANK: '0004' }
+        const orgCode = ORG_BY_ISSUER[String(parsed.issuer || '')]
+        if (orgCode) {
+          try {
+            const conn = await prisma.codefConnection.findFirst({
+              where: { is_active: true, org_type: 'bank', org_code: orgCode },
+              select: { id: true },
+            })
+            if (conn) {
+              // 정본 = 오픈뱅킹 → 문자 거래 저장 skip + 동기화 트리거 (수분 내 정본 유입 + 자동매칭)
+              if (process.env.CRON_SECRET) {
+                const proto = req.headers.get('x-forwarded-proto') || 'https'
+                const host = req.headers.get('host') || ''
+                fetch(`${proto}://${host}/api/codef/sync`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json', 'X-Cron-Secret': process.env.CRON_SECRET },
+                  body: JSON.stringify({}),
+                }).catch(() => {})
+              }
+              transactionId = null
+              return NextResponse.json({
+                status: parseStatus,
+                id,
+                linked: { cardId, carId, transactionId: null },
+                source_policy: '오픈뱅킹 정본 — 문자는 동기화 알림으로만 사용',
+              })
+            }
+          } catch { /* 연동 조회 실패 — 기존대로 저장 (누락 방지 우선) */ }
+        }
+      }
+
+      // PR-RECONCILE — 은행 문자의 「잔액 N원」 저장 → 잔액 사슬 자동 검증 재료
+      //   (카드의 「잔여한도」는 '잔액' 표기가 아니라 자동 제외)
+      const balanceMatch = importedFrom === 'sms_bank' ? String(text || '').match(/잔액\s*([\d,]+)\s*원/) : null
+      const balanceAfter = balanceMatch ? Number(balanceMatch[1].replace(/,/g, '')) : null
+
       await prisma.$executeRaw`
         INSERT INTO transactions (
           id, transaction_date, type, amount, description, client_name,
           card_company, imported_from, related_type, related_id,
-          category, status, created_at, updated_at
+          category, status, balance_after, created_at, updated_at
         ) VALUES (
           ${transactionId}, ${txDate}, ${txType}, ${parsed.amount},
           ${description}, ${await resolveClientName(parsed.holder || '')},
           ${parsed.issuer}, ${importedFrom},
           ${carId ? 'car' : null}, ${carId},
           ${ruleResult && ruleResult.tier === 'auto' ? ruleResult.category : null},
-          'completed', NOW(), NOW()
+          'completed', ${balanceAfter}, NOW(), NOW()
         )
       `
       // SMS 레코드에 transaction_id 연결

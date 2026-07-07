@@ -263,6 +263,31 @@ export default function BankCardPage() {
   const [payFilter, setPayFilter] = useState<'all' | 'paid' | 'candidate' | 'unpaid'>('candidate')
   // PR-PAY-DRAWER — 행 클릭 시 페이지 이동 대신 사이드 드로어 (사고대차와 공용 컴포넌트)
   const [payDrawerId, setPayDrawerId] = useState<string | null>(null)
+
+  // PR-RECONCILE — 잔액 맞춰보기 (은행 실제 잔액 증감 vs 시스템 입출금 합계)
+  const [reconcileOpen, setReconcileOpen] = useState(false)
+  const [rcFrom, setRcFrom] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01` })
+  const [rcTo, setRcTo] = useState(() => new Date().toISOString().slice(0, 10))
+  const [rcBank, setRcBank] = useState<'all' | 'woori' | 'kb'>('all')
+  const [rcStart, setRcStart] = useState('')
+  const [rcEnd, setRcEnd] = useState('')
+  const [rcBusy, setRcBusy] = useState(false)
+  const [rcResult, setRcResult] = useState<any>(null)
+
+  const runReconcile = useCallback(async () => {
+    setRcBusy(true)
+    setRcResult(null)
+    try {
+      const { json } = await fetchWithAuth(`/api/finance/bank-reconcile?from=${rcFrom}&to=${rcTo}&bank=${rcBank}`)
+      if (json?.error) throw new Error(json.error)
+      setRcResult(json)
+    } catch (e: any) {
+      setRcResult({ error: e?.message || '계산 오류' })
+    } finally {
+      setRcBusy(false)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rcFrom, rcTo, rcBank])
   const [payLoading, setPayLoading] = useState(false)
   // 후보 입금을 대차건에 수동 연결
   const linkPaymentCandidate = useCallback(async (txId: string, rentalId: string) => {
@@ -3810,6 +3835,97 @@ export default function BankCardPage() {
           </div>
         )}
 
+        {/* PR-RECONCILE — 잔액 맞춰보기 모달 */}
+        {reconcileOpen && (
+          <div onClick={() => !rcBusy && setReconcileOpen(false)}
+            style={{ position: 'fixed', inset: 0, zIndex: 60, background: 'rgba(15,23,42,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+            <div onClick={(e) => e.stopPropagation()}
+              style={{ background: '#fff', width: 'min(560px, 96vw)', maxHeight: '86vh', borderRadius: 16, boxShadow: '0 24px 60px rgba(0,0,0,0.25)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 20px', borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
+                <h3 style={{ fontSize: 15, fontWeight: 900, color: '#0f2440', margin: 0 }}>🧮 잔액 맞춰보기</h3>
+                <span style={{ fontSize: 11, color: COLORS.textMuted }}>이 기간 자료가 정확한지 확인</span>
+                <div style={{ flex: 1 }} />
+                <button onClick={() => !rcBusy && setReconcileOpen(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 16, color: '#64748b' }}>✕</button>
+              </div>
+              <div style={{ flex: 1, overflowY: 'auto', padding: '14px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <select value={rcBank} onChange={(e) => setRcBank(e.target.value as any)} style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid rgba(0,0,0,0.12)', fontSize: 12 }}>
+                    <option value="all">모든 통장</option>
+                    <option value="woori">우리은행</option>
+                    <option value="kb">국민은행</option>
+                  </select>
+                  <input type="date" value={rcFrom} onChange={(e) => setRcFrom(e.target.value)} style={{ padding: '7px 9px', borderRadius: 8, border: '1px solid rgba(0,0,0,0.12)', fontSize: 12 }} />
+                  <span style={{ fontSize: 11, color: COLORS.textMuted }}>~</span>
+                  <input type="date" value={rcTo} onChange={(e) => setRcTo(e.target.value)} style={{ padding: '7px 9px', borderRadius: 8, border: '1px solid rgba(0,0,0,0.12)', fontSize: 12 }} />
+                  <button onClick={runReconcile} disabled={rcBusy}
+                    style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: COLORS.primary, color: '#fff', fontSize: 12, fontWeight: 800, cursor: rcBusy ? 'wait' : 'pointer' }}>
+                    {rcBusy ? '확인 중…' : '확인하기'}
+                  </button>
+                </div>
+
+                {rcResult && !rcResult.error && (
+                  <>
+                    {/* 자동 검사 — 문자·은행이 알려준 잔액 사슬 */}
+                    <div style={{ padding: '11px 14px', borderRadius: 10, border: `1px solid ${Number(rcResult.chain?.breaks?.length) > 0 ? 'rgba(239,68,68,0.35)' : 'rgba(16,185,129,0.4)'}`, background: Number(rcResult.chain?.breaks?.length) > 0 ? 'rgba(254,242,242,0.6)' : 'rgba(236,253,245,0.6)' }}>
+                      <div style={{ fontSize: 13, fontWeight: 800, color: Number(rcResult.chain?.breaks?.length) > 0 ? '#991b1b' : '#065f46' }}>
+                        {Number(rcResult.chain?.breaks?.length) > 0
+                          ? `⚠ 잔액이 이어지지 않는 지점 ${rcResult.chain.breaks_found}곳 — 그 사이에 빠졌거나 두 번 들어간 거래가 있습니다`
+                          : rcResult.chain?.with_balance > 1
+                            ? `✅ 잔액 기록이 있는 ${rcResult.chain.with_balance}건이 끊김 없이 이어집니다 — 이 기간 자료 정확`
+                            : `이 기간에는 잔액이 기록된 거래가 적어 자동 확인이 어렵습니다 — 아래 수동 비교를 쓰세요`}
+                      </div>
+                      {(rcResult.chain?.breaks || []).map((b: any, i: number) => (
+                        <div key={i} style={{ fontSize: 12, color: '#7f1d1d', marginTop: 5 }}>
+                          · {b.date} {b.client_name} 근처 — 장부보다 {Math.abs(b.diff).toLocaleString('ko-KR')}원 {b.diff > 0 ? '많음(누락 의심)' : '적음(중복 의심)'}
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* 기간 합계 */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+                      <div style={{ padding: '10px 12px', borderRadius: 10, background: 'rgba(16,185,129,0.07)' }}>
+                        <div style={{ fontSize: 11, color: COLORS.textMuted }}>기간 입금 합계</div>
+                        <div style={{ fontSize: 15, fontWeight: 800, color: '#065f46' }}>{Number(rcResult.income_sum).toLocaleString('ko-KR')}원</div>
+                      </div>
+                      <div style={{ padding: '10px 12px', borderRadius: 10, background: 'rgba(239,68,68,0.06)' }}>
+                        <div style={{ fontSize: 11, color: COLORS.textMuted }}>기간 출금 합계</div>
+                        <div style={{ fontSize: 15, fontWeight: 800, color: '#991b1b' }}>{Number(rcResult.expense_sum).toLocaleString('ko-KR')}원</div>
+                      </div>
+                      <div style={{ padding: '10px 12px', borderRadius: 10, background: 'rgba(59,110,181,0.06)' }}>
+                        <div style={{ fontSize: 11, color: COLORS.textMuted }}>늘어난 돈 (계산)</div>
+                        <div style={{ fontSize: 15, fontWeight: 800, color: '#0f2440' }}>{Number(rcResult.net).toLocaleString('ko-KR')}원</div>
+                      </div>
+                    </div>
+
+                    {/* 수동 비교 — 은행 앱 잔액 두 개 */}
+                    <div style={{ padding: '11px 14px', borderRadius: 10, border: '1px solid rgba(0,0,0,0.08)' }}>
+                      <div style={{ fontSize: 12, fontWeight: 800, color: '#0f2440', marginBottom: 8 }}>은행 앱 잔액으로 한 번 더 확인 (선택)</div>
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                        <input type="number" value={rcStart} onChange={(e) => setRcStart(e.target.value)} placeholder="시작일 아침 잔액"
+                          style={{ flex: '1 1 140px', padding: '8px 10px', borderRadius: 8, border: '1px solid rgba(0,0,0,0.12)', fontSize: 12 }} />
+                        <input type="number" value={rcEnd} onChange={(e) => setRcEnd(e.target.value)} placeholder="끝일 저녁 잔액"
+                          style={{ flex: '1 1 140px', padding: '8px 10px', borderRadius: 8, border: '1px solid rgba(0,0,0,0.12)', fontSize: 12 }} />
+                      </div>
+                      {rcStart !== '' && rcEnd !== '' && (() => {
+                        const realNet = Number(rcEnd) - Number(rcStart)
+                        const diff = realNet - Number(rcResult.net)
+                        return (
+                          <div style={{ marginTop: 8, fontSize: 13, fontWeight: 800, color: diff === 0 ? '#065f46' : '#991b1b' }}>
+                            {diff === 0
+                              ? '✅ 은행과 딱 맞습니다 — 이 기간 자료 정확'
+                              : `⚠ 은행보다 장부가 ${Math.abs(diff).toLocaleString('ko-KR')}원 ${diff > 0 ? '적습니다 (누락 의심)' : '많습니다 (중복 의심)'}`}
+                          </div>
+                        )
+                      })()}
+                    </div>
+                  </>
+                )}
+                {rcResult?.error && <div style={{ fontSize: 12, color: '#991b1b' }}>⚠ {rcResult.error}</div>}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* ──── 통장 거래 탭 ──── */}
         {activeTab === 'bank' && (
           <>
@@ -3826,6 +3942,12 @@ export default function BankCardPage() {
               onFilterChange={setBankFilter}
               trailing={
                 <div style={{ display: 'flex', gap: 6 }}>
+                  <button
+                    onClick={() => setReconcileOpen(true)}
+                    style={{ ...BTN.sm, background: '#fff', color: COLORS.textSecondary, border: '1px solid rgba(0,0,0,0.12)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+                  >
+                    🧮 잔액 맞춰보기
+                  </button>
                   <button
                     onClick={() => { setUploadSource('excel_bank'); setShowUpload(true); setUploadPreview([]); setUploadResult(null); setUploadFiles([]); setUploadFileName(''); setUploadColumns({}); setSkippedFiles([]) }}
                     style={{ ...BTN.sm, background: COLORS.primary, color: '#fff', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}

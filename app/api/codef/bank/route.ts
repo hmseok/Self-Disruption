@@ -74,16 +74,18 @@ export async function POST(req: NextRequest) {
 
       try {
         // transactions 테이블은 Prisma 스키마 외 테이블 → raw insert
+        // PR-RECONCILE — 거래 후 잔액 저장 (잔액 사슬 자동 검증 재료). 필드 없으면 null.
+        const balanceAfter = Number(tx.resAfterTranBalance || tx.resAccountBalance || 0) || null
         await prisma.$executeRaw`
           INSERT INTO transactions
             (transaction_date, type, amount, client_name, description, category,
-             payment_method, status, imported_from, codef_org_code, raw_data)
+             payment_method, status, imported_from, codef_org_code, balance_after, raw_data)
           VALUES
             (${txDate}, ${type}, ${amount},
              ${tx.resAccountDesc1 || tx.resAccountDesc2 || '미상'},
              ${[tx.resAccountDesc1, tx.resAccountDesc2, tx.resAccountDesc3].filter(Boolean).join(' / ')},
              ${'Import - Bank'}, ${BANK_CODES[orgCode as keyof typeof BANK_CODES]},
-             ${'completed'}, ${'codef_bank'}, ${orgCode},
+             ${'completed'}, ${'codef_bank'}, ${orgCode}, ${balanceAfter},
              ${JSON.stringify(tx)})
         `
         insertedCount++
