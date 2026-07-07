@@ -43,6 +43,9 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
     const { rows, source, batchId } = body
+    // PR-ACCOUNT (V10) — 파일 단위 계좌 지정 (은행 엑셀은 계좌별 파일)
+    const accountLast4: string | null = String(body.account_last4 || '').replace(/\D/g, '').slice(-4) || null
+    let accountColumnOk = true
 
     if (!rows || !Array.isArray(rows) || rows.length === 0) {
       return NextResponse.json({ error: '가져올 데이터가 없습니다' }, { status: 400 })
@@ -243,9 +246,7 @@ export async function POST(request: NextRequest) {
           rawDataJson = JSON.stringify(rawDataObj)
         }
 
-        await prisma.$executeRawUnsafe(
-          `INSERT INTO transactions (id, transaction_date, type, amount, description, client_name, bank_name, card_company, imported_from, category, final_category, balance_after, raw_data, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+        const baseParams = [
           id,
           txDate,
           txType,
@@ -259,6 +260,26 @@ export async function POST(request: NextRequest) {
           autoCategory,
           balanceAfter,
           rawDataJson,
+        ]
+        // PR-ACCOUNT (V10) — account_last4 포함 시도, 컬럼 미적용 DB 는 기존 형태 (규칙 23)
+        if (accountLast4 && accountColumnOk) {
+          try {
+            await prisma.$executeRawUnsafe(
+              `INSERT INTO transactions (id, transaction_date, type, amount, description, client_name, bank_name, card_company, imported_from, category, final_category, balance_after, raw_data, account_last4, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+              ...baseParams, accountLast4,
+            )
+            inserted++
+            continue
+          } catch (e: any) {
+            if (/Unknown column/i.test(e?.message || '')) accountColumnOk = false
+            else throw e
+          }
+        }
+        await prisma.$executeRawUnsafe(
+          `INSERT INTO transactions (id, transaction_date, type, amount, description, client_name, bank_name, card_company, imported_from, category, final_category, balance_after, raw_data, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+          ...baseParams,
         )
         inserted++
       } catch (err: any) {

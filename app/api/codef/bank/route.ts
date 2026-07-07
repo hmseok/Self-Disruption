@@ -61,6 +61,9 @@ export async function POST(req: NextRequest) {
 
     const txList: any[] = result.resTrHistoryList || []
     let insertedCount = 0
+    // PR-ACCOUNT (V10) — 계좌 끝4자리 저장 (계좌별 관리). 컬럼 미적용 DB 는 자동 생략.
+    const accountLast4 = cleanAccount.slice(-4)
+    let accountColumnOk = true
 
     for (const tx of txList) {
       const txDate = tx.resAccountTrDate
@@ -76,15 +79,35 @@ export async function POST(req: NextRequest) {
         // transactions 테이블은 Prisma 스키마 외 테이블 → raw insert
         // PR-RECONCILE — 거래 후 잔액 저장 (잔액 사슬 자동 검증 재료). 필드 없으면 null.
         const balanceAfter = Number(tx.resAfterTranBalance || tx.resAccountBalance || 0) || null
+        const clientName = tx.resAccountDesc1 || tx.resAccountDesc2 || '미상'
+        const desc = [tx.resAccountDesc1, tx.resAccountDesc2, tx.resAccountDesc3].filter(Boolean).join(' / ')
+        const bankName = BANK_CODES[orgCode as keyof typeof BANK_CODES]
+        if (accountColumnOk) {
+          try {
+            await prisma.$executeRaw`
+              INSERT INTO transactions
+                (transaction_date, type, amount, client_name, description, category,
+                 payment_method, status, imported_from, codef_org_code, balance_after, account_last4, raw_data)
+              VALUES
+                (${txDate}, ${type}, ${amount}, ${clientName}, ${desc},
+                 ${'Import - Bank'}, ${bankName},
+                 ${'completed'}, ${'codef_bank'}, ${orgCode}, ${balanceAfter}, ${accountLast4},
+                 ${JSON.stringify(tx)})
+            `
+            insertedCount++
+            continue
+          } catch (e: any) {
+            if (/Unknown column/i.test(e?.message || '')) accountColumnOk = false
+            else throw e  // 중복 등 → 바깥 catch 에서 무시
+          }
+        }
         await prisma.$executeRaw`
           INSERT INTO transactions
             (transaction_date, type, amount, client_name, description, category,
              payment_method, status, imported_from, codef_org_code, balance_after, raw_data)
           VALUES
-            (${txDate}, ${type}, ${amount},
-             ${tx.resAccountDesc1 || tx.resAccountDesc2 || '미상'},
-             ${[tx.resAccountDesc1, tx.resAccountDesc2, tx.resAccountDesc3].filter(Boolean).join(' / ')},
-             ${'Import - Bank'}, ${BANK_CODES[orgCode as keyof typeof BANK_CODES]},
+            (${txDate}, ${type}, ${amount}, ${clientName}, ${desc},
+             ${'Import - Bank'}, ${bankName},
              ${'completed'}, ${'codef_bank'}, ${orgCode}, ${balanceAfter},
              ${JSON.stringify(tx)})
         `

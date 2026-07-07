@@ -25,16 +25,22 @@ export async function GET(request: NextRequest) {
     const from = String(sp.get('from') || '').slice(0, 10)
     const to = String(sp.get('to') || '').slice(0, 10)
     const bank = String(sp.get('bank') || 'all')
+    // PR-ACCOUNT (V10) — 계좌 끝4자리 지정 시 그 계좌만 (사슬 검사 정확도 최상)
+    const account = String(sp.get('account') || '').replace(/\D/g, '').slice(-4)
     if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
       return NextResponse.json({ error: '기간(from/to)을 지정하세요' }, { status: 400 })
     }
 
-    const bankClause =
+    let bankClause =
       bank === 'woori' ? `AND (bank_name LIKE '%우리%' OR card_company LIKE '%WOORI%')`
       : bank === 'kb' ? `AND (bank_name LIKE '%국민%' OR card_company LIKE '%KB%')`
       : ''
+    if (account) {
+      // V10 미적용 DB 는 아래 쿼리가 1054 → catch 에서 계좌 조건 없이 재시도
+      bankClause += ` AND account_last4 = '${account}'`
+    }
 
-    const rows = await prisma.$queryRawUnsafe<Array<any>>(
+    const sumSql = (clause: string) =>
       `SELECT imported_from,
               SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END) AS income_sum,
               SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END) AS expense_sum,
@@ -43,10 +49,16 @@ export async function GET(request: NextRequest) {
         WHERE deleted_at IS NULL
           AND (imported_from LIKE 'excel_bank%' OR imported_from = 'sms_bank' OR imported_from = 'codef_bank')
           AND transaction_date >= ? AND transaction_date < DATE_ADD(?, INTERVAL 1 DAY)
-          ${bankClause}
-        GROUP BY imported_from`,
-      from, to,
-    )
+          ${clause}
+        GROUP BY imported_from`
+    const rows = await prisma.$queryRawUnsafe<Array<any>>(sumSql(bankClause), from, to)
+      .catch(async (e: any) => {
+        if (account && /Unknown column/i.test(e?.message || '')) {
+          bankClause = bankClause.replace(` AND account_last4 = '${account}'`, '')
+          return prisma.$queryRawUnsafe<Array<any>>(sumSql(bankClause), from, to)
+        }
+        throw e
+      })
 
     let incomeSum = 0, expenseSum = 0, count = 0
     const bySource: Record<string, { income: number; expense: number; cnt: number }> = {}

@@ -269,6 +269,7 @@ export default function BankCardPage() {
   const [rcFrom, setRcFrom] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01` })
   const [rcTo, setRcTo] = useState(() => new Date().toISOString().slice(0, 10))
   const [rcBank, setRcBank] = useState<'all' | 'woori' | 'kb'>('all')
+  const [rcAccount, setRcAccount] = useState('')  // V10 — 계좌 끝4자리 (사슬 검사 정확도 최상)
   const [rcStart, setRcStart] = useState('')
   const [rcEnd, setRcEnd] = useState('')
   const [rcBusy, setRcBusy] = useState(false)
@@ -278,7 +279,7 @@ export default function BankCardPage() {
     setRcBusy(true)
     setRcResult(null)
     try {
-      const { json } = await fetchWithAuth(`/api/finance/bank-reconcile?from=${rcFrom}&to=${rcTo}&bank=${rcBank}`)
+      const { json } = await fetchWithAuth(`/api/finance/bank-reconcile?from=${rcFrom}&to=${rcTo}&bank=${rcBank}&account=${rcAccount}`)
       if (json?.error) throw new Error(json.error)
       setRcResult(json)
     } catch (e: any) {
@@ -322,6 +323,7 @@ export default function BankCardPage() {
   const [uploadPreview, setUploadPreview] = useState<any[]>([])
   const [uploadColumns, setUploadColumns] = useState<Record<string, string>>({})
   const [uploadFileName, setUploadFileName] = useState('')
+  const [uploadAccountLast4, setUploadAccountLast4] = useState('')  // V10 — 통장 엑셀 계좌 지정
   const [uploading, setUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState('')
   const [uploadResult, setUploadResult] = useState<any>(null)
@@ -1809,7 +1811,8 @@ export default function BankCardPage() {
         const batchId = mapped.length > BATCH_SIZE ? `${batchBase}_b${Math.floor(bi / BATCH_SIZE)}` : batchBase
         const { json } = await fetchWithAuth('/api/finance/transactions/import', {
           method: 'POST',
-          body: { rows: chunk, source: uploadSource, batchId },
+          // PR-ACCOUNT (V10) — 통장 엑셀은 파일 이름/입력에서 계좌 끝4자리 지정 (계좌별 관리)
+          body: { rows: chunk, source: uploadSource, batchId, account_last4: uploadSource === 'excel_bank' ? (uploadAccountLast4 || (file.name.match(/(\d{4})(?!.*\d{4})/)?.[1] ?? null)) : null },
         })
         const res = json?.data || json || {}
         fileInserted += res.inserted || 0
@@ -3859,6 +3862,9 @@ export default function BankCardPage() {
                     <option value="woori">우리은행</option>
                     <option value="kb">국민은행</option>
                   </select>
+                  <input value={rcAccount} onChange={(e) => setRcAccount(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                    placeholder="계좌 끝4자리" maxLength={4}
+                    style={{ width: 92, padding: '7px 9px', borderRadius: 8, border: '1px solid rgba(0,0,0,0.12)', fontSize: 12 }} />
                   <input type="date" value={rcFrom} onChange={(e) => setRcFrom(e.target.value)} style={{ padding: '7px 9px', borderRadius: 8, border: '1px solid rgba(0,0,0,0.12)', fontSize: 12 }} />
                   <span style={{ fontSize: 11, color: COLORS.textMuted }}>~</span>
                   <input type="date" value={rcTo} onChange={(e) => setRcTo(e.target.value)} style={{ padding: '7px 9px', borderRadius: 8, border: '1px solid rgba(0,0,0,0.12)', fontSize: 12 }} />
@@ -8044,6 +8050,17 @@ export default function BankCardPage() {
                 {uploadFileName ? uploadFileName : '클릭하여 엑셀 파일 선택 (.xlsx, .xls, .csv) — 복수 선택 가능'}
               </div>
             </div>
+
+            {/* PR-ACCOUNT (V10) — 통장 엑셀은 어느 계좌인지 지정 (계좌별 관리) */}
+            {uploadSource === 'excel_bank' && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: COLORS.textSecondary, whiteSpace: 'nowrap' }}>이 파일의 계좌 끝 4자리</span>
+                <input value={uploadAccountLast4} onChange={(e) => setUploadAccountLast4(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                  placeholder="예: 8777" maxLength={4}
+                  style={{ width: 90, padding: '7px 10px', borderRadius: 8, border: '1px solid rgba(0,0,0,0.12)', fontSize: 13, fontWeight: 700, color: '#1e293b' }} />
+                <span style={{ fontSize: 11, color: COLORS.textMuted }}>비우면 파일 이름의 마지막 4자리 숫자를 사용합니다 — 계좌별 잔액 검사·필터에 쓰여요</span>
+              </div>
+            )}
 
             {/* 스킵된 파일 경고 */}
             {skippedFiles.length > 0 && (
