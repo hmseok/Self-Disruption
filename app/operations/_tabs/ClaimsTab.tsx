@@ -497,6 +497,23 @@ export default function ClaimsTab() {
   ]
   const statActions: ActionButton[] = [
     { label: partnerBusy ? '반영 중…' : '외주 정산 업로드', onClick: () => !partnerBusy && partnerFileRef.current?.click(), variant: 'primary', icon: '📥' },
+    {
+      // PR-CLEAN-TABS — 자동매칭 실행 버튼을 재무에서 청구 탭으로 이동 (업무층 자기완결)
+      label: '입금 자동매칭', icon: '🔗', variant: 'secondary',
+      onClick: async () => {
+        try {
+          const headers = { ...(await getAuthHeader()), 'Content-Type': 'application/json' }
+          const r = await fetch('/api/finance/transactions/auto-match-fmi-rental', {
+            method: 'POST', headers, body: JSON.stringify({ mode: 'insurance', dryRun: false }),
+          }).then((x) => x.json())
+          setPartnerMsg({ type: 'ok', text: `✅ ${r?.message || '자동매칭 완료'}` })
+          fetchPayCandidates()
+          refresh()
+        } catch (e: any) {
+          setPartnerMsg({ type: 'err', text: e?.message || '자동매칭 오류' })
+        }
+      },
+    },
     { label: '새로고침', onClick: refresh, variant: 'secondary', icon: '🔄' },
   ]
   const filterItems: FilterItem[] = [
