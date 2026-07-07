@@ -85,23 +85,43 @@ export async function GET(request: NextRequest) {
         LIMIT 3000`,
       from, to,
     )
+    // 같은 시각 묶음(은행 일괄처리 — 세금 납부 등)은 순서를 알 수 없어 건별 비교 시 오탐.
+    //   → 묶음 단위로 검사: 이전 끝잔액 + 묶음 합계 = 묶음 내 어느 한 행의 잔액이면 정상.
+    const groups: Array<{ ts: string; rows: any[] }> = []
+    for (const r of chainRows) {
+      const ts = String(r.transaction_date)
+      if (groups.length && groups[groups.length - 1].ts === ts) groups[groups.length - 1].rows.push(r)
+      else groups.push({ ts, rows: [r] })
+    }
     const breaks: any[] = []
     let checked = 0
-    for (let i = 1; i < chainRows.length; i++) {
-      const prev = chainRows[i - 1]
-      const cur = chainRows[i]
-      const expected = Number(prev.balance_after) + (cur.type === 'income' ? Number(cur.amount) : -Number(cur.amount))
+    let prevEnd: number | null = null
+    for (const g of groups) {
+      const net = g.rows.reduce((s, r) => s + (r.type === 'income' ? Number(r.amount) : -Number(r.amount)), 0)
+      if (prevEnd === null) {
+        // 시작 묶음 — 묶음 내 잔액 중 "그 행까지의 누적"과 맞는 끝잔액 후보를 그대로 채택
+        prevEnd = Number(g.rows[g.rows.length - 1].balance_after)
+        continue
+      }
       checked++
-      if (Math.abs(expected - Number(cur.balance_after)) > 0.5) {
+      const expected: number = prevEnd + net
+      const hit = g.rows.some((r) => Math.abs(Number(r.balance_after) - expected) <= 0.5)
+      if (hit) {
+        prevEnd = expected
+      } else {
+        const first = g.rows[0]
+        const closest = g.rows.reduce((b, r) => (Math.abs(Number(r.balance_after) - expected) < Math.abs(Number(b.balance_after) - expected) ? r : b), g.rows[0])
         if (breaks.length < 10) {
           breaks.push({
-            date: String(cur.transaction_date).slice(0, 10),
-            client_name: cur.client_name || cur.description || '',
+            date: String(first.transaction_date).slice(0, 10),
+            client_name: first.client_name || first.description || '',
             expected,
-            actual: Number(cur.balance_after),
-            diff: Number(cur.balance_after) - expected,
+            actual: Number(closest.balance_after),
+            diff: Number(closest.balance_after) - expected,
           })
         }
+        // 사슬 재동기화 — 이후 구간은 이 묶음의 실제 잔액 기준으로 계속 검사
+        prevEnd = Number(closest.balance_after)
       }
     }
 

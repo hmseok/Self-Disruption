@@ -30,6 +30,7 @@ export type DedupTransaction = {
   related_id: string | null
   final_category: string | null
   category: string | null
+  balance_after?: any  // v3 — 쌍둥이 판별자 (거래 후 잔액)
 }
 
 export type DedupPair = {
@@ -65,7 +66,7 @@ export async function loadDedupCandidates(): Promise<{
   const sql = `
     SELECT id, transaction_date, amount, type, description,
            client_name, card_company, bank_name, imported_from,
-           related_type, related_id, final_category, category
+           related_type, related_id, final_category, category, balance_after
       FROM transactions
      WHERE deleted_at IS NULL
        AND transaction_date >= DATE_SUB(NOW(), INTERVAL 400 DAY)
@@ -224,8 +225,17 @@ export function findBankSelfDuplicates(rows: DedupTransaction[]): {
   for (const r of bankRows) {
     const d = new Date(r.transaction_date as any)
     if (!isFinite(d.getTime())) continue
-    const day = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`
-    const key = `${day}|${Number(r.amount)}|${r.type}|${nm(r.client_name)}|${nm(r.description)}`
+    // v3 (2026-07-08) — 오탐 방지: 같은 날 정당한 반복 거래(같은 고객·같은 금액 2회)를
+    //   중복으로 오인하지 않도록 판별자 강화.
+    //   · 시각(초)까지 같아야 하고
+    //   · 거래 후 잔액까지 같아야 진짜 쌍둥이 (별개 거래면 잔액이 다를 수밖에 없음)
+    //   · 시각도 잔액도 없는 행(날짜만·잔액 없음)은 확신 불가 → 검사 제외
+    const hasTime = !(d.getHours() === 0 && d.getMinutes() === 0 && d.getSeconds() === 0)
+    const bal = r as any
+    const hasBalance = bal.balance_after != null && Number(bal.balance_after) > 0
+    if (!hasTime && !hasBalance) continue
+    const ts = d.toISOString()
+    const key = `${ts}|${Number(r.amount)}|${r.type}|${nm(r.client_name)}|${nm(r.description)}|${hasBalance ? Number(bal.balance_after) : 'x'}`
     if (!groups.has(key)) groups.set(key, [])
     groups.get(key)!.push(r)
   }

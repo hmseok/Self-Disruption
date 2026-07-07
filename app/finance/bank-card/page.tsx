@@ -1403,8 +1403,18 @@ export default function BankCardPage() {
     return false
   }
 
+  // PR-ACCOUNT — 계좌별 필터 (V10 account_last4)
+  const [bankAccountPick, setBankAccountPick] = useState('all')
+  const bankAccountOptions = useMemo(() => {
+    const set = new Set<string>()
+    for (const t of transactions) if (isBankTx(t) && (t as any).account_last4) set.add(String((t as any).account_last4))
+    return Array.from(set).sort()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [transactions])
+
   const bankTransactions = useMemo(() => {
     let data = transactions.filter(isBankTx)
+    if (bankAccountPick !== 'all') data = data.filter(t => String((t as any).account_last4 || '') === bankAccountPick)
     if (bankFilter === 'income') data = data.filter(t => t.type === 'income')
     else if (bankFilter === 'expense') data = data.filter(t => t.type === 'expense')
     if (search) {
@@ -1417,10 +1427,43 @@ export default function BankCardPage() {
       )
     }
     return data
-  }, [transactions, bankFilter, search])
+  }, [transactions, bankFilter, search, bankAccountPick])
+
+  // PR-ACCOUNT — 카드별(끝4자리/별칭)·소지자별 필터
+  const [cardPick, setCardPick] = useState('all')
+  const [holderPick, setHolderPick] = useState('all')
+  const cardPickOptions = useMemo(() => {
+    const set = new Set<string>()
+    for (const t of transactions) {
+      if (!isCardTx(t)) continue
+      const a = (t as any).matched_card_alias || (t as any).sms_card_alias || ((t as any).account_last4 ? `****${(t as any).account_last4}` : '')
+      if (a) set.add(String(a))
+    }
+    return Array.from(set).sort()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [transactions])
+  const holderPickOptions = useMemo(() => {
+    const set = new Set<string>()
+    for (const t of transactions) {
+      if (!isCardTx(t)) continue
+      const h = (t as any).matched_holder_name || (t as any).sms_holder
+      if (h) set.add(String(h))
+    }
+    return Array.from(set).sort()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [transactions])
 
   const cardTransactions = useMemo(() => {
     let data = transactions.filter(isCardTx)
+    if (cardPick !== 'all') {
+      data = data.filter(t => {
+        const a = (t as any).matched_card_alias || (t as any).sms_card_alias || ((t as any).account_last4 ? `****${(t as any).account_last4}` : '')
+        return String(a) === cardPick
+      })
+    }
+    if (holderPick !== 'all') {
+      data = data.filter(t => String((t as any).matched_holder_name || (t as any).sms_holder || '') === holderPick)
+    }
     if (cardFilter !== 'all') {
       // 카드사 매칭 — 한글/영문 양방향 (KB_BANK 제외)
       // 'kb' → 'KB', 'KB국민', 'KB국민카드' / '우리' → 'WOORI', '우리카드' / '현대' → 'HYUNDAI', '현대카드'
@@ -1446,7 +1489,7 @@ export default function BankCardPage() {
       )
     }
     return data
-  }, [transactions, cardFilter, search])
+  }, [transactions, cardFilter, search, cardPick, holderPick])
 
   const filteredSettlements = useMemo(() => {
     let data = [...settlements]
@@ -3121,7 +3164,7 @@ export default function BankCardPage() {
       //   "🚗 차량번호" = 등록 + 차량 할당 (드뭄 — 차량 전용 통장)
       const alias = r.bank_account_alias || r.sms_card_alias || ''
       const aliasLast4 = alias.match(/(\d{4})\s*$/)?.[1]
-      const last4 = aliasLast4
+      const last4 = aliasLast4 || (r as any).account_last4  // V10 — 계좌별 관리
       const bankName = r.bank_name || (r.card_company || '').replace('_BANK', '')
       const hasBankMapping = !!(r.bank_account_alias || r.bank_account_holder)
       const hasCarAssigned = !!r.bank_matched_car_number
@@ -3754,7 +3797,15 @@ export default function BankCardPage() {
               activeFilter={bankFilter}
               onFilterChange={setBankFilter}
               trailing={
-                <div style={{ display: 'flex', gap: 6 }}>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                  {/* PR-ACCOUNT — 계좌별 보기 */}
+                  {bankAccountOptions.length > 0 && (
+                    <select value={bankAccountPick} onChange={(e) => setBankAccountPick(e.target.value)}
+                      style={{ padding: '7px 9px', borderRadius: 8, border: '1px solid rgba(0,0,0,0.12)', fontSize: 12, fontWeight: 700, color: COLORS.textPrimary }}>
+                      <option value="all">🏦 계좌 전체</option>
+                      {bankAccountOptions.map((a) => <option key={a} value={a}>계좌 ****{a}</option>)}
+                    </select>
+                  )}
                   <button
                     onClick={() => setReconcileOpen(true)}
                     style={{ ...BTN.sm, background: '#fff', color: COLORS.textSecondary, border: '1px solid rgba(0,0,0,0.12)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
@@ -7846,7 +7897,7 @@ export default function BankCardPage() {
             {/* PR-ACCOUNT (V10) — 어느 계좌/카드 파일인지 지정 (계좌·카드별 관리) */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
               <span style={{ fontSize: 12, fontWeight: 700, color: COLORS.textSecondary, whiteSpace: 'nowrap' }}>
-                이 파일의 {uploadSource === 'excel_bank' ? '계좌' : '카드'} 끝 4자리
+                {uploadSource === 'excel_bank' ? '계좌' : '카드'} 끝 4자리 <span style={{ fontWeight: 500, color: COLORS.textMuted }}>(자동 인식 안 된 파일에만 적용)</span>
               </span>
               <input value={uploadAccountLast4} onChange={(e) => setUploadAccountLast4(e.target.value.replace(/\D/g, '').slice(0, 4))}
                 placeholder={uploadSource === 'excel_bank' ? '예: 8777' : '예: 7109'} maxLength={4}
@@ -7883,6 +7934,9 @@ export default function BankCardPage() {
                     }}
                   >
                     {f.name} ({f.rows.length}행)
+                    {(f as any).accountLast4
+                      ? <span style={{ marginLeft: 5, fontWeight: 700 }}>· 계좌 {(f as any).accountLast4}</span>
+                      : uploadSource === 'excel_bank' && <span style={{ marginLeft: 5, color: i === currentFileIndex ? '#fde68a' : '#b45309' }}>· 계좌 미인식</span>}
                     {f.result && <span style={{ marginLeft: 4 }}>✅</span>}
                   </button>
                 ))}

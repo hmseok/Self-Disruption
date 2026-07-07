@@ -60,6 +60,7 @@ export async function GET(request: NextRequest) {
     const baseQuery = `SELECT
          t.id, t.transaction_date, t.type, t.amount, t.description, t.client_name,
          t.bank_name, t.card_company, t.imported_from, t.category, t.final_category, t.balance_after,
+         t.account_last4,
          t.related_type, t.related_id,
          JSON_UNQUOTE(JSON_EXTRACT(t.raw_data, '$.card_last4')) AS card_last4,
          sms.card_alias         AS sms_card_alias,
@@ -97,7 +98,15 @@ export async function GET(request: NextRequest) {
 
     let data: any[]
     try {
-      data = await prisma.$queryRawUnsafe<any[]>(baseQuery, ...params)
+      data = await prisma.$queryRawUnsafe<any[]>(
+        // V10 미적용 DB 대비 (규칙 23)
+        baseQuery, ...params,
+      ).catch(async (e: any) => {
+        if (/Unknown column.*account_last4/i.test(e?.message || '')) {
+          return prisma.$queryRawUnsafe<any[]>(baseQuery.replace('t.account_last4,', ''), ...params)
+        }
+        throw e
+      })
     } catch (e: any) {
       // bank_account_mappings 없는 환경 등 — graceful fallback
       console.warn('[finance/transactions/list] full query 실패, simple fallback:', e?.message?.slice(0, 200))
