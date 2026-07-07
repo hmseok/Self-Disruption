@@ -16,7 +16,7 @@ import type {
   Cafe24SmsRow,
 } from '@/app/operations/intake/types'
 import { CATEGORY_META, describeAccidentTypes, fmtCafe24DateTime, fmtCafe24DateOnly, sanitizeSmsBody } from '@/app/operations/intake/types'
-import QuoteCalc, { QuoteResult } from '@/app/operations/QuoteCalc'
+import QuoteCalc, { QuoteResult } from '@/app/components/QuoteCalc'
 
 // ═══════════════════════════════════════════════════════════════════
 // /operations/dispatch/[idno]/[mddt]/[srno] — PR-OPS-1.5c

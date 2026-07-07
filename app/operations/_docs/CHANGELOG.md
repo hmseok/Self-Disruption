@@ -2,6 +2,10 @@
 
 > 규칙 22 — 매 PR 한 줄 이상. 이전 이력은 `harness-engineering/handover/` 참조.
 
+## 2026-07-05 PR-PAY-DRAWER — 입금현황 행 클릭 = 사이드 드로어 (사용자 명시 「페이지 이동 대신 사이드 모달」)
+- RentalDrawer·QuoteCalc·ConsultationTimeline 을 `app/components/` 로 승격 (operations+finance 공용 — 규칙 17).
+- 입금현황 행 클릭 → 페이지 이동 대신 대차건 드로어 (상담·일정·청구정보 즉시 확인·수정). onRequestReturn 옵셔널화 (조회 중심 화면은 반납 버튼 숨김).
+
 ## 2026-07-05 PR-PAY-TABLE — 대차료 입금현황 상세 테이블화 (사용자 명시 「한 탭 상세 리스트, 일하기 불편」)
 - 압축 5컬럼 grid → NeuDataTable 9컬럼 (배차일·사고차량·대차차량·고객·보험사·청구액·입금액/입금일·상태배지·후보) — 전 컬럼 정렬 (규칙 18).
 - 매칭필요 행: 후보 최대 2건 각각 근거 배지(입금자명/차량/이름) + 이름·금액·일자 + 🔗 즉시연결. 행 클릭 = 대차 상세(?from=claims). 검수형 연결(수정 포함)은 청구 탭 확정 모달 안내.

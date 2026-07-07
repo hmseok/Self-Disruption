@@ -7,7 +7,7 @@ import DcToolbar, { FilterItem } from '@/app/components/DcToolbar'
 import NeuDataTable, { TableColumn, MobileCardConfig } from '@/app/components/NeuDataTable'
 import { GLASS, COLORS } from '@/app/utils/ui-tokens'
 import { LOTTE_SHORT_TERM_RATES, computeLotteClaim } from '@/lib/lotte-short-term-rates'
-import { calcRentalDays, matchLotteRateIdx } from '../QuoteCalc'
+import { calcRentalDays, matchLotteRateIdx } from '@/app/components/QuoteCalc'
 
 // ═══════════════════════════════════════════════════════════════════
 // ClaimsTab — 청구관리 (회차완료 → 청구 → 정산)

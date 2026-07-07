@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { getAuthHeader } from '@/app/utils/auth-client'
-import ConsultationTimeline from '../../ConsultationTimeline'
+import ConsultationTimeline from '@/app/components/ConsultationTimeline'
 
 // ═══════════════════════════════════════════════════════════════════
 // /operations/rentals/[id] — 배차(대차) 상세·편집 (PR-V2)

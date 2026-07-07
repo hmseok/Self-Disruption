@@ -6,7 +6,7 @@ import DcStatStrip, { StatItem, ActionButton } from '@/app/components/DcStatStri
 import DcToolbar, { FilterItem } from '@/app/components/DcToolbar'
 import NeuDataTable, { TableColumn, MobileCardConfig } from '@/app/components/NeuDataTable'
 import { GLASS } from '@/app/utils/ui-tokens'
-import RentalDrawer from '../RentalDrawer'
+import RentalDrawer from '@/app/components/RentalDrawer'
 
 // ═══════════════════════════════════════════════════════════════════
 // RentalListTab — 대차리스트 (대차 업무 전 구간: 상담미진행 → 배차완료)

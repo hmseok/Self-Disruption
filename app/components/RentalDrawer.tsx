@@ -52,8 +52,8 @@ export default function RentalDrawer({
   onClose: () => void
   /** 저장 성공 시 — 부모 리스트 갱신 */
   onChanged: () => void
-  /** 반납 버튼 — 부모의 반납 모달 열기 */
-  onRequestReturn: (detail: any) => void
+  /** 반납 버튼 — 부모의 반납 모달 열기 (미전달 시 버튼 숨김 — 조회 중심 화면용) */
+  onRequestReturn?: (detail: any) => void
 }) {
   const router = useRouter()
   const [f, setF] = useState<any>(null)
@@ -284,7 +284,7 @@ export default function RentalDrawer({
         {/* 푸터 */}
         {f && (
           <div style={{ display: 'flex', gap: 8, padding: '12px 16px', borderTop: '1px solid rgba(0,0,0,0.06)', flexShrink: 0 }}>
-            {f.status === 'dispatched' && !f.actual_return_date && (
+            {onRequestReturn && f.status === 'dispatched' && !f.actual_return_date && (
               <button
                 onClick={() => { onClose(); onRequestReturn(f) }}
                 style={{ padding: '9px 14px', borderRadius: 8, border: '1px solid rgba(245,158,11,0.35)', background: 'rgba(245,158,11,0.1)', color: '#b45309', cursor: 'pointer', fontSize: 12, fontWeight: 800 }}
