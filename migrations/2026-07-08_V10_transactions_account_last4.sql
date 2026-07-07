@@ -1,6 +1,7 @@
--- V10 (2026-07-08) — transactions.account_last4 추가 (계좌별 관리)
--- PR-ACCOUNT (사용자 명시): 「내역들도 계좌별로 관리할 수 있게」
---   통장 거래에 계좌 끝 4자리를 저장 → 계좌별 필터·계좌 단위 잔액 사슬 검증.
+-- V10 (2026-07-08) — transactions.account_last4 추가 (계좌·카드별 관리)
+-- PR-ACCOUNT (사용자 명시): 「내역들도 계좌별로」 + 「카드도 카드별로」
+--   통장 = 계좌 끝4자리 (계좌별 필터·계좌 단위 잔액 사슬 검증)
+--   카드 = 카드 끝4자리 (카드별 명세 대조·필터)
 -- 멱등: @col_exists + PREPARE 패턴.
 
 SET @c = (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'transactions' AND COLUMN_NAME = 'account_last4');

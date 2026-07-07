@@ -1811,8 +1811,8 @@ export default function BankCardPage() {
         const batchId = mapped.length > BATCH_SIZE ? `${batchBase}_b${Math.floor(bi / BATCH_SIZE)}` : batchBase
         const { json } = await fetchWithAuth('/api/finance/transactions/import', {
           method: 'POST',
-          // PR-ACCOUNT (V10) — 통장 엑셀은 파일 이름/입력에서 계좌 끝4자리 지정 (계좌별 관리)
-          body: { rows: chunk, source: uploadSource, batchId, account_last4: uploadSource === 'excel_bank' ? (uploadAccountLast4 || (file.name.match(/(\d{4})(?!.*\d{4})/)?.[1] ?? null)) : null },
+          // PR-ACCOUNT (V10) — 계좌/카드 끝4자리 지정 (입력 우선, 없으면 파일 이름에서 추출)
+          body: { rows: chunk, source: uploadSource, batchId, account_last4: uploadAccountLast4 || (file.name.match(/(\d{4})(?!.*\d{4})/)?.[1] ?? null) },
         })
         const res = json?.data || json || {}
         fileInserted += res.inserted || 0
@@ -3103,12 +3103,14 @@ export default function BankCardPage() {
 
   // ═══ 탭 콘텐츠 ═════════════════════════════════════════
 
-  // 큰 구성(평소 사용) = 통장·카드·정산. 나머지(분석·관리)는 adv=true → 「고급」 토글로 접힘.
+  // 큰 구성 = 통장·카드 원장만 (정보구조 3층 원칙 — 2026-07-08 사용자 명시:
+  //   「대차료 입금현황·정산 연결은 여기서 안 하고 대차/지입/투자 페이지에서 각각」)
+  //   대차료 → 사고대차 청구 탭 / 정산 → 지입·투자 페이지. 기존 탭은 고급으로 강등 (레거시 접근용).
   const allTabs = [
     { key: 'bank', label: '통장 거래', count: summary?.transactions.bank },
     { key: 'card', label: '카드 거래', count: summary?.transactions.card },
-    { key: 'payments', label: '💰 대차료 입금현황' },
-    { key: 'settlement', label: '정산 연결', count: summary?.settlement.total },
+    { key: 'payments', label: '💰 대차료 입금현황', adv: true },
+    { key: 'settlement', label: '정산 연결', count: summary?.settlement.total, adv: true },
     // ── 아래는 분석·관리용 (평소 숨김) ──
     { key: 'workflow', label: '🌊 운영 흐름', count: (summary?.transactions.classified || 0) + (summary?.transactions.unclassified || 0), adv: true },
     { key: 'classify', label: '분류 검수', count: (summary?.transactions.classified || 0) + (summary?.transactions.unclassified || 0), adv: true },
@@ -8051,16 +8053,18 @@ export default function BankCardPage() {
               </div>
             </div>
 
-            {/* PR-ACCOUNT (V10) — 통장 엑셀은 어느 계좌인지 지정 (계좌별 관리) */}
-            {uploadSource === 'excel_bank' && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 12, fontWeight: 700, color: COLORS.textSecondary, whiteSpace: 'nowrap' }}>이 파일의 계좌 끝 4자리</span>
-                <input value={uploadAccountLast4} onChange={(e) => setUploadAccountLast4(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                  placeholder="예: 8777" maxLength={4}
-                  style={{ width: 90, padding: '7px 10px', borderRadius: 8, border: '1px solid rgba(0,0,0,0.12)', fontSize: 13, fontWeight: 700, color: '#1e293b' }} />
-                <span style={{ fontSize: 11, color: COLORS.textMuted }}>비우면 파일 이름의 마지막 4자리 숫자를 사용합니다 — 계좌별 잔액 검사·필터에 쓰여요</span>
-              </div>
-            )}
+            {/* PR-ACCOUNT (V10) — 어느 계좌/카드 파일인지 지정 (계좌·카드별 관리) */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: COLORS.textSecondary, whiteSpace: 'nowrap' }}>
+                이 파일의 {uploadSource === 'excel_bank' ? '계좌' : '카드'} 끝 4자리
+              </span>
+              <input value={uploadAccountLast4} onChange={(e) => setUploadAccountLast4(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                placeholder={uploadSource === 'excel_bank' ? '예: 8777' : '예: 7109'} maxLength={4}
+                style={{ width: 90, padding: '7px 10px', borderRadius: 8, border: '1px solid rgba(0,0,0,0.12)', fontSize: 13, fontWeight: 700, color: '#1e293b' }} />
+              <span style={{ fontSize: 11, color: COLORS.textMuted }}>
+                파일 안에 {uploadSource === 'excel_bank' ? '계좌번호' : '카드번호'}가 있으면 자동으로 읽습니다 — 없을 때만 입력하세요 (그래도 없으면 파일 이름의 숫자 사용)
+              </span>
+            </div>
 
             {/* 스킵된 파일 경고 */}
             {skippedFiles.length > 0 && (

@@ -261,13 +261,15 @@ export async function POST(request: NextRequest) {
           balanceAfter,
           rawDataJson,
         ]
-        // PR-ACCOUNT (V10) — account_last4 포함 시도, 컬럼 미적용 DB 는 기존 형태 (규칙 23)
-        if (accountLast4 && accountColumnOk) {
+        // PR-ACCOUNT (V10) — 계좌/카드 끝4자리. 우선순위: 파일 안 계좌번호(행별 자동 추출) > 파일 단위 지정
+        const rowAccount = String(row.account_last4 || '').replace(/\D/g, '').slice(-4) || accountLast4
+        // 컬럼 미적용 DB 는 기존 형태로 (규칙 23)
+        if (rowAccount && accountColumnOk) {
           try {
             await prisma.$executeRawUnsafe(
               `INSERT INTO transactions (id, transaction_date, type, amount, description, client_name, bank_name, card_company, imported_from, category, final_category, balance_after, raw_data, account_last4, created_at, updated_at)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
-              ...baseParams, accountLast4,
+              ...baseParams, rowAccount,
             )
             inserted++
             continue

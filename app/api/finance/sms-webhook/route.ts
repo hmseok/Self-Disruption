@@ -256,20 +256,49 @@ export async function POST(req: NextRequest) {
       const balanceMatch = importedFrom === 'sms_bank' ? String(text || '').match(/잔액\s*([\d,]+)\s*원/) : null
       const balanceAfter = balanceMatch ? Number(balanceMatch[1].replace(/,/g, '')) : null
 
-      await prisma.$executeRaw`
+      // PR-ACCOUNT (V10) — 카드/계좌 끝4자리: 파서 별칭 또는 원문 *번호 에서 추출 (카드·계좌별 관리)
+      const aliasDigits = String(parsed.card_alias || '').replace(/\D/g, '')
+      const starMatch = String(text || '').match(/\*\s?(\d{4,})/)
+      const acctLast4 = (aliasDigits || (starMatch ? starMatch[1] : '')).slice(-4) || null
+
+      const resolvedClient = await resolveClientName(parsed.holder || '')
+      const insertLegacy = () => prisma.$executeRaw`
         INSERT INTO transactions (
           id, transaction_date, type, amount, description, client_name,
           card_company, imported_from, related_type, related_id,
           category, status, balance_after, created_at, updated_at
         ) VALUES (
           ${transactionId}, ${txDate}, ${txType}, ${parsed.amount},
-          ${description}, ${await resolveClientName(parsed.holder || '')},
+          ${description}, ${resolvedClient},
           ${parsed.issuer}, ${importedFrom},
           ${carId ? 'car' : null}, ${carId},
           ${ruleResult && ruleResult.tier === 'auto' ? ruleResult.category : null},
           'completed', ${balanceAfter}, NOW(), NOW()
         )
       `
+      if (acctLast4) {
+        try {
+          await prisma.$executeRaw`
+            INSERT INTO transactions (
+              id, transaction_date, type, amount, description, client_name,
+              card_company, imported_from, related_type, related_id,
+              category, status, balance_after, account_last4, created_at, updated_at
+            ) VALUES (
+              ${transactionId}, ${txDate}, ${txType}, ${parsed.amount},
+              ${description}, ${resolvedClient},
+              ${parsed.issuer}, ${importedFrom},
+              ${carId ? 'car' : null}, ${carId},
+              ${ruleResult && ruleResult.tier === 'auto' ? ruleResult.category : null},
+              'completed', ${balanceAfter}, ${acctLast4}, NOW(), NOW()
+            )
+          `
+        } catch (e: any) {
+          if (/Unknown column/i.test(e?.message || '')) await insertLegacy()  // V10 미적용 DB
+          else throw e
+        }
+      } else {
+        await insertLegacy()
+      }
       // SMS 레코드에 transaction_id 연결
       await prisma.$executeRaw`
         UPDATE card_sms_transactions SET transaction_id = ${transactionId} WHERE id = ${id}
