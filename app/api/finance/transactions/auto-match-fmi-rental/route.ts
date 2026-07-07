@@ -409,6 +409,17 @@ export async function POST(request: NextRequest) {
             confidence = 'HIGH'
           }
         }
+        // PR-AUTO-LINK v2 (2026-07-05) — 대차건 보험사 「미입력」 승격:
+        //   차량 후보 유일 + 대차건 insurance_company 빈값 + 입금자명에 보험사 명시
+        //   → mismatch 가 아니라 미입력 → MEDIUM 자동 + 보험사 역기입 (데이터 보강)
+        if (!pick && parsed.insurerKeywords.length > 0 && insurerOnly.length === 1) {
+          const only = insurerOnly[0]
+          if (!String(only.insurance_company || '').trim()) {
+            pick = only
+            confidence = 'MEDIUM'
+            ;(pick as any)._backfill_insurer = parsed.abbr
+          }
+        }
         if (!pick) {
           // 보험사 mismatch / 뒤4자리만 일치 — LOW confidence (자동 매칭 안 함, 사용자 검수용)
           result.low_confidence++
@@ -504,6 +515,16 @@ export async function POST(request: NextRequest) {
              SET related_type = 'fmi_rental', related_id = ${pick.id}, updated_at = NOW()
            WHERE id = ${tx.id}
         `
+        // (a-2) PR-AUTO-LINK v2 — 보험사 미입력 대차건에 입금자명의 보험사 역기입
+        if ((pick as any)._backfill_insurer) {
+          try {
+            await prisma.$executeRaw`
+              UPDATE fmi_rentals
+                 SET insurance_company = COALESCE(NULLIF(insurance_company, ''), ${(pick as any)._backfill_insurer})
+               WHERE id = ${pick.id}
+            `
+          } catch { /* 역기입 실패 — 매칭 자체는 유지 */ }
+        }
         // (b) 2차 매칭 — transaction_assignments INSERT 차량 (FMI 보유 차량)
         // PR-UX12: vehicleId (cars.id 매핑 결과) 사용. vehicle_id NULL 이면 INSERT skip
         if (vehicleId) {
