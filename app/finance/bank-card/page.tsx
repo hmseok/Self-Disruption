@@ -3667,6 +3667,30 @@ export default function BankCardPage() {
                 }}>{k === 'all' ? '전체' : k === 'candidate' ? '🔗 매칭 필요' : k === 'paid' ? '입금 확인' : '미입금'}</button>
               ))}
               <span style={{ flex: 1 }} />
+              {/* 규칙 28/30 — 쉬운 말 버튼: 미리 확인 → 확인 후 정리 (한 버튼 완결) */}
+              <button onClick={async () => {
+                setPayLoading(true)
+                try {
+                  const { json: chk } = await fetchWithAuth('/api/admin/sms-excel-dedup?dryRun=true')
+                  const n = Number(chk?.will_delete_excel || 0)
+                  if (n === 0) {
+                    alert('두 번 들어온 입금이 없습니다. 깨끗해요!')
+                  } else if (window.confirm(`같은 입금이 두 번 들어온 것 ${n}건을 찾았어요.\n하나로 정리할까요? (지워도 복구할 수 있습니다)`)) {
+                    let remain = n
+                    while (remain > 0) {
+                      const { json: ap } = await fetchWithAuth('/api/admin/sms-excel-dedup?apply=true&max=200', { method: 'POST' })
+                      const done = Number(ap?.excel_deleted || 0)
+                      if (!done) break
+                      remain -= done
+                    }
+                    alert(`정리 완료 — ${n - Math.max(remain, 0)}건을 하나로 합쳤습니다.`)
+                  }
+                } catch (e: any) { alert('정리 중 문제가 생겼습니다: ' + (e?.message || '')) }
+                await loadPayments()
+              }} disabled={payLoading} style={{
+                padding: '7px 14px', borderRadius: 9, border: '1px solid rgba(0,0,0,0.12)', background: '#fff', color: COLORS.textSecondary,
+                fontSize: 12, fontWeight: 800, cursor: payLoading ? 'wait' : 'pointer',
+              }}>🧹 중복 입금 정리</button>
               <button onClick={async () => {
                 setPayLoading(true)
                 try { await fetchWithAuth('/api/finance/transactions/auto-match-fmi-rental', { method: 'POST', body: { mode: 'insurance', dryRun: false } }) } catch {}
