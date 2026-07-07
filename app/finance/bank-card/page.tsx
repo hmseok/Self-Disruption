@@ -5,6 +5,7 @@ import NeuFilterTabs from '@/app/components/NeuFilterTabs'
 import DcStatStrip, { StatItem, ActionButton } from '@/app/components/DcStatStrip'
 import DcToolbar, { FilterItem } from '@/app/components/DcToolbar'
 import NeuDataTable, { TableColumn, MobileCardConfig } from '@/app/components/NeuDataTable'
+import RentalDrawer from '@/app/components/RentalDrawer'
 import { useAIProgress } from '@/app/components/AIProgressFloater'
 import { COLORS, GLASS, BTN, pillStyle } from '@/app/utils/ui-tokens'
 import { fetchWithAuth, getAuthHeader } from '@/app/utils/finance-upload'
@@ -260,6 +261,8 @@ export default function BankCardPage() {
   const [payRows, setPayRows] = useState<any[]>([])
   const [paySummary, setPaySummary] = useState<{ total: number; paid_count: number; candidate_count: number; unpaid_count: number; paid_sum: number } | null>(null)
   const [payFilter, setPayFilter] = useState<'all' | 'paid' | 'candidate' | 'unpaid'>('candidate')
+  // PR-PAY-DRAWER — 행 클릭 시 페이지 이동 대신 사이드 드로어 (사고대차와 공용 컴포넌트)
+  const [payDrawerId, setPayDrawerId] = useState<string | null>(null)
   const [payLoading, setPayLoading] = useState(false)
   // 후보 입금을 대차건에 수동 연결
   const linkPaymentCandidate = useCallback(async (txId: string, rentalId: string) => {
@@ -3753,7 +3756,7 @@ export default function BankCardPage() {
                 ] as TableColumn<any>[])}
                 data={payFilter === 'all' ? payRows : payRows.filter((r) => r.status === payFilter)}
                 rowKey={(r: any) => r.id}
-                onRowClick={(r: any) => { window.location.href = `/operations/rentals/${r.id}?from=claims` }}
+                onRowClick={(r: any) => setPayDrawerId(String(r.id))}
                 defaultSort={{ key: 'dispatch_date', dir: 'desc' }}
                 emptyIcon="💰"
                 emptyMessage="해당 건이 없습니다"
@@ -3764,8 +3767,15 @@ export default function BankCardPage() {
               />
             )}
             <div style={{ marginTop: 10, fontSize: 11, color: COLORS.textMuted }}>
-              💡 행 클릭 = 대차건 상세. 후보 확인·수정 후 연결(확정 모달)은 사고대차 → 청구 탭에서.
+              💡 행 클릭 = 대차건 사이드 드로어 (상담·청구정보 바로 확인·수정). 후보 확인·수정 후 연결(확정 모달)은 사고대차 → 청구 탭에서.
             </div>
+
+            {/* PR-PAY-DRAWER — 대차건 드로어 (사고대차 배차 탭과 공용) */}
+            <RentalDrawer
+              rentalId={payDrawerId}
+              onClose={() => setPayDrawerId(null)}
+              onChanged={loadPayments}
+            />
           </div>
         )}
 
