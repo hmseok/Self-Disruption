@@ -116,7 +116,6 @@ export default function ClaimsTab() {
   type PayCandidate = { id: string; client_name: string | null; amount: number; transaction_date: string | null; match_by?: 'car' | 'name' | 'payer' }
   type PayRow = { id: string; customer_car_number: string | null; customer_name: string | null; insurance_company: string | null; claim_amount: number | null; candidates: PayCandidate[] }
   const [payCand, setPayCand] = useState<PayRow[]>([])
-  const [linkBusyId, setLinkBusyId] = useState<string | null>(null)
   const [linkPanelOpen, setLinkPanelOpen] = useState(true)
 
   const fetchPayCandidates = useCallback(async () => {
@@ -129,26 +128,69 @@ export default function ClaimsTab() {
     } catch { setPayCand([]) }
   }, [])
 
-  const linkDeposit = useCallback(async (txId: string, rentalId: string) => {
-    setLinkBusyId(txId)
+  // PR-PAY-LINK-MODAL (2026-07-05 사용자 명시) — 연결 전 대차건 확인·수정 모달
+  const [linkModal, setLinkModal] = useState<{ row: PayRow; cand: PayCandidate } | null>(null)
+  const [lmRental, setLmRental] = useState<any>(null)
+  const [lmBusy, setLmBusy] = useState(false)
+  const [lmFields, setLmFields] = useState({ insurance_company: '', claim_type: '', insurance_claim_no: '', expected_payer: '', final_claim_amount: '' })
+
+  const openLinkModal = useCallback(async (row: PayRow, cand: PayCandidate) => {
+    setLinkModal({ row, cand })
+    setLmRental(null)
+    try {
+      const headers = await getAuthHeader()
+      const res = await fetch(`/api/fmi-rentals/${row.id}`, { headers })
+      const j = await res.json().catch(() => ({}))
+      const d = j?.data || {}
+      setLmRental(d)
+      setLmFields({
+        insurance_company: d.insurance_company || '',
+        claim_type: d.claim_type || '',
+        insurance_claim_no: d.insurance_claim_no || '',
+        expected_payer: d.expected_payer || cand.client_name || '',
+        // 청구액 비어있으면 입금액으로 제안 (흔한 케이스: 입금 = 확정 청구액)
+        final_claim_amount: Number(d.final_claim_amount) > 0 ? String(Number(d.final_claim_amount)) : String(cand.amount || ''),
+      })
+    } catch { setLmRental({}) }
+  }, [])
+
+  const confirmLinkModal = useCallback(async () => {
+    if (!linkModal) return
+    setLmBusy(true)
     try {
       const headers = { ...(await getAuthHeader()), 'Content-Type': 'application/json' }
-      const res = await fetch(`/api/transactions/${txId}`, {
+      // 1) 대차건 수정분 저장
+      const pRes = await fetch(`/api/fmi-rentals/${linkModal.row.id}`, {
         method: 'PATCH', headers,
-        body: JSON.stringify({ related_type: 'fmi_rental', related_id: rentalId }),
+        body: JSON.stringify({
+          insurance_company: lmFields.insurance_company || null,
+          claim_type: lmFields.claim_type || null,
+          insurance_claim_no: lmFields.insurance_claim_no || null,
+          expected_payer: lmFields.expected_payer || null,
+          final_claim_amount: lmFields.final_claim_amount === '' ? null : Number(lmFields.final_claim_amount),
+        }),
       })
-      const j = await res.json().catch(() => ({}))
-      if (!res.ok || j?.error) throw new Error(j?.error || '연결 실패')
-      // 연결 성공 — 입금 반영 + 완납 자동 청구완료(transactions PATCH 훅) → 목록 갱신
+      const pj = await pRes.json().catch(() => ({}))
+      if (!pRes.ok || pj?.error) throw new Error(pj?.error || '대차건 저장 실패')
+      // 2) 입금 연결 (완납이면 자동 청구완료 훅)
+      const lRes = await fetch(`/api/transactions/${linkModal.cand.id}`, {
+        method: 'PATCH', headers,
+        body: JSON.stringify({ related_type: 'fmi_rental', related_id: linkModal.row.id }),
+      })
+      const lj = await lRes.json().catch(() => ({}))
+      if (!lRes.ok || lj?.error) throw new Error(lj?.error || '연결 실패')
+      setLinkModal(null)
       fetchPayCandidates()
       refresh()
     } catch (e: any) {
-      setErr(e?.message || '입금 연결 오류')
+      setErr(e?.message || '연결 확정 오류')
     } finally {
-      setLinkBusyId(null)
+      setLmBusy(false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fetchPayCandidates])
+  }, [linkModal, lmFields, fetchPayCandidates])
+
+  // (직접 연결 함수는 PR-PAY-LINK-MODAL 로 대체 — 모달에서 확인·수정 후 확정)
 
   // 청구 작성 모달
   const [claimModalOpen, setClaimModalOpen] = useState(false)
@@ -512,10 +554,9 @@ export default function ClaimsTab() {
                       </span>
                       <span style={{ fontSize: 12, color: '#1e293b' }}>{c.client_name || '-'} · <b>{fmtWon(c.amount)}</b> · {fmtDate(c.transaction_date)}</span>
                       <button
-                        onClick={() => linkDeposit(c.id, row.id)}
-                        disabled={linkBusyId === c.id}
-                        style={{ padding: '4px 10px', borderRadius: 7, border: 'none', background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)', color: '#fff', cursor: linkBusyId === c.id ? 'wait' : 'pointer', fontSize: 11, fontWeight: 800, opacity: linkBusyId === c.id ? 0.5 : 1 }}
-                      >{linkBusyId === c.id ? '연결 중…' : '🔗 연결'}</button>
+                        onClick={() => openLinkModal(row, c)}
+                        style={{ padding: '4px 10px', borderRadius: 7, border: 'none', background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)', color: '#fff', cursor: 'pointer', fontSize: 11, fontWeight: 800 }}
+                      >🔗 연결</button>
                     </span>
                   ))}
                 </div>
@@ -564,6 +605,97 @@ export default function ClaimsTab() {
       <div style={{ marginTop: 12, fontSize: 12, color: '#64748b' }}>
         💡 흐름: 청구전(반납됨) → 청구중(청구서 발송) → 청구완료. 입금은 재무 자동매칭으로 상태에 💰 금액이 붙습니다. 행 클릭 = 청구 작성.
       </div>
+
+      {/* PR-PAY-LINK-MODAL — 입금 연결 확정 모달 (대차건 확인·수정 → 연결) */}
+      {linkModal && (
+        <div
+          onClick={() => !lmBusy && setLinkModal(null)}
+          style={{ position: 'fixed', inset: 0, zIndex: 52, background: 'rgba(15,23,42,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ ...GLASS.L5, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', width: 'min(520px, 96vw)', maxHeight: '86vh', borderRadius: 16, boxShadow: '0 24px 60px rgba(0,0,0,0.25)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 20px', borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
+              <h3 style={{ fontSize: 15, fontWeight: 900, color: '#0f2440', margin: 0 }}>🔗 입금 연결 확정</h3>
+              <div style={{ flex: 1 }} />
+              <button onClick={() => !lmBusy && setLinkModal(null)}
+                style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 16, color: '#64748b' }}>✕</button>
+            </div>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '14px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {/* 입금 정보 (읽기) */}
+              <div style={{ ...GLASS.L3, padding: '10px 12px', borderRadius: 9, border: '1px solid rgba(16,185,129,0.3)' }}>
+                <div style={{ fontSize: 11, fontWeight: 800, color: '#047857', marginBottom: 5 }}>💰 입금</div>
+                <div style={{ fontSize: 13, color: '#1e293b', fontWeight: 700 }}>
+                  {linkModal.cand.client_name || '-'} · {fmtWon(linkModal.cand.amount)} · {fmtDate(linkModal.cand.transaction_date)}
+                </div>
+              </div>
+              {/* 대차건 (수정 가능) */}
+              <div style={{ ...GLASS.L3, padding: '10px 12px', borderRadius: 9 }}>
+                <div style={{ fontSize: 11, fontWeight: 800, color: '#1d4ed8', marginBottom: 5 }}>🚗 대차건</div>
+                <div style={{ fontSize: 13, color: '#1e293b', fontWeight: 700 }}>
+                  {linkModal.row.customer_car_number || '-'} · {linkModal.row.customer_name || '-'}
+                  {lmRental?.vehicle_car_number ? <span style={{ color: '#94a3b8', fontWeight: 600 }}> · 대차 {lmRental.vehicle_car_number}</span> : null}
+                </div>
+                {lmRental?.dispatch_date && (
+                  <div style={{ fontSize: 11, color: '#64748b', marginTop: 3 }}>
+                    {fmtDate(lmRental.dispatch_date)} ~ {fmtDate(lmRental.actual_return_date || lmRental.expected_return_date)} · {STATUS_META[lmRental.status]?.label || lmRental.status}
+                  </div>
+                )}
+              </div>
+              {!lmRental ? (
+                <div style={{ fontSize: 12, color: '#94a3b8' }}>대차건 불러오는 중…</div>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#475569', marginBottom: 4 }}>보험사</label>
+                    <input value={lmFields.insurance_company} onChange={(e) => setLmFields((p) => ({ ...p, insurance_company: e.target.value }))}
+                      style={{ ...GLASS.L1, width: '100%', padding: '8px 10px', borderRadius: 8, fontSize: 12, color: '#1e293b' }} />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#475569', marginBottom: 4 }}>청구유형</label>
+                    <select value={lmFields.claim_type} onChange={(e) => setLmFields((p) => ({ ...p, claim_type: e.target.value }))}
+                      style={{ ...GLASS.L1, width: '100%', padding: '8px 10px', borderRadius: 8, fontSize: 12, color: '#1e293b' }}>
+                      <option value="">— 선택 —</option>
+                      {CLAIM_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#475569', marginBottom: 4 }}>보험 접수번호</label>
+                    <input value={lmFields.insurance_claim_no} onChange={(e) => setLmFields((p) => ({ ...p, insurance_claim_no: e.target.value }))}
+                      style={{ ...GLASS.L1, width: '100%', padding: '8px 10px', borderRadius: 8, fontSize: 12, color: '#1e293b' }} />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#475569', marginBottom: 4 }}>예상 입금자명</label>
+                    <input value={lmFields.expected_payer} onChange={(e) => setLmFields((p) => ({ ...p, expected_payer: e.target.value }))}
+                      style={{ ...GLASS.L1, width: '100%', padding: '8px 10px', borderRadius: 8, fontSize: 12, color: '#1e293b' }} />
+                  </div>
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#475569', marginBottom: 4 }}>
+                      최종 청구액 (원) <span style={{ fontWeight: 500, color: '#94a3b8' }}>— 입금액 이상이면 자동 청구완료</span>
+                    </label>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <input type="number" value={lmFields.final_claim_amount} onChange={(e) => setLmFields((p) => ({ ...p, final_claim_amount: e.target.value }))}
+                        style={{ ...GLASS.L1, flex: 1, padding: '8px 10px', borderRadius: 8, fontSize: 12, color: '#1e293b' }} />
+                      <button onClick={() => setLmFields((p) => ({ ...p, final_claim_amount: String(linkModal.cand.amount || '') }))}
+                        style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(0,0,0,0.1)', background: 'transparent', color: '#475569', cursor: 'pointer', fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap' }}>입금액으로</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: 8, padding: '12px 20px', borderTop: '1px solid rgba(0,0,0,0.06)' }}>
+              <button onClick={() => !lmBusy && setLinkModal(null)}
+                style={{ padding: '9px 16px', background: 'transparent', border: '1px solid rgba(0,0,0,0.12)', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700, color: '#475569' }}>닫기</button>
+              <div style={{ flex: 1 }} />
+              <button onClick={confirmLinkModal} disabled={lmBusy || !lmRental}
+                style={{ padding: '9px 20px', background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)', color: '#fff', border: 'none', borderRadius: 8, cursor: lmBusy ? 'wait' : 'pointer', fontWeight: 800, fontSize: 13, opacity: lmBusy || !lmRental ? 0.5 : 1 }}>
+                {lmBusy ? '처리 중…' : '🔗 연결 + 저장 확정'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 청구 작성 모달 */}
       {claimModalOpen && selectedClaim && (
