@@ -3676,39 +3676,96 @@ export default function BankCardPage() {
 
             {payLoading ? (
               <div style={{ padding: 30, textAlign: 'center', color: COLORS.textMuted }}>불러오는 중…</div>
-            ) : (() => {
-              const rows = payFilter === 'all' ? payRows : payRows.filter((r) => r.status === payFilter)
-              if (rows.length === 0) return <div style={{ padding: 30, textAlign: 'center', color: COLORS.textMuted }}>해당 건이 없습니다.</div>
-              const GC = '90px minmax(0,1fr) 84px minmax(0,150px) 96px'
-              return (
-                <div style={{ background: '#fff', border: '0.5px solid rgba(0,0,0,0.08)', borderRadius: 12, overflow: 'hidden' }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: GC, gap: 8, padding: '10px 14px', fontSize: 11, fontWeight: 700, color: COLORS.textMuted, borderBottom: '0.5px solid rgba(0,0,0,0.06)' }}>
-                    <span>배차일</span><span>사고차량 · 대차차량 · 고객</span><span>보험사</span><span>입금 / 후보</span><span style={{ textAlign: 'center' }}>상태</span>
-                  </div>
-                  {rows.slice(0, 500).map((r) => {
-                    const cand = r.candidates && r.candidates[0]
-                    return (
-                    <div key={r.id} onClick={() => { window.location.href = `/operations/rentals/${r.id}` }}
-                      style={{ display: 'grid', gridTemplateColumns: GC, gap: 8, padding: '9px 14px', fontSize: 12, borderBottom: '0.5px solid rgba(0,0,0,0.04)', cursor: 'pointer', alignItems: 'center' }}>
-                      <span style={{ color: COLORS.textSecondary, whiteSpace: 'nowrap' }}>{fmtDate(r.dispatch_date)}</span>
-                      <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: COLORS.textPrimary }}>{r.customer_car_number || '-'} · 🚗{r.vehicle_car_number || '-'} · {r.customer_name || '-'}</span>
-                      <span style={{ color: COLORS.textSecondary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.insurance_company || '-'}</span>
-                      <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {r.status === 'paid' ? <span style={{ fontWeight: 700, color: COLORS.income }}>{nf(r.paid_amount)} <span style={{ fontSize: 10, color: COLORS.textMuted }}>{r.paid_date ? fmtDate(r.paid_date) : ''}</span></span>
-                          : r.status === 'candidate' && cand ? <span style={{ color: COLORS.primary }}>후보: {cand.client_name} {nf(cand.amount)}{r.candidates.length > 1 ? ` 외 ${r.candidates.length - 1}` : ''}</span>
-                          : <span style={{ color: COLORS.textMuted }}>-</span>}
-                      </span>
-                      <span style={{ textAlign: 'center' }}>{
-                        r.status === 'paid' ? <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 10, background: COLORS.bgGreen, color: COLORS.success, whiteSpace: 'nowrap' }}>입금확인</span>
-                        : r.status === 'candidate' && cand ? <button onClick={(e) => { e.stopPropagation(); linkPaymentCandidate(cand.id, r.id) }} style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 9, border: 'none', background: COLORS.primary, color: '#fff', cursor: 'pointer', whiteSpace: 'nowrap' }}>🔗 연결</button>
-                        : <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 10, background: COLORS.bgAmber, color: COLORS.warning, whiteSpace: 'nowrap' }}>미입금</span>
-                      }</span>
-                    </div>
-                    )
-                  })}
-                </div>
-              )
-            })()}
+            ) : (
+              /* PR-PAY-TABLE (2026-07-05 사용자 명시): 「한 탭 상세 리스트 + 상태 컬럼 + 매칭필요 상세」 */
+              <NeuDataTable
+                columns={([
+                  {
+                    key: 'dispatch_date', label: '배차일', width: 92,
+                    sortBy: (r: any) => r.dispatch_date || '',
+                    render: (r: any) => <span style={{ whiteSpace: 'nowrap', fontSize: 12, color: COLORS.textSecondary }}>{fmtDate(r.dispatch_date)}</span>,
+                  },
+                  {
+                    key: 'customer_car', label: '사고차량', width: 104,
+                    sortBy: (r: any) => r.customer_car_number || '',
+                    render: (r: any) => <span style={{ whiteSpace: 'nowrap', fontWeight: 700, color: COLORS.textPrimary, fontSize: 12 }}>{r.customer_car_number || '-'}</span>,
+                  },
+                  {
+                    key: 'vehicle_car', label: '대차차량', width: 104,
+                    sortBy: (r: any) => r.vehicle_car_number || '',
+                    render: (r: any) => <span style={{ whiteSpace: 'nowrap', fontSize: 12, color: COLORS.textSecondary }}>🚗 {r.vehicle_car_number || '-'}</span>,
+                  },
+                  {
+                    key: 'customer', label: '고객', width: 96,
+                    sortBy: (r: any) => r.customer_name || '',
+                    render: (r: any) => <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: 96, fontSize: 12 }}>{r.customer_name || '-'}</span>,
+                  },
+                  {
+                    key: 'insurer', label: '보험사', width: 90,
+                    sortBy: (r: any) => r.insurance_company || '',
+                    render: (r: any) => <span style={{ whiteSpace: 'nowrap', fontSize: 12, color: COLORS.textSecondary }}>{r.insurance_company || '-'}</span>,
+                  },
+                  {
+                    key: 'claim', label: '청구액', width: 100, align: 'right' as const,
+                    sortBy: (r: any) => Number(r.claim_amount || 0),
+                    render: (r: any) => Number(r.claim_amount) > 0
+                      ? <span style={{ whiteSpace: 'nowrap', fontWeight: 700, color: COLORS.textPrimary, fontSize: 12 }}>{nf(r.claim_amount)}</span>
+                      : <span style={{ fontSize: 11, color: COLORS.textMuted }}>미작성</span>,
+                  },
+                  {
+                    key: 'paid', label: '입금액 · 입금일', width: 140, align: 'right' as const,
+                    sortBy: (r: any) => Number(r.paid_amount || 0),
+                    render: (r: any) => Number(r.paid_amount) > 0
+                      ? <span style={{ whiteSpace: 'nowrap', fontSize: 12 }}><b style={{ color: COLORS.success }}>{nf(r.paid_amount)}</b><span style={{ fontSize: 10, color: COLORS.textMuted }}> {r.paid_date ? fmtDate(r.paid_date) : ''}</span></span>
+                      : <span style={{ fontSize: 11, color: COLORS.textMuted }}>-</span>,
+                  },
+                  {
+                    key: 'status', label: '상태', width: 92, align: 'center' as const,
+                    sortBy: (r: any) => r.status || '',
+                    render: (r: any) =>
+                      r.status === 'paid' ? <span style={{ fontSize: 11, fontWeight: 800, padding: '2px 9px', borderRadius: 10, background: COLORS.bgGreen, color: COLORS.success, whiteSpace: 'nowrap' }}>✅ 입금확인</span>
+                      : r.status === 'candidate' ? <span style={{ fontSize: 11, fontWeight: 800, padding: '2px 9px', borderRadius: 10, background: COLORS.bgBlue, color: COLORS.primary, whiteSpace: 'nowrap' }}>🔗 매칭필요</span>
+                      : <span style={{ fontSize: 11, fontWeight: 800, padding: '2px 9px', borderRadius: 10, background: COLORS.bgAmber, color: COLORS.warning, whiteSpace: 'nowrap' }}>⏳ 미입금</span>,
+                  },
+                  {
+                    key: 'candidates', label: '후보 입금 · 연결', width: 300,
+                    sortBy: (r: any) => (r.candidates || []).length,
+                    render: (r: any) => {
+                      const cands = r.candidates || []
+                      if (r.status !== 'candidate' || cands.length === 0) return <span style={{ fontSize: 11, color: COLORS.textMuted }}>-</span>
+                      return (
+                        <span style={{ display: 'inline-flex', gap: 6, whiteSpace: 'nowrap', overflow: 'hidden' }}>
+                          {cands.slice(0, 2).map((c: any) => (
+                            <span key={c.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
+                              <span style={{ fontSize: 9, fontWeight: 800, padding: '1px 5px', borderRadius: 5, background: c.match_by === 'name' ? COLORS.bgGreen : c.match_by === 'payer' ? 'rgba(124,58,237,0.12)' : COLORS.bgBlue, color: c.match_by === 'name' ? COLORS.success : c.match_by === 'payer' ? '#6d28d9' : COLORS.primary }}>
+                                {c.match_by === 'name' ? '이름' : c.match_by === 'payer' ? '입금자명' : '차량'}
+                              </span>
+                              <span style={{ fontSize: 11, color: COLORS.textPrimary }}>{c.client_name || '-'} <b>{nf(c.amount)}</b> {fmtDate(c.transaction_date)}</span>
+                              <button onClick={(e) => { e.stopPropagation(); linkPaymentCandidate(c.id, r.id) }}
+                                style={{ fontSize: 10, fontWeight: 800, padding: '2px 8px', borderRadius: 7, border: 'none', background: COLORS.primary, color: '#fff', cursor: 'pointer', whiteSpace: 'nowrap' }}>🔗</button>
+                            </span>
+                          ))}
+                          {cands.length > 2 && <span style={{ fontSize: 10, color: COLORS.textMuted }}>외 {cands.length - 2}</span>}
+                        </span>
+                      )
+                    },
+                  },
+                ] as TableColumn<any>[])}
+                data={payFilter === 'all' ? payRows : payRows.filter((r) => r.status === payFilter)}
+                rowKey={(r: any) => r.id}
+                onRowClick={(r: any) => { window.location.href = `/operations/rentals/${r.id}?from=claims` }}
+                defaultSort={{ key: 'dispatch_date', dir: 'desc' }}
+                emptyIcon="💰"
+                emptyMessage="해당 건이 없습니다"
+                mobileCard={{
+                  title: (r: any) => <span style={{ whiteSpace: 'nowrap' }}>🚗 {r.customer_car_number || r.customer_name || '-'}</span>,
+                  subtitle: (r: any) => `${r.status === 'paid' ? '입금확인 ' + nf(r.paid_amount) : r.status === 'candidate' ? '매칭필요' : '미입금'} · ${r.insurance_company || '-'}`,
+                } as MobileCardConfig<any>}
+              />
+            )}
+            <div style={{ marginTop: 10, fontSize: 11, color: COLORS.textMuted }}>
+              💡 행 클릭 = 대차건 상세. 후보 확인·수정 후 연결(확정 모달)은 사고대차 → 청구 탭에서.
+            </div>
           </div>
         )}
 
