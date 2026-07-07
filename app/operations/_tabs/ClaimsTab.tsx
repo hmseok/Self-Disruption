@@ -512,21 +512,12 @@ export default function ClaimsTab() {
       render: (r) => <span style={{ whiteSpace: 'nowrap', fontWeight: 700, color: '#1e293b', fontSize: 12 }}>{fmtDate(r.actual_return_date)}</span>,
     },
     {
-      key: 'status', label: '상태', width: 150, align: 'center',
+      // 규칙 30 — 상태 배지 하나만 (입금액·지급상태는 별도 컬럼)
+      key: 'status', label: '상태', width: 106, align: 'center',
       sortBy: (r) => r.status || '',
       render: (r) => {
         const meta = STATUS_META[r.status || ''] || { label: r.status || '-', bg: 'rgba(148,163,184,0.15)', fg: '#475569' }
-        const paid = Number(r.paid_amount || 0)
-        return (
-          <span style={{ whiteSpace: 'nowrap' }}>
-            <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: 8, fontSize: 11, fontWeight: 800, whiteSpace: 'nowrap', background: meta.bg, color: meta.fg }}>{meta.label}</span>
-            {r.status === 'settled' && (
-              paid > 0
-                ? <span style={{ marginLeft: 4, fontSize: 10, fontWeight: 800, color: '#15803d' }}>💰 {Math.round(paid / 10000).toLocaleString('ko-KR')}만</span>
-                : <span style={{ marginLeft: 4, fontSize: 10, fontWeight: 700, color: '#94a3b8' }}>입금 대기</span>
-            )}
-          </span>
-        )
+        return <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: 8, fontSize: 11, fontWeight: 800, whiteSpace: 'nowrap', background: meta.bg, color: meta.fg }}>{meta.label}</span>
       },
     },
     {
@@ -561,11 +552,18 @@ export default function ClaimsTab() {
       render: (r) => <span style={{ fontSize: 12, color: '#475569', whiteSpace: 'nowrap' }}>{r.insurance_company || '-'}</span>,
     },
     {
-      // PR-LIST-INFO (2026-07-05) — 과실·청구율 리스트 표출
-      key: 'rates', label: '과실·청구율', width: 96, align: 'center',
+      // PR-LIST-INFO / 규칙 30 — 1컬럼 1값
+      key: 'fault_rate', label: '과실', width: 62, align: 'center',
       sortBy: (r) => Number(r.fault_rate ?? -1),
-      render: (r) => (r.fault_rate != null || r.claim_rate != null)
-        ? <span style={{ fontSize: 12, color: '#475569', whiteSpace: 'nowrap' }}>{r.fault_rate != null ? `${Number(r.fault_rate)}%` : '-'} · {r.claim_rate != null ? `${Number(r.claim_rate)}%` : '-'}</span>
+      render: (r) => r.fault_rate != null
+        ? <span style={{ fontSize: 12, color: '#475569', whiteSpace: 'nowrap' }}>{Number(r.fault_rate)}%</span>
+        : <span style={{ fontSize: 11, color: '#cbd5e1' }}>-</span>,
+    },
+    {
+      key: 'claim_rate', label: '청구율', width: 66, align: 'center',
+      sortBy: (r) => Number(r.claim_rate ?? -1),
+      render: (r) => r.claim_rate != null
+        ? <span style={{ fontSize: 12, color: '#475569', whiteSpace: 'nowrap' }}>{Number(r.claim_rate)}%</span>
         : <span style={{ fontSize: 11, color: '#cbd5e1' }}>-</span>,
     },
     {
@@ -581,15 +579,19 @@ export default function ClaimsTab() {
         : <span style={{ fontSize: 11, color: '#cbd5e1', whiteSpace: 'nowrap' }}>미작성</span>,
     },
     {
-      // PR-PAY-COL (2026-07-05) — 지급액(매칭 입금 합계) 리스트 표출
-      key: 'paid_amount', label: '지급액', width: 116, align: 'right',
+      // PR-PAY-COL / 규칙 30 — 지급액은 금액만
+      key: 'paid_amount', label: '지급액', width: 106, align: 'right',
       sortBy: (r) => Number(r.paid_amount || 0),
       render: (r) => Number(r.paid_amount) > 0
-        ? <span style={{ whiteSpace: 'nowrap' }}>
-            <span style={{ fontWeight: 800, color: '#15803d' }}>{fmtWon(r.paid_amount)}</span>
-            {r.payment_status && <span style={{ marginLeft: 4, fontSize: 10, color: '#94a3b8' }}>{r.payment_status}</span>}
-          </span>
+        ? <span style={{ fontWeight: 800, color: '#15803d', whiteSpace: 'nowrap' }}>{fmtWon(r.paid_amount)}</span>
         : <span style={{ fontSize: 11, color: '#cbd5e1', whiteSpace: 'nowrap' }}>-</span>,
+    },
+    {
+      key: 'payment_status', label: '지급상태', width: 76, align: 'center',
+      sortBy: (r) => r.payment_status || '',
+      render: (r) => r.payment_status
+        ? <span style={{ fontSize: 11, fontWeight: 700, color: r.payment_status === '완납' ? '#15803d' : '#b45309', whiteSpace: 'nowrap' }}>{r.payment_status}</span>
+        : <span style={{ fontSize: 11, color: '#cbd5e1' }}>-</span>,
     },
   ]
   // PR-UX-SIMPLE — 입고공장·보험접수번호·담당자 컬럼 제거 (청구 카드·전체 편집에서 확인)

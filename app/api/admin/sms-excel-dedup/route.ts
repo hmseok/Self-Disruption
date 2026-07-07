@@ -97,26 +97,27 @@ export async function POST(request: NextRequest) {
 
     for (let i = 0; i < Math.min(result.pairs.length, max); i++) {
       const pair = result.pairs[i]
+      // PR-BANK-DEDUP — delete_side 에 따라 삭제 (카드=excel 기존 동작, 은행=매칭·정보량 기준)
+      const deleteId = pair.delete_side === 'sms' ? pair.sms.id : pair.excel.id
       try {
-        // Excel row soft-delete
         await prisma.$executeRaw`
           UPDATE transactions SET
             deleted_at = NOW(),
             updated_at = NOW()
-          WHERE id = ${pair.excel.id} AND deleted_at IS NULL
+          WHERE id = ${deleteId} AND deleted_at IS NULL
         `
         deleted++
         if (samples.length < 5) {
           samples.push({
-            sms_id: pair.sms.id,
-            excel_id_deleted: pair.excel.id,
+            deleted_side: pair.delete_side,
+            deleted_id: deleteId,
             sms_desc: pair.sms.description,
             excel_desc: pair.excel.description,
             amount: Number(pair.sms.amount),
           })
         }
       } catch (e: any) {
-        errors.push({ id: pair.excel.id, reason: e?.message || 'unknown' })
+        errors.push({ id: deleteId, reason: e?.message || 'unknown' })
       }
     }
 

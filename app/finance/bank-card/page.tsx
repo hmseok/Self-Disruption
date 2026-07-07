@@ -3716,10 +3716,17 @@ export default function BankCardPage() {
                       : <span style={{ fontSize: 11, color: COLORS.textMuted }}>미작성</span>,
                   },
                   {
-                    key: 'paid', label: '입금액 · 입금일', width: 140, align: 'right' as const,
+                    key: 'paid', label: '입금액', width: 100, align: 'right' as const,
                     sortBy: (r: any) => Number(r.paid_amount || 0),
                     render: (r: any) => Number(r.paid_amount) > 0
-                      ? <span style={{ whiteSpace: 'nowrap', fontSize: 12 }}><b style={{ color: COLORS.success }}>{nf(r.paid_amount)}</b><span style={{ fontSize: 10, color: COLORS.textMuted }}> {r.paid_date ? fmtDate(r.paid_date) : ''}</span></span>
+                      ? <b style={{ whiteSpace: 'nowrap', fontSize: 12, color: COLORS.success }}>{nf(r.paid_amount)}</b>
+                      : <span style={{ fontSize: 11, color: COLORS.textMuted }}>-</span>,
+                  },
+                  {
+                    key: 'paid_date', label: '입금일', width: 88, align: 'center' as const,
+                    sortBy: (r: any) => r.paid_date || '',
+                    render: (r: any) => r.paid_date
+                      ? <span style={{ whiteSpace: 'nowrap', fontSize: 12, color: COLORS.textSecondary }}>{fmtDate(r.paid_date)}</span>
                       : <span style={{ fontSize: 11, color: COLORS.textMuted }}>-</span>,
                   },
                   {
@@ -3731,7 +3738,7 @@ export default function BankCardPage() {
                       : <span style={{ fontSize: 11, fontWeight: 800, padding: '2px 9px', borderRadius: 10, background: COLORS.bgAmber, color: COLORS.warning, whiteSpace: 'nowrap' }}>⏳ 미입금</span>,
                   },
                   {
-                    key: 'candidates', label: '후보 입금 · 연결', width: 300,
+                    key: 'candidates', label: '후보 입금', width: 300,
                     sortBy: (r: any) => (r.candidates || []).length,
                     render: (r: any) => {
                       const cands = r.candidates || []

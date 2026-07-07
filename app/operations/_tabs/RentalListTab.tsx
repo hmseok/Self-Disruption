@@ -460,22 +460,19 @@ export default function RentalListTab() {
       </span>,
     },
     {
-      // PR-LIST-INFO — 청구 주요정보 (유형·과실·견적액) 리스트 표출
-      key: 'claim_info', label: '청구정보', width: 150,
+      // PR-LIST-INFO / 규칙 30 — 1컬럼 1값
+      key: 'claim_type', label: '청구유형', width: 80, align: 'center',
       sortBy: (r) => r.claim_type || '',
-      render: (r) => {
-        const hasClaimAmt = Number(r.final_claim_amount) > 0
-        if (r.kind !== 'rental' || (!r.claim_type && r.fault_rate == null && !hasClaimAmt)) {
-          return <span style={{ fontSize: 11, color: '#cbd5e1' }}>-</span>
-        }
-        return (
-          <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: 150, fontSize: 12 }}>
-            {r.claim_type && <span style={{ fontWeight: 700, color: '#4338ca' }}>{r.claim_type}</span>}
-            {r.fault_rate != null && <span style={{ color: '#475569' }}> {Number(r.fault_rate)}%</span>}
-            {hasClaimAmt && <span style={{ color: '#0f2440', fontWeight: 700 }}> · {Math.round(Number(r.final_claim_amount) / 10000).toLocaleString('ko-KR')}만</span>}
-          </span>
-        )
-      },
+      render: (r) => (r.kind === 'rental' && r.claim_type)
+        ? <span style={{ fontSize: 12, fontWeight: 700, color: '#4338ca', whiteSpace: 'nowrap' }}>{r.claim_type}</span>
+        : <span style={{ fontSize: 11, color: '#cbd5e1' }}>-</span>,
+    },
+    {
+      key: 'quote_amount', label: '견적액', width: 84, align: 'right',
+      sortBy: (r) => Number(r.final_claim_amount || 0),
+      render: (r) => (r.kind === 'rental' && Number(r.final_claim_amount) > 0)
+        ? <span style={{ fontSize: 12, fontWeight: 700, color: '#0f2440', whiteSpace: 'nowrap' }}>{Math.round(Number(r.final_claim_amount) / 10000).toLocaleString('ko-KR')}만</span>
+        : <span style={{ fontSize: 11, color: '#cbd5e1' }}>-</span>,
     },
     {
       key: 'status', label: '상태', width: 100, align: 'center',

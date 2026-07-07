@@ -37,6 +37,8 @@ export type DedupPair = {
   excel: DedupTransaction
   date_diff_min: number  // 분 차이 (절대값)
   match_score: number    // 0.0~1.0 — 가맹점 부분 일치 등 보강
+  /** PR-BANK-DEDUP — 삭제할 쪽. 기본 'excel'(카드 기존 동작). 은행 쌍은 매칭·정보량 기준 결정 */
+  delete_side: 'excel' | 'sms'
 }
 
 export type DedupResult = {
@@ -66,13 +68,14 @@ export async function loadDedupCandidates(): Promise<{
            related_type, related_id, final_category, category
       FROM transactions
      WHERE deleted_at IS NULL
-       AND transaction_date >= DATE_SUB(NOW(), INTERVAL 90 DAY)
+       AND transaction_date >= DATE_SUB(NOW(), INTERVAL 400 DAY)
        AND ?
      ORDER BY transaction_date DESC
      LIMIT 5000
   `
+  // PR-BANK-DEDUP (2026-07-07) — 은행 SMS(sms_bank) 포함 (통장 엑셀 ↔ SMS 이중 수집 정리)
   const smsRows = await prisma.$queryRawUnsafe<DedupTransaction[]>(
-    sql.replace('?', "imported_from = 'sms'")
+    sql.replace('?', "imported_from IN ('sms', 'sms_bank')")
   )
   const excelRows = await prisma.$queryRawUnsafe<DedupTransaction[]>(
     sql.replace('?', "imported_from LIKE 'excel_%'")
@@ -88,14 +91,35 @@ function matchPair(sms: DedupTransaction, excel: DedupTransaction): { match: boo
   // 2) amount 정확히 같아야 함 (Decimal 직렬화 string 가능 → Number 캐스팅)
   if (Number(sms.amount) !== Number(excel.amount)) return { match: false, diff: 0, score: 0 }
 
-  // 3) 시간 차이 ±3분
   const ts1 = new Date(sms.transaction_date as any).getTime()
   const ts2 = new Date(excel.transaction_date as any).getTime()
   if (!isFinite(ts1) || !isFinite(ts2)) return { match: false, diff: 0, score: 0 }
   const diffMin = Math.abs(ts1 - ts2) / 60000
+
+  // PR-BANK-DEDUP — 은행 쌍 (sms_bank ↔ excel_bank): 엑셀은 날짜만 있어 ±3분 불가
+  //   → 같은 날 + 같은 금액 + 입금자명/적요 토큰 겹침 필수 (오탐 방지)
+  const smsIsBank = sms.imported_from === 'sms_bank'
+  const excelIsBank = String(excel.imported_from || '').startsWith('excel_bank')
+  if (smsIsBank !== excelIsBank) return { match: false, diff: diffMin, score: 0 }  // 카드↔통장 교차 금지
+
+  if (smsIsBank && excelIsBank) {
+    const d1 = new Date(ts1); const d2 = new Date(ts2)
+    const sameDay = d1.getFullYear() === d2.getFullYear() && d1.getMonth() === d2.getMonth() && d1.getDate() === d2.getDate()
+    if (!sameDay) return { match: false, diff: diffMin, score: 0 }
+    // 토큰 겹침: 한쪽의 이름/적요 문자열이 다른 쪽에 포함 (예: '삼성2102')
+    const bag = (t: DedupTransaction) => `${t.client_name || ''} ${t.description || ''}`.replace(/\s+/g, '')
+    const b1 = bag(sms); const b2 = bag(excel)
+    const tokens = [sms.client_name, sms.description, excel.client_name, excel.description]
+      .map((x) => String(x || '').replace(/\s+/g, '').trim()).filter((x) => x.length >= 3)
+    const overlap = tokens.some((tk) => (b1.includes(tk) && b2.includes(tk)))
+    if (!overlap) return { match: false, diff: diffMin, score: 0 }
+    return { match: true, diff: diffMin, score: 0.8 }
+  }
+
+  // 카드 쌍 — 기존 동작: ±3분
   if (diffMin > TOLERANCE_MIN) return { match: false, diff: diffMin, score: 0 }
 
-  // 4) 부가 score: 가맹점 부분 일치 여부 (보너스, 매칭 결정에는 영향 X)
+  // 부가 score: 가맹점 부분 일치 여부 (보너스, 매칭 결정에는 영향 X)
   let score = 0.5
   if (sms.description && excel.description) {
     const s = String(sms.description).replace(/\[취소\]\s*/g, '').trim()
@@ -154,8 +178,19 @@ export function findUniquePairs(
       result.ambiguous.excel_with_multiple_sms++
       continue
     }
-    // 사용자 수동 분류 보호 (final_category 설정된 Excel row 는 skip)
-    if (matchedExcel.final_category) {
+    // PR-BANK-DEDUP — 삭제 방향 결정
+    //   은행 쌍: 매칭(related) 붙은 쪽 보존. 둘 다/둘 다 아님 → 정보 많은 엑셀 보존, SMS 삭제
+    //   카드 쌍: 기존 동작 (엑셀 삭제, SMS 보존)
+    const isBankPair = sms.imported_from === 'sms_bank'
+    let deleteSide: 'excel' | 'sms' = 'excel'
+    if (isBankPair) {
+      if (sms.related_id && !matchedExcel.related_id) deleteSide = 'excel'
+      else deleteSide = 'sms'
+    }
+
+    // 사용자 수동 분류 보호 — 삭제될 쪽에 final_category 있으면 skip
+    const toDelete = deleteSide === 'excel' ? matchedExcel : sms
+    if (toDelete.final_category) {
       result.protected.excel_has_final_category++
       continue
     }
@@ -165,6 +200,7 @@ export function findUniquePairs(
       excel: matchedExcel,
       date_diff_min: excelMatches[0].diff,
       match_score: excelMatches[0].score,
+      delete_side: deleteSide,
     })
   }
 
