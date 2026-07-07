@@ -82,7 +82,7 @@ export async function GET(request: NextRequest) {
            FROM transactions
           WHERE deleted_at IS NULL AND type = 'income'
             AND (related_type IS NULL OR related_id IS NULL)
-            AND (imported_from LIKE 'excel_bank%' OR imported_from = 'sms_bank' OR imported_from = 'codef_bank')
+            AND (imported_from LIKE 'excel_bank%' OR imported_from = 'sms_bank' OR imported_from = 'codef_bank' OR imported_from = 'excel_partner')
           LIMIT 5000`,
       )
       for (const d of deposits) {

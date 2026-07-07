@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback, useMemo } from 'react'
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import DcStatStrip, { StatItem, ActionButton } from '@/app/components/DcStatStrip'
 import DcToolbar, { FilterItem } from '@/app/components/DcToolbar'
@@ -191,6 +191,80 @@ export default function ClaimsTab() {
   }, [linkModal, lmFields, fetchPayCandidates])
 
   // (직접 연결 함수는 PR-PAY-LINK-MODAL 로 대체 — 모달에서 확인·수정 후 확정)
+
+  // PR-PARTNER-IMPORT (2026-07-07) — 외주(지입) 정산 엑셀 업로드
+  //   양식: 차량별 5컬럼 블록 [수식|입금일|보험사|고객차|입금액], 블록 상단 2행 위 = 대차차량번호
+  const partnerFileRef = useRef<HTMLInputElement>(null)
+  const [partnerBusy, setPartnerBusy] = useState(false)
+  const [partnerMsg, setPartnerMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
+
+  const handlePartnerFile = useCallback(async (file: File) => {
+    setPartnerBusy(true)
+    setPartnerMsg(null)
+    try {
+      const XLSX = await import('xlsx')
+      const wb = XLSX.read(await file.arrayBuffer(), { cellDates: true })
+      const toDate = (v: any): string | null => {
+        if (v instanceof Date && !isNaN(v.getTime())) {
+          return `${v.getFullYear()}-${String(v.getMonth() + 1).padStart(2, '0')}-${String(v.getDate()).padStart(2, '0')}`
+        }
+        const s = String(v || '').slice(0, 10)
+        return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : null
+      }
+      const rows: any[] = []
+      for (const sn of wb.SheetNames) {
+        const grid: any[][] = XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1, defval: null }) as any[][]
+        for (let hr = 0; hr < grid.length; hr++) {
+          const header = grid[hr] || []
+          for (let c = 0; c < header.length; c++) {
+            if (String(header[c] || '').trim() !== '고객차') continue
+            // 블록: 입금일(c-2) 보험사(c-1) 고객차(c) 입금액(c+1), 대차차량 = 헤더 2행 위 · c-3 열
+            const vehicleCar = String((grid[hr - 2] || [])[c - 3] || '').trim()
+            for (let dr = hr + 1; dr < Math.min(grid.length, hr + 300); dr++) {
+              const row = grid[dr] || []
+              const date = toDate(row[c - 2])
+              const amount = Number(row[c + 1] || 0)
+              const customerCar = String(row[c] || '').trim()
+              if (!date || !(amount > 0) || !customerCar || !/\d{3,4}/.test(customerCar)) continue
+              rows.push({
+                vehicle_car_number: vehicleCar,
+                deposit_date: date,
+                insurer: String(row[c - 1] || '').trim(),
+                customer_car_number: customerCar,
+                amount,
+              })
+            }
+          }
+        }
+      }
+      if (rows.length === 0) throw new Error('양식에서 정산 행을 찾지 못했습니다 (입금일·보험사·고객차·입금액 블록 필요)')
+
+      const headers = { ...(await getAuthHeader()), 'Content-Type': 'application/json' }
+      // 1) dry-run 으로 반영 예상 확인
+      const dry = await fetch('/api/finance/partner-settlement-import', {
+        method: 'POST', headers, body: JSON.stringify({ rows, dryRun: true }),
+      }).then((x) => x.json())
+      if (dry?.error) throw new Error(dry.error)
+      const go = window.confirm(
+        `외주 정산 ${rows.length}행 추출\n\n신규 반영: ${dry.created}건 (대차건 링크 ${dry.linked} / 미링크 ${dry.unlinked})\n중복 skip: ${dry.duplicates}건\n\n반영할까요?`,
+      )
+      if (!go) { setPartnerMsg({ type: 'err', text: '업로드 취소됨' }); return }
+      // 2) 실제 반영
+      const res = await fetch('/api/finance/partner-settlement-import', {
+        method: 'POST', headers, body: JSON.stringify({ rows }),
+      }).then((x) => x.json())
+      if (res?.error) throw new Error(res.error)
+      setPartnerMsg({ type: 'ok', text: `✅ ${res.message}` })
+      fetchPayCandidates()
+      refresh()
+    } catch (e: any) {
+      setPartnerMsg({ type: 'err', text: e?.message || '외주 정산 업로드 오류' })
+    } finally {
+      setPartnerBusy(false)
+      if (partnerFileRef.current) partnerFileRef.current.value = ''
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fetchPayCandidates])
 
   // 청구 작성 모달
   const [claimModalOpen, setClaimModalOpen] = useState(false)
@@ -422,6 +496,7 @@ export default function ClaimsTab() {
     { label: '🧮 청구액 합계', value: Math.round(totalClaim / 10000), unit: '만원', tint: 'green' },
   ]
   const statActions: ActionButton[] = [
+    { label: partnerBusy ? '반영 중…' : '외주 정산 업로드', onClick: () => !partnerBusy && partnerFileRef.current?.click(), variant: 'primary', icon: '📥' },
     { label: '새로고침', onClick: refresh, variant: 'secondary', icon: '🔄' },
   ]
   const filterItems: FilterItem[] = [
@@ -526,6 +601,15 @@ export default function ClaimsTab() {
 
   return (
     <div>
+      {/* PR-PARTNER-IMPORT — 외주 정산 엑셀 (숨은 파일 입력) */}
+      <input ref={partnerFileRef} type="file" accept=".xlsx,.xls" style={{ display: 'none' }}
+        onChange={(e) => { const f = e.target.files?.[0]; if (f) handlePartnerFile(f) }} />
+      {partnerMsg && (
+        <div style={{ ...GLASS.L3, marginBottom: 12, padding: '10px 14px', borderRadius: 10, border: `1px solid ${partnerMsg.type === 'ok' ? 'rgba(16,185,129,0.4)' : 'rgba(239,68,68,0.35)'}`, fontSize: 12, fontWeight: 700, color: partnerMsg.type === 'ok' ? '#065f46' : '#991b1b', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ flex: 1 }}>{partnerMsg.text}</span>
+          <button onClick={() => setPartnerMsg(null)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'inherit', fontSize: 14 }}>×</button>
+        </div>
+      )}
       <DcStatStrip stats={statItems} actions={statActions} />
 
       {/* PR-PAY-REVIEW — 입금 연결 검수 패널 (차량번호축 + 고객명축 후보) */}
