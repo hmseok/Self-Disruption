@@ -3033,12 +3033,17 @@ export default function BankCardPage() {
   }, [rules])
 
   // ── 은행 데이터 삭제 + 재업로드 안내 ──
+  //   PR-BANK-RESET: 통장은 엑셀+문자+오픈뱅킹 수집분을 한 번에 비움 (외주정산·카드는 유지, 복구 가능)
   const deleteAndReupload = async (source: 'excel_bank' | 'excel_card') => {
     const label = source === 'excel_bank' ? '통장' : '카드'
-    if (!confirm(`기존 ${label} 거래 데이터를 모두 삭제합니다.\n삭제 후 엑셀 파일을 다시 업로드하면 개선된 컬럼 매핑으로 거래처/적요가 정상 입력됩니다.\n\n진행하시겠습니까?`)) return
-    const { json } = await fetchWithAuth(`/api/finance/transactions/import?source=${source}`, { method: 'DELETE' })
+    const apiSource = source === 'excel_bank' ? 'bank_all' : source
+    const detail = source === 'excel_bank'
+      ? '엑셀·문자·오픈뱅킹으로 들어온 통장 거래를 전부 비웁니다. (외주 정산 자료와 카드는 그대로, 지워도 복구 가능)\n\n비운 뒤 은행에서 받은 전체 기간 엑셀을 올리고 자동매칭을 누르면 연결이 다시 붙습니다.'
+      : '기존 카드 거래 데이터를 모두 삭제합니다.\n삭제 후 엑셀 파일을 다시 업로드하세요.'
+    if (!confirm(`${label} 거래를 새로 정리할까요?\n\n${detail}`)) return
+    const { json } = await fetchWithAuth(`/api/finance/transactions/import?source=${apiSource}`, { method: 'DELETE' })
     if (json?.ok) {
-      alert(`${label} 거래 ${json.deleted}건 삭제 완료.\n이제 엑셀 파일을 다시 업로드하세요.`)
+      alert(`${label} 거래 ${json.deleted}건을 비웠습니다.\n이제 엑셀 파일을 올려주세요.`)
       await Promise.all([loadSummary(), loadTransactions()])
       setGroupData(null)
       setAutoClassifyResult(null)

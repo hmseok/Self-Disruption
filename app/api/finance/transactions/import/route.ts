@@ -310,14 +310,25 @@ export async function DELETE(request: NextRequest) {
 
     const { searchParams } = request.nextUrl
     const source = searchParams.get('source')
-    if (!source || !['excel_bank', 'excel_card', 'sms'].includes(source)) {
-      return NextResponse.json({ error: '올바른 source 필요 (excel_bank / excel_card / sms)' }, { status: 400 })
+    // PR-BANK-RESET (2026-07-07) — 'bank_all' = 통장 계열 전체(엑셀+문자+오픈뱅킹) 비우기.
+    //   외주정산(excel_partner)·카드는 안 건드림. soft delete — 복구 가능.
+    if (!source || !['excel_bank', 'excel_card', 'sms', 'sms_bank', 'codef_bank', 'bank_all'].includes(source)) {
+      return NextResponse.json({ error: '올바른 source 필요 (excel_bank / excel_card / sms / sms_bank / codef_bank / bank_all)' }, { status: 400 })
     }
 
-    const result = await prisma.$executeRawUnsafe(
-      `UPDATE transactions SET deleted_at = NOW() WHERE imported_from = ? AND deleted_at IS NULL`,
-      source
-    )
+    let result: any
+    if (source === 'bank_all') {
+      result = await prisma.$executeRawUnsafe(
+        `UPDATE transactions SET deleted_at = NOW()
+          WHERE (imported_from LIKE 'excel_bank%' OR imported_from = 'sms_bank' OR imported_from = 'codef_bank')
+            AND deleted_at IS NULL`,
+      )
+    } else {
+      result = await prisma.$executeRawUnsafe(
+        `UPDATE transactions SET deleted_at = NOW() WHERE imported_from = ? AND deleted_at IS NULL`,
+        source
+      )
+    }
 
     return NextResponse.json({ ok: true, deleted: Number(result) })
   } catch (e: any) {
