@@ -24,6 +24,7 @@
 ## 2. 인프라 (이 세션에서 구축 — 운영 지식)
 
 - **cafe24 릴레이**: AWS EC2(ride-care-manager, 3.37.165.107 — cafe24 화이트리스트 IP)에 socat systemd 서비스 `cafe24-relay` — :3307 → skyautosvc.co.kr:3306. ufw 3307 allow + SG 3307 오픈. ERP는 `CAFE24_DB_HOST=3.37.165.107 / PORT=3307`. ⚠ Elastic IP 여부 미확인 — 재부팅 시 IP 바뀌면 화이트리스트 깨짐.
+- **(7-05 저녁) 운영도 릴레이 경유로 전환**: Cloud Run 아웃바운드 IP 가 34.22.83.112 로 바뀌며 cafe24 직결이 끊김 (`ER_HOST_NOT_PRIVILEGED`) → Cloud Run env `CAFE24_DB_HOST=3.37.165.107 / PORT=3307` 로 변경. **이제 그 EC2 가 운영+로컬 cafe24 연결의 단일 관문** — 인스턴스 중지·IP 변동 시 접수 탭 전체 영향. 진단은 `/api/operations/cafe24-health`.
 - **로컬 dev**: `.env.local`에 DATABASE_URL/JWT_SECRET 없었음(운영은 Dockerfile/Cloud Run 주입) → 사용자가 직접 추가해 로그인 정상. localhost:3000은 별개 프로젝트(RideCare ERP)가 점유 중일 수 있음 — FMI ERP는 3001로 뜨는 경우 있음.
 - ⚠ **보안 부채**: Dockerfile에 JWT_SECRET·API 키 평문 커밋 상태 — Secret Manager 이전 권장 (로드맵 후보).
 
@@ -32,6 +33,16 @@
 - V8 마이그레이션: ✅ Cloud SQL 적용 완료 (v8_applied=7 확인)
 - codef_bank / DRAWER+CLAIM / SIMPLE 커밋: 사용자가 Mac에서 safe-commit.sh로 진행 (flock 없어 cowork:commit 폴백 — `brew install flock` 하면 한 줄로 가능)
 - PR-QUOTE 커밋: 마지막 안내분 — 미완이면 § 5 명령 참조
+
+## 3.5 🏛 정보 구조 원칙 (2026-07-05 사용자 명시 — 전 모듈 적용)
+
+> 「SMS 수집에는 수집만 상세하게 보고, 통장카드에서는 통장·카드별 분리와 연결 상태를 보고,
+>   각 업무 페이지 개별들에서 연결된 것들을 보고 이후 업무를 하는 것. 지입이면 사람별로 있고
+>   연결이나 매칭은 그 페이지에서. 비슷한 게 여러 페이지에 나와도 각자 독립적으로 깔끔하게.」
+
+3층 구조 — **수집층**(SMS/오픈뱅킹/엑셀: 원천 조회만) → **원장층**(통장/카드: 계좌·카드별 분리 + 연결 상태 확인) → **업무층**(사고대차/지입/투자자/직원: 각 페이지 자기 완결 — 후보 확인·연결·매칭·후속 업무).
+⚠ 유사 화면을 "중복이니 통합하자"로 접근하지 말 것 — 도메인별 독립이 의도된 설계.
+지입/투자자 페이지에 사고대차와 동형의 「입금 후보 패널 + 확정 모달」 적용이 다음 단계.
 
 ## 4. 다음 작업 후보
 
