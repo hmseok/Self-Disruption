@@ -86,6 +86,24 @@ export async function POST(request: NextRequest) {
       meta_row: 0,       // '총합/합계/소계' 키워드
       duplicate: 0,      // 중복 해시 (엑셀끼리)
       sms_already_exists: 0,  // 같은 거래의 SMS row 가 이미 있음 — Excel skip
+      cross_source: 0,   // 연동(codef)/은행문자가 이미 넣은 거래 — Excel skip (2026-07-08)
+    }
+
+    // 교차 소스 중복 판별자 프리로드 (2026-07-08) — 같은 날+금액+입출+잔액
+    //   엑셀이 늦게 올라와도 연동/문자로 이미 들어온 거래와 중복 안 생기게 (codef/bank 검사와 동형)
+    const crossSourceKeys = new Set<string>()
+    if (source === 'excel_bank') {
+      try {
+        const others = await prisma.$queryRaw<any[]>`
+          SELECT transaction_date, amount, type, balance_after FROM transactions
+          WHERE deleted_at IS NULL AND imported_from IN ('sms_bank', 'codef_bank') AND balance_after IS NOT NULL`
+        for (const o of others) {
+          const d = o.transaction_date instanceof Date
+            ? o.transaction_date.toISOString().slice(0, 10)
+            : String(o.transaction_date || '').slice(0, 10)
+          crossSourceKeys.add(`${d}|${Number(o.amount)}|${o.type}|${Number(o.balance_after)}`)
+        }
+      } catch { /* 컬럼 부재 등 — 교차 검사 생략 (기존 동작) */ }
     }
     let smsMatched = 0  // SMS 와 매칭되어 skip 한 건수 (사용자에게 알림)
     // 메타 행 키워드 — 정확 매칭만 (부분 포함 X)
@@ -218,6 +236,16 @@ export async function POST(request: NextRequest) {
         }
 
         const balanceAfter = row.balance != null ? Number(row.balance) || null : null
+
+        // 교차 소스 중복 (2026-07-08) — 연동/은행문자가 같은 거래를 이미 등록했으면 skip
+        if (source === 'excel_bank' && balanceAfter != null) {
+          const crossKey = `${String(txDate).slice(0, 10)}|${finalAmount}|${txType}|${balanceAfter}`
+          if (crossSourceKeys.has(crossKey)) {
+            skipBreakdown.cross_source++
+            skipped++
+            continue
+          }
+        }
 
         // ★ Excel 카드/통장 거래의 메타 정보 → raw_data 저장
         //   카드: card_last4 → corporate_cards 매칭
