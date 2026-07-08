@@ -254,8 +254,7 @@ export default function BankCardPage() {
   const [activeTab, setActiveTab] = useState<TabKey>('bank')
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  // 페이지 단순화 — 평소엔 큰 구성(통장·카드·정산)만, 분석용 탭은 「고급」으로 접기 (사용자 명령 2026-06-28)
-  const [showAdvTabs, setShowAdvTabs] = useState(false)
+  // 고급 탭 묶음 제거 (2026-07-08 사용자 명시) — 탭은 통장/카드/SMS수집/매핑관리 4개만
 
   // PR-RECONCILE — 잔액 맞춰보기 (은행 실제 잔액 증감 vs 시스템 입출금 합계)
   const [reconcileOpen, setReconcileOpen] = useState(false)
@@ -1405,6 +1404,7 @@ export default function BankCardPage() {
 
   // PR-ACCOUNT — 계좌별 필터 (V10 account_last4)
   const [bankAccountPick, setBankAccountPick] = useState('all')
+  const [bankLinkPick, setBankLinkPick] = useState('all')  // 연결(매칭) 필터
   const bankAccountOptions = useMemo(() => {
     const set = new Set<string>()
     for (const t of transactions) if (isBankTx(t) && (t as any).account_last4) set.add(String((t as any).account_last4))
@@ -1412,9 +1412,67 @@ export default function BankCardPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [transactions])
 
+  // PR-ADMIN-SUMMARY (2026-07-08 사용자 명시) — 계좌별 현재 잔액 + 30일 자동 검증, 카드별 이번 달 누적
+  const bankAccountSummary = useMemo(() => {
+    const byAcct = new Map<string, { balance: number | null; balanceDate: string | null }>()
+    for (const t of transactions) {
+      if (!isBankTx(t)) continue
+      const a = String((t as any).account_last4 || '')
+      if (!a) continue
+      const cur = byAcct.get(a)
+      const bal = (t as any).balance_after
+      const d = String(t.transaction_date || '')
+      if (bal != null && Number(bal) > 0 && (!cur || !cur.balanceDate || d > cur.balanceDate)) {
+        byAcct.set(a, { balance: Number(bal), balanceDate: d })
+      } else if (!cur) byAcct.set(a, { balance: null, balanceDate: null })
+    }
+    return byAcct
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [transactions])
+
+  const [acctVerify, setAcctVerify] = useState<Record<string, { ok: boolean; breaks: number }>>({})
+  useEffect(() => {
+    if (activeTab !== 'bank' || bankAccountOptions.length === 0) return
+    let cancelled = false
+    ;(async () => {
+      const to = new Date().toISOString().slice(0, 10)
+      const from = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10)
+      const out: Record<string, { ok: boolean; breaks: number }> = {}
+      await Promise.all(bankAccountOptions.slice(0, 8).map(async (a) => {
+        try {
+          const { json } = await fetchWithAuth(`/api/finance/bank-reconcile?from=${from}&to=${to}&bank=all&account=${a}`)
+          const n = Array.isArray(json?.chain?.breaks) ? json.chain.breaks.length : 0
+          out[a] = { ok: n === 0, breaks: n }
+        } catch { /* 검증 실패 — 표시 생략 */ }
+      }))
+      if (!cancelled) setAcctVerify(out)
+    })()
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, bankAccountOptions.join(',')])
+
+  const cardMonthSummary = useMemo(() => {
+    const ym = new Date().toISOString().slice(0, 7)
+    const byCard = new Map<string, number>()
+    for (const t of transactions) {
+      if (!isCardTx(t)) continue
+      if (String(t.transaction_date || '').slice(0, 7) !== ym) continue
+      const alias = (t as any).matched_card_alias || (t as any).sms_card_alias || ((t as any).account_last4 ? `****${(t as any).account_last4}` : '')
+      if (!alias) continue
+      const amt = Number(t.amount || 0)
+      const canceled = (t as any).sms_transaction_type === 'canceled'
+      byCard.set(alias, (byCard.get(alias) || 0) + (canceled ? -amt : amt))
+    }
+    return byCard
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [transactions])
+
   const bankTransactions = useMemo(() => {
     let data = transactions.filter(isBankTx)
     if (bankAccountPick !== 'all') data = data.filter(t => String((t as any).account_last4 || '') === bankAccountPick)
+    if (bankLinkPick === 'linked') data = data.filter(t => !!t.related_type && !!t.related_id)
+    else if (bankLinkPick === 'unlinked') data = data.filter(t => !t.related_type || !t.related_id)
+    else if (bankLinkPick !== 'all') data = data.filter(t => t.related_type === bankLinkPick)
     if (bankFilter === 'income') data = data.filter(t => t.type === 'income')
     else if (bankFilter === 'expense') data = data.filter(t => t.type === 'expense')
     if (search) {
@@ -1427,7 +1485,7 @@ export default function BankCardPage() {
       )
     }
     return data
-  }, [transactions, bankFilter, search, bankAccountPick])
+  }, [transactions, bankFilter, search, bankAccountPick, bankLinkPick])
 
   // PR-ACCOUNT — 카드별(끝4자리/별칭)·소지자별 필터
   const [cardPick, setCardPick] = useState('all')
@@ -3124,21 +3182,15 @@ export default function BankCardPage() {
   // 큰 구성 = 통장·카드 원장만 (정보구조 3층 원칙 — 2026-07-08 사용자 명시:
   //   「대차료 입금현황·정산 연결은 여기서 안 하고 대차/지입/투자 페이지에서 각각」)
   //   대차료 → 사고대차 청구 탭 / 정산 → 지입·투자 페이지. 기존 탭은 고급으로 강등 (레거시 접근용).
-  const allTabs = [
+  // 2026-07-08 사용자 명시 「확실하지 않은 기능은 혼란」 — 4개만:
+  //   통장·카드(원장) + SMS 수집(수집층 확인) + 매핑 관리(계좌·카드 식별 설정)
+  //   운영흐름·분류검수·매칭검수·분류룰·시스템 탭은 화면에서 제거 (코드 정리는 후속)
+  const tabs = [
     { key: 'bank', label: '통장 거래', count: summary?.transactions.bank },
     { key: 'card', label: '카드 거래', count: summary?.transactions.card },
-    // ── 아래는 분석·관리용 (평소 숨김) ──
-    { key: 'workflow', label: '🌊 운영 흐름', count: (summary?.transactions.classified || 0) + (summary?.transactions.unclassified || 0), adv: true },
-    { key: 'classify', label: '분류 검수', count: (summary?.transactions.classified || 0) + (summary?.transactions.unclassified || 0), adv: true },
-    { key: 'matchreview', label: '매칭 검수', count: summary?.transactions.classified || 0, adv: true },
-    { key: 'sms', label: 'SMS 수집', count: summary?.sms?.total || 0, adv: true },
-    { key: 'mapping', label: '매핑 관리', adv: true },
-    { key: 'rules', label: '분류 룰', adv: true },
-    { key: 'system', label: '⚙ 시스템', adv: true },
+    { key: 'sms', label: 'SMS 수집', count: summary?.sms?.total || 0 },
+    { key: 'mapping', label: '매핑 관리' },
   ]
-  // 평소엔 큰 구성만. 고급 펼침 또는 현재 고급탭 활성 시 전체 표시.
-  const advActive = allTabs.some(t => t.adv && t.key === activeTab)
-  const tabs = (showAdvTabs || advActive) ? allTabs : allTabs.filter(t => !t.adv)
 
   // ── 통계 카드 ─────────────────────────────────────────
 
@@ -3155,39 +3207,29 @@ export default function BankCardPage() {
     { key: 'date', label: '날짜', width: 100,
       sortBy: (r) => r.transaction_date ? new Date(r.transaction_date as any).getTime() : 0,
       render: (r) => <span style={{ fontSize: 13, color: COLORS.textSecondary }}>{fmtDate(r.transaction_date)}</span> },
-    { key: 'account', label: '계좌', width: 170,
-      sortBy: (r: any) => `${r.bank_name || r.card_company || ''} ${r.bank_account_alias || r.sms_card_alias || ''}`,
+    // 규칙 30 확장 (2026-07-08) — 3층 스택 → 1셀 1값 (은행/계좌/용도 분리 컬럼)
+    { key: 'account', label: '은행', width: 76,
+      sortBy: (r: any) => r.bank_name || r.card_company || '',
       render: (r: any) => {
-      // 통장 컬럼: 계좌번호 + 매핑 상태
-      //   "통장미등록"  = bank_account_mappings 에 미등록 → 매핑 관리에서 등록 필요
-      //   "사업 통장"   = 등록됐고 차량 미할당 (정상 운영 — 사업 단위 공용 계좌)
-      //   "🚗 차량번호" = 등록 + 차량 할당 (드뭄 — 차량 전용 통장)
-      const alias = r.bank_account_alias || r.sms_card_alias || ''
-      const aliasLast4 = alias.match(/(\d{4})\s*$/)?.[1]
-      const last4 = aliasLast4 || (r as any).account_last4  // V10 — 계좌별 관리
-      const bankName = r.bank_name || (r.card_company || '').replace('_BANK', '')
-      const hasBankMapping = !!(r.bank_account_alias || r.bank_account_holder)
-      const hasCarAssigned = !!r.bank_matched_car_number
-      const purpose = r.bank_purpose || ''
-      return (
-        <div>
-          <div style={{ fontSize: 12, fontWeight: 700, color: COLORS.primary }}>
-            {bankName || '-'}{last4 ? ` ${last4}` : ''}
-          </div>
-          {alias && hasBankMapping && <div style={{ fontSize: 10, color: '#94a3b8' }}>{alias}</div>}
-          {!hasBankMapping && last4 && (
-            <div style={{ fontSize: 10, color: '#dc2626', fontWeight: 600 }} title="bank_account_mappings 에 등록 필요">
-              📝 통장 미등록
-            </div>
-          )}
-          {hasBankMapping && !hasCarAssigned && (
-            <div style={{ fontSize: 10, color: '#64748b', fontWeight: 500 }} title="사업 단위 공용 계좌 — 정상 운영. 차량 매칭은 거래별 검수에서 처리.">
-              💼 사업 통장{purpose ? ` · ${purpose.split('/')[0]}` : ''}
-            </div>
-          )}
-        </div>
-      )
-    }, hideOnMobile: true },
+        const bankName = r.bank_name || (r.card_company || '').replace('_BANK', '')
+        return <span style={{ fontSize: 12, fontWeight: 700, color: COLORS.primary, whiteSpace: 'nowrap' }}>{bankName || '-'}</span>
+      }, hideOnMobile: true },
+    { key: 'account_no', label: '계좌', width: 90,
+      sortBy: (r: any) => (r as any).account_last4 || (r.bank_account_alias || '').match(/(\d{4})\s*$/)?.[1] || '',
+      render: (r: any) => {
+        const last4 = (r as any).account_last4 || (r.bank_account_alias || '').match(/(\d{4})\s*$/)?.[1]
+        return last4
+          ? <span style={{ fontSize: 12, fontWeight: 700, color: COLORS.textPrimary, whiteSpace: 'nowrap' }}>****{last4}</span>
+          : <span style={{ fontSize: 11, color: '#cbd5e1' }}>-</span>
+      }, hideOnMobile: true },
+    { key: 'account_purpose', label: '용도', width: 100,
+      sortBy: (r: any) => r.bank_purpose || r.bank_account_alias || '',
+      render: (r: any) => {
+        const p = (r.bank_purpose || '').split('/')[0] || r.bank_account_alias
+        return p
+          ? <span style={{ fontSize: 12, color: COLORS.textSecondary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: 100 }}>{p}</span>
+          : <span style={{ fontSize: 11, color: '#cbd5e1' }}>-</span>
+      }, hideOnMobile: true },
     { key: 'desc', label: '적요',
       sortBy: (r) => r.description || '',
       render: (r) => <span style={{ fontSize: 13, fontWeight: 500 }}>{r.description || '-'}</span> },
@@ -3276,71 +3318,38 @@ export default function BankCardPage() {
     { key: 'date', label: '날짜', width: 100,
       sortBy: (r) => r.transaction_date ? new Date(r.transaction_date as any).getTime() : 0,
       render: (r) => <span style={{ fontSize: 13, color: COLORS.textSecondary }}>{fmtDate(r.transaction_date)}</span> },
-    { key: 'card', label: '카드', width: 170,
-      sortBy: (r: any) => `${r.card_company || ''} ${r.sms_card_alias || r.matched_card_alias || ''}`,
+    // 규칙 30 확장 (2026-07-08) — 4층 스택 셀 → 1셀 1값 분리 컬럼
+    { key: 'card_company', label: '카드사', width: 72,
+      sortBy: (r: any) => r.card_company || '',
+      render: (r: any) => <span style={{ fontSize: 12, fontWeight: 700, color: COLORS.primary, whiteSpace: 'nowrap' }}>{(r.card_company || '-').replace('_BANK', '')}</span> },
+    { key: 'card_no', label: '카드', width: 110,
+      sortBy: (r: any) => {
+        const alias = r.sms_card_alias || r.matched_card_alias || ''
+        return alias.match(/(\d{4})\s*$/)?.[1] || r.card_last4 || (r as any).account_last4 || ''
+      },
       render: (r: any) => {
-      // 카드 라벨 분기 (사용자 운영 모델 반영):
-      //   📝 미등록      = corporate_cards 에 미등록
-      //   🚗 차량 카드   = assigned_car_id 있음 (그 차량 전용 — 거래 자동 차량 매칭)
-      //   👤 직원 카드   = assigned_employee_id 있고 assigned_car_id 없음
-      //                    → 거래별 분류 검수 필요 (차량지원/운영비/개인)
-      //   🃏 공용 카드   = 둘 다 없음 (드뭄)
-      const alias = r.sms_card_alias || r.matched_card_alias || ''
-      const aliasLast4 = alias.match(/(\d{4})\s*$/)?.[1]
-      const rawLast4 = r.card_last4 || ''
-      const last4 = aliasLast4 || rawLast4
-      const hasCardMapping = !!(r.matched_card_alias || r.matched_holder_name || r.matched_car_id || r.matched_employee_id)
-      const hasCarCard = !!r.matched_car_id
-      const hasEmployeeCard = !!r.matched_employee_id && !hasCarCard
-      const holder = r.matched_holder_name || ''
-      // 거래 분류 상태 (직원 카드일 때 의미)
-      const txCategorized = !!r.related_type || !!r.category
-      const txCar = r.related_type === 'car' && !!r.related_id
-      const txSalary = !!r.salary_adjustment_id
-      return (
-        <div>
-          <div style={{ fontSize: 12, fontWeight: 700, color: COLORS.primary }}>
-            {r.card_company || '-'}{last4 ? ` ${last4}` : ''}
-          </div>
-          {alias && hasCardMapping && <div style={{ fontSize: 10, color: '#94a3b8' }}>{alias}</div>}
-          {!hasCardMapping && last4 && (
-            <div style={{ fontSize: 10, color: '#dc2626', fontWeight: 600 }} title="corporate_cards 에 등록 필요">
-              📝 카드 미등록
-            </div>
-          )}
-          {hasCardMapping && hasCarCard && (
-            <div style={{ fontSize: 10, color: '#1e40af', fontWeight: 600 }} title="차량 전용 카드 — 자동 차량 매칭">
-              🚗 차량 카드 {r.matched_car_number ? `· ${r.matched_car_number}` : ''}
-            </div>
-          )}
-          {hasCardMapping && hasEmployeeCard && !txCategorized && (
-            <div style={{ fontSize: 10, color: '#d97706', fontWeight: 600 }} title="직원 카드 — 거래별 분류 검수 필요 (차량지원/운영비/개인)">
-              👤 {holder || '직원'} · 분류 필요
-            </div>
-          )}
-          {hasCardMapping && hasEmployeeCard && txCategorized && txCar && (
-            <div style={{ fontSize: 10, color: '#15803d', fontWeight: 500 }} title="직원 카드 → 차량 비용 분류 완료">
-              👤 {holder || '직원'} → 🚗 분류완료
-            </div>
-          )}
-          {hasCardMapping && hasEmployeeCard && txCategorized && !txCar && txSalary && (
-            <div style={{ fontSize: 10, color: '#ca8a04', fontWeight: 600 }} title="직원 개인 사용 — 급여 차감 대기">
-              👤 {holder || '직원'} · 개인 (급여)
-            </div>
-          )}
-          {hasCardMapping && hasEmployeeCard && txCategorized && !txCar && !txSalary && (
-            <div style={{ fontSize: 10, color: '#64748b', fontWeight: 500 }} title="직원 카드 → 운영비 분류">
-              👤 {holder || '직원'} · 운영비
-            </div>
-          )}
-          {hasCardMapping && !hasCarCard && !hasEmployeeCard && (
-            <div style={{ fontSize: 10, color: '#7c3aed', fontWeight: 500 }} title="공용 카드 — 거래별 분류 필요">
-              🃏 공용 카드
-            </div>
-          )}
-        </div>
-      )
-    }},
+        const alias = r.sms_card_alias || r.matched_card_alias || ''
+        const last4 = alias.match(/(\d{4})\s*$/)?.[1] || r.card_last4 || (r as any).account_last4 || ''
+        return last4
+          ? <span style={{ fontSize: 12, fontWeight: 700, color: COLORS.textPrimary, whiteSpace: 'nowrap' }}>****{last4}</span>
+          : <span style={{ fontSize: 11, color: '#cbd5e1' }}>-</span>
+      }},
+    { key: 'holder', label: '소지자', width: 76,
+      sortBy: (r: any) => r.matched_holder_name || r.sms_holder || '',
+      render: (r: any) => {
+        const h = r.matched_holder_name || r.sms_holder
+        return h
+          ? <span style={{ fontSize: 12, color: COLORS.textSecondary, whiteSpace: 'nowrap' }}>{h}</span>
+          : <span style={{ fontSize: 11, color: '#cbd5e1' }}>-</span>
+      }},
+    { key: 'card_link', label: '연결', width: 100,
+      sortBy: (r: any) => r.matched_car_number || r.matched_car_number_sms || '',
+      render: (r: any) => {
+        const car = r.matched_car_number || r.matched_car_number_sms
+        return car
+          ? <span style={{ fontSize: 12, fontWeight: 600, color: '#1e40af', whiteSpace: 'nowrap' }}>🚗 {car}</span>
+          : <span style={{ fontSize: 11, color: '#cbd5e1' }}>-</span>
+      }},
     { key: 'merchant', label: '가맹점',
       sortBy: (r: any) => r.sms_merchant || r.description || '',
       render: (r: any) => {
@@ -3573,27 +3582,13 @@ export default function BankCardPage() {
       {/* 상단 통계 */}
       {summary && <div style={{ padding: '0 16px 12px' }}><DcStatStrip stats={stats} /></div>}
 
-      {/* 탭 — 큰 구성(통장·카드·정산)만 평소 표시, 분석·관리는 「고급」 토글로 접힘 */}
-      <div style={{ padding: '0 16px 8px', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <NeuFilterTabs
-            tabs={tabs}
-            activeKey={activeTab}
-            onSelect={(k) => { setActiveTab(k as TabKey); setSearch('') }}
-          />
-        </div>
-        <button
-          onClick={() => setShowAdvTabs(v => !v)}
-          style={{
-            padding: '6px 12px', borderRadius: 9, fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap',
-            cursor: 'pointer', border: '1px solid rgba(0,0,0,0.1)',
-            background: showAdvTabs ? 'rgba(100,116,139,0.12)' : '#fff',
-            color: '#475569',
-          }}
-          title="운영 흐름·분류·매칭·SMS·매핑·룰·시스템 등 분석·관리 탭"
-        >
-          {showAdvTabs ? '▲ 고급 접기' : '⚙️ 고급'}
-        </button>
+      {/* 탭 — 통장·카드 원장 + 수집 확인(SMS)·식별 설정(매핑) 4개만 (2026-07-08 사용자 명시 「깔끔하게」) */}
+      <div style={{ padding: '0 16px 8px' }}>
+        <NeuFilterTabs
+          tabs={tabs}
+          activeKey={activeTab}
+          onSelect={(k) => { setActiveTab(k as TabKey); setSearch('') }}
+        />
       </div>
 
       {/* ──── BulkActionBar — 선택된 거래 일괄 작업 (floating bottom — 거래 row 근처) ──── */}
@@ -3747,7 +3742,7 @@ export default function BankCardPage() {
                         <div style={{ fontSize: 11, color: COLORS.textMuted }}>기간 출금 합계</div>
                         <div style={{ fontSize: 15, fontWeight: 800, color: '#991b1b' }}>{Number(rcResult.expense_sum).toLocaleString('ko-KR')}원</div>
                       </div>
-                      <div style={{ padding: '10px 12px', borderRadius: 10, background: 'rgba(59,110,181,0.06)' }}>
+                      <div style={{ padding: '10px 12px', borderRadius: 10, background: COLORS.bgBlue }}>
                         <div style={{ fontSize: 11, color: COLORS.textMuted }}>늘어난 돈 (계산)</div>
                         <div style={{ fontSize: 15, fontWeight: 800, color: '#0f2440' }}>{Number(rcResult.net).toLocaleString('ko-KR')}원</div>
                       </div>
@@ -3785,6 +3780,46 @@ export default function BankCardPage() {
         {/* ──── 통장 거래 탭 ──── */}
         {activeTab === 'bank' && (
           <>
+            {/* 관리자 요약 — 계좌별 현재 잔액 + 최근 30일 자동 검증 (2026-07-08 사용자 명시) */}
+            {bankAccountOptions.length > 0 && (
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
+                {bankAccountOptions.map((a) => {
+                  const s = bankAccountSummary.get(a)
+                  const v = acctVerify[a]
+                  const selected = bankAccountPick === a
+                  return (
+                    <div key={a}
+                      onClick={() => setBankAccountPick(selected ? 'all' : a)}
+                      style={{
+                        ...GLASS.L3,
+                        cursor: 'pointer', padding: '10px 14px', borderRadius: 12, minWidth: 172,
+                        ...(selected ? { background: COLORS.bgBlue } : {}),
+                        border: selected ? `1.5px solid ${COLORS.primary}` : `1px solid ${COLORS.borderBlue}`,
+                      }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSecondary }}>계좌 ****{a}</span>
+                        {v && (
+                          <span
+                            onClick={(e) => { e.stopPropagation(); setRcAccount(a); setReconcileOpen(true) }}
+                            title={v.ok ? '최근 30일 입출금과 잔액이 이어집니다' : `최근 30일 중 ${v.breaks}곳에서 잔액이 안 이어집니다 — 눌러서 확인`}
+                            style={{
+                              fontSize: 10, fontWeight: 800, padding: '1px 6px', borderRadius: 8, whiteSpace: 'nowrap',
+                              background: v.ok ? 'rgba(22,163,74,0.10)' : 'rgba(239,68,68,0.10)',
+                              color: v.ok ? '#15803d' : '#dc2626',
+                            }}>{v.ok ? '✅ 검증됨' : `⚠ ${v.breaks}곳 확인`}</span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: 16, fontWeight: 800, color: COLORS.textPrimary, whiteSpace: 'nowrap' }}>
+                        {s?.balance != null ? `${Math.round(s.balance).toLocaleString()}원` : '잔액 정보 없음'}
+                      </div>
+                      {s?.balanceDate && (
+                        <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 2 }}>기준 {String(s.balanceDate).slice(0, 10)}</div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
             <DcToolbar
               search={search}
               onSearchChange={setSearch}
@@ -3806,68 +3841,21 @@ export default function BankCardPage() {
                       {bankAccountOptions.map((a) => <option key={a} value={a}>계좌 ****{a}</option>)}
                     </select>
                   )}
-                  <button
-                    onClick={() => setReconcileOpen(true)}
-                    style={{ ...BTN.sm, background: '#fff', color: COLORS.textSecondary, border: '1px solid rgba(0,0,0,0.12)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
-                  >
-                    🧮 잔액 맞춰보기
-                  </button>
-                  <button
-                    onClick={async () => {
-                      try {
-                        const { json: chk } = await fetchWithAuth('/api/admin/sms-excel-dedup?dryRun=true')
-                        const n = Number(chk?.will_delete_excel || 0)
-                        if (n === 0) { alert('두 번 들어온 입금이 없습니다. 깨끗해요!'); return }
-                        if (!window.confirm(`같은 입금이 두 번 들어온 것 ${n}건을 찾았어요.\n하나로 정리할까요? (지워도 복구할 수 있습니다)`)) return
-                        let remain = n
-                        while (remain > 0) {
-                          const { json: ap } = await fetchWithAuth('/api/admin/sms-excel-dedup?apply=true&max=200', { method: 'POST' })
-                          const done = Number(ap?.excel_deleted || 0)
-                          if (!done) break
-                          remain -= done
-                        }
-                        alert(`정리 완료 — ${n - Math.max(remain, 0)}건을 하나로 합쳤습니다.`)
-                        await loadTransactions()
-                      } catch (e: any) { alert('정리 중 문제가 생겼습니다: ' + (e?.message || '')) }
-                    }}
-                    style={{ ...BTN.sm, background: '#fff', color: COLORS.textSecondary, border: '1px solid rgba(0,0,0,0.12)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
-                  >
-                    🧹 중복 정리
-                  </button>
+                  {/* 🧮 잔액 맞춰보기 버튼 제거 (2026-07-08) — 상단 계좌 카드의 자동 검증 배지로 대체 (배지 클릭 = 상세 확인) */}
+                  {/* 연결(매칭) 필터 — 2026-07-08 사용자 명시 「연결된 부분들 필터」 */}
+                  <select value={bankLinkPick} onChange={(e) => setBankLinkPick(e.target.value)}
+                    style={{ padding: '7px 9px', borderRadius: 8, border: '1px solid rgba(0,0,0,0.12)', fontSize: 12, fontWeight: 700, color: COLORS.textPrimary }}>
+                    <option value="all">🔗 연결 전체</option>
+                    <option value="linked">연결됨</option>
+                    <option value="unlinked">미연결</option>
+                    <option value="fmi_rental">대차 연결</option>
+                    <option value="car">차량 연결</option>
+                  </select>
                   <button
                     onClick={() => { setUploadSource('excel_bank'); setShowUpload(true); setUploadPreview([]); setUploadResult(null); setUploadFiles([]); setUploadFileName(''); setUploadColumns({}); setSkippedFiles([]) }}
                     style={{ ...BTN.sm, background: COLORS.primary, color: '#fff', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
                   >
                     📤 엑셀 업로드
-                  </button>
-                  <button
-                    onClick={async () => {
-                      const { json } = await fetchWithAuth('/api/admin/bank-match-diag')
-                      if (json?.error) { alert(`오류: ${json.error}`); return }
-                      const s = json?.summary || {}
-                      const fmtList = (arr: any[], format: (x: any) => string) =>
-                        (arr || []).slice(0, 10).map(format).join('\n') || '  (없음)'
-                      const noMapping = fmtList(json?.top_no_mapping, (x: any) =>
-                        `  · ****${x.last4} — ${x.tx}건`)
-                      const noCar = fmtList(json?.top_no_car, (x: any) =>
-                        `  · ****${x.last4} — ${x.tx}건${x.holders?.length ? ` [${x.holders.join(',')}]` : ''}${x.purposes?.length ? ` (${x.purposes.join(',')})` : ''}`)
-                      console.log('[통장 매칭 진단] 등록 매핑 전체:', json?.all_mappings || [])
-                      alert(
-                        `🏦 통장 매칭 진단\n\n` +
-                        `📊 요약\n` +
-                        `  · 통장 거래(SMS): ${s.total_transactions || 0}건\n` +
-                        `  · 거래의 차량 직접 매칭: ${s.matched_transactions || 0}건 (드뭄 — 통장은 보통 사업 단위)\n` +
-                        `  · 등록 매핑: ${s.total_mappings || 0}개 (차량 전용 통장: ${s.mappings_with_car || 0})\n` +
-                        `  · last4 종류: ${s.unique_last4 || 0}개\n\n` +
-                        `🔴 매핑 부재 — 통장 등록 필요\n${noMapping}\n\n` +
-                        `💼 사업 통장 (정상 운영 — 차량 매칭은 거래별 검수에서 처리)\n${noCar}\n\n` +
-                        `🟢 차량 전용 통장 매칭: ${json?.ok_count || 0} 종류\n\n` +
-                        `→ 등록 매핑 전체는 콘솔(F12) 확인`
-                      )
-                    }}
-                    style={{ ...BTN.sm, background: '#fff', color: '#0369a1', border: '1px solid rgba(14,165,233,0.4)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
-                  >
-                    🔍 매칭 진단
                   </button>
                   {summary && summary.transactions.bank > 0 && (
                     <button
@@ -3896,6 +3884,30 @@ export default function BankCardPage() {
         {/* ──── 카드 거래 탭 ──── */}
         {activeTab === 'card' && (
           <>
+            {/* 관리자 요약 — 카드별 이번 달 누적 사용액 (2026-07-08 사용자 명시) */}
+            {cardMonthSummary.size > 0 && (
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
+                {Array.from(cardMonthSummary.entries()).sort((x, y) => y[1] - x[1]).slice(0, 10).map(([alias, sum]) => {
+                  const selected = cardPick === alias
+                  return (
+                    <div key={alias}
+                      onClick={() => setCardPick(selected ? 'all' : alias)}
+                      style={{
+                        ...GLASS.L3,
+                        cursor: 'pointer', padding: '10px 14px', borderRadius: 12, minWidth: 150,
+                        ...(selected ? { background: COLORS.bgViolet } : {}),
+                        border: selected ? '1.5px solid #7c3aed' : `1px solid ${COLORS.borderViolet}`,
+                      }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSecondary, marginBottom: 4, whiteSpace: 'nowrap' }}>{alias}</div>
+                      <div style={{ fontSize: 16, fontWeight: 800, color: COLORS.textPrimary, whiteSpace: 'nowrap' }}>
+                        {Math.round(sum).toLocaleString()}원
+                      </div>
+                      <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 2 }}>이번 달 사용</div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
             <DcToolbar
               search={search}
               onSearchChange={setSearch}
@@ -3916,49 +3928,7 @@ export default function BankCardPage() {
                   >
                     📤 엑셀 업로드
                   </button>
-                  <button
-                    onClick={async () => {
-                      const { json } = await fetchWithAuth('/api/admin/card-match-diag')
-                      if (json?.error) { alert(`오류: ${json.error}`); return }
-                      const s = json?.summary || {}
-                      const p = json?.problems || {}
-                      const fmtList = (arr: any[], format: (x: any) => string) =>
-                        (arr || []).slice(0, 10).map(format).join('\n') || '  (없음)'
-                      const noCard = fmtList(json?.top_no_card, (x: any) =>
-                        `  · ****${x.last4} — ${x.tx}건${x.sms > 0 ? ` (SMS ${x.sms})` : ''}`)
-                      const noAssign = fmtList(json?.top_no_assignment, (x: any) =>
-                        `  · ****${x.last4} — ${x.tx}건${x.holders?.length ? ` [${x.holders.join(',')}]` : ''}`)
-                      const okEmp = fmtList(json?.ok_employee_card, (x: any) =>
-                        `  · ****${x.last4} — ${x.tx}건${x.employees?.length ? ` [${x.employees.join(',')}]` : ''}`)
-                      const okPool = fmtList(json?.ok_pool_card, (x: any) =>
-                        `  · ****${x.last4} — ${x.tx}건${x.holders?.length ? ` [${x.holders.join(',')}/${x.departments?.[0] || '공용'}]` : ''}`)
-                      const okCanceled = fmtList(json?.ok_canceled, (x: any) =>
-                        `  · ****${x.last4} — ${x.tx}건${x.holders?.length ? ` [${x.holders.join(',')}]` : ''}`)
-                      // 콘솔에 등록된 카드 전체 last4 출력 — 사용자가 직접 확인 가능
-                      const allCards = json?.all_registered_cards || []
-                      console.log('[카드 매칭 진단] 등록된 카드 전체:', allCards)
-                      alert(
-                        `🔍 카드 매칭 진단\n\n` +
-                        `📊 요약\n` +
-                        `  · 카드 거래: ${s.total_transactions || 0}건 (매칭 ${s.matched_transactions || 0} / 미매칭 ${s.unmatched_transactions || 0})\n` +
-                        `  · 등록 카드: ${s.total_cards_registered || 0}장 (차량 할당 ${s.cards_with_car_assigned || 0})\n` +
-                        `  · last4 종류: ${s.unique_last4_in_tx || 0}개\n\n` +
-                        `🔴 매핑 부재 — 신규 카드 등록 필요\n${noCard}\n` +
-                        `   ※ 이전 카드번호도 검색됨 (previous_card_number)\n` +
-                        `   안 잡혔다면 진짜 미등록\n\n` +
-                        `🟠 진짜 누락 — 활성 카드인데 차량/직원/공용 모두 X\n${noAssign}\n\n` +
-                        `👤 직원 카드 (정상 — 직원에게 비용 귀속)\n${okEmp}\n\n` +
-                        `⚪ 공용 카드 (정상 — 배차팀/탁송팀 의도)\n${okPool}\n\n` +
-                        `🔘 해지 카드 (정상 — 사용 종료)\n${okCanceled}\n\n` +
-                        `🟢 정상 매칭: ${json?.ok_count || 0} 종류\n\n` +
-                        `💡 등록 카드 전체 ${allCards.length}장은 콘솔(F12)에서 확인 가능\n` +
-                        `→ 매핑 관리 탭에서 카드 추가 시 자동 backfill 동작`
-                      )
-                    }}
-                    style={{ ...BTN.sm, background: '#fff', color: '#0369a1', border: '1px solid rgba(14,165,233,0.4)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
-                  >
-                    🔍 매칭 진단
-                  </button>
+                  {/* 🔍 매칭 진단 제거 (2026-07-08 사용자 명시 「확실하지 않은 기능은 혼란」) — 매핑 상태는 매핑 관리 탭에서 */}
                   {/* 일회성 정리 도구 (📛 거래 재생성 / 🔧 SMS 강제 매칭) 는 admin 영역으로 이동 — 일반 사용 패턴 X */}
                   {summary && summary.transactions.card > 0 && (
                     <button
