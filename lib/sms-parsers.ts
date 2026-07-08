@@ -481,6 +481,28 @@ function parseKBBank(text: string): ParsedSms | null {
     }
   }
 
+  // 패턴 3 (2026-07-08 실제 수신 포맷 — 「원」 없음, 계좌 마스킹 **, 적요 포함):
+  //   [KB]07/08 13:50 217001**168 103호9390 출금 20,000 잔액26,149,599
+  //   [KB]07/08 10:46 217001**168 194하3191 입금 30,000 잔액26,535,099
+  const m3 = text.match(
+    /(?:\[KB\]|\[국민은행\])\s*(\d{1,2}[./-]\d{1,2}\s+\d{1,2}:\d{2})\s+([\d*]{6,})\s+(.*?)\s*(출금|입금)\s+([\d,]+)\s*(?:원)?\s*잔액\s*([\d,]+)/
+  )
+  if (m3) {
+    const [, dt, acctToken, memo, txType, amtStr] = m3
+    // 계좌 토큰 217001**168 → 마스킹 뒤 보이는 꼬리 숫자만 (168)
+    const acctTail = (acctToken.split('*').pop() || '').replace(/\D/g, '')
+    return {
+      issuer: 'KB_BANK',
+      type: txType === '입금' ? 'deposit' : 'withdrawal',
+      holder: null,
+      card_alias: acctTail ? `국민은행***${acctTail}` : null,
+      amount: Number(amtStr.replace(/,/g, '')),
+      merchant: memo.trim() || null,   // 적요 (194하3191 = 차량번호 등 — 매칭 재료)
+      installment: null,
+      txAt: parseDateTime(dt),
+    }
+  }
+
   // 패턴 2: 날짜 먼저 오는 포맷
   const m2 = text.match(
     /(?:\[KB\]|\[국민은행\]|국민은행)\s*(\d{1,2}[./-]\d{1,2}\s+\d{1,2}:\d{2})\s+\*(\d{4,})\s+(출금|입금)\s+([\d,]+)\s*원/

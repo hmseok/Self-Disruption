@@ -253,7 +253,8 @@ export async function POST(req: NextRequest) {
 
       // PR-RECONCILE — 은행 문자의 「잔액 N원」 저장 → 잔액 사슬 자동 검증 재료
       //   (카드의 「잔여한도」는 '잔액' 표기가 아니라 자동 제외)
-      const balanceMatch = importedFrom === 'sms_bank' ? String(text || '').match(/잔액\s*([\d,]+)\s*원/) : null
+      //   KB 신형 문자는 「잔액26,149,599」 처럼 원 없이 옴 (2026-07-08) → 원 선택
+      const balanceMatch = importedFrom === 'sms_bank' ? String(text || '').match(/잔액\s*([\d,]+)\s*원?/) : null
       const balanceAfter = balanceMatch ? Number(balanceMatch[1].replace(/,/g, '')) : null
 
       // PR-ACCOUNT (V10) — 카드/계좌 끝4자리: 파서 별칭 또는 원문 *번호 에서 추출 (카드·계좌별 관리)

@@ -1154,6 +1154,21 @@ export default function BankCardPage() {
     }
   }, [smsStatusFilter, smsIssuerFilter])
 
+  // 개별 원장 등록 (2026-07-08 사용자 요청 — 전체삭제로 사라진 오늘 문자 건 복구)
+  const [smsRegistering, setSmsRegistering] = useState<string | null>(null)
+  const registerSmsToLedger = useCallback(async (smsId: string) => {
+    if (!confirm('이 문자를 거래 1건으로 등록할까요?\n(이미 같은 거래가 있으면 등록되지 않습니다 — 복구 가능)')) return
+    setSmsRegistering(smsId)
+    try {
+      const { json } = await fetchWithAuth('/api/finance/sms', { method: 'PUT', body: { id: smsId } })
+      if (json?.ok) alert('등록했습니다. 통장/카드 탭에서 확인하세요.')
+      else alert(json?.reason || json?.error || '등록하지 못했습니다')
+      loadSmsData()
+    } finally {
+      setSmsRegistering(null)
+    }
+  }, [loadSmsData])
+
   const loadMappings = useCallback(async () => {
     setMappingLoading(true)
     try {
@@ -6914,14 +6929,15 @@ export default function BankCardPage() {
                     <th style={{ padding: '10px 12px', fontSize: 11, fontWeight: 700, textAlign: 'right' }}>금액</th>
                     <th style={{ padding: '10px 12px', fontSize: 11, fontWeight: 700 }}>구분</th>
                     <th style={{ padding: '10px 12px', fontSize: 11, fontWeight: 700 }}>원문</th>
+                    <th style={{ padding: '10px 12px', fontSize: 11, fontWeight: 700 }}>거래</th>
                   </tr>
                 </thead>
                 <tbody>
                   {smsLoading && (
-                    <tr><td colSpan={8} style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>불러오는 중...</td></tr>
+                    <tr><td colSpan={9} style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>불러오는 중...</td></tr>
                   )}
                   {!smsLoading && smsRows.length === 0 && (
-                    <tr><td colSpan={8} style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>
+                    <tr><td colSpan={9} style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>
                       수신된 SMS가 없습니다. SMS Forwarder 앱 설정 후 카드 결제 시 자동 수집됩니다.
                     </td></tr>
                   )}
@@ -6944,12 +6960,25 @@ export default function BankCardPage() {
                       <td style={{ padding: '10px 12px', color: '#1e293b' }}>{r.holder_name || '—'}</td>
                       <td style={{ padding: '10px 12px', color: '#1e293b' }}>{r.merchant || '—'}</td>
                       <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: r.transaction_type === 'canceled' || r.transaction_type === 'withdrawal' ? '#ef4444' : r.transaction_type === 'deposit' ? '#059669' : '#1e293b' }}>
-                        {r.amount != null ? `${r.transaction_type === 'canceled' || r.transaction_type === 'withdrawal' ? '-' : r.transaction_type === 'deposit' ? '+' : ''}${Number(r.amount).toLocaleString()}` : '—'}
+                        {/* 규칙 18 — + 부호 금지 (색상으로 의미 표현), - 는 취소만 */}
+                        {r.amount != null ? `${r.transaction_type === 'canceled' ? '-' : ''}${Number(r.amount).toLocaleString()}` : '—'}
                       </td>
                       <td style={{ padding: '10px 12px', color: '#1e293b' }}>{r.transaction_type === 'canceled' ? '취소' : r.transaction_type === 'deposit' ? '입금' : r.transaction_type === 'withdrawal' ? '출금' : r.installment || '일시불'}</td>
                       <td style={{ padding: '10px 12px', maxWidth: 300, color: '#64748b', fontSize: 11 }}>
                         <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.raw_text}>{r.raw_text}</div>
                         {r.parse_error && <div style={{ color: '#ef4444', fontSize: 10, marginTop: 2 }}>⚠ {r.parse_error}</div>}
+                      </td>
+                      <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
+                        {/* 개별 원장 등록 (2026-07-08) — 전체삭제 등으로 거래가 사라진 파싱 성공 건 복구 */}
+                        {(r as any).tx_alive
+                          ? <span style={{ fontSize: 11, color: '#059669', fontWeight: 700 }}>연결됨</span>
+                          : r.parse_status === 'parsed' && r.amount != null
+                            ? <button
+                                onClick={() => registerSmsToLedger(r.id)}
+                                disabled={smsRegistering === r.id}
+                                style={{ ...BTN.sm, padding: '3px 8px', fontSize: 11, background: '#fff', color: COLORS.primary, border: `1px solid ${COLORS.borderBlue}`, cursor: smsRegistering === r.id ? 'wait' : 'pointer' }}
+                              >{smsRegistering === r.id ? '등록 중...' : '거래로 등록'}</button>
+                            : <span style={{ fontSize: 11, color: '#cbd5e1' }}>—</span>}
                       </td>
                     </tr>
                   ))}

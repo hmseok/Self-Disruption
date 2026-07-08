@@ -87,8 +87,10 @@ export async function GET(request: NextRequest) {
         LEFT JOIN cars bam_car             ON bam_car.id COLLATE utf8mb4_unicode_ci = bam.assigned_car_id COLLATE utf8mb4_unicode_ci
         WHERE t.deleted_at IS NULL
         ORDER BY t.created_at DESC
-        LIMIT 5000
+        LIMIT 20000
       `
+      // ↑ LIMIT 5000 → 20000 (2026-07-08): 통장 12,000+건 환경에서 절반만 로드되어
+      //   화면 카운트·계좌 잔액·필터가 옛날 데이터로 잘리던 사고 수정
       try {
         data = await prisma.$queryRawUnsafe<any[]>(baseQuery)
       } catch (e: any) {
@@ -115,7 +117,7 @@ export async function GET(request: NextRequest) {
           LEFT JOIN cars car                 ON car.id COLLATE utf8mb4_unicode_ci = cc.assigned_car_id COLLATE utf8mb4_unicode_ci
           WHERE t.deleted_at IS NULL
           ORDER BY t.created_at DESC
-          LIMIT 5000
+          LIMIT 20000
         `)
       }
       return NextResponse.json({ data: serialize(data), error: null })

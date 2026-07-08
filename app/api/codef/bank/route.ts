@@ -82,6 +82,31 @@ export async function POST(req: NextRequest) {
         const clientName = tx.resAccountDesc1 || tx.resAccountDesc2 || '미상'
         const desc = [tx.resAccountDesc1, tx.resAccountDesc2, tx.resAccountDesc3].filter(Boolean).join(' / ')
         const bankName = BANK_CODES[orgCode as keyof typeof BANK_CODES]
+
+        // ── 중복 검사 (2026-07-08 신설) ──────────────────────────────
+        //   기존엔 존재 확인 없이 INSERT → 30분 주기가 같은 3일치를 계속 재등록할 위험.
+        //   판별자: 같은 날 + 금액 + 입출 + 잔액 (잔액이 같으면 같은 거래 — dedup v3 학습).
+        //   잔액 없으면 같은 날 + 금액 + 입출 + 거래처로 판단.
+        //   deleted_at IS NULL 조건 → 화면에서 삭제한 건은 다음 주기에 자동 복구.
+        //   통장 3계열(excel/sms/codef) 전체와 대조 — 엑셀로 이미 올라온 날짜와 겹쳐도 중복 안 생김.
+        try {
+          const dupRows = balanceAfter != null
+            ? await prisma.$queryRaw<Array<{ id: string }>>`
+                SELECT id FROM transactions
+                WHERE deleted_at IS NULL
+                  AND (imported_from LIKE 'excel_bank%' OR imported_from IN ('sms_bank', 'codef_bank'))
+                  AND DATE(transaction_date) = ${txDate} AND type = ${type}
+                  AND amount = ${amount} AND balance_after = ${balanceAfter}
+                LIMIT 1`
+            : await prisma.$queryRaw<Array<{ id: string }>>`
+                SELECT id FROM transactions
+                WHERE deleted_at IS NULL
+                  AND (imported_from LIKE 'excel_bank%' OR imported_from IN ('sms_bank', 'codef_bank'))
+                  AND DATE(transaction_date) = ${txDate} AND type = ${type}
+                  AND amount = ${amount} AND client_name = ${clientName}
+                LIMIT 1`
+          if (dupRows.length > 0) continue
+        } catch { /* 검사 실패 (컬럼 부재 등) → 기존 동작대로 INSERT 진행 (누락 방지 우선) */ }
         if (accountColumnOk) {
           try {
             await prisma.$executeRaw`
