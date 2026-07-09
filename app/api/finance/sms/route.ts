@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verifyUser } from '@/lib/auth-server'
+import { resolveAccountLast4 } from '@/lib/last4-match'
 
 // ═══════════════════════════════════════════════════════════
 // SMS 관리 API — 관리자 UI 전용 (인증 필수)
@@ -94,19 +95,49 @@ export async function DELETE(req: NextRequest) {
   return NextResponse.json({ ok: true })
 }
 
-// ── POST: 실패 건 재파싱 ──────────────────────────
+// ── POST: 실패 건 재파싱 + 은행 문자 원장 자동 등록 ──────────────
+//   (2026-07-08 확장 — 오픈뱅킹 연동 미등록 환경에선 문자가 통장의 유일한 입구.
+//    재파싱으로 해석이 살아난 은행 문자는 중복 검사 후 거래로도 바로 등록.)
 export async function POST(req: NextRequest) {
   const user = await verifyUser(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { parseSms, detectIssuer } = await import('@/lib/sms-parsers')
+  const { randomUUID } = await import('crypto')
 
   // 실패 건 모두 조회
-  const failedRows = await prisma.$queryRaw<Array<{ id: string; raw_text: string; sender: string | null }>>`
-    SELECT id, raw_text, sender FROM card_sms_transactions WHERE parse_status = 'failed'
+  const failedRows = await prisma.$queryRaw<Array<{ id: string; raw_text: string; sender: string | null; received_at: Date | null }>>`
+    SELECT id, raw_text, sender, received_at FROM card_sms_transactions WHERE parse_status = 'failed'
   `
 
+  // ── 원장 등록 준비 (프리로드 — 행별 쿼리 없이 메모리 대조) ──
+  // 1) 통장 3계열 중복 판별자: 같은 날+금액+입출+잔액 (잔액 없으면 +적요)
+  const balKeys = new Set<string>()
+  const descKeys = new Set<string>()
+  try {
+    const existing = await prisma.$queryRaw<any[]>`
+      SELECT transaction_date, amount, type, balance_after, description FROM transactions
+      WHERE deleted_at IS NULL
+        AND (imported_from LIKE 'excel_bank%' OR imported_from IN ('sms_bank', 'codef_bank'))`
+    for (const e of existing) {
+      const d = e.transaction_date instanceof Date ? e.transaction_date.toISOString().slice(0, 10) : String(e.transaction_date || '').slice(0, 10)
+      const base = `${d}|${Number(e.amount)}|${e.type}`
+      if (e.balance_after != null) balKeys.add(`${base}|${Number(e.balance_after)}`)
+      descKeys.add(`${base}|${e.description || ''}`)
+    }
+  } catch { /* 프리로드 실패 — 원장 등록 생략 (재파싱만 진행) */ }
+  // 2) 오픈뱅킹 연동 은행 (정본 정책 — 연동 있으면 문자는 원장 등록 X)
+  const connectedOrgs = new Set<string>()
+  try {
+    const conns = await prisma.codefConnection.findMany({ where: { is_active: true, org_type: 'bank' }, select: { org_code: true } })
+    for (const c of conns) connectedOrgs.add(String(c.org_code))
+  } catch { /* 조회 실패 — 연동 없다고 간주 */ }
+  const ORG_BY_ISSUER: Record<string, string> = { WOORI_BANK: '0020', KB_BANK: '0004' }
+
   let fixed = 0
+  let registered = 0
+  let dupSkipped = 0
+  let hadBankIncome = false
   for (const row of failedRows) {
     let text = (row.raw_text || '').trim()
     let sender = row.sender || ''
@@ -145,6 +176,67 @@ export async function POST(req: NextRequest) {
         WHERE id = ${row.id}
       `
       fixed++
+
+      // ── 은행 문자 원장 자동 등록 (2026-07-08) ──
+      //   연동 미등록 은행만 (연동 있으면 오픈뱅킹이 정본). 잔액을 함께 실어
+      //   계좌별 잔액 사슬 자동 검증이 문자 건 기준으로도 동작.
+      const isBank = /BANK$/i.test(String(parsed.issuer || ''))
+      const orgCode = ORG_BY_ISSUER[String(parsed.issuer || '')]
+      if (isBank && parsed.amount && !(orgCode && connectedOrgs.has(orgCode))) {
+        const txType = parsed.type === 'deposit' ? 'income' : 'expense'
+        const txDate = parsed.txAt || row.received_at || new Date()
+        const dateOnly = txDate instanceof Date ? txDate.toISOString().slice(0, 10) : String(txDate).slice(0, 10)
+        const description = parsed.merchant || parsed.issuer
+        const balanceMatch = text.match(/잔액\s*([\d,]+)\s*원?/)
+        const balanceAfter = balanceMatch ? Number(balanceMatch[1].replace(/,/g, '')) : null
+        const base = `${dateOnly}|${Number(parsed.amount)}|${txType}`
+        const isDup = balanceAfter != null ? balKeys.has(`${base}|${balanceAfter}`) : descKeys.has(`${base}|${description}`)
+        if (isDup) {
+          dupSkipped++
+        } else {
+          try {
+            const aliasDigits = String(parsed.card_alias || '').replace(/\D/g, '')
+            const starMatch = text.match(/\*\s?(\d{4,})/)
+            const acctLast4 = await resolveAccountLast4(prisma, aliasDigits || (starMatch ? starMatch[1] : ''))
+            const txId = randomUUID()
+            const insertLegacy = () => prisma.$executeRaw`
+              INSERT INTO transactions (
+                id, transaction_date, type, amount, description, client_name,
+                card_company, imported_from, status, balance_after, created_at, updated_at
+              ) VALUES (
+                ${txId}, ${txDate}, ${txType}, ${parsed.amount}, ${description}, ${parsed.holder || ''},
+                ${parsed.issuer}, 'sms_bank', 'completed', ${balanceAfter}, NOW(), NOW()
+              )
+            `
+            if (acctLast4) {
+              try {
+                await prisma.$executeRaw`
+                  INSERT INTO transactions (
+                    id, transaction_date, type, amount, description, client_name,
+                    card_company, imported_from, status, balance_after, account_last4, created_at, updated_at
+                  ) VALUES (
+                    ${txId}, ${txDate}, ${txType}, ${parsed.amount}, ${description}, ${parsed.holder || ''},
+                    ${parsed.issuer}, 'sms_bank', 'completed', ${balanceAfter}, ${acctLast4}, NOW(), NOW()
+                  )
+                `
+              } catch (e: any) {
+                if (/Unknown column/i.test(e?.message || '')) await insertLegacy()  // V10 미적용 DB (규칙 23)
+                else throw e
+              }
+            } else {
+              await insertLegacy()
+            }
+            await prisma.$executeRaw`
+              UPDATE card_sms_transactions SET transaction_id = ${txId} WHERE id = ${row.id}
+            `
+            // 같은 실행 안에서 쌍둥이 문자가 또 들어와도 중복 안 생기게 키 등록
+            if (balanceAfter != null) balKeys.add(`${base}|${balanceAfter}`)
+            descKeys.add(`${base}|${description}`)
+            registered++
+            if (txType === 'income') hadBankIncome = true
+          } catch { /* 등록 실패해도 재파싱 결과는 유지 */ }
+        }
+      }
     } else if (issuer === 'UNKNOWN') {
       // 카드/은행 SMS가 아닌 일반 문자 → ignored 처리
       await prisma.$executeRaw`
@@ -157,8 +249,21 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // 은행 입금 등록됐으면 대차 자동매칭 1회 트리거 (webhook 동형, fire-and-forget)
+  if (hadBankIncome && process.env.CRON_SECRET) {
+    try {
+      const proto = req.headers.get('x-forwarded-proto') || 'https'
+      const host = req.headers.get('host') || ''
+      fetch(`${proto}://${host}/api/finance/transactions/auto-match-fmi-rental`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Cron-Secret': process.env.CRON_SECRET },
+        body: JSON.stringify({ mode: 'insurance', dryRun: false }),
+      }).catch(() => {})
+    } catch { /* 트리거 실패 무시 */ }
+  }
+
   const ignored = failedRows.length - fixed
-  return NextResponse.json({ ok: true, total: failedRows.length, fixed, ignored })
+  return NextResponse.json({ ok: true, total: failedRows.length, fixed, ignored, registered, dup_skipped: dupSkipped })
 }
 
 // ── PUT: 파싱 성공 건 개별 원장(거래) 등록 ──────────────
@@ -200,7 +305,8 @@ export async function PUT(req: NextRequest) {
   const balanceAfter = balanceMatch ? Number(balanceMatch[1].replace(/,/g, '')) : null
   const aliasDigits = String(sms.card_alias || '').replace(/\D/g, '')
   const starMatch = String(sms.raw_text || '').match(/\*\s?(\d{4,})/)
-  const acctLast4 = (aliasDigits || (starMatch ? starMatch[1] : '')).slice(-4) || null
+  // 꼬리 3자리(KB 마스킹)는 매핑 테이블로 실제 끝4자리 승격 — 계좌별 잔액 사슬 유지
+  const acctLast4 = await resolveAccountLast4(prisma, aliasDigits || (starMatch ? starMatch[1] : ''))
 
   // 통장 3계열 중복 검사 (codef/bank 와 같은 판별자) — 은행 문자만
   if (importedFrom === 'sms_bank') {

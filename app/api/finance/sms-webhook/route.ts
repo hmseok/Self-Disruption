@@ -4,6 +4,7 @@ import { createHash, randomUUID } from 'crypto'
 import { parseSms, detectIssuer, isNonTransactionSms } from '@/lib/sms-parsers'
 import { classifyByRules } from '@/lib/transaction-classifier'
 import { resolveClientName } from '@/lib/client-name-aliases'
+import { resolveAccountLast4 } from '@/lib/last4-match'
 
 // ═══════════════════════════════════════════════════════════
 // SMS 웹훅 — 안드로이드 공기계 SMS Forwarder 수신 엔드포인트
@@ -258,9 +259,10 @@ export async function POST(req: NextRequest) {
       const balanceAfter = balanceMatch ? Number(balanceMatch[1].replace(/,/g, '')) : null
 
       // PR-ACCOUNT (V10) — 카드/계좌 끝4자리: 파서 별칭 또는 원문 *번호 에서 추출 (카드·계좌별 관리)
+      //   KB 마스킹(**168 — 꼬리 3자리)은 매핑 테이블로 실제 끝4자리 승격 (계좌별 잔액 사슬 유지)
       const aliasDigits = String(parsed.card_alias || '').replace(/\D/g, '')
       const starMatch = String(text || '').match(/\*\s?(\d{4,})/)
-      const acctLast4 = (aliasDigits || (starMatch ? starMatch[1] : '')).slice(-4) || null
+      const acctLast4 = await resolveAccountLast4(prisma, aliasDigits || (starMatch ? starMatch[1] : ''))
 
       const resolvedClient = await resolveClientName(parsed.holder || '')
       const insertLegacy = () => prisma.$executeRaw`

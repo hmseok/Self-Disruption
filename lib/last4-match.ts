@@ -153,3 +153,28 @@ export function cardMappingJoinSql(ccAlias: string, smsAlias: string, txAlias?: 
     )${txExcelMatch}
   )`
 }
+
+/**
+ * 계좌 꼬리 숫자 → 실제 끝4자리 해석 (2026-07-08).
+ *
+ * KB 신형 문자는 계좌를 217001**168 처럼 마스킹 — 보이는 꼬리가 3자리뿐.
+ * bank_account_mappings 의 계좌번호/별칭 숫자가 그 꼬리로 끝나면 그 계좌의
+ * 끝4자리로 승격 (예: '168' → '6168'). 못 찾으면 꼬리 그대로 반환.
+ *
+ * 사용처 (규칙 14 동형): sms-webhook / sms 재파싱 원장 등록 / sms 개별 등록
+ */
+export async function resolveAccountLast4(prisma: any, tailDigits: string | null | undefined): Promise<string | null> {
+  const tail = String(tailDigits || '').replace(/\D/g, '')
+  if (!tail) return null
+  if (tail.length >= 4) return tail.slice(-4)
+  try {
+    const rows: any[] = await prisma.$queryRaw`
+      SELECT account_alias, account_number FROM bank_account_mappings
+    `.catch(() => prisma.$queryRaw`SELECT account_alias, NULL AS account_number FROM bank_account_mappings`)
+    for (const r of rows) {
+      const digits = String(r.account_number || r.account_alias || '').replace(/\D/g, '')
+      if (digits.length >= 4 && digits.endsWith(tail)) return digits.slice(-4)
+    }
+  } catch { /* 매핑 테이블 없음 등 — 꼬리 그대로 */ }
+  return tail
+}

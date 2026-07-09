@@ -35,9 +35,11 @@ export async function GET(request: NextRequest) {
       bank === 'woori' ? `AND (bank_name LIKE '%우리%' OR card_company LIKE '%WOORI%')`
       : bank === 'kb' ? `AND (bank_name LIKE '%국민%' OR card_company LIKE '%KB%')`
       : ''
+    // 문자 계좌 마스킹(**168)으로 3자리만 저장된 행도 포함 — 끝자리 일치 허용 (2026-07-08)
+    const accountClause = ` AND (account_last4 = '${account}' OR ('${account}' LIKE CONCAT('%', account_last4) AND CHAR_LENGTH(account_last4) >= 3))`
     if (account) {
       // V10 미적용 DB 는 아래 쿼리가 1054 → catch 에서 계좌 조건 없이 재시도
-      bankClause += ` AND account_last4 = '${account}'`
+      bankClause += accountClause
     }
 
     const sumSql = (clause: string) =>
@@ -54,7 +56,7 @@ export async function GET(request: NextRequest) {
     const rows = await prisma.$queryRawUnsafe<Array<any>>(sumSql(bankClause), from, to)
       .catch(async (e: any) => {
         if (account && /Unknown column/i.test(e?.message || '')) {
-          bankClause = bankClause.replace(` AND account_last4 = '${account}'`, '')
+          bankClause = bankClause.replace(accountClause, '')
           return prisma.$queryRawUnsafe<Array<any>>(sumSql(bankClause), from, to)
         }
         throw e

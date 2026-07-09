@@ -1259,12 +1259,16 @@ export default function BankCardPage() {
     setReparsing(true)
     try {
       const { json } = await fetchWithAuth('/api/finance/sms', { method: 'POST' })
-      alert(`재파싱 완료: ${json?.total || 0}건 중 ${json?.fixed || 0}건 성공`)
+      alert(
+        `재파싱 완료: ${json?.total || 0}건 중 ${json?.fixed || 0}건 성공\n` +
+        `통장 거래 등록: ${json?.registered || 0}건 / 이미 있어 제외: ${json?.dup_skipped || 0}건`
+      )
       loadSmsData()
+      loadTransactions()
     } finally {
       setReparsing(false)
     }
-  }, [loadSmsData])
+  }, [loadSmsData, loadTransactions])
 
   // ── 취소 SMS 일괄 재파싱 (admin 전용 — 서버가 권한 체크) ─────
   const [recanceling, setRecanceling] = useState(false)
