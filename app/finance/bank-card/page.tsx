@@ -1476,7 +1476,7 @@ export default function BankCardPage() {
 
   const cardMonthSummary = useMemo(() => {
     const ym = new Date().toISOString().slice(0, 7)
-    const byCard = new Map<string, { sum: number; holder: string }>()
+    const byCard = new Map<string, { sum: number; holder: string; car: string }>()
     for (const t of transactions) {
       if (!isCardTx(t)) continue
       if (String(t.transaction_date || '').slice(0, 7) !== ym) continue
@@ -1484,10 +1484,12 @@ export default function BankCardPage() {
       if (!alias) continue
       const amt = Number(t.amount || 0)
       const canceled = (t as any).sms_transaction_type === 'canceled'
-      const cur = byCard.get(alias) || { sum: 0, holder: '' }
+      const cur = byCard.get(alias) || { sum: 0, holder: '', car: '' }
       cur.sum += canceled ? -amt : amt
       // 소지자 (2026-07-08 사용자 명시) — 매핑 등록 소지자 > 문자 승인자
       if (!cur.holder) cur.holder = (t as any).matched_holder_name || (t as any).sms_holder || ''
+      // 연결 차량 (2026-07-08 사용자 명시) — 카드에 할당된 차량번호
+      if (!cur.car) cur.car = (t as any).matched_car_number || ''
       byCard.set(alias, cur)
     }
     return byCard
@@ -3949,7 +3951,9 @@ export default function BankCardPage() {
                       <div style={{ fontSize: 16, fontWeight: 800, color: COLORS.textPrimary, whiteSpace: 'nowrap' }}>
                         {Math.round(info.sum).toLocaleString()}원
                       </div>
-                      <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 2 }}>이번 달 사용</div>
+                      <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 2, whiteSpace: 'nowrap' }}>
+                        이번 달 사용{info.car ? <span style={{ color: '#1e40af', fontWeight: 700 }}> · 🚗 {info.car}</span> : ''}
+                      </div>
                     </div>
                   )
                 })}
