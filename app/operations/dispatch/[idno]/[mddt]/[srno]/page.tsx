@@ -248,6 +248,8 @@ export default function DispatchDetailPage({
   const [newCategory, setNewCategory] = useState<ConsultationCategory>('followup')
   const [posting, setPosting] = useState(false)
   const noteRef = useRef<HTMLTextAreaElement | null>(null)
+  // 상담 입력 사이드 드로어 (2026-07-10 사용자 명시 「하단 표출 입력보다는 사이드에서 나오는 모달로」)
+  const [consultOpen, setConsultOpen] = useState(false)
 
   // ── 공통 결과 토스트 ──
   const [resultMsg, setResultMsg] = useState<ResultMsg | null>(null)
@@ -1081,7 +1083,7 @@ export default function DispatchDetailPage({
               {/* PR-B3 — 카페24 문자 발송 이력 + 발송문구 (crmsendh + crmsmsgh)
                   사용자 명시 (2026-05-16): 「문자 발송이력과 발송문구 내용도 카페24 접수에 있긴한데」
                   PR-B3.3 — 상단 요약 strip (사용자 명시): 「길어지니까 상단에 전체 내역을 카운드해주고 볼수있게」 */}
-              <Section icon="📨" title={`문자 발송 이력 (${sms.length})`}>
+              <Section icon="📨" title={`문자 발송 이력 (${sms.length})`} collapsible defaultOpen={false}>
                 {smsLoading ? <Place>cafe24 문자 발송 이력 조회 중…</Place>
                   : sms.length === 0 ? <Place>발송된 문자가 없습니다</Place>
                   : (
@@ -1220,7 +1222,7 @@ export default function DispatchDetailPage({
               </Section>
 
               {/* 카페24 ACR 사고처리관리 상담내역 (acrmemoh) — P1.5f */}
-              <Section icon="📒" title={`카페24 상담내역 (${acrMemos.length})`}>
+              <Section icon="📒" title={`카페24 상담내역 (${acrMemos.length})`} collapsible>
                 {acrMemosLoading ? <Place>cafe24 상담내역 조회 중…</Place>
                   : acrMemos.length === 0 ? <Place>카페24 측 상담내역 없음</Place>
                   : (
@@ -1255,7 +1257,7 @@ export default function DispatchDetailPage({
                   사용자 명시 (2026-05-16): 「사고 이니 긴급출동메모는 사고엔 없는게 맞고」
                   → 데이터 있을 때만 (또는 긴급출동/현장출동 Y 일 때만) 표출 */}
               {(memosLoading || memos.length > 0 || row.otptacph === 'Y' || row.otptacno === 'Y') && (
-                <Section icon="📞" title={`긴급출동 메모 (${memos.length})`}>
+                <Section icon="📞" title={`긴급출동 메모 (${memos.length})`} collapsible>
                   {memosLoading ? <Place>cafe24 메모 조회 중…</Place>
                     : memos.length === 0 ? <Place>긴급출동 메모 없음</Place>
                     : (
@@ -1318,77 +1320,17 @@ export default function DispatchDetailPage({
                         })}
                       </div>
 
-                      {/* 새 상담 입력 — 큰 영역 */}
+                      {/* 새 상담 입력은 사이드 드로어로 (2026-07-10 사용자 명시) */}
                       <div style={{ borderTop: '1px dashed rgba(0,0,0,0.1)', paddingTop: 12 }}>
-                        <div style={{ fontSize: 12, fontWeight: 700, color: '#0f2440', marginBottom: 6 }}>✍️ 새 상담 추가</div>
-                        <textarea
-                          ref={noteRef}
-                          value={newNote}
-                          onChange={(e) => setNewNote(e.target.value)}
-                          onKeyDown={onKeyDown}
-                          disabled={!dispatchOrder || migrationPending || posting}
-                          placeholder="상담 내용을 입력하세요 (Ctrl/Cmd + Enter 로 전송)"
-                          rows={5}
+                        <button
+                          onClick={() => { setConsultOpen(true); setTimeout(() => noteRef.current?.focus(), 150) }}
+                          disabled={!dispatchOrder || migrationPending}
                           style={{
-                            width: '100%',
-                            padding: '12px 14px',
-                            borderRadius: 10,
-                            fontSize: 13,
-                            color: '#1e293b',
-                            ...GLASS.L1,
-                            resize: 'vertical',
-                            minHeight: 100,
-                            lineHeight: 1.5,
+                            padding: '10px 18px', borderRadius: 10, border: 'none', cursor: 'pointer',
+                            background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)', color: '#fff',
+                            fontWeight: 800, fontSize: 13, whiteSpace: 'nowrap',
                           }}
-                        />
-                        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 10, flexWrap: 'wrap' }}>
-                          <span style={{ fontSize: 11, color: '#64748b', fontWeight: 700, whiteSpace: 'nowrap' }}>카테고리:</span>
-                          {(Object.keys(CATEGORY_META) as ConsultationCategory[]).map((k) => {
-                            const meta = CATEGORY_META[k]
-                            const active = newCategory === k
-                            return (
-                              <button
-                                key={k}
-                                onClick={() => setNewCategory(k)}
-                                disabled={!dispatchOrder || migrationPending || posting}
-                                style={{
-                                  padding: '4px 10px',
-                                  borderRadius: 8,
-                                  border: `1px solid ${active ? meta.tint : 'rgba(0,0,0,0.1)'}`,
-                                  background: active ? meta.tint : 'transparent',
-                                  color: active ? '#fff' : meta.tint,
-                                  cursor: 'pointer',
-                                  fontWeight: 700,
-                                  fontSize: 11,
-                                  whiteSpace: 'nowrap',
-                                }}
-                              >
-                                {meta.emoji} {meta.label}
-                              </button>
-                            )
-                          })}
-                          <div style={{ flex: 1 }} />
-                          <span style={{ fontSize: 11, color: '#94a3b8', whiteSpace: 'nowrap' }}>{newNote.length}/5000</span>
-                          <button
-                            onClick={submitConsultation}
-                            disabled={!dispatchOrder || migrationPending || posting || !newNote.trim()}
-                            style={{
-                              padding: '10px 18px',
-                              background: (!dispatchOrder || migrationPending || posting || !newNote.trim())
-                                ? '#94a3b8'
-                                : 'linear-gradient(135deg, #3b6eb5, #5a8fd4)',
-                              color: '#fff',
-                              border: 'none',
-                              borderRadius: 10,
-                              cursor: (!dispatchOrder || migrationPending || posting || !newNote.trim()) ? 'not-allowed' : 'pointer',
-                              fontWeight: 800,
-                              fontSize: 13,
-                              whiteSpace: 'nowrap',
-                            }}
-                          >
-                            💬 상담 추가
-                          </button>
-                        </div>
+                        >✍️ 상담 입력</button>
                       </div>
                     </>
                   )}
@@ -1397,6 +1339,78 @@ export default function DispatchDetailPage({
           </div>
         )}
       </div>
+      {/* 상담 입력 사이드 드로어 (2026-07-10) — 스크롤 위치와 무관하게 우측에서 입력 */}
+      {consultOpen && (
+        <>
+          <div onClick={() => setConsultOpen(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.25)', zIndex: 90 }} />
+          <div style={{
+            position: 'fixed', top: 0, right: 0, bottom: 0, width: 460, maxWidth: '92vw', zIndex: 95,
+            background: 'rgba(255,255,255,0.97)', backdropFilter: 'blur(16px)',
+            boxShadow: '-8px 0 24px rgba(15,23,42,0.12)', padding: 20, overflowY: 'auto',
+            display: 'flex', flexDirection: 'column', gap: 12,
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ fontSize: 15, fontWeight: 800, color: '#0f2440' }}>✍️ 상담 입력</div>
+              <button onClick={() => setConsultOpen(false)} style={{ border: 'none', background: 'none', fontSize: 18, cursor: 'pointer', color: '#94a3b8' }}>×</button>
+            </div>
+            {/* 최근 상담 3건 — 맥락 보면서 입력 */}
+            {consultations.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 220, overflowY: 'auto' }}>
+                {consultations.slice(0, 3).map((c) => {
+                  const meta = CATEGORY_META[c.category] || CATEGORY_META.other
+                  return (
+                    <div key={c.id} style={{ padding: '8px 10px', background: `${meta.tint}11`, borderLeft: `3px solid ${meta.tint}`, borderRadius: 6, fontSize: 12 }}>
+                      <div style={{ fontSize: 10, color: '#64748b', marginBottom: 2 }}>{meta.emoji} {meta.label} · {fmtIsoFull(c.created_at)}</div>
+                      <div style={{ color: '#1e293b', whiteSpace: 'pre-wrap', lineHeight: 1.4 }}>{c.note.length > 120 ? c.note.slice(0, 120) + '…' : c.note}</div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+            <textarea
+              ref={noteRef}
+              value={newNote}
+              onChange={(e) => setNewNote(e.target.value)}
+              onKeyDown={onKeyDown}
+              disabled={!dispatchOrder || migrationPending || posting}
+              placeholder="상담 내용을 입력하세요 (Ctrl/Cmd + Enter 로 전송)"
+              rows={8}
+              style={{
+                width: '100%', padding: '12px 14px', borderRadius: 10, fontSize: 13, color: '#1e293b',
+                ...GLASS.L1, resize: 'vertical', minHeight: 160, lineHeight: 1.5, boxSizing: 'border-box',
+              }}
+            />
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+              {(Object.keys(CATEGORY_META) as ConsultationCategory[]).map((k) => {
+                const meta = CATEGORY_META[k]
+                const active = newCategory === k
+                return (
+                  <button key={k} onClick={() => setNewCategory(k)} disabled={posting}
+                    style={{
+                      padding: '4px 10px', borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: 11, whiteSpace: 'nowrap',
+                      border: `1px solid ${active ? meta.tint : 'rgba(0,0,0,0.1)'}`,
+                      background: active ? meta.tint : 'transparent', color: active ? '#fff' : meta.tint,
+                    }}>{meta.emoji} {meta.label}</button>
+                )
+              })}
+            </div>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <span style={{ fontSize: 11, color: '#94a3b8' }}>{newNote.length}/5000</span>
+              <div style={{ flex: 1 }} />
+              <button
+                onClick={submitConsultation}
+                disabled={!dispatchOrder || migrationPending || posting || !newNote.trim()}
+                style={{
+                  padding: '10px 20px', borderRadius: 10, border: 'none', fontWeight: 800, fontSize: 13, whiteSpace: 'nowrap',
+                  background: (!dispatchOrder || migrationPending || posting || !newNote.trim()) ? '#94a3b8' : 'linear-gradient(135deg, #3b6eb5, #5a8fd4)',
+                  color: '#fff',
+                  cursor: (!dispatchOrder || migrationPending || posting || !newNote.trim()) ? 'not-allowed' : 'pointer',
+                }}
+              >{posting ? '저장 중…' : '💬 상담 추가'}</button>
+            </div>
+          </div>
+        </>
+      )}
       {/* PR-C2a (2026-05-16) — 하단 sticky 배차 처리 패널
          사용자 명시: 「A-1 + 하단 고정해서 작성하면서 위아래 이동」
          - 위 본문: 사고 정보 / 상담 / SMS / 공장배정 등 — 자유 스크롤
@@ -2131,15 +2145,23 @@ export default function DispatchDetailPage({
 }
 
 // ─── Helpers ───────────────────────────────────────────────────
-function Section({ icon, title, children }: { icon: string; title: string; children: React.ReactNode }) {
+function Section({ icon, title, children, collapsible, defaultOpen = true }: { icon: string; title: string; children: React.ReactNode; collapsible?: boolean; defaultOpen?: boolean }) {
+  // 접기 지원 (2026-07-10 사용자 명시 「문자 발송 부분은 별도 탭으로 빼주던 접어주고」)
+  const [open, setOpen] = useState(defaultOpen)
   return (
     <div style={{ marginBottom: 16 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+      <div
+        onClick={collapsible ? () => setOpen((v) => !v) : undefined}
+        style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, cursor: collapsible ? 'pointer' : undefined }}
+      >
         <h3 style={{ fontSize: 13, fontWeight: 800, color: '#0f2440', margin: 0, whiteSpace: 'nowrap' }}>{icon} {title}</h3>
+        {collapsible && <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 700 }}>{open ? '▴ 접기' : '▾ 펼치기'}</span>}
       </div>
-      <div style={{ ...GLASS.L4, border: '1px solid rgba(0,0,0,0.05)', borderRadius: 12, padding: 14 }}>
-        {children}
-      </div>
+      {(!collapsible || open) && (
+        <div style={{ ...GLASS.L4, border: '1px solid rgba(0,0,0,0.05)', borderRadius: 12, padding: 14 }}>
+          {children}
+        </div>
+      )}
     </div>
   )
 }
