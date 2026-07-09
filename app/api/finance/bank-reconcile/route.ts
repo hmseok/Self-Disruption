@@ -75,56 +75,78 @@ export async function GET(request: NextRequest) {
     //   잔액이 기록된 거래를 시간순으로 놓고 「이전 잔액 ± 입출금 = 다음 잔액」 이 이어지는지 검사.
     //   끊긴 지점 = 그 사이에 누락 또는 중복이 있다는 뜻 (위치까지 특정).
     //   ※ 같은 은행에 계좌가 여러 개면 사슬이 섞일 수 있어 은행 선택 시 가장 정확.
+    // (2026-07-08 재작성 — 오탐 2건 수정)
+    //   ① 잔액 없는 행도 합계(net)에는 포함해야 함 — 기존엔 balance IS NOT NULL 필터로
+    //      제외되어 그날 이후 기대잔액이 전부 어긋남.
+    //   ② 날짜만 있는 데이터(시각 00:00 동일)는 같은 날 안의 순서를 알 수 없음 —
+    //      시작일 기준 잔액을 임의 행으로 잡으면 기대값이 음수까지 나오는 오탐.
+    //      → 시작 묶음의 모든 잔액을 후보로 시뮬레이션, 끊김이 가장 적은 기준을 채택.
     const chainRows = await prisma.$queryRawUnsafe<Array<any>>(
       `SELECT transaction_date, type, amount, balance_after, client_name, description
          FROM transactions
         WHERE deleted_at IS NULL
           AND (imported_from LIKE 'excel_bank%' OR imported_from = 'sms_bank' OR imported_from = 'codef_bank')
-          AND balance_after IS NOT NULL AND balance_after > 0
           AND transaction_date >= ? AND transaction_date < DATE_ADD(?, INTERVAL 1 DAY)
           ${bankClause}
         ORDER BY transaction_date ASC
-        LIMIT 3000`,
+        LIMIT 5000`,
       from, to,
     )
-    // 같은 시각 묶음(은행 일괄처리 — 세금 납부 등)은 순서를 알 수 없어 건별 비교 시 오탐.
-    //   → 묶음 단위로 검사: 이전 끝잔액 + 묶음 합계 = 묶음 내 어느 한 행의 잔액이면 정상.
-    const groups: Array<{ ts: string; rows: any[] }> = []
+    const withBalance = chainRows.filter((r) => r.balance_after != null && Number(r.balance_after) > 0).length
+    // 같은 시각 묶음(은행 일괄처리·날짜만 있는 엑셀)은 순서를 알 수 없어 건별 비교 시 오탐.
+    //   → 묶음 단위 검사: 이전 끝잔액 + 묶음 합계(잔액 없는 행 포함) = 묶음 내 어느 잔액과 일치하면 정상.
+    const groups: Array<{ ts: string; rows: any[]; net: number; balances: number[] }> = []
     for (const r of chainRows) {
       const ts = String(r.transaction_date)
-      if (groups.length && groups[groups.length - 1].ts === ts) groups[groups.length - 1].rows.push(r)
-      else groups.push({ ts, rows: [r] })
+      if (!groups.length || groups[groups.length - 1].ts !== ts) groups.push({ ts, rows: [], net: 0, balances: [] })
+      const g = groups[groups.length - 1]
+      g.rows.push(r)
+      g.net += r.type === 'income' ? Number(r.amount) : -Number(r.amount)
+      if (r.balance_after != null && Number(r.balance_after) > 0) g.balances.push(Number(r.balance_after))
     }
-    const breaks: any[] = []
-    let checked = 0
-    let prevEnd: number | null = null
-    for (const g of groups) {
-      const net = g.rows.reduce((s, r) => s + (r.type === 'income' ? Number(r.amount) : -Number(r.amount)), 0)
-      if (prevEnd === null) {
-        // 시작 묶음 — 묶음 내 잔액 중 "그 행까지의 누적"과 맞는 끝잔액 후보를 그대로 채택
-        prevEnd = Number(g.rows[g.rows.length - 1].balance_after)
-        continue
-      }
-      checked++
-      const expected: number = prevEnd + net
-      const hit = g.rows.some((r) => Math.abs(Number(r.balance_after) - expected) <= 0.5)
-      if (hit) {
-        prevEnd = expected
-      } else {
-        const first = g.rows[0]
-        const closest = g.rows.reduce((b, r) => (Math.abs(Number(r.balance_after) - expected) < Math.abs(Number(b.balance_after) - expected) ? r : b), g.rows[0])
-        if (breaks.length < 10) {
-          breaks.push({
-            date: String(first.transaction_date).slice(0, 10),
-            client_name: first.client_name || first.description || '',
-            expected,
-            actual: Number(closest.balance_after),
-            diff: Number(closest.balance_after) - expected,
-          })
+    // 시작 기준 잔액 후보 = 첫 잔액 보유 묶음의 잔액들 → 각각 시뮬레이션 → 끊김 최소 채택
+    const startIdx = groups.findIndex((g) => g.balances.length > 0)
+    const simulate = (anchor: number) => {
+      const bks: any[] = []
+      let checkedCnt = 0
+      let prevEnd = anchor
+      for (let i = startIdx + 1; i < groups.length; i++) {
+        const g = groups[i]
+        const expected = prevEnd + g.net
+        if (g.balances.length === 0) { prevEnd = expected; continue }  // 잔액 없는 묶음 — 검증 불가, 누적만
+        checkedCnt++
+        const hit = g.balances.some((b) => Math.abs(b - expected) <= 0.5)
+        if (hit) {
+          prevEnd = expected
+        } else {
+          const closest = g.balances.reduce((b, c) => (Math.abs(c - expected) < Math.abs(b - expected) ? c : b), g.balances[0])
+          if (bks.length < 10) {
+            const first = g.rows[0]
+            bks.push({
+              date: String(first.transaction_date).slice(0, 10),
+              client_name: first.client_name || first.description || '',
+              expected,
+              actual: closest,
+              diff: closest - expected,
+            })
+          }
+          prevEnd = closest  // 사슬 재동기화
         }
-        // 사슬 재동기화 — 이후 구간은 이 묶음의 실제 잔액 기준으로 계속 검사
-        prevEnd = Number(closest.balance_after)
       }
+      return { bks, checkedCnt }
+    }
+    let breaks: any[] = []
+    let checked = 0
+    if (startIdx >= 0 && groups.length > startIdx + 1) {
+      const candidates = Array.from(new Set(groups[startIdx].balances))
+      let best: { bks: any[]; checkedCnt: number } | null = null
+      for (const c of candidates) {
+        const sim = simulate(c)
+        if (!best || sim.bks.length < best.bks.length) best = sim
+        if (best.bks.length === 0) break
+      }
+      breaks = best?.bks || []
+      checked = best?.checkedCnt || 0
     }
 
     return NextResponse.json({
@@ -134,7 +156,7 @@ export async function GET(request: NextRequest) {
       net: incomeSum - expenseSum,
       count,
       by_source: bySource,
-      chain: { with_balance: chainRows.length, checked, breaks_found: breaks.length >= 10 ? '10+' : breaks.length, breaks },
+      chain: { with_balance: withBalance, checked, breaks_found: breaks.length >= 10 ? '10+' : breaks.length, breaks },
       error: null,
     })
   } catch (e: any) {
