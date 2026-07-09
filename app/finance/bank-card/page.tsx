@@ -267,11 +267,15 @@ export default function BankCardPage() {
   const [rcBusy, setRcBusy] = useState(false)
   const [rcResult, setRcResult] = useState<any>(null)
 
-  const runReconcile = useCallback(async () => {
+  // override — 배지 클릭 등에서 state 반영 기다리지 않고 바로 실행 (2026-07-08 사용자 명시 「바로 내역이 나와야」)
+  const runReconcile = useCallback(async (override?: { account?: string; from?: string; to?: string }) => {
     setRcBusy(true)
     setRcResult(null)
     try {
-      const { json } = await fetchWithAuth(`/api/finance/bank-reconcile?from=${rcFrom}&to=${rcTo}&bank=${rcBank}&account=${rcAccount}`)
+      const from = override?.from ?? rcFrom
+      const to = override?.to ?? rcTo
+      const account = override?.account ?? rcAccount
+      const { json } = await fetchWithAuth(`/api/finance/bank-reconcile?from=${from}&to=${to}&bank=${rcBank}&account=${account}`)
       if (json?.error) throw new Error(json.error)
       setRcResult(json)
     } catch (e: any) {
@@ -280,7 +284,7 @@ export default function BankCardPage() {
       setRcBusy(false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rcFrom, rcTo, rcBank])
+  }, [rcFrom, rcTo, rcBank, rcAccount])
 
   // 데이터
   const [transactions, setTransactions] = useState<Transaction[]>([])
@@ -3741,7 +3745,7 @@ export default function BankCardPage() {
                   <input type="date" value={rcFrom} onChange={(e) => setRcFrom(e.target.value)} style={{ padding: '7px 9px', borderRadius: 8, border: '1px solid rgba(0,0,0,0.12)', fontSize: 12 }} />
                   <span style={{ fontSize: 11, color: COLORS.textMuted }}>~</span>
                   <input type="date" value={rcTo} onChange={(e) => setRcTo(e.target.value)} style={{ padding: '7px 9px', borderRadius: 8, border: '1px solid rgba(0,0,0,0.12)', fontSize: 12 }} />
-                  <button onClick={runReconcile} disabled={rcBusy}
+                  <button onClick={() => runReconcile()} disabled={rcBusy}
                     style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: COLORS.primary, color: '#fff', fontSize: 12, fontWeight: 800, cursor: rcBusy ? 'wait' : 'pointer' }}>
                     {rcBusy ? '확인 중…' : '확인하기'}
                   </button>
@@ -3833,7 +3837,14 @@ export default function BankCardPage() {
                         <span style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSecondary }}>계좌 ****{a}</span>
                         {v && (
                           <span
-                            onClick={(e) => { e.stopPropagation(); setRcAccount(a); setReconcileOpen(true) }}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              // 배지 검사와 같은 기간(최근 30일)으로 즉시 실행 — 결과가 배지 숫자와 일치
+                              const to = new Date().toISOString().slice(0, 10)
+                              const from = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10)
+                              setRcAccount(a); setRcFrom(from); setRcTo(to); setReconcileOpen(true)
+                              runReconcile({ account: a, from, to })
+                            }}
                             title={v.ok ? '최근 30일 입출금과 잔액이 이어집니다' : `최근 30일 중 ${v.breaks}곳에서 잔액이 안 이어집니다 — 눌러서 확인`}
                             style={{
                               fontSize: 10, fontWeight: 800, padding: '1px 6px', borderRadius: 8, whiteSpace: 'nowrap',
