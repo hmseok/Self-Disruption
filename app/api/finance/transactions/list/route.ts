@@ -81,6 +81,7 @@ export async function GET(request: NextRequest) {
          bam.account_alias      AS bank_account_alias,
          bam.account_holder     AS bank_account_holder,
          bam.purpose            AS bank_purpose,
+         bam.bank_name          AS bank_mapped_name,
          bam_car.number         AS bank_matched_car_number,
          CONCAT_WS(' ', bam_car.brand, bam_car.model) AS bank_matched_car_model
        FROM transactions t

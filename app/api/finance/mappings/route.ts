@@ -382,6 +382,32 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // ── 은행명 자동 교정 (2026-07-08) ──
+    //   업로드 시 파일에서 은행명을 못 읽으면 잘못된 기본값이 박히던 사고.
+    //   매핑 저장 = 그 계좌(끝4자리)의 기존 거래 bank_name 을 매핑 기준으로 일괄 교정.
+    let bankNameFixed = 0
+    if (bank_name) {
+      const numDigits2 = String(account_number || '').replace(/\D/g, '')
+      const aliasDigits2 = String(account_alias || '').replace(/\D/g, '')
+      const acct4 = numDigits2.length >= 4 ? numDigits2.slice(-4) : aliasDigits2.length >= 4 ? aliasDigits2.slice(-4) : null
+      if (acct4) {
+        try {
+          const res = await prisma.$executeRawUnsafe(`
+            UPDATE transactions
+            SET bank_name = ?, updated_at = NOW()
+            WHERE deleted_at IS NULL
+              AND account_last4 = ?
+              AND (imported_from LIKE 'excel_bank%' OR imported_from IN ('sms_bank', 'codef_bank'))
+              AND (bank_name IS NULL OR bank_name <> ?)
+          `, bank_name, acct4, bank_name)
+          bankNameFixed = Number(res)
+        } catch (e: any) {
+          // account_last4 컬럼 미적용 DB (규칙 23) — 교정 생략
+          console.warn('[mappings bank_name fix]', e.message)
+        }
+      }
+    }
+
     // ── 검증 (규칙 10): INSERT/UPDATE 후 실제 row 가 있는지 확인 ──
     let verifiedBank: any = null
     if (account_alias) {
@@ -399,7 +425,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       ok: true,
       verified: verifiedBank ? { id: verifiedBank.id, account_alias: verifiedBank.account_alias } : null,
-      backfill: { sms: 0, tx: bankBackfilledTx },
+      backfill: { sms: 0, tx: bankBackfilledTx, bank_name_fixed: bankNameFixed },
     })
   }
 

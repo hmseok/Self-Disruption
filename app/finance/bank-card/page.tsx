@@ -1472,7 +1472,7 @@ export default function BankCardPage() {
 
   const cardMonthSummary = useMemo(() => {
     const ym = new Date().toISOString().slice(0, 7)
-    const byCard = new Map<string, number>()
+    const byCard = new Map<string, { sum: number; holder: string }>()
     for (const t of transactions) {
       if (!isCardTx(t)) continue
       if (String(t.transaction_date || '').slice(0, 7) !== ym) continue
@@ -1480,7 +1480,11 @@ export default function BankCardPage() {
       if (!alias) continue
       const amt = Number(t.amount || 0)
       const canceled = (t as any).sms_transaction_type === 'canceled'
-      byCard.set(alias, (byCard.get(alias) || 0) + (canceled ? -amt : amt))
+      const cur = byCard.get(alias) || { sum: 0, holder: '' }
+      cur.sum += canceled ? -amt : amt
+      // 소지자 (2026-07-08 사용자 명시) — 매핑 등록 소지자 > 문자 승인자
+      if (!cur.holder) cur.holder = (t as any).matched_holder_name || (t as any).sms_holder || ''
+      byCard.set(alias, cur)
     }
     return byCard
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1856,7 +1860,8 @@ export default function BankCardPage() {
             balance: safeNum(row[reverse.balance]) || undefined,
             counterpart: rawCounterpart,
             // 파일 상단 메타에서 추출 (모든 행에 동일하게 부여 — 매핑 매칭용)
-            bank_name: (file as any).bankName || '우리은행',
+            // 기본값 '우리은행' 제거 (2026-07-08) — 못 읽으면 비워두고 매핑 관리 기준으로 표시/교정
+            bank_name: (file as any).bankName || '',
             account_number: (file as any).accountNumber || undefined,
             account_last4: (file as any).accountLast4 || undefined,
             account_holder: (file as any).accountHolder || undefined,
@@ -3227,10 +3232,11 @@ export default function BankCardPage() {
       sortBy: (r) => r.transaction_date ? new Date(r.transaction_date as any).getTime() : 0,
       render: (r) => <span style={{ fontSize: 13, color: COLORS.textSecondary }}>{fmtDate(r.transaction_date)}</span> },
     // 규칙 30 확장 (2026-07-08) — 3층 스택 → 1셀 1값 (은행/계좌/용도 분리 컬럼)
+    // 은행 = 매핑 관리 기준 우선 (업로드 시 파일에서 은행명 못 읽으면 잘못 박히던 사고 — 2026-07-08)
     { key: 'account', label: '은행', width: 76,
-      sortBy: (r: any) => r.bank_name || r.card_company || '',
+      sortBy: (r: any) => (r as any).bank_mapped_name || r.bank_name || r.card_company || '',
       render: (r: any) => {
-        const bankName = r.bank_name || (r.card_company || '').replace('_BANK', '')
+        const bankName = (r as any).bank_mapped_name || r.bank_name || (r.card_company || '').replace('_BANK', '')
         return <span style={{ fontSize: 12, fontWeight: 700, color: COLORS.primary, whiteSpace: 'nowrap' }}>{bankName || '-'}</span>
       }, hideOnMobile: true },
     { key: 'account_no', label: '계좌', width: 90,
@@ -3293,7 +3299,15 @@ export default function BankCardPage() {
       render: (r) =>
       r.type === 'expense' ? <span style={{ color: COLORS.expense, fontWeight: 600, fontSize: 13 }}>{nf(r.amount)}</span> : <span style={{ color: COLORS.textMuted }}>-</span>
     },
-    // 잔액 컬럼 제거 — 거의 없는 데이터 (화면 자리 차지)
+    // 잔액 컬럼 복원 (2026-07-08 사용자 명시 「잔액이 같이 나오고 누락이 있는지 통장에 표출」)
+    //   문자·엑셀의 거래 후 잔액 — 행 사이 잔액이 안 이어지는 지점 = 누락/중복 육안 확인
+    { key: 'balance', label: '잔액', width: 110, align: 'right',
+      sortBy: (r: any) => Number(r.balance_after || 0),
+      render: (r: any) =>
+        r.balance_after != null && Number(r.balance_after) > 0
+          ? <span style={{ fontSize: 12, color: COLORS.textSecondary, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{nf(r.balance_after)}</span>
+          : <span style={{ fontSize: 11, color: '#cbd5e1' }}>—</span>,
+      hideOnMobile: true },
     { key: 'matched', label: '매칭', width: 110,
       sortBy: (r: any) => r.bank_matched_car_number || r.bank_purpose || '',
       render: (r: any) => {
@@ -3906,7 +3920,7 @@ export default function BankCardPage() {
             {/* 관리자 요약 — 카드별 이번 달 누적 사용액 (2026-07-08 사용자 명시) */}
             {cardMonthSummary.size > 0 && (
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
-                {Array.from(cardMonthSummary.entries()).sort((x, y) => y[1] - x[1]).slice(0, 10).map(([alias, sum]) => {
+                {Array.from(cardMonthSummary.entries()).sort((x, y) => y[1].sum - x[1].sum).slice(0, 10).map(([alias, info]) => {
                   const selected = cardPick === alias
                   return (
                     <div key={alias}
@@ -3917,9 +3931,12 @@ export default function BankCardPage() {
                         ...(selected ? { background: COLORS.bgViolet } : {}),
                         border: selected ? '1.5px solid #7c3aed' : `1px solid ${COLORS.borderViolet}`,
                       }}>
-                      <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSecondary, marginBottom: 4, whiteSpace: 'nowrap' }}>{alias}</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSecondary, whiteSpace: 'nowrap' }}>{alias}</span>
+                        {info.holder && <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 8, background: 'rgba(124,58,237,0.08)', color: '#7c3aed', whiteSpace: 'nowrap' }}>{info.holder}</span>}
+                      </div>
                       <div style={{ fontSize: 16, fontWeight: 800, color: COLORS.textPrimary, whiteSpace: 'nowrap' }}>
-                        {Math.round(sum).toLocaleString()}원
+                        {Math.round(info.sum).toLocaleString()}원
                       </div>
                       <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 2 }}>이번 달 사용</div>
                     </div>
