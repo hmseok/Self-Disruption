@@ -631,44 +631,15 @@ export default function ClaimsTab() {
       )}
       <DcStatStrip stats={statItems} actions={statActions} />
 
-      {/* PR-PAY-REVIEW — 입금 연결 검수 패널 (차량번호축 + 고객명축 후보) */}
+      {/* 입금 연결 검수는 입금 탭으로 통합 (2026-07-08 사용자 명시 「보기 안 좋아서」) — 여기선 안내만 */}
       {payCand.length > 0 && (
-        <div style={{ ...GLASS.L3, marginBottom: 12, borderRadius: 12, border: '1px solid rgba(245,158,11,0.35)', overflow: 'hidden' }}>
+        <div style={{ ...GLASS.L3, marginBottom: 12, borderRadius: 12, border: '1px solid rgba(245,158,11,0.35)', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ fontSize: 13, fontWeight: 800, color: '#b45309' }}>🔗 입금 연결 필요 {payCand.length}건</span>
+          <span style={{ flex: 1 }} />
           <button
-            onClick={() => setLinkPanelOpen((v) => !v)}
-            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '11px 14px', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left' }}
-          >
-            <span style={{ fontSize: 13, fontWeight: 800, color: '#b45309' }}>🔗 입금 연결 필요 {payCand.length}건</span>
-            <span style={{ fontSize: 11, color: '#94a3b8' }}>미매칭 입금 중 차량번호·고객명이 닿는 후보 — 확인 후 연결하세요</span>
-            <span style={{ flex: 1 }} />
-            <span style={{ fontSize: 12, color: '#b45309' }}>{linkPanelOpen ? '▴ 접기' : '▾ 펼치기'}</span>
-          </button>
-          {linkPanelOpen && (
-            <div style={{ padding: '0 14px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {payCand.slice(0, 20).map((row) => (
-                <div key={row.id} style={{ ...GLASS.L1, borderRadius: 9, padding: '9px 12px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 12, fontWeight: 800, color: '#0f2440', whiteSpace: 'nowrap' }}>🚗 {row.customer_car_number || '-'}</span>
-                  <span style={{ fontSize: 12, color: '#475569', whiteSpace: 'nowrap' }}>{row.customer_name || '-'}{row.insurance_company ? ` · ${row.insurance_company}` : ''}</span>
-                  <span style={{ flex: 1 }} />
-                  {row.candidates.map((c) => (
-                    <span key={c.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}>
-                      <span style={{ fontSize: 10, fontWeight: 800, padding: '2px 6px', borderRadius: 6, background: c.match_by === 'name' ? 'rgba(16,185,129,0.12)' : c.match_by === 'payer' ? 'rgba(124,58,237,0.12)' : COLORS.bgBlue, color: c.match_by === 'name' ? '#047857' : c.match_by === 'payer' ? '#6d28d9' : COLORS.primary }}>
-                        {c.match_by === 'name' ? '이름' : c.match_by === 'payer' ? '입금자명' : '차량'}
-                      </span>
-                      <span style={{ fontSize: 12, color: '#1e293b' }}>{c.client_name || '-'} · <b>{fmtWon(c.amount)}</b> · {fmtDate(c.transaction_date)}</span>
-                      <button
-                        onClick={() => openLinkModal(row, c)}
-                        style={{ padding: '4px 10px', borderRadius: 7, border: 'none', background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)', color: '#fff', cursor: 'pointer', fontSize: 11, fontWeight: 800 }}
-                      >🔗 연결</button>
-                    </span>
-                  ))}
-                </div>
-              ))}
-              {payCand.length > 20 && (
-                <div style={{ fontSize: 11, color: '#94a3b8' }}>외 {payCand.length - 20}건 — 재무 → 통장/카드 → 대차료 입금현황에서 전체 확인</div>
-              )}
-            </div>
-          )}
+            onClick={() => window.dispatchEvent(new CustomEvent('operations:switch-tab', { detail: { tab: 'deposits' } }))}
+            style={{ padding: '5px 14px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)', color: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 800 }}
+          >입금 탭에서 처리 →</button>
         </div>
       )}
       <DcToolbar

@@ -35,6 +35,35 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const { id } = await params
     const body = await request.json()
 
+    // ── 「대차 입금 아님」 사유 처리 (2026-07-08 사고대차 입금 탭) ──
+    //   raw_data $._not_rental 에 사유 저장 → 자동매칭/검수 풀에서 제외.
+    //   사유는 관리자 도메인과 맞춤 (지입 정산/투자/보험/일반 매출/기타) — 지입·투자
+    //   페이지 및 통장 분류에서 관리자가 이어받아 처리 (사용자 명시).
+    if (body.not_rental !== undefined) {
+      if (body.not_rental === null) {
+        await prisma.$executeRaw`
+          UPDATE transactions
+             SET raw_data = JSON_REMOVE(COALESCE(raw_data, JSON_OBJECT()), '$._not_rental', '$._not_rental_memo'),
+                 updated_at = NOW()
+           WHERE id = ${id}
+        `
+      } else {
+        const reason = String(body.not_rental.reason || '기타').slice(0, 30)
+        const memo = String(body.not_rental.memo || '').slice(0, 200)
+        await prisma.$executeRaw`
+          UPDATE transactions
+             SET raw_data = JSON_SET(COALESCE(raw_data, JSON_OBJECT()),
+                   '$._not_rental', ${reason},
+                   '$._not_rental_memo', ${memo}),
+                 updated_at = NOW()
+           WHERE id = ${id}
+        `
+      }
+      // 사유만 온 요청이면 여기서 종료
+      const otherKeys = Object.keys(body).filter((k) => k !== 'not_rental')
+      if (otherKeys.length === 0) return NextResponse.json({ data: { id }, error: null })
+    }
+
     // 허용 필드 화이트리스트
     const allowed: Record<string, any> = {}
     const allowedKeys = [

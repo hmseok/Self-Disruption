@@ -5,6 +5,7 @@ import AccidentIntakeTab from './_tabs/AccidentIntakeTab'
 import WaitingTab from './_tabs/WaitingTab'
 import RentalListTab from './_tabs/RentalListTab'
 import ClaimsTab from './_tabs/ClaimsTab'
+import DepositsTab from './_tabs/DepositsTab'
 
 // ═══════════════════════════════════════════════════════════════════
 // /operations — 「대차업무」 통합 페이지
@@ -26,7 +27,7 @@ import ClaimsTab from './_tabs/ClaimsTab'
 // PR-Y3 (2026-05-24) — 사용자 명시: 반납점검 탭 제거 (정비는 대차업무 흐름 외).
 // ═══════════════════════════════════════════════════════════════════
 
-type SubTab = 'intake' | 'available' | 'dispatched' | 'claims'
+type SubTab = 'intake' | 'available' | 'dispatched' | 'claims' | 'deposits'
 
 // 업무 흐름: ① 접수·상담 → ② 배차중 → ③ 반납·청구 (사용가능 차량은 자원 뷰)
 // PR-UX-SIMPLE (2026-07-04) — 사용자 명시: 「접수-배차-청구 로 깔끔하게 필요정보만」
@@ -36,9 +37,10 @@ const FLOW_TABS: Array<{ key: SubTab; label: string; icon: string; step: number 
   { key: 'intake',      label: '접수', icon: '📋', step: 1 },
   { key: 'dispatched',  label: '배차', icon: '🚗', step: 2 },
   { key: 'claims',      label: '청구', icon: '💰', step: 3 },
+  { key: 'deposits',    label: '입금', icon: '🏦', step: 4 },
 ]
 
-const TAB_KEYS: SubTab[] = ['intake', 'available', 'dispatched', 'claims']
+const TAB_KEYS: SubTab[] = ['intake', 'available', 'dispatched', 'claims', 'deposits']
 
 export default function OperationsPage() {
   const [tab, setTab] = useState<SubTab>('intake')  // default: 접수·상담 (업무 진입점)
@@ -97,6 +99,8 @@ export default function OperationsPage() {
         {tab === 'dispatched' && <RentalListTab />}
 
         {tab === 'claims' && <ClaimsTab />}
+
+        {tab === 'deposits' && <DepositsTab />}
       </div>
     </div>
   )

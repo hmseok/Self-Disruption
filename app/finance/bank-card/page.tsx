@@ -3315,10 +3315,19 @@ export default function BankCardPage() {
           : <span style={{ fontSize: 11, color: '#cbd5e1' }}>—</span>,
       hideOnMobile: true },
     { key: 'matched', label: '매칭', width: 110,
-      sortBy: (r: any) => r.bank_matched_car_number || r.bank_purpose || '',
+      sortBy: (r: any) => (r.related_type === 'fmi_rental' ? '0대차' : '') || r.bank_matched_car_number || r.bank_purpose || '',
       render: (r: any) => {
         // 한 줄 표시 (줄바꿈 최소화 — CLAUDE.md 규칙 19)
-        // 차량 > purpose > —
+        // 대차 연결 > 사유 처리 > 차량 > purpose > —  (2026-07-08 「전체 매칭확인은 여기서도」)
+        if (r.related_type === 'fmi_rental' && r.related_id) {
+          return <span style={{ fontSize: 12, fontWeight: 600, color: '#059669', whiteSpace: 'nowrap' }}>💰 대차 연결</span>
+        }
+        try {
+          const raw = typeof r.raw_data === 'string' ? JSON.parse(r.raw_data) : r.raw_data
+          if (raw && raw._not_rental) {
+            return <span style={{ fontSize: 12, color: '#6d28d9', whiteSpace: 'nowrap' }} title={raw._not_rental_memo || ''}>🏷 {raw._not_rental}</span>
+          }
+        } catch { /* raw_data 파싱 실패 — 무시 */ }
         if (r.bank_matched_car_number) {
           return <span style={{ fontSize: 12, fontWeight: 600, color: '#1e40af', whiteSpace: 'nowrap' }}>🚗 {r.bank_matched_car_number}</span>
         }
