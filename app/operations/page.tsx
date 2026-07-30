@@ -8,45 +8,36 @@ import ClaimsTab from './_tabs/ClaimsTab'
 import DepositsTab from './_tabs/DepositsTab'
 
 // ═══════════════════════════════════════════════════════════════════
-// /operations — 「대차업무」 통합 페이지
+// /operations — 「단기·대차」 (A안 확정 2026-07-30, CONTRACT-UNIFY-A-PLAN)
 //
-// 운영 라이프사이클: 사고접수 → 상담 → 배차 → 반납 → 청구
+// 운영 라이프사이클: 사고접수 → 상담 → 배차 → 반납 → 청구 → 입금
 //
-// PR-W  (2026-05-23) — 사고접수 독립탭 폐기 → 대차업무 서브탭
-// PR-Y1 (2026-05-23) — 사용자 명시: 「대차업무 안에 접수·상담 / 사용가능 /
-//   배차중 / 반납점검 / 반납·청구 로 가면 되는데」
-//   → 차량 상태축(사용가능·배차중·반납점검)과 업무 단계축(접수·상담 / 반납·청구)을
-//     한 줄 하위탭으로 정렬. 상위 멀티탭 폐기, 5개 하위탭으로 단순화.
-//
+// 탭 구조는 2026-07-04 사용자 확정 「접수-배차-청구 로 깔끔하게」 흐름 유지.
+// 2026-07-30 개편: 페이지 헤더 신설 + 플랫 스타일 (이모지·그림자 제거).
 //   탭 ↔ 컴포넌트:
-//     접수·상담  → AccidentIntakeTab (cafe24 사고 + 상담 진행상태, 기본 오늘)
-//     사용가능   → WaitingTab lockStatus='available'
-//     배차중     → RentalListTab scope='dispatch' (배차예정+배차완료)
-//     반납·청구  → ClaimsTab (회차완료·청구중·정산완료)
-//
-// PR-Y3 (2026-05-24) — 사용자 명시: 반납점검 탭 제거 (정비는 대차업무 흐름 외).
+//     접수  → AccidentIntakeTab (사고 + 상담 진행상태, 기본 오늘)
+//     배차  → RentalListTab scope='dispatch' (배차예정+배차완료)
+//     청구  → ClaimsTab (회차완료·청구중·정산완료)
+//     입금  → DepositsTab (렌터카통장 열람 + 연결)
+//     (사용가능 차량 뷰는 ?tab=available 레거시 링크로만 접근)
 // ═══════════════════════════════════════════════════════════════════
 
 type SubTab = 'intake' | 'available' | 'dispatched' | 'claims' | 'deposits'
 
-// 업무 흐름: ① 접수·상담 → ② 배차중 → ③ 반납·청구 (사용가능 차량은 자원 뷰)
-// PR-UX-SIMPLE (2026-07-04) — 사용자 명시: 「접수-배차-청구 로 깔끔하게 필요정보만」
-//   사용가능 차량 탭 제거 — 배차하기 화면이 이미 사용가능 차량에서 선택 (waiting-vehicles).
-//   ?tab=available 레거시 링크는 계속 동작 (탭 버튼만 없음).
-const FLOW_TABS: Array<{ key: SubTab; label: string; icon: string; step: number }> = [
-  { key: 'intake',      label: '접수', icon: '📋', step: 1 },
-  { key: 'dispatched',  label: '배차', icon: '🚗', step: 2 },
-  { key: 'claims',      label: '청구', icon: '💰', step: 3 },
-  { key: 'deposits',    label: '입금', icon: '🏦', step: 4 },
+const FLOW_TABS: Array<{ key: SubTab; label: string; step: number }> = [
+  { key: 'intake',      label: '접수', step: 1 },
+  { key: 'dispatched',  label: '배차', step: 2 },
+  { key: 'claims',      label: '청구', step: 3 },
+  { key: 'deposits',    label: '입금', step: 4 },
 ]
 
 const TAB_KEYS: SubTab[] = ['intake', 'available', 'dispatched', 'claims', 'deposits']
 
 export default function OperationsPage() {
-  const [tab, setTab] = useState<SubTab>('intake')  // default: 접수·상담 (업무 진입점)
+  const [tab, setTab] = useState<SubTab>('intake')  // default: 접수 (업무 진입점)
 
   // ?tab= 쿼리로 초기 탭 지정 — 레거시 링크 매핑
-  //   schedule/rentals → 배차중,  accident → 접수·상담,  waiting → 사용가능
+  //   schedule/rentals → 배차,  accident → 접수,  waiting → 사용가능
   useEffect(() => {
     let t = new URLSearchParams(window.location.search).get('tab')
     if (t === 'schedule' || t === 'rentals') t = 'dispatched'
@@ -68,23 +59,29 @@ export default function OperationsPage() {
   return (
     <div className="page-bg">
       <div className="max-w-[1800px] mx-auto py-4 px-4 md:py-5 md:px-6">
-        {/* 업무 흐름 탭 (① → ② → ③) + 사용가능 차량(자원) */}
+        {/* 페이지 헤더 */}
+        <div style={{ marginBottom: 16 }}>
+          <h1 style={{ fontSize: 21, letterSpacing: '-0.02em', fontWeight: 700, color: '#1a1d23' }}>단기·대차</h1>
+          <p style={{ color: '#5b626e', fontSize: 13, marginTop: 3 }}>사고대차와 단기렌트 — 접수부터 배차, 보험사 청구, 입금 확인까지</p>
+        </div>
+
+        {/* 업무 흐름 탭 (① → ② → ③ → ④) */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
           {FLOW_TABS.map((t, i) => {
             const active = tab === t.key
             return (
               <div key={t.key} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                {i > 0 && <span style={{ color: '#cbd5e1', fontSize: 18, fontWeight: 700 }}>→</span>}
+                {i > 0 && <span style={{ color: '#cbd5e1', fontSize: 16, fontWeight: 600 }}>→</span>}
                 <button onClick={() => setTab(t.key)} style={{
-                  display: 'flex', alignItems: 'center', gap: 8, padding: '9px 16px', borderRadius: 12,
-                  border: active ? 'none' : '1px solid rgba(0,0,0,0.08)', cursor: 'pointer',
-                  fontSize: 13, fontWeight: active ? 800 : 600, whiteSpace: 'nowrap',
+                  display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px', borderRadius: 10,
+                  border: `1px solid ${active ? '#2563eb' : '#e6e8ec'}`, cursor: 'pointer',
+                  fontSize: 13.5, fontWeight: 600, whiteSpace: 'nowrap',
                   background: active ? '#2563eb' : '#fff',
-                  color: active ? '#fff' : '#475569',
-                  boxShadow: active ? '0 6px 16px rgba(59,110,181,0.3)' : 'none', transition: 'all 0.2s',
+                  color: active ? '#fff' : '#5b626e',
+                  transition: 'all 0.12s',
                 }}>
-                  <span style={{ width: 22, height: 22, borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, background: active ? 'rgba(255,255,255,0.25)' : 'rgba(59,110,181,0.12)', color: active ? '#fff' : '#2563eb' }}>{t.step}</span>
-                  {t.icon} {t.label}
+                  <span style={{ width: 20, height: 20, borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, background: active ? 'rgba(255,255,255,0.22)' : '#eff4ff', color: active ? '#fff' : '#2563eb' }}>{t.step}</span>
+                  {t.label}
                 </button>
               </div>
             )
