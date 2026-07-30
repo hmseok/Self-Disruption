@@ -70,17 +70,17 @@ export const MENUS: MenuEntry[] = [
   // ── 홈 — 모든 로그인 사용자. 사이드바 최상단에 별도 렌더 (ClientLayout)
   { id: 'mod-home', name: '홈', path: '/home', iconKey: 'Home', group: 'core', sortOrder: 0, requirePermission: false, sidebarHidden: true },
 
-  // ── 핵심 업무 (core) — 새 IA 6메뉴
+  // ── 핵심 업무 (core) — 새 IA (계약은 A안 확정: 장기계약 / 단기·대차 — 2026-07-30)
   { id: 'mod-cars',       name: '차량',    path: '/cars',                 iconKey: 'Car',    group: 'core', sortOrder: 1, requirePermission: true },
-  // 계약 — 개편 3단계에서 contracts + long_term_rentals 통합 예정. 통합 전까지 두 entry 병행.
-  { id: 'mod-contracts',  name: '계약/고객', displayName: '계약',  path: '/contracts',          iconKey: 'Doc',    group: 'core', sortOrder: 2, requirePermission: true },
-  { id: 'mod-long-term',  name: '장기렌트', path: '/long-term-rentals',    iconKey: 'Key',    group: 'core', sortOrder: 3, requirePermission: true },
+  { id: 'mod-long-term',  name: '장기렌트', displayName: '장기계약', path: '/long-term-rentals', iconKey: 'Doc', group: 'core', sortOrder: 2, requirePermission: true },
+  { id: 'mod-ops',        name: '사고대차', displayName: '단기·대차', path: '/operations',       iconKey: 'Key', group: 'core', sortOrder: 3, requirePermission: true },
   { id: 'mod-ledger',     name: '통장/카드', displayName: '장부', path: '/finance/bank-card', iconKey: 'Ledger', group: 'core', sortOrder: 4, requirePermission: true },
   { id: 'mod-settlement', name: '정산/수금', displayName: '정산', path: '/finance/settlement', iconKey: 'Coin',   group: 'core', sortOrder: 5, requirePermission: true },
   { id: 'mod-pnl',        name: '차량 손익', displayName: '손익', path: '/finance/fleet',      iconKey: 'Trend',  group: 'core', sortOrder: 6, requirePermission: true },
 
-  // ── 세부 화면 (detail) — 개편 진행에 따라 core 6메뉴 안으로 흡수 예정
-  { id: 'mod-ops',            name: '사고대차',     path: '/operations',            iconKey: 'Wrench', group: 'detail', sortOrder: 10, requirePermission: true },
+  // ── 세부 화면 (detail) — 개편 진행에 따라 core 메뉴 안으로 흡수 예정
+  // 구 계약/고객 — A안 확정으로 강등. contracts 실데이터 확인(CONTRACT-UNIFY-A-PLAN 3장) 후 은퇴 예정.
+  { id: 'mod-contracts',      name: '계약/고객(구)', path: '/contracts',             iconKey: 'Doc',    group: 'detail', sortOrder: 10, requirePermission: true },
   { id: 'mod-factory-search', name: '협력공장 추천', path: '/factory-search',        iconKey: 'Wrench', group: 'detail', sortOrder: 11, requirePermission: true },
   { id: 'mod-loans',          name: '대출',         path: '/loans',                 iconKey: 'Money',  group: 'detail', sortOrder: 12, requirePermission: true },
   { id: 'mod-insurance',      name: '보험',         path: '/insurance',             iconKey: 'Shield', group: 'detail', sortOrder: 13, requirePermission: true },
