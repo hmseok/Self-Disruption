@@ -40,6 +40,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     //   사유는 관리자 도메인과 맞춤 (지입 정산/투자/보험/일반 매출/기타) — 지입·투자
     //   페이지 및 통장 분류에서 관리자가 이어받아 처리 (사용자 명시).
     if (body.not_rental !== undefined) {
+      // 사유 ↔ 관리 구분(V11) 동기: 사유를 남기면 그 페이지 소관으로 지정, 해제하면 지정도 해제
+      const DOMAIN_BY_REASON: Record<string, string> = { '지입 정산': 'jiip', '투자': 'invest', '보험': 'insure', '일반 매출': 'general', '기타': 'general' }
       if (body.not_rental === null) {
         await prisma.$executeRaw`
           UPDATE transactions
@@ -47,6 +49,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
                  updated_at = NOW()
            WHERE id = ${id}
         `
+        await prisma.$executeRaw`UPDATE transactions SET manage_domain = NULL WHERE id = ${id}`
+          .catch(() => { /* V11 미적용 DB (규칙 23) */ })
       } else {
         const reason = String(body.not_rental.reason || '기타').slice(0, 30)
         const memo = String(body.not_rental.memo || '').slice(0, 200)
@@ -58,6 +62,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
                  updated_at = NOW()
            WHERE id = ${id}
         `
+        const dom = DOMAIN_BY_REASON[reason] || 'general'
+        await prisma.$executeRaw`UPDATE transactions SET manage_domain = ${dom} WHERE id = ${id}`
+          .catch(() => { /* V11 미적용 DB (규칙 23) */ })
       }
       // 사유만 온 요청이면 여기서 종료
       const otherKeys = Object.keys(body).filter((k) => k !== 'not_rental')

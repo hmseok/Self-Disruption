@@ -219,7 +219,7 @@ export default function InvestorPage() {
               ) : null}
             </div>
           </div>
-          <a href="/finance/bank-card?tab=workflow" style={{
+          <a href="/finance/classify" style={{
             padding: '6px 14px',
             fontSize: 12,
             fontWeight: 600,
