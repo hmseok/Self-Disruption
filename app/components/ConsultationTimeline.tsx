@@ -87,7 +87,7 @@ export default function ConsultationTimeline({
         <button
           onClick={submit}
           disabled={busy || !draft.trim()}
-          style={{ padding: '9px 14px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)', color: '#fff', cursor: busy || !draft.trim() ? 'not-allowed' : 'pointer', fontWeight: 800, fontSize: 12, whiteSpace: 'nowrap', opacity: busy || !draft.trim() ? 0.5 : 1 }}
+          style={{ padding: '9px 14px', borderRadius: 8, border: 'none', background: '#2563eb', color: '#fff', cursor: busy || !draft.trim() ? 'not-allowed' : 'pointer', fontWeight: 800, fontSize: 12, whiteSpace: 'nowrap', opacity: busy || !draft.trim() ? 0.5 : 1 }}
         >{busy ? '저장 중…' : '＋ 기록'}</button>
       </div>
       {pendingHint && (

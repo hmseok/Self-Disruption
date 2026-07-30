@@ -169,7 +169,7 @@ export default function LedgerTab({ filterDate }: { filterDate: string }) {
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
           <button onClick={generateMonth} disabled={busy !== ''}
             style={{ padding: '8px 14px', fontSize: 12, fontWeight: 700, borderRadius: 8, border: 'none',
-              background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)', color: '#fff',
+              background: '#2563eb', color: '#fff',
               cursor: busy ? 'wait' : 'pointer', opacity: busy ? 0.6 : 1 }}>
             {busy === 'generate' ? '생성 중...' : `⚡ ${filterDate} 정산 생성`}
           </button>
@@ -187,8 +187,8 @@ export default function LedgerTab({ filterDate }: { filterDate: string }) {
         {(['all', 'pending', 'matched', 'paid'] as const).map(s => (
           <button key={s} onClick={() => setStatus(s)}
             style={{ padding: '4px 10px', fontSize: 11, fontWeight: 700, borderRadius: 6,
-              border: '1px solid ' + (status === s ? '#3b6eb5' : '#e2e8f0'),
-              background: status === s ? '#3b6eb5' : '#fff',
+              border: '1px solid ' + (status === s ? '#2563eb' : '#e2e8f0'),
+              background: status === s ? '#2563eb' : '#fff',
               color: status === s ? '#fff' : '#334155', cursor: 'pointer' }}>
             {s === 'all' ? '전체' : s === 'pending' ? '미결' : s === 'matched' ? '이체대기' : '지급완료'}
           </button>
@@ -197,8 +197,8 @@ export default function LedgerTab({ filterDate }: { filterDate: string }) {
         {(['all', 'jiip', 'invest', 'loan_out'] as const).map(t => (
           <button key={t} onClick={() => setType(t)}
             style={{ padding: '4px 10px', fontSize: 11, fontWeight: 700, borderRadius: 6,
-              border: '1px solid ' + (type === t ? '#3b6eb5' : '#e2e8f0'),
-              background: type === t ? '#3b6eb5' : '#fff',
+              border: '1px solid ' + (type === t ? '#2563eb' : '#e2e8f0'),
+              background: type === t ? '#2563eb' : '#fff',
               color: type === t ? '#fff' : '#334155', cursor: 'pointer' }}>
             {t === 'all' ? '전체' : t === 'jiip' ? '지입' : t === 'invest' ? '투자' : '대여'}
           </button>

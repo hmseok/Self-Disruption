@@ -112,12 +112,12 @@ export default function NeuSearchBar({
               whiteSpace: 'nowrap',
               transition: 'all 0.2s',
               ...(isPrimary ? {
-                background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)',
+                background: '#2563eb',
                 color: '#fff',
                 boxShadow: '3px 3px 8px rgba(140,170,210,0.19), -1px -1px 4px rgba(255,255,255,0.47)',
               } : isGhost ? {
                 background: 'transparent',
-                color: '#3b6eb5',
+                color: '#2563eb',
               } : {
                 background: 'rgba(255,255,255,0.60)',
                 color: '#1e293b',

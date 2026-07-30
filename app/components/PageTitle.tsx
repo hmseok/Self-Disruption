@@ -122,7 +122,7 @@ const ADMIN_GROUP: Record<string, string> = {
 // 회사 식별 배지 (org-brand) — 로그인 회사 첫 글자.
 // 솔리드 hex / linear-gradient 라 ui-token-lint(rgba 토큰) 무관.
 const BRAND_BADGE: Record<string, { initial: string; gradient: string }> = {
-  FMI:  { initial: 'F', gradient: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)' },
+  FMI:  { initial: 'F', gradient: '#2563eb' },
   RIDE: { initial: 'R', gradient: 'linear-gradient(135deg, #0d9488, #14b8a6)' },
 }
 
@@ -237,10 +237,8 @@ export default function PageTitle({ dynamicMenuName, brand, primaryLabel }: Page
   return (
     <div style={{
       background: GLASS.L5.background,
-      backdropFilter: 'blur(12px)',
-      WebkitBackdropFilter: 'blur(12px)',
-      padding: '14px 24px',
-      borderBottom: '1px solid rgba(0,0,0,0.06)',
+      padding: '12px 24px',
+      borderBottom: '1px solid #f0f1f4',
       display: 'flex',
       alignItems: 'center',
       gap: 12,
@@ -262,7 +260,6 @@ export default function PageTitle({ dynamicMenuName, brand, primaryLabel }: Page
             justifyContent: 'center',
             marginRight: 4,
             flexShrink: 0,
-            boxShadow: '2px 2px 5px rgba(140,170,210,0.30)',
           }}>
             {badge.initial}
           </div>
@@ -291,12 +288,12 @@ export default function PageTitle({ dynamicMenuName, brand, primaryLabel }: Page
               style={{
                 fontSize: item.isCurrent ? 13 : 12,
                 fontWeight: item.isCurrent ? 700 : 500,
-                color: item.isCurrent ? '#3b6eb5' : '#64748b',  // PR-HR-23b hotfix — tab-color-lint 표준 (UI-DESIGN-STANDARD § 4.1)
+                color: item.isCurrent ? '#2563eb' : '#5b626e',  // 2026-07 플랫 팔레트
                 cursor: item.clickable ? 'pointer' : 'default',
                 transition: 'color 120ms',
               }}
-              onMouseEnter={(e) => { if (item.clickable) (e.currentTarget as HTMLElement).style.color = '#3b6eb5' }}
-              onMouseLeave={(e) => { if (item.clickable) (e.currentTarget as HTMLElement).style.color = item.isCurrent ? '#3b6eb5' : '#64748b' }}
+              onMouseEnter={(e) => { if (item.clickable) (e.currentTarget as HTMLElement).style.color = '#2563eb' }}
+              onMouseLeave={(e) => { if (item.clickable) (e.currentTarget as HTMLElement).style.color = item.isCurrent ? '#2563eb' : '#5b626e' }}
             >
               {item.label}
             </span>

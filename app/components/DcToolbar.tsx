@@ -1,8 +1,7 @@
 'use client'
 
 // ═══════════════════════════════════════════════════════════
-// Design C — Unified Toolbar (Search + Filter Tabs in one bar)
-// Single bar containing: search input + filter pill buttons
+// DcToolbar — 검색 + 필터 칩 통합 바 (2026-07 개편: 플랫, 목업 .toolbar/.chip)
 // ═══════════════════════════════════════════════════════════
 
 import { ReactNode } from 'react'
@@ -40,82 +39,89 @@ export default function DcToolbar({
     <div style={{
       display: 'flex',
       alignItems: 'center',
-      gap: 12,
-      marginBottom: 16,
-      background: 'rgba(255,255,255,0.72)',
-      borderRadius: 14,
-      padding: '8px 8px 8px 20px',
-      boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -4px -4px 12px rgba(255,255,255,0.5)',
-      border: '1px solid rgba(0,0,0,0.05)',
+      gap: 8,
+      marginBottom: 14,
+      background: '#ffffff',
+      borderRadius: 12,
+      padding: '10px 12px',
+      boxShadow: '0 1px 2px rgba(16,24,40,0.05)',
+      border: '1px solid #e6e8ec',
       flexWrap: 'wrap',
       minHeight: 48,
     }}>
       {/* Leading content */}
       {leading}
 
-      {/* Search icon + input (hidden when noSearch) */}
+      {/* Search input (hidden when noSearch) */}
       {!noSearch && (
-        <>
-          <span style={{ color: '#8aabc7', fontSize: 14, flexShrink: 0 }}>🔍</span>
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          flex: '0 1 260px', minWidth: 140,
+          border: '1px solid #e6e8ec', borderRadius: 8,
+          padding: '7px 11px', background: '#f6f7f9',
+        }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9aa1ad" strokeWidth="2" strokeLinecap="round" style={{ flexShrink: 0 }}><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
           <input
             value={search}
             onChange={e => onSearchChange(e.target.value)}
             placeholder={placeholder}
             style={{
-              flex: '0 1 240px',
-              minWidth: 120,
-              maxWidth: 320,
+              flex: 1,
+              minWidth: 0,
               border: 'none',
               background: 'transparent',
               fontSize: 13,
               fontWeight: 500,
               outline: 'none',
-              color: '#2a4a6b',
+              color: '#1a1d23',
               fontFamily: 'inherit',
             }}
           />
-        </>
+        </div>
       )}
 
-      {/* Filter pills (검색 바로 옆 고정 — trailing 유무와 무관하게 위치 변동 없음) */}
+      {/* Filter chips (검색 바로 옆 고정 — trailing 유무와 무관하게 위치 변동 없음) */}
       {filters && filters.length > 0 && (
-        <div style={{ display: 'flex', gap: 4, flexShrink: 0, flexWrap: 'nowrap' }}>
-          {filters.map(f => (
-            <button
-              key={f.key}
-              onClick={() => onFilterChange?.(f.key)}
-              style={{
-                padding: '7px 14px',
-                borderRadius: 10,
-                border: 'none',
-                fontSize: 12,
-                fontWeight: 700,
-                background: activeFilter === f.key ? '#3b6eb5' : 'transparent',
-                color: activeFilter === f.key ? '#fff' : '#64748b',
-                cursor: 'pointer',
-                fontFamily: 'inherit',
-                transition: 'all 0.15s',
-                whiteSpace: 'nowrap',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 4,
-              }}
-            >
-              {f.label}
-              {f.count !== undefined && (
-                <span style={{
-                  fontSize: 10,
-                  fontWeight: 800,
-                  padding: '1px 5px',
-                  borderRadius: 6,
-                  background: activeFilter === f.key ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.06)',
-                  color: activeFilter === f.key ? 'rgba(255,255,255,0.8)' : '#8aabc7',
-                }}>
-                  {f.count}
-                </span>
-              )}
-            </button>
-          ))}
+        <div style={{ display: 'flex', gap: 6, flexShrink: 0, flexWrap: 'nowrap' }}>
+          {filters.map(f => {
+            const on = activeFilter === f.key
+            return (
+              <button
+                key={f.key}
+                onClick={() => onFilterChange?.(f.key)}
+                style={{
+                  padding: '6px 13px',
+                  borderRadius: 99,
+                  border: `1px solid ${on ? '#1a1d23' : '#e6e8ec'}`,
+                  fontSize: 12.5,
+                  fontWeight: 500,
+                  background: on ? '#1a1d23' : '#ffffff',
+                  color: on ? '#ffffff' : '#5b626e',
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  transition: 'all 0.12s',
+                  whiteSpace: 'nowrap',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 5,
+                }}
+              >
+                {f.label}
+                {f.count !== undefined && (
+                  <span style={{
+                    fontSize: 10.5,
+                    fontWeight: 700,
+                    padding: '1px 6px',
+                    borderRadius: 9,
+                    background: on ? 'rgba(255,255,255,0.2)' : '#f0f1f4',
+                    color: on ? '#ffffff' : '#9aa1ad',
+                  }}>
+                    {f.count}
+                  </span>
+                )}
+              </button>
+            )
+          })}
         </div>
       )}
 

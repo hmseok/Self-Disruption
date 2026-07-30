@@ -293,7 +293,7 @@ export default function RentalDrawer({
             <div style={{ flex: 1 }} />
             <button
               onClick={() => router.push(`/operations/rentals/${rentalId}?from=dispatched`)}
-              style={{ padding: '9px 16px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)', color: '#fff', cursor: 'pointer', fontWeight: 800, fontSize: 12 }}
+              style={{ padding: '9px 16px', borderRadius: 8, border: 'none', background: '#2563eb', color: '#fff', cursor: 'pointer', fontWeight: 800, fontSize: 12 }}
             >전체 편집 →</button>
           </div>
         )}

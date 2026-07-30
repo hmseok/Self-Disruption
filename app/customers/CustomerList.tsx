@@ -592,7 +592,7 @@ export default function CustomerPage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <div style={{
             width: 32, height: 32, borderRadius: 8,
-            background: `linear-gradient(135deg, #3b6eb5, #5a8fd4)`,
+            background: `#2563eb`,
             color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontWeight: 700, fontSize: 13
           }}>
@@ -654,7 +654,7 @@ export default function CustomerPage() {
     subtitle: (c) => `${c.type} · ${formatPhone(c.phone)}`,
     trailing: (c) => (
       <div style={{ textAlign: 'right' }}>
-        <div style={{ fontWeight: 700, fontSize: 13, color: '#3b6eb5' }}>{c.grade}</div>
+        <div style={{ fontWeight: 700, fontSize: 13, color: '#2563eb' }}>{c.grade}</div>
         <div style={{ fontSize: 10, color: '#8aabc7', marginTop: 2 }}>{c.created_at.split('T')[0]}</div>
       </div>
     ),
@@ -790,8 +790,8 @@ export default function CustomerPage() {
                     style={{
                       padding: '12px 16px', fontSize: 13, fontWeight: detailTab === tab ? 700 : 500,
                       border: 'none', background: 'transparent', cursor: 'pointer',
-                      borderBottom: detailTab === tab ? '3px solid #3b6eb5' : 'none',
-                      color: detailTab === tab ? '#3b6eb5' : '#64748b',
+                      borderBottom: detailTab === tab ? '3px solid #2563eb' : 'none',
+                      color: detailTab === tab ? '#2563eb' : '#64748b',
                     }}
                   >
                     {tab === 'info' ? '정보' : tab === 'payments' ? '결제' : tab === 'invoices' ? '계산서' : '메모'}
@@ -810,7 +810,7 @@ export default function CustomerPage() {
                             onClick={() => { setIsEditing(true); setEditForm({ ...selectedCustomer }) }}
                             style={{
                               flex: 1, padding: '10px 14px', fontSize: 12, fontWeight: 600,
-                              background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)', color: '#fff',
+                              background: '#2563eb', color: '#fff',
                               border: 'none', borderRadius: 8, cursor: 'pointer',
                             }}
                           >
@@ -924,7 +924,7 @@ export default function CustomerPage() {
                             onClick={handleUpdateCustomer}
                             style={{
                               flex: 1, padding: '10px 14px', fontSize: 12, fontWeight: 600,
-                              background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)', color: '#fff',
+                              background: '#2563eb', color: '#fff',
                               border: 'none', borderRadius: 8, cursor: 'pointer',
                             }}
                           >
@@ -952,7 +952,7 @@ export default function CustomerPage() {
                       onClick={() => setShowPaymentForm(!showPaymentForm)}
                       style={{
                         width: '100%', padding: '10px 14px', fontSize: 12, fontWeight: 600,
-                        background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)', color: '#fff',
+                        background: '#2563eb', color: '#fff',
                         border: 'none', borderRadius: 8, cursor: 'pointer', marginBottom: 12,
                       }}
                     >
@@ -971,7 +971,7 @@ export default function CustomerPage() {
                             onClick={handleAddPayment}
                             style={{
                               flex: 1, padding: '10px 14px', fontSize: 12, fontWeight: 600,
-                              background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)', color: '#fff',
+                              background: '#2563eb', color: '#fff',
                               border: 'none', borderRadius: 8, cursor: 'pointer',
                             }}
                           >
@@ -1023,7 +1023,7 @@ export default function CustomerPage() {
                       onClick={() => setShowInvoiceForm(!showInvoiceForm)}
                       style={{
                         width: '100%', padding: '10px 14px', fontSize: 12, fontWeight: 600,
-                        background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)', color: '#fff',
+                        background: '#2563eb', color: '#fff',
                         border: 'none', borderRadius: 8, cursor: 'pointer', marginBottom: 12,
                       }}
                     >
@@ -1040,7 +1040,7 @@ export default function CustomerPage() {
                             onClick={handleAddInvoice}
                             style={{
                               flex: 1, padding: '10px 14px', fontSize: 12, fontWeight: 600,
-                              background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)', color: '#fff',
+                              background: '#2563eb', color: '#fff',
                               border: 'none', borderRadius: 8, cursor: 'pointer',
                             }}
                           >
@@ -1121,7 +1121,7 @@ export default function CustomerPage() {
                         onClick={handleAddNote}
                         style={{
                           width: '100%', padding: '10px 14px', fontSize: 12, fontWeight: 600,
-                          background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)', color: '#fff',
+                          background: '#2563eb', color: '#fff',
                           border: 'none', borderRadius: 8, cursor: 'pointer',
                         }}
                       >
@@ -1275,7 +1275,7 @@ export default function CustomerPage() {
                     onClick={handleCreateCustomer}
                     style={{
                       flex: 1, padding: '10px 14px', fontSize: 12, fontWeight: 600,
-                      background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)', color: '#fff',
+                      background: '#2563eb', color: '#fff',
                       border: 'none', borderRadius: 8, cursor: 'pointer',
                     }}
                   >

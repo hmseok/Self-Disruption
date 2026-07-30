@@ -38,7 +38,7 @@ interface Props {
 }
 
 const DOT: Record<string, string> = {
-  depreciation: '#3b6eb5', finance: '#6366f1', insurance: '#10b981',
+  depreciation: '#2563eb', finance: '#6366f1', insurance: '#10b981',
   maintenance: '#f59e0b', tax_inspection: '#ef4444', risk: '#a855f7',
   overhead: '#64748b', discount: '#34d399',
 }
@@ -97,7 +97,7 @@ export default function CostSummaryPanel({ result, loading, err, onApply }: Prop
 
       {result && (
         <>
-          <div style={{ padding: 14, borderRadius: 12, background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)', color: '#fff' }}>
+          <div style={{ padding: 14, borderRadius: 12, background: '#2563eb', color: '#fff' }}>
             <div style={{ fontSize: 10, opacity: 0.85, fontWeight: 700 }}>적정 월 렌트료 (VAT 포함)</div>
             <div style={{ fontSize: 24, fontWeight: 900, marginTop: 2 }}>{result.suggested_rent_with_vat.toLocaleString('ko-KR')}원</div>
             <div style={{ fontSize: 10, opacity: 0.75, marginTop: 2 }}>VAT 별도: {result.suggested_rent.toLocaleString('ko-KR')}원</div>

@@ -40,7 +40,7 @@ export default function ContractsHub() {
                 fontSize: 13,
                 fontWeight: mainTab === t.key ? 700 : 500,
                 color: mainTab === t.key ? '#fff' : '#64748b',
-                background: mainTab === t.key ? '#3b6eb5' : 'transparent',
+                background: mainTab === t.key ? '#2563eb' : 'transparent',
                 border: '1px solid transparent',
                 borderRadius: 10,
                 cursor: 'pointer',

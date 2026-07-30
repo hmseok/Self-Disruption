@@ -271,7 +271,7 @@ export default function CarListPage() {
     subtitle: (car) => `${car.brand} ${car.model} · ${car.year}년 · ${car.fuel}`,
     trailing: (car) => (
       <div style={{ textAlign: 'right' }}>
-        <div style={{ fontWeight: 900, fontSize: 13, color: '#3b6eb5' }}>{formatMoney(car.purchase_price)}원</div>
+        <div style={{ fontWeight: 900, fontSize: 13, color: '#2563eb' }}>{formatMoney(car.purchase_price)}원</div>
         <div style={{ fontSize: 10, color: '#8aabc7', marginTop: 2 }}>{car.created_at.split('T')[0]}</div>
       </div>
     ),
@@ -387,7 +387,7 @@ export default function CarListPage() {
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
               <span style={{ fontSize: 16 }}>🆕</span>
-              <h3 style={{ fontWeight: 700, color: '#3b6eb5', fontSize: 13 }}>
+              <h3 style={{ fontWeight: 700, color: '#2563eb', fontSize: 13 }}>
                 최근 7일 신규 등록 ({recentCars.length}대)
               </h3>
             </div>
@@ -411,7 +411,7 @@ export default function CarListPage() {
                   <div style={{ fontWeight: 700, fontSize: 13, color: '#1e293b' }}>{car.number}</div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
                     <span style={{ fontSize: 11, color: '#64748b' }}>{car.brand}</span>
-                    <span style={{ fontSize: 10, color: '#3b6eb5', fontWeight: 700 }}>{car.created_at.split('T')[0]}</span>
+                    <span style={{ fontSize: 10, color: '#2563eb', fontWeight: 700 }}>{car.created_at.split('T')[0]}</span>
                   </div>
                 </button>
               ))}

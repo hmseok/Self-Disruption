@@ -51,7 +51,7 @@ const DEFAULT_STYLES: Required<Style> = {
 // Phase 1.4-fix4 — 섹션 타입별 본문 헤더 색상 (사용자 통찰 2026-05-19):
 // "본문 내부에서도 종류별로 구분"
 const SECTION_TYPE_DECOR: Record<SectionType, { color: string; bg: string; emoji: string; label: string }> = {
-  chapter:    { color: '#3b6eb5', bg: '#eff6ff', emoji: '📖', label: '본문' },
+  chapter:    { color: '#2563eb', bg: '#eff6ff', emoji: '📖', label: '본문' },
   attachment: { color: '#7c3aed', bg: '#f5f3ff', emoji: '📎', label: '별첨' },
   form:       { color: '#10b981', bg: '#f0fdf4', emoji: '📝', label: '서식' },
   general:    { color: '#475569', bg: '#f8fafc', emoji: '📋', label: '일반규정' },

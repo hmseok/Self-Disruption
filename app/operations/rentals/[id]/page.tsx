@@ -88,7 +88,7 @@ export default function RentalDetailPage() {
   )
   const Chk = ({ k, label }: any) => (
     <label style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, color: '#475569', cursor: 'pointer' }}>
-      <input type="checkbox" checked={b01(f[k])} onChange={(e) => set(k, e.target.checked ? 1 : 0)} style={{ width: 16, height: 16, accentColor: '#3b6eb5', cursor: 'pointer' }} />
+      <input type="checkbox" checked={b01(f[k])} onChange={(e) => set(k, e.target.checked ? 1 : 0)} style={{ width: 16, height: 16, accentColor: '#2563eb', cursor: 'pointer' }} />
       {label}
     </label>
   )
@@ -107,7 +107,7 @@ export default function RentalDetailPage() {
           <div style={{ fontSize: 11, fontWeight: 700, color: '#1d4ed8', background: 'rgba(59,110,181,0.1)', padding: '3px 10px', borderRadius: 20 }}>{STATUS_LABEL[f.status] || f.status}</div>
           <span style={{ fontSize: 11, color: '#94a3b8' }}>{f.rental_no}</span>
           <div style={{ flex: 1 }} />
-          <button onClick={save} disabled={saving} style={{ padding: '9px 20px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)', color: '#fff', cursor: saving ? 'wait' : 'pointer', fontWeight: 800, fontSize: 13, opacity: saving ? 0.5 : 1 }}>{saving ? '저장 중…' : '💾 저장'}</button>
+          <button onClick={save} disabled={saving} style={{ padding: '9px 20px', borderRadius: 8, border: 'none', background: '#2563eb', color: '#fff', cursor: saving ? 'wait' : 'pointer', fontWeight: 800, fontSize: 13, opacity: saving ? 0.5 : 1 }}>{saving ? '저장 중…' : '💾 저장'}</button>
         </div>
         {msg && <div style={{ fontSize: 12, fontWeight: 700, color: msg.type === 'ok' ? '#15803d' : '#991b1b', marginBottom: 12 }}>{msg.type === 'ok' ? '✅' : '⚠️'} {msg.text}</div>}
 

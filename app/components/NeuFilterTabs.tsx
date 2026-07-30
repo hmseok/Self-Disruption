@@ -1,8 +1,9 @@
 'use client'
 
 // ═══════════════════════════════════════════════════════════════
-// NeuFilterTabs — 뉴모피즘 필터 탭 (인셋 컨테이너 + 레이즈드 활성 탭)
+// NeuFilterTabs — 페이지 탭 (2026-07 개편: 언더라인 탭, 목업 .tabs)
 // 모든 리스트 페이지 상태/카테고리 필터 통일 컴포넌트
+// (파일명은 하위 호환 유지 — 뉴모피즘 스타일은 폐지)
 // ═══════════════════════════════════════════════════════════════
 
 export interface FilterTab {
@@ -26,13 +27,9 @@ export default function NeuFilterTabs({ tabs, activeKey, onSelect, trailing, com
     <div style={{
       display: 'flex',
       alignItems: 'center',
-      gap: 6,
-      padding: compact ? '4px 6px' : '5px 8px',
-      background: 'rgba(255,255,255,0.40)',
-      borderRadius: 12,
-      border: '1px solid rgba(0,0,0,0.05)',
-      boxShadow: 'inset 2px 2px 5px rgba(140,170,210,0.10), inset -2px -2px 5px rgba(255,255,255,0.30)',
-      marginBottom: 12,
+      gap: 2,
+      borderBottom: '1px solid #e6e8ec',
+      marginBottom: 14,
       overflowX: 'auto',
       flexWrap: 'nowrap',
     }}>
@@ -45,39 +42,26 @@ export default function NeuFilterTabs({ tabs, activeKey, onSelect, trailing, com
             style={{
               display: 'inline-flex',
               alignItems: 'center',
-              gap: 4,
-              padding: compact ? '5px 10px' : '7px 14px',
-              fontSize: compact ? 11 : 12,
-              fontWeight: isActive ? 700 : 500,
-              borderRadius: 8,
+              gap: 5,
+              padding: compact ? '8px 12px' : '10px 16px',
+              fontSize: compact ? 12.5 : 13.5,
+              fontWeight: 600,
               border: 'none',
+              background: 'none',
               cursor: 'pointer',
               whiteSpace: 'nowrap',
-              transition: 'all 0.2s ease',
-              ...(isActive ? {
-                background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)',
-                color: '#fff',
-                boxShadow: '2px 2px 6px rgba(140,170,210,0.22), -1px -1px 4px rgba(255,255,255,0.40)',
-              } : {
-                background: 'transparent',
-                color: '#64748b',
-              }),
+              color: isActive ? '#2563eb' : '#9aa1ad',
+              borderBottom: `2px solid ${isActive ? '#2563eb' : 'transparent'}`,
+              marginBottom: -1,
+              transition: 'color 0.15s',
             }}
           >
             {tab.label}
             {tab.count !== undefined && (
               <span style={{
-                fontSize: compact ? 9 : 10,
-                fontWeight: 700,
-                padding: '1px 5px',
-                borderRadius: 6,
-                ...(isActive ? {
-                  background: 'rgba(255,255,255,0.25)',
-                  color: '#fff',
-                } : {
-                  background: 'rgba(0,0,0,0.04)',
-                  color: '#8aabc7',
-                }),
+                fontSize: compact ? 10 : 11,
+                fontWeight: 600,
+                color: isActive ? '#2563eb' : '#9aa1ad',
               }}>
                 {tab.count}
               </span>

@@ -574,7 +574,7 @@ export default function MaintenanceMainPage() {
                   padding: '8px 14px',
                   borderRadius: 10,
                   border: 'none',
-                  background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)',
+                  background: '#2563eb',
                   color: '#fff',
                   fontSize: 12,
                   fontWeight: 600,
@@ -593,7 +593,7 @@ export default function MaintenanceMainPage() {
                   padding: '8px 14px',
                   borderRadius: 10,
                   border: 'none',
-                  background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)',
+                  background: '#2563eb',
                   color: '#fff',
                   fontSize: 12,
                   fontWeight: 600,
@@ -829,7 +829,7 @@ export default function MaintenanceMainPage() {
                 subtitle: (maint: MaintenanceRecord) => `${getCar(maint.car_id)?.brand} ${getCar(maint.car_id)?.model} · ${maint.shop_name}`,
                 trailing: (maint: MaintenanceRecord) => (
                   <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontWeight: 900, fontSize: 13, color: '#3b6eb5' }}>{Number(maint.estimated_cost || 0).toLocaleString()}원</div>
+                    <div style={{ fontWeight: 900, fontSize: 13, color: '#2563eb' }}>{Number(maint.estimated_cost || 0).toLocaleString()}원</div>
                     <div style={{ fontSize: 10, color: '#8aabc7', marginTop: 2 }}>{maint.requested_date}</div>
                   </div>
                 ),
@@ -969,7 +969,7 @@ export default function MaintenanceMainPage() {
                   const daysLeft = getDDay(insp.due_date)
                   return (
                     <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontWeight: 900, fontSize: 13, color: '#3b6eb5' }}>{insp.due_date}</div>
+                      <div style={{ fontWeight: 900, fontSize: 13, color: '#2563eb' }}>{insp.due_date}</div>
                       <div style={{ fontSize: 10, color: '#8aabc7', marginTop: 2 }}>
                         {daysLeft < 0 ? `D+${Math.abs(daysLeft)}` : `D-${daysLeft}`}
                       </div>

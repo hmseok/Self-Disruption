@@ -36,14 +36,14 @@ export interface DarkHeaderProps {
 
 const actionStyles: Record<string, React.CSSProperties> = {
   primary: {
-    background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)',
+    background: '#2563eb',
     color: '#fff',
     border: 'none',
     boxShadow: '3px 3px 8px rgba(140,170,210,0.19), -1px -1px 4px rgba(255,255,255,0.47)',
   },
   secondary: {
     background: 'rgba(255,255,255,0.60)',
-    color: '#3b6eb5',
+    color: '#2563eb',
     border: '1px solid rgba(255,255,255,0.30)',
     boxShadow: '2px 2px 6px rgba(140,170,210,0.19), -2px -2px 6px rgba(255,255,255,0.47)',
   },
@@ -190,7 +190,7 @@ export function DarkHeaderTabs({ tabs, activeTab, onTabChange, rightContent }: {
                 padding: '8px 16px', border: 'none', cursor: 'pointer',
                 borderRadius: 10,
                 background: active
-                  ? 'linear-gradient(135deg, #3b6eb5, #5a8fd4)'
+                  ? '#2563eb'
                   : 'transparent',
                 fontSize: 12, fontWeight: active ? 700 : 600,
                 color: active ? '#fff' : '#64748b',
@@ -251,7 +251,7 @@ export function DarkHeaderFilterBar({ filters, activeFilter, onFilterChange, rig
           <button key={f.key} onClick={() => onFilterChange(f.key)}
             style={{
               padding: '5px 12px', borderRadius: 8, fontWeight: 700, fontSize: 11, cursor: 'pointer',
-              background: active ? 'linear-gradient(135deg, #3b6eb5, #5a8fd4)' : 'rgba(255,255,255,0.50)',
+              background: active ? '#2563eb' : 'rgba(255,255,255,0.50)',
               color: active ? '#fff' : '#64748b',
               border: active ? 'none' : '1px solid rgba(255,255,255,0.30)',
               boxShadow: active
@@ -295,7 +295,7 @@ export function DarkHeaderSummaryBar({ items, actions }: {
 }) {
   return (
     <div style={{
-      background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)',
+      background: '#2563eb',
       padding: '10px 20px',
       display: 'flex',
       alignItems: 'center',
@@ -322,7 +322,7 @@ export function DarkHeaderSummaryBar({ items, actions }: {
                 cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4,
                 ...(a.variant === 'primary'
                   ? {
-                      background: 'rgba(255,255,255,0.95)', color: '#3b6eb5', border: 'none', fontWeight: 800,
+                      background: 'rgba(255,255,255,0.95)', color: '#2563eb', border: 'none', fontWeight: 800,
                       boxShadow: '2px 2px 6px rgba(0,0,0,0.1)',
                     }
                   : {

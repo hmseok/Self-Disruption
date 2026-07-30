@@ -147,7 +147,7 @@ export default function PublicLtQuotePage() {
           maxWidth: 760, margin: '0 auto 16px', display: 'flex', gap: 8, justifyContent: 'flex-end', alignItems: 'center',
         }}>
           <button onClick={() => window.print()}
-            style={{ padding: '10px 18px', background: '#3b6eb5', color: '#fff', border: 'none', borderRadius: 9, cursor: 'pointer', fontSize: 13, fontWeight: 800 }}>
+            style={{ padding: '10px 18px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 9, cursor: 'pointer', fontSize: 13, fontWeight: 800 }}>
             🖨 PDF 저장 / 인쇄
           </button>
         </div>
@@ -158,10 +158,10 @@ export default function PublicLtQuotePage() {
           boxShadow: '0 14px 44px rgba(15,23,42,0.12)', overflow: 'hidden', border: '1px solid rgba(0,0,0,0.06)',
         }}>
           {/* 헤더 */}
-          <div style={{ padding: '28px 32px 18px', borderBottom: '2px solid #3b6eb5', background: 'linear-gradient(135deg, #ebf1f9 0%, #f4f8fd 100%)' }}>
+          <div style={{ padding: '28px 32px 18px', borderBottom: '2px solid #2563eb', background: 'linear-gradient(135deg, #ebf1f9 0%, #f4f8fd 100%)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: '#3b6eb5', letterSpacing: 1.2 }}>LONG-TERM RENTAL QUOTE</div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#2563eb', letterSpacing: 1.2 }}>LONG-TERM RENTAL QUOTE</div>
                 <h1 style={{ fontSize: 24, fontWeight: 900, color: '#0f2440', margin: '4px 0 6px' }}>장기렌트 견적서</h1>
                 <div style={{ fontSize: 12, color: '#64748b' }}>
                   견적번호: <span style={{ fontWeight: 700, color: '#1e293b' }}>{data.quote_no || `LTQ-${data.id.slice(0, 8)}`}</span>
@@ -191,7 +191,7 @@ export default function PublicLtQuotePage() {
           <div style={{ padding: '24px 32px', display: 'flex', flexDirection: 'column', gap: 18 }}>
             {/* 고객 */}
             <section>
-              <div style={{ fontSize: 11, fontWeight: 800, color: '#3b6eb5', marginBottom: 8, letterSpacing: 0.6 }}>고객 정보</div>
+              <div style={{ fontSize: 11, fontWeight: 800, color: '#2563eb', marginBottom: 8, letterSpacing: 0.6 }}>고객 정보</div>
               <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
                 <tbody>
                   <tr>
@@ -206,7 +206,7 @@ export default function PublicLtQuotePage() {
 
             {/* 차량 */}
             <section>
-              <div style={{ fontSize: 11, fontWeight: 800, color: '#3b6eb5', marginBottom: 8, letterSpacing: 0.6 }}>
+              <div style={{ fontSize: 11, fontWeight: 800, color: '#2563eb', marginBottom: 8, letterSpacing: 0.6 }}>
                 차량 정보 · {data.contract_type === '신차구입' ? '🆕 신차 구입 계약' : '🚗 기존 차량 계약'} · {fmtRentType(data.rent_type)}
               </div>
               <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
@@ -242,7 +242,7 @@ export default function PublicLtQuotePage() {
 
             {/* 계약 조건 */}
             <section>
-              <div style={{ fontSize: 11, fontWeight: 800, color: '#3b6eb5', marginBottom: 8, letterSpacing: 0.6 }}>계약 조건</div>
+              <div style={{ fontSize: 11, fontWeight: 800, color: '#2563eb', marginBottom: 8, letterSpacing: 0.6 }}>계약 조건</div>
               <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
                 <tbody>
                   <tr>
@@ -276,8 +276,8 @@ export default function PublicLtQuotePage() {
             </section>
 
             {/* 금액 (강조) */}
-            <section style={{ border: '2px solid #3b6eb5', borderRadius: 10, padding: 18, background: 'linear-gradient(135deg, #f4f8fd 0%, #ebf1f9 100%)' }}>
-              <div style={{ fontSize: 11, fontWeight: 800, color: '#3b6eb5', marginBottom: 10, letterSpacing: 0.6 }}>💰 금액 (VAT 포함)</div>
+            <section style={{ border: '2px solid #2563eb', borderRadius: 10, padding: 18, background: 'linear-gradient(135deg, #f4f8fd 0%, #ebf1f9 100%)' }}>
+              <div style={{ fontSize: 11, fontWeight: 800, color: '#2563eb', marginBottom: 10, letterSpacing: 0.6 }}>💰 금액 (VAT 포함)</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                 <div>
                   <div style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>월 렌트료</div>
@@ -285,7 +285,7 @@ export default function PublicLtQuotePage() {
                 </div>
                 <div>
                   <div style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>총 렌트료 ({data.months || 0}개월)</div>
-                  <div style={{ fontSize: 18, fontWeight: 800, color: '#3b6eb5', marginTop: 2 }}>{fmtWon(totalMonthsFee || null)}</div>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: '#2563eb', marginTop: 2 }}>{fmtWon(totalMonthsFee || null)}</div>
                 </div>
               </div>
               <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px dashed rgba(0,0,0,0.1)', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, fontSize: 12 }}>
@@ -310,7 +310,7 @@ export default function PublicLtQuotePage() {
 
             {data.memo && (
               <section>
-                <div style={{ fontSize: 11, fontWeight: 800, color: '#3b6eb5', marginBottom: 8, letterSpacing: 0.6 }}>특이사항</div>
+                <div style={{ fontSize: 11, fontWeight: 800, color: '#2563eb', marginBottom: 8, letterSpacing: 0.6 }}>특이사항</div>
                 <div style={{ fontSize: 12, color: '#475569', lineHeight: 1.6, padding: 10, background: '#f8fafc', borderRadius: 8, whiteSpace: 'pre-wrap' }}>{data.memo}</div>
               </section>
             )}

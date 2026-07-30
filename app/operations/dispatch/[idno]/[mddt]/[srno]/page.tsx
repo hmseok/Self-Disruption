@@ -1327,7 +1327,7 @@ export default function DispatchDetailPage({
                           disabled={!dispatchOrder || migrationPending}
                           style={{
                             padding: '10px 18px', borderRadius: 10, border: 'none', cursor: 'pointer',
-                            background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)', color: '#fff',
+                            background: '#2563eb', color: '#fff',
                             fontWeight: 800, fontSize: 13, whiteSpace: 'nowrap',
                           }}
                         >✍️ 상담 입력</button>
@@ -1345,7 +1345,7 @@ export default function DispatchDetailPage({
           <div onClick={() => setConsultOpen(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.25)', zIndex: 90 }} />
           <div style={{
             position: 'fixed', top: 0, right: 0, bottom: 0, width: 460, maxWidth: '92vw', zIndex: 95,
-            background: 'rgba(255,255,255,0.97)', backdropFilter: 'blur(16px)',
+            ...GLASS.L5,
             boxShadow: '-8px 0 24px rgba(15,23,42,0.12)', padding: 20, overflowY: 'auto',
             display: 'flex', flexDirection: 'column', gap: 12,
           }}>
@@ -1402,7 +1402,7 @@ export default function DispatchDetailPage({
                 disabled={!dispatchOrder || migrationPending || posting || !newNote.trim()}
                 style={{
                   padding: '10px 20px', borderRadius: 10, border: 'none', fontWeight: 800, fontSize: 13, whiteSpace: 'nowrap',
-                  background: (!dispatchOrder || migrationPending || posting || !newNote.trim()) ? '#94a3b8' : 'linear-gradient(135deg, #3b6eb5, #5a8fd4)',
+                  background: (!dispatchOrder || migrationPending || posting || !newNote.trim()) ? '#94a3b8' : '#2563eb',
                   color: '#fff',
                   cursor: (!dispatchOrder || migrationPending || posting || !newNote.trim()) ? 'not-allowed' : 'pointer',
                 }}
@@ -1439,7 +1439,7 @@ export default function DispatchDetailPage({
                 onClick={() => setPanelOpen((v) => !v)}
                 style={{
                   padding: '6px 12px',
-                  background: panelOpen ? '#3b6eb5' : 'transparent',
+                  background: panelOpen ? '#2563eb' : 'transparent',
                   color: panelOpen ? '#fff' : '#0f2440',
                   border: panelOpen ? 'none' : '1px solid rgba(15,36,64,0.2)',
                   borderRadius: 8,
@@ -1500,7 +1500,7 @@ export default function DispatchDetailPage({
                     disabled={busy}
                     style={{
                       padding: '8px 14px',
-                      background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)',
+                      background: '#2563eb',
                       color: '#fff', border: 'none', borderRadius: 8,
                       cursor: busy ? 'not-allowed' : 'pointer',
                       fontWeight: 800, fontSize: 12, whiteSpace: 'nowrap',
@@ -1550,7 +1550,7 @@ export default function DispatchDetailPage({
                   onClick={() => setReturnModalOpen(true)}
                   style={{
                     padding: '8px 16px',
-                    background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)',
+                    background: '#2563eb',
                     color: '#fff',
                     border: 'none',
                     borderRadius: 8,
@@ -1651,7 +1651,7 @@ export default function DispatchDetailPage({
                             padding: '6px 12px', borderRadius: 8, cursor: 'pointer',
                             fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap',
                             border: active ? 'none' : '1px solid rgba(0,0,0,0.12)',
-                            background: active ? '#3b6eb5' : 'transparent',
+                            background: active ? '#2563eb' : 'transparent',
                             color: active ? '#fff' : '#475569',
                           }}
                         >
@@ -1701,7 +1701,7 @@ export default function DispatchDetailPage({
                         if (deliveryVendor || deliveryPhone) lines.push(`업체: ${deliveryVendor} ${deliveryPhone}`.trim())
                         if (deliveryNote) lines.push('요청: ' + deliveryNote)
                         navigator.clipboard?.writeText(lines.join('\n')).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000) })
-                      }} style={{ alignSelf: 'flex-start', padding: '7px 14px', borderRadius: 8, border: 'none', background: copied ? '#10b981' : '#3b6eb5', color: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 800 }}>
+                      }} style={{ alignSelf: 'flex-start', padding: '7px 14px', borderRadius: 8, border: 'none', background: copied ? '#10b981' : '#2563eb', color: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 800 }}>
                         {copied ? '✅ 복사됨' : '📋 복사 (카톡 전송용)'}
                       </button>
                     </div>
@@ -1742,7 +1742,7 @@ export default function DispatchDetailPage({
                         <span style={{ fontSize: 11, color: '#94a3b8' }}>%</span>
                       </div>
                       <button onClick={saveClaimInfo} disabled={claimInfoBusy}
-                        style={{ padding: '7px 14px', borderRadius: 8, border: 'none', cursor: claimInfoBusy ? 'wait' : 'pointer', fontSize: 12, fontWeight: 800, background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)', color: '#fff', opacity: claimInfoBusy ? 0.5 : 1 }}>
+                        style={{ padding: '7px 14px', borderRadius: 8, border: 'none', cursor: claimInfoBusy ? 'wait' : 'pointer', fontSize: 12, fontWeight: 800, background: '#2563eb', color: '#fff', opacity: claimInfoBusy ? 0.5 : 1 }}>
                         {claimInfoBusy ? '저장 중…' : '청구정보 저장'}
                       </button>
                     </div>
@@ -1770,7 +1770,7 @@ export default function DispatchDetailPage({
                       />
                       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                         <button onClick={saveQuoteToOrder} disabled={quoteBusy}
-                          style={{ padding: '7px 14px', borderRadius: 8, border: 'none', cursor: quoteBusy ? 'wait' : 'pointer', fontSize: 12, fontWeight: 800, background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)', color: '#fff', opacity: quoteBusy ? 0.5 : 1 }}>
+                          style={{ padding: '7px 14px', borderRadius: 8, border: 'none', cursor: quoteBusy ? 'wait' : 'pointer', fontSize: 12, fontWeight: 800, background: '#2563eb', color: '#fff', opacity: quoteBusy ? 0.5 : 1 }}>
                           {quoteBusy ? '저장 중…' : '💾 견적 저장'}
                         </button>
                         {quoteResult && (
@@ -2127,7 +2127,7 @@ export default function DispatchDetailPage({
                 disabled={returnBusy || returnUploading}
                 style={{
                   padding: '9px 20px',
-                  background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)',
+                  background: '#2563eb',
                   color: '#fff', border: 'none', borderRadius: 8,
                   cursor: (returnBusy || returnUploading) ? 'not-allowed' : 'pointer',
                   fontWeight: 800, fontSize: 13,

@@ -137,7 +137,7 @@ export default function StatementPage() {
           <p style={{ fontSize: 28, marginBottom: 12 }}>📄</p>
           <p style={{ fontWeight: 800, color: '#0f172a', marginBottom: 6 }}>정산서 데이터 없음</p>
           <p style={{ color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>{err}</p>
-          <button onClick={() => window.close()} style={{ marginTop: 20, padding: '8px 18px', borderRadius: 8, border: 'none', background: '#3b6eb5', color: '#fff', fontWeight: 700, cursor: 'pointer' }}>
+          <button onClick={() => window.close()} style={{ marginTop: 20, padding: '8px 18px', borderRadius: 8, border: 'none', background: '#2563eb', color: '#fff', fontWeight: 700, cursor: 'pointer' }}>
             창 닫기
           </button>
         </div>
@@ -426,13 +426,13 @@ export default function StatementPage() {
 // ── 스타일 ─────────────────────────────────────────────────
 const btnPrimary: React.CSSProperties = {
   padding: '8px 18px', borderRadius: 8, border: 'none',
-  background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)',
+  background: '#2563eb',
   color: '#fff', fontWeight: 800, fontSize: 13, cursor: 'pointer',
   boxShadow: '0 2px 8px rgba(59,110,181,0.25)',
 }
 const btnSecondary: React.CSSProperties = {
-  padding: '8px 18px', borderRadius: 8, border: '1px solid #3b6eb5',
-  background: '#fff', color: '#3b6eb5', fontWeight: 800, fontSize: 13, cursor: 'pointer',
+  padding: '8px 18px', borderRadius: 8, border: '1px solid #2563eb',
+  background: '#fff', color: '#2563eb', fontWeight: 800, fontSize: 13, cursor: 'pointer',
 }
 const btnGhost: React.CSSProperties = {
   padding: '8px 14px', borderRadius: 8, border: '1px solid #cbd5e1',

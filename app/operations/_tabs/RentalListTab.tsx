@@ -544,7 +544,7 @@ export default function RentalListTab() {
           {resultMsg.action && (
             <button
               onClick={resultMsg.action.onClick}
-              style={{ padding: '6px 12px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)', color: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 800, whiteSpace: 'nowrap', flexShrink: 0 }}
+              style={{ padding: '6px 12px', borderRadius: 8, border: 'none', background: '#2563eb', color: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 800, whiteSpace: 'nowrap', flexShrink: 0 }}
             >{resultMsg.action.label}</button>
           )}
           <button onClick={() => setResultMsg(null)} aria-label="닫기"

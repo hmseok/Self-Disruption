@@ -819,11 +819,11 @@ export default function ReceiptsPage() {
               style={{ width: 90, padding: '6px 4px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 12, textAlign: 'right', fontWeight: 700 }} />
           </td>
           <td style={{ padding: '6px 4px', textAlign: 'center' }}>
-            {item.receipt_url && <a href={item.receipt_url} target="_blank" rel="noopener" style={{ color: '#3b6eb5', fontSize: 11 }}>📎</a>}
+            {item.receipt_url && <a href={item.receipt_url} target="_blank" rel="noopener" style={{ color: '#2563eb', fontSize: 11 }}>📎</a>}
           </td>
           <td style={{ padding: '6px 4px', textAlign: 'center', whiteSpace: 'nowrap' }}>
             <button onClick={saveEdit}
-              style={{ background: '#3b6eb5', color: '#fff', border: 'none', borderRadius: 6, padding: '4px 8px', fontSize: 11, fontWeight: 700, cursor: 'pointer', marginRight: 2 }}>
+              style={{ background: '#2563eb', color: '#fff', border: 'none', borderRadius: 6, padding: '4px 8px', fontSize: 11, fontWeight: 700, cursor: 'pointer', marginRight: 2 }}>
               저장
             </button>
             <button onClick={() => setEditingId(null)}
@@ -860,7 +860,7 @@ export default function ReceiptsPage() {
               type="checkbox"
               checked={selectedIds.has(item.id)}
               onChange={() => toggleSelect(item.id!)}
-              style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#3b6eb5' }}
+              style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#2563eb' }}
             />
           )}
         </td>
@@ -871,7 +871,7 @@ export default function ReceiptsPage() {
             <span style={{
               display: 'inline-block', padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 700,
               background: item.category === '접대' ? '#fef3c7' : item.category.includes('주유') ? '#dbeafe' : item.category === '충전' ? '#dcfce7' : '#f1f5f9',
-              color: item.category === '접대' ? '#d97706' : item.category.includes('주유') ? '#3b6eb5' : item.category === '충전' ? '#16a34a' : '#475569',
+              color: item.category === '접대' ? '#d97706' : item.category.includes('주유') ? '#2563eb' : item.category === '충전' ? '#16a34a' : '#475569',
             }}>{item.category}</span>
           ) : (
             <span style={{ color: '#ef4444', fontSize: 11, fontWeight: 700 }}>미입력</span>
@@ -898,7 +898,7 @@ export default function ReceiptsPage() {
         </td>
         <td style={{ padding: '10px 8px', textAlign: 'center' }}>
           {item.receipt_url ? (
-            <a href={item.receipt_url} target="_blank" rel="noopener" onClick={e => e.stopPropagation()} style={{ color: '#3b6eb5', fontSize: 11, fontWeight: 600, textDecoration: 'none' }}>📎 보기</a>
+            <a href={item.receipt_url} target="_blank" rel="noopener" onClick={e => e.stopPropagation()} style={{ color: '#2563eb', fontSize: 11, fontWeight: 600, textDecoration: 'none' }}>📎 보기</a>
           ) : '-'}
         </td>
         <td style={{ padding: '10px 4px', textAlign: 'center' }}>
@@ -956,7 +956,7 @@ export default function ReceiptsPage() {
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <button onClick={saveEdit}
-              style={{ flex: 1, background: '#3b6eb5', color: '#fff', border: 'none', borderRadius: 6, padding: '8px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+              style={{ flex: 1, background: '#2563eb', color: '#fff', border: 'none', borderRadius: 6, padding: '8px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
               저장
             </button>
             <button onClick={() => setEditingId(null)}
@@ -985,7 +985,7 @@ export default function ReceiptsPage() {
             <span style={{
               display: 'inline-block', padding: '2px 6px', borderRadius: 4, fontSize: 10, fontWeight: 700,
               background: item.category === '접대' ? '#fef3c7' : item.category.includes('주유') ? '#dbeafe' : item.category === '충전' ? '#dcfce7' : '#f1f5f9',
-              color: item.category === '접대' ? '#d97706' : item.category.includes('주유') ? '#3b6eb5' : item.category === '충전' ? '#16a34a' : '#475569',
+              color: item.category === '접대' ? '#d97706' : item.category.includes('주유') ? '#2563eb' : item.category === '충전' ? '#16a34a' : '#475569',
             }}>{item.category}</span>
           ) : (
             <span style={{ fontSize: 10, fontWeight: 700, color: '#ef4444' }}>미입력</span>
@@ -1021,7 +1021,7 @@ export default function ReceiptsPage() {
           <div style={{ display: 'flex', gap: 4 }}>
             {item.receipt_url && (
               <a href={item.receipt_url} target="_blank" rel="noopener" onClick={e => e.stopPropagation()} style={{
-                color: '#3b6eb5', fontSize: 11, fontWeight: 600, textDecoration: 'none', padding: '4px 6px'
+                color: '#2563eb', fontSize: 11, fontWeight: 600, textDecoration: 'none', padding: '4px 6px'
               }}>📎</a>
             )}
             <button onClick={(e) => { e.stopPropagation(); if (item.id) handleDelete(item.id) }}
@@ -1077,7 +1077,7 @@ export default function ReceiptsPage() {
               <span style={{ fontWeight: 800, fontSize: 13, color: '#0f2440' }}>
                 Gemini AI 분석 진행 중
               </span>
-              <span style={{ marginLeft: 'auto', fontSize: 12, fontWeight: 700, color: '#3b6eb5' }}>
+              <span style={{ marginLeft: 'auto', fontSize: 12, fontWeight: 700, color: '#2563eb' }}>
                 {uploadQueue.filter(q => q.status === 'done').length} / {uploadQueue.length}
               </span>
             </div>
@@ -1085,7 +1085,7 @@ export default function ReceiptsPage() {
               {uploadQueue.map((q, i) => (
                 <div key={i} style={{
                   width: 48, height: 48, borderRadius: 10, overflow: 'hidden', position: 'relative',
-                  border: q.status === 'uploading' ? '2px solid #3b6eb5' : q.status === 'done' ? '2px solid #22c55e' : q.status === 'error' ? '2px solid #ef4444' : '2px solid #e2e8f0',
+                  border: q.status === 'uploading' ? '2px solid #2563eb' : q.status === 'done' ? '2px solid #22c55e' : q.status === 'error' ? '2px solid #ef4444' : '2px solid #e2e8f0',
                   opacity: q.status === 'pending' ? 0.4 : 1,
                 }}>
                   <img src={q.preview} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -1120,7 +1120,7 @@ export default function ReceiptsPage() {
         {!isProcessing && uploadQueue.length === 0 && (
           <div
             style={{
-              border: isDragOver ? '2px solid #3b6eb5' : '1px dashed rgba(0,0,0,0.12)',
+              border: isDragOver ? '2px solid #2563eb' : '1px dashed rgba(0,0,0,0.12)',
               borderRadius: 14,
               padding: isMobile ? '14px 12px' : '16px 20px',
               textAlign: 'center',
@@ -1140,7 +1140,7 @@ export default function ReceiptsPage() {
             onDrop={handleDrop}
           >
             <span style={{ fontSize: isMobile ? 20 : 22 }}>{isDragOver ? '🤖' : '🧾'}</span>
-            <span style={{ fontSize: isMobile ? 12 : 13, fontWeight: 700, color: isDragOver ? '#3b6eb5' : '#475569' }}>
+            <span style={{ fontSize: isMobile ? 12 : 13, fontWeight: 700, color: isDragOver ? '#2563eb' : '#475569' }}>
               {isDragOver
                 ? '여기에 놓으면 AI가 자동 분석합니다'
                 : (isMobile ? '영수증을 클릭하여 업로드' : '영수증 이미지를 드래그하거나 위 [영수증 업로드] 버튼 클릭')}
@@ -1209,8 +1209,8 @@ export default function ReceiptsPage() {
           <button
             onClick={() => setSelectedCategory(null)}
             style={{
-              background: selectedCategory === null ? '#3b6eb5' : '#f8fafc',
-              border: `1px solid ${selectedCategory === null ? '#3b6eb5' : '#e2e8f0'}`,
+              background: selectedCategory === null ? '#2563eb' : '#f8fafc',
+              border: `1px solid ${selectedCategory === null ? '#2563eb' : '#e2e8f0'}`,
               borderRadius: 8, padding: isMobile ? '4px 8px' : '5px 12px',
               display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer',
             }}
@@ -1227,8 +1227,8 @@ export default function ReceiptsPage() {
                 key={cat}
                 onClick={() => setSelectedCategory(active ? null : cat)}
                 style={{
-                  background: active ? '#3b6eb5' : '#f8fafc',
-                  border: `1px solid ${active ? '#3b6eb5' : '#e2e8f0'}`,
+                  background: active ? '#2563eb' : '#f8fafc',
+                  border: `1px solid ${active ? '#2563eb' : '#e2e8f0'}`,
                   borderRadius: 8, padding: isMobile ? '4px 8px' : '5px 12px',
                   display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer',
                 }}
@@ -1400,7 +1400,7 @@ export default function ReceiptsPage() {
                       type="checkbox"
                       checked={allDisplayItems.filter(i => i.id).length > 0 && allDisplayItems.filter(i => i.id).every(i => selectedIds.has(i.id!))}
                       onChange={toggleSelectAll}
-                      style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#3b6eb5' }}
+                      style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#2563eb' }}
                     />
                   </th>
                   {([
@@ -1418,7 +1418,7 @@ export default function ReceiptsPage() {
                         onClick={() => toggleSort(key)}
                         style={{
                           padding: '12px 10px', textAlign: 'left', fontWeight: 700,
-                          color: active ? '#3b6eb5' : '#475569',
+                          color: active ? '#2563eb' : '#475569',
                           whiteSpace: 'nowrap', fontSize: 12, cursor: 'pointer',
                           userSelect: 'none',
                         }}
@@ -1434,7 +1434,7 @@ export default function ReceiptsPage() {
                     onClick={() => toggleSort('amount')}
                     style={{
                       padding: '12px 10px', textAlign: 'right', fontWeight: 700,
-                      color: sortKey === 'amount' ? '#3b6eb5' : '#475569',
+                      color: sortKey === 'amount' ? '#2563eb' : '#475569',
                       whiteSpace: 'nowrap', fontSize: 12, cursor: 'pointer', userSelect: 'none',
                     }}
                   >

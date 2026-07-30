@@ -1,107 +1,99 @@
 // ═══════════════════════════════════════════════════════════════════
-// UI Tokens — FMI ERP Soft Ice Glass 디자인 시스템
+// UI Tokens — FMI ERP 플랫 디자인 시스템 (2026-07 개편)
 // ───────────────────────────────────────────────────────────────────
-// CLAUDE.md §10 Soft Ice 디자인 시스템 + Phase A 결정사항 구현
-// 목적: finance 모듈 ~13,400줄 전역 토큰화 / 색상·버튼·글래스 통일
+// 기준: _mockups/fmi-erp-redesign.html (REDESIGN 4장 디자인 원칙)
+//   · 절제된 색 — 기본 무채색 + 의미 색 (파랑=정보, 초록=수입/정상, 빨강=지출/경고)
+//   · 글래스/뉴모피즘 폐지 — 흰 카드 + 얇은 보더 + 미세 그림자
+// GLASS 키는 하위 호환용으로 유지하되 값은 플랫 서피스 (60개 파일이 참조)
 // 사용: import { COLORS, BTN, GLASS, SPACING, pillStyle } from '@/app/utils/ui-tokens'
 // ═══════════════════════════════════════════════════════════════════
 
 import type React from 'react'
 
 /**
- * COLORS — 시맨틱 컬러 토큰
- * Decision 1 α: 미분류(danger/red) ≠ 기타(warning/amber) 구분
+ * COLORS — 시맨틱 컬러 토큰 (목업 팔레트)
  */
 export const COLORS = {
   // ── 브랜드 ──
-  primary: '#3b6eb5',
-  primaryDark: '#2a4a6b',
+  primary: '#2563eb',
+  primaryDark: '#1d4fd7',
 
   // ── 재무 시맨틱 ──
-  income: '#3b6eb5',      // 수입 (파랑 — 플러스)
-  expense: '#ef4444',     // 지출 (빨강 — 마이너스)
+  income: '#16a34a',      // 수입 (초록 — 목업 amt-in)
+  expense: '#dc2626',     // 지출 (빨강)
 
   // ── 상태 시맨틱 ──
-  success: '#10b981',     // 완료/정상/분류완료
-  warning: '#f59e0b',     // 주의/기타
+  success: '#16a34a',     // 완료/정상/분류완료
+  warning: '#d97706',     // 주의/기타
   danger: '#dc2626',      // 위험/미분류/파괴적 액션
-  info: '#3b6eb5',        // 정보/수입과 동일 톤
-  neutral: '#94a3b8',     // 중립/0원/비활성
+  info: '#2563eb',        // 정보
+  neutral: '#9aa1ad',     // 중립/0원/비활성
 
-  // ── 분류 상태 (Decision 1 α) ──
+  // ── 분류 상태 ──
   unclassified: '#dc2626',  // 미분류 — 빨강 (즉각 액션 필요)
-  etc: '#f59e0b',           // 기타 — 앰버 (완료된 분류, 다만 세분화 여지)
-  classified: '#10b981',    // 분류완료 — 초록
+  etc: '#d97706',           // 기타 — 앰버 (완료된 분류, 다만 세분화 여지)
+  classified: '#16a34a',    // 분류완료 — 초록
 
-  // ── 배경 (글래스 틴트 베이스) ──
-  bgBlue: '#eff6ff',
-  bgGreen: '#f0fdf4',
-  bgRed: '#fef2f2',
-  bgAmber: '#fffbeb',
+  // ── 배경 (의미 색 틴트) ──
+  bgBlue: '#eff4ff',
+  bgGreen: '#effaf3',
+  bgRed: '#fdf0f0',
+  bgAmber: '#fdf6ec',
   bgViolet: '#f5f3ff',
-  bgGray: '#f8fafc',
+  bgGray: '#f6f7f9',
 
-  // ── 보더 (Level 3 색상 틴트) ──
-  borderBlue: 'rgba(191,219,254,0.80)',
-  borderGreen: 'rgba(187,247,208,0.80)',
-  borderRed: 'rgba(252,165,165,0.80)',
-  borderAmber: 'rgba(253,230,138,0.80)',
-  borderViolet: 'rgba(221,214,254,0.80)',
-  borderSubtle: 'rgba(0,0,0,0.06)',   // Level 5, 4
-  borderFaint: 'rgba(0,0,0,0.05)',    // Level 2, 1
+  // ── 보더 ──
+  borderBlue: '#c9dbfa',
+  borderGreen: '#bfe3cd',
+  borderRed: '#f3c6c6',
+  borderAmber: '#f3e3c8',
+  borderViolet: '#ddd6fe',
+  borderSubtle: '#e6e8ec',
+  borderFaint: '#f0f1f4',
 
   // ── 텍스트 ──
-  textPrimary: '#1e293b',
-  textSecondary: '#475569',
-  textMuted: '#94a3b8',
+  textPrimary: '#1a1d23',
+  textSecondary: '#5b626e',
+  textMuted: '#9aa1ad',
   textDim: '#cbd5e1',
 } as const
 
 /**
  * BTN — 버튼 프리셋
- * Decision 4 β: sm(4×10)/md(8×14)/lg(12×22) — 조밀 비율
  */
 export const BTN = {
-  sm: { padding: '4px 10px', fontSize: 12, borderRadius: 6, fontWeight: 600 },
-  md: { padding: '8px 14px', fontSize: 13, borderRadius: 8, fontWeight: 700 },
+  sm: { padding: '4px 10px', fontSize: 12, borderRadius: 7, fontWeight: 600 },
+  md: { padding: '8px 14px', fontSize: 13, borderRadius: 9, fontWeight: 600 },
   lg: { padding: '12px 22px', fontSize: 14, borderRadius: 10, fontWeight: 700 },
 } as const
 
 /**
- * GLASS — Soft Ice Glass 5단계 (CLAUDE.md §10)
- * L5 최상위 (네비) ≥ L4 테이블/모달 ≥ L3 스탯카드 ≥ L2 사이드/서브 ≥ L1 인풋(오목)
+ * GLASS — (구 Soft Ice Glass 5단계) → 플랫 서피스로 재정의
+ * 하위 호환: 60개 파일이 GLASS.L1~L5 를 참조하므로 키는 유지, 값만 플랫.
+ * L5/L4 카드·모달 = 흰 패널 / L3 스탯카드 = 흰 패널 / L2 서브 = 옅은 회색 / L1 인풋 = 회색 필드
  */
 export const GLASS = {
   L5: {
-    background: 'rgba(255,255,255,0.75)',
-    border: '1px solid rgba(0,0,0,0.06)',
-    backdropFilter: 'blur(20px) saturate(160%)',
-    WebkitBackdropFilter: 'blur(20px) saturate(160%)',
+    background: '#ffffff',
+    border: '1px solid #e6e8ec',
   },
   L4: {
-    background: 'rgba(255,255,255,0.72)',
-    border: '1px solid rgba(0,0,0,0.06)',
-    backdropFilter: 'blur(16px) saturate(150%)',
-    WebkitBackdropFilter: 'blur(16px) saturate(150%)',
+    background: '#ffffff',
+    border: '1px solid #e6e8ec',
+    boxShadow: '0 1px 2px rgba(16,24,40,0.05)',
   },
   L3: {
-    background: 'rgba(255,255,255,0.60)',
-    backdropFilter: 'blur(12px) saturate(140%)',
-    WebkitBackdropFilter: 'blur(12px) saturate(140%)',
+    background: '#ffffff',
+    boxShadow: '0 1px 2px rgba(16,24,40,0.05)',
     // border는 색상 틴트로 호출측에서 주입
   },
   L2: {
-    background: 'rgba(255,255,255,0.35)',
-    border: '1px solid rgba(0,0,0,0.05)',
-    backdropFilter: 'blur(8px) saturate(130%)',
-    WebkitBackdropFilter: 'blur(8px) saturate(130%)',
+    background: '#fafbfc',
+    border: '1px solid #f0f1f4',
   },
   L1: {
-    background: 'rgba(255,255,255,0.40)',
-    border: '1px solid rgba(0,0,0,0.05)',
-    boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.04)',
-    backdropFilter: 'blur(6px)',
-    WebkitBackdropFilter: 'blur(6px)',
+    background: '#f6f7f9',
+    border: '1px solid #e6e8ec',
   },
 } as const
 
@@ -119,38 +111,37 @@ export const SPACING = {
 
 /**
  * pillStyle — 알약(Pill) 배지 스타일 생성기
- * 용도: 상태 배지, 카테고리 칩, 필터 토글 등
+ * 용도: 상태 배지, 카테고리 칩, 필터 토글 등 (목업 .badge — 사각 6px 라운드)
  */
 export type PillTone = 'danger' | 'warning' | 'success' | 'info' | 'neutral' | 'primary'
 
 export const pillStyle = (tone: PillTone): React.CSSProperties => {
-  const map: Record<PillTone, { bg: string; color: string; border: string }> = {
-    danger:  { bg: COLORS.bgRed,    color: COLORS.danger,     border: COLORS.borderRed },
-    warning: { bg: COLORS.bgAmber,  color: COLORS.warning,    border: COLORS.borderAmber },
-    success: { bg: COLORS.bgGreen,  color: COLORS.success,    border: COLORS.borderGreen },
-    info:    { bg: COLORS.bgBlue,   color: COLORS.info,       border: COLORS.borderBlue },
-    neutral: { bg: COLORS.bgGray,   color: COLORS.textMuted,  border: COLORS.borderFaint },
-    primary: { bg: COLORS.bgBlue,   color: COLORS.primary,    border: COLORS.borderBlue },
+  const map: Record<PillTone, { bg: string; color: string }> = {
+    danger:  { bg: COLORS.bgRed,    color: COLORS.danger },
+    warning: { bg: COLORS.bgAmber,  color: COLORS.warning },
+    success: { bg: COLORS.bgGreen,  color: COLORS.success },
+    info:    { bg: COLORS.bgBlue,   color: COLORS.info },
+    neutral: { bg: COLORS.borderFaint, color: COLORS.textSecondary },
+    primary: { bg: COLORS.bgBlue,   color: COLORS.primary },
   }
   const t = map[tone]
   return {
     display: 'inline-flex',
     alignItems: 'center',
     gap: 4,
-    padding: '2px 8px',
+    padding: '3px 8px',
     fontSize: 11,
-    fontWeight: 700,
+    fontWeight: 600,
     color: t.color,
     background: t.bg,
-    border: `1px solid ${t.border}`,
-    borderRadius: 999,
+    border: 'none',
+    borderRadius: 6,
     whiteSpace: 'nowrap',
   }
 }
 
 /**
  * classifyTone — 분류 상태 → Pill 톤 매핑
- * Decision 1 α: 미분류=danger, 기타=warning, 분류=success
  */
 export const classifyTone = (category: string | null | undefined): PillTone => {
   if (!category || category === '미분류' || category === 'unclassified') return 'danger'

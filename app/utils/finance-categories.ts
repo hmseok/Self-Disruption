@@ -242,7 +242,7 @@ export function getItemsForGroup(groupName: string, mode: 'accounting' | 'displa
 // ═══ 카테고리 그룹 색상 (UI 전용) ═══
 export const CATEGORY_COLORS: Record<string, string> = {
   // 회계 기준
-  '매출(영업수익)': '#3b6eb5',
+  '매출(영업수익)': '#2563eb',
   '영업외수익': '#06b6d4',
   '자본변동': '#6366f1',
   '부채변동': '#8b5cf6',
@@ -254,7 +254,7 @@ export const CATEGORY_COLORS: Record<string, string> = {
   '세금/공과': '#ef4444',
   '기타': '#94a3b8',
   // 용도별
-  '💰 돈 들어오는 것': '#3b6eb5',
+  '💰 돈 들어오는 것': '#2563eb',
   '🏦 투자/대출/카드 입출금': '#6366f1',
   '🚗 차량 자산': '#0ea5e9',
   '🚛 차량 운영': '#f59e0b',

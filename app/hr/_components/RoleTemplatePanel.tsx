@@ -62,7 +62,7 @@ interface MenuGroup {
 // GLASS / COLORS 는 @/app/utils/ui-tokens 의 표준 토큰 사용 (Soft Ice 시스템)
 const GLASS_L4 = { ...GLASS.L4, borderRadius: 16, boxShadow: '0 4px 20px rgba(0,0,0,0.04)' } as const
 // primary tint — hex + alpha (8자리) 표기로 COLORS.primary 기반
-//   #3b6eb5 (primary) + 1A (10% alpha) / 0D (5% alpha)
+//   #2563eb (primary) + 1A (10% alpha) / 0D (5% alpha)
 const TINT_PRIMARY_10 = `${COLORS.primary}1A`
 const TINT_PRIMARY_05 = `${COLORS.primary}0D`
 
@@ -131,7 +131,7 @@ export default function RoleTemplatePanel() {
         <button
           onClick={() => setShowAdd(true)}
           style={{
-            padding: '10px 16px', background: '#3b6eb5', color: '#fff', border: 'none',
+            padding: '10px 16px', background: '#2563eb', color: '#fff', border: 'none',
             borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: 'pointer',
           }}
         >
@@ -291,7 +291,7 @@ function TemplateCard({ template, expanded, onToggle, onApply, onReload }: {
         }}>{template.company_key}</code>
         <code style={{
           padding: '2px 8px', background: TINT_PRIMARY_10,
-          color: '#3b6eb5', borderRadius: 4, fontSize: 12, whiteSpace: 'nowrap',
+          color: '#2563eb', borderRadius: 4, fontSize: 12, whiteSpace: 'nowrap',
         }}>{template.role_key}</code>
         <div style={{ flex: 1 }}>
           <div style={{ fontWeight: 600, color: '#1a1a1a' }}>{template.label}</div>
@@ -324,7 +324,7 @@ function TemplateCard({ template, expanded, onToggle, onApply, onReload }: {
                   각 페이지의 권한 체크 → 저장 → 「적용」 버튼으로 직원에 일괄 부여
                 </div>
                 <button onClick={save} disabled={saving} style={{
-                  padding: '6px 14px', background: '#3b6eb5', color: '#fff',
+                  padding: '6px 14px', background: '#2563eb', color: '#fff',
                   border: 'none', borderRadius: 4, fontSize: 12, fontWeight: 600, cursor: 'pointer',
                 }}>
                   {saving ? '저장 중…' : '권한 묶음 저장'}
@@ -629,7 +629,7 @@ const inputStyle: React.CSSProperties = {
   border: '1px solid rgba(0,0,0,0.10)', borderRadius: 6, background: '#fff',
 }
 const btnPrimary: React.CSSProperties = {
-  padding: '8px 16px', background: '#3b6eb5', color: '#fff', border: 'none',
+  padding: '8px 16px', background: '#2563eb', color: '#fff', border: 'none',
   borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer',
 }
 const btnSecondary: React.CSSProperties = {
@@ -642,7 +642,7 @@ const modalBg: React.CSSProperties = {
 }
 const chipStyle = (active: boolean): React.CSSProperties => ({
   padding: '6px 14px',
-  background: active ? '#3b6eb5' : 'rgba(0,0,0,0.05)',
+  background: active ? '#2563eb' : 'rgba(0,0,0,0.05)',
   color: active ? '#fff' : 'rgba(0,0,0,0.70)',
   border: 'none', borderRadius: 6, fontSize: 13, fontWeight: active ? 600 : 400,
   cursor: 'pointer',

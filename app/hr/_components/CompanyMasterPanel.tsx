@@ -34,7 +34,7 @@ interface Company {
 const GLASS_L4 = { ...GLASS.L4, borderRadius: 16, boxShadow: '0 4px 20px rgba(0,0,0,0.04)' } as const
 const GLASS_L3 = { ...GLASS.L3, borderRadius: 12 } as const
 // primary tint — hex + alpha (8자리) 표기로 COLORS.primary 기반
-//   #3b6eb5 (primary) + 1A (10% alpha) / 0D (5% alpha)
+//   #2563eb (primary) + 1A (10% alpha) / 0D (5% alpha)
 const TINT_PRIMARY_10 = `${COLORS.primary}1A`
 const TINT_PRIMARY_05 = `${COLORS.primary}0D`
 
@@ -105,7 +105,7 @@ export default function CompanyMasterPanel() {
         <button
           onClick={() => setShowAdd(true)}
           style={{
-            padding: '10px 16px', background: '#3b6eb5', color: '#fff', border: 'none',
+            padding: '10px 16px', background: '#2563eb', color: '#fff', border: 'none',
             borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: 'pointer',
           }}
         >
@@ -148,7 +148,7 @@ export default function CompanyMasterPanel() {
                     <td style={{ padding: 12, whiteSpace: 'nowrap' }}>
                       <code style={{
                         padding: '2px 8px', background: TINT_PRIMARY_10,
-                        color: '#3b6eb5', borderRadius: 4, fontSize: 12,
+                        color: '#2563eb', borderRadius: 4, fontSize: 12,
                       }}>
                         {c.company_key || '-'}
                       </code>
@@ -210,7 +210,7 @@ export default function CompanyMasterPanel() {
                         onClick={() => setEditing(isEditing ? null : c.id)}
                         style={{
                           padding: '4px 10px', background: TINT_PRIMARY_10,
-                          color: '#3b6eb5', border: 'none', borderRadius: 4,
+                          color: '#2563eb', border: 'none', borderRadius: 4,
                           fontSize: 12, cursor: 'pointer',
                         }}
                       >
@@ -248,7 +248,7 @@ function EditCompanyForm({ company, onClose, onSave }: {
 }) {
   const [label, setLabel] = useState(company.label || '')
   const [short, setShort] = useState(company.short_name || '')
-  const [primary, setPrimary] = useState(company.primary_color || '#3b6eb5')
+  const [primary, setPrimary] = useState(company.primary_color || '#2563eb')
   const [accent, setAccent] = useState(company.accent_color || '#5b8def')
   const [sortOrder, setSortOrder] = useState(company.sort_order)
   const [saving, setSaving] = useState(false)
@@ -401,7 +401,7 @@ const inputStyle: React.CSSProperties = {
   border: '1px solid rgba(0,0,0,0.10)', borderRadius: 6, background: '#fff',
 }
 const btnPrimary: React.CSSProperties = {
-  padding: '8px 16px', background: '#3b6eb5', color: '#fff', border: 'none',
+  padding: '8px 16px', background: '#2563eb', color: '#fff', border: 'none',
   borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer',
 }
 const btnSecondary: React.CSSProperties = {

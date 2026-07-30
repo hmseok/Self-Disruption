@@ -103,14 +103,14 @@ export default function NeuDataTable<T>({
   if (loading) {
     return (
       <div style={{
-        background: 'rgba(255,255,255,0.72)',
-        borderRadius: 16,
-        border: '1px solid rgba(0,0,0,0.06)',
-        boxShadow: '6px 6px 18px rgba(140,170,210,0.14), -6px -6px 18px rgba(255,255,255,0.47)',
+        background: '#ffffff',
+        borderRadius: 12,
+        border: '1px solid #e6e8ec',
+        boxShadow: '0 1px 2px rgba(16,24,40,0.05)',
         padding: 40,
         textAlign: 'center',
       }}>
-        <div style={{ fontSize: 13, color: '#8aabc7', fontWeight: 500 }}>
+        <div style={{ fontSize: 13, color: '#9aa1ad', fontWeight: 500 }}>
           불러오는 중...
         </div>
       </div>
@@ -120,25 +120,25 @@ export default function NeuDataTable<T>({
   if (!data.length) {
     return (
       <div style={{
-        background: 'rgba(255,255,255,0.72)',
-        borderRadius: 16,
-        border: '1px solid rgba(0,0,0,0.06)',
-        boxShadow: '6px 6px 18px rgba(140,170,210,0.14), -6px -6px 18px rgba(255,255,255,0.47)',
+        background: '#ffffff',
+        borderRadius: 12,
+        border: '1px solid #e6e8ec',
+        boxShadow: '0 1px 2px rgba(16,24,40,0.05)',
         padding: '40px 20px',
         textAlign: 'center',
       }}>
         <div style={{ fontSize: 28, marginBottom: 8 }}>{emptyIcon}</div>
-        <div style={{ fontSize: 13, color: '#8aabc7', fontWeight: 500 }}>{emptyMessage}</div>
+        <div style={{ fontSize: 13, color: '#9aa1ad', fontWeight: 500 }}>{emptyMessage}</div>
       </div>
     )
   }
 
   return (
     <div style={{
-      background: 'rgba(255,255,255,0.72)',
-      borderRadius: 16,
-      border: '1px solid rgba(0,0,0,0.06)',
-      boxShadow: '6px 6px 18px rgba(140,170,210,0.14), -6px -6px 18px rgba(255,255,255,0.47)',
+      background: '#ffffff',
+      borderRadius: 12,
+      border: '1px solid #e6e8ec',
+      boxShadow: '0 1px 2px rgba(16,24,40,0.05)',
       overflow: 'hidden',
     }}>
       {/* ── 데스크탑 테이블 ── */}
@@ -149,7 +149,7 @@ export default function NeuDataTable<T>({
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr style={{
-              borderBottom: '1px solid rgba(0,0,0,0.06)',
+              borderBottom: '1px solid #f0f1f4',
             }}>
               {columns.filter(c => !c.hideOnMobile || true).map(col => {
                 const sortable = !!col.sortBy
@@ -159,13 +159,13 @@ export default function NeuDataTable<T>({
                     key={col.key}
                     onClick={sortable ? () => handleSort(col.key) : undefined}
                     style={{
-                      padding: '12px 14px',
-                      fontSize: 11,
+                      padding: '10px 14px',
+                      fontSize: 12,
                       fontWeight: 600,
-                      color: active ? '#3b6eb5' : '#64748b',
+                      color: active ? '#2563eb' : '#9aa1ad',
                       textAlign: col.align || 'left',
                       whiteSpace: 'nowrap',
-                      background: 'rgba(255,255,255,0.40)',
+                      background: '#ffffff',
                       letterSpacing: '0.02em',
                       width: col.width,
                       position: 'sticky',
@@ -193,12 +193,12 @@ export default function NeuDataTable<T>({
                 key={rowKey(row)}
                 onClick={() => onRowClick?.(row)}
                 style={{
-                  borderBottom: i < sortedData.length - 1 ? '1px solid rgba(0,0,0,0.04)' : 'none',
+                  borderBottom: i < sortedData.length - 1 ? '1px solid #f0f1f4' : 'none',
                   cursor: onRowClick ? 'pointer' : 'default',
                   transition: 'background 0.15s',
                 }}
                 onMouseEnter={e => {
-                  if (onRowClick) e.currentTarget.style.background = 'rgba(59,110,181,0.03)'
+                  if (onRowClick) e.currentTarget.style.background = '#fafbfc'
                 }}
                 onMouseLeave={e => {
                   e.currentTarget.style.background = 'transparent'
@@ -208,9 +208,9 @@ export default function NeuDataTable<T>({
                   <td
                     key={col.key}
                     style={{
-                      padding: '12px 14px',
-                      fontSize: 13,
-                      color: '#1e293b',
+                      padding: '11px 14px',
+                      fontSize: 13.5,
+                      color: '#1a1d23',
                       textAlign: col.align || 'left',
                       verticalAlign: 'middle',
                     }}
@@ -232,7 +232,7 @@ export default function NeuDataTable<T>({
             onClick={() => onRowClick?.(row)}
             style={{
               padding: '14px 16px',
-              borderBottom: i < sortedData.length - 1 ? '1px solid rgba(0,0,0,0.04)' : 'none',
+              borderBottom: i < sortedData.length - 1 ? '1px solid #f0f1f4' : 'none',
               cursor: onRowClick ? 'pointer' : 'default',
             }}
           >

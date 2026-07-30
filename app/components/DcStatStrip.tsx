@@ -110,64 +110,51 @@ export default function DcStatStrip({ stats, actions, fullWidth, defaultTint = '
               key={i}
               onClick={s.onClick}
               style={{
-                // GLASS.L3 — 스탯카드 전용 (background + backdropFilter)
-                background: GLASS.L3.background,
-                backdropFilter: GLASS.L3.backdropFilter,
-                WebkitBackdropFilter: GLASS.L3.WebkitBackdropFilter,
-                border: s.active ? `2px solid ${t.labelColor}` : `1px solid ${t.border}`,
-                borderRadius: 16,
-                padding: '16px 14px',
-                textAlign: 'center',
+                // 2026-07 개편 — 플랫 카드 (목업 .card)
+                background: '#ffffff',
+                border: s.active ? `1.5px solid ${t.labelColor}` : '1px solid #e6e8ec',
+                borderRadius: 12,
+                padding: '14px 16px',
+                textAlign: 'left',
                 minWidth: 0,
                 cursor: s.onClick ? 'pointer' : 'default',
-                boxShadow: s.active
-                  ? `0 0 0 3px ${t.border}, 6px 6px 16px rgba(140,170,210,0.2)`
-                  : '6px 6px 16px rgba(140,170,210,0.12), -2px -2px 8px rgba(255,255,255,0.6)',
-                transition: 'all 0.2s',
+                boxShadow: '0 1px 2px rgba(16,24,40,0.05)',
+                transition: 'border-color 0.12s',
               }}
             >
               {/* 라벨 (아이콘 + 텍스트) */}
               <div style={{
-                fontSize: 10,
-                color: t.labelColor,
-                fontWeight: 700,
-                textTransform: 'uppercase',
-                letterSpacing: '0.06em',
+                fontSize: 12.5,
+                color: '#5b626e',
+                fontWeight: 500,
                 marginBottom: 6,
                 whiteSpace: 'nowrap',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'center',
-                gap: 4,
+                gap: 6,
               }}>
-                {s.icon && (
-                  <span aria-hidden="true" style={{ fontSize: 11, lineHeight: 1, opacity: 0.9 }}>
-                    {s.icon}
-                  </span>
-                )}
+                <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: '50%', background: t.labelColor, display: 'inline-block', flexShrink: 0 }} />
                 <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.label}</span>
               </div>
 
               {/* 메인 값 */}
               <div style={{
                 fontSize: stats.length > 5 ? 18 : 22,
-                fontWeight: 800,
+                fontWeight: 700,
+                letterSpacing: '-0.02em',
                 lineHeight: 1.15,
                 whiteSpace: 'nowrap',
-                backgroundImage: t.valueGradient,
-                WebkitBackgroundClip: 'text',
-                backgroundClip: 'text',
-                color: 'transparent',
+                color: '#1a1d23',
               }}>
                 {typeof s.value === 'number' ? s.value.toLocaleString() : s.value}
                 {s.unit && (
                   <span style={{
-                    fontSize: 11,
+                    fontSize: 12,
                     marginLeft: 3,
-                    fontWeight: 700,
-                    opacity: 0.55,
+                    fontWeight: 500,
+                    color: '#9aa1ad',
                   }}>
                     {s.unit}
                   </span>
@@ -207,24 +194,19 @@ export default function DcStatStrip({ stats, actions, fullWidth, defaultTint = '
               key={i}
               onClick={a.onClick}
               style={{
-                padding: '10px 16px',
-                borderRadius: 12,
-                border: a.variant === 'primary' ? 'none' : `1px solid ${COLORS.borderSubtle}`,
-                background: a.variant === 'primary'
-                  ? `linear-gradient(135deg, ${COLORS.primary}, #5a8fd4)`
-                  : 'rgba(255,255,255,0.72)',
-                color: a.variant === 'primary' ? '#fff' : COLORS.textPrimary,
+                padding: '9px 16px',
+                borderRadius: 9,
+                border: a.variant === 'primary' ? `1px solid ${COLORS.primary}` : `1px solid ${COLORS.borderSubtle}`,
+                background: a.variant === 'primary' ? COLORS.primary : '#ffffff',
+                color: a.variant === 'primary' ? '#fff' : COLORS.textSecondary,
                 fontSize: 13,
-                fontWeight: 700,
+                fontWeight: 600,
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: 8,
-                transition: 'all 0.2s',
-                boxShadow: a.variant === 'primary'
-                  ? '4px 4px 12px rgba(59,110,181,0.25), -2px -2px 6px rgba(255,255,255,0.3)'
-                  : '4px 4px 10px rgba(140,170,210,0.15), -2px -2px 6px rgba(255,255,255,0.6)',
+                transition: 'all 0.12s',
                 fontFamily: 'inherit',
               }}
             >

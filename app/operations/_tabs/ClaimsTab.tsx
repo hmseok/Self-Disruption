@@ -638,7 +638,7 @@ export default function ClaimsTab() {
           <span style={{ flex: 1 }} />
           <button
             onClick={() => window.dispatchEvent(new CustomEvent('operations:switch-tab', { detail: { tab: 'deposits' } }))}
-            style={{ padding: '5px 14px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)', color: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 800 }}
+            style={{ padding: '5px 14px', borderRadius: 8, border: 'none', background: '#2563eb', color: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 800 }}
           >입금 탭에서 처리 →</button>
         </div>
       )}
@@ -763,7 +763,7 @@ export default function ClaimsTab() {
                 style={{ padding: '9px 16px', background: 'transparent', border: '1px solid rgba(0,0,0,0.12)', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700, color: '#475569' }}>닫기</button>
               <div style={{ flex: 1 }} />
               <button onClick={confirmLinkModal} disabled={lmBusy || !lmRental}
-                style={{ padding: '9px 20px', background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)', color: '#fff', border: 'none', borderRadius: 8, cursor: lmBusy ? 'wait' : 'pointer', fontWeight: 800, fontSize: 13, opacity: lmBusy || !lmRental ? 0.5 : 1 }}>
+                style={{ padding: '9px 20px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 8, cursor: lmBusy ? 'wait' : 'pointer', fontWeight: 800, fontSize: 13, opacity: lmBusy || !lmRental ? 0.5 : 1 }}>
                 {lmBusy ? '처리 중…' : '🔗 연결 + 저장 확정'}
               </button>
             </div>
@@ -913,7 +913,7 @@ export default function ClaimsTab() {
                     <button
                       type="button"
                       onClick={() => setClaimAmount(String(lotteResult.finalTotal))}
-                      style={{ padding: '6px 12px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 800, background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)', color: '#fff' }}
+                      style={{ padding: '6px 12px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 800, background: '#2563eb', color: '#fff' }}
                     >청구액에 적용 →</button>
                   </div>
                 ) : (
@@ -981,7 +981,7 @@ export default function ClaimsTab() {
                 const total = supply + vat
                 const chk = (label: string, val: boolean, on: (v: boolean) => void) => (
                   <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#475569', cursor: 'pointer' }}>
-                    <input type="checkbox" checked={val} onChange={(e) => on(e.target.checked)} style={{ width: 14, height: 14, accentColor: '#3b6eb5', cursor: 'pointer' }} />
+                    <input type="checkbox" checked={val} onChange={(e) => on(e.target.checked)} style={{ width: 14, height: 14, accentColor: '#2563eb', cursor: 'pointer' }} />
                     {label}
                   </label>
                 )
@@ -989,7 +989,7 @@ export default function ClaimsTab() {
                   <div style={{ ...GLASS.L2, padding: 11, borderRadius: 10, border: '1px solid rgba(59,110,181,0.18)' }}>
                     <div style={{ fontSize: 12, fontWeight: 800, color: '#1d4ed8', marginBottom: 8 }}>🧾 부가세</div>
                     <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#475569', cursor: 'pointer', marginBottom: 8 }}>
-                      <input type="checkbox" checked={vatIncl} onChange={(e) => setVatIncl(e.target.checked)} style={{ width: 14, height: 14, accentColor: '#3b6eb5', cursor: 'pointer' }} />
+                      <input type="checkbox" checked={vatIncl} onChange={(e) => setVatIncl(e.target.checked)} style={{ width: 14, height: 14, accentColor: '#2563eb', cursor: 'pointer' }} />
                       청구액에 부가세 포함 (체크 시 ÷1.1 / 미체크 시 +10%)
                     </label>
                     <div style={{ display: 'flex', gap: 14, fontSize: 12, marginBottom: 9, flexWrap: 'wrap' }}>
@@ -1046,7 +1046,7 @@ export default function ClaimsTab() {
                 disabled={claimBusy}
                 style={{
                   padding: '9px 18px',
-                  background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)',
+                  background: '#2563eb',
                   color: '#fff', border: 'none', borderRadius: 8,
                   cursor: claimBusy ? 'not-allowed' : 'pointer', fontWeight: 800, fontSize: 12,
                   opacity: claimBusy ? 0.5 : 1,

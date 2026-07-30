@@ -79,11 +79,11 @@ export default function OperationsPage() {
                   display: 'flex', alignItems: 'center', gap: 8, padding: '9px 16px', borderRadius: 12,
                   border: active ? 'none' : '1px solid rgba(0,0,0,0.08)', cursor: 'pointer',
                   fontSize: 13, fontWeight: active ? 800 : 600, whiteSpace: 'nowrap',
-                  background: active ? 'linear-gradient(135deg, #3b6eb5, #5a8fd4)' : '#fff',
+                  background: active ? '#2563eb' : '#fff',
                   color: active ? '#fff' : '#475569',
                   boxShadow: active ? '0 6px 16px rgba(59,110,181,0.3)' : 'none', transition: 'all 0.2s',
                 }}>
-                  <span style={{ width: 22, height: 22, borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, background: active ? 'rgba(255,255,255,0.25)' : 'rgba(59,110,181,0.12)', color: active ? '#fff' : '#3b6eb5' }}>{t.step}</span>
+                  <span style={{ width: 22, height: 22, borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, background: active ? 'rgba(255,255,255,0.25)' : 'rgba(59,110,181,0.12)', color: active ? '#fff' : '#2563eb' }}>{t.step}</span>
                   {t.icon} {t.label}
                 </button>
               </div>

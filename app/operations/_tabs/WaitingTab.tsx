@@ -329,7 +329,7 @@ export default function WaitingTab({ lockStatus }: { lockStatus?: 'available' | 
               style={{
                 padding: '5px 11px', borderRadius: 7, border: 'none', cursor: 'pointer',
                 fontSize: 11, fontWeight: 800, whiteSpace: 'nowrap',
-                background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)', color: '#fff',
+                background: '#2563eb', color: '#fff',
               }}
             >🚗 이 차로 배차</button>
             <button

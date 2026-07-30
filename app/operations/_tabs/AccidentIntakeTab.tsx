@@ -282,7 +282,7 @@ export default function AccidentIntakeTab() {
             style={{
               padding: '4px 10px', borderRadius: 7, border: 'none', cursor: busy ? 'wait' : 'pointer',
               fontSize: 11, fontWeight: 800, whiteSpace: 'nowrap',
-              background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)',
+              background: '#2563eb',
               color: '#fff', opacity: busy ? 0.5 : 1,
             }}
           >

@@ -559,7 +559,7 @@ export default function QuoteDetailPage({ params }: { params: Promise<{ id: stri
                 </>
               )}
               <button onClick={save} disabled={saving || !!actionBusy}
-                style={{ padding: '10px 22px', background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)', color: '#fff', border: 'none', borderRadius: 8, cursor: (saving || actionBusy) ? 'not-allowed' : 'pointer', fontWeight: 800, fontSize: 13, opacity: (saving || actionBusy) ? 0.5 : 1 }}>
+                style={{ padding: '10px 22px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 8, cursor: (saving || actionBusy) ? 'not-allowed' : 'pointer', fontWeight: 800, fontSize: 13, opacity: (saving || actionBusy) ? 0.5 : 1 }}>
                 {saving ? '저장 중…' : '✎ 수정 저장'}
               </button>
             </div>

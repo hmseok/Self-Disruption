@@ -264,7 +264,7 @@ export default function CatalogDetailPage({ params }: { params: Promise<{ id: st
               style={{ padding: '10px 14px', background: 'transparent', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, cursor: delBusy ? 'not-allowed' : 'pointer', fontSize: 12, fontWeight: 700, color: '#991b1b' }}>🗑 삭제</button>
             <div style={{ flex: 1 }} />
             <button onClick={save} disabled={saving}
-              style={{ padding: '10px 22px', background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)', color: '#fff', border: 'none', borderRadius: 8, cursor: saving ? 'not-allowed' : 'pointer', fontWeight: 800, fontSize: 13, opacity: saving ? 0.5 : 1 }}>
+              style={{ padding: '10px 22px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 8, cursor: saving ? 'not-allowed' : 'pointer', fontWeight: 800, fontSize: 13, opacity: saving ? 0.5 : 1 }}>
               {saving ? '저장 중…' : '✎ 수정 저장'}
             </button>
           </div>

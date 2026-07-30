@@ -181,8 +181,8 @@ export default function QuickTxModal({
           maxWidth: 720,
           borderRadius: 16,
           padding: SPACING.xl,
-          boxShadow: '0 20px 60px rgba(15,23,42,0.25)',
           ...GLASS.L4,
+          boxShadow: '0 20px 60px rgba(15,23,42,0.25)',
         }}
       >
         {/* ── 헤더 ── */}

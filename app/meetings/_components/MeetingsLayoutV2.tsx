@@ -602,7 +602,7 @@ export default function MeetingsLayoutV2({ meetingId, initialTab = 'body' }: Pro
                   title="V1 섹션 (안건/결정/메모/첨부) 을 V2 본문으로 변환 — body 비어있으면 자동 / 있으면 append 확인"
                   style={{
                     padding: '5px 12px', fontSize: 11, fontWeight: 700, borderRadius: 6,
-                    background: `linear-gradient(135deg, ${COLORS.primary}, #5a8fd4)`,
+                    background: `linear-gradient(135deg, ${COLORS.primary}, #5a8ff0)`,
                     color: '#fff', border: 'none', cursor: convertingV1 ? 'wait' : 'pointer',
                     whiteSpace: 'nowrap', boxShadow: `0 2px 6px ${COLORS.primary}4D`,
                   }}>
@@ -663,7 +663,7 @@ function TabBtn({ label, active, onClick }: { label: string; active: boolean; on
     <button onClick={onClick} style={{
       padding: '7px 14px', borderRadius: 8, border: 'none',
       fontSize: 12, fontWeight: 700,
-      background: active ? '#3b6eb5' : GLASS.L1.background,
+      background: active ? '#2563eb' : GLASS.L1.background,
       color: active ? '#fff' : COLORS.textSecondary,
       cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit',
       transition: 'all 0.15s',

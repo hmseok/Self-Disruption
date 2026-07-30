@@ -10,7 +10,7 @@ import { useState } from 'react'
 const TINT: Record<string, {
   border: string; bg: string; labelColor: string; valueColor: string; shadow: string
 }> = {
-  blue:   { border: 'rgba(59,130,246,0.15)', bg: '#dbeafe', labelColor: '#3b6eb5', valueColor: '#1e3a5f', shadow: 'rgba(59,130,246,0.08)' },
+  blue:   { border: 'rgba(59,130,246,0.15)', bg: '#dbeafe', labelColor: '#2563eb', valueColor: '#1e3a5f', shadow: 'rgba(59,130,246,0.08)' },
   green:  { border: 'rgba(34,197,94,0.15)',  bg: '#d1fae5', labelColor: '#16a34a', valueColor: '#166534', shadow: 'rgba(34,197,94,0.08)' },
   red:    { border: 'rgba(239,68,68,0.15)',  bg: '#fee2e2', labelColor: '#dc2626', valueColor: '#991b1b', shadow: 'rgba(239,68,68,0.08)' },
   amber:  { border: 'rgba(245,158,11,0.15)', bg: '#fef3c7', labelColor: '#d97706', valueColor: '#92400e', shadow: 'rgba(245,158,11,0.08)' },

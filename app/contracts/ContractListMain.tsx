@@ -298,7 +298,7 @@ export default function ContractListMain() {
       align: 'right',
       render: (contract) => (
         <div>
-          <span style={{ fontWeight: 900, fontSize: 14, color: '#3b6eb5' }}>
+          <span style={{ fontWeight: 900, fontSize: 14, color: '#2563eb' }}>
             {f(Math.round((contract.monthly_rent || 0) * 1.1))}원
           </span>
           <div style={{ fontSize: 10, color: '#64748b', marginTop: 2 }}>/월 (VAT포함)</div>
@@ -332,7 +332,7 @@ export default function ContractListMain() {
     ),
     trailing: (contract) => (
       <div style={{ textAlign: 'right' }}>
-        <div style={{ fontWeight: 900, fontSize: 14, color: '#3b6eb5' }}>
+        <div style={{ fontWeight: 900, fontSize: 14, color: '#2563eb' }}>
           {f(Math.round((contract.monthly_rent || 0) * 1.1))}원
         </div>
         <div style={{ fontSize: 10, color: '#64748b', marginTop: 4 }}>/월 VAT포함</div>

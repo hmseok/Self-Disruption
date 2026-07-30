@@ -36,7 +36,7 @@ export const COMPANY_BRANDS: Record<CompanyKey, CompanyBrand> = {
     name: '주식회사 에프엠아이',
     publicName: 'ERP',          // 메인(hmseok.com) 로그인은 중립 — FMI 표기 노출 X
     shortName: 'FMI',
-    primary: '#3b6eb5',
+    primary: '#2563eb',
     accent: '#5b8def',
     logo: '',
     logoWhite: '',
