@@ -1,25 +1,21 @@
 'use client'
 
+// ═══════════════════════════════════════════════════════════════
+// 장기계약 — A안 확정 구조 (2026-07-30, CONTRACT-UNIFY-A-PLAN)
+//   "영업의 흐름 — 견적을 보내고, 계약으로 만들고, 수납과 만기를 관리"
+//   탭: 원장 · 견적 · 만기 관리 · 신차 카탈로그
+//   개편 원칙(rebuild-fresh): 페이지 골격·원장·만기 뷰는 백지 재작성,
+//   견적/카탈로그는 기존 컴포넌트 재사용 (데이터 계층 동일).
+//   등록/수정은 모달 대신 우측 슬라이드 패널 (REDESIGN 4장 원칙 4)
+// ═══════════════════════════════════════════════════════════════
+
 import { useEffect, useState, useCallback, useMemo } from 'react'
-import DcStatStrip, { StatItem, ActionButton } from '@/app/components/DcStatStrip'
-import DcToolbar, { FilterItem } from '@/app/components/DcToolbar'
+import NeuFilterTabs from '@/app/components/NeuFilterTabs'
+import DcToolbar from '@/app/components/DcToolbar'
 import NeuDataTable, { TableColumn, MobileCardConfig } from '@/app/components/NeuDataTable'
-import NeuFilterTabs, { FilterTab } from '@/app/components/NeuFilterTabs'
-import { GLASS, COLORS } from '@/app/utils/ui-tokens'
+import { COLORS } from '@/app/utils/ui-tokens'
 import QuotesTab from './_components/QuotesTab'
 import NewCarCatalogTab from './_components/NewCarCatalogTab'
-
-// PR-Q3-1 (2026-05-26) — 탭 3개로 확장 (카탈로그가 첫 탭, 작성중 앞)
-// PR-DESIGN-9 적용 — NeuFilterTabs 의무 사용 (자체 button strip 폐기)
-type TopTab = 'catalog' | 'quotes' | 'rentals'
-
-// ═══════════════════════════════════════════════════════════════════
-// /long-term-rentals — 장기렌트 관리 (PR-L1)
-//
-// 사용자 명시: 장기렌트 나간 차량이 operations 「사용가능」 에 잘못 떠 —
-//   별도 구현. 대차(operations)와 분리된 장기 계약 원장.
-//   1차 범위: 차량·고객·기간·월렌트료 등록 + 목록 (만기·월청구는 2차)
-// ═══════════════════════════════════════════════════════════════════
 
 async function getAuthHeader(): Promise<Record<string, string>> {
   try {
@@ -28,121 +24,142 @@ async function getAuthHeader(): Promise<Record<string, string>> {
   } catch { return {} }
 }
 
-type Row = {
+type Rental = {
   id: string
   vehicle_id: string | null
   vehicle_car_number: string | null
   vehicle_brand: string | null
   vehicle_model: string | null
-  customer_name: string | null
+  vehicle_spec: string | null
+  customer_name: string
   customer_phone: string | null
   contract_no: string | null
   start_date: string | null
   end_date: string | null
   monthly_fee: number | null
   deposit: number | null
-  status: string | null
-  notes: string | null
+  status: 'active' | 'expired' | 'terminated' | string
   contract_type: string | null
-  vehicle_spec: string | null
+  notes: string | null
 }
 
-// PR-L2 — 라이프사이클 필터 (계약대기 / 출고대기 / 운영중 / 종결)
-type FilterKey = 'all' | 'contracted' | 'pending_delivery' | 'active' | 'ended'
-
-const STATUS_META: Record<string, { label: string; bg: string; fg: string }> = {
-  contracted:       { label: '📝 계약대기',  bg: 'rgba(148,163,184,0.18)', fg: '#475569' },
-  pending_delivery: { label: '🚚 출고대기',  bg: 'rgba(245,158,11,0.12)',  fg: '#b45309' },
-  active:           { label: '🔵 운영중',    bg: COLORS.bgBlue,            fg: COLORS.primary },
-  expired:          { label: '⏳ 만기',      bg: 'rgba(148,163,184,0.15)', fg: '#475569' },
-  terminated:       { label: '✗ 해지',       bg: 'rgba(239,68,68,0.12)',   fg: '#991b1b' },
-}
-const STATUS_OPTIONS = [
-  { value: 'contracted', label: '계약대기' },
-  { value: 'pending_delivery', label: '출고대기 (신차)' },
-  { value: 'active', label: '운영중 (배차 완료)' },
-  { value: 'expired', label: '만기' },
-  { value: 'terminated', label: '해지' },
-]
-const CONTRACT_TYPES = [
-  { value: '기존차량', label: '기존차량' },
-  { value: '신차구입', label: '신차구입' },
-]
-
-function fmtWon(n: number | null | undefined): string {
-  if (n == null) return '-'
-  return `${Number(n).toLocaleString('ko-KR')}원`
-}
-function fmtDate(s: string | null | undefined): string {
-  if (!s) return '-'
-  return String(s).slice(0, 10)
-}
-function daysUntil(end: string | null | undefined): number | null {
-  if (!end) return null
-  const e = new Date(String(end).slice(0, 10))
-  if (isNaN(e.getTime())) return null
-  return Math.ceil((e.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
-}
+type TopTab = 'ledger' | 'quotes' | 'expiry' | 'catalog'
 
 const emptyForm = {
-  contract_type: '기존차량', vehicle_spec: '',
-  vehicle_car_number: '', customer_name: '', customer_phone: '', contract_no: '',
-  start_date: '', end_date: '', monthly_fee: '', deposit: '', status: 'active', notes: '',
+  contract_type: '기존차량',
+  vehicle_spec: '',
+  vehicle_car_number: '',
+  customer_name: '',
+  customer_phone: '',
+  contract_no: '',
+  start_date: '',
+  end_date: '',
+  monthly_fee: '',
+  deposit: '',
+  status: 'active',
+  notes: '',
 }
 
-export default function LongTermRentalsPage() {
-  const [topTab, setTopTab] = useState<TopTab>('catalog')
-  const [filter, setFilter] = useState<FilterKey>('contracted')
-  const [search, setSearch] = useState('')
-  const [rows, setRows] = useState<Row[] | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [err, setErr] = useState<string | null>(null)
+const won = (n: number | null | undefined) => n != null ? Number(n).toLocaleString('ko-KR') : '—'
+const fmtDate = (d: string | null) => d ? String(d).slice(0, 10) : '—'
 
-  // 등록/수정 모달
-  const [modalOpen, setModalOpen] = useState(false)
+function daysUntil(d: string | null): number | null {
+  if (!d) return null
+  const end = new Date(String(d).slice(0, 10) + 'T00:00:00')
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+  return Math.round((end.getTime() - today.getTime()) / 86400000)
+}
+
+function StatusBadge({ r }: { r: Rental }) {
+  const dday = daysUntil(r.end_date)
+  if (r.status === 'terminated') return <span style={{ fontSize: 11, fontWeight: 600, padding: '3px 8px', borderRadius: 6, background: COLORS.borderFaint, color: COLORS.textSecondary }}>해지</span>
+  if (r.status === 'expired') return <span style={{ fontSize: 11, fontWeight: 600, padding: '3px 8px', borderRadius: 6, background: COLORS.borderFaint, color: COLORS.textMuted }}>종료</span>
+  if (dday !== null && dday <= 30) return <span style={{ fontSize: 11, fontWeight: 600, padding: '3px 8px', borderRadius: 6, background: COLORS.bgAmber, color: COLORS.warning }}>만기 D-{Math.max(dday, 0)}</span>
+  return <span style={{ fontSize: 11, fontWeight: 600, padding: '3px 8px', borderRadius: 6, background: COLORS.bgGreen, color: COLORS.success }}>운영중</span>
+}
+
+const inputStyle: React.CSSProperties = {
+  width: '100%', padding: '8px 10px', borderRadius: 8, border: `1px solid ${COLORS.borderSubtle}`,
+  fontSize: 13, outline: 'none', background: '#f6f7f9', color: COLORS.textPrimary, fontFamily: 'inherit',
+}
+const fieldLabel: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: COLORS.textSecondary, marginBottom: 4, display: 'block' }
+
+export default function LongTermPage() {
+  const [topTab, setTopTab] = useState<TopTab>('ledger')
+  const [rentals, setRentals] = useState<Rental[]>([])
+  const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState('active') // active | expiring | expired | terminated | all
+  const [quoteCounts, setQuoteCounts] = useState<{ draft: number; sent: number; accepted: number } | null>(null)
+
+  // 등록/수정 슬라이드 패널
+  const [panelOpen, setPanelOpen] = useState(false)
   const [editId, setEditId] = useState<string | null>(null)
   const [form, setForm] = useState({ ...emptyForm })
   const [saving, setSaving] = useState(false)
-  const [modalMsg, setModalMsg] = useState<string | null>(null)
-
-  // 삭제 확인
-  const [delTarget, setDelTarget] = useState<Row | null>(null)
+  const [panelMsg, setPanelMsg] = useState<string | null>(null)
+  const [delTarget, setDelTarget] = useState<Rental | null>(null)
   const [delBusy, setDelBusy] = useState(false)
-
-  // 결과 토스트
   const [toast, setToast] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
   const showToast = useCallback((m: { type: 'ok' | 'err'; text: string }) => {
     setToast(m)
-    setTimeout(() => setToast(null), 4500)
+    setTimeout(() => setToast(null), 4000)
   }, [])
 
-  const fetchAll = useCallback(async () => {
+  const load = useCallback(async () => {
     setLoading(true)
-    setErr(null)
     try {
       const headers = await getAuthHeader()
-      const res = await fetch('/api/long-term-rentals?status=all', { headers })
-      const json = await res.json().catch(() => ({}))
-      if (Array.isArray(json?.data)) setRows(json.data as Row[])
-      else { setRows([]); if (json?.error) setErr(json.error) }
-    } catch (e: any) {
-      setRows([]); setErr(e?.message || 'fetch 실패')
-    } finally {
-      setLoading(false)
+      const [rRes, qRes] = await Promise.all([
+        fetch('/api/long-term-rentals?status=all', { headers }),
+        fetch('/api/lt-quotes?status=all', { headers }),
+      ])
+      const rJson = await rRes.json().catch(() => ({}))
+      if (Array.isArray(rJson?.data)) {
+        setRentals(rJson.data.map((r: any) => ({ ...r, monthly_fee: r.monthly_fee != null ? Number(r.monthly_fee) : null, deposit: r.deposit != null ? Number(r.deposit) : null })))
+      }
+      const qJson = await qRes.json().catch(() => ({}))
+      if (Array.isArray(qJson?.data)) {
+        const qs = qJson.data as Array<{ status: string }>
+        setQuoteCounts({
+          draft: qs.filter(q => q.status === 'draft').length,
+          sent: qs.filter(q => q.status === 'sent').length,
+          accepted: qs.filter(q => q.status === 'accepted').length,
+        })
+      }
+    } catch { /* 네트워크 오류 — 빈 상태 유지 */ }
+    setLoading(false)
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  const active = useMemo(() => rentals.filter(r => r.status === 'active'), [rentals])
+  const expiring = useMemo(() => active.filter(r => { const d = daysUntil(r.end_date); return d !== null && d >= 0 && d <= 30 }), [active])
+  const monthlyTotal = useMemo(() => active.reduce((s, r) => s + (r.monthly_fee || 0), 0), [active])
+  const quoteInProgress = quoteCounts ? quoteCounts.draft + quoteCounts.sent + quoteCounts.accepted : null
+
+  // ── 원장 탭 필터링 ──
+  const filtered = useMemo(() => {
+    let data = rentals
+    if (statusFilter === 'active') data = data.filter(r => r.status === 'active')
+    else if (statusFilter === 'expiring') data = expiring
+    else if (statusFilter === 'expired') data = data.filter(r => r.status === 'expired')
+    else if (statusFilter === 'terminated') data = data.filter(r => r.status === 'terminated')
+    if (search.trim()) {
+      const q = search.trim().toLowerCase()
+      data = data.filter(r =>
+        (r.customer_name || '').toLowerCase().includes(q) ||
+        (r.vehicle_car_number || '').toLowerCase().includes(q) ||
+        (r.contract_no || '').toLowerCase().includes(q))
     }
-  }, [])
+    return data
+  }, [rentals, statusFilter, search, expiring])
 
-  useEffect(() => {
-    if (rows === null && !loading) fetchAll()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  const refresh = useCallback(() => { setRows(null); fetchAll() }, [fetchAll])
-
+  // ── 등록/수정 ──
   const openCreate = useCallback(() => {
-    setEditId(null); setForm({ ...emptyForm }); setModalMsg(null); setModalOpen(true)
+    setEditId(null); setForm({ ...emptyForm }); setPanelMsg(null); setPanelOpen(true)
   }, [])
-  const openEdit = useCallback((r: Row) => {
+  const openEdit = useCallback((r: Rental) => {
     setEditId(r.id)
     setForm({
       contract_type: r.contract_type || '기존차량',
@@ -158,12 +175,12 @@ export default function LongTermRentalsPage() {
       status: r.status || 'active',
       notes: r.notes || '',
     })
-    setModalMsg(null); setModalOpen(true)
+    setPanelMsg(null); setPanelOpen(true)
   }, [])
 
   const save = useCallback(async () => {
-    if (!form.customer_name.trim()) { setModalMsg('고객명은 필수입니다'); return }
-    setSaving(true); setModalMsg(null)
+    if (!form.customer_name.trim()) { setPanelMsg('고객명은 필수입니다'); return }
+    setSaving(true); setPanelMsg(null)
     try {
       const headers = { ...(await getAuthHeader()), 'Content-Type': 'application/json' }
       const body = {
@@ -184,15 +201,15 @@ export default function LongTermRentalsPage() {
       const res = await fetch(url, { method: editId ? 'PATCH' : 'POST', headers, body: JSON.stringify(body) })
       const json = await res.json().catch(() => ({}))
       if (!res.ok || json?.error) throw new Error(json?.error || '저장 실패')
-      setModalOpen(false)
-      showToast({ type: 'ok', text: editId ? '장기렌트 수정 완료' : '장기렌트 등록 완료' })
-      refresh()
+      setPanelOpen(false)
+      showToast({ type: 'ok', text: editId ? '계약을 수정했습니다' : '계약을 등록했습니다' })
+      load()
     } catch (e: any) {
-      setModalMsg(e?.message || '저장 오류')
+      setPanelMsg(e?.message || '저장 오류')
     } finally {
       setSaving(false)
     }
-  }, [form, editId, refresh, showToast])
+  }, [form, editId, load, showToast])
 
   const runDelete = useCallback(async () => {
     if (!delTarget) return
@@ -202,311 +219,322 @@ export default function LongTermRentalsPage() {
       const res = await fetch(`/api/long-term-rentals/${delTarget.id}`, { method: 'DELETE', headers })
       const json = await res.json().catch(() => ({}))
       if (!res.ok || json?.error) throw new Error(json?.error || '삭제 실패')
+      showToast({ type: 'ok', text: '계약을 삭제했습니다' })
       setDelTarget(null)
-      showToast({ type: 'ok', text: '장기렌트 삭제 완료' })
-      refresh()
+      load()
     } catch (e: any) {
       showToast({ type: 'err', text: e?.message || '삭제 오류' })
     } finally {
       setDelBusy(false)
     }
-  }, [delTarget, refresh, showToast])
+  }, [delTarget, load, showToast])
 
-  const allRows = rows || []
-  const data = useMemo(() => ({
-    all: allRows,
-    contracted: allRows.filter((r) => r.status === 'contracted'),
-    pending_delivery: allRows.filter((r) => r.status === 'pending_delivery'),
-    active: allRows.filter((r) => r.status === 'active'),
-    ended: allRows.filter((r) => r.status === 'expired' || r.status === 'terminated'),
-  }), [allRows])
-  // 만기임박 (운영중 + 30일 이하)
-  const expiringSoon = useMemo(() => data.active.filter((r) => {
-    const d = daysUntil(r.end_date); return d != null && d >= 0 && d <= 30
-  }), [data])
-
-  const activeData = data[filter]
-  const filtered = useMemo(() => {
-    if (!search.trim()) return activeData
-    const q = search.toLowerCase()
-    return activeData.filter((r) =>
-      (r.customer_name || '').toLowerCase().includes(q) ||
-      (r.vehicle_car_number || '').toLowerCase().includes(q) ||
-      (r.customer_phone || '').toLowerCase().includes(q) ||
-      (r.contract_no || '').toLowerCase().includes(q),
-    )
-  }, [activeData, search])
-
-  const counts = {
-    all: data.all.length,
-    contracted: data.contracted.length,
-    pending_delivery: data.pending_delivery.length,
-    active: data.active.length,
-    ended: data.ended.length,
-    expiring: expiringSoon.length,
-  }
-
-  const statItems: StatItem[] = [
-    { label: '📋 전체', value: counts.all, unit: '건', tint: 'blue' },
-    { label: '📝 계약대기', value: counts.contracted, unit: '건', tint: 'purple' },
-    { label: '🚚 출고대기 (신차)', value: counts.pending_delivery, unit: '건', tint: 'amber' },
-    { label: '🔵 운영중', value: counts.active, unit: '건', tint: 'green' },
-    { label: '⏳ 만기임박 (30일)', value: counts.expiring, unit: '건', tint: 'red' },
-  ]
-  const statActions: ActionButton[] = [
-    { label: '장기렌트 등록', onClick: openCreate, variant: 'primary', icon: '➕' },
-    { label: '새로고침', onClick: refresh, variant: 'secondary', icon: '🔄' },
-  ]
-  const filterItems: FilterItem[] = [
-    { key: 'contracted', label: '📝 계약대기', count: counts.contracted },
-    { key: 'pending_delivery', label: '🚚 출고대기', count: counts.pending_delivery },
-    { key: 'active', label: '🔵 운영중', count: counts.active },
-    { key: 'ended', label: '✗ 종결', count: counts.ended },
-    { key: 'all', label: '📋 전체', count: counts.all },
-  ]
-
-  const columns: TableColumn<Row>[] = [
-    {
-      key: 'contract_type', label: '유형', width: 78, align: 'center',
-      sortBy: (r) => r.contract_type || '',
-      render: (r) => {
-        const isNew = r.contract_type === '신차구입'
-        return <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 6, fontSize: 10, fontWeight: 800, whiteSpace: 'nowrap',
-          background: isNew ? 'rgba(245,158,11,0.14)' : COLORS.bgBlue,
-          color: isNew ? '#b45309' : COLORS.primary }}>
-          {isNew ? '🆕 신차' : '🚗 기존'}
-        </span>
-      },
-    },
-    {
-      key: 'vehicle', label: '차량', width: 168,
-      sortBy: (r) => r.vehicle_car_number || r.vehicle_spec || '',
-      render: (r) => <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: 168, fontSize: 12 }}>
-        {r.vehicle_car_number
-          ? <><span style={{ fontWeight: 800, color: '#0f2440' }}>🚗 {r.vehicle_car_number}</span>{(r.vehicle_brand || r.vehicle_model) ? <span style={{ color: '#94a3b8' }}> · {[r.vehicle_brand, r.vehicle_model].filter(Boolean).join(' ')}</span> : null}</>
-          : r.vehicle_spec
-            ? <span style={{ color: '#b45309', fontWeight: 600 }}>🚚 {r.vehicle_spec} <span style={{ fontSize: 10, color: '#94a3b8' }}>(출고대기)</span></span>
-            : <span style={{ color: '#cbd5e1' }}>미지정</span>}
-      </span>,
-    },
-    {
-      key: 'customer', label: '고객', width: 160,
+  const columns: TableColumn<Rental>[] = [
+    { key: 'customer', label: '고객',
       sortBy: (r) => r.customer_name || '',
-      render: (r) => <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: 160, fontSize: 12 }}>
-        <span style={{ fontWeight: 700, color: '#1e293b' }}>{r.customer_name || '-'}</span>
-        {r.customer_phone ? <span style={{ color: '#94a3b8' }}> · {r.customer_phone}</span> : null}
-      </span>,
-    },
-    {
-      key: 'period', label: '계약기간', width: 186,
-      sortBy: (r) => r.end_date || '9999',
-      render: (r) => {
-        const d = daysUntil(r.end_date)
-        const soon = r.status === 'active' && d != null && d >= 0 && d <= 30
-        return <span style={{ whiteSpace: 'nowrap', fontSize: 12, color: soon ? '#b45309' : '#475569', fontWeight: soon ? 800 : 600 }}>
-          {fmtDate(r.start_date)} ~ {fmtDate(r.end_date)}
-          {soon ? <span style={{ marginLeft: 4, fontSize: 10, fontWeight: 800 }}>D-{d}</span> : null}
-        </span>
-      },
-    },
-    {
-      key: 'monthly_fee', label: '월 렌트료', width: 110, align: 'right',
-      sortBy: (r) => Number(r.monthly_fee || 0),
-      render: (r) => <span style={{ whiteSpace: 'nowrap', fontSize: 12, fontWeight: 700, color: '#0f2440' }}>{fmtWon(r.monthly_fee)}</span>,
-    },
-    {
-      key: 'deposit', label: '보증금', width: 104, align: 'right',
-      sortBy: (r) => Number(r.deposit || 0),
-      render: (r) => <span style={{ whiteSpace: 'nowrap', fontSize: 12, color: '#475569' }}>{fmtWon(r.deposit)}</span>,
-    },
-    {
-      key: 'status', label: '상태', width: 96, align: 'center',
-      sortBy: (r) => r.status || '',
-      render: (r) => {
-        const m = STATUS_META[r.status || ''] || { label: r.status || '-', bg: 'rgba(148,163,184,0.15)', fg: '#475569' }
-        return <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: 8, fontSize: 11, fontWeight: 800, whiteSpace: 'nowrap', background: m.bg, color: m.fg }}>{m.label}</span>
-      },
-    },
-    {
-      key: 'actions', label: '액션', width: 116, align: 'center',
       render: (r) => (
-        <span style={{ display: 'inline-flex', gap: 4, whiteSpace: 'nowrap' }}>
+        <div>
+          <div style={{ fontSize: 13.5, fontWeight: 600 }}>{r.customer_name}</div>
+          {r.customer_phone && <div style={{ fontSize: 11.5, color: COLORS.textMuted }}>{r.customer_phone}</div>}
+        </div>
+      ) },
+    { key: 'vehicle', label: '차량', width: 170,
+      sortBy: (r) => r.vehicle_car_number || '',
+      render: (r) => r.vehicle_car_number ? (
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 600 }}>{r.vehicle_car_number}</div>
+          {(r.vehicle_brand || r.vehicle_model) && <div style={{ fontSize: 11.5, color: COLORS.textMuted }}>{[r.vehicle_brand, r.vehicle_model].filter(Boolean).join(' ')}</div>}
+        </div>
+      ) : <span style={{ color: COLORS.textDim }}>{r.vehicle_spec || '—'}</span> },
+    { key: 'contract_no', label: '계약번호', width: 110,
+      sortBy: (r) => r.contract_no || '',
+      render: (r) => <span style={{ fontSize: 12.5, color: COLORS.textSecondary }}>{r.contract_no || '—'}</span>,
+      hideOnMobile: true },
+    { key: 'period', label: '기간', width: 185,
+      sortBy: (r) => r.end_date || '',
+      render: (r) => <span style={{ fontSize: 12.5, color: COLORS.textSecondary, whiteSpace: 'nowrap' }}>{fmtDate(r.start_date)} ~ {fmtDate(r.end_date)}</span> },
+    { key: 'monthly_fee', label: '월 렌트료', width: 105, align: 'right',
+      sortBy: (r) => r.monthly_fee || 0,
+      render: (r) => <span style={{ fontSize: 13, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{won(r.monthly_fee)}</span> },
+    { key: 'deposit', label: '보증금', width: 95, align: 'right',
+      sortBy: (r) => r.deposit || 0,
+      render: (r) => <span style={{ fontSize: 12.5, color: COLORS.textSecondary, fontVariantNumeric: 'tabular-nums' }}>{won(r.deposit)}</span>,
+      hideOnMobile: true },
+    { key: 'status', label: '상태', width: 95, align: 'center',
+      sortBy: (r) => r.status,
+      render: (r) => <StatusBadge r={r} /> },
+    { key: 'actions', label: '', width: 90, align: 'center',
+      render: (r) => (
+        <span style={{ display: 'inline-flex', gap: 4 }}>
           <button onClick={(e) => { e.stopPropagation(); openEdit(r) }}
-            style={{ padding: '4px 9px', borderRadius: 7, border: `1px solid ${COLORS.borderBlue}`, background: COLORS.bgBlue, color: COLORS.primary, cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>✎ 수정</button>
+            style={{ border: `1px solid ${COLORS.borderSubtle}`, background: '#fff', borderRadius: 7, padding: '3px 9px', fontSize: 11.5, fontWeight: 600, color: COLORS.textSecondary, cursor: 'pointer' }}>수정</button>
           <button onClick={(e) => { e.stopPropagation(); setDelTarget(r) }}
-            style={{ padding: '4px 9px', borderRadius: 7, border: '1px solid rgba(239,68,68,0.25)', background: 'transparent', color: '#991b1b', cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>🗑</button>
+            style={{ border: `1px solid ${COLORS.borderRed}`, background: '#fff', borderRadius: 7, padding: '3px 9px', fontSize: 11.5, fontWeight: 600, color: COLORS.danger, cursor: 'pointer' }}>삭제</button>
         </span>
-      ),
-    },
+      ) },
   ]
 
-  const mobileCard: MobileCardConfig<Row> = {
-    title: (r) => <span style={{ whiteSpace: 'nowrap' }}>🚗 {r.vehicle_car_number || r.customer_name || r.id.slice(0, 8)}</span>,
-    subtitle: (r) => `${STATUS_META[r.status || '']?.label || r.status || ''} · ${r.customer_name || ''} · ${fmtWon(r.monthly_fee)}/월`,
+  const mobile: MobileCardConfig<Rental> = {
+    title: (r) => <span>{r.customer_name} · {r.vehicle_car_number || '차량 미지정'}</span>,
+    subtitle: (r) => <span>{fmtDate(r.start_date)} ~ {fmtDate(r.end_date)}</span>,
+    trailing: (r) => <span style={{ fontWeight: 700 }}>{won(r.monthly_fee)}원</span>,
+    badges: (r) => <StatusBadge r={r} />,
   }
 
-  const fld = (k: keyof typeof emptyForm, v: string) => setForm((f) => ({ ...f, [k]: v }))
-  const inputStyle = { ...GLASS.L1, width: '100%', padding: '9px 12px', borderRadius: 8, fontSize: 13, color: '#1e293b' } as const
-  const labelStyle = { display: 'block', fontSize: 12, fontWeight: 700, color: '#475569', marginBottom: 5 } as const
+  // ── 만기 관리 탭 — 60일 이내 ──
+  const expiryList = useMemo(() =>
+    active
+      .map(r => ({ r, d: daysUntil(r.end_date) }))
+      .filter(x => x.d !== null && x.d <= 60)
+      .sort((a, b) => (a.d as number) - (b.d as number)),
+  [active])
 
   return (
-    <div className="page-bg">
-      {/* PR-DESIGN-9 § 1.6: 페이지 전체 너비 — max-w 제거, 좌우 패딩만 */}
-      <div className="py-4 px-4 md:py-5 md:px-6">
-        {toast && (
-          <div role="status" style={{
-            position: 'fixed', top: 72, left: '50%', transform: 'translateX(-50%)', zIndex: 60,
-            maxWidth: 'min(520px, 92vw)', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10,
-            background: toast.type === 'ok' ? 'rgba(236,253,245,0.97)' : 'rgba(254,242,242,0.97)',
-            backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
-            border: `1px solid ${toast.type === 'ok' ? 'rgba(16,185,129,0.45)' : 'rgba(239,68,68,0.45)'}`,
-            borderRadius: 12, boxShadow: '0 14px 36px rgba(15,23,42,0.18)',
-            fontSize: 13, fontWeight: 700, color: toast.type === 'ok' ? '#065f46' : '#991b1b',
-          }}>
-            <span>{toast.type === 'ok' ? '✅' : '⚠️'}</span>
-            <span style={{ flex: 1 }}>{toast.text}</span>
-            <button onClick={() => setToast(null)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 15 }}>×</button>
-          </div>
-        )}
-
-        {/* 상단 탭 — 카탈로그 / 견적 / 계약·운영 (PR-Q3-1 + PR-DESIGN-9 NeuFilterTabs) */}
-        <NeuFilterTabs
-          tabs={[
-            { key: 'catalog', label: '🚗 신차 카탈로그' },
-            { key: 'quotes', label: '📝 견적' },
-            { key: 'rentals', label: '🔑 계약 · 운영' },
-          ] as FilterTab[]}
-          activeKey={topTab}
-          onSelect={(k) => setTopTab(k as TopTab)}
-        />
-
-        {topTab === 'catalog' && <NewCarCatalogTab />}
-        {topTab === 'quotes' && <QuotesTab />}
-
-        {topTab === 'rentals' && (<>
-        <DcStatStrip stats={statItems} actions={statActions} />
-        <DcToolbar
-          search={search}
-          onSearchChange={setSearch}
-          placeholder="고객 / 차량번호 / 연락처 / 계약번호 검색…"
-          filters={filterItems}
-          activeFilter={filter}
-          onFilterChange={(k) => setFilter(k as FilterKey)}
-        />
-        {err && (
-          <div style={{ ...GLASS.L3, marginBottom: 12, padding: 12, borderRadius: 10, border: '1px solid rgba(239,68,68,0.3)', fontSize: 12, color: '#991b1b' }}>
-            ⚠ {err} {' '}— long_term_rentals 마이그레이션이 적용됐는지 확인해주세요.
-          </div>
-        )}
-        <NeuDataTable
-          columns={columns}
-          data={filtered}
-          rowKey={(r) => r.id}
-          onRowClick={openEdit}
-          loading={loading}
-          emptyIcon="🔑"
-          emptyMessage="장기렌트 계약이 없습니다 — 「장기렌트 등록」으로 추가하세요"
-          mobileCard={mobileCard}
-          defaultSort={{ key: 'period', dir: 'asc' }}
-        />
-        <div style={{ marginTop: 12, fontSize: 12, color: '#64748b' }}>
-          💡 장기렌트는 사고 대차와 별개 계약입니다. 여기 등록된 계약중 차량은 대차업무 「사용가능」에서 자동 제외됩니다.
+    <div style={{ padding: '20px 24px', maxWidth: 1280, color: COLORS.textPrimary, fontSize: 14 }}>
+      {/* 페이지 헤더 */}
+      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 16 }}>
+        <div>
+          <h1 style={{ fontSize: 21, letterSpacing: '-0.02em', fontWeight: 700 }}>장기계약</h1>
+          <p style={{ color: COLORS.textSecondary, fontSize: 13, marginTop: 3 }}>견적을 보내고, 계약으로 만들고, 수납과 만기를 관리합니다</p>
         </div>
-
-        {/* 등록/수정 모달 */}
-        {modalOpen && (
-          <div onClick={() => !saving && setModalOpen(false)}
-            style={{ position: 'fixed', inset: 0, zIndex: 50, background: 'rgba(15,23,42,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-            <div onClick={(e) => e.stopPropagation()}
-              style={{ ...GLASS.L5, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', width: 'min(560px, 96vw)', maxHeight: '88vh', borderRadius: 16, boxShadow: '0 24px 60px rgba(0,0,0,0.25)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '16px 20px', borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
-                <h3 style={{ fontSize: 15, fontWeight: 900, color: '#0f2440', margin: 0 }}>🔑 장기렌트 {editId ? '수정' : '등록'}</h3>
-                <div style={{ flex: 1 }} />
-                <button onClick={() => !saving && setModalOpen(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 16, color: '#64748b' }}>✕</button>
-              </div>
-              <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 13 }}>
-                {/* PR-L2 — 계약 유형 */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 12 }}>
-                  <div><label style={labelStyle}>계약 유형</label>
-                    <select value={form.contract_type} onChange={(e) => fld('contract_type', e.target.value)} style={inputStyle}>
-                      {CONTRACT_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
-                    </select></div>
-                  <div><label style={labelStyle}>
-                    예정 차종/스펙
-                    <span style={{ marginLeft: 6, fontSize: 10, color: '#94a3b8', fontWeight: 500 }}>신차구입 시 — 차량 도착 전</span>
-                  </label>
-                    <input value={form.vehicle_spec} onChange={(e) => fld('vehicle_spec', e.target.value)}
-                      placeholder={form.contract_type === '신차구입' ? '예: GV80 디젤 5인승 25년식' : '선택'} style={inputStyle} /></div>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                  <div><label style={labelStyle}>
-                    차량번호
-                    {form.contract_type === '신차구입' && <span style={{ marginLeft: 6, fontSize: 10, color: '#94a3b8', fontWeight: 500 }}>차량 도착 후 입력</span>}
-                  </label>
-                    <input value={form.vehicle_car_number} onChange={(e) => fld('vehicle_car_number', e.target.value)} placeholder="예: 12가3456" style={inputStyle} /></div>
-                  <div><label style={labelStyle}>계약번호</label>
-                    <input value={form.contract_no} onChange={(e) => fld('contract_no', e.target.value)} placeholder="선택" style={inputStyle} /></div>
-                  <div><label style={labelStyle}>고객명 *</label>
-                    <input value={form.customer_name} onChange={(e) => fld('customer_name', e.target.value)} placeholder="필수" style={inputStyle} /></div>
-                  <div><label style={labelStyle}>연락처</label>
-                    <input value={form.customer_phone} onChange={(e) => fld('customer_phone', e.target.value)} placeholder="010-…" style={inputStyle} /></div>
-                  <div><label style={labelStyle}>계약 시작일</label>
-                    <input type="date" value={form.start_date} onChange={(e) => fld('start_date', e.target.value)} style={inputStyle} /></div>
-                  <div><label style={labelStyle}>만기일</label>
-                    <input type="date" value={form.end_date} onChange={(e) => fld('end_date', e.target.value)} style={inputStyle} /></div>
-                  <div><label style={labelStyle}>월 렌트료 (원)</label>
-                    <input type="number" value={form.monthly_fee} onChange={(e) => fld('monthly_fee', e.target.value)} placeholder="예: 700000" style={inputStyle} /></div>
-                  <div><label style={labelStyle}>보증금 (원)</label>
-                    <input type="number" value={form.deposit} onChange={(e) => fld('deposit', e.target.value)} placeholder="예: 3000000" style={inputStyle} /></div>
-                </div>
-                <div><label style={labelStyle}>상태</label>
-                  <select value={form.status} onChange={(e) => fld('status', e.target.value)} style={inputStyle}>
-                    {STATUS_OPTIONS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-                  </select></div>
-                <div><label style={labelStyle}>메모</label>
-                  <textarea value={form.notes} onChange={(e) => fld('notes', e.target.value)} rows={2} placeholder="특이사항"
-                    style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }} /></div>
-                {modalMsg && <div style={{ fontSize: 12, fontWeight: 700, color: '#991b1b' }}>⚠️ {modalMsg}</div>}
-              </div>
-              <div style={{ display: 'flex', gap: 8, padding: '14px 20px', borderTop: '1px solid rgba(0,0,0,0.06)' }}>
-                <button onClick={() => !saving && setModalOpen(false)}
-                  style={{ padding: '9px 16px', background: 'transparent', border: '1px solid rgba(0,0,0,0.12)', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700, color: '#475569' }}>닫기</button>
-                <div style={{ flex: 1 }} />
-                <button onClick={save} disabled={saving}
-                  style={{ padding: '9px 20px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 8, cursor: saving ? 'not-allowed' : 'pointer', fontWeight: 800, fontSize: 13, opacity: saving ? 0.5 : 1 }}>
-                  {saving ? '저장 중…' : editId ? '✎ 수정 저장' : '➕ 등록'}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* 삭제 확인 */}
-        {delTarget && (
-          <div onClick={() => !delBusy && setDelTarget(null)}
-            style={{ position: 'fixed', inset: 0, zIndex: 55, background: 'rgba(15,23,42,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-            <div onClick={(e) => e.stopPropagation()}
-              style={{ ...GLASS.L5, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', width: 'min(400px, 96vw)', borderRadius: 16, boxShadow: '0 24px 60px rgba(0,0,0,0.25)', overflow: 'hidden' }}>
-              <div style={{ padding: '18px 20px 14px' }}>
-                <h3 style={{ fontSize: 15, fontWeight: 900, color: '#0f2440', margin: 0 }}>🗑 장기렌트 삭제</h3>
-                <div style={{ ...GLASS.L1, marginTop: 12, padding: '10px 12px', borderRadius: 8, fontSize: 12, color: '#1e293b' }}>
-                  🚗 {delTarget.vehicle_car_number || '미지정'} · {delTarget.customer_name || '-'}
-                </div>
-                <div style={{ marginTop: 10, fontSize: 12, fontWeight: 700, color: '#991b1b' }}>이 장기렌트 계약을 삭제합니다. 되돌릴 수 없습니다.</div>
-              </div>
-              <div style={{ display: 'flex', gap: 8, padding: '12px 20px 16px' }}>
-                <button onClick={() => !delBusy && setDelTarget(null)}
-                  style={{ flex: 1, padding: '10px', background: 'transparent', border: '1px solid rgba(0,0,0,0.12)', borderRadius: 9, cursor: 'pointer', fontSize: 13, fontWeight: 700, color: '#475569' }}>닫기</button>
-                <button onClick={runDelete} disabled={delBusy}
-                  style={{ flex: 1, padding: '10px', color: '#fff', border: 'none', borderRadius: 9, cursor: delBusy ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 800, opacity: delBusy ? 0.5 : 1, background: 'linear-gradient(135deg,#ef4444,#dc2626)' }}>
-                  {delBusy ? '처리 중…' : '🗑 삭제하기'}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-        </>)}
+        <button onClick={openCreate}
+          style={{ background: COLORS.primary, color: '#fff', border: 'none', borderRadius: 9, padding: '9px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+          + 계약 등록
+        </button>
       </div>
+
+      {/* 요약 카드 */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginBottom: 18 }}>
+        {[
+          { label: '운영중 계약', dot: COLORS.success, value: loading ? '—' : `${active.length}건`, onClick: undefined as undefined | (() => void) },
+          { label: '만기 임박 (30일)', dot: COLORS.warning, value: loading ? '—' : `${expiring.length}건`, onClick: () => { setTopTab('ledger'); setStatusFilter('expiring') } },
+          { label: '월 렌트료 합계', dot: COLORS.info, value: loading ? '—' : `${won(monthlyTotal)}원`, onClick: undefined },
+          { label: '진행중 견적', dot: '#7c3aed', value: quoteInProgress === null ? '—' : `${quoteInProgress}건`, onClick: () => setTopTab('quotes') },
+        ].map((c, i) => (
+          <div key={i} onClick={c.onClick}
+            style={{ background: '#fff', border: `1px solid ${COLORS.borderSubtle}`, borderRadius: 12, padding: '14px 16px', boxShadow: '0 1px 2px rgba(16,24,40,0.05)', cursor: c.onClick ? 'pointer' : 'default' }}>
+            <div style={{ fontSize: 12.5, color: COLORS.textSecondary, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: c.dot, display: 'inline-block' }} />{c.label}
+            </div>
+            <div style={{ fontSize: 21, fontWeight: 700, letterSpacing: '-0.02em', marginTop: 5 }}>{c.value}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* 탭 */}
+      <NeuFilterTabs
+        tabs={[
+          { key: 'ledger', label: '원장', count: rentals.length },
+          { key: 'quotes', label: '견적' },
+          { key: 'expiry', label: '만기 관리', count: expiryList.length },
+          { key: 'catalog', label: '신차 카탈로그' },
+        ]}
+        activeKey={topTab}
+        onSelect={(k) => setTopTab(k as TopTab)}
+      />
+
+      {/* ── 원장 ── */}
+      {topTab === 'ledger' && (
+        <>
+          <DcToolbar
+            search={search}
+            onSearchChange={setSearch}
+            placeholder="고객명, 차량번호, 계약번호 검색..."
+            filters={[
+              { key: 'active', label: '운영중', count: active.length },
+              { key: 'expiring', label: '만기임박', count: expiring.length },
+              { key: 'expired', label: '종료' },
+              { key: 'terminated', label: '해지' },
+              { key: 'all', label: '전체', count: rentals.length },
+            ]}
+            activeFilter={statusFilter}
+            onFilterChange={setStatusFilter}
+          />
+          <NeuDataTable
+            columns={columns}
+            data={filtered}
+            rowKey={(r) => r.id}
+            mobileCard={mobile}
+            loading={loading}
+            emptyIcon="📄"
+            emptyMessage="장기계약이 없습니다 — 견적 탭에서 견적을 만들고 수락되면 계약으로 전환됩니다"
+            defaultSort={{ key: 'period', dir: 'asc' }}
+          />
+        </>
+      )}
+
+      {/* ── 견적 (기존 컴포넌트 재사용 — 데이터 계층 동일) ── */}
+      {topTab === 'quotes' && <QuotesTab />}
+
+      {/* ── 만기 관리 ── */}
+      {topTab === 'expiry' && (
+        <div style={{ background: '#fff', border: `1px solid ${COLORS.borderSubtle}`, borderRadius: 12, boxShadow: '0 1px 2px rgba(16,24,40,0.05)', overflow: 'hidden' }}>
+          <div style={{ fontSize: 14, fontWeight: 700, padding: '13px 16px', borderBottom: `1px solid ${COLORS.borderFaint}` }}>
+            60일 이내 만기 {expiryList.length}건 — 연장 협의 또는 재견적이 필요합니다
+          </div>
+          {loading && <div style={{ padding: '28px 16px', color: COLORS.textMuted, fontSize: 13 }}>불러오는 중...</div>}
+          {!loading && expiryList.length === 0 && (
+            <div style={{ padding: '28px 16px', color: COLORS.textMuted, fontSize: 13 }}>60일 이내 만기 계약이 없습니다</div>
+          )}
+          {expiryList.map(({ r, d }) => (
+            <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 16px', borderBottom: `1px solid ${COLORS.borderFaint}` }}>
+              <span style={{
+                minWidth: 52, textAlign: 'center', fontSize: 12, fontWeight: 700, padding: '4px 8px', borderRadius: 8,
+                background: (d as number) <= 14 ? COLORS.bgRed : COLORS.bgAmber,
+                color: (d as number) <= 14 ? COLORS.danger : COLORS.warning,
+              }}>{(d as number) < 0 ? '만료' : `D-${d}`}</span>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <b style={{ fontSize: 13.5 }}>{r.customer_name} · {r.vehicle_car_number || '차량 미지정'}</b>
+                <div style={{ fontSize: 12, color: COLORS.textMuted }}>
+                  {fmtDate(r.end_date)} 만기 · 월 {won(r.monthly_fee)}원{r.customer_phone ? ` · ${r.customer_phone}` : ''}
+                </div>
+              </div>
+              <button
+                onClick={() => setTopTab('quotes')}
+                style={{ border: `1px solid ${COLORS.borderSubtle}`, background: '#fff', borderRadius: 8, padding: '6px 12px', fontSize: 12, fontWeight: 600, color: COLORS.textSecondary, cursor: 'pointer', whiteSpace: 'nowrap' }}
+              >재견적</button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ── 신차 카탈로그 (기존 컴포넌트 재사용) ── */}
+      {topTab === 'catalog' && <NewCarCatalogTab />}
+
+      {/* ═══ 등록/수정 슬라이드 패널 ═══ */}
+      {panelOpen && (
+        <>
+          <div onClick={() => setPanelOpen(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(16,24,40,0.24)', zIndex: 90 }} />
+          <div style={{
+            position: 'fixed', top: 0, right: 0, bottom: 0, width: 440, maxWidth: '92vw', zIndex: 95,
+            background: '#fff', borderLeft: `1px solid ${COLORS.borderSubtle}`,
+            boxShadow: '-12px 0 32px rgba(16,24,40,0.08)', padding: 24, overflowY: 'auto',
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+              <h2 style={{ fontSize: 17, fontWeight: 700 }}>{editId ? '계약 수정' : '계약 등록'}</h2>
+              <button onClick={() => setPanelOpen(false)}
+                style={{ border: 'none', background: COLORS.borderFaint, borderRadius: 8, width: 30, height: 30, fontSize: 15, color: COLORS.textSecondary, cursor: 'pointer' }}>×</button>
+            </div>
+            <p style={{ color: COLORS.textMuted, fontSize: 12.5, marginBottom: 18 }}>장기계약 원장에 기록됩니다. 고객명만 필수입니다.</p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div>
+                  <label style={fieldLabel}>고객명 *</label>
+                  <input style={inputStyle} value={form.customer_name} onChange={e => setForm(f => ({ ...f, customer_name: e.target.value }))} placeholder="예: ㈜잠실에너지" />
+                </div>
+                <div>
+                  <label style={fieldLabel}>연락처</label>
+                  <input style={inputStyle} value={form.customer_phone} onChange={e => setForm(f => ({ ...f, customer_phone: e.target.value }))} placeholder="010-0000-0000" />
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div>
+                  <label style={fieldLabel}>계약 유형</label>
+                  <select style={inputStyle} value={form.contract_type} onChange={e => setForm(f => ({ ...f, contract_type: e.target.value }))}>
+                    <option value="기존차량">기존차량</option>
+                    <option value="신차출고">신차출고</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={fieldLabel}>차량번호</label>
+                  <input style={inputStyle} value={form.vehicle_car_number} onChange={e => setForm(f => ({ ...f, vehicle_car_number: e.target.value }))} placeholder="예: 34가1234" />
+                </div>
+              </div>
+              <div>
+                <label style={fieldLabel}>차량 사양 (신차출고 시)</label>
+                <input style={inputStyle} value={form.vehicle_spec} onChange={e => setForm(f => ({ ...f, vehicle_spec: e.target.value }))} placeholder="예: 팰리세이드 캘리그래피 2.5T" />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div>
+                  <label style={fieldLabel}>계약 시작일</label>
+                  <input type="date" style={inputStyle} value={form.start_date} onChange={e => setForm(f => ({ ...f, start_date: e.target.value }))} />
+                </div>
+                <div>
+                  <label style={fieldLabel}>만기일</label>
+                  <input type="date" style={inputStyle} value={form.end_date} onChange={e => setForm(f => ({ ...f, end_date: e.target.value }))} />
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div>
+                  <label style={fieldLabel}>월 렌트료 (원)</label>
+                  <input type="number" style={inputStyle} value={form.monthly_fee} onChange={e => setForm(f => ({ ...f, monthly_fee: e.target.value }))} placeholder="1250000" />
+                </div>
+                <div>
+                  <label style={fieldLabel}>보증금 (원)</label>
+                  <input type="number" style={inputStyle} value={form.deposit} onChange={e => setForm(f => ({ ...f, deposit: e.target.value }))} placeholder="3000000" />
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div>
+                  <label style={fieldLabel}>계약번호</label>
+                  <input style={inputStyle} value={form.contract_no} onChange={e => setForm(f => ({ ...f, contract_no: e.target.value }))} placeholder="선택 입력" />
+                </div>
+                <div>
+                  <label style={fieldLabel}>상태</label>
+                  <select style={inputStyle} value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))}>
+                    <option value="active">운영중</option>
+                    <option value="expired">종료</option>
+                    <option value="terminated">해지</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label style={fieldLabel}>메모</label>
+                <textarea style={{ ...inputStyle, minHeight: 72, resize: 'vertical' }} value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} />
+              </div>
+
+              {panelMsg && (
+                <div style={{ padding: '9px 12px', borderRadius: 8, background: COLORS.bgRed, color: COLORS.danger, fontSize: 12.5, fontWeight: 600 }}>{panelMsg}</div>
+              )}
+
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 6 }}>
+                <button onClick={() => setPanelOpen(false)}
+                  style={{ border: `1px solid ${COLORS.borderSubtle}`, background: '#fff', borderRadius: 9, padding: '9px 16px', fontSize: 13, fontWeight: 600, color: COLORS.textSecondary, cursor: 'pointer' }}>취소</button>
+                <button onClick={save} disabled={saving}
+                  style={{ border: 'none', background: COLORS.primary, borderRadius: 9, padding: '9px 18px', fontSize: 13, fontWeight: 600, color: '#fff', cursor: saving ? 'wait' : 'pointer', opacity: saving ? 0.7 : 1 }}>
+                  {saving ? '저장 중...' : editId ? '수정 저장' : '등록'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ═══ 삭제 확인 ═══ */}
+      {delTarget && (
+        <>
+          <div onClick={() => setDelTarget(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(16,24,40,0.24)', zIndex: 90 }} />
+          <div style={{
+            position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 95,
+            background: '#fff', border: `1px solid ${COLORS.borderSubtle}`, borderRadius: 12,
+            boxShadow: '0 8px 24px rgba(16,24,40,0.18)', padding: 22, width: 360, maxWidth: '90vw',
+          }}>
+            <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 8 }}>계약 삭제</div>
+            <div style={{ fontSize: 13, color: COLORS.textSecondary, marginBottom: 16 }}>
+              {delTarget.customer_name} · {delTarget.vehicle_car_number || '차량 미지정'} 계약을 삭제할까요? 되돌릴 수 없습니다.
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button onClick={() => setDelTarget(null)}
+                style={{ border: `1px solid ${COLORS.borderSubtle}`, background: '#fff', borderRadius: 9, padding: '8px 14px', fontSize: 13, fontWeight: 600, color: COLORS.textSecondary, cursor: 'pointer' }}>취소</button>
+              <button onClick={runDelete} disabled={delBusy}
+                style={{ border: 'none', background: COLORS.danger, borderRadius: 9, padding: '8px 16px', fontSize: 13, fontWeight: 600, color: '#fff', cursor: delBusy ? 'wait' : 'pointer', opacity: delBusy ? 0.7 : 1 }}>
+                {delBusy ? '삭제 중...' : '삭제'}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ═══ 토스트 ═══ */}
+      {toast && (
+        <div style={{
+          position: 'fixed', top: 20, right: 24, zIndex: 99,
+          background: toast.type === 'ok' ? COLORS.textPrimary : COLORS.danger, color: '#fff',
+          padding: '11px 18px', borderRadius: 10, fontSize: 13, fontWeight: 500,
+          boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
+        }}>{toast.text}</div>
+      )}
     </div>
   )
 }
