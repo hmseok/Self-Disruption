@@ -232,7 +232,7 @@ export default function PageTitle({ dynamicMenuName, brand, primaryLabel }: Page
     } catch { /* canvas 미지원 환경 — 기본 favicon 유지 */ }
   }, [brand])
 
-  if (!pageName || pathname === '/dashboard') return null
+  if (!pageName || pathname === '/dashboard' || pathname === '/home') return null
 
   return (
     <div style={{

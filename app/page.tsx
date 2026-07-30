@@ -325,7 +325,7 @@ function AuthPage() {
     const unsubscribe = auth.onAuthStateChanged((user) => {
       if (!redirected && user) {
         redirected = true
-        router.push('/dashboard')
+        router.push('/home')
       }
     })
     return () => { unsubscribe() }
@@ -435,7 +435,7 @@ function AuthPage() {
         return
       }
       setAuth(data.token, data.user)
-      router.push('/dashboard')
+      router.push('/home')
     } catch (err: any) {
       setMessage({ text: '이메일 또는 비밀번호를 확인해주세요.', type: 'error' })
       setLoading(false)
@@ -638,7 +638,7 @@ function AuthPage() {
     try {
       const currentUser = auth.currentUser
       if (currentUser) {
-        router.push('/dashboard')
+        router.push('/home')
         return
       }
       // 로그인 필요
@@ -653,7 +653,7 @@ function AuthPage() {
         return
       }
       setAuth(data.token, data.user)
-      router.push('/dashboard')
+      router.push('/home')
     } catch (err: any) {
       setMessage({ text: '로그인 처리 중 오류가 발생했습니다.', type: 'error' })
     } finally {
@@ -678,7 +678,7 @@ function AuthPage() {
         return
       }
       setAuth(data.token, data.user)
-      router.push('/dashboard')
+      router.push('/home')
     } catch (err: any) {
       setMessage({ text: '개발자 계정 로그인 실패', type: 'error' })
       setLoading(false)

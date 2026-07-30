@@ -12,12 +12,18 @@ import QuickTxModal from '../QuickTxModal'
 import { getAuthHeader } from '@/app/utils/auth-client'
 
 // ============================================
-// 아이콘
+// 아이콘 — 2026-07 개편: 라인 아이콘 통일 (stroke 1.8, 17px)
 // ============================================
+const icn = "w-[17px] h-[17px]"
 const Icons: any = {
   Menu: () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>,
-  Home: () => <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>,
-  Car: () => <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10H8s-1.5-.1-3.5 1.5S2 15 2 15v1c0 .6.4 1 1 1h1" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M6 17a2 2 0 104 0 2 2 0 00-4 0zM14 17a2 2 0 104 0 2 2 0 00-4 0z" /></svg>,
+  Home: () => <svg className={icn} fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5" /><path d="M5 9.5V21h14V9.5" /></svg>,
+  Car: () => <svg className={icn} fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M5 16 6.5 9.5c.3-1 1.1-1.5 2-1.5h7c.9 0 1.7.5 2 1.5L19 16" /><rect x="3" y="16" width="18" height="4" rx="1.5" /><circle cx="7.5" cy="20" r="1.2" /><circle cx="16.5" cy="20" r="1.2" /></svg>,
+  Key: () => <svg className={icn} fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><circle cx="8" cy="15" r="4" /><path d="m10.8 12.2 8.7-8.7" /><path d="M15 6l3 3" /><path d="M18 3l3 3" /></svg>,
+  Ledger: () => <svg className={icn} fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="2" /><path d="M3 10h18" /><path d="M7 15h4" /></svg>,
+  Coin: () => <svg className={icn} fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" /><path d="M12 8v8M9.5 10.2c.6-.8 4.4-.9 4.4 1 0 1.9-3.8 1.4-3.8 3.3 0 1.8 3.4 1.8 4.2.8" /></svg>,
+  Trend: () => <svg className={icn} fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M4 19V5" /><path d="M4 19h16" /><path d="m7 14 4-4 3 3 5-6" /></svg>,
+  Tag: () => <svg className={icn} fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M3 3h8l10 10-8 8L3 11z" /><circle cx="8" cy="8" r="1.5" /></svg>,
   Truck: () => <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" /></svg>,
   Doc: () => <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>,
   Setting: () => <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>,
@@ -68,9 +74,8 @@ function toMenuItem(m: typeof REGISTRY_MENUS[number]) {
 // sidebarHidden=true 인 entry 는 사이드바에서 제외 (권한 페이지는 노출 유지)
 const isSidebarVisible = (m: typeof REGISTRY_MENUS[number]) => !m.sidebarHidden
 
-// 직장인필수 / CX팀 / 설정 메뉴 — menu-registry 에서 자동 추출
-const WORK_ESSENTIALS_MENUS = getMenusByGroup('work-essentials').filter(isSidebarVisible).map(toMenuItem)
-// PR-FMI-ONLY-PURGE Phase 3d (2026-06-02) — 라이드 분리: cx-team/admin-ops/mt-team/vision 그룹 변수 제거 (단독회사 FMI)
+// 설정 메뉴 — menu-registry 에서 자동 추출
+// 2026-07-30 개편: 직장인필수 섹션 제거 (사용자 확정) — 페이지·권한은 유지, 진입은 홈 하단 바로가기
 const SETTINGS_MENUS_ALL = getMenusByGroup('settings').filter(isSidebarVisible).map(toMenuItem)
 // 「회사 정보」를 첫 entry 로 분리 (legacy COMPANY_INFO_MENU 호환)
 const COMPANY_INFO_MENU = SETTINGS_MENUS_ALL.find(m => m.path === '/db/codes')
@@ -94,19 +99,15 @@ function MenuItem({ item, pathname, accent, allPaths }: { item: { name: string; 
   const isActive = pathname === item.path ||
     (!hasMoreSpecificMatch && pathname.startsWith(item.path + '/'))
 
+  // 2026-07 개편 — 플랫 스타일: 활성 = 연한 파랑 배경 + 파랑 텍스트 (그라데이션/그림자 제거)
   return (
     <Link
       href={item.path}
-      className={`flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all text-[13px] font-medium ${
-        isActive
-          ? 'text-white border border-transparent'
-          : 'text-slate-600 hover:text-slate-800 border border-transparent'
-      }`}
-      style={isActive ? {
-        background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)',
-        boxShadow: '3px 3px 8px rgba(140,170,210,0.19), -1px -1px 4px rgba(255,255,255,0.47)',
-      } : {}}
-      onMouseEnter={e => { if (!isActive) (e.currentTarget as HTMLElement).style.background = 'rgba(0,0,0,0.03)' }}
+      className="flex items-center gap-2.5 px-2.5 py-[8px] rounded-lg transition-colors text-[13.5px]"
+      style={isActive
+        ? { background: '#eff4ff', color: '#2563eb', fontWeight: 600 }
+        : { color: '#5b626e', fontWeight: 500 }}
+      onMouseEnter={e => { if (!isActive) (e.currentTarget as HTMLElement).style.background = '#f0f1f4' }}
       onMouseLeave={e => { if (!isActive) (e.currentTarget as HTMLElement).style.background = 'transparent' }}
     >
       <Icon />
@@ -293,10 +294,10 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
   const showSettings = role === 'admin'
 
   return (
-    <div className="print:!h-auto print:!overflow-visible print:!block" style={{ display: 'flex', height: '100dvh', background: '#f2f1ef', overflowX: 'hidden', overflowY: 'hidden' }}>
-      {/* 상단 고정 바 — 햄버거 + 업체선택 (lg:hidden 제거 — 데스크탑에서도 사이드바 닫기 가능) */}
+    <div className="print:!h-auto print:!overflow-visible print:!block" style={{ display: 'flex', height: '100dvh', background: '#f6f7f9', overflowX: 'hidden', overflowY: 'hidden' }}>
+      {/* 상단 고정 바 — 사이드바 닫혔을 때 (햄버거 + 로고) */}
       {!isSidebarOpen && (
-        <div className="fixed top-0 left-0 right-0 z-30 safe-top" style={{ background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', borderBottom: '1px solid rgba(0,0,0,0.06)', boxShadow: '0 4px 12px rgba(140,170,210,0.15)' }}>
+        <div className="fixed top-0 left-0 right-0 z-30 safe-top" style={{ background: '#fff', borderBottom: '1px solid #e6e8ec' }}>
           <div className="flex items-center gap-3 px-4 py-2.5" style={{ paddingTop: 'max(0.625rem, env(safe-area-inset-top))' }}>
             {/* 햄버거 */}
             <button
@@ -307,7 +308,7 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
             </button>
 
             {/* 로고 */}
-            <span className="text-sm font-bold tracking-tight flex-shrink-0" style={{ color: '#3b6eb5' }}>{orgBrand.primaryLabel}</span>
+            <span className="text-sm font-bold tracking-tight flex-shrink-0" style={{ color: '#1a1d23' }}>{orgBrand.primaryLabel}</span>
 
             {/* 회사 표시 (부서별 동적) — FMI 는 companyLabel='' 로 비표시 (2026-05-27) */}
             {orgBrand.companyLabel && (
@@ -323,116 +324,62 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
         onClick={() => setIsSidebarOpen(false)}
       />
 
-      {/* 사이드바 — lg:translate-x-0 제거: 데스크탑에서도 isSidebarOpen state 따름 (사용자 토글 가능) */}
-      <aside className={`${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} w-60 transition-transform duration-300 overflow-hidden flex flex-col fixed h-full z-20`} style={{ background: 'rgba(255,255,255,0.75)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', borderRight: '1px solid rgba(255,255,255,0.30)', boxShadow: '4px 0 12px rgba(140,170,210,0.12)', color: '#1e293b' }}>
+      {/* 사이드바 — 2026-07 개편: 플랫 화이트 (목업 fmi-erp-redesign.html 기준) */}
+      <aside className={`${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} w-60 transition-transform duration-300 overflow-hidden flex flex-col fixed h-full z-20`} style={{ background: '#fff', borderRight: '1px solid #e6e8ec', color: '#1a1d23' }}>
         <div className="w-60 flex flex-col h-full">
 
           {/* 로고 */}
-          <div className="px-5 py-4 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
-            <span className="tracking-tight cursor-pointer" onClick={() => router.push('/dashboard')} style={{ fontSize: 18, fontWeight: 900, background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-              {orgBrand.primaryLabel}
-            </span>
+          <div className="px-4 py-4 flex items-center justify-between" style={{ borderBottom: '1px solid #f0f1f4' }}>
+            <div className="flex items-center gap-2.5 cursor-pointer" onClick={() => router.push('/home')}>
+              <div className="w-[30px] h-[30px] rounded-lg flex items-center justify-center text-white text-[13px] font-extrabold flex-shrink-0" style={{ background: '#2563eb' }}>
+                {orgBrand.primaryLabel?.[0] || 'F'}
+              </div>
+              <div>
+                <div className="text-[15px] font-bold tracking-tight leading-tight">{orgBrand.primaryLabel}</div>
+                {orgBrand.companyLabel && (
+                  <div className="text-[11px] leading-tight" style={{ color: '#9aa1ad' }}>{orgBrand.companyLabel}</div>
+                )}
+              </div>
+            </div>
             <button onClick={() => setIsSidebarOpen(false)} className="text-slate-400 hover:text-slate-700" title="사이드바 닫기">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
             </button>
           </div>
 
-          {/* 워크스페이스 */}
-          <div className="px-3 py-3">
-            <div className="rounded-lg px-3 py-3" style={{ background: 'rgba(0,0,0,0.02)', border: '1px solid rgba(0,0,0,0.06)', boxShadow: 'inset 2px 2px 6px rgba(140,170,210,0.08), inset -2px -2px 6px rgba(255,255,255,0.25)' }}>
-              {/* 회사명 + 플랜 뱃지 — FMI 는 비표시 (2026-05-27 사용자 결정) */}
-              {(orgBrand.companyLabel || orgBrand.brand === 'RIDE') && (
-                <div className="flex items-center justify-between gap-2">
-                  {orgBrand.companyLabel && (
-                    <div className="font-bold text-sm truncate" style={{ color: '#0f2440' }}>{orgBrand.companyLabel}</div>
-                  )}
-                  {orgBrand.brand === 'RIDE' && (
-                    <span className="text-[9px] font-black px-1.5 py-0.5 rounded text-white flex-shrink-0" style={{ background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)' }}>{orgBrand.brand}</span>
-                  )}
-                </div>
-              )}
-              {/* 역할 + 직급 */}
-              <div className="mt-2 flex gap-1 flex-wrap">
-                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
-                  role === 'admin' ? 'text-blue-700' :
-                  'text-slate-500'
-                }`} style={{ background: role === 'admin' ? '#dbeafe' : '#f1f5f9', border: role === 'admin' ? '1px solid rgba(59,130,246,0.15)' : '1px solid rgba(0,0,0,0.06)' }}>
-                  {role === 'admin' ? '관리자' : '직원'}
-                </span>
-                {position && (
-                  <span className="text-[9px] px-1.5 py-0.5 rounded font-bold" style={{ color: '#166534', background: '#d1fae5', border: '1px solid rgba(34,197,94,0.15)' }}>
-                    {position.name}
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* FMI 단일회사 */}
-
           {/* 메뉴 영역 */}
-          <nav className="flex-1 px-3 pb-4 overflow-y-auto">
+          <nav className="flex-1 px-3 pb-4 pt-3 overflow-y-auto">
 
-            {/* 대시보드 — admin 또는 권한 보유자만 (보안) */}
-            {(role === 'admin' || hasPageAccess('/dashboard')) && (
-            <div className="mb-2">
-              <Link
-                href="/dashboard"
-                className={`flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all text-[13px] font-medium ${
-                  pathname === '/dashboard'
-                    ? 'text-white border border-transparent'
-                    : 'text-slate-600 hover:text-slate-800 border border-transparent'
-                }`}
-                style={pathname === '/dashboard' ? {
-                  background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)',
-                  boxShadow: '3px 3px 8px rgba(140,170,210,0.19), -1px -1px 4px rgba(255,255,255,0.47)',
-                } : {}}
-              >
-                <Icons.Home />
-                대시보드
-              </Link>
+            {/* 홈 — 모든 로그인 사용자 */}
+            <div className="mb-1">
+              <MenuItem item={{ name: '홈', path: '/home', iconKey: 'Home' }} pathname={pathname} allPaths={allMenuPaths} />
             </div>
-            )}
 
             {/* 빠른 입력 — 거래 등록 권한 보유자만 (보안: /finance/bank-card create) */}
             {(role === 'admin' || hasPageAccess('/finance/bank-card')) && (
-            <div className="mb-4">
+            <div className="mb-2">
               <button
                 type="button"
                 onClick={() => setQuickOpen(true)}
-                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all text-[13px] font-bold text-white"
-                style={{
-                  background: 'linear-gradient(135deg, #10b981, #059669)',
-                  boxShadow: '3px 3px 8px rgba(16,185,129,0.22), -1px -1px 4px rgba(255,255,255,0.47)',
-                  border: 'none',
-                  cursor: 'pointer',
-                }}
-                onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-1px)'
-                  ;(e.currentTarget as HTMLButtonElement).style.boxShadow =
-                    '4px 4px 12px rgba(16,185,129,0.30), -1px -1px 4px rgba(255,255,255,0.55)'
-                }}
-                onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLButtonElement).style.transform = 'none'
-                  ;(e.currentTarget as HTMLButtonElement).style.boxShadow =
-                    '3px 3px 8px rgba(16,185,129,0.22), -1px -1px 4px rgba(255,255,255,0.47)'
-                }}
+                className="w-full flex items-center gap-2.5 px-2.5 py-[8px] rounded-lg transition-colors text-[13.5px] font-semibold"
+                style={{ background: '#effaf3', color: '#16a34a', border: 'none', cursor: 'pointer' }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#dcf5e5' }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#effaf3' }}
                 aria-label="빠른 입력"
                 title="어느 페이지에서든 바로 거래를 기록 (Alt+N)"
               >
-                <span style={{ fontSize: 15, lineHeight: 1 }}>⚡</span>
+                <svg className="w-[17px] h-[17px]" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M13 3 4 14h6l-1 7 9-11h-6z" /></svg>
                 <span>빠른 입력</span>
               </button>
             </div>
             )}
 
-            {/* 비즈니스 메뉴 그룹 */}
+            {/* 비즈니스 메뉴 그룹 (core=업무 / detail=세부 화면 / roles=역할별 업무) */}
             {businessGroups.map(group => (
-              <div key={group.id} className="mb-3">
-                <div className="px-3 mb-1">
-                  <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">{group.label}</span>
+              <div key={group.id} className="mb-1">
+                <div className="px-2.5 pt-3 pb-1.5">
+                  <span className="text-[11px] font-semibold" style={{ color: '#9aa1ad' }}>{group.label}</span>
                 </div>
-                <div className="space-y-0.5">
+                <div className="space-y-px">
                   {group.items.map(item => (
                     <MenuItem key={item.path} item={item} pathname={pathname} allPaths={allMenuPaths} />
                   ))}
@@ -440,48 +387,33 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
               </div>
             ))}
 
-            {/* 직장인필수 */}
-            <div className="mb-3">
-              <div className="px-3 mb-1">
-                <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">직장인필수</span>
-              </div>
-              <div className="space-y-0.5">
-                {WORK_ESSENTIALS_MENUS
-                  .filter(item => !item.requirePermission || role === 'admin' || hasPageAccess(item.path))
-                  .map(item => (
+            {/* 설정 — admin 전용 */}
+            {showSettings && (
+              <div className="mb-1">
+                <div className="px-2.5 pt-3 pb-1.5" style={{ borderTop: '1px solid #f0f1f4', marginTop: 8, paddingTop: 14 }}>
+                  <span className="text-[11px] font-semibold" style={{ color: '#9aa1ad' }}>설정</span>
+                </div>
+                <div className="space-y-px">
+                  <MenuItem item={COMPANY_INFO_MENU} pathname={pathname} allPaths={allMenuPaths} />
+                  {SETTINGS_MENUS_BASE.map(item => (
                     <MenuItem key={item.path} item={item} pathname={pathname} allPaths={allMenuPaths} />
                   ))}
-              </div>
-
-              {/* PR-FMI-ONLY-PURGE Phase 3d (2026-06-02) — 라이드 분리: CX팀/MT팀/비전/관리자운영 라이드 sub-section 제거 (단독회사 FMI) */}
-            </div>
-
-            {/* 구분선 + 관리 영역 */}
-            {showSettings && (
-              <div className="mt-3 pt-3" style={{ borderTop: '1px solid rgba(0,0,0,0.06)' }}>
-                <div className="mb-3">
-                  <div className="px-3 mb-1">
-                    <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">설정</span>
-                  </div>
-                  <div className="space-y-0.5">
-                    <MenuItem item={COMPANY_INFO_MENU} pathname={pathname} allPaths={allMenuPaths} />
-                    {SETTINGS_MENUS_BASE.map(item => (
-                      <MenuItem key={item.path} item={item} pathname={pathname} allPaths={allMenuPaths} />
-                    ))}
-                  </div>
                 </div>
               </div>
             )}
           </nav>
 
           {/* 유저 정보 */}
-          <div className="p-3" style={{ borderTop: '1px solid rgba(0,0,0,0.06)' }}>
+          <div className="p-3" style={{ borderTop: '1px solid #f0f1f4' }}>
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 text-white" style={{ background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)', boxShadow: '2px 2px 6px rgba(140,170,210,0.19)' }}>
+              <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold flex-shrink-0" style={{ background: '#f0f1f4', color: '#5b626e' }}>
                 {user?.email?.[0]?.toUpperCase()}
               </div>
               <div className="overflow-hidden flex-1 min-w-0">
-                <p className="text-xs font-medium truncate" style={{ color: '#475569' }}>{user?.email}</p>
+                <p className="text-xs font-medium truncate" style={{ color: '#5b626e' }}>
+                  {user?.email}
+                  <span className="ml-1 text-[10px]" style={{ color: '#9aa1ad' }}>{role === 'admin' ? '관리자' : position?.name || '직원'}</span>
+                </p>
                 <button
                   onClick={() => auth.signOut().then(() => router.push('/'))}
                   className="text-[10px] text-slate-500 hover:text-red-500 transition-colors"
@@ -519,14 +451,12 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
             WebkitOverflowScrolling: 'touch',
           }}
         >
-          {/* ═══ 프리뷰 스타일 글래스 프레임 ═══ */}
+          {/* ═══ 콘텐츠 프레임 — 2026-07 개편: 플랫 (글래스/그림자 제거) ═══ */}
           <div style={{
-            margin: '16px 20px 0',
-            background: '#f2f1ef',
-            borderRadius: 20,
+            margin: '12px 20px 0',
+            background: '#f6f7f9',
+            borderRadius: 12,
             overflow: 'hidden',
-            boxShadow: '12px 12px 30px rgba(140,170,210,0.25), -8px -8px 20px rgba(255,255,255,0.5)',
-            border: '1px solid rgba(0,0,0,0.06)',
             minHeight: 'calc(100dvh - 100px)',
           }}>
             {/* 프레임 헤더 — 브레드크럼 + 회사 식별 배지 */}

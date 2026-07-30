@@ -2,38 +2,45 @@
 // FMI ERP — 메뉴 레지스트리 (단일 SOURCE OF TRUTH)
 // ═══════════════════════════════════════════════════════════════════
 //
-//   PR-FMI-ONLY-PURGE Phase 3a (2026-06-02) — MODULE_PROFILE 머신너리 제거 (단독회사 FMI, 라이드 분리 완료)
+//   2026-07-30 전면 개편 (REDESIGN-2026-07.md) — 새 IA 적용
+//     · 핵심 업무 6 (홈/차량/계약/장부/정산/손익) = 'core' 그룹
+//     · 아직 통합 전인 기존 화면 = 'detail' 그룹 (개편 진행에 따라 core 로 흡수 후 삭제)
+//     · 역할별 업무 (배차/경리/실시간) = 'roles' 그룹 (페이지 구현 시 entry 추가)
+//     · 직장인필수 섹션 — 사이드바에서 제거 (사용자 확정). 페이지·권한은 유지,
+//       진입은 홈 대시보드 하단 바로가기. group 정의는 권한 페이지 라벨용으로 보존.
 //
-// 본 파일이 사이드바 / 권한 페이지 (admin/employees) / 초대 페이지 모두의
+// 본 파일이 사이드바 / 권한 페이지 (hr) / 초대 페이지 모두의
 // 단일 source. 새 메뉴 추가 시 ★ 본 파일 한 곳에만 ★ entry 추가하면
 // 모든 곳에 자동 동기화.
 //
 // 사용처:
 //   /api/system_modules/route.ts  → toSystemModules() 호출 (권한 페이지 데이터)
+//   /api/menus/route.ts           → GROUPS + MENUS 반환 (초대 페이지)
 //   app/components/auth/ClientLayout.tsx → MENUS / GROUPS / HIDDEN_PATHS import
-//   app/admin/employees/page.tsx → /api/system_modules 호출 (자동 sync)
+//   app/hr/page.tsx → 그룹 라벨 / 권한 트리
 //
 // 새 페이지 추가 절차:
-//   1. ⬇️ MENUS 배열에 entry 추가 (id / name / displayName / path / iconKey / group / sortOrder)
+//   1. ⬇️ MENUS 배열에 entry 추가 (id / name / path / iconKey / group / sortOrder)
 //   2. 빌드 + 사이드바 / 권한 페이지 자동 반영 확인
 //
 // 비고:
-//   - displayName: 사이드바 표시 (이모지 포함). 미정의 시 name 사용
+//   - displayName: 사이드바 표시. 미정의 시 name 사용 (새 UI 는 이모지 미사용 — 라인 아이콘)
 //   - hidden: 사이드바 + 권한 페이지에서 숨김 (legacy 경로 등)
-//   - requirePermission: 권한 부여 대상 여부 (false = 모든 사용자 / 또는 admin 코드 처리)
+//   - sidebarHidden: 사이드바만 숨김 (권한 페이지에는 노출)
+//   - requirePermission: 권한 부여 대상 여부 — 비즈니스 그룹(core/detail/roles)은 기본 true
 // ═══════════════════════════════════════════════════════════════════
 
 export interface MenuEntry {
   id: string
   name: string                   // 권한 페이지 / system_modules 표시명
-  displayName?: string           // 사이드바 표시 (이모지 포함)
+  displayName?: string           // 사이드바 표시
   path: string
   iconKey: string                // 아이콘 키 (Icons[iconKey])
   group: string                  // GROUPS 의 id 와 매칭
   sortOrder: number
   hidden?: boolean               // 사이드바 + 권한 페이지 모두에서 숨김 (legacy 경로)
   sidebarHidden?: boolean        // 사이드바만 숨김 (권한 페이지에는 노출) — 부모 페이지 안에서 sub-nav 로 접근
-  requirePermission?: boolean    // 권한 부여 대상 (default: 'asset|operation|finance|sales|admin' = true / 그 외 false)
+  requirePermission?: boolean    // 권한 부여 대상 (default: core/detail/roles 그룹 = true / 그 외 false)
 }
 
 export interface MenuGroup {
@@ -41,98 +48,64 @@ export interface MenuGroup {
   label: string
   section: 'business' | 'work-essentials' | 'settings' // 사이드바 섹션 분류
   sortOrder: number
-  // PR-HR-18 (2026-05-28) — 사이드바 회사 격리 분류.
-  //   명시 안 함 = 양사 공통 (FMI / RIDE 둘 다 노출)
-  //   ['FMI'] = FMI 직원에게만 사이드바 노출 (admin 은 전체 보임)
-  //   ['RIDE'] = RIDE 직원에게만 사이드바 노출
-  //   사용자 명령 (2026-05-28): "라이드 중그룹밑이 라이드 용"
-  companies?: ('FMI' | 'RIDE')[]
+  companies?: ('FMI' | 'RIDE')[]  // legacy 필드 — 단독회사 FMI 이후 미사용
 }
 
 // ─── 그룹 정의 ───────────────────────────────────────────
-// label = 권한 페이지 / 초대 페이지 표시명 (구체적)
-// shortLabel = 사이드바 표시명 (짧음, 미정의 시 label 사용)
 export const GROUPS: MenuGroup[] = [
-  // PR-HR-18 (2026-05-28) — 사이드바 회사 격리 (companies 필드).
-  //   사용자 명령: "라이드 중그룹밑이 라이드 용으로 만들었지만 페이지 권한은 각각 줘야 하고
-  //              설정쪽 메뉴는 아무도 주면 안 됨".
-
-  // 비즈니스 메뉴 (FMI 렌터카 — admin 권한 부여 대상)
-  { id: 'asset',           label: '차량 자산',     section: 'business',         sortOrder: 1,  companies: ['FMI'] },
-  { id: 'operation',       label: '차량 운영',     section: 'business',         sortOrder: 2,  companies: ['FMI'] },
-  { id: 'finance',         label: '재무/경영지원', section: 'business',         sortOrder: 3,  companies: ['FMI'] },
-  { id: 'sales',           label: '영업/계약',     section: 'business',         sortOrder: 4,  companies: ['FMI'] },
-  { id: 'admin',           label: '관리',         section: 'business',         sortOrder: 5,  companies: ['FMI'] },
-  // 2026-05-05 PR-B1 — 'hr' 그룹 폐기. 「인사 마스터」 (1개 통합 페이지) 는 settings 그룹 안
-  // 직장인필수 — 양사 공통 (모든 로그인 사용자)
-  { id: 'work-essentials', label: '직장인필수',    section: 'work-essentials', sortOrder: 10 },
-  // PR-FMI-ONLY-PURGE (2026-06-02) — 라이드 분리: cx-team/mt-team/vision/admin-ops 그룹 제거 (단독회사 FMI)
-  // 설정 (admin 전용 — 사이드바 별도 섹션, 페이지 권한 부여 대상 X)
-  { id: 'settings',        label: '설정',         section: 'settings',         sortOrder: 20 },
+  // 새 IA (2026-07-30) — 핵심 업무 / 세부 화면 / 역할별 업무
+  { id: 'core',            label: '업무',        section: 'business',        sortOrder: 1 },
+  { id: 'detail',          label: '세부 화면',    section: 'business',        sortOrder: 2 },
+  { id: 'roles',           label: '역할별 업무',  section: 'business',        sortOrder: 3 },
+  // 직장인필수 — 사이드바 섹션 제거 (2026-07-30 사용자 확정). 권한 페이지 라벨용으로 보존.
+  { id: 'work-essentials', label: '직장인필수',   section: 'work-essentials', sortOrder: 10 },
+  // 설정 (admin 전용 — 사이드바 별도 섹션)
+  { id: 'settings',        label: '설정',        section: 'settings',        sortOrder: 20 },
 ]
 
 // ─── 메뉴 정의 ───────────────────────────────────────────
-// sortOrder 규칙: 자산 1~9 / 운영 10~19 / 재무 20~29 / 영업 30~39 / 관리 40~49
-//                 직장인필수 50~59 / CX팀 60~69 / 설정 70~79
+// sortOrder 규칙: 홈 0 / core 1~9 / detail 10~29 / roles 30~39
+//                 직장인필수 50~59 / 설정 70~79
 export const MENUS: MenuEntry[] = [
-  // ── 자산 (asset) ── 차량을 어떻게 소유·보호하는가
-  { id: 'mod-cars',      name: '차량', displayName: '🚗 차량', path: '/cars',      iconKey: 'Car',   group: 'asset', sortOrder: 1 },
-  { id: 'mod-loans',     name: '대출', displayName: '💰 대출', path: '/loans',     iconKey: 'Money', group: 'asset', sortOrder: 2 },
-  { id: 'mod-insurance', name: '보험', displayName: '🛡 보험',  path: '/insurance', iconKey: 'Money', group: 'asset', sortOrder: 3 },
+  // ── 홈 — 모든 로그인 사용자. 사이드바 최상단에 별도 렌더 (ClientLayout)
+  { id: 'mod-home', name: '홈', path: '/home', iconKey: 'Home', group: 'core', sortOrder: 0, requirePermission: false, sidebarHidden: true },
 
-  // ── 운영 (operation) ── 차량을 어떻게 굴리는가
-  // P2.2 (2026-05-13) — operations 통합 페이지로 정리.
-  // /operations 안 5 sub-tab: 사고접수 / 대차접수 / 배차스케줄 / 청구관리 / 대기차량
-  // /maintenance, /operations/intake 메뉴는 hide (페이지는 그대로 — backward compat)
-  { id: 'mod-ops',    name: '사고대차',  displayName: '🚗 사고대차',   path: '/operations',        iconKey: 'Wrench',            group: 'operation', sortOrder: 10 },
-  // PR-L1 (2026-05-24) — 장기렌트 (대차와 별개 장기 계약 원장)
-  // PR-Q1 (2026-05-26) — 견적 탭 추가 (영업 동선 우선) — long_term_quotes 별도 테이블
-  { id: 'mod-long-term', name: '장기렌트', displayName: '🔑 장기렌트', path: '/long-term-rentals', iconKey: 'Car', group: 'operation', sortOrder: 11 },
+  // ── 핵심 업무 (core) — 새 IA 6메뉴
+  { id: 'mod-cars',       name: '차량',    path: '/cars',                 iconKey: 'Car',    group: 'core', sortOrder: 1, requirePermission: true },
+  // 계약 — 개편 3단계에서 contracts + long_term_rentals 통합 예정. 통합 전까지 두 entry 병행.
+  { id: 'mod-contracts',  name: '계약/고객', displayName: '계약',  path: '/contracts',          iconKey: 'Doc',    group: 'core', sortOrder: 2, requirePermission: true },
+  { id: 'mod-long-term',  name: '장기렌트', path: '/long-term-rentals',    iconKey: 'Key',    group: 'core', sortOrder: 3, requirePermission: true },
+  { id: 'mod-ledger',     name: '통장/카드', displayName: '장부', path: '/finance/bank-card', iconKey: 'Ledger', group: 'core', sortOrder: 4, requirePermission: true },
+  { id: 'mod-settlement', name: '정산/수금', displayName: '정산', path: '/finance/settlement', iconKey: 'Coin',   group: 'core', sortOrder: 5, requirePermission: true },
+  { id: 'mod-pnl',        name: '차량 손익', displayName: '손익', path: '/finance/fleet',      iconKey: 'Trend',  group: 'core', sortOrder: 6, requirePermission: true },
 
-  // ── 재무 (finance) ── 통장 진입점 + 손익/정산/투자
-  { id: 'mod-bank-card',     name: '통장/카드',  displayName: '💳 통장/카드',  path: '/finance/bank-card',     iconKey: 'Money', group: 'finance', sortOrder: 20 },
-  { id: 'mod-fleet-fin',     name: '차량 손익',  displayName: '📊 차량 손익',  path: '/finance/fleet',         iconKey: 'Chart', group: 'finance', sortOrder: 21 },
-  { id: 'mod-settlement',    name: '정산/수금',  displayName: '💵 정산/수금',  path: '/finance/settlement',    iconKey: 'Chart', group: 'finance', sortOrder: 22 },
-  { id: 'mod-investor',      name: '투자자 정산', displayName: '👥 투자자 정산', path: '/finance/investor',      iconKey: 'Money', group: 'finance', sortOrder: 23 },
-  { id: 'mod-cost-analysis', name: '원가 분석',  displayName: '📈 원가 분석',  path: '/finance/cost-analysis', iconKey: 'Chart', group: 'finance', sortOrder: 24 },
-  { id: 'mod-classify',      name: '거래 분류',  displayName: '🏷 거래 분류',   path: '/finance/classify',      iconKey: 'Chart', group: 'finance', sortOrder: 25 },
-  { id: 'mod-sms',           name: 'SMS 수집',   displayName: '📨 SMS 수집',  path: '/finance/sms',           iconKey: 'Doc',   group: 'finance', sortOrder: 26 },
+  // ── 세부 화면 (detail) — 개편 진행에 따라 core 6메뉴 안으로 흡수 예정
+  { id: 'mod-ops',            name: '사고대차',     path: '/operations',            iconKey: 'Wrench', group: 'detail', sortOrder: 10, requirePermission: true },
+  { id: 'mod-factory-search', name: '협력공장 추천', path: '/factory-search',        iconKey: 'Wrench', group: 'detail', sortOrder: 11, requirePermission: true },
+  { id: 'mod-loans',          name: '대출',         path: '/loans',                 iconKey: 'Money',  group: 'detail', sortOrder: 12, requirePermission: true },
+  { id: 'mod-insurance',      name: '보험',         path: '/insurance',             iconKey: 'Shield', group: 'detail', sortOrder: 13, requirePermission: true },
+  { id: 'mod-classify',       name: '거래 분류',    path: '/finance/classify',      iconKey: 'Tag',    group: 'detail', sortOrder: 14, requirePermission: true },
+  { id: 'mod-sms',            name: 'SMS 수집',     path: '/finance/sms',           iconKey: 'Doc',    group: 'detail', sortOrder: 15, requirePermission: true },
+  { id: 'mod-investor',       name: '투자자 정산',  path: '/finance/investor',      iconKey: 'Users',  group: 'detail', sortOrder: 16, requirePermission: true },
+  { id: 'mod-cost-analysis',  name: '원가 분석',    path: '/finance/cost-analysis', iconKey: 'Chart',  group: 'detail', sortOrder: 17, requirePermission: true },
+  { id: 'mod-pricing-standards', name: '요금 기준표', path: '/db/pricing-standards', iconKey: 'Chart', group: 'detail', sortOrder: 18, requirePermission: true },
+  // 구 대시보드 — 홈(/home)으로 대체. 페이지·권한 유지, 사이드바 숨김 (개편 9단계에서 삭제 예정)
+  { id: 'mod-dashboard', name: '대시보드(구)', path: '/dashboard', iconKey: 'Setting', group: 'detail', sortOrder: 19, requirePermission: true, sidebarHidden: true },
 
-  // ── 영업/계약 (sales) ──
-  // PR-Q2-5 (2026-05-26) — 폐기: mod-quotes, mod-operational-learning
-  //   장기렌트 견적은 /long-term-rentals 안 견적 탭 (mod-long-term)으로 통합.
-  { id: 'mod-contracts',               name: '계약/고객', displayName: '📑 계약/고객', path: '/contracts',                   iconKey: 'Doc',   group: 'sales', sortOrder: 32 },
-  // 2026-06-27 — 장기렌트 견적 원가 기준표 (간접비율/마진/감가/보험/세금/금융). 견적 엔진의 단일 source. (이전 HIDDEN_PATHS 에서 노출 복구)
-  { id: 'mod-pricing-standards',       name: '요금 기준표', displayName: '📐 요금 기준표', path: '/db/pricing-standards',        iconKey: 'Chart', group: 'sales', sortOrder: 33, requirePermission: true },
+  // ── 역할별 업무 (roles) — 개편 7단계에서 배차 업무 / 경리 업무 / 실시간 현황 추가 예정
 
-  // ── 관리 (admin) ──
-  // ※ 대시보드 — 사이드바에서 ClientLayout 별도 코드로 최상단 렌더 (그룹 무관)
-  // ※ mod-payroll-ops — 2026-05-06 PR-B4: /hr/payroll 로 이동 (settings 그룹)
-  { id: 'mod-dashboard', name: '대시보드', displayName: '🏠 대시보드', path: '/dashboard', iconKey: 'Setting', group: 'admin', sortOrder: 39, requirePermission: true },
-
-  // ── 직장인필수 (work-essentials) ──
-  // 모두 권한 부여 대상 — 권한 페이지에서 ON/OFF 토글 (사용자 요청: 「실제 적용 페이지만 표출」)
-  { id: 'mod-my-info',         name: '내 정보',     path: '/work-essentials/my-info',  iconKey: 'Users',     group: 'work-essentials', sortOrder: 50, requirePermission: true },
-  { id: 'mod-receipts',        name: '영수증제출',   path: '/work-essentials/receipts', iconKey: 'Clipboard', group: 'work-essentials', sortOrder: 51, requirePermission: true },
-  { id: 'mod-meetings',        name: '회의록', displayName: '📋 회의록', path: '/meetings', iconKey: 'Doc', group: 'work-essentials', sortOrder: 52, requirePermission: true },
-  { id: 'mod-meetings-me',     name: '내 TODO', displayName: '✓ 내 TODO', path: '/meetings/me', iconKey: 'Clipboard', group: 'work-essentials', sortOrder: 53, requirePermission: true },
-
-  // ── 협력공장 추천 (operation) ── 사고대차 시 가까운 공장 추천. 서브: /factory-search/{map,mgmt,groups}
-  //   PR-FMI-ONLY-PURGE (2026-06-02) — 라이드 분리: CX팀/admin-ops/MT팀/비전 라이드 메뉴 13개 제거.
-  //   factory-search 는 비라이드(사고대차 공장 추천)라 보존 — operation 그룹으로 이동.
-  { id: 'mod-factory-search',  name: '협력공장 추천', displayName: '🚨 협력공장 추천', path: '/factory-search', iconKey: 'Wrench', group: 'operation', sortOrder: 12, requirePermission: true },
+  // ── 직장인필수 (work-essentials) — 사이드바 미노출 (섹션 제거). 홈 하단 바로가기로 진입.
+  { id: 'mod-my-info',  name: '내 정보',   path: '/work-essentials/my-info',  iconKey: 'Users',     group: 'work-essentials', sortOrder: 50, requirePermission: true, sidebarHidden: true },
+  { id: 'mod-receipts', name: '영수증제출', path: '/work-essentials/receipts', iconKey: 'Clipboard', group: 'work-essentials', sortOrder: 51, requirePermission: true, sidebarHidden: true },
+  { id: 'mod-meetings', name: '회의록',    path: '/meetings',                 iconKey: 'Doc',       group: 'work-essentials', sortOrder: 52, requirePermission: true, sidebarHidden: true },
+  { id: 'mod-meetings-me', name: '내 TODO', path: '/meetings/me',             iconKey: 'Clipboard', group: 'work-essentials', sortOrder: 53, requirePermission: true, sidebarHidden: true },
 
   // ── 설정 (settings) ── admin 전용 (사이드바 별도 섹션)
-  // 권한 부여 대상 — 일부 사용자에게 회사 정보 / 메시지 센터 등 위임 가능
-  // 2026-05-05 PR-B1 — 「인사 마스터」 통합 페이지 (직원/부서·직급/초대/외부인력) 1개 메뉴로 통합
-  // 2026-05-06 PR-B4 — 「급여 운영」 admin → settings 그룹으로 이동 (인사 영역 통합)
-  // 2026-05-06 PR-B6 — mod-payroll-ops 사이드바에서 숨김 (sidebarHidden), 권한 페이지에는 유지
-  // 「인사 마스터」(/hr) 안 5번째 탭에서 「급여 운영」 으로 진입 — 사이드바는 1 메뉴만
-  { id: 'mod-company-info',     name: '회사 정보',     path: '/db/codes',                iconKey: 'Setting',   group: 'settings', sortOrder: 70, requirePermission: true },
-  { id: 'mod-hr-master',        name: '인사 마스터', displayName: '👥 인사 마스터', path: '/hr', iconKey: 'Users', group: 'settings', sortOrder: 71, requirePermission: true },
-  { id: 'mod-payroll-ops',      name: '급여 운영', displayName: '💼 급여 운영', path: '/hr/payroll', iconKey: 'Money', group: 'settings', sortOrder: 72, requirePermission: true, sidebarHidden: true },
-  { id: 'mod-contract-terms',   name: '계약 약관 관리', path: '/admin/contract-terms',    iconKey: 'Doc',       group: 'settings', sortOrder: 73, requirePermission: true },
-  { id: 'mod-message-templates',name: '메시지 센터',    path: '/admin/message-templates', iconKey: 'Clipboard', group: 'settings', sortOrder: 74, requirePermission: true },
+  { id: 'mod-company-info',      name: '회사 정보',      path: '/db/codes',                iconKey: 'Setting',   group: 'settings', sortOrder: 70, requirePermission: true },
+  { id: 'mod-hr-master',         name: '인사 마스터',    path: '/hr',                      iconKey: 'Users',     group: 'settings', sortOrder: 71, requirePermission: true },
+  { id: 'mod-payroll-ops',       name: '급여 운영',      path: '/hr/payroll',              iconKey: 'Money',     group: 'settings', sortOrder: 72, requirePermission: true, sidebarHidden: true },
+  { id: 'mod-contract-terms',    name: '계약 약관 관리', path: '/admin/contract-terms',    iconKey: 'Doc',       group: 'settings', sortOrder: 73, requirePermission: true },
+  { id: 'mod-message-templates', name: '메시지 센터',    path: '/admin/message-templates', iconKey: 'Clipboard', group: 'settings', sortOrder: 74, requirePermission: true },
 ]
 
 // ─── 숨김 경로 (legacy + 통합/축소 / 미사용) ───
@@ -146,13 +119,11 @@ export const HIDDEN_PATHS = new Set<string>([
   '/fleet/factory-mgmt', '/fleet/vehicle-lookup',
   '/db/depreciation', '/db/maintenance', '/db/models',
   // ── 중복/통합 완료 ──
-  // P2.2 (2026-05-13) — operations 통합 페이지로 흡수
   '/maintenance',           // → /operations 안 「대기차량」 sub-tab
   '/operations/intake',     // → /operations 안 「사고접수」 sub-tab
   '/operations/rentals',    // → /operations 안 「배차스케줄」 sub-tab (예정)
-  '/operations/intake-bulk',// → /operations 안 작업 (또는 별도 admin)
+  '/operations/intake-bulk',
   '/e-contract',
-  // PR-Q2-5 폐기: '/quotes/pricing', '/quotes/short-term' (hidden 도 제거)
   '/customers',
   '/finance/collections',
   '/finance', '/finance/transactions',
@@ -169,11 +140,8 @@ export const HIDDEN_PATHS = new Set<string>([
   // ── 미사용 admin 페이지 (legacy / 통합 완료) ──
   '/admin', '/admin/cards', '/admin/codes', '/admin/locations',
   '/admin/market-prices', '/admin/model', '/admin/permissions',
-  // 2026-05-05 PR-A4 — /finance/payroll-ops 로 이전
   '/admin/employees', '/admin/payroll',
-  // 2026-05-05 PR-B1 — /hr 통합 페이지로 흡수
   '/hr/people', '/hr/org',
-  // 2026-05-06 PR-B4 — /hr/payroll 로 이동 (인사 영역 통합)
   '/finance/payroll-ops',
   // ── 인증 콜백 / 미사용 모듈 ──
   '/auth', '/loans-out',
@@ -182,16 +150,17 @@ export const HIDDEN_PATHS = new Set<string>([
 // ─── 권한 부여 대상 결정 (requirePermission 명시 안 했으면 group 기준) ───
 function isRequirePermission(menu: MenuEntry): boolean {
   if (typeof menu.requirePermission === 'boolean') return menu.requirePermission
-  // 비즈니스 그룹 (asset/operation/finance/sales/admin) 은 기본 권한 부여 대상
-  return ['asset', 'operation', 'finance', 'sales', 'admin'].includes(menu.group)
+  // 비즈니스 그룹 (core/detail/roles) 은 기본 권한 부여 대상
+  return ['core', 'detail', 'roles'].includes(menu.group)
 }
 
 // ─── 헬퍼: system_modules API 응답 형식 ───
-// 권한 페이지 (admin/employees) 가 사용 — 권한 부여 대상만 반환
+// 권한 페이지 (hr) 가 사용 — 권한 부여 대상만 반환
 export function toSystemModules() {
   return MENUS
     .filter(m => !m.hidden)
-    .filter(m => isRequirePermission(m))    .map(m => ({
+    .filter(m => isRequirePermission(m))
+    .map(m => ({
       id: m.id,
       name: m.name,
       path: m.path,
@@ -204,24 +173,27 @@ export function toSystemModules() {
 // ─── 헬퍼: 그룹별 사이드바 메뉴 (비즈니스 섹션) ───
 export function getBusinessMenusByGroup(groupId: string) {
   return MENUS
-    .filter(m => !m.hidden && m.group === groupId)    .sort((a, b) => a.sortOrder - b.sortOrder)
+    .filter(m => !m.hidden && m.group === groupId)
+    .sort((a, b) => a.sortOrder - b.sortOrder)
 }
 
 // ─── 헬퍼: 직장인필수 / 설정 섹션 메뉴 ───
 export function getMenusByGroup(groupId: string) {
   return MENUS
-    .filter(m => !m.hidden && m.group === groupId)    .sort((a, b) => a.sortOrder - b.sortOrder)
+    .filter(m => !m.hidden && m.group === groupId)
+    .sort((a, b) => a.sortOrder - b.sortOrder)
 }
 
-// ─── 헬퍼: 비즈니스 그룹 목록 (사이드바 5그룹) ───
+// ─── 헬퍼: 비즈니스 그룹 목록 (사이드바) ───
 export const BUSINESS_GROUPS = GROUPS.filter(g => g.section === 'business').sort((a, b) => a.sortOrder - b.sortOrder)
 
-// ─── 헬퍼: 디스플레이 이름 (이모지 포함) — 사이드바 사용 ───
+// ─── 헬퍼: 디스플레이 이름 — 사이드바 사용 ───
 export function getDisplayName(menu: MenuEntry): string {
   return menu.displayName || menu.name
 }
 
 // ─── 헬퍼: path → group ID 매핑 (legacy PATH_TO_GROUP 호환) ───
 export const PATH_TO_GROUP: Record<string, string> = Object.fromEntries(
-  MENUS.filter(m => !m.hidden && ['asset', 'operation', 'finance', 'sales', 'admin'].includes(m.group))    .map(m => [m.path, m.group])
+  MENUS.filter(m => !m.hidden && ['core', 'detail', 'roles'].includes(m.group))
+    .map(m => [m.path, m.group])
 )

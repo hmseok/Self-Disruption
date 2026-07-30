@@ -27,10 +27,10 @@ import { MENUS, GROUPS, type MenuEntry } from '@/lib/menu-registry'
 
 // menu-registry 의 module-local isRequirePermission 과 동일 로직 (인라인 — Rule 14):
 //   · menu.requirePermission 명시되어 있으면 그 값
-//   · 그 외: 비즈니스 그룹 (asset/operation/finance/sales/admin) 은 기본 권한 대상
+//   · 그 외: 비즈니스 그룹 (core/detail/roles — 2026-07-30 개편) 은 기본 권한 대상
 function isPermissionMenu(menu: MenuEntry): boolean {
   if (typeof menu.requirePermission === 'boolean') return menu.requirePermission
-  return ['asset', 'operation', 'finance', 'sales', 'admin'].includes(menu.group)
+  return ['core', 'detail', 'roles'].includes(menu.group)
 }
 
 export async function GET(request: NextRequest) {
