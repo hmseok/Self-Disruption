@@ -940,7 +940,7 @@ function InsuranceFormModal({ contractId, cars, prefill, onClose, onSaved }: {
 const inputStyle: React.CSSProperties = {
   width: '100%', padding: '8px 12px', borderRadius: 8, fontSize: 13,
   border: `1px solid ${COLORS.borderSubtle}`,
-  background: 'rgba(255,255,255,0.6)',
+  background: '#ffffff',
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {

@@ -162,8 +162,6 @@ function TaskRow({ task, onRemove }: { task: ProgressTask; onRemove: () => void 
       marginBottom: 8,
       minWidth: 280,
       maxWidth: 360,
-      backdropFilter: 'blur(12px)',
-      WebkitBackdropFilter: 'blur(12px)',
       boxShadow: '0 4px 12px rgba(0,0,0,0.06)',
       fontSize: 12,
       color: '#1e293b',

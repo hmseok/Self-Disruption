@@ -1065,12 +1065,12 @@ export default function ReceiptsPage() {
         {/* ── 업로드 진행 배너 (진행중일 때만 표시) ── */}
         {(isProcessing || uploadQueue.length > 0) && (
           <div style={{
-            background: 'rgba(255,255,255,0.72)',
+            background: '#ffffff',
             border: '1px solid rgba(0,0,0,0.06)',
             borderRadius: 16,
             padding: '14px 18px',
             marginBottom: 16,
-            boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -4px -4px 12px rgba(255,255,255,0.5)',
+            boxShadow: '0 1px 2px rgba(16,24,40,0.05)',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
               <span style={{ fontSize: 16 }}>🤖</span>
@@ -1248,9 +1248,9 @@ export default function ReceiptsPage() {
         return (
           <div style={{
             position: 'fixed', bottom: isMobile ? 0 : 24, left: isMobile ? 0 : '50%', right: isMobile ? 0 : 'auto', transform: isMobile ? 'none' : 'translateX(-50%)',
-            background: 'rgba(255,255,255,0.72)', color: '#1e293b', borderRadius: isMobile ? '16px 16px 0 0' : 16,
+            background: '#ffffff', color: '#1e293b', borderRadius: isMobile ? '16px 16px 0 0' : 16,
             padding: isMobile ? '12px 16px' : '12px 20px', display: 'flex', alignItems: 'center', gap: isMobile ? 8 : 12,
-            border: '1px solid rgba(255,255,255,0.30)', boxShadow: '8px 8px 20px rgba(140,170,210,0.19), -8px -8px 20px rgba(255,255,255,0.47)', zIndex: 50, flexWrap: isMobile ? 'wrap' : 'nowrap',
+            border: '1px solid rgba(255,255,255,0.30)', boxShadow: '0 1px 2px rgba(16,24,40,0.05)', zIndex: 50, flexWrap: isMobile ? 'wrap' : 'nowrap',
             width: isMobile ? '100%' : 'auto', boxSizing: 'border-box',
           }}>
             {/* 선택 카운트 + 합계 (첫 줄) */}
@@ -1268,7 +1268,7 @@ export default function ReceiptsPage() {
 
             {/* 구분 선택 (항상 표시) */}
             <select value={bulkCategory} onChange={e => setBulkCategory(e.target.value)}
-              style={{ padding: '7px 8px', borderRadius: 8, border: '1px solid rgba(0,0,0,0.06)', background: 'rgba(255,255,255,0.40)', color: '#1e293b', fontSize: 12, fontWeight: 600, flex: isMobile ? 1 : 'none', minWidth: isMobile ? 0 : 'auto', boxShadow: 'inset 2px 2px 4px rgba(140,170,210,0.12), inset -2px -2px 4px rgba(255,255,255,0.35)' }}>
+              style={{ padding: '7px 8px', borderRadius: 8, border: '1px solid rgba(0,0,0,0.06)', background: 'rgba(255,255,255,0.40)', color: '#1e293b', fontSize: 12, fontWeight: 600, flex: isMobile ? 1 : 'none', minWidth: isMobile ? 0 : 'auto', boxShadow: '0 1px 2px rgba(16,24,40,0.05)' }}>
               <option value="">구분</option>
               {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
@@ -1280,13 +1280,13 @@ export default function ReceiptsPage() {
                   value={bulkItemName}
                   onChange={e => setBulkItemName(e.target.value)}
                   placeholder="품명"
-                  style={{ padding: '7px 10px', borderRadius: 8, border: '1px solid rgba(0,0,0,0.06)', background: 'rgba(255,255,255,0.40)', color: '#1e293b', fontSize: 12, width: 80, outline: 'none', boxShadow: 'inset 2px 2px 4px rgba(140,170,210,0.12), inset -2px -2px 4px rgba(255,255,255,0.35)' }}
+                  style={{ padding: '7px 10px', borderRadius: 8, border: '1px solid rgba(0,0,0,0.06)', background: 'rgba(255,255,255,0.40)', color: '#1e293b', fontSize: 12, width: 80, outline: 'none', boxShadow: '0 1px 2px rgba(16,24,40,0.05)' }}
                 />
                 <input
                   value={bulkCustomerTeam}
                   onChange={e => setBulkCustomerTeam(e.target.value)}
                   placeholder="고객명/팀원"
-                  style={{ padding: '7px 10px', borderRadius: 8, border: '1px solid rgba(0,0,0,0.06)', background: 'rgba(255,255,255,0.40)', color: '#1e293b', fontSize: 12, width: 100, outline: 'none', boxShadow: 'inset 2px 2px 4px rgba(140,170,210,0.12), inset -2px -2px 4px rgba(255,255,255,0.35)' }}
+                  style={{ padding: '7px 10px', borderRadius: 8, border: '1px solid rgba(0,0,0,0.06)', background: 'rgba(255,255,255,0.40)', color: '#1e293b', fontSize: 12, width: 100, outline: 'none', boxShadow: '0 1px 2px rgba(16,24,40,0.05)' }}
                 />
               </>
             )}
@@ -1337,18 +1337,18 @@ export default function ReceiptsPage() {
         <div style={{ paddingBottom: selectedIds.size > 0 ? 100 : 0 }}>
           {loading ? (
             <div style={{
-              background: 'rgba(255,255,255,0.72)',
+              background: '#ffffff',
               borderRadius: 16,
               border: '1px solid rgba(0,0,0,0.06)',
-              boxShadow: '6px 6px 18px rgba(140,170,210,0.14), -6px -6px 18px rgba(255,255,255,0.47)',
+              boxShadow: '0 1px 2px rgba(16,24,40,0.05)',
               padding: 40, textAlign: 'center', color: '#8aabc7', fontWeight: 500,
             }}>불러오는 중...</div>
           ) : allDisplayItems.length === 0 ? (
             <div style={{
-              background: 'rgba(255,255,255,0.72)',
+              background: '#ffffff',
               borderRadius: 16,
               border: '1px solid rgba(0,0,0,0.06)',
-              boxShadow: '6px 6px 18px rgba(140,170,210,0.14), -6px -6px 18px rgba(255,255,255,0.47)',
+              boxShadow: '0 1px 2px rgba(16,24,40,0.05)',
               padding: 60, textAlign: 'center', color: '#64748b',
             }}>
               <div style={{ fontSize: 40, marginBottom: 12 }}>🧾</div>
@@ -1385,10 +1385,10 @@ export default function ReceiptsPage() {
         </div>
       ) : (
         <div style={{
-          background: 'rgba(255,255,255,0.72)',
+          background: '#ffffff',
           borderRadius: 16,
           border: '1px solid rgba(0,0,0,0.06)',
-          boxShadow: '6px 6px 18px rgba(140,170,210,0.14), -6px -6px 18px rgba(255,255,255,0.47)',
+          boxShadow: '0 1px 2px rgba(16,24,40,0.05)',
           overflow: 'hidden',
         }}>
           <div style={{ overflowX: 'auto' }}>

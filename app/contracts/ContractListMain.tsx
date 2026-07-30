@@ -354,10 +354,10 @@ export default function ContractListMain() {
       <div className="page-bg">
         <div className="max-w-[1400px] mx-auto py-4 px-4 md:py-5 md:px-6">
           <div style={{
-            background: 'rgba(255,255,255,0.72)',
+            background: '#ffffff',
             borderRadius: 16,
             border: '1px solid rgba(0,0,0,0.06)',
-            boxShadow: '6px 6px 18px rgba(140,170,210,0.14), -6px -6px 18px rgba(255,255,255,0.47)',
+            boxShadow: '0 1px 2px rgba(16,24,40,0.05)',
             padding: '48px 20px',
             textAlign: 'center',
           }}>

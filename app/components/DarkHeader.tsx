@@ -39,13 +39,13 @@ const actionStyles: Record<string, React.CSSProperties> = {
     background: '#2563eb',
     color: '#fff',
     border: 'none',
-    boxShadow: '3px 3px 8px rgba(140,170,210,0.19), -1px -1px 4px rgba(255,255,255,0.47)',
+    boxShadow: '0 1px 2px rgba(16,24,40,0.05)',
   },
   secondary: {
-    background: 'rgba(255,255,255,0.60)',
+    background: '#ffffff',
     color: '#2563eb',
     border: '1px solid rgba(255,255,255,0.30)',
-    boxShadow: '2px 2px 6px rgba(140,170,210,0.19), -2px -2px 6px rgba(255,255,255,0.47)',
+    boxShadow: '0 1px 2px rgba(16,24,40,0.05)',
   },
   danger: {
     background: 'linear-gradient(135deg, #dc2626, #ef4444)',
@@ -57,7 +57,7 @@ const actionStyles: Record<string, React.CSSProperties> = {
 
 // ── 뉴모피즘 stat 색상 프리셋 (클래식 팔레트) ──
 export const STAT_COLORS = {
-  white: { color: '#1e293b', bgColor: 'rgba(255,255,255,0.60)', borderColor: 'rgba(255,255,255,0.30)', labelColor: '#64748b' },
+  white: { color: '#1e293b', bgColor: '#ffffff', borderColor: 'rgba(255,255,255,0.30)', labelColor: '#64748b' },
   green: { color: '#166534', bgColor: '#d1fae5', borderColor: 'rgba(34,197,94,0.15)', labelColor: '#16a34a' },
   yellow: { color: '#92400e', bgColor: '#fef3c7', borderColor: 'rgba(245,158,11,0.15)', labelColor: '#d97706' },
   red: { color: '#991b1b', bgColor: '#fee2e2', borderColor: 'rgba(239,68,68,0.15)', labelColor: '#dc2626' },
@@ -74,12 +74,12 @@ export default function DarkHeader({ icon, title, subtitle, stats, actions, chil
       borderRadius: 16,
       overflow: 'hidden',
       marginBottom: 16,
-      boxShadow: '8px 8px 20px rgba(140,170,210,0.19), -8px -8px 20px rgba(255,255,255,0.47)',
+      boxShadow: '0 1px 2px rgba(16,24,40,0.05)',
     }}>
       {/* ── 통계/액션 바 ── */}
       {((stats && stats.length > 0) || (actions && actions.length > 0)) && (
         <div style={{
-          background: 'rgba(255,255,255,0.72)',
+          background: '#ffffff',
           padding: '14px 20px',
           borderBottom: children ? 'none' : undefined,
           border: '1px solid rgba(255,255,255,0.30)',
@@ -119,16 +119,16 @@ export default function DarkHeader({ icon, title, subtitle, stats, actions, chil
                     textAlign: 'center',
                     cursor: s.onClick ? 'pointer' : 'default',
                     transition: 'transform 0.2s, box-shadow 0.2s',
-                    boxShadow: '4px 4px 12px rgba(140,170,210,0.19), -4px -4px 12px rgba(255,255,255,0.47)',
+                    boxShadow: '0 1px 2px rgba(16,24,40,0.05)',
                     minWidth: 0,
                   }}
                   onMouseEnter={e => {
                     ;(e.currentTarget as HTMLDivElement).style.transform = 'translateY(-2px)'
-                    ;(e.currentTarget as HTMLDivElement).style.boxShadow = '6px 6px 16px rgba(140,170,210,0.25), -6px -6px 16px rgba(255,255,255,0.55)'
+                    ;(e.currentTarget as HTMLDivElement).style.boxShadow = '0 1px 2px rgba(16,24,40,0.05)'
                   }}
                   onMouseLeave={e => {
                     ;(e.currentTarget as HTMLDivElement).style.transform = 'none'
-                    ;(e.currentTarget as HTMLDivElement).style.boxShadow = '4px 4px 12px rgba(140,170,210,0.19), -4px -4px 12px rgba(255,255,255,0.47)'
+                    ;(e.currentTarget as HTMLDivElement).style.boxShadow = '0 1px 2px rgba(16,24,40,0.05)'
                   }}
                 >
                   <div style={{ fontSize: 10, fontWeight: 600, color: s.labelColor || '#64748b', marginBottom: 4, letterSpacing: '0.02em', textTransform: 'uppercase' }}>{s.label}</div>
@@ -143,7 +143,7 @@ export default function DarkHeader({ icon, title, subtitle, stats, actions, chil
       {/* ── 하단 커스텀 영역 ── */}
       {children && (
         <div style={{
-          background: 'rgba(255,255,255,0.60)',
+          background: '#ffffff',
           borderLeft: '1px solid rgba(255,255,255,0.30)',
           borderRight: '1px solid rgba(255,255,255,0.30)',
           borderBottom: '1px solid rgba(255,255,255,0.30)',
@@ -179,7 +179,7 @@ export function DarkHeaderTabs({ tabs, activeTab, onTabChange, rightContent }: {
       padding: '8px 20px',
       display: 'flex',
       alignItems: 'center',
-      boxShadow: 'inset 2px 2px 6px rgba(140,170,210,0.12), inset -2px -2px 6px rgba(255,255,255,0.35)',
+      boxShadow: '0 1px 2px rgba(16,24,40,0.05)',
     }}>
       <div style={{ display: 'flex', gap: 4, paddingTop: 0 }}>
         {tabs.map(tab => {
@@ -196,14 +196,14 @@ export function DarkHeaderTabs({ tabs, activeTab, onTabChange, rightContent }: {
                 color: active ? '#fff' : '#64748b',
                 display: 'flex', alignItems: 'center', gap: 4,
                 transition: 'all 0.2s',
-                boxShadow: active ? '3px 3px 8px rgba(140,170,210,0.19)' : 'none',
+                boxShadow: active ? '0 1px 2px rgba(16,24,40,0.05)' : 'none',
               }}>
               {tab.icon && <span>{tab.icon}</span>}
               {tab.label}
               {tab.count !== undefined && (
                 <span style={{
                   fontSize: 10, fontWeight: 700,
-                  color: active ? 'rgba(255,255,255,0.8)' : '#8aabc7',
+                  color: active ? '#ffffff' : '#8aabc7',
                   marginLeft: 2,
                 }}>
                   ({tab.count})
@@ -255,8 +255,8 @@ export function DarkHeaderFilterBar({ filters, activeFilter, onFilterChange, rig
               color: active ? '#fff' : '#64748b',
               border: active ? 'none' : '1px solid rgba(255,255,255,0.30)',
               boxShadow: active
-                ? '2px 2px 6px rgba(140,170,210,0.19)'
-                : '2px 2px 6px rgba(140,170,210,0.12), -2px -2px 6px rgba(255,255,255,0.30)',
+                ? '0 1px 2px rgba(16,24,40,0.05)'
+                : '0 1px 2px rgba(16,24,40,0.05)',
               transition: 'all 0.2s',
             }}>
             {f.label}{f.count !== undefined ? ` ${f.count}` : ''}
@@ -306,7 +306,7 @@ export function DarkHeaderSummaryBar({ items, actions }: {
       {items.map((item, i) => (
         <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           {i > 0 && <span style={{ width: 1, height: 18, background: 'rgba(255,255,255,0.25)', display: 'inline-block' }} />}
-          <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.85)' }}>
+          <span style={{ fontSize: 12, color: '#ffffff' }}>
             {item.label} <strong style={{ color: item.color || '#fff', fontSize: 14, fontWeight: 800 }}>
               {typeof item.value === 'number' ? item.value.toLocaleString() : item.value}
             </strong>
@@ -322,7 +322,7 @@ export function DarkHeaderSummaryBar({ items, actions }: {
                 cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4,
                 ...(a.variant === 'primary'
                   ? {
-                      background: 'rgba(255,255,255,0.95)', color: '#2563eb', border: 'none', fontWeight: 800,
+                      background: '#ffffff', color: '#2563eb', border: 'none', fontWeight: 800,
                       boxShadow: '2px 2px 6px rgba(0,0,0,0.1)',
                     }
                   : {

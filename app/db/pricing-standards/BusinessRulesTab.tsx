@@ -188,11 +188,11 @@ export default function BusinessRulesTab() {
       {showGuide && (
         <div
           style={{
-            background: 'rgba(255,255,255,0.72)',
+            background: '#ffffff',
             borderRadius: 16,
             padding: 20,
             border: '1px solid rgba(0,0,0,0.06)',
-            boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -4px -4px 12px rgba(255,255,255,0.5)',
+            boxShadow: '0 1px 2px rgba(16,24,40,0.05)',
           }}
         >
           <div className="flex items-start justify-between mb-3">
@@ -231,7 +231,7 @@ export default function BusinessRulesTab() {
                 fontWeight: 700,
                 borderRadius: 8,
                 border: '1px solid rgba(0,0,0,0.06)',
-                background: 'rgba(255,255,255,0.6)',
+                background: '#ffffff',
                 color: '#64748b',
                 cursor: 'pointer',
               }}
@@ -264,10 +264,10 @@ export default function BusinessRulesTab() {
                           key={rule.id}
                           style={{
                             padding: 14,
-                            background: 'rgba(255,255,255,0.72)',
+                            background: '#ffffff',
                             borderRadius: 12,
                             border: '1px solid rgba(0,0,0,0.06)',
-                            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.9)',
+                            boxShadow: 'inset 0 1px 0 #ffffff',
                           }}
                         >
                           <div className="flex items-start justify-between mb-2">
@@ -364,7 +364,7 @@ export default function BusinessRulesTab() {
                                   fontWeight: 600,
                                   borderRadius: 8,
                                   border: `1px solid ${isSaved ? '#10b981' : 'rgba(0,0,0,0.08)'}`,
-                                  background: 'rgba(255,255,255,0.95)',
+                                  background: '#ffffff',
                                   color: '#0f172a',
                                   outline: 'none',
                                   boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.04)',
@@ -380,7 +380,7 @@ export default function BusinessRulesTab() {
                                   fontWeight: 600,
                                   borderRadius: 8,
                                   border: `1px solid ${isSaved ? '#10b981' : 'rgba(0,0,0,0.08)'}`,
-                                  background: 'rgba(255,255,255,0.95)',
+                                  background: '#ffffff',
                                   color: '#0f172a',
                                   outline: 'none',
                                 }}
@@ -398,7 +398,7 @@ export default function BusinessRulesTab() {
                                   fontWeight: 600,
                                   borderRadius: 8,
                                   border: `1px solid ${isSaved ? '#10b981' : 'rgba(0,0,0,0.08)'}`,
-                                  background: 'rgba(255,255,255,0.95)',
+                                  background: '#ffffff',
                                   color: '#0f172a',
                                   outline: 'none',
                                   boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.04)',
@@ -429,12 +429,11 @@ export default function BusinessRulesTab() {
         <div className="lg:col-span-4">
           <div
             style={{
-              background: 'rgba(255,255,255,0.72)',
+              background: '#ffffff',
               borderRadius: 16,
               padding: 20,
               border: '1px solid rgba(0,0,0,0.06)',
-              boxShadow: '8px 8px 20px rgba(140,170,210,0.14), -4px -4px 14px rgba(255,255,255,0.6)',
-              backdropFilter: 'blur(16px)',
+              boxShadow: '0 1px 2px rgba(16,24,40,0.05)',
               position: 'sticky',
               top: 128,
             }}
@@ -447,7 +446,7 @@ export default function BusinessRulesTab() {
               <div
                 style={{
                   padding: 12,
-                  background: 'rgba(255,255,255,0.60)',
+                  background: '#ffffff',
                   borderRadius: 10,
                   border: '1px solid rgba(59,130,246,0.18)',
                 }}
@@ -461,7 +460,7 @@ export default function BusinessRulesTab() {
               <div
                 style={{
                   padding: 12,
-                  background: 'rgba(255,255,255,0.60)',
+                  background: '#ffffff',
                   borderRadius: 10,
                   border: '1px solid rgba(139,92,246,0.18)',
                 }}
@@ -475,7 +474,7 @@ export default function BusinessRulesTab() {
               <div
                 style={{
                   padding: 12,
-                  background: 'rgba(255,255,255,0.60)',
+                  background: '#ffffff',
                   borderRadius: 10,
                   border: '1px solid rgba(245,158,11,0.20)',
                 }}

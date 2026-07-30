@@ -260,8 +260,7 @@ export default function NewQuotePage() {
           <div role="status" style={{
             position: 'fixed', top: 72, left: '50%', transform: 'translateX(-50%)', zIndex: 60,
             maxWidth: 'min(520px, 92vw)', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10,
-            background: toast.type === 'ok' ? 'rgba(236,253,245,0.97)' : 'rgba(254,242,242,0.97)',
-            backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
+            background: toast.type === 'ok' ? 'rgba(236,253,245,0.97)' : 'rgba(254,242,242,0.97)', WebkitBackdropFilter: 'blur(12px)',
             border: `1px solid ${toast.type === 'ok' ? 'rgba(16,185,129,0.45)' : 'rgba(239,68,68,0.45)'}`,
             borderRadius: 12, boxShadow: '0 14px 36px rgba(15,23,42,0.18)',
             fontSize: 13, fontWeight: 700, color: toast.type === 'ok' ? '#065f46' : '#991b1b',

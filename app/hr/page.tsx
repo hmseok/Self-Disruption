@@ -1234,10 +1234,10 @@ export default function HRMasterPage() {
 
   // ===== Glass 스타일 상수 =====
   const glassCard: React.CSSProperties = {
-    background: 'rgba(255,255,255,0.72)',
+    background: '#ffffff',
     borderRadius: 16,
     border: '1px solid rgba(0,0,0,0.06)',
-    boxShadow: '6px 6px 18px rgba(140,170,210,0.14), -6px -6px 18px rgba(255,255,255,0.47)',
+    boxShadow: '0 1px 2px rgba(16,24,40,0.05)',
     overflow: 'hidden',
   }
   const glassCardInner: React.CSSProperties = { ...glassCard, padding: 20 }
@@ -1468,7 +1468,7 @@ export default function HRMasterPage() {
 
             {/* 일괄등록 미리보기 */}
             {(bulkLogs.length > 0 || bulkData.length > 0) && (
-              <div style={{ background: 'rgba(255,255,255,0.6)', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 10, padding: 12, marginBottom: 12 }}>
+              <div style={{ background: '#ffffff', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 10, padding: 12, marginBottom: 12 }}>
                 {bulkLogs.length > 0 && (
                   <div style={{ marginBottom: bulkData.length > 0 ? 8 : 0 }}>
                     {bulkLogs.map((log, i) => <p key={i} style={{ fontSize: 11, color: '#64748b', margin: '2px 0' }}>{log}</p>)}
@@ -1660,13 +1660,13 @@ export default function HRMasterPage() {
                     <label style={{ fontSize: 11, fontWeight: 600, color: '#64748b', display: 'block', marginBottom: 4 }}>직급명</label>
                     <input value={newPositionName} onChange={e => setNewPositionName(e.target.value)}
                       onKeyDown={e => e.key === 'Enter' && addPosition()}
-                      style={{ width: '100%', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, padding: '8px 12px', fontSize: 13, outline: 'none', background: 'rgba(255,255,255,0.6)', boxSizing: 'border-box' }} placeholder="예: 과장" />
+                      style={{ width: '100%', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, padding: '8px 12px', fontSize: 13, outline: 'none', background: '#ffffff', boxSizing: 'border-box' }} placeholder="예: 과장" />
                   </div>
                   <div style={{ width: 72 }}>
                     <label style={{ fontSize: 11, fontWeight: 600, color: '#64748b', display: 'block', marginBottom: 4 }}>레벨</label>
                     <input type="number" min={1} max={10} value={newPositionLevel}
                       onChange={e => setNewPositionLevel(Number(e.target.value))}
-                      style={{ width: '100%', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, padding: '8px 12px', fontSize: 13, outline: 'none', background: 'rgba(255,255,255,0.6)', boxSizing: 'border-box' }} />
+                      style={{ width: '100%', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, padding: '8px 12px', fontSize: 13, outline: 'none', background: '#ffffff', boxSizing: 'border-box' }} />
                   </div>
                   <button onClick={addPosition} style={{ padding: '8px 16px', background: '#3b82f6', color: '#fff', borderRadius: 10, fontWeight: 600, fontSize: 13, border: 'none', cursor: 'pointer', flexShrink: 0 }}>추가</button>
                 </div>
@@ -1715,7 +1715,7 @@ export default function HRMasterPage() {
                     <label style={{ fontSize: 11, fontWeight: 600, color: '#64748b', display: 'block', marginBottom: 4 }}>부서명</label>
                     <input value={newDeptName} onChange={e => setNewDeptName(e.target.value)}
                       onKeyDown={e => e.key === 'Enter' && addDepartment()}
-                      style={{ width: '100%', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, padding: '8px 12px', fontSize: 13, outline: 'none', background: 'rgba(255,255,255,0.6)', boxSizing: 'border-box' }} placeholder="예: 영업팀" />
+                      style={{ width: '100%', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, padding: '8px 12px', fontSize: 13, outline: 'none', background: '#ffffff', boxSizing: 'border-box' }} placeholder="예: 영업팀" />
                   </div>
                   <button onClick={addDepartment} style={{ padding: '8px 16px', background: '#3b82f6', color: '#fff', borderRadius: 10, fontWeight: 600, fontSize: 13, border: 'none', cursor: 'pointer', flexShrink: 0 }}>추가</button>
                 </div>
@@ -1929,7 +1929,7 @@ export default function HRMasterPage() {
                                         ))}
                                         <select value={perm?.data_scope || 'all'}
                                           onChange={e => matrixChangeScope(emp.id, mod.path, e.target.value)}
-                                          style={{ fontSize: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 6, padding: '2px 6px', background: 'rgba(255,255,255,0.8)', fontWeight: 600, marginLeft: 'auto' }}>
+                                          style={{ fontSize: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 6, padding: '2px 6px', background: '#ffffff', fontWeight: 600, marginLeft: 'auto' }}>
                                           {DATA_SCOPES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
                                         </select>
                                       </div>
@@ -1986,39 +1986,39 @@ export default function HRMasterPage() {
                   <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#64748b', marginBottom: 6 }}>이름 *</label>
                   <input value={freelancerForm.name} onChange={e => setFreelancerForm({ ...freelancerForm, name: e.target.value })}
                     placeholder="홍길동"
-                    style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none', background: 'rgba(255,255,255,0.6)', boxSizing: 'border-box' }} />
+                    style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none', background: '#ffffff', boxSizing: 'border-box' }} />
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#64748b', marginBottom: 6 }}>전화</label>
                   <input value={freelancerForm.phone} onChange={e => setFreelancerForm({ ...freelancerForm, phone: e.target.value })}
                     placeholder="010-1234-5678"
-                    style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none', background: 'rgba(255,255,255,0.6)', boxSizing: 'border-box' }} />
+                    style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none', background: '#ffffff', boxSizing: 'border-box' }} />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#64748b', marginBottom: 6 }}>이메일</label>
                   <input value={freelancerForm.email} onChange={e => setFreelancerForm({ ...freelancerForm, email: e.target.value })}
-                    style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none', background: 'rgba(255,255,255,0.6)', boxSizing: 'border-box' }} />
+                    style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none', background: '#ffffff', boxSizing: 'border-box' }} />
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#64748b', marginBottom: 6 }}>주민/사업자</label>
                   <input value={freelancerForm.reg_number} onChange={e => setFreelancerForm({ ...freelancerForm, reg_number: e.target.value })}
-                    style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none', background: 'rgba(255,255,255,0.6)', boxSizing: 'border-box' }} />
+                    style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none', background: '#ffffff', boxSizing: 'border-box' }} />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#64748b', marginBottom: 6 }}>업무 유형</label>
                   <select value={freelancerForm.service_type} onChange={e => setFreelancerForm({ ...freelancerForm, service_type: e.target.value })}
-                    style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none', background: 'rgba(255,255,255,0.6)' }}>
+                    style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none', background: '#ffffff' }}>
                     {FL_SERVICE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                   </select>
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#64748b', marginBottom: 6 }}>세금 처리</label>
                   <select value={freelancerForm.tax_type} onChange={e => setFreelancerForm({ ...freelancerForm, tax_type: e.target.value })}
-                    style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none', background: 'rgba(255,255,255,0.6)' }}>
+                    style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none', background: '#ffffff' }}>
                     {FL_TAX_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                   </select>
                 </div>
@@ -2029,20 +2029,20 @@ export default function HRMasterPage() {
                   <div>
                     <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#64748b', marginBottom: 6 }}>은행</label>
                     <select value={freelancerForm.bank_name} onChange={e => setFreelancerForm({ ...freelancerForm, bank_name: e.target.value })}
-                      style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none', background: 'rgba(255,255,255,0.6)' }}>
+                      style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none', background: '#ffffff' }}>
                       {FL_BANKS.map(b => <option key={b} value={b}>{b}</option>)}
                     </select>
                   </div>
                   <div>
                     <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#64748b', marginBottom: 6 }}>예금주</label>
                     <input value={freelancerForm.account_holder} onChange={e => setFreelancerForm({ ...freelancerForm, account_holder: e.target.value })}
-                      style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none', background: 'rgba(255,255,255,0.6)', boxSizing: 'border-box' }} />
+                      style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none', background: '#ffffff', boxSizing: 'border-box' }} />
                   </div>
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#64748b', marginBottom: 6 }}>계좌번호</label>
                   <input value={freelancerForm.account_number} onChange={e => setFreelancerForm({ ...freelancerForm, account_number: e.target.value })}
-                    style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none', background: 'rgba(255,255,255,0.6)', boxSizing: 'border-box' }} />
+                    style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none', background: '#ffffff', boxSizing: 'border-box' }} />
                 </div>
               </div>
               <div>
@@ -2052,7 +2052,7 @@ export default function HRMasterPage() {
                 </label>
                 <select value={freelancerForm.linked_profile_id}
                   onChange={e => setFreelancerForm({ ...freelancerForm, linked_profile_id: e.target.value })}
-                  style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none', background: 'rgba(255,255,255,0.6)' }}>
+                  style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none', background: '#ffffff' }}>
                   <option value="">— 외부 프리랜서 (link 없음) —</option>
                   {employees.filter(e => e.role === 'user' || e.role === 'master' || e.role === 'admin').map(e => (
                     <option key={e.id} value={e.id}>
@@ -2065,12 +2065,12 @@ export default function HRMasterPage() {
                 <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#64748b', marginBottom: 6 }}>메모</label>
                 <textarea value={freelancerForm.memo} onChange={e => setFreelancerForm({ ...freelancerForm, memo: e.target.value })}
                   rows={2}
-                  style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none', background: 'rgba(255,255,255,0.6)', boxSizing: 'border-box', resize: 'vertical' }} />
+                  style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none', background: '#ffffff', boxSizing: 'border-box', resize: 'vertical' }} />
               </div>
             </div>
             <div style={{ padding: '14px 20px', borderTop: '1px solid rgba(0,0,0,0.06)', background: 'rgba(255,255,255,0.40)', display: 'flex', gap: 10, flexShrink: 0 }}>
               <button onClick={closeFreelancerForm}
-                style={{ flex: 1, padding: '10px 0', border: '1px solid rgba(0,0,0,0.08)', background: 'rgba(255,255,255,0.8)', color: '#64748b', borderRadius: 10, fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
+                style={{ flex: 1, padding: '10px 0', border: '1px solid rgba(0,0,0,0.08)', background: '#ffffff', color: '#64748b', borderRadius: 10, fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
                 취소
               </button>
               <button onClick={saveFreelancer} disabled={savingFreelancer}
@@ -2136,18 +2136,18 @@ export default function HRMasterPage() {
                 <div>
                   <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#64748b', marginBottom: 6 }}>이름</label>
                   <input value={editForm.employee_name} onChange={e => setEditForm({ ...editForm, employee_name: e.target.value })}
-                    style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, outline: 'none', background: 'rgba(255,255,255,0.6)', boxSizing: 'border-box' }} placeholder="직원 이름" />
+                    style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, outline: 'none', background: '#ffffff', boxSizing: 'border-box' }} placeholder="직원 이름" />
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#64748b', marginBottom: 6 }}>연락처</label>
                   <input value={editForm.phone} onChange={e => setEditForm({ ...editForm, phone: e.target.value })}
-                    style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, outline: 'none', background: 'rgba(255,255,255,0.6)', boxSizing: 'border-box' }} placeholder="010-0000-0000" />
+                    style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, outline: 'none', background: '#ffffff', boxSizing: 'border-box' }} placeholder="010-0000-0000" />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#64748b', marginBottom: 6 }}>역할</label>
                     <select value={editForm.role} onChange={e => setEditForm({ ...editForm, role: e.target.value })}
-                      style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, background: 'rgba(255,255,255,0.6)', outline: 'none' }}>
+                      style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, background: '#ffffff', outline: 'none' }}>
                       <option value="user">직원</option>
                       <option value="master">관리자</option>
                       {role === 'admin' && <option value="admin">GOD ADMIN</option>}
@@ -2156,7 +2156,7 @@ export default function HRMasterPage() {
                   <div>
                     <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#64748b', marginBottom: 6 }}>계정 활성</label>
                     <select value={editForm.is_active ? 'active' : 'inactive'} onChange={e => setEditForm({ ...editForm, is_active: e.target.value === 'active' })}
-                      style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, background: 'rgba(255,255,255,0.6)', outline: 'none' }}>
+                      style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, background: '#ffffff', outline: 'none' }}>
                       <option value="active">로그인 가능</option>
                       <option value="inactive">로그인 차단</option>
                     </select>
@@ -2167,7 +2167,7 @@ export default function HRMasterPage() {
                   <div>
                     <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#64748b', marginBottom: 6 }}>직급</label>
                     <select value={editForm.position_id} onChange={e => setEditForm({ ...editForm, position_id: e.target.value })}
-                      style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, background: 'rgba(255,255,255,0.6)', outline: 'none' }}>
+                      style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, background: '#ffffff', outline: 'none' }}>
                       <option value="">미지정</option>
                       {positions.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                     </select>
@@ -2175,7 +2175,7 @@ export default function HRMasterPage() {
                   <div>
                     <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#64748b', marginBottom: 6 }}>부서</label>
                     <select value={editForm.department_id} onChange={e => setEditForm({ ...editForm, department_id: e.target.value })}
-                      style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, background: 'rgba(255,255,255,0.6)', outline: 'none' }}>
+                      style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, background: '#ffffff', outline: 'none' }}>
                       <option value="">미지정</option>
                       {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                     </select>
@@ -2191,7 +2191,7 @@ export default function HRMasterPage() {
                       <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#64748b', marginBottom: 6 }}>입사일</label>
                       <input type="date" value={editForm.hire_date || ''}
                         onChange={e => setEditForm({ ...editForm, hire_date: e.target.value })}
-                        style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, outline: 'none', background: 'rgba(255,255,255,0.6)', boxSizing: 'border-box' }} />
+                        style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, outline: 'none', background: '#ffffff', boxSizing: 'border-box' }} />
                     </div>
                     <div>
                       <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#64748b', marginBottom: 6 }}>재직 상태</label>
@@ -2205,7 +2205,7 @@ export default function HRMasterPage() {
                             resign_date: v === 'resigned' ? (editForm.resign_date || new Date().toISOString().slice(0, 10)) : (v === 'active' ? '' : editForm.resign_date),
                           })
                         }}
-                        style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, background: 'rgba(255,255,255,0.6)', outline: 'none' }}>
+                        style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, background: '#ffffff', outline: 'none' }}>
                         <option value="active">🟢 재직</option>
                         <option value="on_leave">🟡 휴직</option>
                         <option value="resigned">🔴 퇴사</option>
@@ -2219,14 +2219,14 @@ export default function HRMasterPage() {
                         <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#dc2626', marginBottom: 6 }}>퇴사일</label>
                         <input type="date" value={editForm.resign_date || ''}
                           onChange={e => setEditForm({ ...editForm, resign_date: e.target.value })}
-                          style={{ width: '100%', padding: 10, border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, fontSize: 13, outline: 'none', background: 'rgba(255,255,255,0.8)', boxSizing: 'border-box' }} />
+                          style={{ width: '100%', padding: 10, border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, fontSize: 13, outline: 'none', background: '#ffffff', boxSizing: 'border-box' }} />
                       </div>
                       <div>
                         <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#dc2626', marginBottom: 6 }}>퇴사 사유</label>
                         <input value={editForm.resign_reason || ''}
                           onChange={e => setEditForm({ ...editForm, resign_reason: e.target.value })}
                           placeholder="예: 자진퇴사 / 이직 / 계약만료"
-                          style={{ width: '100%', padding: 10, border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, fontSize: 13, outline: 'none', background: 'rgba(255,255,255,0.8)', boxSizing: 'border-box' }} />
+                          style={{ width: '100%', padding: 10, border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, fontSize: 13, outline: 'none', background: '#ffffff', boxSizing: 'border-box' }} />
                       </div>
                       <p style={{ fontSize: 11, color: '#ef4444', margin: 0 }}>
                         ⚠ 퇴사 처리 시 자동으로 계정 비활성 (is_active = false) 됩니다.
@@ -2261,7 +2261,7 @@ export default function HRMasterPage() {
                     <input type="number" value={salaryForm.base_salary}
                       onChange={e => setSalaryForm({ ...salaryForm, base_salary: e.target.value })}
                       placeholder="3000000"
-                      style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, outline: 'none', background: 'rgba(255,255,255,0.6)', boxSizing: 'border-box', fontVariantNumeric: 'tabular-nums' }} />
+                      style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, outline: 'none', background: '#ffffff', boxSizing: 'border-box', fontVariantNumeric: 'tabular-nums' }} />
                     {salaryForm.base_salary && Number(salaryForm.base_salary) > 0 && (
                       <span style={{ fontSize: 11, color: '#94a3b8', marginTop: 4, display: 'block' }}>
                         ₩ {Number(salaryForm.base_salary).toLocaleString()}
@@ -2276,7 +2276,7 @@ export default function HRMasterPage() {
                     <input type="number" value={salaryForm.meal_allowance}
                       onChange={e => setSalaryForm({ ...salaryForm, meal_allowance: e.target.value })}
                       placeholder="200000"
-                      style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, outline: 'none', background: 'rgba(255,255,255,0.6)', boxSizing: 'border-box', fontVariantNumeric: 'tabular-nums' }} />
+                      style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, outline: 'none', background: '#ffffff', boxSizing: 'border-box', fontVariantNumeric: 'tabular-nums' }} />
                     {salaryForm.meal_allowance && Number(salaryForm.meal_allowance) > 0 && (
                       <span style={{ fontSize: 11, color: '#94a3b8', marginTop: 4, display: 'block' }}>
                         ₩ {Number(salaryForm.meal_allowance).toLocaleString()} <span style={{ color: '#cbd5e1' }}>· 매월 동일 수당</span>
@@ -2310,7 +2310,7 @@ export default function HRMasterPage() {
                         <input type="number" value={v}
                           onChange={e => setSalaryForm({ ...salaryForm, extra_allowances: { ...salaryForm.extra_allowances, [k]: e.target.value } })}
                           placeholder="0"
-                          style={{ width: 130, padding: 8, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none', background: 'rgba(255,255,255,0.8)', fontVariantNumeric: 'tabular-nums', textAlign: 'right' }} />
+                          style={{ width: 130, padding: 8, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none', background: '#ffffff', fontVariantNumeric: 'tabular-nums', textAlign: 'right' }} />
                         <button
                           onClick={() => {
                             const next = { ...salaryForm.extra_allowances }
@@ -2354,7 +2354,7 @@ export default function HRMasterPage() {
                   <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#64748b', marginBottom: 6 }}>지급일</label>
                   <select value={salaryForm.payment_day}
                     onChange={e => setSalaryForm({ ...salaryForm, payment_day: e.target.value })}
-                    style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, background: 'rgba(255,255,255,0.6)', outline: 'none' }}>
+                    style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, background: '#ffffff', outline: 'none' }}>
                     {[5, 10, 15, 20, 25, 28, 30].map(d => <option key={d} value={d}>매월 {d}일</option>)}
                   </select>
                 </div>
@@ -2366,14 +2366,14 @@ export default function HRMasterPage() {
                       <input value={salaryForm.bank_name}
                         onChange={e => setSalaryForm({ ...salaryForm, bank_name: e.target.value })}
                         placeholder="KB국민은행"
-                        style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, outline: 'none', background: 'rgba(255,255,255,0.6)', boxSizing: 'border-box' }} />
+                        style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, outline: 'none', background: '#ffffff', boxSizing: 'border-box' }} />
                     </div>
                     <div>
                       <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#64748b', marginBottom: 6 }}>예금주</label>
                       <input value={salaryForm.account_holder}
                         onChange={e => setSalaryForm({ ...salaryForm, account_holder: e.target.value })}
                         placeholder="홍길동"
-                        style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, outline: 'none', background: 'rgba(255,255,255,0.6)', boxSizing: 'border-box' }} />
+                        style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, outline: 'none', background: '#ffffff', boxSizing: 'border-box' }} />
                     </div>
                   </div>
                   <div>
@@ -2381,7 +2381,7 @@ export default function HRMasterPage() {
                     <input value={salaryForm.account_number}
                       onChange={e => setSalaryForm({ ...salaryForm, account_number: e.target.value })}
                       placeholder="1234-5678-9012"
-                      style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, outline: 'none', background: 'rgba(255,255,255,0.6)', boxSizing: 'border-box', fontVariantNumeric: 'tabular-nums' }} />
+                      style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, outline: 'none', background: '#ffffff', boxSizing: 'border-box', fontVariantNumeric: 'tabular-nums' }} />
                   </div>
                 </div>
               </div>
@@ -2439,7 +2439,7 @@ export default function HRMasterPage() {
                                   ))}
                                   <select value={perm?.data_scope || 'all'}
                                     onChange={e => matrixChangeScope(editingEmp.id, mod.path, e.target.value)}
-                                    style={{ fontSize: 11, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 6, padding: '2px 6px', background: 'rgba(255,255,255,0.8)', fontWeight: 600, marginLeft: 'auto' }}>
+                                    style={{ fontSize: 11, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 6, padding: '2px 6px', background: '#ffffff', fontWeight: 600, marginLeft: 'auto' }}>
                                     {DATA_SCOPES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
                                   </select>
                                 </div>
@@ -2471,7 +2471,7 @@ export default function HRMasterPage() {
                   <div style={{ display: 'flex', gap: 8 }}>
                     <button onClick={() => withdrawEmployee(false)} disabled={withdrawing}
                       title="계정만 비활성화 (목록에서 숨김, 인증 차단)"
-                      style={{ padding: '6px 12px', fontSize: 12, fontWeight: 600, color: '#dc2626', border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(255,255,255,0.8)', borderRadius: 8, cursor: withdrawing ? 'not-allowed' : 'pointer', opacity: withdrawing ? 0.5 : 1 }}>
+                      style={{ padding: '6px 12px', fontSize: 12, fontWeight: 600, color: '#dc2626', border: '1px solid rgba(239,68,68,0.3)', background: '#ffffff', borderRadius: 8, cursor: withdrawing ? 'not-allowed' : 'pointer', opacity: withdrawing ? 0.5 : 1 }}>
                       {withdrawing ? '처리 중...' : '비활성화'}
                     </button>
                     <button onClick={() => withdrawEmployee(true)} disabled={withdrawing}
@@ -2487,7 +2487,7 @@ export default function HRMasterPage() {
             {/* 모달 푸터 — Glass — 섹션별 저장 버튼 */}
             <div style={{ padding: '16px 24px', borderTop: '1px solid rgba(0,0,0,0.06)', background: 'rgba(255,255,255,0.40)', display: 'flex', gap: 12, flexShrink: 0 }}>
               <button onClick={closeEditModal}
-                style={{ flex: 1, padding: '10px 0', border: '1px solid rgba(0,0,0,0.08)', background: 'rgba(255,255,255,0.8)', color: '#64748b', borderRadius: 10, fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>
+                style={{ flex: 1, padding: '10px 0', border: '1px solid rgba(0,0,0,0.08)', background: '#ffffff', color: '#64748b', borderRadius: 10, fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>
                 닫기
               </button>
               {editSection === 'profile' && (

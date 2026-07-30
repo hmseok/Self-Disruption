@@ -162,8 +162,6 @@ export default function QuickTxModal({
         inset: 0,
         zIndex: 1000,
         background: 'rgba(15,23,42,0.45)',
-        backdropFilter: 'blur(4px)',
-        WebkitBackdropFilter: 'blur(4px)',
         display: 'flex',
         alignItems: 'flex-start',
         justifyContent: 'center',
@@ -228,7 +226,7 @@ export default function QuickTxModal({
                       fontSize: 11,
                       fontWeight: 700,
                       color: active ? COLORS.textPrimary : COLORS.textMuted,
-                      background: active ? 'rgba(255,255,255,0.95)' : 'transparent',
+                      background: active ? '#ffffff' : 'transparent',
                       border: active
                         ? `1px solid ${COLORS.borderSubtle}`
                         : '1px solid transparent',

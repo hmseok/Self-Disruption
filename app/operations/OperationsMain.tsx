@@ -681,7 +681,7 @@ export default function OperationsMainPage() {
                 borderRadius: 8,
                 fontSize: 12,
                 fontWeight: 700,
-                background: 'rgba(255,255,255,0.60)',
+                background: '#ffffff',
                 color: '#1e293b',
                 border: '1px solid rgba(0,0,0,0.06)',
                 cursor: 'pointer',

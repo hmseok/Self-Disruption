@@ -178,7 +178,7 @@ export default function PresetsTab() {
   if (loading) {
     return (
       <div className="rounded-2xl border p-8 text-center"
-        style={{ background: 'rgba(255,255,255,0.72)', borderColor: 'rgba(0,0,0,0.06)' }}
+        style={{ background: '#ffffff', borderColor: 'rgba(0,0,0,0.06)' }}
       >
         <p className="text-slate-400 text-sm">프리셋 로딩 중...</p>
       </div>
@@ -190,9 +190,9 @@ export default function PresetsTab() {
       {/* 헤더 + 가이드 + 추가 버튼 */}
       <div className="rounded-2xl p-5 border"
         style={{
-          background: 'rgba(255,255,255,0.72)',
+          background: '#ffffff',
           borderColor: 'rgba(0,0,0,0.06)',
-          boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -4px -4px 12px rgba(255,255,255,0.5)',
+          boxShadow: '0 1px 2px rgba(16,24,40,0.05)',
         }}
       >
         <div className="flex items-start justify-between gap-4 mb-3">
@@ -237,7 +237,7 @@ export default function PresetsTab() {
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
         {presets.length === 0 && (
           <div className="col-span-full rounded-2xl p-8 text-center border"
-            style={{ background: 'rgba(255,255,255,0.60)', borderColor: 'rgba(0,0,0,0.06)' }}
+            style={{ background: '#ffffff', borderColor: 'rgba(0,0,0,0.06)' }}
           >
             <p className="text-slate-500 text-sm">
               등록된 프리셋이 없습니다. 마이그레이션 SQL을 실행해 시드 3종을 추가하거나
@@ -252,9 +252,9 @@ export default function PresetsTab() {
           return (
             <div key={p.id} className="rounded-2xl p-5 border"
               style={{
-                background: 'rgba(255,255,255,0.72)',
+                background: '#ffffff',
                 borderColor: tone.border,
-                boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -4px -4px 12px rgba(255,255,255,0.5)',
+                boxShadow: '0 1px 2px rgba(16,24,40,0.05)',
               }}
             >
               {/* 상단 — 이름 + 기본 뱃지 + 액션 */}
@@ -318,7 +318,7 @@ export default function PresetsTab() {
                         }}
                         className="w-full px-2 py-1 text-xs font-semibold rounded outline-none focus:ring-2"
                         style={{
-                          background: 'rgba(255,255,255,0.75)',
+                          background: '#ffffff',
                           border: '1px solid rgba(0,0,0,0.05)',
                           color: '#0f172a',
                         }}

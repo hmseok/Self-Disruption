@@ -162,8 +162,7 @@ export default function StatementPage() {
       {/* 인쇄 시 숨길 액션바 */}
       <div className="no-print" style={{
         position: 'sticky', top: 0, zIndex: 20,
-        background: 'rgba(255,255,255,0.95)', borderBottom: '1px solid #e2e8f0',
-        backdropFilter: 'blur(6px)',
+        background: '#ffffff', borderBottom: '1px solid #e2e8f0',
         padding: '12px 20px', display: 'flex', gap: 8, justifyContent: 'center', alignItems: 'center',
       }}>
         <button onClick={handlePrint} style={btnPrimary}>🖨️ 인쇄</button>

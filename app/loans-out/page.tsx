@@ -101,14 +101,14 @@ export default function LoansOutPage() {
         ].map((k, i) => (
           <div key={i} style={{
             padding: '14px 16px', borderRadius: 12,
-            background: 'rgba(255,255,255,0.60)',
+            background: '#ffffff',
             border: '1px solid ' + (
               k.tint === 'blue' ? 'rgba(59,110,181,0.25)' :
               k.tint === 'emerald' ? 'rgba(16,185,129,0.25)' :
               k.tint === 'amber' ? 'rgba(202,138,4,0.25)' :
               'rgba(8,145,178,0.25)'
             ),
-            boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -4px -4px 12px rgba(255,255,255,0.5)',
+            boxShadow: '0 1px 2px rgba(16,24,40,0.05)',
           }}>
             <div className="text-xs font-semibold text-slate-500">{k.label}</div>
             <div className="text-xl font-bold text-slate-900 mt-1">{k.value}</div>

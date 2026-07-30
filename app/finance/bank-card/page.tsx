@@ -3372,7 +3372,7 @@ export default function BankCardPage() {
           border: '1px solid rgba(124,58,237,0.4)',
           borderRadius: 12,
           boxShadow: '0 -4px 24px rgba(124,58,237,0.20), 0 8px 32px rgba(0,0,0,0.08)',
-          background: 'linear-gradient(90deg, rgba(245,243,255,0.97), rgba(255,255,255,0.97))',
+          background: 'linear-gradient(90deg, rgba(245,243,255,0.97), #ffffff)',
           display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
           maxWidth: 1400, margin: '0 auto',
         }}>
@@ -3914,7 +3914,7 @@ export default function BankCardPage() {
                     style={{
                       padding: '4px 12px', borderRadius: 8, fontSize: 12, cursor: 'pointer',
                       border: `1px solid ${i === currentFileIndex ? COLORS.primary : COLORS.borderSubtle}`,
-                      background: i === currentFileIndex ? COLORS.primary : 'rgba(255,255,255,0.6)',
+                      background: i === currentFileIndex ? COLORS.primary : '#ffffff',
                       color: i === currentFileIndex ? '#fff' : COLORS.textSecondary,
                       fontWeight: i === currentFileIndex ? 600 : 400,
                     }}

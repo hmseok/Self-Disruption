@@ -47,7 +47,7 @@ export default function SmsTab({
           <button key={s || 'all'} onClick={() => onStatusFilter(s)} style={{
             padding: '6px 14px', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: 'pointer',
             border: `1px solid ${statusFilter === s ? 'rgba(59,110,181,0.4)' : 'rgba(0,0,0,0.06)'}`,
-            background: statusFilter === s ? 'rgba(191,219,254,0.6)' : 'rgba(255,255,255,0.72)',
+            background: statusFilter === s ? 'rgba(191,219,254,0.6)' : '#ffffff',
             color: '#1e293b',
           }}>
             {s === '' ? '상태 전체' : s === 'parsed' ? '✅ 성공' : s === 'failed' ? '❌ 실패' : '🔇 무시'}
@@ -58,7 +58,7 @@ export default function SmsTab({
           <button key={i || 'all'} onClick={() => onIssuerFilter(i)} style={{
             padding: '6px 14px', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: 'pointer',
             border: `1px solid ${issuerFilter === i ? 'rgba(59,110,181,0.4)' : 'rgba(0,0,0,0.06)'}`,
-            background: issuerFilter === i ? 'rgba(191,219,254,0.6)' : 'rgba(255,255,255,0.72)',
+            background: issuerFilter === i ? 'rgba(191,219,254,0.6)' : '#ffffff',
             color: '#1e293b',
           }}>
             {i === '' ? '카드사 전체' : ISSUER_LABEL[i]}
@@ -79,7 +79,7 @@ export default function SmsTab({
       {/* SMS 테이블 */}
       <div style={{
         ...GLASS.L4, borderRadius: 16, overflow: 'hidden',
-        boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -2px -2px 8px rgba(255,255,255,0.6)',
+        boxShadow: '0 1px 2px rgba(16,24,40,0.05)',
       }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
           <thead>

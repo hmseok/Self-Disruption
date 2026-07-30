@@ -402,9 +402,9 @@ export default function FleetPnlPage() {
           trailing={
             <div style={{ display: 'flex', gap: 6, flexShrink: 0, alignItems: 'center' }}>
               <input type="month" value={filterDate} onChange={e => setFilterDate(e.target.value)}
-                style={{ padding: '6px 10px', fontSize: 12, fontWeight: 600, borderRadius: 8, border: '1px solid rgba(0,0,0,0.06)', background: 'rgba(255,255,255,0.6)', color: '#334155', cursor: 'pointer' }} />
+                style={{ padding: '6px 10px', fontSize: 12, fontWeight: 600, borderRadius: 8, border: '1px solid rgba(0,0,0,0.06)', background: '#ffffff', color: '#334155', cursor: 'pointer' }} />
               <select value={sortKey} onChange={e => setSortKey(e.target.value as any)}
-                style={{ padding: '6px 10px', fontSize: 12, fontWeight: 600, borderRadius: 8, border: '1px solid rgba(0,0,0,0.06)', background: 'rgba(255,255,255,0.6)', color: '#334155', cursor: 'pointer' }}>
+                style={{ padding: '6px 10px', fontSize: 12, fontWeight: 600, borderRadius: 8, border: '1px solid rgba(0,0,0,0.06)', background: '#ffffff', color: '#334155', cursor: 'pointer' }}>
                 <option value="revenue">매출순</option>
                 <option value="expense">비용순</option>
                 <option value="operating">영업이익순</option>
@@ -417,7 +417,7 @@ export default function FleetPnlPage() {
         />
 
         {/* Table Section */}
-        <div style={{ background: 'rgba(255,255,255,0.72)', borderRadius: 16, border: '1px solid rgba(0,0,0,0.05)', overflow: 'hidden', boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -4px -4px 12px rgba(255,255,255,0.5)' }}>
+        <div style={{ background: '#ffffff', borderRadius: 16, border: '1px solid rgba(0,0,0,0.05)', overflow: 'hidden', boxShadow: '0 1px 2px rgba(16,24,40,0.05)' }}>
           <table className='w-full text-sm'>
             <thead>
               <tr style={{ borderBottom: '1px solid rgba(0,0,0,0.06)', background: 'rgba(249,250,251,0.5)' }}>

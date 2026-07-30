@@ -579,7 +579,7 @@ export default function MaintenanceMainPage() {
                   fontSize: 12,
                   fontWeight: 600,
                   cursor: 'pointer',
-                  boxShadow: '3px 3px 8px rgba(140,170,210,0.19), -1px -1px 4px rgba(255,255,255,0.47)',
+                  boxShadow: '0 1px 2px rgba(16,24,40,0.05)',
                   whiteSpace: 'nowrap',
                   flexShrink: 0,
                 }}
@@ -598,7 +598,7 @@ export default function MaintenanceMainPage() {
                   fontSize: 12,
                   fontWeight: 600,
                   cursor: 'pointer',
-                  boxShadow: '3px 3px 8px rgba(140,170,210,0.19), -1px -1px 4px rgba(255,255,255,0.47)',
+                  boxShadow: '0 1px 2px rgba(16,24,40,0.05)',
                   whiteSpace: 'nowrap',
                   flexShrink: 0,
                 }}

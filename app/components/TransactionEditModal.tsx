@@ -240,8 +240,7 @@ export default function TransactionEditModal({ txId, onClose, onSaved }: Transac
     <div
       onClick={onClose}
       style={{
-        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)',
-        backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)',
+        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', WebkitBackdropFilter: 'blur(4px)',
         display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
         zIndex: 1000, padding: '40px 20px', overflowY: 'auto',
       }}

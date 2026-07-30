@@ -97,7 +97,7 @@ export default function MarketPricesManager() {
         </div>
       </div>
 
-      <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.72)', border: '1px solid rgba(0,0,0,0.06)', boxShadow: '6px 6px 16px rgba(140,170,210,0.12)' }}>
+      <div className="rounded-2xl overflow-hidden" style={{ background: '#ffffff', border: '1px solid rgba(0,0,0,0.06)', boxShadow: '0 1px 2px rgba(16,24,40,0.05)' }}>
         <table className="w-full text-xs" style={{ fontVariantNumeric: 'tabular-nums' }}>
           <thead>
             <tr style={{ background: 'rgba(241,245,249,0.75)' }} className="text-slate-600 text-left">

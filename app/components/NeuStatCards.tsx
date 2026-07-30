@@ -76,7 +76,7 @@ export default function NeuStatCards({ items, activeKey, onSelect, columns = 5 }
             onMouseEnter={() => setHoveredKey(item.key)}
             onMouseLeave={() => setHoveredKey(null)}
             style={{
-              background: 'rgba(255,255,255,0.72)',
+              background: '#ffffff',
               border: `1.5px solid ${isActive ? tint.border : 'rgba(255,255,255,0.30)'}`,
               borderRadius: 14,
               padding: '14px 16px',
@@ -87,8 +87,8 @@ export default function NeuStatCards({ items, activeKey, onSelect, columns = 5 }
               boxShadow: isActive
                 ? `6px 6px 16px ${tint.shadow}, -4px -4px 12px rgba(255,255,255,0.47), inset 0 0 0 1px ${tint.border}`
                 : isHovered && isClickable
-                  ? '6px 6px 16px rgba(140,170,210,0.22), -4px -4px 12px rgba(255,255,255,0.5)'
-                  : '4px 4px 12px rgba(140,170,210,0.14), -4px -4px 12px rgba(255,255,255,0.47)',
+                  ? '0 1px 2px rgba(16,24,40,0.05)'
+                  : '0 1px 2px rgba(16,24,40,0.05)',
             }}
           >
             {/* 아이콘 */}

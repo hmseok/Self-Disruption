@@ -784,8 +784,7 @@ export default function ClaimsTab() {
           <div
             onClick={(e) => e.stopPropagation()}
             style={{
-              ...GLASS.L5,
-              backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
+              ...GLASS.L5, WebkitBackdropFilter: 'blur(16px)',
               width: 'min(560px, 96vw)', maxHeight: '86vh',
               borderRadius: 16, boxShadow: '0 24px 60px rgba(0,0,0,0.25)',
               display: 'flex', flexDirection: 'column', overflow: 'hidden',

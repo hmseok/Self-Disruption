@@ -215,7 +215,7 @@ export default function DashboardPage() {
 
           {/* 차량 현황 요약 카드 */}
           {showCars && (
-            <div className="si-card rounded-2xl p-5 border border-black/[0.06]" style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(241,245,249,0.98) 100%)' }}>
+            <div className="si-card rounded-2xl p-5 border border-black/[0.06]" style={{ background: 'linear-gradient(135deg, #ffffff 0%, rgba(241,245,249,0.98) 100%)' }}>
               <div className="flex items-center justify-between mb-4">
                 <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">차량 현황</span>
                 <Link href="/cars" className="text-[10px] font-bold text-blue-600 hover:text-blue-500 transition-colors">상세 →</Link>
@@ -276,7 +276,7 @@ export default function DashboardPage() {
 
           {/* 경영 요약 카드 */}
           {showFinance && (
-            <div className="si-card rounded-2xl p-5 border border-black/[0.06]" style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(241,245,249,0.98) 100%)' }}>
+            <div className="si-card rounded-2xl p-5 border border-black/[0.06]" style={{ background: 'linear-gradient(135deg, #ffffff 0%, rgba(241,245,249,0.98) 100%)' }}>
               <div className="flex items-center justify-between mb-4">
                 <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">이번달 경영</span>
                 <Link href="/finance" className="text-[10px] font-bold text-blue-600 hover:text-blue-500 transition-colors">상세 →</Link>
@@ -303,7 +303,7 @@ export default function DashboardPage() {
 
           {/* 수금 현황 카드 */}
           {showFinance && !loading && (collectionStats.pendingCount > 0 || collectionStats.overdueCount > 0 || collectionStats.completedCount > 0) && (
-            <div className="si-card rounded-2xl p-5 border border-black/[0.06]" style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(241,245,249,0.98) 100%)' }}>
+            <div className="si-card rounded-2xl p-5 border border-black/[0.06]" style={{ background: 'linear-gradient(135deg, #ffffff 0%, rgba(241,245,249,0.98) 100%)' }}>
               <div className="flex items-center justify-between mb-4">
                 <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">수금 현황</span>
                 <Link href="/finance/collections" className="text-[10px] font-bold text-blue-600 hover:text-blue-500 transition-colors">상세 →</Link>
@@ -347,7 +347,7 @@ export default function DashboardPage() {
 
           {/* 알림/주의 사항 */}
           {!loading && alerts.length > 0 && (
-            <div className="si-card rounded-2xl p-5 border border-red-500/20" style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(241,245,249,0.98) 100%)' }}>
+            <div className="si-card rounded-2xl p-5 border border-red-500/20" style={{ background: 'linear-gradient(135deg, #ffffff 0%, rgba(241,245,249,0.98) 100%)' }}>
               <div className="flex items-center gap-2 mb-3">
                 <span className="w-2 h-2 rounded-full bg-red-400 animate-pulse" />
                 <span className="text-xs font-bold text-red-400 uppercase tracking-wider">주의 항목</span>
@@ -366,7 +366,7 @@ export default function DashboardPage() {
 
           {/* 알림 없을 때 */}
           {!loading && alerts.length === 0 && (
-            <div className="si-card rounded-2xl p-5 border border-emerald-500/20" style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(241,245,249,0.98) 100%)' }}>
+            <div className="si-card rounded-2xl p-5 border border-emerald-500/20" style={{ background: 'linear-gradient(135deg, #ffffff 0%, rgba(241,245,249,0.98) 100%)' }}>
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-emerald-400" />
                 <span className="text-xs font-bold text-emerald-400">모든 항목 정상</span>
@@ -376,7 +376,7 @@ export default function DashboardPage() {
 
           {/* PR-FMI-ONLY-PURGE Phase 3d (2026-06-02) — 라이드 분리: 라이드 홈 분기 제거 (단독회사 FMI) */}
           {!showCars && !showCustomers && !showInvest && !showFinance && (
-            <div className="si-card rounded-2xl p-6 border border-black/[0.06] text-center" style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(241,245,249,0.98) 100%)' }}>
+            <div className="si-card rounded-2xl p-6 border border-black/[0.06] text-center" style={{ background: 'linear-gradient(135deg, #ffffff 0%, rgba(241,245,249,0.98) 100%)' }}>
               <p className="text-lg font-black text-slate-600">활성화된 모듈이 없습니다</p>
               <p className="text-slate-500 text-sm mt-1">관리자에게 모듈 활성화를 요청해주세요</p>
             </div>

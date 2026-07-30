@@ -44,13 +44,13 @@ export default function MappingTab({
         <button onClick={() => onSub('card')} style={{
           padding: '8px 18px', borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: 'pointer',
           border: `1px solid ${sub === 'card' ? 'rgba(59,110,181,0.4)' : 'rgba(0,0,0,0.06)'}`,
-          background: sub === 'card' ? 'rgba(191,219,254,0.6)' : 'rgba(255,255,255,0.72)',
+          background: sub === 'card' ? 'rgba(191,219,254,0.6)' : '#ffffff',
           color: sub === 'card' ? '#1e40af' : '#475569',
         }}>💳 카드 매핑 ({cards.length})</button>
         <button onClick={() => onSub('bank')} style={{
           padding: '8px 18px', borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: 'pointer',
           border: `1px solid ${sub === 'bank' ? 'rgba(5,150,105,0.4)' : 'rgba(0,0,0,0.06)'}`,
-          background: sub === 'bank' ? 'rgba(167,243,208,0.4)' : 'rgba(255,255,255,0.72)',
+          background: sub === 'bank' ? 'rgba(167,243,208,0.4)' : '#ffffff',
           color: sub === 'bank' ? '#065f46' : '#475569',
         }}>🏦 통장 매핑 ({banks.length})</button>
         <button onClick={() => onSub('domain')} style={{

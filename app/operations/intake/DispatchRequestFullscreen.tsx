@@ -319,7 +319,6 @@ export default function DispatchRequestFullscreen({
         position: 'fixed',
         inset: 0,
         background: 'rgba(15,36,64,0.5)',
-        backdropFilter: 'blur(8px)',
         display: 'flex',
         alignItems: 'flex-start',
         justifyContent: 'center',

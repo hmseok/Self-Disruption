@@ -622,7 +622,7 @@ export default function PayrollOps() {
     return (
       <div className="page-bg">
         <div className="max-w-[1400px] mx-auto py-4 px-4 md:py-5 md:px-6">
-          <div style={{ background: 'rgba(255,255,255,0.72)', borderRadius: 16, border: '1px solid rgba(0,0,0,0.06)', padding: '48px 20px', textAlign: 'center' }}>
+          <div style={{ background: '#ffffff', borderRadius: 16, border: '1px solid rgba(0,0,0,0.06)', padding: '48px 20px', textAlign: 'center' }}>
             <p style={{ fontSize: 40, marginBottom: 12 }}>🏢</p>
             <p style={{ fontWeight: 800, fontSize: 15, color: '#64748b' }}>좌측 상단에서 회사를 먼저 선택해주세요</p>
           </div>

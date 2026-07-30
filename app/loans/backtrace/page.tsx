@@ -203,7 +203,7 @@ export default function LoansBacktracePage() {
         {/* 필터 패널 (Level 4 glass) */}
         <div
           className="rounded-2xl border p-5 backdrop-blur-xl"
-          style={{ background: 'rgba(255,255,255,0.72)', borderColor: 'rgba(0,0,0,0.06)' }}
+          style={{ background: '#ffffff', borderColor: 'rgba(0,0,0,0.06)' }}
         >
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
@@ -276,12 +276,12 @@ export default function LoansBacktracePage() {
         {(stats.candidates_total != null) && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div className="rounded-xl border p-4 backdrop-blur-xl"
-                 style={{ background: 'rgba(255,255,255,0.60)', borderColor: 'rgba(191,219,254,0.80)' }}>
+                 style={{ background: '#ffffff', borderColor: 'rgba(191,219,254,0.80)' }}>
               <div className="text-xs text-slate-500">후보 총계</div>
               <div className="text-2xl font-bold text-blue-700 mt-1">{stats.candidates_total}</div>
             </div>
             <div className="rounded-xl border p-4 backdrop-blur-xl"
-                 style={{ background: 'rgba(255,255,255,0.60)', borderColor: 'rgba(187,247,208,0.80)' }}>
+                 style={{ background: '#ffffff', borderColor: 'rgba(187,247,208,0.80)' }}>
               <div className="text-xs text-slate-500">신뢰도 통과</div>
               <div className="text-2xl font-bold text-green-700 mt-1">
                 {candidates.filter(c => c.ai_confidence >= minConfidence).length}
@@ -289,14 +289,14 @@ export default function LoansBacktracePage() {
             </div>
             {stats.applied != null && (
               <div className="rounded-xl border p-4 backdrop-blur-xl"
-                   style={{ background: 'rgba(255,255,255,0.60)', borderColor: 'rgba(221,214,254,0.80)' }}>
+                   style={{ background: '#ffffff', borderColor: 'rgba(221,214,254,0.80)' }}>
                 <div className="text-xs text-slate-500">실제 적용</div>
                 <div className="text-2xl font-bold text-violet-700 mt-1">{stats.applied}</div>
               </div>
             )}
             {stats.skipped_low_confidence != null && (
               <div className="rounded-xl border p-4 backdrop-blur-xl"
-                   style={{ background: 'rgba(255,255,255,0.60)', borderColor: 'rgba(253,230,138,0.80)' }}>
+                   style={{ background: '#ffffff', borderColor: 'rgba(253,230,138,0.80)' }}>
                 <div className="text-xs text-slate-500">신뢰도 미달 스킵</div>
                 <div className="text-2xl font-bold text-amber-700 mt-1">{stats.skipped_low_confidence}</div>
               </div>
@@ -308,7 +308,7 @@ export default function LoansBacktracePage() {
         {candidates.length > 0 && (
           <div
             className="rounded-2xl border backdrop-blur-xl overflow-hidden"
-            style={{ background: 'rgba(255,255,255,0.72)', borderColor: 'rgba(0,0,0,0.06)' }}
+            style={{ background: '#ffffff', borderColor: 'rgba(0,0,0,0.06)' }}
           >
             <div className="flex items-center justify-between px-5 py-3 border-b" style={{ borderColor: 'rgba(0,0,0,0.05)' }}>
               <h2 className="font-semibold text-slate-800">역추적 후보 ({candidates.length})</h2>
@@ -389,7 +389,7 @@ export default function LoansBacktracePage() {
         {/* 이력 패널 (Level 4 glass) */}
         <div
           className="rounded-2xl border backdrop-blur-xl overflow-hidden"
-          style={{ background: 'rgba(255,255,255,0.72)', borderColor: 'rgba(0,0,0,0.06)' }}
+          style={{ background: '#ffffff', borderColor: 'rgba(0,0,0,0.06)' }}
         >
           <div className="px-5 py-3 border-b" style={{ borderColor: 'rgba(0,0,0,0.05)' }}>
             <h2 className="font-semibold text-slate-800">역추적 이력 (최근 50건)</h2>

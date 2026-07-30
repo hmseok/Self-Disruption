@@ -737,7 +737,6 @@ export default function Cafe24ImportPage() {
             right: 0,
             bottom: 0,
             background: 'rgba(15,23,42,0.32)',
-            backdropFilter: 'blur(2px)',
             zIndex: 1000,
             display: 'flex',
             justifyContent: 'flex-end',

@@ -78,17 +78,17 @@ export const MENUS: MenuEntry[] = [
   { id: 'mod-settlement', name: '정산/수금', displayName: '정산', path: '/finance/settlement', iconKey: 'Coin',   group: 'core', sortOrder: 5, requirePermission: true },
   { id: 'mod-pnl',        name: '차량 손익', displayName: '손익', path: '/finance/fleet',      iconKey: 'Trend',  group: 'core', sortOrder: 6, requirePermission: true },
 
-  // ── 세부 화면 (detail) — 개편 진행에 따라 core 메뉴 안으로 흡수 예정
-  // 구 계약/고객 — A안 확정으로 강등. contracts 실데이터 확인(CONTRACT-UNIFY-A-PLAN 3장) 후 은퇴 예정.
-  { id: 'mod-contracts',      name: '계약/고객(구)', path: '/contracts',             iconKey: 'Doc',    group: 'detail', sortOrder: 10, requirePermission: true },
-  { id: 'mod-factory-search', name: '협력공장 추천', path: '/factory-search',        iconKey: 'Wrench', group: 'detail', sortOrder: 11, requirePermission: true },
-  { id: 'mod-loans',          name: '대출',         path: '/loans',                 iconKey: 'Money',  group: 'detail', sortOrder: 12, requirePermission: true },
-  { id: 'mod-insurance',      name: '보험',         path: '/insurance',             iconKey: 'Shield', group: 'detail', sortOrder: 13, requirePermission: true },
-  { id: 'mod-classify',       name: '거래 분류',    path: '/finance/classify',      iconKey: 'Tag',    group: 'detail', sortOrder: 14, requirePermission: true },
-  { id: 'mod-sms',            name: 'SMS 수집',     path: '/finance/sms',           iconKey: 'Doc',    group: 'detail', sortOrder: 15, requirePermission: true },
-  { id: 'mod-investor',       name: '투자자 정산',  path: '/finance/investor',      iconKey: 'Users',  group: 'detail', sortOrder: 16, requirePermission: true },
-  { id: 'mod-cost-analysis',  name: '원가 분석',    path: '/finance/cost-analysis', iconKey: 'Chart',  group: 'detail', sortOrder: 17, requirePermission: true },
-  { id: 'mod-pricing-standards', name: '요금 기준표', path: '/db/pricing-standards', iconKey: 'Chart', group: 'detail', sortOrder: 18, requirePermission: true },
+  // ── 세부 화면 (detail) — 2026-07-30 사용자 확정 「사이드바 전부 걷어내고 목업처럼」:
+  //    전 항목 sidebarHidden — URL·권한 유지, 각 개편 단계에서 core 화면에 흡수 후 9단계에 코드 삭제.
+  //    (대출·보험→차량 금융탭 / 분류·SMS→장부 / 투자자 정산→정산 / 원가→손익 / 협력공장→단기·대차)
+  { id: 'mod-contracts',      name: '계약/고객(구)', path: '/contracts',             iconKey: 'Doc',    group: 'detail', sortOrder: 10, requirePermission: true, sidebarHidden: true },
+  { id: 'mod-factory-search', name: '협력공장 추천', path: '/factory-search',        iconKey: 'Wrench', group: 'detail', sortOrder: 11, requirePermission: true, sidebarHidden: true },
+  { id: 'mod-loans',          name: '대출',         path: '/loans',                 iconKey: 'Money',  group: 'detail', sortOrder: 12, requirePermission: true, sidebarHidden: true },
+  { id: 'mod-insurance',      name: '보험',         path: '/insurance',             iconKey: 'Shield', group: 'detail', sortOrder: 13, requirePermission: true, sidebarHidden: true },
+  { id: 'mod-classify',       name: '거래 분류',    path: '/finance/classify',      iconKey: 'Tag',    group: 'detail', sortOrder: 14, requirePermission: true, sidebarHidden: true },
+  { id: 'mod-sms',            name: 'SMS 수집',     path: '/finance/sms',           iconKey: 'Doc',    group: 'detail', sortOrder: 15, requirePermission: true, sidebarHidden: true },
+  { id: 'mod-investor',       name: '투자자 정산',  path: '/finance/investor',      iconKey: 'Users',  group: 'detail', sortOrder: 16, requirePermission: true, sidebarHidden: true },
+  { id: 'mod-cost-analysis',  name: '원가 분석',    path: '/finance/cost-analysis', iconKey: 'Chart',  group: 'detail', sortOrder: 17, requirePermission: true, sidebarHidden: true },
   // 구 대시보드 — 홈(/home)으로 대체. 페이지·권한 유지, 사이드바 숨김 (개편 9단계에서 삭제 예정)
   { id: 'mod-dashboard', name: '대시보드(구)', path: '/dashboard', iconKey: 'Setting', group: 'detail', sortOrder: 19, requirePermission: true, sidebarHidden: true },
 
@@ -102,6 +102,8 @@ export const MENUS: MenuEntry[] = [
 
   // ── 설정 (settings) ── admin 전용 (사이드바 별도 섹션)
   { id: 'mod-company-info',      name: '회사 정보',      path: '/db/codes',                iconKey: 'Setting',   group: 'settings', sortOrder: 70, requirePermission: true },
+  // 요금 기준표 — REDESIGN: 설정 하위 (인사/요금 기준표/회사 정보/권한)
+  { id: 'mod-pricing-standards', name: '요금 기준표',    path: '/db/pricing-standards',    iconKey: 'Chart',     group: 'settings', sortOrder: 70.5, requirePermission: true },
   { id: 'mod-hr-master',         name: '인사 마스터',    path: '/hr',                      iconKey: 'Users',     group: 'settings', sortOrder: 71, requirePermission: true },
   { id: 'mod-payroll-ops',       name: '급여 운영',      path: '/hr/payroll',              iconKey: 'Money',     group: 'settings', sortOrder: 72, requirePermission: true, sidebarHidden: true },
   { id: 'mod-contract-terms',    name: '계약 약관 관리', path: '/admin/contract-terms',    iconKey: 'Doc',       group: 'settings', sortOrder: 73, requirePermission: true },

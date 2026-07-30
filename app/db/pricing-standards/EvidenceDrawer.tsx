@@ -192,7 +192,6 @@ export default function EvidenceDrawer({ ctx, onClose, onApply }: Props) {
         style={{
           position: 'fixed', inset: 0, zIndex: 50,
           background: 'rgba(15,23,42,0.18)',
-          backdropFilter: 'blur(2px)',
         }}
       />
 
@@ -202,10 +201,8 @@ export default function EvidenceDrawer({ ctx, onClose, onApply }: Props) {
           position: 'fixed', top: 0, right: 0, bottom: 0, zIndex: 51,
           width: 'min(480px, 92vw)',
           background: 'rgba(255,255,255,0.82)',
-          backdropFilter: 'blur(24px) saturate(140%)',
-          WebkitBackdropFilter: 'blur(24px) saturate(140%)',
           borderLeft: '1px solid rgba(0,0,0,0.06)',
-          boxShadow: '-20px 0 40px rgba(140,170,210,0.16)',
+          boxShadow: '0 1px 2px rgba(16,24,40,0.05)',
           display: 'flex', flexDirection: 'column',
         }}
       >
@@ -229,7 +226,7 @@ export default function EvidenceDrawer({ ctx, onClose, onApply }: Props) {
             style={{
               width: 28, height: 28, borderRadius: 8,
               border: '1px solid rgba(0,0,0,0.06)',
-              background: 'rgba(255,255,255,0.6)', cursor: 'pointer',
+              background: '#ffffff', cursor: 'pointer',
               fontSize: 14, color: '#64748b',
             }}
             aria-label="닫기"
@@ -483,11 +480,11 @@ export default function EvidenceDrawer({ ctx, onClose, onApply }: Props) {
 
 // ============ styles ============
 const panelStyle: React.CSSProperties = {
-  background: 'rgba(255,255,255,0.72)',
+  background: '#ffffff',
   border: '1px solid rgba(0,0,0,0.06)',
   borderRadius: 14,
   padding: 14,
-  boxShadow: '6px 6px 14px rgba(140,170,210,0.10), -4px -4px 10px rgba(255,255,255,0.45)',
+  boxShadow: '0 1px 2px rgba(16,24,40,0.05)',
 }
 
 const sectionLabel: React.CSSProperties = {
@@ -501,7 +498,7 @@ const sectionLabel: React.CSSProperties = {
 const changeRowStyle: React.CSSProperties = {
   padding: 10,
   borderRadius: 10,
-  background: 'rgba(255,255,255,0.72)',
+  background: '#ffffff',
   border: '1px solid rgba(0,0,0,0.05)',
 }
 

@@ -138,9 +138,9 @@ export default function CostAnalysisPage() {
 
         {/* 차량 선택 */}
         <div style={{
-          background: 'rgba(255,255,255,0.72)', borderRadius: 14,
+          background: '#ffffff', borderRadius: 14,
           border: '1px solid rgba(0,0,0,0.06)', padding: 16, marginBottom: 16,
-          boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -4px -4px 12px rgba(255,255,255,0.5)',
+          boxShadow: '0 1px 2px rgba(16,24,40,0.05)',
         }}>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
             <input
@@ -179,7 +179,7 @@ export default function CostAnalysisPage() {
           <>
             {/* 차량 정보 + 매칭 스코프 */}
             <div style={{
-              background: 'rgba(255,255,255,0.72)', borderRadius: 14,
+              background: '#ffffff', borderRadius: 14,
               border: '1px solid rgba(0,0,0,0.06)', padding: 16, marginBottom: 16,
             }}>
               <div className="flex items-center justify-between flex-wrap gap-3">
@@ -216,7 +216,7 @@ export default function CostAnalysisPage() {
 
             {/* 6컴포넌트 비교 표 */}
             <div style={{
-              background: 'rgba(255,255,255,0.72)', borderRadius: 14,
+              background: '#ffffff', borderRadius: 14,
               border: '1px solid rgba(0,0,0,0.06)', overflow: 'hidden',
             }}>
               <div style={{
@@ -281,7 +281,7 @@ export default function CostAnalysisPage() {
             {/* 영업프리셋 — 영업가 시뮬 */}
             {totals && totals.our > 0 && analysis.presets.length > 0 && (
               <div style={{
-                marginTop: 16, background: 'rgba(255,255,255,0.72)', borderRadius: 14,
+                marginTop: 16, background: '#ffffff', borderRadius: 14,
                 border: '1px solid rgba(0,0,0,0.06)', padding: 16,
               }}>
                 <div className="text-sm font-bold text-slate-800 mb-3">🎯 영업가 시뮬레이션 (월 운영원가 기반)</div>
@@ -321,7 +321,7 @@ export default function CostAnalysisPage() {
 
         {!loading && !analysis && (
           <div style={{
-            background: 'rgba(255,255,255,0.72)', borderRadius: 14, padding: 60,
+            background: '#ffffff', borderRadius: 14, padding: 60,
             border: '1px solid rgba(0,0,0,0.06)', textAlign: 'center',
           }}>
             <div style={{ fontSize: 48, marginBottom: 12 }}>👆</div>

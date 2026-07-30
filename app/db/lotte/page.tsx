@@ -356,12 +356,12 @@ export default function BenchmarkPage() {
           trailing={
             <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
               <select value={filterCompetitor} onChange={e => setFilterCompetitor(e.target.value)}
-                style={{ padding: '6px 10px', fontSize: 12, fontWeight: 600, borderRadius: 8, border: '1px solid rgba(0,0,0,0.06)', background: 'rgba(255,255,255,0.6)', color: '#334155', cursor: 'pointer' }}>
+                style={{ padding: '6px 10px', fontSize: 12, fontWeight: 600, borderRadius: 8, border: '1px solid rgba(0,0,0,0.06)', background: '#ffffff', color: '#334155', cursor: 'pointer' }}>
                 <option value="all">전체 경쟁사</option>
                 {COMPETITORS.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
               <select value={filterTerm} onChange={e => setFilterTerm(Number(e.target.value))}
-                style={{ padding: '6px 10px', fontSize: 12, fontWeight: 600, borderRadius: 8, border: '1px solid rgba(0,0,0,0.06)', background: 'rgba(255,255,255,0.6)', color: '#334155', cursor: 'pointer' }}>
+                style={{ padding: '6px 10px', fontSize: 12, fontWeight: 600, borderRadius: 8, border: '1px solid rgba(0,0,0,0.06)', background: '#ffffff', color: '#334155', cursor: 'pointer' }}>
                 <option value={0}>전체 기간</option>
                 {TERM_OPTIONS.map(t => <option key={t} value={t}>{t}개월</option>)}
               </select>

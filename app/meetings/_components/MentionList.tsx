@@ -124,8 +124,6 @@ export default MentionList
 
 const containerStyle: React.CSSProperties = {
   background: GLASS.L5.background,
-  backdropFilter: 'blur(16px)',
-  WebkitBackdropFilter: 'blur(16px)',
   border: '1px solid rgba(0,0,0,0.08)',
   borderRadius: 12,
   boxShadow: '0 10px 32px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.06)',

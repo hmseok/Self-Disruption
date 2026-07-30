@@ -46,7 +46,7 @@ export default function ContractsHub() {
                 cursor: 'pointer',
                 transition: 'all 0.2s',
                 boxShadow: mainTab === t.key
-                  ? '6px 6px 16px rgba(140,170,210,0.12), -4px -4px 12px rgba(255,255,255,0.5)'
+                  ? '0 1px 2px rgba(16,24,40,0.05)'
                   : 'none',
               }}
             >

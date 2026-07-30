@@ -899,8 +899,6 @@ export default function DispatchDetailPage({
               alignItems: 'center',
               gap: 10,
               background: resultMsg.type === 'ok' ? 'rgba(236,253,245,0.97)' : 'rgba(254,242,242,0.97)',
-              backdropFilter: 'blur(12px)',
-              WebkitBackdropFilter: 'blur(12px)',
               border: `1px solid ${resultMsg.type === 'ok' ? 'rgba(16,185,129,0.45)' : 'rgba(239,68,68,0.45)'}`,
               borderRadius: 12,
               boxShadow: '0 14px 36px rgba(15,23,42,0.18)',
@@ -1425,8 +1423,6 @@ export default function DispatchDetailPage({
           className="fixed bottom-0 left-0 right-0 lg:left-60"
           style={{
             ...GLASS.L5,
-            backdropFilter: 'blur(12px)',
-            WebkitBackdropFilter: 'blur(12px)',
             borderTop: '1px solid rgba(0,0,0,0.08)',
             boxShadow: '0 -8px 24px rgba(0,0,0,0.06)',
             zIndex: 30,
@@ -1814,8 +1810,6 @@ export default function DispatchDetailPage({
             onClick={(e) => e.stopPropagation()}
             style={{
               ...GLASS.L5,
-              backdropFilter: 'blur(16px)',
-              WebkitBackdropFilter: 'blur(16px)',
               width: 'min(720px, 96vw)',
               maxHeight: '82vh',
               borderRadius: 16,
@@ -1896,8 +1890,7 @@ export default function DispatchDetailPage({
           <div
             onClick={(e) => e.stopPropagation()}
             style={{
-              ...GLASS.L5,
-              backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
+              ...GLASS.L5, WebkitBackdropFilter: 'blur(16px)',
               width: 'min(640px, 96vw)', maxHeight: '86vh',
               borderRadius: 16, boxShadow: '0 24px 60px rgba(0,0,0,0.25)',
               display: 'flex', flexDirection: 'column', overflow: 'hidden',
@@ -2019,8 +2012,7 @@ export default function DispatchDetailPage({
           <div
             onClick={(e) => e.stopPropagation()}
             style={{
-              ...GLASS.L5,
-              backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
+              ...GLASS.L5, WebkitBackdropFilter: 'blur(16px)',
               width: 'min(640px, 96vw)', maxHeight: '86vh',
               borderRadius: 16, boxShadow: '0 24px 60px rgba(0,0,0,0.25)',
               display: 'flex', flexDirection: 'column', overflow: 'hidden',

@@ -672,10 +672,10 @@ export default function CustomerPage() {
       <div className="page-bg">
         <div className="max-w-[1400px] mx-auto py-4 px-4 md:px-6">
           <div style={{
-            background: 'rgba(255,255,255,0.72)',
+            background: '#ffffff',
             borderRadius: 16,
             border: '1px solid rgba(0,0,0,0.06)',
-            boxShadow: '6px 6px 18px rgba(140,170,210,0.14), -6px -6px 18px rgba(255,255,255,0.47)',
+            boxShadow: '0 1px 2px rgba(16,24,40,0.05)',
             padding: '48px 20px',
             textAlign: 'center',
           }}>
@@ -934,7 +934,7 @@ export default function CustomerPage() {
                             onClick={() => setIsEditing(false)}
                             style={{
                               flex: 1, padding: '10px 14px', fontSize: 12, fontWeight: 600,
-                              background: 'rgba(255,255,255,0.60)', color: '#1e293b',
+                              background: '#ffffff', color: '#1e293b',
                               border: '1px solid rgba(0,0,0,0.06)', borderRadius: 8, cursor: 'pointer',
                             }}
                           >
@@ -981,7 +981,7 @@ export default function CustomerPage() {
                             onClick={() => setShowPaymentForm(false)}
                             style={{
                               flex: 1, padding: '10px 14px', fontSize: 12, fontWeight: 600,
-                              background: 'rgba(255,255,255,0.60)', color: '#1e293b',
+                              background: '#ffffff', color: '#1e293b',
                               border: '1px solid rgba(0,0,0,0.06)', borderRadius: 8, cursor: 'pointer',
                             }}
                           >
@@ -1050,7 +1050,7 @@ export default function CustomerPage() {
                             onClick={() => setShowInvoiceForm(false)}
                             style={{
                               flex: 1, padding: '10px 14px', fontSize: 12, fontWeight: 600,
-                              background: 'rgba(255,255,255,0.60)', color: '#1e293b',
+                              background: '#ffffff', color: '#1e293b',
                               border: '1px solid rgba(0,0,0,0.06)', borderRadius: 8, cursor: 'pointer',
                             }}
                           >
@@ -1285,7 +1285,7 @@ export default function CustomerPage() {
                     onClick={() => setShowNewModal(false)}
                     style={{
                       flex: 1, padding: '10px 14px', fontSize: 12, fontWeight: 600,
-                      background: 'rgba(255,255,255,0.60)', color: '#1e293b',
+                      background: '#ffffff', color: '#1e293b',
                       border: '1px solid rgba(0,0,0,0.06)', borderRadius: 8, cursor: 'pointer',
                     }}
                   >

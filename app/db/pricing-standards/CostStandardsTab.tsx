@@ -177,9 +177,9 @@ export default function CostStandardsTab() {
       {/* ─── 좌: 스코프 리스트 ─── */}
       <div style={{
         width: 320, flexShrink: 0,
-        background: 'rgba(255,255,255,0.72)', borderRadius: 14,
+        background: '#ffffff', borderRadius: 14,
         border: '1px solid rgba(0,0,0,0.06)',
-        boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -4px -4px 12px rgba(255,255,255,0.5)',
+        boxShadow: '0 1px 2px rgba(16,24,40,0.05)',
         padding: 12, display: 'flex', flexDirection: 'column', gap: 10,
       }}>
         {/* 필터 */}
@@ -270,7 +270,7 @@ export default function CostStandardsTab() {
       <div className="flex-1 min-w-0">
         {!selected && (
           <div style={{
-            background: 'rgba(255,255,255,0.72)', borderRadius: 14, padding: 40,
+            background: '#ffffff', borderRadius: 14, padding: 40,
             border: '1px solid rgba(0,0,0,0.06)', textAlign: 'center',
           }}>
             <div style={{ fontSize: 48, marginBottom: 12 }}>👈</div>
@@ -280,9 +280,9 @@ export default function CostStandardsTab() {
 
         {selected && (
           <div style={{
-            background: 'rgba(255,255,255,0.72)', borderRadius: 14, padding: 20,
+            background: '#ffffff', borderRadius: 14, padding: 20,
             border: '1px solid rgba(0,0,0,0.06)',
-            boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -4px -4px 12px rgba(255,255,255,0.5)',
+            boxShadow: '0 1px 2px rgba(16,24,40,0.05)',
           }}>
             {/* 헤더 */}
             <div className="flex items-center justify-between mb-4 pb-3 border-b border-black/5">

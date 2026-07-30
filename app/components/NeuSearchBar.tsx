@@ -73,11 +73,11 @@ export default function NeuSearchBar({
             border: '1px solid rgba(0,0,0,0.05)',
             borderRadius: 10,
             outline: 'none',
-            boxShadow: 'inset 2px 2px 4px rgba(140,170,210,0.12), inset -2px -2px 4px rgba(255,255,255,0.35)',
+            boxShadow: '0 1px 2px rgba(16,24,40,0.05)',
             transition: 'box-shadow 0.2s',
           }}
-          onFocus={e => { e.currentTarget.style.boxShadow = 'inset 2px 2px 4px rgba(140,170,210,0.12), inset -2px -2px 4px rgba(255,255,255,0.35), 0 0 0 2px rgba(59,110,181,0.15)' }}
-          onBlur={e => { e.currentTarget.style.boxShadow = 'inset 2px 2px 4px rgba(140,170,210,0.12), inset -2px -2px 4px rgba(255,255,255,0.35)' }}
+          onFocus={e => { e.currentTarget.style.boxShadow = '0 1px 2px rgba(16,24,40,0.05)' }}
+          onBlur={e => { e.currentTarget.style.boxShadow = '0 1px 2px rgba(16,24,40,0.05)' }}
         />
       </div>
 
@@ -114,15 +114,15 @@ export default function NeuSearchBar({
               ...(isPrimary ? {
                 background: '#2563eb',
                 color: '#fff',
-                boxShadow: '3px 3px 8px rgba(140,170,210,0.19), -1px -1px 4px rgba(255,255,255,0.47)',
+                boxShadow: '0 1px 2px rgba(16,24,40,0.05)',
               } : isGhost ? {
                 background: 'transparent',
                 color: '#2563eb',
               } : {
-                background: 'rgba(255,255,255,0.60)',
+                background: '#ffffff',
                 color: '#1e293b',
                 border: '1px solid rgba(0,0,0,0.06)',
-                boxShadow: '2px 2px 6px rgba(140,170,210,0.10), -2px -2px 6px rgba(255,255,255,0.40)',
+                boxShadow: '0 1px 2px rgba(16,24,40,0.05)',
               }),
             }}
           >

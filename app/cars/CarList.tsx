@@ -294,10 +294,10 @@ export default function CarListPage() {
       <div className="page-bg">
         <div className="max-w-[1400px] mx-auto py-4 px-4 md:px-6">
           <div style={{
-            background: 'rgba(255,255,255,0.72)',
+            background: '#ffffff',
             borderRadius: 16,
             border: '1px solid rgba(0,0,0,0.06)',
-            boxShadow: '6px 6px 18px rgba(140,170,210,0.14), -6px -6px 18px rgba(255,255,255,0.47)',
+            boxShadow: '0 1px 2px rgba(16,24,40,0.05)',
             padding: '48px 20px',
             textAlign: 'center',
           }}>
@@ -322,12 +322,12 @@ export default function CarListPage() {
         {/* ── 정비/사고 경고 배너 ── */}
         {maintenanceCars.length > 0 && (
           <div style={{
-            background: 'rgba(255,255,255,0.72)',
+            background: '#ffffff',
             border: '1.5px solid rgba(239,68,68,0.15)',
             borderRadius: 14,
             padding: 16,
             marginBottom: 12,
-            boxShadow: '4px 4px 12px rgba(140,170,210,0.14), -4px -4px 12px rgba(255,255,255,0.47)',
+            boxShadow: '0 1px 2px rgba(16,24,40,0.05)',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
               <span style={{ fontSize: 16 }}>🔧</span>
@@ -341,14 +341,14 @@ export default function CarListPage() {
                   key={car.id}
                   onClick={() => router.push(`/cars/${car.id}`)}
                   style={{
-                    background: 'rgba(255,255,255,0.60)',
+                    background: '#ffffff',
                     border: '1px solid rgba(239,68,68,0.12)',
                     borderRadius: 10,
                     padding: '8px 12px',
                     flexShrink: 0,
                     cursor: 'pointer',
                     textAlign: 'left',
-                    boxShadow: '2px 2px 6px rgba(140,170,210,0.08), -2px -2px 6px rgba(255,255,255,0.35)',
+                    boxShadow: '0 1px 2px rgba(16,24,40,0.05)',
                     transition: 'all 0.15s',
                   }}
                 >
@@ -378,12 +378,12 @@ export default function CarListPage() {
         {/* ── 최근 등록 배너 ── */}
         {recentCars.length > 0 && (
           <div style={{
-            background: 'rgba(255,255,255,0.72)',
+            background: '#ffffff',
             border: '1.5px solid rgba(59,130,246,0.12)',
             borderRadius: 14,
             padding: 16,
             marginBottom: 12,
-            boxShadow: '4px 4px 12px rgba(140,170,210,0.14), -4px -4px 12px rgba(255,255,255,0.47)',
+            boxShadow: '0 1px 2px rgba(16,24,40,0.05)',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
               <span style={{ fontSize: 16 }}>🆕</span>
@@ -397,14 +397,14 @@ export default function CarListPage() {
                   key={car.id}
                   onClick={() => router.push(`/cars/${car.id}`)}
                   style={{
-                    background: 'rgba(255,255,255,0.60)',
+                    background: '#ffffff',
                     border: '1px solid rgba(59,130,246,0.10)',
                     borderRadius: 10,
                     padding: '8px 12px',
                     flexShrink: 0,
                     cursor: 'pointer',
                     textAlign: 'left',
-                    boxShadow: '2px 2px 6px rgba(140,170,210,0.08), -2px -2px 6px rgba(255,255,255,0.35)',
+                    boxShadow: '0 1px 2px rgba(16,24,40,0.05)',
                     transition: 'all 0.15s',
                   }}
                 >

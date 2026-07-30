@@ -50,15 +50,15 @@ const ORIGINS = ['국산', '수입']
 const VEHICLE_CLASSES = ['경형', '소형', '중형', '대형']
 
 const glass = {
-  level4: { background: 'rgba(255,255,255,0.72)', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 16, boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -4px -4px 12px rgba(255,255,255,0.5)' },
-  level3Blue:   { background: 'rgba(255,255,255,0.60)', border: '1px solid rgba(191,219,254,0.80)',  borderRadius: 14 },
-  level3Green:  { background: 'rgba(255,255,255,0.60)', border: '1px solid rgba(187,247,208,0.80)',  borderRadius: 14 },
-  level3Violet: { background: 'rgba(255,255,255,0.60)', border: '1px solid rgba(221,214,254,0.80)',  borderRadius: 14 },
-  level3Amber:  { background: 'rgba(255,255,255,0.60)', border: '1px solid rgba(253,230,138,0.80)',  borderRadius: 14 },
+  level4: { background: '#ffffff', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 16, boxShadow: '0 1px 2px rgba(16,24,40,0.05)' },
+  level3Blue:   { background: '#ffffff', border: '1px solid rgba(191,219,254,0.80)',  borderRadius: 14 },
+  level3Green:  { background: '#ffffff', border: '1px solid rgba(187,247,208,0.80)',  borderRadius: 14 },
+  level3Violet: { background: '#ffffff', border: '1px solid rgba(221,214,254,0.80)',  borderRadius: 14 },
+  level3Amber:  { background: '#ffffff', border: '1px solid rgba(253,230,138,0.80)',  borderRadius: 14 },
   input: {
     background: 'rgba(255,255,255,0.40)',
     border: '1px solid rgba(0,0,0,0.05)',
-    boxShadow: 'inset 2px 2px 4px rgba(140,170,210,0.08), inset -1px -1px 2px rgba(255,255,255,0.5)',
+    boxShadow: '0 1px 2px rgba(16,24,40,0.05)',
     borderRadius: 10, padding: '6px 10px', fontSize: 12,
   },
 } as const
@@ -212,7 +212,7 @@ export default function MarketPriceTab() {
               {showCrawlMenu && !crawlStatus.running && (
                 <div style={{
                   position: 'absolute', top: '100%', right: 0, marginTop: 4, zIndex: 50,
-                  background: 'rgba(255,255,255,0.95)', borderRadius: 12, padding: 6,
+                  background: '#ffffff', borderRadius: 12, padding: 6,
                   border: '1px solid rgba(0,0,0,0.08)',
                   boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
                   minWidth: 160,
@@ -503,7 +503,7 @@ const btnStylePrimary: React.CSSProperties = {
 }
 const btnStyleGhost: React.CSSProperties = {
   padding: '4px 10px', fontSize: 11, fontWeight: 700, borderRadius: 8,
-  border: '1px solid rgba(0,0,0,0.08)', background: 'rgba(255,255,255,0.6)', color: '#475569',
+  border: '1px solid rgba(0,0,0,0.08)', background: '#ffffff', color: '#475569',
   cursor: 'pointer',
 }
 const btnStyleDanger: React.CSSProperties = {

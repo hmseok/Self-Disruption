@@ -71,7 +71,7 @@ export default function PricingStandardsPage() {
                 style={{
                   padding: '5px 12px', fontSize: 11, fontWeight: 700, borderRadius: 8,
                   border: '1px solid rgba(0,0,0,0.06)',
-                  background: showSimulation ? 'rgba(59,130,246,0.1)' : 'rgba(255,255,255,0.6)',
+                  background: showSimulation ? 'rgba(59,130,246,0.1)' : '#ffffff',
                   color: showSimulation ? '#3b82f6' : '#64748b',
                   cursor: 'pointer', whiteSpace: 'nowrap',
                   display: 'flex', alignItems: 'center', gap: 4,
@@ -83,7 +83,7 @@ export default function PricingStandardsPage() {
                 onClick={() => setShowGuide(!showGuide)}
                 style={{
                   padding: '5px 12px', fontSize: 11, fontWeight: 700, borderRadius: 8,
-                  border: '1px solid rgba(0,0,0,0.06)', background: 'rgba(255,255,255,0.6)',
+                  border: '1px solid rgba(0,0,0,0.06)', background: '#ffffff',
                   color: '#64748b', cursor: 'pointer', whiteSpace: 'nowrap',
                   display: 'flex', alignItems: 'center', gap: 4,
                 }}
@@ -97,12 +97,12 @@ export default function PricingStandardsPage() {
         {/* 초보자 가이드 배너 */}
         {showGuide && (
           <div style={{
-            background: 'rgba(255,255,255,0.72)',
+            background: '#ffffff',
             borderRadius: 14,
             padding: 16,
             marginBottom: 16,
             border: '1px solid rgba(0,0,0,0.05)',
-            boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -4px -4px 12px rgba(255,255,255,0.5)',
+            boxShadow: '0 1px 2px rgba(16,24,40,0.05)',
           }}>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
               <div className="flex items-start gap-3 p-3 bg-white/60 rounded-xl">

@@ -503,11 +503,11 @@ export default function TaxManagementPage() {
         onFilterChange={(key) => setActiveTab(key as any)}
         trailing={
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 'auto' }}>
-            <button onClick={() => changeMonth(-1)} style={{ padding: '5px 10px', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 8, cursor: 'pointer', background: 'rgba(255,255,255,0.6)', fontWeight: 700, fontSize: 13, color: '#64748b' }}>◀</button>
+            <button onClick={() => changeMonth(-1)} style={{ padding: '5px 10px', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 8, cursor: 'pointer', background: '#ffffff', fontWeight: 700, fontSize: 13, color: '#64748b' }}>◀</button>
             <span style={{ fontSize: 13, fontWeight: 800, color: '#0f2440', minWidth: 90, textAlign: 'center' }}>
               {filterMonth.replace('-', '년 ')}월
             </span>
-            <button onClick={() => changeMonth(1)} style={{ padding: '5px 10px', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 8, cursor: 'pointer', background: 'rgba(255,255,255,0.6)', fontWeight: 700, fontSize: 13, color: '#64748b' }}>▶</button>
+            <button onClick={() => changeMonth(1)} style={{ padding: '5px 10px', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 8, cursor: 'pointer', background: '#ffffff', fontWeight: 700, fontSize: 13, color: '#64748b' }}>▶</button>
           </div>
         }
       />
