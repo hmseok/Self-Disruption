@@ -12,7 +12,7 @@ import * as XLSX from 'xlsx'
 // 2026-07-30 개편 2단계 — 탭별 파일 분리
 import SmsTab from './SmsTab'
 import MappingTab from './MappingTab'
-import LedgerTab from './LedgerTab'
+import LedgerTab, { LedgerFilter } from './LedgerTab'
 import { SmsRow } from './_shared'
 
 // ═══════════════════════════════════════════════════════════════
@@ -22,7 +22,7 @@ import { SmsRow } from './_shared'
 
 // 2026-07-30 개편 2단계 — 도달 불가 탭 5종(workflow/classify/matchreview/rules/system) 삭제
 // 거래내역(ledger) = 통장+카드 통합 리스트 (REDESIGN). 통장/카드 탭은 잔액검증·업로드 이관 전까지 병행.
-type TabKey = 'ledger' | 'bank' | 'card' | 'sms' | 'mapping'
+type TabKey = 'ledger' | 'sms' | 'mapping'
 
 interface Transaction {
   id: string
@@ -285,8 +285,6 @@ export default function BankCardPage() {
   const [matchResults, setMatchResults] = useState<MatchResult[]>([])
 
   // 서브 필터
-  const [bankFilter, setBankFilter] = useState('all') // all | income | expense
-  const [cardFilter, setCardFilter] = useState('all') // all | kb | woori | hyundai
 
   // 업로드 모달
   const [showUpload, setShowUpload] = useState(false)
@@ -304,7 +302,6 @@ export default function BankCardPage() {
   const [currentFileIndex, setCurrentFileIndex] = useState(0)
 
   // 인라인 수정
-  const [editingTx, setEditingTx] = useState<{ id: string; field: string; value: string } | null>(null)
   // 거래 분리 모달
   const [splitTarget, setSplitTarget] = useState<Transaction | null>(null)
   const [splitItems, setSplitItems] = useState<{ amount: string; description: string; client_name: string }[]>([])
@@ -1448,6 +1445,7 @@ export default function BankCardPage() {
     }
     return [...freq.entries()].sort((a, b) => b[1] - a[1]).map(([c]) => c)
   }, [transactions])
+
   const bankAccountOptions = useMemo(() => {
     const set = new Set<string>()
     for (const t of transactions) if (isBankTx(t) && (t as any).account_last4) set.add(String((t as any).account_last4))
@@ -1475,7 +1473,7 @@ export default function BankCardPage() {
 
   const [acctVerify, setAcctVerify] = useState<Record<string, { ok: boolean; breaks: number }>>({})
   useEffect(() => {
-    if (activeTab !== 'bank' || bankAccountOptions.length === 0) return
+    if (activeTab !== 'ledger' || bankAccountOptions.length === 0) return
     let cancelled = false
     ;(async () => {
       const to = new Date().toISOString().slice(0, 10)
@@ -1516,28 +1514,6 @@ export default function BankCardPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [transactions])
 
-  const bankTransactions = useMemo(() => {
-    let data = transactions.filter(isBankTx)
-    // 관리 구분 필터 (V11)
-    if (domainPick === 'none') data = data.filter((t: any) => !t.manage_domain)
-    else if (domainPick !== 'all') data = data.filter((t: any) => t.manage_domain === domainPick)
-    if (bankAccountPick !== 'all') data = data.filter(t => String((t as any).account_last4 || '') === bankAccountPick)
-    if (bankLinkPick === 'linked') data = data.filter(t => !!t.related_type && !!t.related_id)
-    else if (bankLinkPick === 'unlinked') data = data.filter(t => !t.related_type || !t.related_id)
-    else if (bankLinkPick !== 'all') data = data.filter(t => t.related_type === bankLinkPick)
-    if (bankFilter === 'income') data = data.filter(t => t.type === 'income')
-    else if (bankFilter === 'expense') data = data.filter(t => t.type === 'expense')
-    if (search) {
-      const q = search.toLowerCase()
-      data = data.filter(t =>
-        (t.description || '').toLowerCase().includes(q) ||
-        (t.client_name || '').toLowerCase().includes(q) ||
-        (t.bank_name || '').toLowerCase().includes(q) ||
-        (t.card_company || '').toLowerCase().includes(q)
-      )
-    }
-    return data
-  }, [transactions, bankFilter, search, bankAccountPick, bankLinkPick, domainPick])
 
   // PR-ACCOUNT — 카드별(끝4자리/별칭)·소지자별 필터
   const [cardPick, setCardPick] = useState('all')
@@ -1563,43 +1539,6 @@ export default function BankCardPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [transactions])
 
-  const cardTransactions = useMemo(() => {
-    let data = transactions.filter(isCardTx)
-    if (cardPick !== 'all') {
-      data = data.filter(t => {
-        const a = (t as any).matched_card_alias || (t as any).sms_card_alias || ((t as any).account_last4 ? `****${(t as any).account_last4}` : '')
-        return String(a) === cardPick
-      })
-    }
-    if (holderPick !== 'all') {
-      data = data.filter(t => String((t as any).matched_holder_name || (t as any).sms_holder || '') === holderPick)
-    }
-    if (cardFilter !== 'all') {
-      // 카드사 매칭 — 한글/영문 양방향 (KB_BANK 제외)
-      // 'kb' → 'KB', 'KB국민', 'KB국민카드' / '우리' → 'WOORI', '우리카드' / '현대' → 'HYUNDAI', '현대카드'
-      const aliases: Record<string, string[]> = {
-        'kb':   ['kb', '국민', 'kb국민'],
-        '우리':  ['woori', '우리', '우리카드'],
-        '현대':  ['hyundai', '현대', '현대카드'],
-        '법인':  ['mycompany', '법인', '법인카드', 'my company'],
-      }
-      const keys = aliases[cardFilter.toLowerCase()] || [cardFilter.toLowerCase()]
-      data = data.filter(t => {
-        const cc = (t.card_company || '').toLowerCase()
-        if (/_bank$/.test(cc)) return false
-        return keys.some(k => cc === k || cc.startsWith(k) || cc.includes(k))
-      })
-    }
-    if (search) {
-      const q = search.toLowerCase()
-      data = data.filter(t =>
-        (t.description || '').toLowerCase().includes(q) ||
-        (t.client_name || '').toLowerCase().includes(q) ||
-        (t.card_company || '').toLowerCase().includes(q)
-      )
-    }
-    return data
-  }, [transactions, cardFilter, search, cardPick, holderPick])
 
   const filteredSettlements = useMemo(() => {
     let data = [...settlements]
@@ -2006,21 +1945,6 @@ export default function BankCardPage() {
     await Promise.all([loadSummary(), loadTransactions()])
   }
 
-  // ─── 인라인 수정 (거래처명, 금액 등) ─────────────────
-  const saveInlineEdit = async () => {
-    if (!editingTx) return
-    const { id, field, value } = editingTx
-    await fetchWithAuth(`/api/finance-upload?table=transactions&id=${id}`, {
-      method: 'PATCH',
-      body: { [field]: value },
-    })
-    setEditingTx(null)
-    await loadTransactions()
-  }
-
-  const handleInlineEdit = (tx: Transaction, field: string, value: string) => {
-    setEditingTx({ id: tx.id, field, value })
-  }
 
   // ─── 별칭 등록 ──────────────────────────────────────
   const saveAlias = async () => {
@@ -3233,10 +3157,9 @@ export default function BankCardPage() {
   //   대차료 → 사고대차 청구 탭 / 정산 → 지입·투자 페이지. 기존 탭은 고급으로 강등 (레거시 접근용).
   // 2026-07-08 사용자 명시 「확실하지 않은 기능은 혼란」 — 4개만:
   //   통장·카드(원장) + SMS 수집(수집층 확인) + 매핑 관리(계좌·카드 식별 설정)
+  // REDESIGN 3탭 완성 (2026-07-30) — 통장/카드 탭은 거래내역에 흡수
   const tabs = [
     { key: 'ledger', label: '거래내역', count: summary?.transactions.total },
-    { key: 'bank', label: '통장 거래', count: summary?.transactions.bank },
-    { key: 'card', label: '카드 거래', count: summary?.transactions.card },
     { key: 'sms', label: '수집함', count: summary?.sms?.total || 0 },
     { key: 'mapping', label: '매핑 관리' },
   ]
@@ -3252,432 +3175,170 @@ export default function BankCardPage() {
 
   // ── 통장 거래 탭 ──────────────────────────────────────
 
-  const bankColumns: TableColumn<Transaction>[] = [
-    { key: 'date', label: '날짜', width: 100,
-      sortBy: (r) => r.transaction_date ? new Date(r.transaction_date as any).getTime() : 0,
-      render: (r) => <span style={{ fontSize: 13, color: COLORS.textSecondary }}>{fmtDate(r.transaction_date)}</span> },
-    // 규칙 30 확장 (2026-07-08) — 3층 스택 → 1셀 1값 (은행/계좌/용도 분리 컬럼)
-    // 은행 = 매핑 관리 기준 우선 (업로드 시 파일에서 은행명 못 읽으면 잘못 박히던 사고 — 2026-07-08)
-    { key: 'account', label: '은행', width: 76,
-      sortBy: (r: any) => (r as any).bank_mapped_name || r.bank_name || r.card_company || '',
-      render: (r: any) => {
-        const bankName = (r as any).bank_mapped_name || r.bank_name || (r.card_company || '').replace('_BANK', '')
-        return <span style={{ fontSize: 12, fontWeight: 700, color: COLORS.primary, whiteSpace: 'nowrap' }}>{bankName || '-'}</span>
-      }, hideOnMobile: true },
-    { key: 'account_no', label: '계좌', width: 90,
-      sortBy: (r: any) => (r as any).account_last4 || (r.bank_account_alias || '').match(/(\d{4})\s*$/)?.[1] || '',
-      render: (r: any) => {
-        const last4 = (r as any).account_last4 || (r.bank_account_alias || '').match(/(\d{4})\s*$/)?.[1]
-        return last4
-          ? <span style={{ fontSize: 12, fontWeight: 700, color: COLORS.textPrimary, whiteSpace: 'nowrap' }}>****{last4}</span>
-          : <span style={{ fontSize: 11, color: '#cbd5e1' }}>-</span>
-      }, hideOnMobile: true },
-    { key: 'account_purpose', label: '용도', width: 100,
-      sortBy: (r: any) => r.bank_purpose || r.bank_account_alias || '',
-      render: (r: any) => {
-        const p = (r.bank_purpose || '').split('/')[0] || r.bank_account_alias
-        return p
-          ? <span style={{ fontSize: 12, color: COLORS.textSecondary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: 100 }}>{p}</span>
-          : <span style={{ fontSize: 11, color: '#cbd5e1' }}>-</span>
-      }, hideOnMobile: true },
-    // 관리 구분 (V11) — 원장은 소관 페이지만 지정, 상세 매핑은 각 페이지에서 (2026-07-10 사용자 명시)
-    { key: 'domain', label: '구분', width: 92,
-      sortBy: (r: any) => (r as any).manage_domain || '',
-      render: (r: any) => {
-        const cur = (r as any).manage_domain || ''
-        const d = domainLabel(cur)
+
+
+  // ── 거래내역 탭 부속 (구 통장/카드 탭에서 이관 — 2026-07-30) ─────────
+  // ── 거래내역 보기 필터 (통장/카드 탭 흡수 — 2026-07-30) ──
+  const [ledgerFilter, setLedgerFilter] = useState<LedgerFilter>('all')
+
+  // 거래처명 인라인 수정 — 낙관적 갱신 + 별칭 등록 제안 (구 통장 탭 기능 이관)
+  const saveClientName = useCallback(async (id: string, value: string, oldValue: string) => {
+    setTransactions((prev) => prev.map((t: any) => t.id === id ? { ...t, client_name: value } : t))
+    const { ok, json } = await fetchWithAuth(`/api/transactions/${id}`, { method: 'PATCH', body: { client_name: value } })
+    if (!ok || json?.error) { alert(json?.error || '거래처 저장에 실패했습니다'); loadTransactions(); return }
+    if (oldValue && value && oldValue !== value) setAliasPrompt({ bankName: oldValue, actualName: value })
+  }, [loadTransactions])
+
+  // page 소유 필터 합성 (계좌·카드 선택, 연결, 구분) — LedgerTab 에 주입
+  const ledgerExternalFilter = useMemo(() => {
+    const active = domainPick !== 'all' || bankLinkPick !== 'all' || bankAccountPick !== 'all' || cardPick !== 'all'
+    if (!active) return undefined
+    return (t: any) => {
+      if (domainPick === 'none' && t.manage_domain) return false
+      if (domainPick !== 'all' && domainPick !== 'none' && t.manage_domain !== domainPick) return false
+      if (bankLinkPick === 'linked' && !(t.related_type && t.related_id)) return false
+      if (bankLinkPick === 'unlinked' && !!t.related_type && !!t.related_id) return false
+      if (!['all', 'linked', 'unlinked'].includes(bankLinkPick) && t.related_type !== bankLinkPick) return false
+      if (bankAccountPick !== 'all' && isBankTx(t) && String(t.account_last4 || '') !== bankAccountPick) return false
+      if (cardPick !== 'all' && !isBankTx(t)) {
+        const alias = t.matched_card_alias || t.sms_card_alias || (t.account_last4 ? `****${t.account_last4}` : '')
+        if (String(alias) !== cardPick) return false
+      }
+      return true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [domainPick, bankLinkPick, bankAccountPick, cardPick])
+
+  // 계좌별 현재 잔액 + 최근 30일 자동 검증 (2026-07-08 사용자 명시 — 통장 보기)
+  const bankStrip = bankAccountOptions.length > 0 ? (
+    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
+      {bankAccountOptions.map((a) => {
+        const s = bankAccountSummary.get(a)
+        const v = acctVerify[a]
+        const selected = bankAccountPick === a
         return (
-          <select
-            value={cur}
-            onClick={(e) => e.stopPropagation()}
-            onChange={(e) => assignDomain([r.id], e.target.value || null)}
+          <div key={a}
+            onClick={() => setBankAccountPick(selected ? 'all' : a)}
             style={{
-              fontSize: 11, fontWeight: 700, padding: '2px 4px', borderRadius: 6, maxWidth: 88,
-              border: `1px solid ${d?.color ? `${d.color}55` : 'rgba(0,0,0,0.1)'}`,
-              color: d?.color || COLORS.textMuted, background: 'transparent', cursor: 'pointer',
-            }}
-          >
-            <option value="">미지정</option>
-            {domains.filter((x) => x.is_active).map((x) => <option key={x.code} value={x.code}>{x.label}</option>)}
-          </select>
+              ...GLASS.L3,
+              cursor: 'pointer', padding: '10px 14px', borderRadius: 12, minWidth: 172,
+              ...(selected ? { background: COLORS.bgBlue } : {}),
+              border: selected ? `1.5px solid ${COLORS.primary}` : `1px solid ${COLORS.borderBlue}`,
+            }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSecondary }}>계좌 ****{a}</span>
+              {v && (
+                <span
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    // 배지 검사와 같은 기간(최근 30일)으로 즉시 실행 — 결과가 배지 숫자와 일치
+                    const to = new Date().toISOString().slice(0, 10)
+                    const from = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10)
+                    setRcAccount(a); setRcFrom(from); setRcTo(to); setReconcileOpen(true)
+                    runReconcile({ account: a, from, to })
+                  }}
+                  title={v.ok ? '최근 30일 입출금과 잔액이 이어집니다' : `최근 30일 중 ${v.breaks}곳에서 잔액이 안 이어집니다 — 눌러서 확인`}
+                  style={{
+                    fontSize: 10, fontWeight: 800, padding: '1px 6px', borderRadius: 8, whiteSpace: 'nowrap',
+                    background: v.ok ? 'rgba(22,163,74,0.10)' : 'rgba(239,68,68,0.10)',
+                    color: v.ok ? '#15803d' : '#dc2626',
+                  }}>{v.ok ? '✅ 검증됨' : `⚠ ${v.breaks}곳 확인`}</span>
+              )}
+            </div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: COLORS.textPrimary, whiteSpace: 'nowrap' }}>
+              {s?.balance != null ? `${Math.round(s.balance).toLocaleString()}원` : '잔액 정보 없음'}
+            </div>
+            {s?.balanceDate && (
+              <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 2 }}>기준 {String(s.balanceDate).slice(0, 10)}</div>
+            )}
+          </div>
         )
-      }, hideOnMobile: true },
-    { key: 'desc', label: '적요',
-      sortBy: (r) => r.description || '',
-      render: (r) => <span style={{ fontSize: 13, fontWeight: 500 }}>{r.description || '-'}</span> },
-    { key: 'counterpart', label: '거래처', width: 140,
-      sortBy: (r) => r.client_name || '',
-      render: (r) =>
-      editingTx?.id === r.id && editingTx.field === 'client_name' ? (
-        <input
-          autoFocus
-          defaultValue={editingTx.value}
-          onChange={(e) => setEditingTx({ ...editingTx, value: e.target.value })}
-          onBlur={() => {
-            if (editingTx.value !== (r.client_name || '')) {
-              saveInlineEdit()
-              // 별칭 등록 제안
-              if (r.client_name && editingTx.value && r.client_name !== editingTx.value) {
-                setAliasPrompt({ bankName: r.client_name, actualName: editingTx.value })
-              }
-            } else {
-              setEditingTx(null)
-            }
-          }}
-          onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); if (e.key === 'Escape') setEditingTx(null) }}
-          style={{ ...GLASS.L1, width: '100%', border: `1px solid ${COLORS.primary}`, borderRadius: 6, padding: '2px 6px', fontSize: 13, outline: 'none' }}
-        />
-      ) : (
-        <span
-          onClick={() => handleInlineEdit(r, 'client_name', r.client_name || '')}
-          style={{ fontSize: 13, cursor: 'pointer', borderBottom: `1px dashed ${COLORS.borderSubtle}`, paddingBottom: 1 }}
-          title="클릭하여 수정"
-        >{r.client_name || '-'}</span>
-      ),
-      hideOnMobile: true
-    },
-    { key: 'deposit', label: '입금', width: 110, align: 'right',
-      sortBy: (r) => r.type === 'income' ? Number(r.amount || 0) : 0,
-      render: (r) =>
-      r.type === 'income' ? <span style={{ color: COLORS.income, fontWeight: 600, fontSize: 13 }}>{nf(r.amount)}</span> : <span style={{ color: COLORS.textMuted }}>-</span>
-    },
-    { key: 'withdrawal', label: '출금', width: 110, align: 'right',
-      sortBy: (r) => r.type === 'expense' ? Number(r.amount || 0) : 0,
-      render: (r) =>
-      r.type === 'expense' ? <span style={{ color: COLORS.expense, fontWeight: 600, fontSize: 13 }}>{nf(r.amount)}</span> : <span style={{ color: COLORS.textMuted }}>-</span>
-    },
-    // 잔액 컬럼 복원 (2026-07-08 사용자 명시 「잔액이 같이 나오고 누락이 있는지 통장에 표출」)
-    //   문자·엑셀의 거래 후 잔액 — 행 사이 잔액이 안 이어지는 지점 = 누락/중복 육안 확인
-    { key: 'balance', label: '잔액', width: 110, align: 'right',
-      sortBy: (r: any) => Number(r.balance_after || 0),
-      render: (r: any) =>
-        r.balance_after != null && Number(r.balance_after) > 0
-          ? <span style={{ fontSize: 12, color: COLORS.textSecondary, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{nf(r.balance_after)}</span>
-          : <span style={{ fontSize: 11, color: '#cbd5e1' }}>—</span>,
-      hideOnMobile: true },
-    { key: 'matched', label: '매칭', width: 110,
-      sortBy: (r: any) => (r.related_type === 'fmi_rental' ? '0대차' : '') || r.bank_matched_car_number || r.bank_purpose || '',
-      render: (r: any) => {
-        // 한 줄 표시 (줄바꿈 최소화 — CLAUDE.md 규칙 19)
-        // 대차 연결 > 사유 처리 > 차량 > purpose > —  (2026-07-08 「전체 매칭확인은 여기서도」)
-        if (r.related_type === 'fmi_rental' && r.related_id) {
-          return <span style={{ fontSize: 12, fontWeight: 600, color: '#059669', whiteSpace: 'nowrap' }}>💰 대차 연결</span>
-        }
-        try {
-          const raw = typeof r.raw_data === 'string' ? JSON.parse(r.raw_data) : r.raw_data
-          if (raw && raw._not_rental) {
-            return <span style={{ fontSize: 12, color: '#6d28d9', whiteSpace: 'nowrap' }} title={raw._not_rental_memo || ''}>🏷 {raw._not_rental}</span>
-          }
-        } catch { /* raw_data 파싱 실패 — 무시 */ }
-        if (r.bank_matched_car_number) {
-          return <span style={{ fontSize: 12, fontWeight: 600, color: '#1e40af', whiteSpace: 'nowrap' }}>🚗 {r.bank_matched_car_number}</span>
-        }
-        if (r.bank_purpose) {
-          // 회사이름 (예금주) 안 표시 — 어차피 회사 통장. purpose 만 한 줄
-          const firstPurpose = r.bank_purpose.split('/')[0]
-          return <span style={{ fontSize: 12, color: '#7c3aed', whiteSpace: 'nowrap' }}>💼 {firstPurpose}</span>
-        }
-        return <span style={{ fontSize: 11, color: '#cbd5e1' }}>—</span>
-      }, hideOnMobile: true },
-    { key: 'status', label: '', width: 28, align: 'center',
-      sortBy: (r) => (!!r.related_type && !!r.related_id) ? 1 : 0,
-      render: (r) =>
-        // 매칭 안 된 거래만 작은 빨간 점 (자리 절약 — 규칙 19)
-        (!!r.related_type && !!r.related_id)
-          ? <span style={{ fontSize: 10, color: '#15803d' }}>✓</span>
-          : <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: 3, background: '#f59e0b' }} title="미매칭" />
-    },
-    // 가위 (✂️ split) 컬럼 제거 — 사용 빈도 낮음 (규칙 19)
-  ]
+      })}
+    </div>
+  ) : null
 
-  const bankMobile: MobileCardConfig<Transaction> = {
-    title: (r) => <span style={{ fontWeight: 600, fontSize: 14 }}>{fmtDate(r.transaction_date)} {r.description || '거래'}</span>,
-    subtitle: (r) => <span style={{ fontSize: 12, color: COLORS.textSecondary }}>{r.client_name || r.bank_name || ''}</span>,
-    trailing: (r) => (
-      <span style={{ fontWeight: 700, fontSize: 14, color: r.type === 'income' ? COLORS.income : COLORS.expense }}>
-        {nf(r.amount)}
-      </span>
-    ),
-    badges: (r) => <MatchBadge matched={!!r.related_type} />,
-  }
-
-  // ── 카드 거래 탭 ──────────────────────────────────────
-
-  const cardColumns: TableColumn<Transaction>[] = [
-    { key: 'date', label: '날짜', width: 100,
-      sortBy: (r) => r.transaction_date ? new Date(r.transaction_date as any).getTime() : 0,
-      render: (r) => <span style={{ fontSize: 13, color: COLORS.textSecondary }}>{fmtDate(r.transaction_date)}</span> },
-    // 규칙 30 확장 (2026-07-08) — 4층 스택 셀 → 1셀 1값 분리 컬럼
-    { key: 'card_company', label: '카드사', width: 72,
-      sortBy: (r: any) => r.card_company || '',
-      render: (r: any) => <span style={{ fontSize: 12, fontWeight: 700, color: COLORS.primary, whiteSpace: 'nowrap' }}>{(r.card_company || '-').replace('_BANK', '')}</span> },
-    { key: 'card_no', label: '카드', width: 110,
-      sortBy: (r: any) => {
-        const alias = r.sms_card_alias || r.matched_card_alias || ''
-        return alias.match(/(\d{4})\s*$/)?.[1] || r.card_last4 || (r as any).account_last4 || ''
-      },
-      render: (r: any) => {
-        const alias = r.sms_card_alias || r.matched_card_alias || ''
-        const last4 = alias.match(/(\d{4})\s*$/)?.[1] || r.card_last4 || (r as any).account_last4 || ''
-        return last4
-          ? <span style={{ fontSize: 12, fontWeight: 700, color: COLORS.textPrimary, whiteSpace: 'nowrap' }}>****{last4}</span>
-          : <span style={{ fontSize: 11, color: '#cbd5e1' }}>-</span>
-      }},
-    { key: 'holder', label: '소지자', width: 76,
-      sortBy: (r: any) => r.matched_holder_name || r.sms_holder || '',
-      render: (r: any) => {
-        const h = r.matched_holder_name || r.sms_holder
-        return h
-          ? <span style={{ fontSize: 12, color: COLORS.textSecondary, whiteSpace: 'nowrap' }}>{h}</span>
-          : <span style={{ fontSize: 11, color: '#cbd5e1' }}>-</span>
-      }},
-    { key: 'card_link', label: '연결', width: 100,
-      sortBy: (r: any) => r.matched_car_number || r.matched_car_number_sms || '',
-      render: (r: any) => {
-        const car = r.matched_car_number || r.matched_car_number_sms
-        return car
-          ? <span style={{ fontSize: 12, fontWeight: 600, color: '#1e40af', whiteSpace: 'nowrap' }}>🚗 {car}</span>
-          : <span style={{ fontSize: 11, color: '#cbd5e1' }}>-</span>
-      }},
-    // 관리 구분 (V11) — 규칙 14 동형 (통장 컬럼과 동일)
-    { key: 'domain', label: '구분', width: 92,
-      sortBy: (r: any) => (r as any).manage_domain || '',
-      render: (r: any) => {
-        const cur = (r as any).manage_domain || ''
-        const d = domainLabel(cur)
+  // 카드별 이번 달 누적 사용액 (2026-07-08 사용자 명시 — 카드 보기)
+  const cardStrip = cardMonthSummary.size > 0 ? (
+    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
+      {Array.from(cardMonthSummary.entries()).sort((x, y) => y[1].sum - x[1].sum).slice(0, 10).map(([alias, info]) => {
+        const selected = cardPick === alias
         return (
-          <select
-            value={cur}
-            onClick={(e) => e.stopPropagation()}
-            onChange={(e) => assignDomain([r.id], e.target.value || null)}
+          <div key={alias}
+            onClick={() => setCardPick(selected ? 'all' : alias)}
             style={{
-              fontSize: 11, fontWeight: 700, padding: '2px 4px', borderRadius: 6, maxWidth: 88,
-              border: `1px solid ${d?.color ? `${d.color}55` : 'rgba(0,0,0,0.1)'}`,
-              color: d?.color || COLORS.textMuted, background: 'transparent', cursor: 'pointer',
-            }}
-          >
-            <option value="">미지정</option>
-            {domains.filter((x) => x.is_active).map((x) => <option key={x.code} value={x.code}>{x.label}</option>)}
-          </select>
-        )
-      }, hideOnMobile: true },
-    { key: 'merchant', label: '가맹점',
-      sortBy: (r: any) => r.sms_merchant || r.description || '',
-      render: (r: any) => {
-      // SMS 가맹점 우선, 없으면 description (구 데이터 호환)
-      const merchant = r.sms_merchant || r.description || '-'
-      const stType = r.sms_transaction_type
-      const isCanceled = stType === 'canceled'
-      const isDeclined = r.sms_parse_status === 'ignored'
-      return (
-        <span style={{ fontSize: 13, fontWeight: 500 }}>
-          {isCanceled && <span style={{ color: '#b91c1c', marginRight: 4, fontWeight: 700 }}>[취소]</span>}
-          {isDeclined && <span style={{ color: '#94a3b8', marginRight: 4, fontWeight: 600 }}>[미승인]</span>}
-          {merchant}
-        </span>
-      )
-    }},
-    { key: 'amount', label: '금액', width: 110, align: 'right',
-      sortBy: (r: any) => Number(r.amount || 0),
-      render: (r: any) => {
-      // 카드 부호 표시 (사용자 운영 모델):
-      //   취소 → -금액 (빨강)
-      //   승인 → 금액 (검정, 부호 없음)
-      //   declined → 금액 (회색)
-      const stType = r.sms_transaction_type
-      const isDeclined = r.sms_parse_status === 'ignored'
-      const isCanceled = stType === 'canceled'
-      const color =
-        isDeclined ? '#94a3b8' :
-        isCanceled ? COLORS.expense :
-        COLORS.textPrimary
-      return (
-        <span style={{ fontWeight: 600, fontSize: 13, color }}>
-          {isCanceled ? '-' : ''}{nf(r.amount)}원
-        </span>
-      )
-    }},
-    { key: 'tx_status', label: '상태', width: 70, align: 'center',
-      sortBy: (r: any) => r.sms_transaction_type || '',
-      render: (r: any) => {
-        const stType = r.sms_transaction_type
-        const isDeclined = r.sms_parse_status === 'ignored'
-        if (isDeclined) {
-          return <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 4, background: 'rgba(0,0,0,0.05)', color: '#94a3b8', fontWeight: 600 }}>거절</span>
-        }
-        if (stType === 'canceled') {
-          return <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 4, background: 'rgba(239,68,68,0.10)', color: '#b91c1c', fontWeight: 700 }}>취소</span>
-        }
-        if (stType === 'approved') {
-          return <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 4, background: 'rgba(34,197,94,0.10)', color: '#15803d', fontWeight: 700 }}>승인</span>
-        }
-        if (stType === 'deposit') {
-          return <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 4, background: 'rgba(59,130,246,0.10)', color: '#1e40af', fontWeight: 700 }}>입금</span>
-        }
-        if (stType === 'withdrawal') {
-          return <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 4, background: 'rgba(245,158,11,0.10)', color: '#b45309', fontWeight: 700 }}>출금</span>
-        }
-        return <span style={{ fontSize: 11, color: '#cbd5e1' }}>—</span>
-      }
-    },
-    { key: 'matched', label: '매칭', width: 140,
-      sortBy: (r: any) => r.matched_car_number || r.matched_holder_name || r.client_name || '',
-      render: (r: any) => {
-      // 차량 매칭 우선, 없으면 직원
-      if (r.matched_car_number) {
-        return (
-          <div>
-            <div style={{ fontSize: 12, fontWeight: 600, color: '#1e40af' }}>🚗 {r.matched_car_number}</div>
-            {r.matched_car_model && <div style={{ fontSize: 10, color: '#94a3b8' }}>{r.matched_car_model}</div>}
+              ...GLASS.L3,
+              cursor: 'pointer', padding: '10px 14px', borderRadius: 12, minWidth: 150,
+              ...(selected ? { background: COLORS.bgViolet } : {}),
+              border: selected ? '1.5px solid #7c3aed' : `1px solid ${COLORS.borderViolet}`,
+            }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSecondary, whiteSpace: 'nowrap' }}>{alias}</span>
+              {info.holder && <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 8, background: 'rgba(124,58,237,0.08)', color: '#7c3aed', whiteSpace: 'nowrap' }}>{info.holder}</span>}
+            </div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: COLORS.textPrimary, whiteSpace: 'nowrap' }}>
+              {Math.round(info.sum).toLocaleString()}원
+            </div>
+            <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 2, whiteSpace: 'nowrap' }}>
+              이번 달 사용{info.car ? <span style={{ color: '#1e40af', fontWeight: 700 }}> · 🚗 {info.car}</span> : ''}
+            </div>
           </div>
         )
-      }
-      if (r.matched_holder_name && r.matched_holder_name !== '공용 (탁송팀)') {
-        return <span style={{ fontSize: 12, color: '#7c3aed' }}>👤 {r.matched_holder_name}</span>
-      }
-      if (r.client_name) {
-        return <span style={{ fontSize: 12, color: '#475569' }}>{r.client_name}</span>
-      }
-      return <span style={{ fontSize: 11, color: '#cbd5e1' }}>—</span>
-    }, hideOnMobile: true },
-    { key: 'source', label: '출처', width: 70, align: 'center',
-      sortBy: (r) => r.imported_from || '',
-      render: (r) =>
-      <span style={{ fontSize: 11, padding: '1px 6px', borderRadius: 4, background: r.imported_from === 'sms' ? COLORS.bgGreen : COLORS.bgBlue, color: r.imported_from === 'sms' ? COLORS.success : COLORS.info }}>
-        {r.imported_from === 'sms' ? 'SMS' : '엑셀'}
-      </span>,
-      hideOnMobile: true
-    },
-    { key: 'status', label: '매칭상태', width: 92, align: 'center',
-      sortBy: (r) => (!!r.related_type && !!r.related_id) ? 1 : 0,
-      render: (r) =>
-      <MatchBadge matched={!!r.related_type && !!r.related_id} />
-    },
-  ]
+      })}
+    </div>
+  ) : null
 
-  const cardMobile: MobileCardConfig<Transaction> = {
-    title: (r) => <span style={{ fontWeight: 600, fontSize: 14 }}>{fmtDate(r.transaction_date)} {r.description || '거래'}</span>,
-    subtitle: (r) => <span style={{ fontSize: 12, color: COLORS.textSecondary }}>{r.card_company} · {r.client_name || ''}</span>,
-    trailing: (r) => <span style={{ fontWeight: 700, fontSize: 14, color: COLORS.expense }}>{nf(r.amount)}원</span>,
-    badges: (r) => <MatchBadge matched={!!r.related_type} />,
-  }
-
-  // ── 자동매칭 탭 컬럼 ─────────────────────────────────
-
-  const matchColumns: TableColumn<MatchResult>[] = [
-    { key: 'date', label: '거래일', width: 90, render: (r) => <span style={{ fontSize: 13 }}>{fmtDate(r.txDate)}</span> },
-    { key: 'txName', label: '거래', render: (r) => (
-      <div>
-        <div style={{ fontSize: 13, fontWeight: 500 }}>{r.txName || '-'}</div>
-        <div style={{ fontSize: 12, color: COLORS.textMuted }}>{nf(r.txAmount)}원</div>
-      </div>
-    )},
-    { key: 'match', label: '매칭 대상', render: (r) => {
-      const typeLabels: Record<string, string> = { settlement: '정산', contract: '계약', car: '차량', employee: '직원', operation: '운영비' }
-      return (
-        <div>
-          <div style={{ fontSize: 13, fontWeight: 500 }}>
-            {r.match.name || '-'}
-            {r.matchMethod === 'ai' && <span style={{ marginLeft: 4, fontSize: 10, padding: '1px 4px', borderRadius: 3, background: COLORS.bgViolet, color: '#7c3aed', fontWeight: 600 }}>AI</span>}
-          </div>
-          <div style={{ fontSize: 12, color: COLORS.textMuted }}>
-            {typeLabels[r.match.type] || r.match.type} {r.match.amount ? `· ${nf(r.match.amount)}원` : ''}
-            {r.match.month ? ` · ${r.match.month}` : ''}
-          </div>
-          {r.aiReason && <div style={{ fontSize: 11, color: '#7c3aed', marginTop: 2 }}>{r.aiReason}</div>}
-        </div>
-      )
-    }},
-    { key: 'score', label: '신뢰도', width: 80, align: 'center', render: (r) => <ScoreBadge score={r.score} /> },
-    { key: 'select', label: '', width: 50, align: 'center', render: (r) => (
-      <input
-        type="checkbox"
-        checked={selectedMatches.has(r.transactionId)}
-        onChange={(e) => {
-          const next = new Set(selectedMatches)
-          e.target.checked ? next.add(r.transactionId) : next.delete(r.transactionId)
-          setSelectedMatches(next)
-        }}
-        style={{ width: 16, height: 16, cursor: 'pointer' }}
-      />
-    )},
-  ]
-
-  const matchMobile: MobileCardConfig<MatchResult> = {
-    title: (r) => <span style={{ fontWeight: 600, fontSize: 14 }}>{r.txName} → {r.match.name}</span>,
-    subtitle: (r) => <span style={{ fontSize: 12, color: COLORS.textSecondary }}>{fmtDate(r.txDate)} · {nf(r.txAmount)}원 → {nf(r.match.amount)}원</span>,
-    trailing: (r) => <ScoreBadge score={r.score} />,
-    badges: (r) => (
-      <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, cursor: 'pointer' }}>
-        <input
-          type="checkbox"
-          checked={selectedMatches.has(r.transactionId)}
-          onChange={(e) => {
-            const next = new Set(selectedMatches)
-            e.target.checked ? next.add(r.transactionId) : next.delete(r.transactionId)
-            setSelectedMatches(next)
-          }}
-        />
-        매칭 확인
-      </label>
-    ),
-  }
-
-  // ── 정산 연결 탭 컬럼 ─────────────────────────────────
-
-  const settlementColumns: TableColumn<Settlement>[] = [
-    { key: 'month', label: '정산월', width: 90, render: (r) => <span style={{ fontSize: 13, fontWeight: 600 }}>{r.settlement_month}</span> },
-    { key: 'name', label: '수령인', width: 120, render: (r) => <span style={{ fontSize: 13 }}>{r.recipient_name || '-'}</span> },
-    { key: 'amount', label: '금액', width: 120, align: 'right', render: (r) =>
-      <span style={{ fontWeight: 600, fontSize: 13 }}>{nf(Number(r.due_amount))}원</span>
-    },
-    { key: 'bank', label: '계좌', render: (r) =>
-      <span style={{ fontSize: 12, color: COLORS.textSecondary }}>{r.bank_name || ''} {r.account_number ? `*${String(r.account_number).slice(-4)}` : ''}</span>,
-      hideOnMobile: true
-    },
-    { key: 'type', label: '유형', width: 70, align: 'center', render: (r) =>
-      <span style={{ fontSize: 11, padding: '1px 6px', borderRadius: 4, background: COLORS.bgBlue, color: COLORS.info }}>{r.contract_type || '-'}</span>,
-      hideOnMobile: true
-    },
-    { key: 'status', label: '상태', width: 92, align: 'center', render: (r) => {
-      const isLinked = r.status === 'matched' || r.status === 'confirmed' || r.status === 'paid'
-      return (
-        <span style={{
-          ...pillStyle(isLinked ? 'success' : 'danger'),
-          fontSize: 11,
-        }}>
-          {isLinked ? '연결됨' : '미연결'}
-        </span>
-      )
-    }},
-    { key: 'action', label: '', width: 80, align: 'center', render: (r) =>
-      r.status === 'pending' ? (
-        <button
-          onClick={(e) => { e.stopPropagation(); openMatchCandidates(r.id) }}
-          style={{
-            ...BTN.sm,
-            background: COLORS.primary, color: '#fff', border: 'none', cursor: 'pointer',
-          }}
-        >
-          매칭
-        </button>
-      ) : (
-        <span style={{ fontSize: 11, color: COLORS.success }}>✓</span>
-      )
-    },
-  ]
-
-  const settlementMobile: MobileCardConfig<Settlement> = {
-    title: (r) => <span style={{ fontWeight: 600, fontSize: 14 }}>{r.settlement_month} · {r.recipient_name}</span>,
-    subtitle: (r) => <span style={{ fontSize: 12, color: COLORS.textSecondary }}>{r.bank_name || ''} · {r.contract_type}</span>,
-    trailing: (r) => <span style={{ fontWeight: 700, fontSize: 14 }}>{nf(Number(r.due_amount))}원</span>,
-    badges: (r) => {
-      const isLinked = r.status === 'matched' || r.status === 'confirmed' || r.status === 'paid'
-      return isLinked
-        ? <span style={{ ...pillStyle('success'), fontSize: 11 }}>연결됨</span>
-        : <button onClick={() => openMatchCandidates(r.id)} style={{ ...BTN.sm, background: COLORS.primary, color: '#fff', border: 'none', cursor: 'pointer' }}>매칭 검색</button>
-    },
-  }
+  // 툴바 우측 — 연결/구분 필터 + 업로드/전체삭제 (구 통장/카드 탭 툴바 이관)
+  const ledgerSelStyle = { padding: '7px 9px', borderRadius: 8, border: '1px solid rgba(0,0,0,0.12)', fontSize: 12, fontWeight: 700, color: COLORS.textPrimary } as const
+  const ledgerTrailing = (
+    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+      {ledgerFilter === 'bank' && bankAccountOptions.length > 0 && (
+        <select value={bankAccountPick} onChange={(e) => setBankAccountPick(e.target.value)} style={ledgerSelStyle}>
+          <option value="all">🏦 계좌 전체</option>
+          {bankAccountOptions.map((a) => <option key={a} value={a}>계좌 ****{a}</option>)}
+        </select>
+      )}
+      {ledgerFilter === 'card' && cardPickOptions.length > 0 && (
+        <select value={cardPick} onChange={(e) => setCardPick(e.target.value)} style={ledgerSelStyle}>
+          <option value="all">💳 카드 전체</option>
+          {cardPickOptions.map((a) => <option key={a} value={a}>{a}</option>)}
+        </select>
+      )}
+      {/* 연결(매칭) 필터 — 2026-07-08 사용자 명시 「연결된 부분들 필터」 */}
+      <select value={bankLinkPick} onChange={(e) => setBankLinkPick(e.target.value)} style={ledgerSelStyle}>
+        <option value="all">🔗 연결 전체</option>
+        <option value="linked">연결됨</option>
+        <option value="unlinked">미연결</option>
+        <option value="fmi_rental">대차 연결</option>
+        <option value="car">차량 연결</option>
+      </select>
+      {/* 관리 구분 필터 (V11) */}
+      {domains.length > 0 && (
+        <select value={domainPick} onChange={(e) => setDomainPick(e.target.value)} style={ledgerSelStyle}>
+          <option value="all">🗂 구분 전체</option>
+          <option value="none">미지정</option>
+          {domains.filter((x) => x.is_active).map((x) => <option key={x.code} value={x.code}>{x.label}</option>)}
+        </select>
+      )}
+      <button
+        onClick={() => { setUploadSource('excel_bank'); setShowUpload(true); setUploadPreview([]); setUploadResult(null); setUploadFiles([]); setUploadFileName(''); setUploadColumns({}); setSkippedFiles([]) }}
+        style={{ ...BTN.sm, background: COLORS.primary, color: '#fff', border: 'none', cursor: 'pointer' }}
+      >📤 통장 업로드</button>
+      <button
+        onClick={() => { setUploadSource('excel_card'); setShowUpload(true); setUploadPreview([]); setUploadResult(null); setUploadFiles([]); setUploadFileName(''); setUploadColumns({}); setSkippedFiles([]) }}
+        style={{ ...BTN.sm, background: '#7c3aed', color: '#fff', border: 'none', cursor: 'pointer' }}
+      >📤 카드 업로드</button>
+      {ledgerFilter === 'bank' && summary && summary.transactions.bank > 0 && (
+        <button onClick={() => deleteAndReupload('excel_bank')}
+          style={{ ...BTN.sm, background: '#fff', color: COLORS.danger, border: `1px solid rgba(239,68,68,0.3)`, cursor: 'pointer' }}
+        >🗑 통장 전체삭제</button>
+      )}
+      {ledgerFilter === 'card' && summary && summary.transactions.card > 0 && (
+        <button onClick={() => deleteAndReupload('excel_card')}
+          style={{ ...BTN.sm, background: '#fff', color: COLORS.danger, border: `1px solid rgba(239,68,68,0.3)`, cursor: 'pointer' }}
+        >🗑 카드 전체삭제</button>
+      )}
+    </div>
+  )
 
   // ═══ 렌더링 ═════════════════════════════════════════════
 
@@ -3888,7 +3549,7 @@ export default function BankCardPage() {
           </div>
         )}
 
-        {/* ──── 거래내역 탭 (통장+카드 통합 — REDESIGN) ──── */}
+        {/* ──── 거래내역 탭 (통장+카드 통합 — REDESIGN, 통장/카드 탭 흡수 2026-07-30) ──── */}
         {activeTab === 'ledger' && (
           <LedgerTab
             transactions={transactions}
@@ -3899,209 +3560,15 @@ export default function BankCardPage() {
             onAssignDomain={assignDomain}
             onCategoryChange={changeCategory}
             categoryOptions={categoryOptions}
+            filter={ledgerFilter}
+            onFilterChange={setLedgerFilter}
+            bankStrip={bankStrip}
+            cardStrip={cardStrip}
+            trailing={ledgerTrailing}
+            externalFilter={ledgerExternalFilter}
+            onSaveClientName={saveClientName}
           />
         )}
-
-        {/* ──── 통장 거래 탭 ──── */}
-        {activeTab === 'bank' && (
-          <>
-            {/* 관리자 요약 — 계좌별 현재 잔액 + 최근 30일 자동 검증 (2026-07-08 사용자 명시) */}
-            {bankAccountOptions.length > 0 && (
-              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
-                {bankAccountOptions.map((a) => {
-                  const s = bankAccountSummary.get(a)
-                  const v = acctVerify[a]
-                  const selected = bankAccountPick === a
-                  return (
-                    <div key={a}
-                      onClick={() => setBankAccountPick(selected ? 'all' : a)}
-                      style={{
-                        ...GLASS.L3,
-                        cursor: 'pointer', padding: '10px 14px', borderRadius: 12, minWidth: 172,
-                        ...(selected ? { background: COLORS.bgBlue } : {}),
-                        border: selected ? `1.5px solid ${COLORS.primary}` : `1px solid ${COLORS.borderBlue}`,
-                      }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                        <span style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSecondary }}>계좌 ****{a}</span>
-                        {v && (
-                          <span
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              // 배지 검사와 같은 기간(최근 30일)으로 즉시 실행 — 결과가 배지 숫자와 일치
-                              const to = new Date().toISOString().slice(0, 10)
-                              const from = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10)
-                              setRcAccount(a); setRcFrom(from); setRcTo(to); setReconcileOpen(true)
-                              runReconcile({ account: a, from, to })
-                            }}
-                            title={v.ok ? '최근 30일 입출금과 잔액이 이어집니다' : `최근 30일 중 ${v.breaks}곳에서 잔액이 안 이어집니다 — 눌러서 확인`}
-                            style={{
-                              fontSize: 10, fontWeight: 800, padding: '1px 6px', borderRadius: 8, whiteSpace: 'nowrap',
-                              background: v.ok ? 'rgba(22,163,74,0.10)' : 'rgba(239,68,68,0.10)',
-                              color: v.ok ? '#15803d' : '#dc2626',
-                            }}>{v.ok ? '✅ 검증됨' : `⚠ ${v.breaks}곳 확인`}</span>
-                        )}
-                      </div>
-                      <div style={{ fontSize: 16, fontWeight: 800, color: COLORS.textPrimary, whiteSpace: 'nowrap' }}>
-                        {s?.balance != null ? `${Math.round(s.balance).toLocaleString()}원` : '잔액 정보 없음'}
-                      </div>
-                      {s?.balanceDate && (
-                        <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 2 }}>기준 {String(s.balanceDate).slice(0, 10)}</div>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-            <DcToolbar
-              search={search}
-              onSearchChange={setSearch}
-              placeholder="적요, 거래처 검색..."
-              filters={[
-                { key: 'all', label: '전체', count: transactions.filter(isBankTx).length },
-                { key: 'income', label: '입금', count: transactions.filter(t => isBankTx(t) && t.type === 'income').length },
-                { key: 'expense', label: '출금', count: transactions.filter(t => isBankTx(t) && t.type === 'expense').length },
-              ]}
-              activeFilter={bankFilter}
-              onFilterChange={setBankFilter}
-              trailing={
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-                  {/* PR-ACCOUNT — 계좌별 보기 */}
-                  {bankAccountOptions.length > 0 && (
-                    <select value={bankAccountPick} onChange={(e) => setBankAccountPick(e.target.value)}
-                      style={{ padding: '7px 9px', borderRadius: 8, border: '1px solid rgba(0,0,0,0.12)', fontSize: 12, fontWeight: 700, color: COLORS.textPrimary }}>
-                      <option value="all">🏦 계좌 전체</option>
-                      {bankAccountOptions.map((a) => <option key={a} value={a}>계좌 ****{a}</option>)}
-                    </select>
-                  )}
-                  {/* 🧮 잔액 맞춰보기 버튼 제거 (2026-07-08) — 상단 계좌 카드의 자동 검증 배지로 대체 (배지 클릭 = 상세 확인) */}
-                  {/* 연결(매칭) 필터 — 2026-07-08 사용자 명시 「연결된 부분들 필터」 */}
-                  <select value={bankLinkPick} onChange={(e) => setBankLinkPick(e.target.value)}
-                    style={{ padding: '7px 9px', borderRadius: 8, border: '1px solid rgba(0,0,0,0.12)', fontSize: 12, fontWeight: 700, color: COLORS.textPrimary }}>
-                    <option value="all">🔗 연결 전체</option>
-                    <option value="linked">연결됨</option>
-                    <option value="unlinked">미연결</option>
-                    <option value="fmi_rental">대차 연결</option>
-                    <option value="car">차량 연결</option>
-                  </select>
-                  {/* 관리 구분 필터 (V11) */}
-                  {domains.length > 0 && (
-                    <select value={domainPick} onChange={(e) => setDomainPick(e.target.value)}
-                      style={{ padding: '7px 9px', borderRadius: 8, border: '1px solid rgba(0,0,0,0.12)', fontSize: 12, fontWeight: 700, color: COLORS.textPrimary }}>
-                      <option value="all">🗂 구분 전체</option>
-                      <option value="none">미지정</option>
-                      {domains.filter((x) => x.is_active).map((x) => <option key={x.code} value={x.code}>{x.label}</option>)}
-                    </select>
-                  )}
-                  <button
-                    onClick={() => { setUploadSource('excel_bank'); setShowUpload(true); setUploadPreview([]); setUploadResult(null); setUploadFiles([]); setUploadFileName(''); setUploadColumns({}); setSkippedFiles([]) }}
-                    style={{ ...BTN.sm, background: COLORS.primary, color: '#fff', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
-                  >
-                    📤 엑셀 업로드
-                  </button>
-                  {summary && summary.transactions.bank > 0 && (
-                    <button
-                      onClick={() => deleteAndReupload('excel_bank')}
-                      style={{ ...BTN.sm, background: '#fff', color: COLORS.danger, border: `1px solid rgba(239,68,68,0.3)`, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
-                    >
-                      🗑 통장 전체삭제
-                    </button>
-                  )}
-                </div>
-              }
-            />
-            <NeuDataTable
-              columns={bankColumns}
-              data={bankTransactions}
-              rowKey={(r) => r.id}
-              mobileCard={bankMobile}
-              loading={loading}
-              emptyIcon="🏦"
-              emptyMessage="통장 거래 데이터가 없습니다"
-              defaultSort={{ key: 'date', dir: 'desc' }}
-            />
-          </>
-        )}
-
-        {/* ──── 카드 거래 탭 ──── */}
-        {activeTab === 'card' && (
-          <>
-            {/* 관리자 요약 — 카드별 이번 달 누적 사용액 (2026-07-08 사용자 명시) */}
-            {cardMonthSummary.size > 0 && (
-              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
-                {Array.from(cardMonthSummary.entries()).sort((x, y) => y[1].sum - x[1].sum).slice(0, 10).map(([alias, info]) => {
-                  const selected = cardPick === alias
-                  return (
-                    <div key={alias}
-                      onClick={() => setCardPick(selected ? 'all' : alias)}
-                      style={{
-                        ...GLASS.L3,
-                        cursor: 'pointer', padding: '10px 14px', borderRadius: 12, minWidth: 150,
-                        ...(selected ? { background: COLORS.bgViolet } : {}),
-                        border: selected ? '1.5px solid #7c3aed' : `1px solid ${COLORS.borderViolet}`,
-                      }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                        <span style={{ fontSize: 11, fontWeight: 700, color: COLORS.textSecondary, whiteSpace: 'nowrap' }}>{alias}</span>
-                        {info.holder && <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 8, background: 'rgba(124,58,237,0.08)', color: '#7c3aed', whiteSpace: 'nowrap' }}>{info.holder}</span>}
-                      </div>
-                      <div style={{ fontSize: 16, fontWeight: 800, color: COLORS.textPrimary, whiteSpace: 'nowrap' }}>
-                        {Math.round(info.sum).toLocaleString()}원
-                      </div>
-                      <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 2, whiteSpace: 'nowrap' }}>
-                        이번 달 사용{info.car ? <span style={{ color: '#1e40af', fontWeight: 700 }}> · 🚗 {info.car}</span> : ''}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-            <DcToolbar
-              search={search}
-              onSearchChange={setSearch}
-              placeholder="가맹점, 카드사 검색..."
-              filters={[
-                { key: 'all', label: '전체' },
-                { key: 'kb', label: 'KB' },
-                { key: '우리', label: '우리' },
-                { key: '현대', label: '현대' },
-              ]}
-              activeFilter={cardFilter}
-              onFilterChange={setCardFilter}
-              trailing={
-                <div style={{ display: 'flex', gap: 6 }}>
-                  <button
-                    onClick={() => { setUploadSource('excel_card'); setShowUpload(true); setUploadPreview([]); setUploadResult(null); setUploadFiles([]); setUploadFileName(''); setUploadColumns({}); setSkippedFiles([]) }}
-                    style={{ ...BTN.sm, background: COLORS.primary, color: '#fff', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
-                  >
-                    📤 엑셀 업로드
-                  </button>
-                  {/* 🔍 매칭 진단 제거 (2026-07-08 사용자 명시 「확실하지 않은 기능은 혼란」) — 매핑 상태는 매핑 관리 탭에서 */}
-                  {/* 일회성 정리 도구 (📛 거래 재생성 / 🔧 SMS 강제 매칭) 는 admin 영역으로 이동 — 일반 사용 패턴 X */}
-                  {summary && summary.transactions.card > 0 && (
-                    <button
-                      onClick={() => deleteAndReupload('excel_card')}
-                      style={{ ...BTN.sm, background: '#fff', color: COLORS.danger, border: `1px solid rgba(239,68,68,0.3)`, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
-                    >
-                      🗑 카드 전체삭제
-                    </button>
-                  )}
-                </div>
-              }
-            />
-            <NeuDataTable
-              columns={cardColumns}
-              data={cardTransactions}
-              rowKey={(r) => r.id}
-              mobileCard={cardMobile}
-              loading={loading}
-              emptyIcon="💳"
-              emptyMessage="카드 거래 데이터가 없습니다"
-              defaultSort={{ key: 'date', dir: 'desc' }}
-            />
-          </>
-        )}
-
-
-
 
         {/* ──── SMS 수집 탭 ──── */}
         {activeTab === 'sms' && (
