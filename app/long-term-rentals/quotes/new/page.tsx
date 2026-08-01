@@ -78,6 +78,17 @@ export default function NewQuotePage() {
   const [calcErr, setCalcErr] = useState<string | null>(null)
   const calcDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  // 중고 매입 (부가세 환급) — 실취득원가 = 입력 총액 / 1.1 (2026-08-01, QUOTE-ENGINE-NOTES)
+  const [usedPurchase, setUsedPurchase] = useState(false)
+  const effectivePurchase = (() => {
+    const p = Number(form.purchase_price)
+    if (!Number.isFinite(p) || p <= 0) return null
+    return usedPurchase ? Math.round(p / 1.1) : p
+  })()
+
+  // 기간 구성 비교 (36/48/60 같은 조건)
+  const [compareResults, setCompareResults] = useState<Array<{ term: number; rent: number | null; margin: number | null }> | null>(null)
+
   // AI 캡쳐
   const [aiUploading, setAiUploading] = useState(false)
   const [aiResult, setAiResult] = useState<any | null>(null)
@@ -95,40 +106,58 @@ export default function NewQuotePage() {
     if (!form.purchase_price || !form.vehicle_brand || !form.vehicle_model ||
         !form.vehicle_fuel || !form.vehicle_engine_cc || !form.months ||
         !form.annual_km || !form.rent_type) {
-      setCalcResult(null); setCalcErr(null); return
+      setCalcResult(null); setCalcErr(null); setCompareResults(null); return
     }
     setCalcLoading(true); setCalcErr(null)
     try {
       const headers = { ...(await getAuthHeader()), 'Content-Type': 'application/json' }
+      const p = Number(form.purchase_price)
+      const effPrice = usedPurchase && Number.isFinite(p) && p > 0 ? Math.round(p / 1.1) : p
+      const baseBody = {
+        purchase_price: effPrice,
+        brand: form.vehicle_brand,
+        model: form.vehicle_model,
+        fuel: form.vehicle_fuel,
+        engine_cc: Number(form.vehicle_engine_cc),
+        term_months: Number(form.months),
+        annual_km: Number(form.annual_km),
+        rent_type: form.rent_type,
+        driver_age: form.driver_age || undefined,
+        residual_rate: form.residual_rate !== '' ? Number(form.residual_rate) : undefined,
+        deposit: form.deposit !== '' ? Number(form.deposit) : undefined,
+        upfront_months: form.upfront_months !== '' ? Number(form.upfront_months) : undefined,
+      }
       const res = await fetch('/api/lt-quotes/calculate', {
-        method: 'POST', headers,
-        body: JSON.stringify({
-          purchase_price: Number(form.purchase_price),
-          brand: form.vehicle_brand,
-          model: form.vehicle_model,
-          fuel: form.vehicle_fuel,
-          engine_cc: Number(form.vehicle_engine_cc),
-          term_months: Number(form.months),
-          annual_km: Number(form.annual_km),
-          rent_type: form.rent_type,
-          driver_age: form.driver_age || undefined,
-          residual_rate: form.residual_rate !== '' ? Number(form.residual_rate) : undefined,
-          deposit: form.deposit !== '' ? Number(form.deposit) : undefined,
-          upfront_months: form.upfront_months !== '' ? Number(form.upfront_months) : undefined,
-        }),
+        method: 'POST', headers, body: JSON.stringify(baseBody),
       })
       const json = await res.json().catch(() => ({}))
       if (!res.ok || json?.error) {
-        setCalcResult(null); setCalcErr(json?.error || '산출 실패')
+        setCalcResult(null); setCalcErr(json?.error || '산출 실패'); setCompareResults(null)
       } else {
         setCalcResult(json.data as CalcResult)
+        // 기간 구성 비교 — 36/48/60 병렬 산출 (현재 기간은 방금 결과 재사용)
+        const terms = [36, 48, 60]
+        Promise.all(terms.map(async (t) => {
+          if (t === Number(form.months)) {
+            const d = json.data as CalcResult
+            return { term: t, rent: d.suggested_rent_with_vat, margin: d.margin_rate }
+          }
+          try {
+            const r = await fetch('/api/lt-quotes/calculate', {
+              method: 'POST', headers, body: JSON.stringify({ ...baseBody, term_months: t }),
+            })
+            const j = await r.json().catch(() => ({}))
+            if (!r.ok || j?.error) return { term: t, rent: null, margin: null }
+            return { term: t, rent: (j.data as CalcResult).suggested_rent_with_vat, margin: (j.data as CalcResult).margin_rate }
+          } catch { return { term: t, rent: null, margin: null } }
+        })).then(setCompareResults)
       }
     } catch (e) {
-      setCalcResult(null); setCalcErr((e as Error)?.message || '산출 오류')
+      setCalcResult(null); setCalcErr((e as Error)?.message || '산출 오류'); setCompareResults(null)
     } finally { setCalcLoading(false) }
   }, [form.purchase_price, form.vehicle_brand, form.vehicle_model, form.vehicle_fuel,
        form.vehicle_engine_cc, form.months, form.annual_km, form.rent_type,
-       form.driver_age, form.residual_rate, form.deposit, form.upfront_months])
+       form.driver_age, form.residual_rate, form.deposit, form.upfront_months, usedPurchase])
 
   useEffect(() => {
     if (calcDebounceRef.current) clearTimeout(calcDebounceRef.current)
@@ -208,7 +237,8 @@ export default function NewQuotePage() {
         vehicle_color_int: form.vehicle_color_int.trim() || null,
         vehicle_options_text: form.vehicle_options_text.trim() || null,
         new_car_price_id: form.new_car_price_id || null,
-        purchase_price: form.purchase_price === '' ? null : Number(form.purchase_price),
+        // 중고 매입 시 부가세 환급 반영한 실취득원가로 저장 (총액은 메모에 남김)
+        purchase_price: form.purchase_price === '' ? null : (usedPurchase && effectivePurchase != null ? effectivePurchase : Number(form.purchase_price)),
         market_price: form.market_price === '' ? null : Number(form.market_price),
         start_date: form.start_date || null,
         months: form.months === '' ? null : Number(form.months),
@@ -222,7 +252,9 @@ export default function NewQuotePage() {
         insurance_option: form.insurance_option.trim() || null,
         valid_until: form.valid_until || null,
         owner_name: form.owner_name.trim() || null,
-        memo: form.memo.trim() || null,
+        memo: (usedPurchase && form.purchase_price !== ''
+          ? `${form.memo.trim() ? form.memo.trim() + '\n' : ''}중고 매입 — 부가세 환급 반영 (매입 총액 ${Number(form.purchase_price).toLocaleString('ko-KR')}원)`
+          : form.memo.trim()) || null,
       }
       if (calcResult) {
         body.cost_breakdown_json = calcResult.cost_breakdown
@@ -379,13 +411,26 @@ export default function NewQuotePage() {
             </div>
 
             <div style={{ ...GLASS.L3, padding: 12, borderRadius: 10, border: '1px solid rgba(16,185,129,0.25)' }}>
-              <div style={{ fontSize: 11, fontWeight: 800, color: '#065f46', marginBottom: 8 }}>💵 매입가 (원가 산출 핵심)</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                <div style={{ fontSize: 11, fontWeight: 800, color: '#065f46' }}>매입가 (원가 산출 핵심)</div>
+                <div style={{ flex: 1 }} />
+                <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, color: '#5b626e', cursor: 'pointer' }}>
+                  <input type="checkbox" checked={usedPurchase} onChange={(e) => setUsedPurchase(e.target.checked)}
+                    style={{ width: 13, height: 13, accentColor: '#2563eb', cursor: 'pointer' }} />
+                  중고 매입 (부가세 환급 반영)
+                </label>
+              </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                 <div><label style={labelStyle}>매입가 (원, VAT 포함) *</label>
                   <input type="number" value={form.purchase_price} onChange={(e) => fld('purchase_price', e.target.value)} placeholder="할인 후 실제 매입가" style={inputStyle} /></div>
                 <div><label style={labelStyle}>시장가 (참조)</label>
                   <input type="number" value={form.market_price} onChange={(e) => fld('market_price', e.target.value)} placeholder="출고가" style={inputStyle} /></div>
               </div>
+              {usedPurchase && effectivePurchase != null && (
+                <div style={{ marginTop: 8, fontSize: 11.5, color: '#15803d', fontWeight: 600 }}>
+                  환급 후 실취득원가 {effectivePurchase.toLocaleString('ko-KR')}원으로 계산합니다 (환급 예상 {(Number(form.purchase_price) - effectivePurchase).toLocaleString('ko-KR')}원)
+                </div>
+              )}
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
@@ -442,8 +487,40 @@ export default function NewQuotePage() {
           </div>
 
           {/* 우측 — 실시간 산출 (sticky) */}
-          <div style={{ position: 'sticky', top: 16, alignSelf: 'flex-start' }}>
-            <CostSummaryPanel result={calcResult} loading={calcLoading} err={calcErr} onApply={applyCalc} />
+          <div style={{ position: 'sticky', top: 16, alignSelf: 'flex-start', display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <CostSummaryPanel
+              result={calcResult} loading={calcLoading} err={calcErr} onApply={applyCalc}
+              negotiatedWithVat={form.monthly_fee !== '' ? Number(form.monthly_fee) : null}
+            />
+
+            {/* 기간 구성 비교 — 같은 조건으로 36/48/60개월 (2026-08-01) */}
+            {compareResults && (
+              <div style={{ background: '#fff', border: '1px solid #e6e8ec', borderRadius: 10, padding: 11, boxShadow: '0 1px 2px rgba(16,24,40,0.05)' }}>
+                <div style={{ fontSize: 10, fontWeight: 800, color: '#5b626e', marginBottom: 7 }}>기간 구성 비교 (같은 조건)</div>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
+                  <thead><tr>
+                    {['기간', '적정 월렌트료(VAT포함)', '마진'].map((h, i) => (
+                      <th key={h} style={{ textAlign: i === 0 ? 'left' : 'right', color: '#9aa1ad', fontWeight: 600, paddingBottom: 5 }}>{h}</th>
+                    ))}
+                  </tr></thead>
+                  <tbody>
+                    {compareResults.map((c) => (
+                      <tr key={c.term} onClick={() => fld('months', String(c.term))}
+                        style={{ cursor: 'pointer', background: String(c.term) === form.months ? '#eff4ff' : 'transparent' }}>
+                        <td style={{ padding: '4px 4px', fontWeight: String(c.term) === form.months ? 700 : 500 }}>{c.term}개월{String(c.term) === form.months ? ' ←' : ''}</td>
+                        <td style={{ padding: '4px 4px', textAlign: 'right', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+                          {c.rent != null ? `${c.rent.toLocaleString('ko-KR')}원` : '—'}
+                        </td>
+                        <td style={{ padding: '4px 4px', textAlign: 'right', color: (c.margin ?? 0) >= 10 ? '#15803d' : (c.margin ?? 0) >= 5 ? '#b45309' : '#dc2626', fontWeight: 600 }}>
+                          {c.margin != null ? `${c.margin.toFixed(1)}%` : '—'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <div style={{ fontSize: 9.5, color: '#9aa1ad', marginTop: 5 }}>행 클릭 시 해당 기간으로 전환됩니다</div>
+              </div>
+            )}
           </div>
         </div>
       </div>

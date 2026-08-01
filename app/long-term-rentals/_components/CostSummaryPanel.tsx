@@ -35,6 +35,8 @@ interface Props {
   loading?: boolean
   err?: string | null
   onApply?: () => void
+  /** 협상가(월 렌트료 VAT 포함 입력값) — 수익/손실 경계 게이지 표시용 (2026-08-01) */
+  negotiatedWithVat?: number | null
 }
 
 const DOT: Record<string, string> = {
@@ -46,7 +48,7 @@ const SOURCE_LABEL: Record<string, string> = {
   db: 'DB 기준', calc: '계산', fallback: '기본값', manual: '직접입력',
 }
 
-export default function CostSummaryPanel({ result, loading, err, onApply }: Props) {
+export default function CostSummaryPanel({ result, loading, err, onApply, negotiatedWithVat }: Props) {
   const [detailOpen, setDetailOpen] = useState(false)
   const [hidden, setHidden] = useState<Set<string>>(new Set())
 
@@ -108,6 +110,47 @@ export default function CostSummaryPanel({ result, loading, err, onApply }: Prop
               </button>
             )}
           </div>
+
+          {/* 수익/손실 경계 게이지 — 협상가 입력 시 (2026-08-01, QUOTE-ENGINE-NOTES 3장) */}
+          {negotiatedWithVat != null && negotiatedWithVat > 0 && (() => {
+            const breakevenWithVat = Math.round(result.cost_breakdown.total * 1.1)
+            const negotiatedExcl = negotiatedWithVat / 1.1
+            const negMargin = negotiatedExcl > 0
+              ? Math.round(((negotiatedExcl - result.cost_breakdown.total) / negotiatedExcl) * 1000) / 10
+              : 0
+            const zone = negotiatedWithVat < breakevenWithVat ? 'loss'
+              : negotiatedWithVat < result.suggested_rent_with_vat ? 'thin'
+              : 'ok'
+            const zoneMeta = {
+              loss: { label: '손실 — 원가 미만', bg: 'rgba(220,38,38,0.08)', bd: 'rgba(220,38,38,0.4)', fg: '#dc2626' },
+              thin: { label: '저마진 — 원가~적정가 사이', bg: 'rgba(217,119,6,0.08)', bd: 'rgba(217,119,6,0.4)', fg: '#b45309' },
+              ok:   { label: '정상 — 적정가 이상', bg: 'rgba(22,163,74,0.08)', bd: 'rgba(22,163,74,0.4)', fg: '#15803d' },
+            }[zone]
+            // 게이지 위치: 손익분기 = 40%, 적정가 = 75% 지점 기준 선형 배치
+            const lo = breakevenWithVat * 0.85
+            const hi = Math.max(result.suggested_rent_with_vat * 1.15, negotiatedWithVat * 1.02)
+            const pos = (v: number) => Math.min(98, Math.max(2, ((v - lo) / (hi - lo)) * 100))
+            return (
+              <div style={{ padding: 11, borderRadius: 10, background: zoneMeta.bg, border: `1px solid ${zoneMeta.bd}` }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 6 }}>
+                  <span style={{ fontWeight: 800, color: zoneMeta.fg }}>{zoneMeta.label}</span>
+                  <span style={{ fontWeight: 700, color: '#1e293b' }}>협상가 마진 {negMargin}%</span>
+                </div>
+                <div style={{ position: 'relative', height: 8, borderRadius: 4, overflow: 'hidden', background: 'linear-gradient(90deg, #dc2626 0%, #dc2626 ' + pos(breakevenWithVat) + '%, #d97706 ' + pos(breakevenWithVat) + '%, #d97706 ' + pos(result.suggested_rent_with_vat) + '%, #16a34a ' + pos(result.suggested_rent_with_vat) + '%, #16a34a 100%)' }}>
+                  <div style={{ position: 'absolute', top: 0, bottom: 0, left: `${pos(negotiatedWithVat)}%`, width: 3, background: '#1a1d23', borderRadius: 2 }} />
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9.5, color: '#64748b', marginTop: 4 }}>
+                  <span>손익분기 {breakevenWithVat.toLocaleString('ko-KR')}원</span>
+                  <span>적정가 {result.suggested_rent_with_vat.toLocaleString('ko-KR')}원</span>
+                </div>
+                {zone === 'loss' && (
+                  <div style={{ fontSize: 10.5, color: '#dc2626', marginTop: 6, fontWeight: 600 }}>
+                    이 가격으로 계약하면 구조적으로 적자입니다. 사유가 있다면 메모에 남겨 주세요.
+                  </div>
+                )}
+              </div>
+            )
+          })()}
 
           {/* 시장 표준가 참고 */}
           {mref && mref.monthly_with_vat > 0 && (
