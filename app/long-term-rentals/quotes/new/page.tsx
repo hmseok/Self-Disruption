@@ -89,6 +89,7 @@ export default function NewQuotePage() {
   // 기간 구성 비교 (36/48/60 같은 조건)
   const [compareResults, setCompareResults] = useState<Array<{ term: number; rent: number | null; margin: number | null }> | null>(null)
 
+
   // AI 캡쳐
   const [aiUploading, setAiUploading] = useState(false)
   const [aiResult, setAiResult] = useState<any | null>(null)
@@ -100,6 +101,51 @@ export default function NewQuotePage() {
   const showToast = useCallback((m: { type: 'ok' | 'err'; text: string }) => {
     setToast(m); setTimeout(() => setToast(null), 4500)
   }, [])
+
+  // 빠른 시작 프리셋 — 최근 견적의 차량 구성 재사용 (2026-08-01 사용자 요청: 기본 세팅 선택)
+  const [presets, setPresets] = useState<Array<{
+    label: string; vehicle_brand: string; vehicle_model: string; vehicle_trim: string
+    vehicle_fuel: string; vehicle_engine_cc: string; purchase_price: string; market_price: string
+    months: string; annual_km: string; rent_type: string
+  }>>([])
+  useEffect(() => {
+    ;(async () => {
+      try {
+        const headers = await getAuthHeader()
+        const res = await fetch('/api/lt-quotes?status=all', { headers })
+        const json = await res.json().catch(() => ({}))
+        if (!Array.isArray(json?.data)) return
+        const seen = new Set<string>()
+        const list: typeof presets = []
+        for (const q of json.data) {
+          if (!q.vehicle_brand || !q.vehicle_model || !q.purchase_price) continue
+          const key = `${q.vehicle_brand}|${q.vehicle_model}|${q.vehicle_trim || ''}`
+          if (seen.has(key)) continue
+          seen.add(key)
+          list.push({
+            label: `${q.vehicle_brand} ${q.vehicle_model}${q.vehicle_trim ? ' ' + q.vehicle_trim : ''}`,
+            vehicle_brand: q.vehicle_brand, vehicle_model: q.vehicle_model, vehicle_trim: q.vehicle_trim || '',
+            vehicle_fuel: q.vehicle_fuel || 'gasoline', vehicle_engine_cc: q.vehicle_engine_cc != null ? String(q.vehicle_engine_cc) : '',
+            purchase_price: String(q.purchase_price), market_price: q.market_price != null ? String(q.market_price) : '',
+            months: q.months != null ? String(q.months) : '36', annual_km: q.annual_km != null ? String(q.annual_km) : '20000',
+            rent_type: q.rent_type || 'return',
+          })
+          if (list.length >= 6) break
+        }
+        setPresets(list)
+      } catch { /* 프리셋 로드 실패 — 무시 */ }
+    })()
+  }, [])
+  const applyPreset = useCallback((p: typeof presets[number]) => {
+    setForm((f) => ({
+      ...f,
+      vehicle_brand: p.vehicle_brand, vehicle_model: p.vehicle_model, vehicle_trim: p.vehicle_trim,
+      vehicle_fuel: p.vehicle_fuel, vehicle_engine_cc: p.vehicle_engine_cc,
+      purchase_price: p.purchase_price, market_price: p.market_price,
+      months: p.months, annual_km: p.annual_km, rent_type: p.rent_type,
+    }))
+    showToast({ type: 'ok', text: `${p.label} 구성을 불러왔습니다 — 고객 정보만 채우거나 그대로 보관하세요` })
+  }, [showToast])
 
   // 실시간 자동 산출 (디바운스 300ms)
   const runCalculate = useCallback(async () => {
@@ -212,16 +258,16 @@ export default function NewQuotePage() {
     showToast({ type: 'ok', text: `${t.name} 적용` })
   }, [aiResult, showToast])
 
-  // 저장
+  // 저장 — 고객명 비우면 「미정」 임의 견적으로 보관 (2026-08-01 사용자 요청:
+  //   금액만 알아보는 문의용 임의 견적 → 나중에 실제 고객과 매칭)
   const save = useCallback(async () => {
-    if (!form.customer_name.trim()) { setMsg('고객명은 필수입니다'); return }
     setSaving(true); setMsg(null)
     try {
       const headers = { ...(await getAuthHeader()), 'Content-Type': 'application/json' }
       const body: Record<string, unknown> = {
         quote_no: form.quote_no.trim() || null,
         contract_type: form.contract_type, rent_type: form.rent_type,
-        customer_name: form.customer_name.trim(),
+        customer_name: form.customer_name.trim() || '미정',
         customer_phone: form.customer_phone.trim() || null,
         customer_email: form.customer_email.trim() || null,
         customer_company: form.customer_company.trim() || null,
@@ -303,6 +349,19 @@ export default function NewQuotePage() {
           </div>
         )}
 
+        {/* 빠른 시작 — 최근 견적 구성 재사용 (외부 카탈로그·AI 조사 데이터는 차량 섹션에서) */}
+        {presets.length > 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 14 }}>
+            <span style={{ fontSize: 12, color: '#9aa1ad' }}>빠른 시작</span>
+            {presets.map((p, i) => (
+              <button key={i} onClick={() => applyPreset(p)}
+                style={{ border: '1px solid #e6e8ec', background: '#fff', borderRadius: 99, padding: '6px 13px', fontSize: 12.5, fontWeight: 500, color: '#5b626e', cursor: 'pointer' }}>
+                {p.label} · {Number(p.purchase_price).toLocaleString('ko-KR')}원
+              </button>
+            ))}
+          </div>
+        )}
+
         <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 400px', gap: 16, alignItems: 'flex-start' }}>
           {/* 좌측 — 입력 */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -324,8 +383,8 @@ export default function NewQuotePage() {
             <div style={{ ...GLASS.L3, padding: 12, borderRadius: 10, border: `1px solid ${COLORS.borderBlue}` }}>
               <div style={{ fontSize: 11, fontWeight: 800, color: COLORS.primary, marginBottom: 8 }}>👤 고객 정보</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                <div><label style={labelStyle}>고객명 *</label>
-                  <input value={form.customer_name} onChange={(e) => fld('customer_name', e.target.value)} placeholder="필수" style={inputStyle} /></div>
+                <div><label style={labelStyle}>고객명 (비우면 임의 견적으로 보관)</label>
+                  <input value={form.customer_name} onChange={(e) => fld('customer_name', e.target.value)} placeholder="미정이면 비워두세요" style={inputStyle} /></div>
                 <div><label style={labelStyle}>연락처</label>
                   <input value={form.customer_phone} onChange={(e) => fld('customer_phone', e.target.value)} placeholder="010-…" style={inputStyle} /></div>
                 <div><label style={labelStyle}>이메일</label>

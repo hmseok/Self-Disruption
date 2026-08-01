@@ -75,6 +75,11 @@ export default function QuotesTab() {
   const [delTarget, setDelTarget] = useState<QuoteRow | null>(null)
   const [delBusy, setDelBusy] = useState(false)
 
+  // 고객 매칭 (임의 견적 → 실제 고객 연결, 2026-08-01)
+  const [matchTarget, setMatchTarget] = useState<QuoteRow | null>(null)
+  const [matchForm, setMatchForm] = useState({ name: '', phone: '', company: '' })
+  const [matchBusy, setMatchBusy] = useState(false)
+
   // 토스트
   const [toast, setToast] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
   const showToast = useCallback((m: { type: 'ok' | 'err'; text: string }) => {
@@ -104,6 +109,30 @@ export default function QuotesTab() {
   // 작성/상세는 풀 페이지
   const openCreate = useCallback(() => router.push('/long-term-rentals/quotes/new'), [router])
   const openDetail = useCallback((r: QuoteRow) => router.push(`/long-term-rentals/quotes/${r.id}`), [router])
+
+  const runMatch = useCallback(async () => {
+    if (!matchTarget) return
+    if (!matchForm.name.trim()) { showToast({ type: 'err', text: '고객명을 입력해 주세요' }); return }
+    setMatchBusy(true)
+    try {
+      const headers = { ...(await getAuthHeader()), 'Content-Type': 'application/json' }
+      const res = await fetch(`/api/lt-quotes/${matchTarget.id}`, {
+        method: 'PATCH', headers,
+        body: JSON.stringify({
+          customer_name: matchForm.name.trim(),
+          customer_phone: matchForm.phone.trim() || null,
+          customer_company: matchForm.company.trim() || null,
+        }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || json?.error) throw new Error(json?.error || '매칭 실패')
+      setMatchTarget(null); setMatchForm({ name: '', phone: '', company: '' })
+      showToast({ type: 'ok', text: '고객을 연결했습니다' })
+      refresh()
+    } catch (e) {
+      showToast({ type: 'err', text: (e as Error)?.message || '매칭 오류' })
+    } finally { setMatchBusy(false) }
+  }, [matchTarget, matchForm, refresh, showToast])
 
   const runDelete = useCallback(async () => {
     if (!delTarget) return
@@ -172,11 +201,17 @@ export default function QuotesTab() {
         </span>
       },
     },
-    { key: 'customer', label: '고객', width: 160, sortBy: (r) => r.customer_name || '',
-      render: (r) => <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: 160, fontSize: 13 }}>
-        <span style={{ fontWeight: 600 }}>{r.customer_name}</span>
-        {r.customer_company ? <span style={{ color: COLORS.textMuted }}> · {r.customer_company}</span> : null}
-      </span>,
+    { key: 'customer', label: '고객', width: 170, sortBy: (r) => r.customer_name || '',
+      render: (r) => r.customer_name === '미정'
+        ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 6, background: COLORS.bgViolet, color: '#6d28d9' }}>임의 견적</span>
+            <button onClick={(e) => { e.stopPropagation(); setMatchTarget(r); setMatchForm({ name: '', phone: r.customer_phone || '', company: '' }) }}
+              style={{ fontSize: 11, fontWeight: 600, padding: '2px 9px', borderRadius: 6, cursor: 'pointer', background: '#fff', color: COLORS.primary, border: `1px solid ${COLORS.borderBlue}` }}>고객 연결</button>
+          </span>
+        : <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: 170, fontSize: 13 }}>
+            <span style={{ fontWeight: 600 }}>{r.customer_name}</span>
+            {r.customer_company ? <span style={{ color: COLORS.textMuted }}> · {r.customer_company}</span> : null}
+          </span>,
     },
     { key: 'vehicle', label: '차량', width: 200, sortBy: (r) => r.vehicle_car_number || `${r.vehicle_brand} ${r.vehicle_model}`,
       render: (r) => {
@@ -276,6 +311,47 @@ export default function QuotesTab() {
       <div style={{ marginTop: 12, fontSize: 12, color: COLORS.textMuted }}>
         매입가·차종·기간을 입력하면 견적 작성 화면 우측에서 원가·마진이 실시간으로 계산됩니다.
       </div>
+
+      {/* 고객 매칭 모달 — 임의 견적 → 실제 고객 (2026-08-01) */}
+      {matchTarget && (
+        <div onClick={() => !matchBusy && setMatchTarget(null)}
+          style={{ position: 'fixed', inset: 0, zIndex: 55, background: 'rgba(16,24,40,0.24)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+          <div onClick={(e) => e.stopPropagation()}
+            style={{ background: '#fff', border: `1px solid ${COLORS.borderSubtle}`, width: 'min(400px, 96vw)', borderRadius: 12, boxShadow: '0 8px 24px rgba(16,24,40,0.18)', padding: 20 }}>
+            <h3 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>고객 연결</h3>
+            <div style={{ marginTop: 8, marginBottom: 14, fontSize: 12.5, color: COLORS.textSecondary }}>
+              {matchTarget.quote_no || matchTarget.id.slice(0, 8)} · {[matchTarget.vehicle_brand, matchTarget.vehicle_model].filter(Boolean).join(' ')} · 월 {fmtWon(matchTarget.monthly_fee)}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: COLORS.textSecondary, marginBottom: 4 }}>고객명 *</label>
+                <input value={matchForm.name} onChange={(e) => setMatchForm(f => ({ ...f, name: e.target.value }))} autoFocus
+                  style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: `1px solid ${COLORS.borderSubtle}`, background: COLORS.bgGray, fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: COLORS.textSecondary, marginBottom: 4 }}>연락처</label>
+                  <input value={matchForm.phone} onChange={(e) => setMatchForm(f => ({ ...f, phone: e.target.value }))} placeholder="010-…"
+                    style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: `1px solid ${COLORS.borderSubtle}`, background: COLORS.bgGray, fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: COLORS.textSecondary, marginBottom: 4 }}>회사/소속</label>
+                  <input value={matchForm.company} onChange={(e) => setMatchForm(f => ({ ...f, company: e.target.value }))} placeholder="선택"
+                    style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: `1px solid ${COLORS.borderSubtle}`, background: COLORS.bgGray, fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
+                </div>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 16 }}>
+              <button onClick={() => setMatchTarget(null)}
+                style={{ padding: '8px 14px', background: '#fff', border: `1px solid ${COLORS.borderSubtle}`, borderRadius: 9, cursor: 'pointer', fontSize: 13, fontWeight: 600, color: COLORS.textSecondary }}>취소</button>
+              <button onClick={runMatch} disabled={matchBusy}
+                style={{ padding: '8px 16px', color: '#fff', border: 'none', borderRadius: 9, cursor: matchBusy ? 'wait' : 'pointer', fontSize: 13, fontWeight: 600, background: COLORS.primary, opacity: matchBusy ? 0.6 : 1 }}>
+                {matchBusy ? '연결 중...' : '연결'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {delTarget && (
         <div onClick={() => !delBusy && setDelTarget(null)}
