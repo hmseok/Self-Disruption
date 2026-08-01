@@ -37,6 +37,33 @@ function last4(s: string | null | undefined): string | null {
 }
 const normName = (s: any) => String(s || '').replace(/[\s\-_()·.,*]+/g, '').trim()
 
+// 보험사명 정규화 — 입금자명(예: 삼성화재해상보험) ↔ 대차건 보험사(예: 삼성) 매칭
+// 2026-08-01 사용자 확인: "입금은 보험사명+사고차량으로 온다"
+const INSURER_ALIASES: Array<[string, string[]]> = [
+  ['삼성', ['삼성화재', '삼성']],
+  ['현대', ['현대해상', '현대']],
+  ['디비', ['디비손해', 'db손해', 'db', '디비']],
+  ['케이비', ['케이비손해', 'kb손해', 'kb', '케이비']],
+  ['한화', ['한화손해', '한화']],
+  ['하나', ['하나손해', '하나']],
+  ['캐롯', ['캐롯손해', '캐롯']],
+  ['메리츠', ['메리츠화재', '메리츠']],
+  ['흥국', ['흥국화재', '흥국']],
+  ['롯데', ['롯데손해', '롯데']],
+  ['엠지', ['엠지손해', 'mg손해', 'mg', '엠지']],
+  ['악사', ['악사손해', 'axa', '악사']],
+  ['렌공', ['전국렌터카공제', '렌터카공제', '렌공']],
+  ['화물공제', ['화물공제', '화물자동차공제']],
+]
+function normInsurer(s: any): string | null {
+  const t = String(s || '').toLowerCase().replace(/[\s\-_()·.,*㈜]+/g, '')
+  if (!t) return null
+  for (const [key, aliases] of INSURER_ALIASES) {
+    if (aliases.some(a => t.includes(a))) return key
+  }
+  return null
+}
+
 export async function GET(request: NextRequest) {
   try {
     const user = await verifyUser(request)
@@ -120,6 +147,7 @@ export async function GET(request: NextRequest) {
     })
     const byLast4 = new Map<string, any[]>()
     const byName = new Map<string, any[]>()
+    const byInsurer = new Map<string, any[]>()
     for (const r of rentals) {
       const l4 = last4(r.customer_car_number)
       if (l4) { if (!byLast4.has(l4)) byLast4.set(l4, []); byLast4.get(l4)!.push(r) }
@@ -129,6 +157,12 @@ export async function GET(request: NextRequest) {
           if (!byName.has(nm)) byName.set(nm, [])
           if (!byName.get(nm)!.some((x) => x.id === r.id)) byName.get(nm)!.push(r)
         }
+      }
+      // 보험사 축 — 미정산(청구 진행) 건만 (보험사 하나에 건이 많으면 약한 신호라 3건 이하일 때만 후보로 씀)
+      const ins = normInsurer(r.insurance_company)
+      if (ins && r.status !== 'settled') {
+        if (!byInsurer.has(ins)) byInsurer.set(ins, [])
+        byInsurer.get(ins)!.push(r)
       }
     }
 
@@ -149,6 +183,8 @@ export async function GET(request: NextRequest) {
       } else {
         const toks = new Set([...digitTokens(d.client_name), ...digitTokens(d.description)])
         const nm = normName(d.client_name)
+        // 보험사 입금 식별 — 입금자명/적요에서 보험사명 추출 (사용자 확인: 보험사명+사고차량으로 입금됨)
+        const depInsurer = normInsurer(d.client_name) || normInsurer(d.description)
         const seen = new Set<string>()
         const cands: any[] = []
         // 이름축 (입금자명 = 예상입금자/고객명) 우선, 다음 차량번호축
@@ -156,6 +192,16 @@ export async function GET(request: NextRequest) {
         for (const tok of toks) {
           const key = tok.slice(-4)
           if (byLast4.has(key)) for (const r of byLast4.get(key)!) cands.push({ ...r, match_by: 'car' })
+        }
+        // 보험사축 — 차량번호 없이 보험사명만 온 입금: 그 보험사의 미정산 건이 3건 이하일 때만 후보
+        if (depInsurer && byInsurer.has(depInsurer)) {
+          const pool = byInsurer.get(depInsurer)!
+          if (pool.length <= 3) for (const r of pool) cands.push({ ...r, match_by: 'insurer' })
+        }
+        // 보험사명까지 일치하는 후보를 앞으로 (차량번호+보험사 = 최고 확신)
+        if (depInsurer) {
+          cands.sort((a, b) =>
+            Number(normInsurer(b.insurance_company) === depInsurer) - Number(normInsurer(a.insurance_company) === depInsurer))
         }
         candidates = cands
           .filter((c) => (seen.has(c.id) ? false : (seen.add(c.id), true)))

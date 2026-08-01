@@ -51,7 +51,7 @@ type Rental = {
 
 const nf = (n: any) => Number(n || 0).toLocaleString('ko-KR')
 const REASONS = ['지입 정산', '투자', '보험', '일반 매출', '기타']
-const MATCH_BY_LABEL: Record<string, string> = { name: '입금자명', car: '차량번호', payer: '입금자명' }
+const MATCH_BY_LABEL: Record<string, string> = { name: '입금자명', car: '차량번호', payer: '입금자명', insurer: '보험사명' }
 // 입금 매칭 대상 = 배차 이후 ~ 청구 진행 중 (settled 전)
 const ACTIVE_STATUSES = new Set(['dispatched', 'returned', 'claiming'])
 const RENTAL_STATUS_LABEL: Record<string, string> = {
@@ -80,6 +80,7 @@ export default function DepositsTab() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [view, setView] = useState<'rentals' | 'deposits'>('rentals')
+  const [days, setDays] = useState(120) // 과거 입금 매칭용 기간 (국민은행 구계좌 포함)
   const [payFilter, setPayFilter] = useState('open') // open = 대기+부분 / all / done
   const [depositFilter, setDepositFilter] = useState('todo')
   const [matching, setMatching] = useState(false)
@@ -97,11 +98,11 @@ export default function DepositsTab() {
     try {
       const headers = await getAuthHeader()
       const q = search ? `&q=${encodeURIComponent(search)}` : ''
-      const res = await fetch(`/api/operations/deposits?days=120${q}`, { headers })
+      const res = await fetch(`/api/operations/deposits?days=${days}${q}`, { headers })
       const json = await res.json()
       if (json?.data) { setRows(json.data); setRentals(json.rentals || []); setSummary(json.summary) }
     } finally { setLoading(false) }
-  }, [search])
+  }, [search, days])
   useEffect(() => { load() }, [load])
 
   const runAutoMatch = useCallback(async () => {
@@ -355,6 +356,12 @@ export default function DepositsTab() {
             : '렌터카통장 입금 전체 (최근 120일)'}
         </span>
         <span style={{ flex: 1 }} />
+        <select value={days} onChange={(e) => setDays(Number(e.target.value))}
+          style={{ padding: '7px 10px', borderRadius: 9, border: `1px solid ${COLORS.borderSubtle}`, fontSize: 12.5, fontWeight: 600, color: COLORS.textSecondary, background: '#fff' }}>
+          <option value={120}>최근 4개월</option>
+          <option value={183}>최근 6개월</option>
+          <option value={365}>최근 1년</option>
+        </select>
         <button onClick={runAutoMatch} disabled={matching}
           style={{ border: 'none', background: COLORS.primary, borderRadius: 9, padding: '8px 15px', fontSize: 12.5, fontWeight: 600, color: '#fff', cursor: matching ? 'wait' : 'pointer' }}>
           {matching ? '연결 중...' : '자동 연결'}
