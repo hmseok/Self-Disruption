@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 
 // ⚡️ [엔진 설정] 2.0 Flash (속도/가성비 최적)
-const MODEL_MAIN = "gemini-2.0-flash";
+const MODEL_MAIN = "gemini-2.5-flash";
 
 async function callGeminiAI(model: string, base64Data: string) {
   const apiKey = process.env.GEMINI_API_KEY;

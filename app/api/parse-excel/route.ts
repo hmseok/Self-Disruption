@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
     // 여기서는 확실한 처리를 위해 전체를 보냅니다. (Flash 모델 추천)
 
     const model = genAI.getGenerativeModel({
-        model: "gemini-2.0-flash",
+        model: "gemini-2.5-flash",
         generationConfig: { responseMimeType: "application/json" }
     });
 

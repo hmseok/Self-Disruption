@@ -22,7 +22,7 @@ import { verifyUser } from '@/lib/auth-server'
  *   }
  */
 
-const MODEL = 'gemini-2.0-flash'
+const MODEL = 'gemini-2.5-flash'
 
 type SuggestBody = {
   key: string

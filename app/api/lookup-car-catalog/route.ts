@@ -21,7 +21,7 @@ export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 export const maxDuration = 30
 
-const MODEL = 'gemini-2.0-flash'
+const MODEL = 'gemini-2.5-flash'
 
 const PROMPT_TEMPLATE = (brand: string, model: string, year: number) => `
 너는 대한민국 자동차 카탈로그 전문가야.

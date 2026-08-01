@@ -4,7 +4,7 @@ export async function POST(request: Request) {
   try {
     const { imageBase64 } = await request.json()
     const apiKey = "AIzaSyDIWzebrOfO_lGy3E783UeZT23OOmncKMU"; // 🔑 대표님 키
-    const modelName = "gemini-2.0-flash";
+    const modelName = "gemini-2.5-flash";
 
     // Base64 헤더 제거
     const base64Data = imageBase64.includes(',') ? imageBase64.split(',')[1] : imageBase64;

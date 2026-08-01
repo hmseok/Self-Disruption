@@ -8,7 +8,7 @@ export async function POST(request: Request) {
 
     // ⚡️ 유료 계정의 핵심 모델 (가장 빠름 + 한도 넉넉함)
     // 만약 1.5가 안 되면 자동으로 2.0으로 넘어가게 설정했습니다.
-    const modelsToTry = ["gemini-1.5-flash", "gemini-2.0-flash"];
+    const modelsToTry = ["gemini-2.5-flash", "gemini-2.5-flash"];
 
     const base64Data = imageBase64.includes(',') ? imageBase64.split(',')[1] : imageBase64;
 

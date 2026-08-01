@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server'
 
 // ⚡️ 모델 정의 (성능순)
-const MODEL_FAST = "gemini-2.0-flash";
-const MODEL_SMART = "gemini-1.5-pro"; // 가장 안정적인 트림 박사
+const MODEL_FAST = "gemini-2.5-flash";
+const MODEL_SMART = "gemini-2.5-flash"; // 가장 안정적인 트림 박사
 const MODEL_ULTRA = "gemini-2.0-pro-exp-02-05";
 
 async function callGeminiAI(model: string, base64Data: string, mode: 'fast' | 'smart' | 'ultra') {

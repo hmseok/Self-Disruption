@@ -7,7 +7,7 @@ export async function POST(request: Request) {
     const apiKey = process.env.GEMINI_API_KEY;
 
     // 🎯 2.5 Pro가 가장 똑똑하므로 1순위
-    const modelsToTry = ["gemini-2.5-pro", "gemini-1.5-pro", "gemini-2.0-flash"];
+    const modelsToTry = ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.5-flash"];
 
     const base64Data = imageBase64.includes(',') ? imageBase64.split(',')[1] : imageBase64;
 

@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
 
     // Gemini 2.0 Flash 모델 사용
     const model = genAI.getGenerativeModel({
-        model: "gemini-2.0-flash",
+        model: "gemini-2.5-flash",
         generationConfig: { responseMimeType: "application/json" }
     });
 

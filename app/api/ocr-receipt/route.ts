@@ -15,9 +15,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "이미지 데이터가 없습니다." }, { status: 400 });
     }
 
-    // 🚀 [수정 포인트] 모델명을 'gemini-2.0-flash
+    // 🚀 [수정 포인트] 모델명을 'gemini-2.5-flash
     const model = genAI.getGenerativeModel({
-        model: "gemini-2.0-flash",
+        model: "gemini-2.5-flash",
         generationConfig: { responseMimeType: "application/json" }
     });
 

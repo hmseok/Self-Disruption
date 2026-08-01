@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 // ⚡️ [엔진 최종 확정]
 // 대표님 계정에서 100% 작동하는 모델로 고정합니다. (에러 방지)
 // Flash 모델이지만 프롬프트로 지능을 끌어올려 Pro급 결과를 냅니다.
-const MODEL_MAIN = "gemini-2.0-flash";
+const MODEL_MAIN = "gemini-2.5-flash";
 
 async function callGeminiAI(model: string, base64Data: string) {
   const apiKey = process.env.GEMINI_API_KEY;

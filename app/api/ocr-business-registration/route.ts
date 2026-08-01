@@ -3,7 +3,7 @@ import { NextRequest } from 'next/server'
 
 // ⚡️ 사업자등록증 OCR — 회원가입 시 사용 (인증 불필요)
 // 회원가입 전이므로 requireAuth를 사용하지 않음
-const MODEL_MAIN = "gemini-2.0-flash";
+const MODEL_MAIN = "gemini-2.5-flash";
 
 async function extractBusinessNumber(base64Data: string, mimeType: string) {
   const apiKey = process.env.GEMINI_API_KEY;

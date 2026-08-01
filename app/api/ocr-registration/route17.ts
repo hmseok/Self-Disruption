@@ -2,11 +2,11 @@ import { NextResponse } from 'next/server'
 
 // ⚡️ [최적화] 대표님 계정에서 사용 가능한 최신 모델로 설정
 // 1차 시도: 속도와 성능 밸런스가 좋은 2.0 Flash
-const MODEL_MAIN = "gemini-2.0-flash";
+const MODEL_MAIN = "gemini-2.5-flash";
 
 // 2차 시도: 만약 실패 시 더 강력한 추론이 필요할 때 (안정적인 1.5 Pro 사용)
 // (혹은 'gemini-2.0-pro-exp' 등 실험 버전을 넣을 수도 있습니다)
-const MODEL_BACKUP = "gemini-1.5-pro-latest";
+const MODEL_BACKUP = "gemini-2.5-flash";
 
 async function callGeminiAI(model: string, base64Data: string, mode: string) {
   const apiKey = process.env.GEMINI_API_KEY;

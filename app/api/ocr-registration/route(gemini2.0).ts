@@ -8,7 +8,7 @@ export async function POST(request: Request) {
 
     // 🎯 [전략 변경] 문서 인식은 1.5 Flash가 가장 가성비/성능 균형이 좋습니다.
     // 2.0은 창의적인 작업엔 좋지만, 딱딱한 OCR은 1.5가 더 낫습니다.
-    const modelsToTry = ["gemini-1.5-flash", "gemini-1.5-pro"];
+    const modelsToTry = ["gemini-2.5-flash", "gemini-2.5-flash"];
 
     const base64Data = imageBase64.includes(',') ? imageBase64.split(',')[1] : imageBase64;
 

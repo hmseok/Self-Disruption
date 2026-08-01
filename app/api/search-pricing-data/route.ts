@@ -3,7 +3,7 @@ import { NextRequest } from 'next/server'
 import { requireAuth } from '../../utils/auth-guard'
 
 // ⚡️ Gemini 2.0 Flash — 가격 참고 데이터 검색용
-const MODEL = 'gemini-2.0-flash'
+const MODEL = 'gemini-2.5-flash'
 
 // 🏷️ 가격 기준 카테고리별 한국어 검색 프롬프트
 type PricingCategory = 'depreciation' | 'insurance' | 'maintenance' | 'tax' | 'finance' | 'registration'

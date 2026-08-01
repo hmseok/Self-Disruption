@@ -6,7 +6,7 @@ export async function POST(request: Request) {
     const apiKey = process.env.GEMINI_API_KEY;
 
     // 🚀 최신 모델 사용
-    const model = "gemini-2.0-flash";
+    const model = "gemini-2.5-flash";
 
     const base64Data = imageBase64.includes(',') ? imageBase64.split(',')[1] : imageBase64;
 

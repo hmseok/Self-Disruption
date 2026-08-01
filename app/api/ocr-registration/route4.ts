@@ -6,7 +6,7 @@ export async function POST(request: Request) {
     const apiKey = process.env.GEMINI_API_KEY;
 
     // 🎯 가장 성능 좋은 모델 순서
-    const modelsToTry = ["gemini-1.5-pro", "gemini-2.0-flash", "gemini-1.5-flash"];
+    const modelsToTry = ["gemini-2.5-flash", "gemini-2.5-flash", "gemini-2.5-flash"];
 
     const base64Data = imageBase64.includes(',') ? imageBase64.split(',')[1] : imageBase64;
 

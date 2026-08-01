@@ -4,7 +4,7 @@ export async function POST(request: Request) {
   try {
     const { imageBase64 } = await request.json()
     const apiKey = process.env.GEMINI_API_KEY;
-    const model = "gemini-2.0-flash"; // 가장 똑똑한 모델
+    const model = "gemini-2.5-flash"; // 가장 똑똑한 모델
 
     const base64Data = imageBase64.includes(',') ? imageBase64.split(',')[1] : imageBase64;
 

@@ -14,8 +14,8 @@ export async function POST(request: Request) {
     // 🎯 [최적화 전략] 표에 있는 모델 중 가장 적합한 순서대로 배치
     const modelsToTry = [
         "gemini-2.5-pro",           // 🥇 1순위: 최신 2.5 Pro (150 RPM, 지능 최상)
-        "gemini-1.5-pro",           // 🥈 2순위: 검증된 문서 전문가 (안정적)
-        "gemini-2.0-flash",         // 🥉 3순위: 속도 빠름 (백업용)
+        "gemini-2.5-flash",           // 🥈 2순위: 검증된 문서 전문가 (안정적)
+        "gemini-2.5-flash",         // 🥉 3순위: 속도 빠름 (백업용)
         "gemini-3-pro"              // 4순위: 지능은 좋으나 RPM(25)이 낮아 마지막 보루로 사용
     ];
 

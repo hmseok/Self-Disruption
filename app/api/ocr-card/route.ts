@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { NextRequest } from 'next/server'
 import { requireAuth } from '../../utils/auth-guard'
 
-const MODEL = "gemini-2.0-flash";
+const MODEL = "gemini-2.5-flash";
 
 async function callGeminiAI(base64Data: string, mimeType: string) {
   const apiKey = process.env.GEMINI_API_KEY;

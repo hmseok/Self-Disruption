@@ -3,7 +3,7 @@ import { NextRequest } from 'next/server'
 import { requireAuth } from '../../utils/auth-guard'
 
 // ⚡️ Gemini 2.0 Flash — 신차 정보 조회용 (비용 절감)
-const MODEL = 'gemini-2.0-flash'
+const MODEL = 'gemini-2.5-flash'
 
 // 🏭 제조사 공식 사이트 매핑
 const BRAND_OFFICIAL_SITES: Record<string, { url: string; domain: string }> = {

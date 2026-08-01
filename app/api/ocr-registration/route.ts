@@ -3,7 +3,7 @@ import { NextRequest } from 'next/server'
 import { requireAuth } from '../../utils/auth-guard'
 
 // ⚡️ [엔진] 2.0 Flash (PDF 분석도 빠르고 정확함)
-const MODEL_MAIN = "gemini-2.0-flash";
+const MODEL_MAIN = "gemini-2.5-flash";
 
 async function callGeminiAI(base64Data: string, mimeType: string) {
   const apiKey = process.env.GEMINI_API_KEY;

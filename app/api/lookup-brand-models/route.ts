@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { NextRequest } from 'next/server'
 import { requireAuth } from '../../utils/auth-guard'
 
-const MODEL = 'gemini-2.0-flash'
+const MODEL = 'gemini-2.5-flash'
 
 const BRAND_OFFICIAL_SITES: Record<string, { url: string; domain: string }> = {
   '기아':       { url: 'https://www.kia.com/kr/',            domain: 'kia.com/kr' },
