@@ -96,18 +96,24 @@ export async function GET(request: NextRequest) {
       })
 
     // 3) 대차건 인덱스 (후보 대조 — fmi-rental-payments 와 동형 3축)
+    //    2026-08-01 배차건 중심 뷰: 건별 입금 누계(paid_sum, 전 기간) 포함
+    const PAID_SUM_SQL = `(SELECT COALESCE(SUM(t2.amount), 0) FROM transactions t2
+              WHERE t2.related_type = 'fmi_rental' AND t2.related_id = r.id
+                AND t2.type = 'income' AND t2.deleted_at IS NULL) AS paid_sum`
     const rentals = await prisma.$queryRawUnsafe<Array<any>>(
-      `SELECT id, customer_name, expected_payer, customer_car_number, vehicle_car_number,
-              insurance_company, final_claim_amount, dispatch_date, status
-         FROM fmi_rentals
-        ORDER BY dispatch_date DESC
+      `SELECT r.id, r.customer_name, r.expected_payer, r.customer_car_number, r.vehicle_car_number,
+              r.insurance_company, r.final_claim_amount, r.dispatch_date, r.status,
+              ${PAID_SUM_SQL}
+         FROM fmi_rentals r
+        ORDER BY r.dispatch_date DESC
         LIMIT 500`,
     ).catch(async (e: any) => {
       if (/Unknown column/i.test(e?.message || '')) {
         return prisma.$queryRawUnsafe<Array<any>>(
-          `SELECT id, customer_name, customer_car_number, vehicle_car_number,
-                  insurance_company, final_claim_amount, dispatch_date, status
-             FROM fmi_rentals ORDER BY dispatch_date DESC LIMIT 500`,
+          `SELECT r.id, r.customer_name, r.customer_car_number, r.vehicle_car_number,
+                  r.insurance_company, r.final_claim_amount, r.dispatch_date, r.status,
+                  ${PAID_SUM_SQL}
+             FROM fmi_rentals r ORDER BY r.dispatch_date DESC LIMIT 500`,
         )
       }
       throw e
@@ -196,6 +202,7 @@ export async function GET(request: NextRequest) {
       vehicle_car_number: r.vehicle_car_number, insurance_company: r.insurance_company,
       claim_amount: r.final_claim_amount != null ? Number(r.final_claim_amount) : null,
       dispatch_date: r.dispatch_date, status: r.status,
+      paid_sum: r.paid_sum != null ? Number(r.paid_sum) : 0,
     })), summary, error: null })
   } catch (e: any) {
     console.error('[GET /api/operations/deposits]', e)
