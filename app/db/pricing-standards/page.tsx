@@ -41,6 +41,8 @@ const TabComponents: Record<string, React.ComponentType<any>> = {
 }
 
 const SimulationPanel = dynamicImport(() => import('./SimulationPanel'), { ssr: false })
+// 실데이터 대조 (2026-07-30) — 기준표 값이 우리 실계약·실지출과 맞는지 항시 표시
+const CalibrationPanel = dynamicImport(() => import('./CalibrationPanel'), { ssr: false })
 
 export default function PricingStandardsPage() {
   const [activeTab, setActiveTab] = useState<string>('cost')
@@ -138,6 +140,9 @@ export default function PricingStandardsPage() {
             </div>
           </div>
         )}
+
+        {/* 실데이터 대조 — 기준표 ↔ 실계약·실지출 (2026-07-30) */}
+        <CalibrationPanel />
 
         {/* 메인 레이아웃: 탭 콘텐츠 + 시뮬레이션 사이드패널 */}
         <div className="flex gap-5">
