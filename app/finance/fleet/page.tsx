@@ -1,461 +1,236 @@
 'use client'
-import { useEffect, useState, useMemo } from 'react'
+
+// ═══════════════════════════════════════════════════════════════
+// 손익 — 차량별·회사 전체 (REDESIGN 5단계, 2026-08-01 백지 재작성)
+//   계산은 전부 공통 엔진(lib/pnl-engine → /api/pnl) — 화면은 소비만.
+//   미귀속 거래(차량 연결 안 된 입출금)를 계기판으로 노출해
+//   "연결할수록 손익이 정확해지는" 구조를 보이게 한다.
+// ═══════════════════════════════════════════════════════════════
+
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { useApp } from '../../context/AppContext'
-import DcStatStrip, { StatItem } from '../../components/DcStatStrip'
-import DcToolbar from '../../components/DcToolbar'
+import { COLORS } from '@/app/utils/ui-tokens'
+
 async function getAuthHeader(): Promise<Record<string, string>> {
   try {
-    const { auth } = await import('@/lib/auth-client')
-    const user = auth.currentUser
-    if (!user) return {}
-    const token = await user.getIdToken(false)
-    return { Authorization: `Bearer ${token}` }
-  } catch {
-    return {}
-  }
+    const token = typeof window !== 'undefined' ? localStorage.getItem('fmi_token') : null
+    return token ? { Authorization: `Bearer ${token}` } : {}
+  } catch { return {} }
 }
 
-// ============================================
-// 전체 차량 수익 현황 (Fleet P&L Dashboard)
-// ============================================
-
-// ★ Decimal 안전 캐스팅 (Prisma Decimal 은 string 직렬화)
-const f = (n: any) => (Number(n) || 0).toLocaleString()
-const fMan = (raw: any) => {
-  const n = Number(raw) || 0
-  const abs = Math.abs(n)
-  if (abs >= 100000000) return `${(n / 100000000).toFixed(1)}억`
-  if (abs >= 10000) return `${Math.round(n / 10000)}만`
-  return f(n)
-}
-
-// 비용 제외 카테고리 (자본/금융 거래)
-const EXCLUDE_EXPENSE_CATS = new Set(['차량구입', '할부', '리스', '대출', '투자', '투자입금', '투자회수', '대출상환'])
-
-type Period = 'all' | '1y' | '6m' | '3m' | '1m'
-type SortKey = 'revenue' | 'expense' | 'operating' | 'settlement' | 'net' | 'rate'
-type SortDir = 'asc' | 'desc'
-
-interface CarPnl {
+type CarPnl = {
   carId: string
-  number: string
-  model: string
-  brand: string
-  status: string
-  ownershipType: string
-  // P&L
+  number: string | null
+  brand: string | null
+  model: string | null
+  status: string | null
+  ownershipType: string | null
   revenue: number
+  rentalRevenue: number
   expense: number
-  operatingProfit: number  // 매출 - 운영비
-  settlement: number       // 정산 배분 (지입+투자)
-  netProfit: number        // 영업이익 - 정산
-  profitRate: number       // 수익률 (순이익/매출)
-  // 세부 비용
-  fuel: number
-  insurance: number
-  maintenance: number
-  loan: number
-  parking: number
-  tax: number
-  otherExpense: number
-  // 정산 세부
-  jiipPayout: number
-  investPayout: number
-  // 계약 정보
-  jiipContract: any | null
-  investContracts: any[]
+  settlementPayout: number
+  netProfit: number
+  profitRate: number | null
+  txCount: number
+  byCategory: Record<string, number>
+}
+type PnlData = {
+  from: string; to: string
+  cars: CarPnl[]
+  totals: { revenue: number; expense: number; settlementPayout: number; netProfit: number; profitRate: number | null; excludedCapital: number }
+  unassigned: { revenue: number; expense: number; count: number }
 }
 
-export default function FleetPnlPage() {
+const won = (n: number) => Math.round(n).toLocaleString('ko-KR')
+const OWNERSHIP_LABEL: Record<string, string> = { company: '자사', jiip: '지입', invest: '투자', lease: '임차' }
+
+type PeriodKey = 'this' | 'last' | '3m' | 'year'
+function periodRange(k: PeriodKey): { from: string; to: string; label: string } {
+  const now = new Date()
+  const today = now.toISOString().slice(0, 10)
+  const ym = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+  if (k === 'this') return { from: `${today.slice(0, 7)}-01`, to: today, label: '이번 달' }
+  if (k === 'last') {
+    const p = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+    const last = new Date(p.getFullYear(), p.getMonth() + 1, 0).getDate()
+    return { from: `${ym(p)}-01`, to: `${ym(p)}-${last}`, label: '지난달' }
+  }
+  if (k === '3m') {
+    const p = new Date(now.getFullYear(), now.getMonth() - 2, 1)
+    return { from: `${ym(p)}-01`, to: today, label: '최근 3개월' }
+  }
+  return { from: `${now.getFullYear()}-01-01`, to: today, label: '올해' }
+}
+
+export default function PnlPage() {
   const router = useRouter()
-  const { company, role } = useApp()
-  const effectiveCompanyId = company?.id
-
+  const [period, setPeriod] = useState<PeriodKey>('this')
+  const [data, setData] = useState<PnlData | null>(null)
   const [loading, setLoading] = useState(true)
-  const [cars, setCars] = useState<any[]>([])
-  const [transactions, setTransactions] = useState<any[]>([])
-  const [loans, setLoans] = useState<any[]>([])
-  const [insurances, setInsurances] = useState<any[]>([])
-  const [jiipContracts, setJiipContracts] = useState<any[]>([])
-  const [investContracts, setInvestContracts] = useState<any[]>([])
-  const [settleTxs, setSettleTxs] = useState<any[]>([])
+  const [search, setSearch] = useState('')
+  const [lossOnly, setLossOnly] = useState(false)
+  const [expanded, setExpanded] = useState<string | null>(null)
 
-  const [period, setPeriod] = useState<Period>('1m')
-  const [filterDate, setFilterDate] = useState(new Date().toISOString().slice(0, 7))
-  const [searchText, setSearchText] = useState('')
-  const [statusFilter, setStatusFilter] = useState<string>('all')
-  const [sortKey, setSortKey] = useState<SortKey>('revenue')
-  const [sortDir, setSortDir] = useState<SortDir>('desc')
-  const [expandedCar, setExpandedCar] = useState<string | null>(null)
-
-  // ── 데이터 로드 ──
-  useEffect(() => {
-    if (!effectiveCompanyId) return
-    loadAll()
-  }, [effectiveCompanyId, filterDate])
-
-  const loadAll = async () => {
+  const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [year, month] = filterDate.split('-').map(Number)
-      const startDate = `${filterDate}-01`
-      const lastDay = new Date(year, month, 0).getDate()
-      const endDate = `${filterDate}-${lastDay}`
-
+      const { from, to } = periodRange(period)
       const headers = await getAuthHeader()
+      const res = await fetch(`/api/pnl?from=${from}&to=${to}`, { headers })
+      const json = await res.json().catch(() => ({}))
+      if (json?.data) setData(json.data)
+    } finally { setLoading(false) }
+  }, [period])
+  useEffect(() => { load() }, [load])
 
-      const [carsRes, txRes, loansRes, insRes, jiipRes, investRes, settleTxRes, queueRes] = await Promise.all([
-        // 전체 차량
-        fetch(`/api/cars`, { headers }).then(r => r.json()).catch(() => ({ data: [] })),
-        // 차량 연결 거래 (당월)
-        fetch(`/api/transactions?related_type=car&from=${startDate}&to=${endDate}`, { headers }).then(r => r.json()).catch(() => ({ data: [] })),
-        // 대출/금융상품
-        fetch(`/api/loans`, { headers }).then(r => r.json()).catch(() => ({ data: [] })),
-        // 보험
-        fetch(`/api/insurance`, { headers }).then(r => r.json()).catch(() => ({ data: [] })),
-        // 지입 계약
-        fetch(`/api/jiip`, { headers }).then(r => r.json()).catch(() => ({ data: [] })),
-        // 투자 계약
-        fetch(`/api/investments`, { headers }).then(r => r.json()).catch(() => ({ data: [] })),
-        // 정산 거래 (지입/투자 — 당월)
-        fetch(`/api/transactions?related_type=jiip_share,invest&from=${startDate}&to=${endDate}`, { headers }).then(r => r.json()).catch(() => ({ data: [] })),
-        // classification_queue 확정 건 (아직 transactions에 안 간 것)
-        fetch(`/api/classification-queue?final_matched_type=car&status=confirmed,auto_confirmed`, { headers }).then(r => r.json()).catch(() => ({ data: [] })),
-      ])
-
-      setCars(carsRes.data || [])
-
-      // transactions + classification_queue 병합
-      const txData = txRes.data || []
-      const txIds = new Set(txData.map((t: any) => t.id))
-      const queueTx = (queueRes.data || [])
-        .filter((q: any) => !txIds.has(q.id))
-        .map((q: any) => {
-          const src = typeof q.source_data === 'string' ? JSON.parse(q.source_data) : (q.source_data || {})
-          const txDate = src.transaction_date || src.date || ''
-          // 당월 필터
-          if (!txDate.startsWith(filterDate)) return null
-          return {
-            id: q.id,
-            transaction_date: txDate,
-            type: src.type || 'expense',
-            category: q.final_category || src.category || '기타',
-            amount: Math.abs(src.amount || 0),
-            related_type: 'car',
-            related_id: String(q.final_matched_id || ''),
-            client_name: src.client_name || src.merchant || '',
-            description: src.description || src.memo || '',
-            memo: '',
-          }
-        })
-        .filter(Boolean)
-      setTransactions([...txData, ...queueTx])
-
-      setLoans(loansRes.data || [])
-      setInsurances(insRes.data || [])
-      setJiipContracts(jiipRes.data || [])
-      setInvestContracts(investRes.data || [])
-      setSettleTxs(settleTxRes.data || [])
-    } catch (err) {
-      console.error('Fleet P&L load error:', err)
-    } finally {
-      setLoading(false)
+  const t = data?.totals
+  const lossCars = useMemo(() => (data?.cars || []).filter(c => c.netProfit < 0), [data])
+  const rows = useMemo(() => {
+    let list = data?.cars || []
+    if (lossOnly) list = lossCars
+    if (search.trim()) {
+      const q = search.trim().toLowerCase()
+      list = list.filter(c =>
+        (c.number || '').toLowerCase().includes(q) ||
+        (c.model || '').toLowerCase().includes(q) ||
+        (c.brand || '').toLowerCase().includes(q))
     }
-  }
+    return list
+  }, [data, lossOnly, lossCars, search])
 
-  // ── 차량별 P&L 집계 ──
-  const carPnlList = useMemo<CarPnl[]>(() => {
-    if (!cars.length) return []
-
-    // 인덱싱
-    const txByCar: Record<string, any[]> = {}
-    for (const tx of transactions) {
-      const cid = tx.related_id
-      if (!txByCar[cid]) txByCar[cid] = []
-      txByCar[cid].push(tx)
-    }
-
-    const loanByCar: Record<string, any[]> = {}
-    for (const l of loans) {
-      const cid = String(l.car_id)
-      if (!loanByCar[cid]) loanByCar[cid] = []
-      loanByCar[cid].push(l)
-    }
-
-    const insByCar: Record<string, any[]> = {}
-    for (const ins of insurances) {
-      const cid = String(ins.car_id)
-      if (!insByCar[cid]) insByCar[cid] = []
-      insByCar[cid].push(ins)
-    }
-
-    const jiipByCar: Record<string, any> = {}
-    for (const j of jiipContracts) {
-      jiipByCar[String(j.car_id)] = j
-    }
-
-    const investByCar: Record<string, any[]> = {}
-    for (const inv of investContracts) {
-      const cid = String(inv.car_id)
-      if (!investByCar[cid]) investByCar[cid] = []
-      investByCar[cid].push(inv)
-    }
-
-    // 정산 거래 → 지입계약 car_id 매핑
-    const jiipIdToCarId: Record<string, string> = {}
-    for (const j of jiipContracts) {
-      jiipIdToCarId[String(j.id)] = String(j.car_id)
-    }
-    const investIdToCarId: Record<string, string> = {}
-    for (const inv of investContracts) {
-      investIdToCarId[String(inv.id)] = String(inv.car_id)
-    }
-
-    const settleByCar: Record<string, { jiip: number; invest: number }> = {}
-    for (const stx of settleTxs) {
-      let carId = ''
-      if (stx.related_type === 'jiip_share') {
-        carId = jiipIdToCarId[stx.related_id] || ''
-      } else if (stx.related_type === 'invest') {
-        carId = investIdToCarId[stx.related_id] || ''
-      }
-      if (!carId) continue
-      if (!settleByCar[carId]) settleByCar[carId] = { jiip: 0, invest: 0 }
-      const amt = Math.abs(Number(stx.amount) || 0)
-      if (stx.related_type === 'jiip_share') {
-        settleByCar[carId].jiip += amt
-      } else {
-        settleByCar[carId].invest += amt
-      }
-    }
-
-    return cars.map(car => {
-      const cid = String(car.id)
-      const carTxs = txByCar[cid] || []
-      const carLoans = loanByCar[cid] || []
-      const carIns = insByCar[cid] || []
-      const jiip = jiipByCar[cid] || null
-      const invests = investByCar[cid] || []
-      const settle = settleByCar[cid] || { jiip: 0, invest: 0 }
-
-      // 수입
-      let revenue = 0
-      // 비용 세부
-      let fuel = 0, insurance = 0, maintenance = 0, parking = 0, tax = 0, otherExpense = 0, loanExpense = 0
-
-      for (const tx of carTxs) {
-        const amt = Math.abs(Number(tx.amount) || 0)
-        if (tx.type === 'income') {
-          revenue += amt
-        } else {
-          const cat = tx.category || ''
-          if (EXCLUDE_EXPENSE_CATS.has(cat)) continue
-          if (cat === '주유비' || cat === '충전') fuel += amt
-          else if (cat === '보험료') insurance += amt
-          else if (cat === '정비비' || cat === '차량유지비') maintenance += amt
-          else if (cat === '주차비') parking += amt
-          else if (cat === '세금/과태료') tax += amt
-          else if (cat === '대출이자' || cat === '리스료') loanExpense += amt
-          else otherExpense += amt
-        }
-      }
-
-      // 고정비: 대출 월 납부
-      const loanMonthly = carLoans.reduce((s, l) => {
-        const start = l.start_date ? l.start_date.slice(0, 7) : ''
-        const end = l.end_date ? l.end_date.slice(0, 7) : ''
-        if (start && start <= filterDate && (!end || end >= filterDate)) {
-          return s + (Number(l.monthly_payment) || 0)
-        }
-        return s
-      }, 0)
-
-      // 고정비: 보험료 월 납부
-      const insMonthly = carIns.reduce((s, i) => {
-        const start = i.start_date ? i.start_date.slice(0, 7) : ''
-        const end = i.end_date ? i.end_date.slice(0, 7) : ''
-        if (start && start <= filterDate && (!end || end >= filterDate)) {
-          return s + (Number(i.premium) || 0) / 12
-        }
-        return s
-      }, 0)
-
-      const totalFixed = loanMonthly + insMonthly
-      const totalExpense = fuel + insurance + maintenance + parking + tax + otherExpense + totalFixed
-      const operatingProfit = revenue - totalExpense
-      const settlement = settle.jiip + settle.invest
-      const netProfit = operatingProfit - settlement
-      const profitRate = revenue > 0 ? (netProfit / revenue) * 100 : 0
-
-      return {
-        carId: cid,
-        number: car.number || '',
-        model: car.model || '',
-        brand: car.brand || '',
-        status: car.status || '',
-        ownershipType: car.ownership_type || '',
-        revenue,
-        expense: totalExpense,
-        operatingProfit,
-        settlement,
-        netProfit,
-        profitRate,
-        fuel,
-        insurance,
-        maintenance,
-        loan: totalFixed,
-        parking,
-        tax,
-        otherExpense,
-        jiipPayout: settle.jiip,
-        investPayout: settle.invest,
-        jiipContract: jiip,
-        investContracts: invests,
-      }
-    })
-  }, [cars, transactions, loans, insurances, jiipContracts, investContracts, settleTxs, filterDate])
-
-  // ── 필터링 및 정렬 ──
-  const filtered = useMemo(() => {
-    let result = carPnlList
-    if (searchText) {
-      const q = searchText.toLowerCase()
-      result = result.filter(p => p.number.toLowerCase().includes(q) || p.model.toLowerCase().includes(q))
-    }
-    if (statusFilter !== 'all') {
-      result = result.filter(p => p.status === statusFilter)
-    }
-    return result
-  }, [carPnlList, searchText, statusFilter])
-
-  const sorted = useMemo(() => {
-    const copy = [...filtered]
-    copy.sort((a, b) => {
-      let aVal = 0, bVal = 0
-      switch (sortKey) {
-        case 'revenue': aVal = a.revenue; bVal = b.revenue; break
-        case 'expense': aVal = a.expense; bVal = b.expense; break
-        case 'operating': aVal = a.operatingProfit; bVal = b.operatingProfit; break
-        case 'settlement': aVal = a.settlement; bVal = b.settlement; break
-        case 'net': aVal = a.netProfit; bVal = b.netProfit; break
-        case 'rate': aVal = a.profitRate; bVal = b.profitRate; break
-      }
-      return sortDir === 'desc' ? bVal - aVal : aVal - bVal
-    })
-    return copy
-  }, [filtered, sortKey, sortDir])
-
-  // ── 합계 ──
-  const totals = useMemo(() => {
-    return filtered.reduce((acc, p) => ({
-      revenue: acc.revenue + p.revenue,
-      expense: acc.expense + p.expense,
-      operatingProfit: acc.operatingProfit + p.operatingProfit,
-      settlement: acc.settlement + p.settlement,
-      netProfit: acc.netProfit + p.netProfit,
-    }), { revenue: 0, expense: 0, operatingProfit: 0, settlement: 0, netProfit: 0 })
-  }, [filtered])
-
-  const avgProfitRate = filtered.length > 0
-    ? (totals.netProfit / totals.revenue) * 100
-    : 0
-
-  if (loading) {
-    return (
-      <div className='min-h-screen page-bg p-8'>
-        <div className='max-w-[1400px] mx-auto'>
-          <div className='text-center text-slate-400 mt-8'>로딩 중...</div>
-        </div>
-      </div>
-    )
+  const cardStyle: React.CSSProperties = {
+    background: '#fff', border: `1px solid ${COLORS.borderSubtle}`, borderRadius: 12,
+    padding: '14px 16px', boxShadow: '0 1px 2px rgba(16,24,40,0.05)',
   }
 
   return (
-    <div className='page-bg'>
-      <div className='max-w-[1400px] mx-auto py-4 px-4 md:py-5 md:px-6'>
+    <div style={{ padding: '20px 24px', maxWidth: 1280, color: COLORS.textPrimary, fontSize: 14 }}>
+      {/* 헤더 + 기간 */}
+      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
+        <div>
+          <h1 style={{ fontSize: 21, letterSpacing: '-0.02em', fontWeight: 700 }}>손익</h1>
+          <p style={{ color: COLORS.textSecondary, fontSize: 13, marginTop: 3 }}>차량별·회사 전체 손익 — 계산 기준은 공통 엔진 한 곳입니다</p>
+        </div>
+        <div style={{ display: 'flex', gap: 6 }}>
+          {([['this', '이번 달'], ['last', '지난달'], ['3m', '3개월'], ['year', '올해']] as const).map(([k, label]) => {
+            const on = period === k
+            return (
+              <button key={k} onClick={() => setPeriod(k)}
+                style={{ padding: '6px 13px', borderRadius: 99, fontSize: 12.5, fontWeight: 500, cursor: 'pointer',
+                  border: `1px solid ${on ? '#1a1d23' : COLORS.borderSubtle}`,
+                  background: on ? '#1a1d23' : '#fff', color: on ? '#fff' : COLORS.textSecondary }}>{label}</button>
+            )
+          })}
+        </div>
+      </div>
 
-        {/* Stats Section */}
-        <DcStatStrip
-          stats={[
-            { label: '총 매출', value: fMan(totals.revenue), unit: '원' },
-            { label: '총 비용', value: fMan(totals.expense), unit: '원' },
-            { label: '영업이익', value: fMan(totals.operatingProfit), unit: '원' },
-            { label: '정산액', value: fMan(totals.settlement), unit: '원' },
-            { label: '순이익', value: fMan(totals.netProfit), unit: '원' },
-          ] as StatItem[]}
-          fullWidth
-        />
+      {/* 미귀속 계기판 — 연결할수록 정확해짐 */}
+      {!loading && data && data.unassigned.count > 0 && (
+        <div style={{ background: COLORS.bgAmber, border: `1px solid ${COLORS.borderAmber}`, color: '#8a5a10', borderRadius: 10, padding: '10px 14px', fontSize: 12.5, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <span>
+            <b>차량 미귀속 거래 {data.unassigned.count.toLocaleString()}건</b> — 수입 {won(data.unassigned.revenue)}원 / 지출 {won(data.unassigned.expense)}원이 어느 차량 손익에도 잡히지 않았습니다. 장부에서 차량을 연결할수록 손익이 정확해집니다.
+          </span>
+          <button onClick={() => router.push('/finance/bank-card')}
+            style={{ marginLeft: 'auto', border: `1px solid ${COLORS.borderAmber}`, background: '#fff', borderRadius: 8, padding: '5px 12px', fontSize: 12, fontWeight: 600, color: '#8a5a10', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+            장부에서 연결하기
+          </button>
+        </div>
+      )}
 
-        {/* ═══ Toolbar ═══ */}
-        <DcToolbar
-          search={searchText}
-          onSearchChange={setSearchText}
-          placeholder="차량번호, 모델명..."
-          filters={[
-            { key: 'all', label: '전체' },
-            { key: 'active', label: '운영 중' },
-            { key: 'inactive', label: '중지' },
-          ]}
-          activeFilter={statusFilter}
-          onFilterChange={setStatusFilter}
-          trailing={
-            <div style={{ display: 'flex', gap: 6, flexShrink: 0, alignItems: 'center' }}>
-              <input type="month" value={filterDate} onChange={e => setFilterDate(e.target.value)}
-                style={{ padding: '6px 10px', fontSize: 12, fontWeight: 600, borderRadius: 8, border: '1px solid rgba(0,0,0,0.06)', background: '#ffffff', color: '#334155', cursor: 'pointer' }} />
-              <select value={sortKey} onChange={e => setSortKey(e.target.value as any)}
-                style={{ padding: '6px 10px', fontSize: 12, fontWeight: 600, borderRadius: 8, border: '1px solid rgba(0,0,0,0.06)', background: '#ffffff', color: '#334155', cursor: 'pointer' }}>
-                <option value="revenue">매출순</option>
-                <option value="expense">비용순</option>
-                <option value="operating">영업이익순</option>
-                <option value="settlement">정산순</option>
-                <option value="net">순이익순</option>
-                <option value="rate">수익률순</option>
-              </select>
-            </div>
-          }
-        />
+      {/* 요약 카드 */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginBottom: 18 }}>
+        <div style={cardStyle}>
+          <div style={{ fontSize: 12.5, color: COLORS.textSecondary, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: COLORS.success, display: 'inline-block' }} />총 매출 (차량 귀속)
+          </div>
+          <div style={{ fontSize: 21, fontWeight: 700, letterSpacing: '-0.02em', marginTop: 5, color: COLORS.success }}>{loading ? '—' : won(t?.revenue || 0)}</div>
+        </div>
+        <div style={cardStyle}>
+          <div style={{ fontSize: 12.5, color: COLORS.textSecondary, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: COLORS.danger, display: 'inline-block' }} />총 비용
+          </div>
+          <div style={{ fontSize: 21, fontWeight: 700, letterSpacing: '-0.02em', marginTop: 5 }}>{loading ? '—' : won((t?.expense || 0) + (t?.settlementPayout || 0))}</div>
+          <div style={{ fontSize: 11.5, color: COLORS.textMuted, marginTop: 2 }}>
+            정산 지급 {loading ? '—' : won(t?.settlementPayout || 0)} 포함 · 자본성 {loading ? '—' : won(t?.excludedCapital || 0)} 제외
+          </div>
+        </div>
+        <div style={cardStyle}>
+          <div style={{ fontSize: 12.5, color: COLORS.textSecondary, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: COLORS.info, display: 'inline-block' }} />영업이익
+          </div>
+          <div style={{ fontSize: 21, fontWeight: 700, letterSpacing: '-0.02em', marginTop: 5, color: (t?.netProfit || 0) >= 0 ? COLORS.info : COLORS.danger }}>{loading ? '—' : won(t?.netProfit || 0)}</div>
+          <div style={{ fontSize: 11.5, color: COLORS.textMuted, marginTop: 2 }}>{!loading && t?.profitRate != null ? `이익률 ${t.profitRate}%` : ''}</div>
+        </div>
+        <div onClick={() => setLossOnly(v => !v)}
+          style={{ ...cardStyle, cursor: 'pointer', border: lossOnly ? `1.5px solid ${COLORS.danger}` : cardStyle.border }}>
+          <div style={{ fontSize: 12.5, color: COLORS.textSecondary, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: COLORS.danger, display: 'inline-block' }} />적자 차량
+          </div>
+          <div style={{ fontSize: 21, fontWeight: 700, letterSpacing: '-0.02em', marginTop: 5, color: COLORS.danger }}>{loading ? '—' : `${lossCars.length}대`}</div>
+          <div style={{ fontSize: 11.5, color: COLORS.textMuted, marginTop: 2 }}>클릭하면 해당 차량만 표시</div>
+        </div>
+      </div>
 
-        {/* Table Section */}
-        <div style={{ background: '#ffffff', borderRadius: 16, border: '1px solid rgba(0,0,0,0.05)', overflow: 'hidden', boxShadow: '0 1px 2px rgba(16,24,40,0.05)' }}>
-          <table className='w-full text-sm'>
+      {/* 테이블 */}
+      <div style={{ background: '#fff', border: `1px solid ${COLORS.borderSubtle}`, borderRadius: 12, boxShadow: '0 1px 2px rgba(16,24,40,0.05)', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 14px', borderBottom: `1px solid ${COLORS.borderFaint}` }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, border: `1px solid ${COLORS.borderSubtle}`, borderRadius: 8, padding: '6px 11px', background: COLORS.bgGray, flex: '0 1 240px' }}>
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="차량번호, 모델 검색..."
+              style={{ flex: 1, minWidth: 0, border: 'none', background: 'transparent', fontSize: 13, outline: 'none', fontFamily: 'inherit' }} />
+          </div>
+          <span style={{ marginLeft: 'auto', fontSize: 12, color: COLORS.textMuted }}>수익률 낮은 순 · 거래가 귀속된 차량만 표시</span>
+        </div>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
-              <tr style={{ borderBottom: '1px solid rgba(0,0,0,0.06)', background: 'rgba(249,250,251,0.5)' }}>
-                <th className='px-4 py-3 text-left text-slate-600 font-medium'>차량번호</th>
-                <th className='px-4 py-3 text-left text-slate-600 font-medium'>모델</th>
-                <th className='px-4 py-3 text-right text-slate-600 font-medium'>매출</th>
-                <th className='px-4 py-3 text-right text-slate-600 font-medium'>비용</th>
-                <th className='px-4 py-3 text-right text-slate-600 font-medium'>영업이익</th>
-                <th className='px-4 py-3 text-right text-slate-600 font-medium'>정산</th>
-                <th className='px-4 py-3 text-right text-slate-600 font-medium'>순이익</th>
-                <th className='px-4 py-3 text-right text-slate-600 font-medium'>수익률</th>
+              <tr>
+                {['차량', '소유', '매출', '비용', '정산 지급', '순이익', '수익률'].map((h, i) => (
+                  <th key={h} style={{ fontSize: 12, color: COLORS.textMuted, fontWeight: 600, textAlign: i >= 2 ? 'right' : 'left', padding: '10px 14px', borderBottom: `1px solid ${COLORS.borderFaint}`, whiteSpace: 'nowrap' }}>{h}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {sorted.map((pnl, idx) => (
-                <tr key={pnl.carId} style={{ borderBottom: '1px solid rgba(0,0,0,0.04)' }} className='hover:bg-slate-50/50 transition'>
-                  <td className='px-4 py-3 text-slate-800 font-mono'>{pnl.number}</td>
-                  <td className='px-4 py-3 text-slate-600'>{pnl.model}</td>
-                  <td className='px-4 py-3 text-right text-blue-600'>{fMan(pnl.revenue)}</td>
-                  <td className='px-4 py-3 text-right text-red-500'>{fMan(pnl.expense)}</td>
-                  <td className='px-4 py-3 text-right text-amber-600'>{fMan(pnl.operatingProfit)}</td>
-                  <td className='px-4 py-3 text-right text-purple-600'>{fMan(pnl.settlement)}</td>
-                  <td className={`px-4 py-3 text-right font-semibold ${pnl.netProfit >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-                    {fMan(pnl.netProfit)}
-                  </td>
-                  <td className='px-4 py-3 text-right text-slate-600'>{pnl.profitRate.toFixed(1)}%</td>
-                </tr>
+              {loading && <tr><td colSpan={7} style={{ padding: 36, textAlign: 'center', color: COLORS.textMuted, fontSize: 13 }}>계산 중...</td></tr>}
+              {!loading && rows.length === 0 && (
+                <tr><td colSpan={7} style={{ padding: 36, textAlign: 'center', color: COLORS.textMuted, fontSize: 13 }}>
+                  {lossOnly ? '적자 차량이 없습니다' : '이 기간에 차량 귀속 거래가 없습니다 — 장부에서 거래에 차량을 연결해 주세요'}
+                </td></tr>
+              )}
+              {rows.map(c => (
+                <>
+                  <tr key={c.carId} onClick={() => setExpanded(expanded === c.carId ? null : c.carId)}
+                    style={{ borderBottom: `1px solid ${COLORS.borderFaint}`, cursor: 'pointer' }}>
+                    <td style={{ padding: '11px 14px', whiteSpace: 'nowrap' }}>
+                      <b style={{ fontSize: 13.5 }}>{c.number || '—'}</b>
+                      <span style={{ color: COLORS.textMuted, fontSize: 12.5 }}> {[c.brand, c.model].filter(Boolean).join(' ')}</span>
+                    </td>
+                    <td style={{ padding: '11px 14px', fontSize: 12.5, whiteSpace: 'nowrap' }}>{OWNERSHIP_LABEL[c.ownershipType || ''] || c.ownershipType || '—'}</td>
+                    <td style={{ padding: '11px 14px', fontSize: 13, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{won(c.revenue)}</td>
+                    <td style={{ padding: '11px 14px', fontSize: 13, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{won(c.expense)}</td>
+                    <td style={{ padding: '11px 14px', fontSize: 13, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{c.settlementPayout > 0 ? won(c.settlementPayout) : '—'}</td>
+                    <td style={{ padding: '11px 14px', fontSize: 13.5, fontWeight: 700, textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: c.netProfit >= 0 ? COLORS.textPrimary : COLORS.danger }}>{won(c.netProfit)}</td>
+                    <td style={{ padding: '11px 14px', fontSize: 13, fontWeight: 600, textAlign: 'right', color: c.profitRate == null ? COLORS.textDim : c.profitRate >= 20 ? COLORS.success : c.profitRate >= 0 ? COLORS.warning : COLORS.danger }}>
+                      {c.profitRate != null ? `${c.profitRate}%` : '—'}
+                    </td>
+                  </tr>
+                  {expanded === c.carId && (
+                    <tr key={`${c.carId}-detail`} style={{ borderBottom: `1px solid ${COLORS.borderFaint}`, background: COLORS.bgGray }}>
+                      <td colSpan={7} style={{ padding: '10px 14px' }}>
+                        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', fontSize: 12.5 }}>
+                          <span style={{ color: COLORS.textMuted }}>거래 {c.txCount}건</span>
+                          {c.rentalRevenue > 0 && <span>대차 매출 <b>{won(c.rentalRevenue)}</b></span>}
+                          {Object.entries(c.byCategory).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([k, v]) => (
+                            <span key={k}>{k} <b>{won(v)}</b></span>
+                          ))}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </>
               ))}
             </tbody>
           </table>
         </div>
-
-        {/* 빈 상태 */}
-        {sorted.length === 0 && (
-          <div className='text-center text-slate-400 py-12'>
-            <p>조회 결과가 없습니다.</p>
-          </div>
-        )}
       </div>
     </div>
   )
