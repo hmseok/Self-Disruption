@@ -9,12 +9,19 @@
 //   으로 연결 — 이후 단계에서 흡수 예정.
 // ═══════════════════════════════════════════════════════════════
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useApp } from '../../context/AppContext'
 import { COLORS } from '@/app/utils/ui-tokens'
 import { useSettlementData } from './hooks/useSettlementData'
 import type { SettlementItem } from './lib/types'
+
+async function getAuthHeader(): Promise<Record<string, string>> {
+  try {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('fmi_token') : null
+    return token ? { Authorization: `Bearer ${token}` } : {}
+  } catch { return {} }
+}
 
 const won = (n: number) => Math.round(n).toLocaleString('ko-KR')
 
@@ -43,6 +50,46 @@ export default function SettlementFlow() {
   const [month, setMonth] = useState(new Date().toISOString().slice(0, 7))
   const [step, setStep] = useState<StepKey>(2)
   const [typeFilter, setTypeFilter] = useState<'all' | 'jiip' | 'invest' | 'review'>('all')
+
+  // 연도 보기 (2026-07-30 사용자 요청) — 12개월 발송/지급 현황 한눈에
+  const [view, setView] = useState<'month' | 'year'>('month')
+  const [year, setYear] = useState(new Date().getFullYear())
+  const [yearShares, setYearShares] = useState<Array<{ settlement_month: string; total_amount: number; paid_at: string | null }> | null>(null)
+  const [yearLoading, setYearLoading] = useState(false)
+
+  useEffect(() => {
+    if (view !== 'year') return
+    let cancelled = false
+    ;(async () => {
+      setYearLoading(true)
+      try {
+        const months = Array.from({ length: 12 }, (_, i) => `${year}-${String(i + 1).padStart(2, '0')}`).join(',')
+        const headers = await getAuthHeader()
+        const res = await fetch(`/api/settlement/shares?months=${months}`, { headers })
+        const json = await res.json().catch(() => ({}))
+        if (!cancelled) setYearShares(Array.isArray(json?.data) ? json.data : [])
+      } catch {
+        if (!cancelled) setYearShares([])
+      } finally {
+        if (!cancelled) setYearLoading(false)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [view, year])
+
+  const yearByMonth = useMemo(() => {
+    const map = new Map<string, { count: number; paidCount: number; total: number; paidTotal: number }>()
+    for (const s of yearShares || []) {
+      const m = String(s.settlement_month || '')
+      if (!m) continue
+      const cur = map.get(m) || { count: 0, paidCount: 0, total: 0, paidTotal: 0 }
+      cur.count += 1
+      cur.total += Number(s.total_amount) || 0
+      if (s.paid_at) { cur.paidCount += 1; cur.paidTotal += Number(s.total_amount) || 0 }
+      map.set(m, cur)
+    }
+    return map
+  }, [yearShares])
 
   const {
     settlementItems, shareHistory, jiips, investors, transactions,
@@ -99,18 +146,46 @@ export default function SettlementFlow() {
             {loading ? '계산 중...' : `지입 차주 ${jiipItems.length}명 · 투자자 ${investItems.length}명 · 총 지급 예정 ${won(totalPayout)}원`}
           </p>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={() => shiftMonth(-1)}
-            style={{ border: `1px solid ${COLORS.borderSubtle}`, background: '#fff', borderRadius: 9, padding: '8px 14px', fontSize: 13, fontWeight: 600, color: COLORS.textSecondary, cursor: 'pointer' }}>
-            ◀ 이전 달
-          </button>
-          <button onClick={() => shiftMonth(1)} disabled={isCurrentMonth}
-            style={{ border: `1px solid ${COLORS.borderSubtle}`, background: '#fff', borderRadius: 9, padding: '8px 14px', fontSize: 13, fontWeight: 600, color: COLORS.textSecondary, cursor: isCurrentMonth ? 'default' : 'pointer', opacity: isCurrentMonth ? 0.45 : 1 }}>
-            다음 달 ▶
-          </button>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {/* 월/연도 보기 토글 */}
+          <div style={{ display: 'inline-flex', padding: 3, borderRadius: 9, background: COLORS.borderFaint }}>
+            {([['month', '월 보기'], ['year', '연도 보기']] as const).map(([k, label]) => (
+              <button key={k} onClick={() => setView(k)}
+                style={{
+                  padding: '5px 12px', fontSize: 12.5, fontWeight: 600, borderRadius: 7, cursor: 'pointer',
+                  border: view === k ? `1px solid ${COLORS.borderSubtle}` : '1px solid transparent',
+                  background: view === k ? '#fff' : 'transparent',
+                  color: view === k ? COLORS.textPrimary : COLORS.textMuted,
+                }}>{label}</button>
+            ))}
+          </div>
+          {view === 'month' ? (
+            <>
+              <button onClick={() => shiftMonth(-1)}
+                style={{ border: `1px solid ${COLORS.borderSubtle}`, background: '#fff', borderRadius: 9, padding: '8px 14px', fontSize: 13, fontWeight: 600, color: COLORS.textSecondary, cursor: 'pointer' }}>
+                ◀ 이전 달
+              </button>
+              <button onClick={() => shiftMonth(1)} disabled={isCurrentMonth}
+                style={{ border: `1px solid ${COLORS.borderSubtle}`, background: '#fff', borderRadius: 9, padding: '8px 14px', fontSize: 13, fontWeight: 600, color: COLORS.textSecondary, cursor: isCurrentMonth ? 'default' : 'pointer', opacity: isCurrentMonth ? 0.45 : 1 }}>
+                다음 달 ▶
+              </button>
+            </>
+          ) : (
+            <>
+              <button onClick={() => setYear(y => y - 1)}
+                style={{ border: `1px solid ${COLORS.borderSubtle}`, background: '#fff', borderRadius: 9, padding: '8px 14px', fontSize: 13, fontWeight: 600, color: COLORS.textSecondary, cursor: 'pointer' }}>
+                ◀ {year - 1}년
+              </button>
+              <button onClick={() => setYear(y => y + 1)} disabled={year >= new Date().getFullYear()}
+                style={{ border: `1px solid ${COLORS.borderSubtle}`, background: '#fff', borderRadius: 9, padding: '8px 14px', fontSize: 13, fontWeight: 600, color: COLORS.textSecondary, cursor: year >= new Date().getFullYear() ? 'default' : 'pointer', opacity: year >= new Date().getFullYear() ? 0.45 : 1 }}>
+                {year + 1}년 ▶
+              </button>
+            </>
+          )}
         </div>
       </div>
 
+      {view === 'month' && (<>
       {/* 스테퍼 */}
       <div style={{ display: 'flex', marginBottom: 20 }}>
         {STEPS.map((s, i) => {
@@ -290,6 +365,44 @@ export default function SettlementFlow() {
               지급 작업 열기 — 이체·완료 처리
             </button>
           </div>
+        </div>
+      )}
+      </>)}
+
+      {/* ── 연도 보기 — 12개월 발송/지급 현황 ── */}
+      {view === 'year' && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
+          {Array.from({ length: 12 }, (_, i) => {
+            const m = `${year}-${String(i + 1).padStart(2, '0')}`
+            const stat = yearByMonth.get(m)
+            const isFuture = m > new Date().toISOString().slice(0, 7)
+            return (
+              <div key={m}
+                onClick={() => { if (!isFuture) { setMonth(m); setView('month'); setStep(2) } }}
+                style={{
+                  background: '#fff', border: `1px solid ${COLORS.borderSubtle}`, borderRadius: 12,
+                  padding: '14px 16px', boxShadow: '0 1px 2px rgba(16,24,40,0.05)',
+                  cursor: isFuture ? 'default' : 'pointer', opacity: isFuture ? 0.45 : 1,
+                }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <b style={{ fontSize: 14 }}>{Number(m.split('-')[1])}월</b>
+                  {yearLoading
+                    ? <span style={{ fontSize: 11, color: COLORS.textMuted }}>집계 중...</span>
+                    : !stat
+                      ? <span style={{ fontSize: 11, fontWeight: 600, padding: '3px 8px', borderRadius: 6, background: COLORS.borderFaint, color: COLORS.textMuted }}>정산 없음</span>
+                      : stat.paidCount >= stat.count
+                        ? <span style={{ fontSize: 11, fontWeight: 600, padding: '3px 8px', borderRadius: 6, background: COLORS.bgGreen, color: COLORS.success }}>지급 완료</span>
+                        : <span style={{ fontSize: 11, fontWeight: 600, padding: '3px 8px', borderRadius: 6, background: COLORS.bgAmber, color: COLORS.warning }}>대기 {stat.count - stat.paidCount}건</span>}
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, color: COLORS.textSecondary, marginBottom: 3 }}>
+                  <span>발송</span><b style={{ color: COLORS.textPrimary }}>{stat ? `${stat.count}건 · ${won(stat.total)}원` : '—'}</b>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, color: COLORS.textSecondary }}>
+                  <span>지급 완료</span><b style={{ color: stat && stat.paidCount > 0 ? COLORS.success : COLORS.textPrimary }}>{stat ? `${stat.paidCount}건 · ${won(stat.paidTotal)}원` : '—'}</b>
+                </div>
+              </div>
+            )
+          })}
         </div>
       )}
     </div>
