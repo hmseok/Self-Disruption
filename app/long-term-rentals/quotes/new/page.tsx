@@ -24,7 +24,19 @@ async function getAuthHeader(): Promise<Record<string, string>> {
   } catch { return {} }
 }
 
-type VehicleSource = 'existing' | 'catalog' | 'ai'
+type VehicleSource = 'existing' | 'catalog' | 'ai' | 'research'
+
+// 외부 조사 (가상 견적) 응답 — lookup-car-catalog NewCarResult 형식
+type ResearchTrim = {
+  name: string; base_price: number
+  exterior_colors?: Array<{ name: string; code?: string; price?: number }>
+  interior_colors?: Array<{ name: string; code?: string; price?: number }>
+  options?: Array<{ name: string; price?: number }>
+}
+type ResearchResult = {
+  brand: string; model: string; year: number
+  variants: Array<{ variant_name?: string; fuel_type?: string; engine_cc?: number; trims: ResearchTrim[] }>
+}
 
 const CONTRACT_TYPES = [
   { value: '기존차량', label: '기존차량' },
@@ -95,6 +107,18 @@ export default function NewQuotePage() {
   const [aiResult, setAiResult] = useState<any | null>(null)
   const [aiErr, setAiErr] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+
+  // 외부 조사 (가상 견적) — 브랜드/차종만 치면 트림·색상·옵션·출고가 생성 (2026-08-01 사용자 요청)
+  const [rsBrand, setRsBrand] = useState('')
+  const [rsModel, setRsModel] = useState('')
+  const [rsYear, setRsYear] = useState(String(new Date().getFullYear()))
+  const [rsBusy, setRsBusy] = useState(false)
+  const [rsErr, setRsErr] = useState<string | null>(null)
+  const [rsResult, setRsResult] = useState<ResearchResult | null>(null)
+  const [rsSel, setRsSel] = useState<{ vi: number; ti: number } | null>(null)
+  const [rsExt, setRsExt] = useState(0)
+  const [rsInt, setRsInt] = useState(0)
+  const [rsOpts, setRsOpts] = useState<Set<number>>(new Set())
 
   // 토스트
   const [toast, setToast] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
@@ -216,6 +240,67 @@ export default function NewQuotePage() {
     setForm((f) => ({ ...f, monthly_fee: String(calcResult.suggested_rent_with_vat) }))
     showToast({ type: 'ok', text: `월 ${calcResult.suggested_rent_with_vat.toLocaleString('ko-KR')}원 적용` })
   }, [calcResult, showToast])
+
+  // 외부 조사 실행
+  const runResearch = useCallback(async () => {
+    if (!rsBrand.trim() || !rsModel.trim()) { setRsErr('브랜드와 차종을 입력해 주세요'); return }
+    setRsBusy(true); setRsErr(null); setRsResult(null); setRsSel(null)
+    try {
+      const headers = { ...(await getAuthHeader()), 'Content-Type': 'application/json' }
+      const res = await fetch('/api/lookup-car-catalog', {
+        method: 'POST', headers,
+        body: JSON.stringify({ brand: rsBrand.trim(), model: rsModel.trim(), year: Number(rsYear) || new Date().getFullYear() }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || json?.error) throw new Error(json?.error || '조사 실패')
+      setRsResult((json.data || json) as ResearchResult)
+      showToast({ type: 'ok', text: '조사 완료 — 트림을 선택하세요' })
+    } catch (e) {
+      setRsErr((e as Error)?.message || '조사 오류')
+    } finally { setRsBusy(false) }
+  }, [rsBrand, rsModel, rsYear, showToast])
+
+  // 외부 조사 — 선택한 구성(트림+색상+옵션) 출고가 계산 후 폼 적용
+  const rsSelected = rsResult && rsSel ? {
+    variant: rsResult.variants[rsSel.vi],
+    trim: rsResult.variants[rsSel.vi]?.trims?.[rsSel.ti],
+  } : null
+  const rsTotal = (() => {
+    if (!rsSelected?.trim) return null
+    const t = rsSelected.trim
+    let sum = Number(t.base_price) || 0
+    sum += Number(t.exterior_colors?.[rsExt]?.price) || 0
+    sum += Number(t.interior_colors?.[rsInt]?.price) || 0
+    for (const i of rsOpts) sum += Number(t.options?.[i]?.price) || 0
+    return sum
+  })()
+  const applyResearch = useCallback(() => {
+    if (!rsResult || !rsSelected?.trim || rsTotal == null) return
+    const v = rsSelected.variant
+    const t = rsSelected.trim
+    const fuel = String(v.fuel_type || '').toLowerCase()
+    const fuelKey = fuel.includes('전기') || fuel.includes('ev') ? 'ev'
+      : fuel.includes('하이브리드') || fuel.includes('hybrid') ? 'hybrid'
+      : fuel.includes('디젤') || fuel.includes('diesel') ? 'diesel'
+      : 'gasoline'
+    const optNames = [...rsOpts].map((i) => t.options?.[i]?.name).filter(Boolean).join(', ')
+    setForm((f) => ({
+      ...f,
+      contract_type: '신차구입',
+      vehicle_brand: rsResult.brand || rsBrand,
+      vehicle_model: rsResult.model || rsModel,
+      vehicle_trim: t.name || '',
+      vehicle_year: String(rsResult.year || rsYear),
+      vehicle_fuel: fuelKey,
+      vehicle_engine_cc: String(v.engine_cc ?? (fuelKey === 'ev' ? 0 : '')),
+      vehicle_color_ext: t.exterior_colors?.[rsExt]?.name || '',
+      vehicle_color_int: t.interior_colors?.[rsInt]?.name || '',
+      vehicle_options_text: optNames,
+      market_price: String(rsTotal),
+      purchase_price: f.purchase_price || String(rsTotal),
+    }))
+    showToast({ type: 'ok', text: `${t.name} 구성 적용 (출고가 추정 ${rsTotal.toLocaleString('ko-KR')}원) — 고객명 없이 저장하면 가상 견적으로 보관됩니다` })
+  }, [rsResult, rsSelected, rsTotal, rsExt, rsInt, rsOpts, rsBrand, rsModel, rsYear, showToast])
 
   // AI 캡쳐
   const handleAiUpload = useCallback(async (file: File) => {
@@ -402,7 +487,8 @@ export default function NewQuotePage() {
                   {([
                     { k: 'existing' as const, label: '기존 차량' },
                     { k: 'catalog' as const, label: '신차 카탈로그' },
-                    { k: 'ai' as const, label: '신차 AI 캡쳐' },
+                    { k: 'research' as const, label: '외부 조사 (가상 견적)' },
+                    { k: 'ai' as const, label: '견적서 캡쳐' },
                   ]).map((t) => (
                     <button key={t.k} onClick={() => setVehicleSource(t.k)}
                       style={{ padding: '4px 9px', borderRadius: 6, fontSize: 10, fontWeight: 700, cursor: 'pointer',
@@ -436,6 +522,103 @@ export default function NewQuotePage() {
               {vehicleSource === 'catalog' && (
                 <CatalogPicker form={form as any} setForm={setForm as any} inputStyle={inputStyle} labelStyle={labelStyle} />
               )}
+              {vehicleSource === 'research' && (
+                <div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 90px auto', gap: 8, alignItems: 'end', marginBottom: 10 }}>
+                    <div><label style={labelStyle}>브랜드</label>
+                      <input value={rsBrand} onChange={(e) => setRsBrand(e.target.value)} placeholder="예: 기아" style={inputStyle} /></div>
+                    <div><label style={labelStyle}>차종</label>
+                      <input value={rsModel} onChange={(e) => setRsModel(e.target.value)} placeholder="예: 카니발" style={inputStyle}
+                        onKeyDown={(e) => { if (e.key === 'Enter') runResearch() }} /></div>
+                    <div><label style={labelStyle}>연식</label>
+                      <input type="number" value={rsYear} onChange={(e) => setRsYear(e.target.value)} style={inputStyle} /></div>
+                    <button onClick={runResearch} disabled={rsBusy}
+                      style={{ padding: '9px 16px', borderRadius: 8, border: 'none', background: '#2563eb', color: '#fff', cursor: rsBusy ? 'wait' : 'pointer', fontSize: 12.5, fontWeight: 600, whiteSpace: 'nowrap' }}>
+                      {rsBusy ? '조사 중...' : '조사'}
+                    </button>
+                  </div>
+                  {rsErr && <div style={{ fontSize: 12, color: '#dc2626', marginBottom: 8 }}>{rsErr}</div>}
+
+                  {rsResult && (
+                    <div style={{ display: 'grid', gridTemplateColumns: rsSelected?.trim ? '1fr 1fr' : '1fr', gap: 10 }}>
+                      {/* 트림 목록 */}
+                      <div style={{ background: '#f6f7f9', border: '1px solid #e6e8ec', padding: 10, borderRadius: 10, maxHeight: 260, overflowY: 'auto' }}>
+                        <div style={{ fontSize: 11.5, fontWeight: 700, marginBottom: 6 }}>{rsResult.brand} {rsResult.model} ({rsResult.year}) — 트림 선택</div>
+                        {rsResult.variants?.map((v, vi) =>
+                          v.trims?.map((t, ti) => {
+                            const on = rsSel?.vi === vi && rsSel?.ti === ti
+                            return (
+                              <button key={`${vi}-${ti}`}
+                                onClick={() => { setRsSel({ vi, ti }); setRsExt(0); setRsInt(0); setRsOpts(new Set()) }}
+                                style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '6px 9px', borderRadius: 7, cursor: 'pointer', fontSize: 12, textAlign: 'left', marginBottom: 4,
+                                  border: on ? '1.5px solid #2563eb' : '1px solid #e6e8ec',
+                                  background: on ? '#eff4ff' : '#fff' }}>
+                                <span style={{ color: '#5b626e', minWidth: 76, fontSize: 11 }}>{v.fuel_type || v.variant_name || ''}</span>
+                                <span style={{ flex: 1, fontWeight: on ? 700 : 500 }}>{t.name}</span>
+                                <span style={{ fontWeight: 700, color: '#2563eb', fontVariantNumeric: 'tabular-nums' }}>{(t.base_price || 0).toLocaleString('ko-KR')}원</span>
+                              </button>
+                            )
+                          })
+                        )}
+                      </div>
+
+                      {/* 구성 선택 (색상·옵션) + 적용 */}
+                      {rsSelected?.trim && (
+                        <div style={{ background: '#fff', border: '1px solid #e6e8ec', padding: 10, borderRadius: 10, maxHeight: 260, overflowY: 'auto' }}>
+                          <div style={{ fontSize: 11.5, fontWeight: 700, marginBottom: 6 }}>{rsSelected.trim.name} 구성</div>
+                          {(rsSelected.trim.exterior_colors?.length || 0) > 0 && (
+                            <div style={{ marginBottom: 8 }}>
+                              <label style={labelStyle}>외장 색상</label>
+                              <select value={rsExt} onChange={(e) => setRsExt(Number(e.target.value))} style={inputStyle}>
+                                {rsSelected.trim.exterior_colors!.map((c, i) => (
+                                  <option key={i} value={i}>{c.name}{c.price ? ` (+${Number(c.price).toLocaleString('ko-KR')}원)` : ''}</option>
+                                ))}
+                              </select>
+                            </div>
+                          )}
+                          {(rsSelected.trim.interior_colors?.length || 0) > 0 && (
+                            <div style={{ marginBottom: 8 }}>
+                              <label style={labelStyle}>내장 색상</label>
+                              <select value={rsInt} onChange={(e) => setRsInt(Number(e.target.value))} style={inputStyle}>
+                                {rsSelected.trim.interior_colors!.map((c, i) => (
+                                  <option key={i} value={i}>{c.name}{c.price ? ` (+${Number(c.price).toLocaleString('ko-KR')}원)` : ''}</option>
+                                ))}
+                              </select>
+                            </div>
+                          )}
+                          {(rsSelected.trim.options?.length || 0) > 0 && (
+                            <div style={{ marginBottom: 8 }}>
+                              <label style={labelStyle}>옵션</label>
+                              {rsSelected.trim.options!.map((o, i) => (
+                                <label key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, padding: '3px 0', cursor: 'pointer' }}>
+                                  <input type="checkbox" checked={rsOpts.has(i)}
+                                    onChange={() => setRsOpts((prev) => { const n = new Set(prev); n.has(i) ? n.delete(i) : n.add(i); return n })}
+                                    style={{ width: 13, height: 13, accentColor: '#2563eb' }} />
+                                  <span style={{ flex: 1 }}>{o.name}</span>
+                                  <span style={{ color: '#5b626e', fontVariantNumeric: 'tabular-nums' }}>{o.price ? `+${Number(o.price).toLocaleString('ko-KR')}원` : '무료'}</span>
+                                </label>
+                              ))}
+                            </div>
+                          )}
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 8, borderTop: '1px dashed #e6e8ec' }}>
+                            <div style={{ fontSize: 12 }}>출고가 추정 <b style={{ fontSize: 13.5 }}>{rsTotal != null ? rsTotal.toLocaleString('ko-KR') : '—'}원</b></div>
+                            <button onClick={applyResearch}
+                              style={{ padding: '7px 14px', borderRadius: 8, border: 'none', background: '#2563eb', color: '#fff', cursor: 'pointer', fontSize: 12.5, fontWeight: 600 }}>
+                              이 구성으로 적용
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {!rsResult && !rsBusy && (
+                    <div style={{ fontSize: 11.5, color: '#9aa1ad' }}>
+                      브랜드·차종만 입력하면 시판 트림·색상·옵션·출고가를 자동 조사합니다. 구성을 골라 적용한 뒤 고객명 없이 저장하면 가상 견적으로 보관됩니다.
+                    </div>
+                  )}
+                </div>
+              )}
+
               {vehicleSource === 'ai' && (
                 <div>
                   <input ref={fileRef} type="file" accept="image/*,application/pdf" style={{ display: 'none' }}
