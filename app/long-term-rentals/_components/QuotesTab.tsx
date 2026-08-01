@@ -2,18 +2,16 @@
 
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import DcStatStrip, { StatItem, ActionButton } from '@/app/components/DcStatStrip'
 import DcToolbar, { FilterItem } from '@/app/components/DcToolbar'
 import NeuDataTable, { TableColumn, MobileCardConfig } from '@/app/components/NeuDataTable'
-import { GLASS, COLORS } from '@/app/utils/ui-tokens'
+import { COLORS } from '@/app/utils/ui-tokens'
 
 // ═══════════════════════════════════════════════════════════════════
-// 장기렌트 견적 V3 목록 탭 (PR-Q4-1)
-//
-// 사용자 명시: 「견적작성 모달로 하기싫은데 페이지에서 구성하고 싶어요」
-// → 모달 모두 제거, 목록만 유지.
+// 장기렌트 견적 목록 탭
+// 2026-07-30 개편: 플랫 디자인 재작성 (이모지 제거, 목업 배지 스타일).
+// 데이터 흐름은 유지 — 목록 + 상태 필터, 작성/상세는 풀 페이지
 //   「+ 견적 작성」 → /long-term-rentals/quotes/new
-//   「✎ 상세」      → /long-term-rentals/quotes/[id]
+//   행 클릭        → /long-term-rentals/quotes/[id]
 // ═══════════════════════════════════════════════════════════════════
 
 async function getAuthHeader(): Promise<Record<string, string>> {
@@ -48,20 +46,20 @@ type QuoteRow = {
 type FilterKey = 'all' | 'draft' | 'sent' | 'accepted' | 'rejected' | 'expired' | 'converted'
 
 const STATUS_META: Record<string, { label: string; bg: string; fg: string }> = {
-  draft:     { label: '✏️ 작성중',  bg: 'rgba(148,163,184,0.18)', fg: '#475569' },
-  sent:      { label: '📤 발송됨',  bg: COLORS.bgBlue,            fg: COLORS.primary },
-  accepted:  { label: '✅ 수락',    bg: 'rgba(16,185,129,0.14)',  fg: '#065f46' },
-  rejected:  { label: '✗ 거부',     bg: 'rgba(239,68,68,0.12)',   fg: '#991b1b' },
-  expired:   { label: '⏰ 만료',    bg: 'rgba(245,158,11,0.12)',  fg: '#b45309' },
-  converted: { label: '🔗 계약',    bg: 'rgba(124,58,237,0.14)',  fg: '#5b21b6' },
+  draft:     { label: '작성중', bg: COLORS.borderFaint, fg: COLORS.textSecondary },
+  sent:      { label: '발송됨', bg: COLORS.bgBlue,      fg: COLORS.primary },
+  accepted:  { label: '수락',   bg: COLORS.bgGreen,     fg: COLORS.success },
+  rejected:  { label: '거부',   bg: COLORS.bgRed,       fg: COLORS.danger },
+  expired:   { label: '만료',   bg: COLORS.bgAmber,     fg: COLORS.warning },
+  converted: { label: '계약 전환', bg: COLORS.bgViolet, fg: '#6d28d9' },
 }
 
 function fmtWon(n: number | null | undefined): string {
-  if (n == null) return '-'
+  if (n == null) return '—'
   return `${Number(n).toLocaleString('ko-KR')}원`
 }
 function fmtDate(s: string | null | undefined): string {
-  if (!s) return '-'
+  if (!s) return '—'
   return String(s).slice(0, 10)
 }
 
@@ -80,7 +78,7 @@ export default function QuotesTab() {
   // 토스트
   const [toast, setToast] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
   const showToast = useCallback((m: { type: 'ok' | 'err'; text: string }) => {
-    setToast(m); setTimeout(() => setToast(null), 4500)
+    setToast(m); setTimeout(() => setToast(null), 4000)
   }, [])
 
   const fetchAll = useCallback(async () => {
@@ -92,7 +90,7 @@ export default function QuotesTab() {
       if (Array.isArray(json?.data)) setRows(json.data as QuoteRow[])
       else { setRows([]); if (json?.error) setErr(json.error) }
     } catch (e) {
-      setRows([]); setErr((e as Error)?.message || 'fetch 실패')
+      setRows([]); setErr((e as Error)?.message || '견적 목록을 불러오지 못했습니다')
     } finally { setLoading(false) }
   }, [])
 
@@ -103,7 +101,7 @@ export default function QuotesTab() {
 
   const refresh = useCallback(() => { setRows(null); fetchAll() }, [fetchAll])
 
-  // PR-Q4-1: 모달 → 풀 페이지
+  // 작성/상세는 풀 페이지
   const openCreate = useCallback(() => router.push('/long-term-rentals/quotes/new'), [router])
   const openDetail = useCallback((r: QuoteRow) => router.push(`/long-term-rentals/quotes/${r.id}`), [router])
 
@@ -116,7 +114,7 @@ export default function QuotesTab() {
       const json = await res.json().catch(() => ({}))
       if (!res.ok || json?.error) throw new Error(json?.error || '삭제 실패')
       setDelTarget(null)
-      showToast({ type: 'ok', text: '견적 삭제 완료' })
+      showToast({ type: 'ok', text: '견적을 삭제했습니다' })
       refresh()
     } catch (e) {
       showToast({ type: 'err', text: (e as Error)?.message || '삭제 오류' })
@@ -149,94 +147,78 @@ export default function QuotesTab() {
     )
   }, [activeData, search])
 
-  const counts = {
-    all: data.all.length, draft: data.draft.length, sent: data.sent.length,
-    accepted: data.accepted.length, converted: data.converted.length,
-  }
-
-  const statItems: StatItem[] = [
-    { label: '📋 전체', value: counts.all, unit: '건', tint: 'blue' },
-    { label: '✏️ 작성중', value: counts.draft, unit: '건', tint: 'purple' },
-    { label: '📤 발송', value: counts.sent, unit: '건', tint: 'amber' },
-    { label: '✅ 수락', value: counts.accepted, unit: '건', tint: 'green' },
-    { label: '🔗 계약전환', value: counts.converted, unit: '건', tint: 'red' },
-  ]
-  const statActions: ActionButton[] = [
-    { label: '견적 작성', onClick: openCreate, variant: 'primary', icon: '➕' },
-    { label: '새로고침', onClick: refresh, variant: 'secondary', icon: '🔄' },
-  ]
   const filterItems: FilterItem[] = [
-    { key: 'all', label: '📋 전체', count: counts.all },
-    { key: 'draft', label: '✏️ 작성중', count: counts.draft },
-    { key: 'sent', label: '📤 발송', count: counts.sent },
-    { key: 'accepted', label: '✅ 수락', count: counts.accepted },
-    { key: 'converted', label: '🔗 계약전환', count: counts.converted },
+    { key: 'all', label: '전체', count: data.all.length },
+    { key: 'draft', label: '작성중', count: data.draft.length },
+    { key: 'sent', label: '발송', count: data.sent.length },
+    { key: 'accepted', label: '수락', count: data.accepted.length },
+    { key: 'converted', label: '계약 전환', count: data.converted.length },
   ]
 
   const columns: TableColumn<QuoteRow>[] = [
-    { key: 'status', label: '상태', width: 92, align: 'center', sortBy: (r) => r.status || '',
+    { key: 'status', label: '상태', width: 90, align: 'center', sortBy: (r) => r.status || '',
       render: (r) => {
-        const m = STATUS_META[r.status] || { label: r.status, bg: 'rgba(148,163,184,0.15)', fg: '#475569' }
-        return <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: 8, fontSize: 11, fontWeight: 800, whiteSpace: 'nowrap', background: m.bg, color: m.fg }}>{m.label}</span>
+        const m = STATUS_META[r.status] || { label: r.status, bg: COLORS.borderFaint, fg: COLORS.textSecondary }
+        return <span style={{ display: 'inline-block', padding: '3px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap', background: m.bg, color: m.fg }}>{m.label}</span>
       },
     },
-    { key: 'contract_type', label: '유형', width: 70, align: 'center', sortBy: (r) => r.contract_type || '',
+    { key: 'contract_type', label: '유형', width: 64, align: 'center', sortBy: (r) => r.contract_type || '',
       render: (r) => {
         const isNew = r.contract_type === '신차구입'
-        return <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 6, fontSize: 10, fontWeight: 800, whiteSpace: 'nowrap',
-          background: isNew ? 'rgba(245,158,11,0.14)' : COLORS.bgBlue,
-          color: isNew ? '#b45309' : COLORS.primary }}>
-          {isNew ? '🆕 신차' : '🚗 기존'}
+        return <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap',
+          background: isNew ? COLORS.bgAmber : COLORS.bgBlue,
+          color: isNew ? COLORS.warning : COLORS.primary }}>
+          {isNew ? '신차' : '기존'}
         </span>
       },
     },
     { key: 'customer', label: '고객', width: 160, sortBy: (r) => r.customer_name || '',
-      render: (r) => <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: 160, fontSize: 12 }}>
-        <span style={{ fontWeight: 700, color: '#1e293b' }}>{r.customer_name}</span>
-        {r.customer_company ? <span style={{ color: '#94a3b8' }}> · {r.customer_company}</span> : null}
+      render: (r) => <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: 160, fontSize: 13 }}>
+        <span style={{ fontWeight: 600 }}>{r.customer_name}</span>
+        {r.customer_company ? <span style={{ color: COLORS.textMuted }}> · {r.customer_company}</span> : null}
       </span>,
     },
     { key: 'vehicle', label: '차량', width: 200, sortBy: (r) => r.vehicle_car_number || `${r.vehicle_brand} ${r.vehicle_model}`,
       render: (r) => {
         const spec = [r.vehicle_brand, r.vehicle_model, r.vehicle_trim].filter(Boolean).join(' ')
-        return <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: 200, fontSize: 12 }}>
+        return <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: 200, fontSize: 12.5 }}>
           {r.vehicle_car_number
-            ? <><span style={{ fontWeight: 800, color: '#0f2440' }}>🚗 {r.vehicle_car_number}</span>{spec ? <span style={{ color: '#94a3b8' }}> · {spec}</span> : null}</>
+            ? <><span style={{ fontWeight: 600 }}>{r.vehicle_car_number}</span>{spec ? <span style={{ color: COLORS.textMuted }}> · {spec}</span> : null}</>
             : spec
-              ? <span style={{ color: '#b45309', fontWeight: 600 }}>🚚 {spec}</span>
-              : <span style={{ color: '#cbd5e1' }}>미지정</span>}
+              ? <span style={{ color: COLORS.warning, fontWeight: 500 }}>{spec} (신차)</span>
+              : <span style={{ color: COLORS.textDim }}>미지정</span>}
         </span>
       },
     },
     { key: 'months', label: '기간', width: 64, align: 'center', sortBy: (r) => Number(r.months || 0),
-      render: (r) => <span style={{ whiteSpace: 'nowrap', fontSize: 12, fontWeight: 600, color: '#475569' }}>{r.months ? `${r.months}개월` : '-'}</span>,
+      render: (r) => <span style={{ whiteSpace: 'nowrap', fontSize: 12.5, color: COLORS.textSecondary }}>{r.months ? `${r.months}개월` : '—'}</span>,
     },
-    { key: 'monthly_fee', label: '월 렌트료', width: 116, align: 'right', sortBy: (r) => Number(r.monthly_fee || 0),
-      render: (r) => <span style={{ whiteSpace: 'nowrap', fontSize: 12, fontWeight: 700, color: '#0f2440' }}>{fmtWon(r.monthly_fee)}</span>,
+    { key: 'monthly_fee', label: '월 렌트료', width: 110, align: 'right', sortBy: (r) => Number(r.monthly_fee || 0),
+      render: (r) => <span style={{ whiteSpace: 'nowrap', fontSize: 13, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{fmtWon(r.monthly_fee)}</span>,
     },
-    { key: 'margin', label: '마진율', width: 70, align: 'center', sortBy: (r) => Number(r.margin_rate || 0),
+    { key: 'margin', label: '마진율', width: 68, align: 'center', sortBy: (r) => Number(r.margin_rate || 0),
       render: (r) => r.margin_rate != null
-        ? <span style={{ whiteSpace: 'nowrap', fontSize: 11, fontWeight: 700, color: r.margin_rate >= 10 ? '#065f46' : r.margin_rate >= 5 ? '#b45309' : '#991b1b' }}>{r.margin_rate.toFixed(1)}%</span>
-        : <span style={{ color: '#cbd5e1' }}>-</span>,
+        ? <span style={{ whiteSpace: 'nowrap', fontSize: 12, fontWeight: 600, color: r.margin_rate >= 10 ? COLORS.success : r.margin_rate >= 5 ? COLORS.warning : COLORS.danger }}>{r.margin_rate.toFixed(1)}%</span>
+        : <span style={{ color: COLORS.textDim }}>—</span>,
     },
-    { key: 'owner', label: '담당', width: 80, align: 'center', sortBy: (r) => r.owner_name || '',
-      render: (r) => <span style={{ whiteSpace: 'nowrap', fontSize: 12, color: '#475569' }}>{r.owner_name || '-'}</span>,
+    { key: 'owner', label: '담당', width: 76, align: 'center', sortBy: (r) => r.owner_name || '',
+      render: (r) => <span style={{ whiteSpace: 'nowrap', fontSize: 12.5, color: COLORS.textSecondary }}>{r.owner_name || '—'}</span>,
     },
-    { key: 'sent_at', label: '발송', width: 84, align: 'center', sortBy: (r) => r.sent_at || '',
-      render: (r) => <span style={{ whiteSpace: 'nowrap', fontSize: 11, color: '#94a3b8' }}>{fmtDate(r.sent_at)}</span>,
+    { key: 'sent_at', label: '발송일', width: 84, align: 'center', sortBy: (r) => r.sent_at || '',
+      render: (r) => <span style={{ whiteSpace: 'nowrap', fontSize: 12, color: COLORS.textMuted }}>{fmtDate(r.sent_at)}</span>,
     },
-    { key: 'views', label: '조회', width: 56, align: 'center', sortBy: (r) => Number(r.share_views || 0),
+    { key: 'views', label: '열람', width: 56, align: 'center', sortBy: (r) => Number(r.share_views || 0),
       render: (r) => r.share_views > 0
-        ? <span style={{ whiteSpace: 'nowrap', fontSize: 11, fontWeight: 700, color: COLORS.primary }}>👁 {r.share_views}</span>
-        : <span style={{ color: '#cbd5e1', fontSize: 11 }}>-</span>,
+        ? <span style={{ whiteSpace: 'nowrap', fontSize: 12, fontWeight: 600, color: COLORS.primary }}>{r.share_views}회</span>
+        : <span style={{ color: COLORS.textDim, fontSize: 12 }}>—</span>,
     },
-    { key: 'actions', label: '액션', width: 80, align: 'center',
+    { key: 'actions', label: '', width: 88, align: 'center',
       render: (r) => (
         <span style={{ display: 'inline-flex', gap: 4, whiteSpace: 'nowrap' }}>
           <button onClick={(e) => { e.stopPropagation(); openDetail(r) }}
-            style={{ padding: '4px 9px', borderRadius: 7, border: `1px solid ${COLORS.borderBlue}`, background: COLORS.bgBlue, color: COLORS.primary, cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>✎ 상세</button>
+            style={{ padding: '3px 9px', borderRadius: 7, border: `1px solid ${COLORS.borderSubtle}`, background: '#fff', color: COLORS.textSecondary, cursor: 'pointer', fontSize: 11.5, fontWeight: 600 }}>상세</button>
           <button onClick={(e) => { e.stopPropagation(); setDelTarget(r) }}
-            style={{ padding: '4px 9px', borderRadius: 7, border: '1px solid rgba(239,68,68,0.25)', background: 'transparent', color: '#991b1b', cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>🗑</button>
+            style={{ padding: '3px 9px', borderRadius: 7, border: `1px solid ${COLORS.borderRed}`, background: '#fff', color: COLORS.danger, cursor: 'pointer', fontSize: 11.5, fontWeight: 600 }}>삭제</button>
         </span>
       ),
     },
@@ -244,38 +226,40 @@ export default function QuotesTab() {
 
   const mobileCard: MobileCardConfig<QuoteRow> = {
     title: (r) => <span style={{ whiteSpace: 'nowrap' }}>{STATUS_META[r.status]?.label || r.status} · {r.customer_name}</span>,
-    subtitle: (r) => `${[r.vehicle_brand, r.vehicle_model].filter(Boolean).join(' ') || r.vehicle_car_number || '미지정'} · ${r.months || '-'}개월 · ${fmtWon(r.monthly_fee)}/월`,
+    subtitle: (r) => `${[r.vehicle_brand, r.vehicle_model].filter(Boolean).join(' ') || r.vehicle_car_number || '미지정'} · ${r.months || '—'}개월 · ${fmtWon(r.monthly_fee)}/월`,
   }
 
   return (
     <>
       {toast && (
         <div role="status" style={{
-          position: 'fixed', top: 72, left: '50%', transform: 'translateX(-50%)', zIndex: 60,
-          maxWidth: 'min(520px, 92vw)', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10,
-          background: toast.type === 'ok' ? 'rgba(236,253,245,0.97)' : 'rgba(254,242,242,0.97)', WebkitBackdropFilter: 'blur(12px)',
-          border: `1px solid ${toast.type === 'ok' ? 'rgba(16,185,129,0.45)' : 'rgba(239,68,68,0.45)'}`,
-          borderRadius: 12, boxShadow: '0 14px 36px rgba(15,23,42,0.18)',
-          fontSize: 13, fontWeight: 700, color: toast.type === 'ok' ? '#065f46' : '#991b1b',
-        }}>
-          <span>{toast.type === 'ok' ? '✅' : '⚠️'}</span>
-          <span style={{ flex: 1 }}>{toast.text}</span>
-          <button onClick={() => setToast(null)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 15 }}>×</button>
-        </div>
+          position: 'fixed', top: 20, right: 24, zIndex: 60,
+          maxWidth: 'min(520px, 92vw)', padding: '11px 18px',
+          background: toast.type === 'ok' ? COLORS.textPrimary : COLORS.danger, color: '#fff',
+          borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
+          fontSize: 13, fontWeight: 500,
+        }}>{toast.text}</div>
       )}
 
-      <DcStatStrip stats={statItems} actions={statActions} />
       <DcToolbar
         search={search}
         onSearchChange={setSearch}
-        placeholder="고객 / 차량 / 견적번호 검색…"
+        placeholder="고객, 차량, 견적번호 검색..."
         filters={filterItems}
         activeFilter={filter}
         onFilterChange={(k) => setFilter(k as FilterKey)}
+        trailing={
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button onClick={refresh}
+              style={{ border: `1px solid ${COLORS.borderSubtle}`, background: '#fff', borderRadius: 9, padding: '7px 13px', fontSize: 12.5, fontWeight: 600, color: COLORS.textSecondary, cursor: 'pointer' }}>새로고침</button>
+            <button onClick={openCreate}
+              style={{ border: 'none', background: COLORS.primary, borderRadius: 9, padding: '7px 15px', fontSize: 12.5, fontWeight: 600, color: '#fff', cursor: 'pointer' }}>+ 견적 작성</button>
+          </div>
+        }
       />
       {err && (
-        <div style={{ ...GLASS.L3, marginBottom: 12, padding: 12, borderRadius: 10, border: '1px solid rgba(239,68,68,0.3)', fontSize: 12, color: '#991b1b' }}>
-          ⚠ {err} — lt_quotes 마이그레이션이 적용됐는지 확인해주세요.
+        <div style={{ marginBottom: 12, padding: '10px 14px', borderRadius: 10, background: COLORS.bgRed, border: `1px solid ${COLORS.borderRed}`, fontSize: 12.5, color: COLORS.danger }}>
+          {err}
         </div>
       )}
       <NeuDataTable
@@ -287,30 +271,30 @@ export default function QuotesTab() {
         emptyIcon="📝"
         emptyMessage="견적이 없습니다 — 「견적 작성」으로 추가하세요"
         mobileCard={mobileCard}
-        defaultSort={{ key: 'updated_at', dir: 'desc' }}
+        defaultSort={{ key: 'sent_at', dir: 'desc' }}
       />
-      <div style={{ marginTop: 12, fontSize: 12, color: '#64748b' }}>
-        💡 매입가 + 차종 + 기간 입력 시 견적 작성 페이지 우측에서 7대 원가·마진·IRR 실시간 자동 산출.
+      <div style={{ marginTop: 12, fontSize: 12, color: COLORS.textMuted }}>
+        매입가·차종·기간을 입력하면 견적 작성 화면 우측에서 원가·마진이 실시간으로 계산됩니다.
       </div>
 
       {delTarget && (
         <div onClick={() => !delBusy && setDelTarget(null)}
-          style={{ position: 'fixed', inset: 0, zIndex: 55, background: 'rgba(15,23,42,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+          style={{ position: 'fixed', inset: 0, zIndex: 55, background: 'rgba(16,24,40,0.24)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
           <div onClick={(e) => e.stopPropagation()}
-            style={{ ...GLASS.L5, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', width: 'min(400px, 96vw)', borderRadius: 16, boxShadow: '0 24px 60px rgba(0,0,0,0.25)', overflow: 'hidden' }}>
+            style={{ background: '#fff', border: `1px solid ${COLORS.borderSubtle}`, width: 'min(380px, 96vw)', borderRadius: 12, boxShadow: '0 8px 24px rgba(16,24,40,0.18)', overflow: 'hidden' }}>
             <div style={{ padding: '18px 20px 14px' }}>
-              <h3 style={{ fontSize: 15, fontWeight: 900, color: '#0f2440', margin: 0 }}>🗑 견적 삭제</h3>
-              <div style={{ ...GLASS.L1, marginTop: 12, padding: '10px 12px', borderRadius: 8, fontSize: 12, color: '#1e293b' }}>
-                📝 {delTarget.quote_no || delTarget.id.slice(0, 8)} · {delTarget.customer_name}
+              <h3 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>견적 삭제</h3>
+              <div style={{ marginTop: 12, padding: '10px 12px', borderRadius: 8, background: COLORS.bgGray, border: `1px solid ${COLORS.borderSubtle}`, fontSize: 12.5 }}>
+                {delTarget.quote_no || delTarget.id.slice(0, 8)} · {delTarget.customer_name}
               </div>
-              <div style={{ marginTop: 10, fontSize: 12, fontWeight: 700, color: '#991b1b' }}>이 견적을 삭제합니다. 되돌릴 수 없습니다.</div>
+              <div style={{ marginTop: 10, fontSize: 12.5, color: COLORS.danger }}>이 견적을 삭제합니다. 되돌릴 수 없습니다.</div>
             </div>
             <div style={{ display: 'flex', gap: 8, padding: '12px 20px 16px' }}>
               <button onClick={() => !delBusy && setDelTarget(null)}
-                style={{ flex: 1, padding: '10px', background: 'transparent', border: '1px solid rgba(0,0,0,0.12)', borderRadius: 9, cursor: 'pointer', fontSize: 13, fontWeight: 700, color: '#475569' }}>닫기</button>
+                style={{ flex: 1, padding: '9px', background: '#fff', border: `1px solid ${COLORS.borderSubtle}`, borderRadius: 9, cursor: 'pointer', fontSize: 13, fontWeight: 600, color: COLORS.textSecondary }}>취소</button>
               <button onClick={runDelete} disabled={delBusy}
-                style={{ flex: 1, padding: '10px', color: '#fff', border: 'none', borderRadius: 9, cursor: delBusy ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 800, opacity: delBusy ? 0.5 : 1, background: 'linear-gradient(135deg,#ef4444,#dc2626)' }}>
-                {delBusy ? '처리 중…' : '🗑 삭제하기'}
+                style={{ flex: 1, padding: '9px', color: '#fff', border: 'none', borderRadius: 9, cursor: delBusy ? 'wait' : 'pointer', fontSize: 13, fontWeight: 600, opacity: delBusy ? 0.6 : 1, background: COLORS.danger }}>
+                {delBusy ? '삭제 중...' : '삭제'}
               </button>
             </div>
           </div>
