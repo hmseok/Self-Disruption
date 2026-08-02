@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verifyUser } from '@/lib/auth-server'
 import { resolveAccountLast4 } from '@/lib/last4-match'
+import { autoAttributeCardExpenses } from '@/lib/card-attribution'
 
 // ═══════════════════════════════════════════════════════════
 // SMS 관리 API — 관리자 UI 전용 (인증 필수)
@@ -365,6 +366,11 @@ export async function PUT(req: NextRequest) {
   await prisma.$executeRaw`
     UPDATE card_sms_transactions SET transaction_id = ${transactionId}, updated_at = CURRENT_TIMESTAMP WHERE id = ${id}
   `
+
+  // 카드 승인이면 배정 차량 자동 귀속 (2026-08-02)
+  if (importedFrom === 'sms' && txType === 'expense') {
+    await autoAttributeCardExpenses()
+  }
 
   // 은행 입금이면 대차 자동매칭 트리거 (webhook 과 동형, fire-and-forget)
   if (importedFrom === 'sms_bank' && txType === 'income' && process.env.CRON_SECRET) {

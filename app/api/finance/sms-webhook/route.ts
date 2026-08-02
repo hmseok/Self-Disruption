@@ -140,11 +140,15 @@ export async function POST(req: NextRequest) {
 
   if (parsed && parsed.card_alias) {
     try {
-      // 카드 매칭: card_alias로 corporate_cards 조회
-      const cards = await prisma.$queryRaw<Array<{ id: string; assigned_car_id: string | null }>>`
-        SELECT id, assigned_car_id FROM corporate_cards
-        WHERE card_alias = ${parsed.card_alias} LIMIT 1
-      `
+      // 카드 매칭: 끝4자리 기준 (2026-08-02 — SMS 별칭 "KB****1806" vs 마스터 "KB국민-1806"
+      // 표기가 달라 완전일치가 한 번도 성립 안 하던 버그. 카드번호 끝4자리로 대조)
+      const aliasLast4 = String(parsed.card_alias).replace(/\D/g, '').slice(-4)
+      const cards = aliasLast4.length === 4
+        ? await prisma.$queryRaw<Array<{ id: string; assigned_car_id: string | null }>>`
+            SELECT id, assigned_car_id FROM corporate_cards
+            WHERE RIGHT(REPLACE(card_number,'-',''),4) = ${aliasLast4} LIMIT 1
+          `
+        : []
       if (cards.length > 0) {
         cardId = cards[0].id
         carId = cards[0].assigned_car_id
