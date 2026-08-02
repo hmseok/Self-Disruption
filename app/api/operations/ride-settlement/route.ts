@@ -42,12 +42,23 @@ export async function POST(request: NextRequest) {
       SELECT id, customer_car_number, insurance_company, dispatch_date, vehicle_car_number
         FROM fmi_rentals`
     const byCarLast4 = new Map<string, any[]>()
+    const byVehicle = new Map<string, any[]>()
     for (const r of rentals) {
       const l4 = last4(r.customer_car_number)
-      if (!l4) continue
-      if (!byCarLast4.has(l4)) byCarLast4.set(l4, [])
-      byCarLast4.get(l4)!.push(r)
+      if (l4) {
+        if (!byCarLast4.has(l4)) byCarLast4.set(l4, [])
+        byCarLast4.get(l4)!.push(r)
+      }
+      const veh = String(r.vehicle_car_number || '').replace(/\s+/g, '')
+      if (veh) {
+        if (!byVehicle.has(veh)) byVehicle.set(veh, [])
+        byVehicle.get(veh)!.push(r)
+      }
     }
+    const nearestByDate = (pool: any[], date: string | null) =>
+      [...pool].sort((a, b) =>
+        Math.abs(new Date(a.dispatch_date || 0).getTime() - new Date(date || 0).getTime())
+      - Math.abs(new Date(b.dispatch_date || 0).getTime() - new Date(date || 0).getTime()))[0]
 
     let inserted = 0, duplicated = 0, matched = 0, unmatched = 0
     const unmatchedList: any[] = []
@@ -66,10 +77,19 @@ export async function POST(request: NextRequest) {
         else {
           const ins = normInsurer(d.insurer)
           const insMatch = pool.filter(r => normInsurer(r.insurance_company) === ins)
-          const pick = (insMatch.length ? insMatch : pool)
-            .sort((a, b) => Math.abs(new Date(a.dispatch_date || 0).getTime() - new Date(d.depositDate || 0).getTime())
-                          - Math.abs(new Date(b.dispatch_date || 0).getTime() - new Date(d.depositDate || 0).getTime()))[0]
+          const pick = nearestByDate(insMatch.length ? insMatch : pool, d.depositDate)
           if (pick) { rentalId = pick.id; matchBy = insMatch.length ? 'car+insurer' : 'car' }
+        }
+      }
+      // 폴백: 고객차가 차량번호가 아닌 항목(휴차손해료 등) — 대차차량번호로 매칭
+      if (!rentalId && d.vehicleNumber) {
+        const veh = String(d.vehicleNumber).replace(/\s+/g, '')
+        const pool = byVehicle.get(veh)
+        if (pool?.length) {
+          const ins = normInsurer(d.insurer)
+          const insMatch = pool.filter(r => normInsurer(r.insurance_company) === ins)
+          const pick = nearestByDate(insMatch.length ? insMatch : pool, d.depositDate)
+          if (pick) { rentalId = pick.id; matchBy = insMatch.length ? 'vehicle+insurer' : 'vehicle' }
         }
       }
 

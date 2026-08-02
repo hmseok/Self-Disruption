@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import QuotesTab from '@/app/long-term-rentals/_components/QuotesTab'
 import NeuFilterTabs from '@/app/components/NeuFilterTabs'
 import { COLORS } from '@/app/utils/ui-tokens'
@@ -18,22 +17,16 @@ import { COLORS } from '@/app/utils/ui-tokens'
 // ═══════════════════════════════════════════════════════════════════
 
 export default function QuotesPage() {
-  const router = useRouter()
   const [tab, setTab] = useState<'long' | 'short'>('long')
 
   return (
     <div style={{ padding: '20px 24px', maxWidth: 1280, color: COLORS.textPrimary, fontSize: 14 }}>
-      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 16 }}>
-        <div>
-          <h1 style={{ fontSize: 21, letterSpacing: '-0.02em', fontWeight: 700 }}>견적</h1>
-          <p style={{ color: COLORS.textSecondary, fontSize: 13, marginTop: 3 }}>
-            임의 견적을 작성·보관하고, 고객이 확정되면 계약에서 불러와 연결합니다
-          </p>
-        </div>
-        <button onClick={() => router.push('/long-term-rentals/quotes/new')}
-          style={{ background: COLORS.primary, color: '#fff', border: 'none', borderRadius: 9, padding: '9px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
-          + 장기 견적 작성
-        </button>
+      {/* 작성 버튼은 장기 견적 탭 안(QuotesTab)에 이미 있어 헤더에는 두지 않음 */}
+      <div style={{ marginBottom: 16 }}>
+        <h1 style={{ fontSize: 21, letterSpacing: '-0.02em', fontWeight: 700 }}>견적</h1>
+        <p style={{ color: COLORS.textSecondary, fontSize: 13, marginTop: 3 }}>
+          임의 견적을 작성·보관하고, 고객이 확정되면 계약에서 불러와 연결합니다
+        </p>
       </div>
 
       <NeuFilterTabs
