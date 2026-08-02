@@ -55,6 +55,7 @@ type ClaimRow = {
   repair_factory: string | null
   customer_birth: string | null
   paid_amount: number | null
+  ride_paid?: number | null   // 라이드(빌려타) 월 일괄 정산분 — paid_amount 에 합산됨
   payment_status: string | null
   payment_memo: string | null
   // PR-N7.1 — 과실율 / 청구율
@@ -192,8 +193,8 @@ export default function ClaimsTab() {
 
   // (직접 연결 함수는 PR-PAY-LINK-MODAL 로 대체 — 모달에서 확인·수정 후 확정)
 
-  // PR-PARTNER-IMPORT (2026-07-07) — 외주(지입) 정산 엑셀 업로드
-  //   양식: 차량별 5컬럼 블록 [수식|입금일|보험사|고객차|입금액], 블록 상단 2행 위 = 대차차량번호
+  // 라이드(빌려타) 월 대차료 정산 업로드 — 입금 탭과 동일 파이프라인 (2026-08-02 통합)
+  //   구 PR-PARTNER-IMPORT(가짜 거래 생성 방식, 미사용 0건)를 ride_settlement_deposits 경로로 교체
   const partnerFileRef = useRef<HTMLInputElement>(null)
   const [partnerBusy, setPartnerBusy] = useState(false)
   const [partnerMsg, setPartnerMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
@@ -202,63 +203,31 @@ export default function ClaimsTab() {
     setPartnerBusy(true)
     setPartnerMsg(null)
     try {
-      const XLSX = await import('xlsx')
-      const wb = XLSX.read(await file.arrayBuffer(), { cellDates: true })
-      const toDate = (v: any): string | null => {
-        if (v instanceof Date && !isNaN(v.getTime())) {
-          return `${v.getFullYear()}-${String(v.getMonth() + 1).padStart(2, '0')}-${String(v.getDate()).padStart(2, '0')}`
-        }
-        const s = String(v || '').slice(0, 10)
-        return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : null
-      }
-      const rows: any[] = []
-      for (const sn of wb.SheetNames) {
-        const grid: any[][] = XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1, defval: null }) as any[][]
-        for (let hr = 0; hr < grid.length; hr++) {
-          const header = grid[hr] || []
-          for (let c = 0; c < header.length; c++) {
-            if (String(header[c] || '').trim() !== '고객차') continue
-            // 블록: 입금일(c-2) 보험사(c-1) 고객차(c) 입금액(c+1), 대차차량 = 헤더 2행 위 · c-3 열
-            const vehicleCar = String((grid[hr - 2] || [])[c - 3] || '').trim()
-            for (let dr = hr + 1; dr < Math.min(grid.length, hr + 300); dr++) {
-              const row = grid[dr] || []
-              const date = toDate(row[c - 2])
-              const amount = Number(row[c + 1] || 0)
-              const customerCar = String(row[c] || '').trim()
-              if (!date || !(amount > 0) || !customerCar || !/\d{3,4}/.test(customerCar)) continue
-              rows.push({
-                vehicle_car_number: vehicleCar,
-                deposit_date: date,
-                insurer: String(row[c - 1] || '').trim(),
-                customer_car_number: customerCar,
-                amount,
-              })
-            }
-          }
-        }
-      }
-      if (rows.length === 0) throw new Error('양식에서 정산 행을 찾지 못했습니다 (입금일·보험사·고객차·입금액 블록 필요)')
-
-      const headers = { ...(await getAuthHeader()), 'Content-Type': 'application/json' }
-      // 1) dry-run 으로 반영 예상 확인
-      const dry = await fetch('/api/finance/partner-settlement-import', {
-        method: 'POST', headers, body: JSON.stringify({ rows, dryRun: true }),
-      }).then((x) => x.json())
-      if (dry?.error) throw new Error(dry.error)
+      const [{ read, utils }, { parseRideSettlement }] = await Promise.all([
+        import('xlsx'), import('@/lib/ride-settlement-parser'),
+      ])
+      const wb = read(await file.arrayBuffer(), { type: 'array' })
+      const sheetName = wb.SheetNames.find((n) => n.includes('정산')) || wb.SheetNames[0]
+      const grid = utils.sheet_to_json<unknown[]>(wb.Sheets[sheetName], { header: 1, raw: true }) as unknown[][]
+      const parsed = parseRideSettlement(grid)
+      if (!parsed.deposits.length) throw new Error('정산 내역을 찾지 못했습니다 — 라이드 마감엑셀(월 정산 시트)인지 확인해주세요')
+      const month = parsed.month || prompt('정산월을 확인하지 못했습니다. YYYY-MM 형식으로 입력해주세요', '') || ''
+      if (!/^\d{4}-\d{2}$/.test(month)) throw new Error('정산월(YYYY-MM) 미확인으로 중단')
       const go = window.confirm(
-        `외주 정산 ${rows.length}행 추출\n\n신규 반영: ${dry.created}건 (대차건 링크 ${dry.linked} / 미링크 ${dry.unlinked})\n중복 skip: ${dry.duplicates}건\n\n반영할까요?`,
+        `라이드 ${month} 정산 — 차량 ${parsed.vehicles.length}대, 입금 ${parsed.deposits.length}건, 총 ${parsed.grandTotal.toLocaleString('ko-KR')}원\n저장하고 배차건과 매칭할까요? (재업로드해도 중복 저장되지 않습니다)`,
       )
       if (!go) { setPartnerMsg({ type: 'err', text: '업로드 취소됨' }); return }
-      // 2) 실제 반영
-      const res = await fetch('/api/finance/partner-settlement-import', {
-        method: 'POST', headers, body: JSON.stringify({ rows }),
+      const headers = { ...(await getAuthHeader()), 'Content-Type': 'application/json' }
+      const res = await fetch('/api/operations/ride-settlement', {
+        method: 'POST', headers, body: JSON.stringify({ month, deposits: parsed.deposits }),
       }).then((x) => x.json())
       if (res?.error) throw new Error(res.error)
-      setPartnerMsg({ type: 'ok', text: `✅ ${res.message}` })
+      const d = res.data
+      setPartnerMsg({ type: 'ok', text: `✅ 라이드 ${d.month} 정산 반영 — 신규 ${d.inserted}건 (중복 제외 ${d.duplicated}) · 매칭 ${d.matched} / 미매칭 ${d.unmatched}` })
       fetchPayCandidates()
       refresh()
     } catch (e: any) {
-      setPartnerMsg({ type: 'err', text: e?.message || '외주 정산 업로드 오류' })
+      setPartnerMsg({ type: 'err', text: e?.message || '라이드 정산 업로드 오류' })
     } finally {
       setPartnerBusy(false)
       if (partnerFileRef.current) partnerFileRef.current.value = ''
@@ -496,7 +465,7 @@ export default function ClaimsTab() {
     { label: '🧮 청구액 합계', value: Math.round(totalClaim / 10000), unit: '만원', tint: 'green' },
   ]
   const statActions: ActionButton[] = [
-    { label: partnerBusy ? '반영 중…' : '외주 정산 업로드', onClick: () => !partnerBusy && partnerFileRef.current?.click(), variant: 'primary', icon: '📥' },
+    { label: partnerBusy ? '반영 중…' : '라이드 정산 업로드', onClick: () => !partnerBusy && partnerFileRef.current?.click(), variant: 'primary', icon: '📥' },
     {
       // PR-CLEAN-TABS — 자동매칭 실행 버튼을 재무에서 청구 탭으로 이동 (업무층 자기완결)
       label: '입금 자동매칭', icon: '🔗', variant: 'secondary',
@@ -600,7 +569,10 @@ export default function ClaimsTab() {
       key: 'paid_amount', label: '지급액', width: 106, align: 'right',
       sortBy: (r) => Number(r.paid_amount || 0),
       render: (r) => Number(r.paid_amount) > 0
-        ? <span style={{ fontWeight: 800, color: '#15803d', whiteSpace: 'nowrap' }}>{fmtWon(r.paid_amount)}</span>
+        ? <span style={{ whiteSpace: 'nowrap' }}>
+            <span style={{ fontWeight: 800, color: '#15803d' }}>{fmtWon(r.paid_amount)}</span>
+            {Number(r.ride_paid) > 0 && <div style={{ fontSize: 10, color: '#6d28d9' }}>라이드 정산 {fmtWon(r.ride_paid)}</div>}
+          </span>
         : <span style={{ fontSize: 11, color: '#cbd5e1', whiteSpace: 'nowrap' }}>-</span>,
     },
     {

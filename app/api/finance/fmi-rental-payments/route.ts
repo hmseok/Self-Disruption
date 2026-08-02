@@ -48,7 +48,8 @@ export async function GET(request: NextRequest) {
       `SELECT r.id, r.dispatch_date, r.vehicle_car_number, r.customer_car_number,
               r.customer_name, r.insurance_company, r.final_claim_amount AS claim_amount,
               ${withPayer ? 'r.expected_payer,' : ''}
-              COALESCE(p.paid_amount, 0) AS paid_amount, p.paid_date, COALESCE(p.paid_count, 0) AS paid_count
+              COALESCE(p.paid_amount, 0) AS paid_amount, p.paid_date, COALESCE(p.paid_count, 0) AS paid_count,
+              COALESCE(rs.ride_amount, 0) AS ride_amount, rs.ride_date
          FROM fmi_rentals r
          LEFT JOIN (
            SELECT t.related_id, SUM(t.amount) AS paid_amount, MAX(t.transaction_date) AS paid_date, COUNT(*) AS paid_count
@@ -56,6 +57,12 @@ export async function GET(request: NextRequest) {
             WHERE t.related_type = 'fmi_rental' AND t.type = 'income' AND t.deleted_at IS NULL
             GROUP BY t.related_id
          ) p ON p.related_id = r.id
+         LEFT JOIN (
+           /* 라이드(빌려타) 월 일괄 정산분 (2026-08-02) — 통장 입금과 별도 경로 */
+           SELECT rental_id, SUM(amount) AS ride_amount, MAX(deposit_date) AS ride_date
+             FROM ride_settlement_deposits WHERE rental_id IS NOT NULL
+            GROUP BY rental_id
+         ) rs ON rs.rental_id = r.id
         WHERE r.fleet_group = '빌려타'
           ${q ? `AND (r.customer_name LIKE ? OR r.customer_car_number LIKE ? OR r.vehicle_car_number LIKE ? OR r.insurance_company LIKE ?)` : ''}
         ORDER BY (COALESCE(p.paid_amount,0) > 0) ASC, r.dispatch_date DESC
@@ -108,8 +115,11 @@ export async function GET(request: NextRequest) {
     }
 
     // 3) 상태 도출 — paid / candidate / unpaid
+    //    입금 = 통장 매칭분 + 라이드 월 정산분 (2026-08-02)
     const list = rows.map((r) => {
-      const paid = Number(r.paid_amount || 0)
+      const bankPaid = Number(r.paid_amount || 0)
+      const ridePaid = Number(r.ride_amount || 0)
+      const paid = bankPaid + ridePaid
       const claim = r.claim_amount != null ? Number(r.claim_amount) : null
       const l4 = last4(r.customer_car_number)
       let status: 'paid' | 'candidate' | 'unpaid'
@@ -140,7 +150,9 @@ export async function GET(request: NextRequest) {
         insurance_company: r.insurance_company,
         claim_amount: claim,
         paid_amount: paid,
-        paid_date: r.paid_date,
+        bank_paid: bankPaid,
+        ride_paid: ridePaid,
+        paid_date: r.paid_date || r.ride_date,
         status,
         candidates,
       }

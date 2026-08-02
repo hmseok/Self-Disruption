@@ -61,6 +61,7 @@ export async function GET(request: NextRequest) {
          r.claim_type, r.vat_extra_billing, r.capital_company,
          r.repair_factory, r.customer_birth, r.dispatch_location,
          COALESCE(p.paid_sum, r.paid_amount) AS paid_amount, r.payment_status, r.payment_memo,
+         COALESCE(rs.ride_sum, 0) AS ride_paid,
          r.fault_rate, r.claim_rate,
          COALESCE(r.fleet_group, v.ownership_type) AS fleet_group,
          v.status AS vehicle_status
@@ -72,6 +73,12 @@ export async function GET(request: NextRequest) {
           WHERE t.related_type = 'fmi_rental' AND t.type = 'income' AND t.deleted_at IS NULL
           GROUP BY t.related_id
        ) p ON p.related_id = r.id
+       LEFT JOIN (
+         /* 라이드(빌려타) 월 일괄 정산분 (2026-08-02) — 통장 입금과 별도 경로 */
+         SELECT rental_id, SUM(amount) AS ride_sum
+           FROM ride_settlement_deposits WHERE rental_id IS NOT NULL
+          GROUP BY rental_id
+       ) rs ON rs.rental_id = r.id
        ${whereClause}
        ORDER BY r.dispatch_date DESC
        LIMIT ${limit}`,
@@ -79,7 +86,10 @@ export async function GET(request: NextRequest) {
     )
 
     const data = rows.map((r: any) => {
-      const paid = r.paid_amount !== null && r.paid_amount !== undefined ? Number(r.paid_amount) : null
+      const bankPaid = r.paid_amount !== null && r.paid_amount !== undefined ? Number(r.paid_amount) : null
+      const ridePaid = Number(r.ride_paid || 0)
+      // 입금 = 통장 매칭분 + 라이드 월 정산분 (2026-08-02)
+      const paid = bankPaid !== null || ridePaid > 0 ? (bankPaid || 0) + ridePaid : null
       const claim = r.final_claim_amount !== null ? Number(r.final_claim_amount) : null
       // PR-PAY-SYNC — 지급여부 파생: 매칭 입금 합계 기준 (저장 안 함 — 항상 정합, 규칙 12)
       const paymentStatus = paid && paid > 0
@@ -91,6 +101,7 @@ export async function GET(request: NextRequest) {
         total_rental_fee: r.total_rental_fee !== null ? Number(r.total_rental_fee) : null,
         final_claim_amount: claim,
         paid_amount: paid,
+        ride_paid: ridePaid,
         payment_status: paymentStatus,
         fault_rate: r.fault_rate !== null && r.fault_rate !== undefined ? Number(r.fault_rate) : null,
         claim_rate: r.claim_rate !== null && r.claim_rate !== undefined ? Number(r.claim_rate) : null,
