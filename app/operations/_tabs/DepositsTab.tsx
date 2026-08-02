@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback, useMemo } from 'react'
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import DcToolbar from '@/app/components/DcToolbar'
 import NeuDataTable, { TableColumn } from '@/app/components/NeuDataTable'
 import { COLORS } from '@/app/utils/ui-tokens'
@@ -47,7 +47,10 @@ type Rental = {
   dispatch_date: string | null
   status: string | null
   paid_sum: number
+  ride_sum: number
 }
+// 통장 입금 + 라이드 일괄 정산분 합계
+const totalPaid = (r: Rental) => (r.paid_sum || 0) + (r.ride_sum || 0)
 
 const nf = (n: any) => Number(n || 0).toLocaleString('ko-KR')
 const REASONS = ['지입 정산', '투자', '보험', '일반 매출', '기타']
@@ -61,9 +64,10 @@ const RENTAL_STATUS_LABEL: Record<string, string> = {
 
 type PayState = 'waiting' | 'partial' | 'done' | 'noclaim'
 function payState(r: Rental): PayState {
-  if (r.claim_amount == null || r.claim_amount <= 0) return r.paid_sum > 0 ? 'partial' : 'noclaim'
-  if (r.paid_sum <= 0) return 'waiting'
-  if (r.paid_sum >= r.claim_amount) return 'done'
+  const paid = totalPaid(r)
+  if (r.claim_amount == null || r.claim_amount <= 0) return paid > 0 ? 'partial' : 'noclaim'
+  if (paid <= 0) return 'waiting'
+  if (paid >= r.claim_amount) return 'done'
   return 'partial'
 }
 const PAY_META: Record<PayState, { label: string; bg: string; fg: string }> = {
@@ -84,6 +88,8 @@ export default function DepositsTab() {
   const [payFilter, setPayFilter] = useState('open') // open = 대기+부분 / all / done
   const [depositFilter, setDepositFilter] = useState('todo')
   const [matching, setMatching] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const rideFileRef = useRef<HTMLInputElement>(null)
 
   // 배차건 상세 (배차건 기준 뷰) / 입금 연결 모달 (입금 목록 뷰)
   const [rentalModal, setRentalModal] = useState<Rental | null>(null)
@@ -117,6 +123,44 @@ export default function DepositsTab() {
       alert(json?.error ? `오류: ${json.error}` : `자동 연결 완료: ${json?.applied ?? json?.matched ?? 0}건`)
       load()
     } finally { setMatching(false) }
+  }, [load])
+
+  // 라이드(빌려타) 월 대차료 마감엑셀 업로드 → 건별 저장 + 자동 매칭
+  const uploadRideSettlement = useCallback(async (file: File) => {
+    setUploading(true)
+    try {
+      const [{ read, utils }, { parseRideSettlement }] = await Promise.all([
+        import('xlsx'), import('@/lib/ride-settlement-parser'),
+      ])
+      const wb = read(await file.arrayBuffer(), { type: 'array' })
+      const sheetName = wb.SheetNames.find((n) => n.includes('정산')) || wb.SheetNames[0]
+      const rows = utils.sheet_to_json<unknown[]>(wb.Sheets[sheetName], { header: 1, raw: true }) as unknown[][]
+      const parsed = parseRideSettlement(rows)
+      if (!parsed.deposits.length) { alert('정산 내역을 찾지 못했습니다 — 「월 정산」 시트가 있는 라이드 마감엑셀인지 확인해주세요'); return }
+      const month = parsed.month || prompt('정산월을 확인하지 못했습니다. YYYY-MM 형식으로 입력해주세요', '') || ''
+      if (!/^\d{4}-\d{2}$/.test(month)) { alert('정산월(YYYY-MM)이 없어 중단했습니다'); return }
+      if (!confirm(`라이드 ${month} 정산 — 차량 ${parsed.vehicles.length}대, 입금 ${parsed.deposits.length}건, 총 ${nf(parsed.grandTotal)}원\n저장하고 배차건과 매칭할까요? (재업로드해도 중복 저장되지 않습니다)`)) return
+      const headers = { ...(await getAuthHeader()), 'Content-Type': 'application/json' }
+      const res = await fetch('/api/operations/ride-settlement', {
+        method: 'POST', headers, body: JSON.stringify({ month, deposits: parsed.deposits }),
+      })
+      const json = await res.json()
+      if (json?.error) { alert(`업로드 실패: ${json.error}`); return }
+      const d = json.data
+      let msg = `라이드 ${d.month} 정산 반영 완료\n신규 ${d.inserted}건 (중복 제외 ${d.duplicated}건)\n배차건 매칭 ${d.matched}건 / 미매칭 ${d.unmatched}건`
+      if (d.unmatchedList?.length) {
+        msg += '\n\n미매칭 내역:\n' + d.unmatchedList.slice(0, 8).map((u: any) =>
+          `· ${u.vehicle || '?'} / 고객차 ${u.customerCar || '?'} / ${u.insurer || '?'} / ${nf(u.amount)}원`).join('\n')
+        if (d.unmatchedList.length > 8) msg += `\n… 외 ${d.unmatchedList.length - 8}건`
+      }
+      alert(msg)
+      load()
+    } catch (e: any) {
+      alert(`엑셀 처리 오류: ${e?.message || e}`)
+    } finally {
+      setUploading(false)
+      if (rideFileRef.current) rideFileRef.current.value = ''
+    }
   }, [load])
 
   const linkRental = useCallback(async (txId: string, rentalId: string, label: string) => {
@@ -244,14 +288,19 @@ export default function DepositsTab() {
     { key: 'claim', label: '청구액', width: 105, align: 'right',
       sortBy: (r) => r.claim_amount || 0,
       render: (r) => <span style={{ fontSize: 13, fontVariantNumeric: 'tabular-nums' }}>{r.claim_amount != null ? nf(r.claim_amount) : '—'}</span> },
-    { key: 'paid', label: '입금 누계', width: 105, align: 'right',
-      sortBy: (r) => r.paid_sum,
-      render: (r) => <span style={{ fontSize: 13, fontWeight: 600, color: r.paid_sum > 0 ? COLORS.success : COLORS.textMuted, fontVariantNumeric: 'tabular-nums' }}>{nf(r.paid_sum)}</span> },
+    { key: 'paid', label: '입금 누계', width: 115, align: 'right',
+      sortBy: (r) => totalPaid(r),
+      render: (r) => (
+        <div>
+          <span style={{ fontSize: 13, fontWeight: 600, color: totalPaid(r) > 0 ? COLORS.success : COLORS.textMuted, fontVariantNumeric: 'tabular-nums' }}>{nf(totalPaid(r))}</span>
+          {r.ride_sum > 0 && <div style={{ fontSize: 10.5, color: COLORS.textMuted }}>라이드 {nf(r.ride_sum)}</div>}
+        </div>
+      ) },
     { key: 'remain', label: '잔액', width: 105, align: 'right',
-      sortBy: (r) => (r.claim_amount || 0) - r.paid_sum,
+      sortBy: (r) => (r.claim_amount || 0) - totalPaid(r),
       render: (r) => {
         if (r.claim_amount == null) return <span style={{ color: COLORS.textDim, fontSize: 12 }}>—</span>
-        const remain = r.claim_amount - r.paid_sum
+        const remain = r.claim_amount - totalPaid(r)
         return <span style={{ fontSize: 13, fontWeight: 600, color: remain > 0 ? COLORS.danger : COLORS.success, fontVariantNumeric: 'tabular-nums' }}>{nf(Math.max(remain, 0))}</span>
       } },
     { key: 'paystate', label: '입금 상태', width: 92, align: 'center',
@@ -362,6 +411,12 @@ export default function DepositsTab() {
           <option value={183}>최근 6개월</option>
           <option value={365}>최근 1년</option>
         </select>
+        <input ref={rideFileRef} type="file" accept=".xlsx,.xls" style={{ display: 'none' }}
+          onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadRideSettlement(f) }} />
+        <button onClick={() => rideFileRef.current?.click()} disabled={uploading}
+          style={{ background: '#fff', border: `1px solid ${COLORS.borderSubtle}`, borderRadius: 9, padding: '8px 15px', fontSize: 12.5, fontWeight: 600, color: COLORS.textSecondary, cursor: uploading ? 'wait' : 'pointer' }}>
+          {uploading ? '처리 중...' : '라이드 정산 업로드'}
+        </button>
         <button onClick={runAutoMatch} disabled={matching}
           style={{ border: 'none', background: COLORS.primary, borderRadius: 9, padding: '8px 15px', fontSize: 12.5, fontWeight: 600, color: '#fff', cursor: matching ? 'wait' : 'pointer' }}>
           {matching ? '연결 중...' : '자동 연결'}
@@ -452,8 +507,8 @@ export default function DepositsTab() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 16 }}>
                 {[
                   { k: '청구액', v: rentalModal.claim_amount != null ? `${nf(rentalModal.claim_amount)}원` : '미정' },
-                  { k: '입금 누계', v: `${nf(rentalModal.paid_sum)}원` },
-                  { k: '잔액', v: rentalModal.claim_amount != null ? `${nf(Math.max(rentalModal.claim_amount - rentalModal.paid_sum, 0))}원` : '—' },
+                  { k: '입금 누계', v: `${nf(totalPaid(rentalModal))}원` },
+                  { k: '잔액', v: rentalModal.claim_amount != null ? `${nf(Math.max(rentalModal.claim_amount - totalPaid(rentalModal), 0))}원` : '—' },
                 ].map((c, i) => (
                   <div key={i} style={{ background: COLORS.bgGray, borderRadius: 10, padding: '10px 12px' }}>
                     <div style={{ fontSize: 11, color: COLORS.textMuted }}>{c.k}</div>
@@ -461,8 +516,13 @@ export default function DepositsTab() {
                   </div>
                 ))}
               </div>
-              <div style={{ marginBottom: 16 }}>
+              <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ fontSize: 11.5, fontWeight: 600, padding: '4px 10px', borderRadius: 6, background: ps.bg, color: ps.fg }}>{ps.label}</span>
+                {rentalModal.ride_sum > 0 && (
+                  <span style={{ fontSize: 11.5, fontWeight: 600, padding: '4px 10px', borderRadius: 6, background: COLORS.bgViolet, color: '#6d28d9' }}>
+                    라이드 일괄 정산분 {nf(rentalModal.ride_sum)}원 포함
+                  </span>
+                )}
               </div>
 
               {/* 연결된 입금 */}

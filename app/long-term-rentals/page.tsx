@@ -3,18 +3,20 @@
 // ═══════════════════════════════════════════════════════════════
 // 장기계약 — A안 확정 구조 (2026-07-30, CONTRACT-UNIFY-A-PLAN)
 //   "영업의 흐름 — 견적을 보내고, 계약으로 만들고, 수납과 만기를 관리"
-//   탭: 원장 · 견적 · 만기 관리 · 신차 카탈로그
+//   탭: 원장 · 만기 관리 · 신차 카탈로그
+//   (견적은 2026-08-02 별도 페이지 /quotes 로 분리 — 임의 견적 보관,
+//    계약 등록 패널의 「견적 불러오기」로 연결)
 //   개편 원칙(rebuild-fresh): 페이지 골격·원장·만기 뷰는 백지 재작성,
-//   견적/카탈로그는 기존 컴포넌트 재사용 (데이터 계층 동일).
+//   카탈로그는 기존 컴포넌트 재사용 (데이터 계층 동일).
 //   등록/수정은 모달 대신 우측 슬라이드 패널 (REDESIGN 4장 원칙 4)
 // ═══════════════════════════════════════════════════════════════
 
 import { useEffect, useState, useCallback, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
 import NeuFilterTabs from '@/app/components/NeuFilterTabs'
 import DcToolbar from '@/app/components/DcToolbar'
 import NeuDataTable, { TableColumn, MobileCardConfig } from '@/app/components/NeuDataTable'
 import { COLORS } from '@/app/utils/ui-tokens'
-import QuotesTab from './_components/QuotesTab'
 import NewCarCatalogTab from './_components/NewCarCatalogTab'
 
 async function getAuthHeader(): Promise<Record<string, string>> {
@@ -43,7 +45,22 @@ type Rental = {
   notes: string | null
 }
 
-type TopTab = 'ledger' | 'quotes' | 'expiry' | 'catalog'
+type TopTab = 'ledger' | 'expiry' | 'catalog'
+
+// 견적 불러오기 — /quotes 에 보관된 임의 견적을 계약 등록 시 선택
+type QuotePick = {
+  id: string
+  quote_no: string | null
+  status: string
+  customer_name: string
+  customer_phone: string | null
+  vehicle_car_number: string | null
+  vehicle_brand: string | null
+  vehicle_model: string | null
+  vehicle_trim: string | null
+  months: number | null
+  monthly_fee: number | null
+}
 
 const emptyForm = {
   contract_type: '기존차량',
@@ -85,12 +102,14 @@ const inputStyle: React.CSSProperties = {
 const fieldLabel: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: COLORS.textSecondary, marginBottom: 4, display: 'block' }
 
 export default function LongTermPage() {
+  const router = useRouter()
   const [topTab, setTopTab] = useState<TopTab>('ledger')
   const [rentals, setRentals] = useState<Rental[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('active') // active | expiring | expired | terminated | all
   const [quoteCounts, setQuoteCounts] = useState<{ draft: number; sent: number; accepted: number } | null>(null)
+  const [quoteList, setQuoteList] = useState<QuotePick[]>([])
 
   // 등록/수정 슬라이드 패널
   const [panelOpen, setPanelOpen] = useState(false)
@@ -120,12 +139,14 @@ export default function LongTermPage() {
       }
       const qJson = await qRes.json().catch(() => ({}))
       if (Array.isArray(qJson?.data)) {
-        const qs = qJson.data as Array<{ status: string }>
+        const qs = qJson.data as QuotePick[]
         setQuoteCounts({
           draft: qs.filter(q => q.status === 'draft').length,
           sent: qs.filter(q => q.status === 'sent').length,
           accepted: qs.filter(q => q.status === 'accepted').length,
         })
+        // 계약 전환 전 견적만 불러오기 후보로 (전환 완료 제외)
+        setQuoteList(qs.filter(q => q.status !== 'converted' && q.status !== 'rejected'))
       }
     } catch { /* 네트워크 오류 — 빈 상태 유지 */ }
     setLoading(false)
@@ -309,7 +330,7 @@ export default function LongTermPage() {
           { label: '운영중 계약', dot: COLORS.success, value: loading ? '—' : `${active.length}건`, onClick: undefined as undefined | (() => void) },
           { label: '만기 임박 (30일)', dot: COLORS.warning, value: loading ? '—' : `${expiring.length}건`, onClick: () => { setTopTab('ledger'); setStatusFilter('expiring') } },
           { label: '월 렌트료 합계', dot: COLORS.info, value: loading ? '—' : `${won(monthlyTotal)}원`, onClick: undefined },
-          { label: '진행중 견적', dot: '#7c3aed', value: quoteInProgress === null ? '—' : `${quoteInProgress}건`, onClick: () => setTopTab('quotes') },
+          { label: '진행중 견적', dot: '#7c3aed', value: quoteInProgress === null ? '—' : `${quoteInProgress}건`, onClick: () => router.push('/quotes') },
         ].map((c, i) => (
           <div key={i} onClick={c.onClick}
             style={{ background: '#fff', border: `1px solid ${COLORS.borderSubtle}`, borderRadius: 12, padding: '14px 16px', boxShadow: '0 1px 2px rgba(16,24,40,0.05)', cursor: c.onClick ? 'pointer' : 'default' }}>
@@ -325,7 +346,6 @@ export default function LongTermPage() {
       <NeuFilterTabs
         tabs={[
           { key: 'ledger', label: '원장', count: rentals.length },
-          { key: 'quotes', label: '견적' },
           { key: 'expiry', label: '만기 관리', count: expiryList.length },
           { key: 'catalog', label: '신차 카탈로그' },
         ]}
@@ -357,14 +377,11 @@ export default function LongTermPage() {
             mobileCard={mobile}
             loading={loading}
             emptyIcon="📄"
-            emptyMessage="장기계약이 없습니다 — 견적 탭에서 견적을 만들고 수락되면 계약으로 전환됩니다"
+            emptyMessage="장기계약이 없습니다 — 견적 메뉴에서 견적을 만들고 수락되면 계약으로 전환됩니다"
             defaultSort={{ key: 'period', dir: 'asc' }}
           />
         </>
       )}
-
-      {/* ── 견적 (기존 컴포넌트 재사용 — 데이터 계층 동일) ── */}
-      {topTab === 'quotes' && <QuotesTab />}
 
       {/* ── 만기 관리 ── */}
       {topTab === 'expiry' && (
@@ -390,7 +407,7 @@ export default function LongTermPage() {
                 </div>
               </div>
               <button
-                onClick={() => setTopTab('quotes')}
+                onClick={() => router.push('/quotes')}
                 style={{ border: `1px solid ${COLORS.borderSubtle}`, background: '#fff', borderRadius: 8, padding: '6px 12px', fontSize: 12, fontWeight: 600, color: COLORS.textSecondary, cursor: 'pointer', whiteSpace: 'nowrap' }}
               >재견적</button>
             </div>
@@ -416,6 +433,37 @@ export default function LongTermPage() {
                 style={{ border: 'none', background: COLORS.borderFaint, borderRadius: 8, width: 30, height: 30, fontSize: 15, color: COLORS.textSecondary, cursor: 'pointer' }}>×</button>
             </div>
             <p style={{ color: COLORS.textMuted, fontSize: 12.5, marginBottom: 18 }}>장기계약 원장에 기록됩니다. 고객명만 필수입니다.</p>
+
+            {/* 견적 불러오기 — /quotes 에 보관된 임의 견적으로 폼 채우기 (신규 등록 시만) */}
+            {!editId && quoteList.length > 0 && (
+              <div style={{ marginBottom: 14, padding: '10px 12px', borderRadius: 10, background: COLORS.bgViolet }}>
+                <label style={{ ...fieldLabel, color: '#6d28d9' }}>견적 불러오기 (선택)</label>
+                <select style={inputStyle} defaultValue=""
+                  onChange={e => {
+                    const q = quoteList.find(x => x.id === e.target.value)
+                    if (!q) return
+                    const spec = [q.vehicle_brand, q.vehicle_model, q.vehicle_trim].filter(Boolean).join(' ')
+                    setForm(f => ({
+                      ...f,
+                      customer_name: q.customer_name && q.customer_name !== '미정' ? q.customer_name : f.customer_name,
+                      customer_phone: q.customer_phone || f.customer_phone,
+                      vehicle_car_number: q.vehicle_car_number || f.vehicle_car_number,
+                      vehicle_spec: spec || f.vehicle_spec,
+                      contract_type: q.vehicle_car_number ? '기존차량' : '신차출고',
+                      monthly_fee: q.monthly_fee != null ? String(q.monthly_fee) : f.monthly_fee,
+                      notes: f.notes || `견적 ${q.quote_no || q.id.slice(0, 8)} 에서 불러옴${q.months ? ` (${q.months}개월)` : ''}`,
+                    }))
+                  }}>
+                  <option value="">— 견적을 선택하면 아래 항목이 채워집니다 —</option>
+                  {quoteList.map(q => (
+                    <option key={q.id} value={q.id}>
+                      {[q.quote_no, q.customer_name, [q.vehicle_brand, q.vehicle_model].filter(Boolean).join(' '),
+                        q.monthly_fee != null ? `월 ${won(q.monthly_fee)}원` : null].filter(Boolean).join(' · ')}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>

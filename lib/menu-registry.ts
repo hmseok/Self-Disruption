@@ -74,6 +74,8 @@ export const MENUS: MenuEntry[] = [
   { id: 'mod-cars',       name: '차량',    path: '/cars',                 iconKey: 'Car',    group: 'core', sortOrder: 1, requirePermission: true },
   { id: 'mod-long-term',  name: '장기렌트', displayName: '장기계약', path: '/long-term-rentals', iconKey: 'Doc', group: 'core', sortOrder: 2, requirePermission: true },
   { id: 'mod-ops',        name: '사고대차', displayName: '단기·대차', path: '/operations',       iconKey: 'Key', group: 'core', sortOrder: 3, requirePermission: true },
+  // 견적함 — 별도 페이지 분리 (2026-08-02 사용자 확정: 임의 견적 보관 → 계약에서 불러와 연결)
+  { id: 'mod-quotes',     name: '견적',    path: '/quotes',               iconKey: 'Clipboard', group: 'core', sortOrder: 3.5, requirePermission: true },
   { id: 'mod-ledger',     name: '통장/카드', displayName: '장부', path: '/finance/bank-card', iconKey: 'Ledger', group: 'core', sortOrder: 4, requirePermission: true },
   { id: 'mod-settlement', name: '정산/수금', displayName: '정산', path: '/finance/settlement', iconKey: 'Coin',   group: 'core', sortOrder: 5, requirePermission: true },
   { id: 'mod-pnl',        name: '차량 손익', displayName: '손익', path: '/finance/fleet',      iconKey: 'Trend',  group: 'core', sortOrder: 6, requirePermission: true },

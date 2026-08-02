@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyUser } from '@/lib/auth-server'
 import { prisma } from '@/lib/prisma'
+import { normInsurer } from '@/lib/insurer'
 
 /**
  * GET /api/operations/deposits — 사고대차 「입금」 탭 (2026-07-08 사용자 명시)
@@ -37,32 +38,6 @@ function last4(s: string | null | undefined): string | null {
 }
 const normName = (s: any) => String(s || '').replace(/[\s\-_()·.,*]+/g, '').trim()
 
-// 보험사명 정규화 — 입금자명(예: 삼성화재해상보험) ↔ 대차건 보험사(예: 삼성) 매칭
-// 2026-08-01 사용자 확인: "입금은 보험사명+사고차량으로 온다"
-const INSURER_ALIASES: Array<[string, string[]]> = [
-  ['삼성', ['삼성화재', '삼성']],
-  ['현대', ['현대해상', '현대']],
-  ['디비', ['디비손해', 'db손해', 'db', '디비']],
-  ['케이비', ['케이비손해', 'kb손해', 'kb', '케이비']],
-  ['한화', ['한화손해', '한화']],
-  ['하나', ['하나손해', '하나']],
-  ['캐롯', ['캐롯손해', '캐롯']],
-  ['메리츠', ['메리츠화재', '메리츠']],
-  ['흥국', ['흥국화재', '흥국']],
-  ['롯데', ['롯데손해', '롯데']],
-  ['엠지', ['엠지손해', 'mg손해', 'mg', '엠지']],
-  ['악사', ['악사손해', 'axa', '악사']],
-  ['렌공', ['전국렌터카공제', '렌터카공제', '렌공']],
-  ['화물공제', ['화물공제', '화물자동차공제']],
-]
-function normInsurer(s: any): string | null {
-  const t = String(s || '').toLowerCase().replace(/[\s\-_()·.,*㈜]+/g, '')
-  if (!t) return null
-  for (const [key, aliases] of INSURER_ALIASES) {
-    if (aliases.some(a => t.includes(a))) return key
-  }
-  return null
-}
 
 export async function GET(request: NextRequest) {
   try {
@@ -126,7 +101,9 @@ export async function GET(request: NextRequest) {
     //    2026-08-01 배차건 중심 뷰: 건별 입금 누계(paid_sum, 전 기간) 포함
     const PAID_SUM_SQL = `(SELECT COALESCE(SUM(t2.amount), 0) FROM transactions t2
               WHERE t2.related_type = 'fmi_rental' AND t2.related_id = r.id
-                AND t2.type = 'income' AND t2.deleted_at IS NULL) AS paid_sum`
+                AND t2.type = 'income' AND t2.deleted_at IS NULL) AS paid_sum,
+           (SELECT COALESCE(SUM(rs.amount), 0) FROM ride_settlement_deposits rs
+              WHERE rs.rental_id = r.id) AS ride_sum`
     const rentals = await prisma.$queryRawUnsafe<Array<any>>(
       `SELECT r.id, r.customer_name, r.expected_payer, r.customer_car_number, r.vehicle_car_number,
               r.insurance_company, r.final_claim_amount, r.dispatch_date, r.status,
@@ -249,6 +226,7 @@ export async function GET(request: NextRequest) {
       claim_amount: r.final_claim_amount != null ? Number(r.final_claim_amount) : null,
       dispatch_date: r.dispatch_date, status: r.status,
       paid_sum: r.paid_sum != null ? Number(r.paid_sum) : 0,
+      ride_sum: r.ride_sum != null ? Number(r.ride_sum) : 0,
     })), summary, error: null })
   } catch (e: any) {
     console.error('[GET /api/operations/deposits]', e)
