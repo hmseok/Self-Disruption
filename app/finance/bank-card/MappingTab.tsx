@@ -230,62 +230,83 @@ export default function MappingTab({
         </div>
       )}
 
-      {/* 카드 매핑 테이블 */}
-      {sub === 'card' && (
-        <div style={{ overflowX: 'auto' }}>
+      {/* ═══ 카드 매핑 테이블 — 2026-08-02 사용자 지시 재정리 ═══
+          「카드사/카드번호/공용·지정/상태/하이패스 구분 깔끔하게」
+          카드번호는 내부 데이터라 전체 표시 — 마스킹된 값은 카드사 원본
+          (엑셀·문자) 이 가린 채 준 것: 수정에서 전체 번호로 채우면 됨. */}
+      {sub === 'card' && (() => {
+        const fmtCardNo = (no: string | null) => {
+          const s = String(no || '').trim()
+          if (!s) return null
+          const digits = s.replace(/[^0-9*]/g, '')
+          return digits.length >= 12 ? (digits.match(/.{1,4}/g) || []).join('-') : s
+        }
+        const STATUS_ORDER: Record<string, number> = { active: 0, suspended: 1, canceled: 2 }
+        const sorted = [...cards].sort((a, b) =>
+          (STATUS_ORDER[a.status] ?? 0) - (STATUS_ORDER[b.status] ?? 0)
+          || String(a.card_issuer || '').localeCompare(String(b.card_issuer || ''))
+          || String(a.card_alias || '').localeCompare(String(b.card_alias || '')))
+        const th: React.CSSProperties = { padding: '9px 12px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: COLORS.textSecondary, whiteSpace: 'nowrap' }
+        const badge = (text: string, bg: string, fg: string) => (
+          <span style={{ padding: '3px 8px', borderRadius: 6, background: bg, color: fg, fontWeight: 600, fontSize: 11, whiteSpace: 'nowrap' }}>{text}</span>
+        )
+        return (
+        <div style={{ background: '#fff', border: `1px solid ${COLORS.borderSubtle}`, borderRadius: 12, boxShadow: '0 1px 2px rgba(16,24,40,0.05)', overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
-              <tr style={{ borderBottom: '2px solid rgba(0,0,0,0.08)' }}>
-                <th style={{ padding: '10px 12px', textAlign: 'left', fontSize: 11, fontWeight: 700 }}>카드 별칭</th>
-                <th style={{ padding: '10px 12px', textAlign: 'left', fontSize: 11, fontWeight: 700 }}>카드사</th>
-                <th style={{ padding: '10px 12px', textAlign: 'center', fontSize: 11, fontWeight: 700 }}>상태</th>
-                <th style={{ padding: '10px 12px', textAlign: 'center', fontSize: 11, fontWeight: 700 }}>종류</th>
-                <th style={{ padding: '10px 12px', textAlign: 'left', fontSize: 11, fontWeight: 700 }}>소지자/부서</th>
-                <th style={{ padding: '10px 12px', textAlign: 'right', fontSize: 11, fontWeight: 700 }}>한도</th>
-                <th style={{ padding: '10px 12px', textAlign: 'center', fontSize: 11, fontWeight: 700 }}>결제일</th>
-                <th style={{ padding: '10px 12px', textAlign: 'left', fontSize: 11, fontWeight: 700 }}>배정 차량</th>
-                <th style={{ padding: '10px 12px', textAlign: 'center', fontSize: 11, fontWeight: 700 }}>관리</th>
+              <tr style={{ borderBottom: `1px solid ${COLORS.borderSubtle}`, background: COLORS.bgGray }}>
+                <th style={th}>카드사</th>
+                <th style={th}>카드번호</th>
+                <th style={th}>별칭</th>
+                <th style={{ ...th, textAlign: 'center' }}>공용 / 지정</th>
+                <th style={th}>배정 (차량·부서)</th>
+                <th style={{ ...th, textAlign: 'center' }}>종류</th>
+                <th style={{ ...th, textAlign: 'center' }}>상태</th>
+                <th style={{ ...th, textAlign: 'center' }}>관리</th>
               </tr>
             </thead>
             <tbody>
-              {cards.map((c: any) => {
-                const statusBadge = c.status === 'canceled' ? { bg: 'rgba(239,68,68,0.12)', fg: '#b91c1c', text: '🚫 해지' }
-                                  : c.status === 'suspended' ? { bg: 'rgba(245,158,11,0.12)', fg: '#b45309', text: '⏸ 정지' }
-                                  : { bg: 'rgba(34,197,94,0.12)', fg: '#15803d', text: '✓ 사용중' }
-                const typeColors: Record<string, string> = {
-                  '법인신용': '#3b82f6', '법인체크': '#8b5cf6',
-                  '하이패스': '#f59e0b', '주유': '#ef4444', '기타': '#94a3b8',
+              {sorted.map((c: any) => {
+                const cardNo = fmtCardNo(c.card_number)
+                const masked = !!cardNo && cardNo.includes('*')
+                const isDedicated = !!c.assigned_car_id || c.card_holder_type === '기명'
+                const typeColors: Record<string, [string, string]> = {
+                  '법인신용': [COLORS.bgBlue, '#1d4ed8'], '법인체크': [COLORS.bgViolet, '#6d28d9'],
+                  '하이패스': [COLORS.bgAmber, '#b45309'], '주유': [COLORS.bgRed, '#b91c1c'],
                 }
-                const typeColor = typeColors[c.card_type || '법인신용'] || '#94a3b8'
+                const [tBg, tFg] = typeColors[c.card_type] || [COLORS.borderFaint, COLORS.textSecondary]
                 return (
-                <tr key={c.id} style={{ borderBottom: '1px solid rgba(0,0,0,0.05)', opacity: c.status === 'canceled' ? 0.6 : 1 }}>
-                  <td style={{ padding: '10px 12px', fontWeight: 600 }}>
-                    {c.card_alias || c.card_number || '—'}
-                    {c.card_holder_type === '기명' && <span style={{ marginLeft: 4, fontSize: 10, color: '#7c3aed' }}>(기명)</span>}
-                  </td>
+                <tr key={c.id} style={{ borderBottom: `1px solid ${COLORS.borderFaint}`, opacity: c.status === 'canceled' ? 0.5 : 1 }}>
                   <td style={{ padding: '10px 12px' }}>
-                    {c.card_issuer && <span style={{ padding: '2px 8px', borderRadius: 6, background: `${ISSUER_COLOR[c.card_issuer] || '#94a3b8'}22`, color: ISSUER_COLOR[c.card_issuer] || '#94a3b8', fontWeight: 700, fontSize: 11 }}>{ISSUER_LABEL[c.card_issuer] || c.card_issuer}</span>}
+                    <span style={{ fontWeight: 700, fontSize: 12.5, color: ISSUER_COLOR[c.card_issuer] || COLORS.textPrimary }}>
+                      {ISSUER_LABEL[c.card_issuer] || c.card_issuer || '—'}
+                    </span>
                   </td>
-                  <td style={{ padding: '10px 12px', textAlign: 'center' }}>
-                    <span style={{ padding: '2px 8px', borderRadius: 6, background: statusBadge.bg, color: statusBadge.fg, fontWeight: 700, fontSize: 11 }}>{statusBadge.text}</span>
+                  <td style={{ padding: '10px 12px', fontFamily: 'ui-monospace, monospace', fontSize: 12.5, whiteSpace: 'nowrap' }}>
+                    {cardNo || <span style={{ color: COLORS.textDim }}>—</span>}
+                    {masked && <div style={{ fontSize: 10, color: COLORS.warning }}>원본 마스킹 — 수정에서 전체 번호 입력</div>}
                   </td>
+                  <td style={{ padding: '10px 12px', fontWeight: 600, fontSize: 12.5, whiteSpace: 'nowrap' }}>{c.card_alias || '—'}</td>
                   <td style={{ padding: '10px 12px', textAlign: 'center' }}>
-                    {c.card_type && <span style={{ padding: '2px 8px', borderRadius: 6, background: `${typeColor}22`, color: typeColor, fontWeight: 700, fontSize: 11 }}>{c.card_type}</span>}
+                    {isDedicated
+                      ? badge('지정', COLORS.bgBlue, '#1d4ed8')
+                      : badge('공용', COLORS.borderFaint, COLORS.textSecondary)}
                   </td>
                   <td style={{ padding: '10px 12px', fontSize: 12 }}>
-                    {c.holder_name || '—'}
-                    {c.department && <div style={{ fontSize: 10, color: '#64748b', marginTop: 1 }}>{c.department}</div>}
-                  </td>
-                  <td style={{ padding: '10px 12px', textAlign: 'right', fontSize: 12, fontFamily: 'monospace' }}>
-                    {c.monthly_limit ? `${Number(c.monthly_limit).toLocaleString()}원` : <span style={{ color: '#cbd5e1' }}>—</span>}
-                  </td>
-                  <td style={{ padding: '10px 12px', textAlign: 'center', fontSize: 12 }}>
-                    {c.payment_day ? `${c.payment_day}일` : <span style={{ color: '#cbd5e1' }}>—</span>}
-                  </td>
-                  <td style={{ padding: '10px 12px' }}>
-                    {c.car_number ? <span style={{ padding: '2px 8px', borderRadius: 6, background: 'rgba(59,130,246,0.1)', color: '#1d4ed8', fontWeight: 600, fontSize: 11 }}>🚗 {c.car_number}</span> : <span style={{ color: '#94a3b8' }}>공용</span>}
+                    {c.car_number
+                      ? <span style={{ fontWeight: 600, color: '#1d4ed8' }}>{c.car_number}</span>
+                      : <span style={{ color: COLORS.textMuted }}>{c.holder_name || '—'}</span>}
+                    {c.department && <span style={{ marginLeft: 6, fontSize: 11, color: COLORS.textMuted }}>{c.department}</span>}
                   </td>
                   <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                    {badge(c.card_type || '법인신용', tBg, tFg)}
+                  </td>
+                  <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                    {c.status === 'canceled' ? badge('해지', COLORS.bgRed, COLORS.danger)
+                      : c.status === 'suspended' ? badge('정지', COLORS.bgAmber, COLORS.warning)
+                      : badge('사용중', COLORS.bgGreen, COLORS.success)}
+                  </td>
+                  <td style={{ padding: '10px 12px', textAlign: 'center', whiteSpace: 'nowrap' }}>
                     <button onClick={() => onEdit({
                       type: 'card', id: c.id,
                       card_number: c.card_number,
@@ -305,17 +326,18 @@ export default function MappingTab({
                       previous_card_number: c.previous_card_number || '',
                       department: c.department || '',
                       memo: c.memo || '',
-                    })} style={{ padding: '3px 8px', borderRadius: 6, fontSize: 11, cursor: 'pointer', background: 'rgba(191,219,254,0.5)', border: '1px solid rgba(59,130,246,0.2)', color: '#1e40af', marginRight: 4 }}>수정</button>
-                    <button onClick={() => onDelete(c.id, 'card')} style={{ padding: '3px 8px', borderRadius: 6, fontSize: 11, cursor: 'pointer', background: 'rgba(254,202,202,0.5)', border: '1px solid rgba(239,68,68,0.2)', color: '#b91c1c' }}>삭제</button>
+                    })} style={{ padding: '4px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer', background: '#fff', border: `1px solid ${COLORS.borderSubtle}`, color: COLORS.primary, marginRight: 4 }}>수정</button>
+                    <button onClick={() => onDelete(c.id, 'card')} style={{ padding: '4px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer', background: '#fff', border: `1px solid ${COLORS.borderSubtle}`, color: COLORS.danger }}>삭제</button>
                   </td>
                 </tr>
                 )
               })}
-              {cards.length === 0 && <tr><td colSpan={9} style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>등록된 카드가 없습니다</td></tr>}
+              {sorted.length === 0 && <tr><td colSpan={8} style={{ padding: 40, textAlign: 'center', color: COLORS.textMuted }}>등록된 카드가 없습니다</td></tr>}
             </tbody>
           </table>
         </div>
-      )}
+        )
+      })()}
 
       {/* 통장 매핑 테이블 */}
       {sub === 'bank' && (
