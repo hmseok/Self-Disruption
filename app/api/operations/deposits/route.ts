@@ -122,6 +122,36 @@ export async function GET(request: NextRequest) {
       }
       throw e
     })
+    // 라이드(빌려타) 정산 정보 (2026-08-02 사용자 확정: 지입된 빌려타 차량은 라이드
+    // 월 정산으로, 자사 직접 운용 차량은 통장 입금으로 확인 — 소속 구분 필요)
+    //   빌려타 차량 = 라이드 정산서에 등장한 차량. 번호판 하/허 오기가 있어 숫자만 비교.
+    const vehDigits = (s: any) => String(s || '').replace(/[^0-9]/g, '')
+    const rideVehicles = new Set<string>()
+    const rideItemsByRental = new Map<string, any[]>()
+    let rideMonths: any[] = []
+    try {
+      const [vehRows, itemRows, monthRows] = await Promise.all([
+        prisma.$queryRaw<any[]>`SELECT DISTINCT vehicle_number FROM ride_settlement_deposits`,
+        prisma.$queryRaw<any[]>`
+          SELECT rental_id, settle_month, deposit_date, insurer, customer_car, amount
+            FROM ride_settlement_deposits WHERE rental_id IS NOT NULL`,
+        prisma.$queryRaw<any[]>`
+          SELECT settle_month, COUNT(*) c, SUM(amount) total, SUM(rental_id IS NOT NULL) matched
+            FROM ride_settlement_deposits GROUP BY settle_month ORDER BY settle_month DESC`,
+      ])
+      for (const v of vehRows) { const d = vehDigits(v.vehicle_number); if (d) rideVehicles.add(d) }
+      for (const it of itemRows) {
+        if (!rideItemsByRental.has(it.rental_id)) rideItemsByRental.set(it.rental_id, [])
+        rideItemsByRental.get(it.rental_id)!.push({
+          settle_month: it.settle_month, deposit_date: it.deposit_date,
+          insurer: it.insurer, customer_car: it.customer_car, amount: Number(it.amount),
+        })
+      }
+      rideMonths = monthRows.map((m) => ({
+        month: m.settle_month, count: Number(m.c), total: Number(m.total), matched: Number(m.matched),
+      }))
+    } catch { /* ride_settlement_deposits 미생성 — 구분 없이 진행 */ }
+
     const byLast4 = new Map<string, any[]>()
     const byName = new Map<string, any[]>()
     const byInsurer = new Map<string, any[]>()
@@ -227,7 +257,10 @@ export async function GET(request: NextRequest) {
       dispatch_date: r.dispatch_date, status: r.status,
       paid_sum: r.paid_sum != null ? Number(r.paid_sum) : 0,
       ride_sum: r.ride_sum != null ? Number(r.ride_sum) : 0,
-    })), summary, error: null })
+      // 차량 소속: 라이드 정산서에 등장한 차량 = 빌려타(지입) / 그 외 = 자사
+      vehicle_class: rideVehicles.has(vehDigits(r.vehicle_car_number)) ? 'ride' : 'own',
+      ride_items: rideItemsByRental.get(r.id) || [],
+    })), summary, ride_months: rideMonths, error: null })
   } catch (e: any) {
     console.error('[GET /api/operations/deposits]', e)
     return NextResponse.json({ error: e.message }, { status: 500 })

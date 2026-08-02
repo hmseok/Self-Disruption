@@ -48,7 +48,10 @@ type Rental = {
   status: string | null
   paid_sum: number
   ride_sum: number
+  vehicle_class: 'ride' | 'own'
+  ride_items: Array<{ settle_month: string; deposit_date: string | null; insurer: string | null; customer_car: string | null; amount: number }>
 }
+type RideMonth = { month: string; count: number; total: number; matched: number }
 // 통장 입금 + 라이드 일괄 정산분 합계
 const totalPaid = (r: Rental) => (r.paid_sum || 0) + (r.ride_sum || 0)
 
@@ -87,6 +90,8 @@ export default function DepositsTab() {
   const [days, setDays] = useState(120) // 과거 입금 매칭용 기간 (국민은행 구계좌 포함)
   const [payFilter, setPayFilter] = useState('open') // open = 대기+부분 / all / done
   const [depositFilter, setDepositFilter] = useState('todo')
+  const [vehClass, setVehClass] = useState<'all' | 'ride' | 'own'>('all') // 차량 소속 (빌려타/자사)
+  const [rideMonths, setRideMonths] = useState<RideMonth[]>([])
   const [matching, setMatching] = useState(false)
   const [uploading, setUploading] = useState(false)
   const rideFileRef = useRef<HTMLInputElement>(null)
@@ -106,7 +111,10 @@ export default function DepositsTab() {
       const q = search ? `&q=${encodeURIComponent(search)}` : ''
       const res = await fetch(`/api/operations/deposits?days=${days}${q}`, { headers })
       const json = await res.json()
-      if (json?.data) { setRows(json.data); setRentals(json.rentals || []); setSummary(json.summary) }
+      if (json?.data) {
+        setRows(json.data); setRentals(json.rentals || []); setSummary(json.summary)
+        setRideMonths(json.ride_months || [])
+      }
     } finally { setLoading(false) }
   }, [search, days])
   useEffect(() => { load() }, [load])
@@ -233,6 +241,7 @@ export default function DepositsTab() {
     rentals.filter((r) => ACTIVE_STATUSES.has(String(r.status || ''))), [rentals])
   const rentalRows = useMemo(() => {
     let data = activeRentals
+    if (vehClass !== 'all') data = data.filter((r) => r.vehicle_class === vehClass)
     if (payFilter === 'open') data = data.filter((r) => payState(r) !== 'done')
     else if (payFilter === 'done') data = data.filter((r) => payState(r) === 'done')
     if (search.trim()) {
@@ -243,7 +252,7 @@ export default function DepositsTab() {
         String(r.vehicle_car_number || '').toLowerCase().includes(q))
     }
     return data
-  }, [activeRentals, payFilter, search])
+  }, [activeRentals, payFilter, search, vehClass])
 
   const filtered = useMemo(() => {
     if (depositFilter === 'all') return rows
@@ -271,11 +280,18 @@ export default function DepositsTab() {
           <div style={{ fontSize: 11.5, color: COLORS.textMuted }}>{r.insurance_company || ''}</div>
         </div>
       ) },
-    { key: 'car', label: '차량', width: 150,
+    { key: 'car', label: '차량', width: 168,
       sortBy: (r) => r.vehicle_car_number || '',
       render: (r) => (
         <div style={{ fontSize: 12.5 }}>
-          <div>대차 <b>{r.vehicle_car_number || '—'}</b></div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            <span>대차 <b>{r.vehicle_car_number || '—'}</b></span>
+            <span style={{
+              fontSize: 10, fontWeight: 700, padding: '1.5px 6px', borderRadius: 5, whiteSpace: 'nowrap',
+              background: r.vehicle_class === 'ride' ? COLORS.bgViolet : COLORS.bgBlue,
+              color: r.vehicle_class === 'ride' ? '#6d28d9' : COLORS.primary,
+            }}>{r.vehicle_class === 'ride' ? '빌려타' : '자사'}</span>
+          </div>
           <div style={{ color: COLORS.textMuted, fontSize: 11.5 }}>고객차 {r.customer_car_number || '—'}</div>
         </div>
       ) },
@@ -405,6 +421,20 @@ export default function DepositsTab() {
             : '렌터카통장 입금 전체 (최근 120일)'}
         </span>
         <span style={{ flex: 1 }} />
+        {view === 'rentals' && (
+          <div style={{ display: 'inline-flex', padding: 3, borderRadius: 9, background: COLORS.borderFaint }}>
+            {([['all', '전체'], ['ride', '빌려타'], ['own', '자사']] as const).map(([k, label]) => (
+              <button key={k} onClick={() => setVehClass(k)}
+                title={k === 'ride' ? '라이드 소유 지입 차량 — 입금은 라이드 월 정산으로 확인' : k === 'own' ? '자사 직접 운용 차량 — 입금은 통장으로 확인' : ''}
+                style={{
+                  padding: '5px 11px', fontSize: 12, fontWeight: 600, borderRadius: 7, cursor: 'pointer',
+                  border: vehClass === k ? `1px solid ${COLORS.borderSubtle}` : '1px solid transparent',
+                  background: vehClass === k ? '#fff' : 'transparent',
+                  color: vehClass === k ? (k === 'ride' ? '#6d28d9' : COLORS.textPrimary) : COLORS.textMuted,
+                }}>{label}</button>
+            ))}
+          </div>
+        )}
         <select value={days} onChange={(e) => setDays(Number(e.target.value))}
           style={{ padding: '7px 10px', borderRadius: 9, border: `1px solid ${COLORS.borderSubtle}`, fontSize: 12.5, fontWeight: 600, color: COLORS.textSecondary, background: '#fff' }}>
           <option value={120}>최근 4개월</option>
@@ -426,6 +456,18 @@ export default function DepositsTab() {
       {/* ── 배차건 기준 뷰 ── */}
       {view === 'rentals' && (
         <>
+          {/* 라이드 정산 반영 현황 — 업로드된 정산월별 요약 */}
+          {rideMonths.length > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 10, padding: '8px 12px', borderRadius: 10, background: COLORS.bgViolet }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: '#6d28d9' }}>라이드 정산 반영</span>
+              {rideMonths.map((m) => (
+                <span key={m.month} style={{ fontSize: 12, color: '#6d28d9' }}>
+                  {m.month} · {m.count}건 · {nf(m.total)}원 (매칭 {m.matched}건{m.matched < m.count ? ` / 미매칭 ${m.count - m.matched}` : ''})
+                </span>
+              ))}
+              <span style={{ fontSize: 11.5, color: COLORS.textMuted }}>— 빌려타 차량 건은 통장이 아닌 라이드 월 정산으로 입금 확인</span>
+            </div>
+          )}
           <DcToolbar
             search={search}
             onSearchChange={setSearch}
@@ -525,8 +567,30 @@ export default function DepositsTab() {
                 )}
               </div>
 
+              {/* 라이드 정산분 (빌려타 차량) */}
+              {rentalModal.ride_items.length > 0 && (
+                <>
+                  <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 6 }}>라이드 정산분 {rentalModal.ride_items.length}건</div>
+                  {rentalModal.ride_items.map((it, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 9, border: '1px solid #ddd6fe', background: COLORS.bgViolet, marginBottom: 6 }}>
+                      <div style={{ flex: 1, fontSize: 12.5 }}>
+                        <b>{nf(it.amount)}원</b> · {it.insurer || '보험사 미상'}
+                        <span style={{ color: COLORS.textMuted, fontSize: 11.5 }}>
+                          {' '}· {it.deposit_date ? String(it.deposit_date).slice(0, 10) : '—'} · {it.settle_month} 정산
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </>
+              )}
+              {rentalModal.vehicle_class === 'ride' && rentalModal.ride_items.length === 0 && (
+                <div style={{ fontSize: 12, color: '#6d28d9', background: COLORS.bgViolet, borderRadius: 9, padding: '8px 10px', marginBottom: 12 }}>
+                  빌려타(라이드 소유) 차량 — 입금은 통장이 아닌 라이드 월 정산 업로드로 확인됩니다
+                </div>
+              )}
+
               {/* 연결된 입금 */}
-              <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 6 }}>연결된 입금 {linked.length}건</div>
+              <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 6 }}>연결된 입금 {linked.length}건{rentalModal.vehicle_class === 'ride' ? ' (통장)' : ''}</div>
               {linked.length === 0 && <div style={{ fontSize: 12, color: COLORS.textMuted, marginBottom: 12 }}>아직 연결된 입금이 없습니다 (최근 120일 기준)</div>}
               {linked.map((d) => (
                 <div key={d.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 9, border: `1px solid ${COLORS.borderGreen}`, background: COLORS.bgGreen, marginBottom: 6 }}>

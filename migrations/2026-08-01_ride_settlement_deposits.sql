@@ -22,4 +22,6 @@ CREATE TABLE IF NOT EXISTS ride_settlement_deposits (
   UNIQUE KEY uniq_ride_item (settle_month, vehicle_number, customer_car, deposit_date, amount),
   KEY idx_ride_rental (rental_id),
   KEY idx_ride_month (settle_month)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+-- 2026-08-02: COLLATE 명시 추가 — 미지정 생성분은 utf8mb4_0900_ai_ci 가 되어
+-- fmi_rentals.id(unicode_ci) 와의 조인에서 1267 에러. 운영 DB 는 CONVERT 적용 완료.
