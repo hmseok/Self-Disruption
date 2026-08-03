@@ -52,7 +52,7 @@ type Rental = {
   ride_items: Array<{ settle_month: string; deposit_date: string | null; insurer: string | null; customer_car: string | null; amount: number }>
 }
 type RideMonth = { month: string; count: number; total: number; matched: number }
-// 통장 입금 + 라이드 일괄 정산분 합계
+// 통장 입금 + 빌려타 일괄 정산분 합계
 const totalPaid = (r: Rental) => (r.paid_sum || 0) + (r.ride_sum || 0)
 
 const nf = (n: any) => Number(n || 0).toLocaleString('ko-KR')
@@ -133,7 +133,7 @@ export default function DepositsTab() {
     } finally { setMatching(false) }
   }, [load])
 
-  // 라이드(빌려타) 월 대차료 마감엑셀 업로드 → 건별 저장 + 자동 매칭
+  // 빌려타 월 대차료 마감엑셀 업로드 → 건별 저장 + 자동 매칭
   const uploadRideSettlement = useCallback(async (file: File) => {
     setUploading(true)
     try {
@@ -144,10 +144,10 @@ export default function DepositsTab() {
       const sheetName = wb.SheetNames.find((n) => n.includes('정산')) || wb.SheetNames[0]
       const rows = utils.sheet_to_json<unknown[]>(wb.Sheets[sheetName], { header: 1, raw: true }) as unknown[][]
       const parsed = parseRideSettlement(rows)
-      if (!parsed.deposits.length) { alert('정산 내역을 찾지 못했습니다 — 「월 정산」 시트가 있는 라이드 마감엑셀인지 확인해주세요'); return }
+      if (!parsed.deposits.length) { alert('정산 내역을 찾지 못했습니다 — 「월 정산」 시트가 있는 빌려타 마감엑셀인지 확인해주세요'); return }
       const month = parsed.month || prompt('정산월을 확인하지 못했습니다. YYYY-MM 형식으로 입력해주세요', '') || ''
       if (!/^\d{4}-\d{2}$/.test(month)) { alert('정산월(YYYY-MM)이 없어 중단했습니다'); return }
-      if (!confirm(`라이드 ${month} 정산 — 차량 ${parsed.vehicles.length}대, 입금 ${parsed.deposits.length}건, 총 ${nf(parsed.grandTotal)}원\n저장하고 배차건과 매칭할까요? (재업로드해도 중복 저장되지 않습니다)`)) return
+      if (!confirm(`빌려타 ${month} 정산 — 차량 ${parsed.vehicles.length}대, 입금 ${parsed.deposits.length}건, 총 ${nf(parsed.grandTotal)}원\n저장하고 배차건과 매칭할까요? (재업로드해도 중복 저장되지 않습니다)`)) return
       const headers = { ...(await getAuthHeader()), 'Content-Type': 'application/json' }
       const res = await fetch('/api/operations/ride-settlement', {
         method: 'POST', headers, body: JSON.stringify({ month, deposits: parsed.deposits }),
@@ -155,7 +155,7 @@ export default function DepositsTab() {
       const json = await res.json()
       if (json?.error) { alert(`업로드 실패: ${json.error}`); return }
       const d = json.data
-      let msg = `라이드 ${d.month} 정산 반영 완료\n신규 ${d.inserted}건 (중복 제외 ${d.duplicated}건)\n배차건 매칭 ${d.matched}건 / 미매칭 ${d.unmatched}건`
+      let msg = `빌려타 ${d.month} 정산 반영 완료\n신규 ${d.inserted}건 (중복 제외 ${d.duplicated}건)\n배차건 매칭 ${d.matched}건 / 미매칭 ${d.unmatched}건`
       if (d.unmatchedList?.length) {
         msg += '\n\n미매칭 내역:\n' + d.unmatchedList.slice(0, 8).map((u: any) =>
           `· ${u.vehicle || '?'} / 고객차 ${u.customerCar || '?'} / ${u.insurer || '?'} / ${nf(u.amount)}원`).join('\n')
@@ -309,7 +309,7 @@ export default function DepositsTab() {
       render: (r) => (
         <div>
           <span style={{ fontSize: 13, fontWeight: 600, color: totalPaid(r) > 0 ? COLORS.success : COLORS.textMuted, fontVariantNumeric: 'tabular-nums' }}>{nf(totalPaid(r))}</span>
-          {r.ride_sum > 0 && <div style={{ fontSize: 10.5, color: COLORS.textMuted }}>라이드 {nf(r.ride_sum)}</div>}
+          {r.ride_sum > 0 && <div style={{ fontSize: 10.5, color: COLORS.textMuted }}>빌려타 {nf(r.ride_sum)}</div>}
         </div>
       ) },
     { key: 'remain', label: '잔액', width: 105, align: 'right',
@@ -425,7 +425,7 @@ export default function DepositsTab() {
           <div style={{ display: 'inline-flex', padding: 3, borderRadius: 9, background: COLORS.borderFaint }}>
             {([['all', '전체'], ['ride', '빌려타'], ['own', '자사']] as const).map(([k, label]) => (
               <button key={k} onClick={() => setVehClass(k)}
-                title={k === 'ride' ? '라이드 소유 지입 차량 — 입금은 라이드 월 정산으로 확인' : k === 'own' ? '자사 직접 운용 차량 — 입금은 통장으로 확인' : ''}
+                title={k === 'ride' ? '빌려타(지입) 차량 — 입금은 빌려타 월 정산으로 확인' : k === 'own' ? '자사 직접 운용 차량 — 입금은 통장으로 확인' : ''}
                 style={{
                   padding: '5px 11px', fontSize: 12, fontWeight: 600, borderRadius: 7, cursor: 'pointer',
                   border: vehClass === k ? `1px solid ${COLORS.borderSubtle}` : '1px solid transparent',
@@ -445,7 +445,7 @@ export default function DepositsTab() {
           onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadRideSettlement(f) }} />
         <button onClick={() => rideFileRef.current?.click()} disabled={uploading}
           style={{ background: '#fff', border: `1px solid ${COLORS.borderSubtle}`, borderRadius: 9, padding: '8px 15px', fontSize: 12.5, fontWeight: 600, color: COLORS.textSecondary, cursor: uploading ? 'wait' : 'pointer' }}>
-          {uploading ? '처리 중...' : '라이드 정산 업로드'}
+          {uploading ? '처리 중...' : '빌려타 정산 업로드'}
         </button>
         <button onClick={runAutoMatch} disabled={matching}
           style={{ border: 'none', background: COLORS.primary, borderRadius: 9, padding: '8px 15px', fontSize: 12.5, fontWeight: 600, color: '#fff', cursor: matching ? 'wait' : 'pointer' }}>
@@ -456,16 +456,16 @@ export default function DepositsTab() {
       {/* ── 배차건 기준 뷰 ── */}
       {view === 'rentals' && (
         <>
-          {/* 라이드 정산 반영 현황 — 업로드된 정산월별 요약 */}
+          {/* 빌려타 정산 반영 현황 — 업로드된 정산월별 요약 */}
           {rideMonths.length > 0 && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 10, padding: '8px 12px', borderRadius: 10, background: COLORS.bgViolet }}>
-              <span style={{ fontSize: 12, fontWeight: 700, color: '#6d28d9' }}>라이드 정산 반영</span>
+              <span style={{ fontSize: 12, fontWeight: 700, color: '#6d28d9' }}>빌려타 정산 반영</span>
               {rideMonths.map((m) => (
                 <span key={m.month} style={{ fontSize: 12, color: '#6d28d9' }}>
                   {m.month} · {m.count}건 · {nf(m.total)}원 (매칭 {m.matched}건{m.matched < m.count ? ` / 미매칭 ${m.count - m.matched}` : ''})
                 </span>
               ))}
-              <span style={{ fontSize: 11.5, color: COLORS.textMuted }}>— 빌려타 차량 건은 통장이 아닌 라이드 월 정산으로 입금 확인</span>
+              <span style={{ fontSize: 11.5, color: COLORS.textMuted }}>— 빌려타 차량 건은 통장이 아닌 빌려타 월 정산으로 입금 확인</span>
             </div>
           )}
           <DcToolbar
@@ -562,15 +562,15 @@ export default function DepositsTab() {
                 <span style={{ fontSize: 11.5, fontWeight: 600, padding: '4px 10px', borderRadius: 6, background: ps.bg, color: ps.fg }}>{ps.label}</span>
                 {rentalModal.ride_sum > 0 && (
                   <span style={{ fontSize: 11.5, fontWeight: 600, padding: '4px 10px', borderRadius: 6, background: COLORS.bgViolet, color: '#6d28d9' }}>
-                    라이드 일괄 정산분 {nf(rentalModal.ride_sum)}원 포함
+                    빌려타 일괄 정산분 {nf(rentalModal.ride_sum)}원 포함
                   </span>
                 )}
               </div>
 
-              {/* 라이드 정산분 (빌려타 차량) */}
+              {/* 빌려타 정산분 (빌려타 차량) */}
               {rentalModal.ride_items.length > 0 && (
                 <>
-                  <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 6 }}>라이드 정산분 {rentalModal.ride_items.length}건</div>
+                  <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 6 }}>빌려타 정산분 {rentalModal.ride_items.length}건</div>
                   {rentalModal.ride_items.map((it, i) => (
                     <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 9, border: '1px solid #ddd6fe', background: COLORS.bgViolet, marginBottom: 6 }}>
                       <div style={{ flex: 1, fontSize: 12.5 }}>
@@ -585,7 +585,7 @@ export default function DepositsTab() {
               )}
               {rentalModal.vehicle_class === 'ride' && rentalModal.ride_items.length === 0 && (
                 <div style={{ fontSize: 12, color: '#6d28d9', background: COLORS.bgViolet, borderRadius: 9, padding: '8px 10px', marginBottom: 12 }}>
-                  빌려타(라이드 소유) 차량 — 입금은 통장이 아닌 라이드 월 정산 업로드로 확인됩니다
+                  빌려타(지입) 차량 — 입금은 통장이 아닌 빌려타 월 정산 업로드로 확인됩니다
                 </div>
               )}
 

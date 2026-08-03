@@ -8,7 +8,7 @@ import { loadVehicleClassMap, classifyVehicle } from '@/lib/vehicle-class'
 //
 // 회사 관점 채권: 단기·대차 청구와 (추후) 장기 렌트료의 청구→수납→미수.
 // 1단계 범위 (청구액 데이터가 아직 없어 플래그·수납 중심):
-//   monthly : 월별 수납 흐름 — 통장 매칭분 + 라이드 정산분
+//   monthly : 월별 수납 흐름 — 통장 매칭분 + 빌려타 정산분
 //   waiting : 청구완료(시트 sheet_billed)인데 입금 흔적 없는 건 — 경과일 순
 //   ledger  : 채권 원장 (최근 배차건: 소속/청구액/수납액/경로/상태)
 // ═══════════════════════════════════════════════════════════════════
@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
          WHERE t.related_type = 'fmi_rental' AND t.type = 'income' AND t.deleted_at IS NULL
            AND t.transaction_date >= DATE_SUB(CURDATE(), INTERVAL ${months} MONTH)
          GROUP BY m ORDER BY m DESC`),
-      // 라이드 정산 수납 (입금일 기준 월)
+      // 빌려타 정산 수납 (입금일 기준 월)
       prisma.$queryRawUnsafe<any[]>(`
         SELECT DATE_FORMAT(deposit_date,'%Y-%m') m, SUM(amount) amt, COUNT(*) c
           FROM ride_settlement_deposits

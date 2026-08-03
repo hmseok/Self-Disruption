@@ -7,7 +7,7 @@ import { fetchWithAuth } from '@/app/utils/finance-upload'
 // ═══════════════════════════════════════════════════════════════════
 // CollectionTab — 장부 「수금」 (2026-08-03 사용자 확정, 목업 ar-collection)
 //
-// 회사 관점 채권 통합 1단계: 월별 수납 흐름(통장+라이드 정산) ·
+// 회사 관점 채권 통합 1단계: 월별 수납 흐름(통장+빌려타 정산) ·
 // 청구완료·입금대기 리스트(시트 플래그) · 채권 원장(소속/유형 필터).
 // 청구액 입력이 쌓이면 금액 미수 KPI 가 자동으로 살아난다 (2단계).
 // 업무 화면(단기·대차/장기계약)은 청구 작성·건별 입금 확인만 담당.
@@ -110,8 +110,8 @@ export default function CollectionTab() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 12, marginBottom: 16 }}>
         {[
           { label: '이번 달 수납', value: summary?.month_now ? `${nf(summary.month_now.bank + summary.month_now.ride)}원` : '—',
-            sub: summary?.month_now ? `통장 ${nf(summary.month_now.bank)} · 라이드 ${nf(summary.month_now.ride)}` : '', dot: COLORS.primary },
-          { label: '라이드 정산 수령', value: summary?.ride_last ? `${nf(summary.ride_last.total)}원` : '—',
+            sub: summary?.month_now ? `통장 ${nf(summary.month_now.bank)} · 빌려타 ${nf(summary.month_now.ride)}` : '', dot: COLORS.primary },
+          { label: '빌려타 정산 수령', value: summary?.ride_last ? `${nf(summary.ride_last.total)}원` : '—',
             sub: summary?.ride_last ? `${summary.ride_last.month} · ${summary.ride_last.count}건` : '정산 업로드 전', dot: '#8b5cf6' },
           { label: '청구완료 · 입금대기', value: summary ? `${summary.waiting_count}건` : '—',
             sub: summary ? `14일 경과 ${summary.waiting_over14}건` : '', dot: COLORS.warning },
@@ -131,12 +131,12 @@ export default function CollectionTab() {
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.5fr) minmax(0, 1fr)', gap: 14, marginBottom: 14 }}>
         {/* 월별 수납 흐름 */}
         <div style={card}>
-          <div style={hd}>월별 수납 흐름 <span style={{ fontSize: 11.5, fontWeight: 500, color: COLORS.textMuted }}>— 통장 매칭분 + 라이드 정산분</span></div>
+          <div style={hd}>월별 수납 흐름 <span style={{ fontSize: 11.5, fontWeight: 500, color: COLORS.textMuted }}>— 통장 매칭분 + 빌려타 정산분</span></div>
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead><tr>
                 <th style={th}>월</th><th style={{ ...th, textAlign: 'right' }}>통장</th>
-                <th style={{ ...th, textAlign: 'right' }}>라이드 정산</th><th style={{ ...th, textAlign: 'right' }}>합계</th>
+                <th style={{ ...th, textAlign: 'right' }}>빌려타 정산</th><th style={{ ...th, textAlign: 'right' }}>합계</th>
                 <th style={{ ...th, width: '30%' }}>구성</th>
               </tr></thead>
               <tbody>
@@ -223,10 +223,10 @@ export default function CollectionTab() {
                     {x.received > 0 ? <b style={{ color: x.ride_paid > 0 && x.bank_paid === 0 ? '#6d28d9' : COLORS.success }}>{nf(x.received)}</b> : <span style={{ color: COLORS.textDim }}>-</span>}
                   </td>
                   <td style={{ ...td, fontSize: 11, color: COLORS.textMuted }}>
-                    {x.ride_paid > 0 && x.bank_paid > 0 ? '통장+라이드'
-                      : x.ride_paid > 0 ? `라이드 정산 ${d10(x.last_received)}`
+                    {x.ride_paid > 0 && x.bank_paid > 0 ? '통장+빌려타'
+                      : x.ride_paid > 0 ? `빌려타 정산 ${d10(x.last_received)}`
                       : x.bank_paid > 0 ? `통장 ${d10(x.last_received)}`
-                      : x.vehicle_class === 'ride' ? '라이드 정산 예정' : '통장 대기'}
+                      : x.vehicle_class === 'ride' ? '빌려타 정산 예정' : '통장 대기'}
                   </td>
                   <td style={{ ...td, textAlign: 'center' }}><Badge meta={STATE_BADGE[x.ar_state]} /></td>
                 </tr>

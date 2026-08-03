@@ -55,7 +55,7 @@ type ClaimRow = {
   repair_factory: string | null
   customer_birth: string | null
   paid_amount: number | null
-  ride_paid?: number | null   // 라이드(빌려타) 월 일괄 정산분 — paid_amount 에 합산됨
+  ride_paid?: number | null   // 빌려타 월 일괄 정산분 — paid_amount 에 합산됨
   vehicle_class?: 'ride' | 'own' | 'unknown'  // 차량 소속 (차량 마스터 기준)
   payment_status: string | null
   payment_memo: string | null
@@ -109,7 +109,7 @@ export default function ClaimsTab() {
   const [filter, setFilter] = useState<FilterKey>('all')
   const [search, setSearch] = useState('')
   const [vatOnly, setVatOnly] = useState(false)
-  // 소속 탭 (2026-08-02 사용자 확정 목업) — 지입(라이드) / 직접운영(FMI) / 미지정
+  // 소속 탭 (2026-08-02 사용자 확정 목업) — 지입(빌려타) / 직접운영(FMI) / 미지정
   const [fleetClass, setFleetClass] = useState<'all' | 'ride' | 'own' | 'unknown'>('all')
   const [rows, setRows] = useState<ClaimRow[] | null>(null)
   const [loading, setLoading] = useState(false)
@@ -196,7 +196,7 @@ export default function ClaimsTab() {
 
   // (직접 연결 함수는 PR-PAY-LINK-MODAL 로 대체 — 모달에서 확인·수정 후 확정)
 
-  // 라이드(빌려타) 월 대차료 정산 업로드 — 입금 탭과 동일 파이프라인 (2026-08-02 통합)
+  // 빌려타 월 대차료 정산 업로드 — 입금 탭과 동일 파이프라인 (2026-08-02 통합)
   //   구 PR-PARTNER-IMPORT(가짜 거래 생성 방식, 미사용 0건)를 ride_settlement_deposits 경로로 교체
   const partnerFileRef = useRef<HTMLInputElement>(null)
   const [partnerBusy, setPartnerBusy] = useState(false)
@@ -213,11 +213,11 @@ export default function ClaimsTab() {
       const sheetName = wb.SheetNames.find((n) => n.includes('정산')) || wb.SheetNames[0]
       const grid = utils.sheet_to_json<unknown[]>(wb.Sheets[sheetName], { header: 1, raw: true }) as unknown[][]
       const parsed = parseRideSettlement(grid)
-      if (!parsed.deposits.length) throw new Error('정산 내역을 찾지 못했습니다 — 라이드 마감엑셀(월 정산 시트)인지 확인해주세요')
+      if (!parsed.deposits.length) throw new Error('정산 내역을 찾지 못했습니다 — 빌려타 마감엑셀(월 정산 시트)인지 확인해주세요')
       const month = parsed.month || prompt('정산월을 확인하지 못했습니다. YYYY-MM 형식으로 입력해주세요', '') || ''
       if (!/^\d{4}-\d{2}$/.test(month)) throw new Error('정산월(YYYY-MM) 미확인으로 중단')
       const go = window.confirm(
-        `라이드 ${month} 정산 — 차량 ${parsed.vehicles.length}대, 입금 ${parsed.deposits.length}건, 총 ${parsed.grandTotal.toLocaleString('ko-KR')}원\n저장하고 배차건과 매칭할까요? (재업로드해도 중복 저장되지 않습니다)`,
+        `빌려타 ${month} 정산 — 차량 ${parsed.vehicles.length}대, 입금 ${parsed.deposits.length}건, 총 ${parsed.grandTotal.toLocaleString('ko-KR')}원\n저장하고 배차건과 매칭할까요? (재업로드해도 중복 저장되지 않습니다)`,
       )
       if (!go) { setPartnerMsg({ type: 'err', text: '업로드 취소됨' }); return }
       const headers = { ...(await getAuthHeader()), 'Content-Type': 'application/json' }
@@ -226,11 +226,11 @@ export default function ClaimsTab() {
       }).then((x) => x.json())
       if (res?.error) throw new Error(res.error)
       const d = res.data
-      setPartnerMsg({ type: 'ok', text: `✅ 라이드 ${d.month} 정산 반영 — 신규 ${d.inserted}건 (중복 제외 ${d.duplicated}) · 매칭 ${d.matched} / 미매칭 ${d.unmatched}` })
+      setPartnerMsg({ type: 'ok', text: `✅ 빌려타 ${d.month} 정산 반영 — 신규 ${d.inserted}건 (중복 제외 ${d.duplicated}) · 매칭 ${d.matched} / 미매칭 ${d.unmatched}` })
       fetchPayCandidates()
       refresh()
     } catch (e: any) {
-      setPartnerMsg({ type: 'err', text: e?.message || '라이드 정산 업로드 오류' })
+      setPartnerMsg({ type: 'err', text: e?.message || '빌려타 정산 업로드 오류' })
     } finally {
       setPartnerBusy(false)
       if (partnerFileRef.current) partnerFileRef.current.value = ''
@@ -479,7 +479,7 @@ export default function ClaimsTab() {
     { label: '🧮 청구액 합계', value: Math.round(totalClaim / 10000), unit: '만원', tint: 'green' },
   ]
   const statActions: ActionButton[] = [
-    { label: partnerBusy ? '반영 중…' : '라이드 정산 업로드', onClick: () => !partnerBusy && partnerFileRef.current?.click(), variant: 'primary', icon: '📥' },
+    { label: partnerBusy ? '반영 중…' : '빌려타 정산 업로드', onClick: () => !partnerBusy && partnerFileRef.current?.click(), variant: 'primary', icon: '📥' },
     {
       // PR-CLEAN-TABS — 자동매칭 실행 버튼을 재무에서 청구 탭으로 이동 (업무층 자기완결)
       label: '입금 자동매칭', icon: '🔗', variant: 'secondary',
@@ -511,7 +511,7 @@ export default function ClaimsTab() {
       key: 'vehicle_class', label: '소속', width: 92, align: 'center',
       sortBy: (r) => r.vehicle_class || 'unknown',
       render: (r) => r.vehicle_class === 'ride'
-        ? <span style={{ fontSize: 10.5, fontWeight: 700, padding: '2.5px 8px', borderRadius: 6, background: '#ede9fe', color: '#6d28d9', whiteSpace: 'nowrap' }}>라이드 지입</span>
+        ? <span style={{ fontSize: 10.5, fontWeight: 700, padding: '2.5px 8px', borderRadius: 6, background: '#ede9fe', color: '#6d28d9', whiteSpace: 'nowrap' }}>빌려타 지입</span>
         : r.vehicle_class === 'own'
           ? <span style={{ fontSize: 10.5, fontWeight: 700, padding: '2.5px 8px', borderRadius: 6, background: '#dbeafe', color: '#1d4ed8', whiteSpace: 'nowrap' }}>FMI 직접</span>
           : <span style={{ fontSize: 10.5, fontWeight: 700, padding: '2.5px 8px', borderRadius: 6, background: '#eef1f5', color: '#667085', whiteSpace: 'nowrap' }}>미지정</span>,
@@ -595,7 +595,7 @@ export default function ClaimsTab() {
       render: (r) => Number(r.paid_amount) > 0
         ? <span style={{ whiteSpace: 'nowrap' }}>
             <span style={{ fontWeight: 800, color: '#15803d' }}>{fmtWon(r.paid_amount)}</span>
-            {Number(r.ride_paid) > 0 && <div style={{ fontSize: 10, color: '#6d28d9' }}>라이드 정산 {fmtWon(r.ride_paid)}</div>}
+            {Number(r.ride_paid) > 0 && <div style={{ fontSize: 10, color: '#6d28d9' }}>빌려타 정산 {fmtWon(r.ride_paid)}</div>}
           </span>
         : <span style={{ fontSize: 11, color: '#cbd5e1', whiteSpace: 'nowrap' }}>-</span>,
     },
@@ -625,11 +625,11 @@ export default function ClaimsTab() {
           <button onClick={() => setPartnerMsg(null)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'inherit', fontSize: 14 }}>×</button>
         </div>
       )}
-      {/* 소속 탭 (2026-08-02 목업 확정) — 지입(라이드) / 직접운영(FMI) 분리 */}
+      {/* 소속 탭 (2026-08-02 목업 확정) — 지입(빌려타) / 직접운영(FMI) 분리 */}
       <div style={{ display: 'flex', borderBottom: '2px solid #e6e8ec', marginBottom: 14 }}>
         {([
           ['all', '전체', null],
-          ['ride', '지입', '라이드'],
+          ['ride', '지입', '빌려타'],
           ['own', '직접운영', 'FMI'],
           ...(fleetCounts.unknown > 0 ? [['unknown', '미지정', null] as const] : []),
         ] as Array<[typeof fleetClass, string, string | null]>).map(([k, label, co]) => (
