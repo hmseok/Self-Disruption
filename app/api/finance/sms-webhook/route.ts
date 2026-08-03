@@ -268,6 +268,23 @@ export async function POST(req: NextRequest) {
       const starMatch = String(text || '').match(/\*\s?(\d{4,})/)
       const acctLast4 = await resolveAccountLast4(prisma, aliasDigits || (starMatch ? starMatch[1] : ''))
 
+      // 수집중단 계좌 (2026-08-03) — 매핑 관리 용도에 「수집중단」: 원장 적재 생략
+      //   (국민 6168: 2025-08-29 법정검사비용지급통장으로 인계 — FMI 장부 대상 아님)
+      if (acctLast4 && importedFrom === 'sms_bank') {
+        try {
+          const stopped = await prisma.$queryRaw<Array<{ id: string }>>`
+            SELECT id FROM bank_account_mappings
+             WHERE purpose LIKE '%수집중단%'
+               AND RIGHT(REGEXP_REPLACE(COALESCE(account_number, account_alias), '[^0-9]', ''), 4) = ${acctLast4}
+             LIMIT 1`
+          if (stopped.length > 0) {
+            await prisma.$executeRaw`
+              UPDATE card_sms_transactions SET parse_status = 'canceled', parse_error = '수집중단 계좌' WHERE id = ${id}`
+            return NextResponse.json({ ok: true, skipped: '수집중단 계좌', account: acctLast4 })
+          }
+        } catch { /* 매핑 조회 실패 — 기존 동작으로 적재 */ }
+      }
+
       const resolvedClient = await resolveClientName(parsed.holder || '')
       const insertLegacy = () => prisma.$executeRaw`
         INSERT INTO transactions (
