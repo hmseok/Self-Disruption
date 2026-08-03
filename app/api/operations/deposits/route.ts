@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { verifyUser } from '@/lib/auth-server'
 import { prisma } from '@/lib/prisma'
 import { normInsurer } from '@/lib/insurer'
+import { loadVehicleClassMap, classifyVehicle } from '@/lib/vehicle-class'
 
 /**
  * GET /api/operations/deposits — 사고대차 「입금」 탭 (2026-07-08 사용자 명시)
@@ -126,6 +127,7 @@ export async function GET(request: NextRequest) {
     // 월 정산으로, 자사 직접 운용 차량은 통장 입금으로 확인 — 소속 구분 필요)
     //   빌려타 차량 = 라이드 정산서에 등장한 차량. 번호판 하/허 오기가 있어 숫자만 비교.
     const vehDigits = (s: any) => String(s || '').replace(/[^0-9]/g, '')
+    const vehClassMap = await loadVehicleClassMap()
     const rideVehicles = new Set<string>()
     const rideItemsByRental = new Map<string, any[]>()
     let rideMonths: any[] = []
@@ -257,8 +259,13 @@ export async function GET(request: NextRequest) {
       dispatch_date: r.dispatch_date, status: r.status,
       paid_sum: r.paid_sum != null ? Number(r.paid_sum) : 0,
       ride_sum: r.ride_sum != null ? Number(r.ride_sum) : 0,
-      // 차량 소속: 라이드 정산서에 등장한 차량 = 빌려타(지입) / 그 외 = 자사
-      vehicle_class: rideVehicles.has(vehDigits(r.vehicle_car_number)) ? 'ride' : 'own',
+      // 차량 소속: 차량 마스터 단일 기준 (2026-08-02 사용자 확정) — 미등록 차량만
+      // 라이드 정산서 등장 여부로 보조 판정
+      vehicle_class: (() => {
+        const c = classifyVehicle(vehClassMap, r.vehicle_car_number)
+        if (c !== 'unknown') return c
+        return rideVehicles.has(vehDigits(r.vehicle_car_number)) ? 'ride' : 'own'
+      })(),
       ride_items: rideItemsByRental.get(r.id) || [],
     })), summary, ride_months: rideMonths, error: null })
   } catch (e: any) {

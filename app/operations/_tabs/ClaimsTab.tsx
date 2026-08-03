@@ -56,6 +56,7 @@ type ClaimRow = {
   customer_birth: string | null
   paid_amount: number | null
   ride_paid?: number | null   // 라이드(빌려타) 월 일괄 정산분 — paid_amount 에 합산됨
+  vehicle_class?: 'ride' | 'own' | 'unknown'  // 차량 소속 (차량 마스터 기준)
   payment_status: string | null
   payment_memo: string | null
   // PR-N7.1 — 과실율 / 청구율
@@ -108,6 +109,8 @@ export default function ClaimsTab() {
   const [filter, setFilter] = useState<FilterKey>('all')
   const [search, setSearch] = useState('')
   const [vatOnly, setVatOnly] = useState(false)
+  // 소속 탭 (2026-08-02 사용자 확정 목업) — 지입(라이드) / 직접운영(FMI) / 미지정
+  const [fleetClass, setFleetClass] = useState<'all' | 'ride' | 'own' | 'unknown'>('all')
   const [rows, setRows] = useState<ClaimRow[] | null>(null)
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState<string | null>(null)
@@ -419,8 +422,9 @@ export default function ClaimsTab() {
   const claimRows = useMemo(() => {
     let list = (rows || []).filter((r) => VISIBLE_STATUS.includes(r.status || ''))
     if (vatOnly) list = list.filter((r) => r.vat_extra_billing === 'Y')
+    if (fleetClass !== 'all') list = list.filter((r) => (r.vehicle_class || 'unknown') === fleetClass)
     return list
-  }, [rows, vatOnly])
+  }, [rows, vatOnly, fleetClass])
 
   const data = useMemo(() => ({
     all: claimRows,
@@ -447,6 +451,16 @@ export default function ClaimsTab() {
     target: data.target.length,
     settled: data.settled.length,
   }
+  // 소속별 건수 (부가세·소속 필터 적용 전 기준)
+  const fleetCounts = useMemo(() => {
+    const base = (rows || []).filter((r) => VISIBLE_STATUS.includes(r.status || ''))
+    return {
+      all: base.length,
+      ride: base.filter((r) => r.vehicle_class === 'ride').length,
+      own: base.filter((r) => r.vehicle_class === 'own').length,
+      unknown: base.filter((r) => !r.vehicle_class || r.vehicle_class === 'unknown').length,
+    }
+  }, [rows])
   const vatCount = useMemo(
     () => (rows || []).filter((r) => VISIBLE_STATUS.includes(r.status || '') && r.vat_extra_billing === 'Y').length,
     [rows],
@@ -492,6 +506,16 @@ export default function ClaimsTab() {
   ]
 
   const columns: TableColumn<ClaimRow>[] = [
+    {
+      // 소속 (2026-08-02 목업 확정) — 차량 마스터 기준 지입/직접운영
+      key: 'vehicle_class', label: '소속', width: 92, align: 'center',
+      sortBy: (r) => r.vehicle_class || 'unknown',
+      render: (r) => r.vehicle_class === 'ride'
+        ? <span style={{ fontSize: 10.5, fontWeight: 700, padding: '2.5px 8px', borderRadius: 6, background: '#ede9fe', color: '#6d28d9', whiteSpace: 'nowrap' }}>라이드 지입</span>
+        : r.vehicle_class === 'own'
+          ? <span style={{ fontSize: 10.5, fontWeight: 700, padding: '2.5px 8px', borderRadius: 6, background: '#dbeafe', color: '#1d4ed8', whiteSpace: 'nowrap' }}>FMI 직접</span>
+          : <span style={{ fontSize: 10.5, fontWeight: 700, padding: '2.5px 8px', borderRadius: 6, background: '#eef1f5', color: '#667085', whiteSpace: 'nowrap' }}>미지정</span>,
+    },
     {
       key: 'actual_return_date', label: '반납일', width: 108,
       sortBy: (r) => r.actual_return_date || '',
@@ -601,6 +625,35 @@ export default function ClaimsTab() {
           <button onClick={() => setPartnerMsg(null)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'inherit', fontSize: 14 }}>×</button>
         </div>
       )}
+      {/* 소속 탭 (2026-08-02 목업 확정) — 지입(라이드) / 직접운영(FMI) 분리 */}
+      <div style={{ display: 'flex', borderBottom: '2px solid #e6e8ec', marginBottom: 14 }}>
+        {([
+          ['all', '전체', null],
+          ['ride', '지입', '라이드'],
+          ['own', '직접운영', 'FMI'],
+          ...(fleetCounts.unknown > 0 ? [['unknown', '미지정', null] as const] : []),
+        ] as Array<[typeof fleetClass, string, string | null]>).map(([k, label, co]) => (
+          <button key={k} onClick={() => setFleetClass(k)}
+            style={{
+              padding: '10px 18px', fontSize: 13.5, fontWeight: 600, cursor: 'pointer',
+              background: 'none', border: 'none', borderBottom: '2.5px solid', marginBottom: -2,
+              borderBottomColor: fleetClass === k ? '#2563eb' : 'transparent',
+              color: fleetClass === k ? '#1a1d23' : '#667085',
+              display: 'flex', alignItems: 'center', gap: 6,
+            }}>
+            {label}
+            {co && <span style={{
+              fontSize: 10.5, fontWeight: 700, padding: '2px 7px', borderRadius: 5,
+              background: k === 'ride' ? '#ede9fe' : '#dbeafe', color: k === 'ride' ? '#6d28d9' : '#1d4ed8',
+            }}>{co}</span>}
+            <span style={{
+              fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 10,
+              background: fleetClass === k ? '#dbeafe' : '#eef1f5', color: fleetClass === k ? '#2563eb' : '#667085',
+            }}>{fleetCounts[k]}</span>
+          </button>
+        ))}
+      </div>
+
       <DcStatStrip stats={statItems} actions={statActions} />
 
       {/* 입금 연결 검수는 입금 탭으로 통합 (2026-07-08 사용자 명시 「보기 안 좋아서」) — 여기선 안내만 */}

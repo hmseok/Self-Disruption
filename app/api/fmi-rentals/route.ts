@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyUser } from '@/lib/auth-server'
 import { prisma } from '@/lib/prisma'
+import { loadVehicleClassMap, classifyVehicle } from '@/lib/vehicle-class'
 
 /**
  * GET /api/fmi-rentals
@@ -85,6 +86,9 @@ export async function GET(request: NextRequest) {
       ...params
     )
 
+    // 차량 소속(지입/직접운영) — 차량 마스터 단일 기준 (2026-08-02)
+    const vehClassMap = await loadVehicleClassMap()
+
     const data = rows.map((r: any) => {
       const bankPaid = r.paid_amount !== null && r.paid_amount !== undefined ? Number(r.paid_amount) : null
       const ridePaid = Number(r.ride_paid || 0)
@@ -102,6 +106,7 @@ export async function GET(request: NextRequest) {
         final_claim_amount: claim,
         paid_amount: paid,
         ride_paid: ridePaid,
+        vehicle_class: classifyVehicle(vehClassMap, r.vehicle_car_number),
         payment_status: paymentStatus,
         fault_rate: r.fault_rate !== null && r.fault_rate !== undefined ? Number(r.fault_rate) : null,
         claim_rate: r.claim_rate !== null && r.claim_rate !== undefined ? Number(r.claim_rate) : null,
