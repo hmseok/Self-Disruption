@@ -12,6 +12,7 @@ import * as XLSX from 'xlsx'
 // 2026-07-30 개편 2단계 — 탭별 파일 분리
 import SmsTab from './SmsTab'
 import MappingTab from './MappingTab'
+import CollectionTab from './CollectionTab'
 import LedgerTab, { LedgerFilter } from './LedgerTab'
 import { SmsRow } from './_shared'
 
@@ -22,7 +23,7 @@ import { SmsRow } from './_shared'
 
 // 2026-07-30 개편 2단계 — 도달 불가 탭 5종(workflow/classify/matchreview/rules/system) 삭제
 // 거래내역(ledger) = 통장+카드 통합 리스트 (REDESIGN). 통장/카드 탭은 잔액검증·업로드 이관 전까지 병행.
-type TabKey = 'ledger' | 'sms' | 'mapping'
+type TabKey = 'ledger' | 'collection' | 'sms' | 'mapping'
 
 interface Transaction {
   id: string
@@ -1868,7 +1869,7 @@ export default function BankCardPage() {
       let fileSkipped = 0
       const fileErrors: string[] = []
       // skip 사유 누적 — 사용자에게 어떤 행이 왜 빠졌는지 표시
-      const fileSkipBreakdown: { no_date: number; invalid_date: number; no_amount: number; meta_row: number; duplicate: number; sms_already_exists?: number } =
+      const fileSkipBreakdown: { no_date: number; invalid_date: number; no_amount: number; meta_row: number; duplicate: number; sms_already_exists?: number; cross_source?: number; duplicate_existing?: number } =
         { no_date: 0, invalid_date: 0, no_amount: 0, meta_row: 0, duplicate: 0 }
       const batchBase = `${uploadSource}_${Date.now()}_${fi}`
 
@@ -1894,6 +1895,8 @@ export default function BankCardPage() {
           fileSkipBreakdown.meta_row += res.skipBreakdown.meta_row || 0
           fileSkipBreakdown.duplicate += res.skipBreakdown.duplicate || 0
           fileSkipBreakdown.sms_already_exists = (fileSkipBreakdown.sms_already_exists || 0) + (res.skipBreakdown.sms_already_exists || 0)
+          fileSkipBreakdown.cross_source = (fileSkipBreakdown.cross_source || 0) + (res.skipBreakdown.cross_source || 0)
+          fileSkipBreakdown.duplicate_existing = (fileSkipBreakdown.duplicate_existing || 0) + (res.skipBreakdown.duplicate_existing || 0)
         }
       }
 
@@ -1919,6 +1922,8 @@ export default function BankCardPage() {
       acc.meta_row += sb.meta_row || 0
       acc.duplicate += sb.duplicate || 0
       acc.sms_already_exists = (acc.sms_already_exists || 0) + (sb.sms_already_exists || 0)
+      acc.cross_source = (acc.cross_source || 0) + (sb.cross_source || 0)
+      acc.duplicate_existing = (acc.duplicate_existing || 0) + (sb.duplicate_existing || 0)
       return acc
     }, { no_date: 0, invalid_date: 0, no_amount: 0, meta_row: 0, duplicate: 0 })
 
@@ -3160,6 +3165,8 @@ export default function BankCardPage() {
   // REDESIGN 3탭 완성 (2026-07-30) — 통장/카드 탭은 거래내역에 흡수
   const tabs = [
     { key: 'ledger', label: '거래내역', count: summary?.transactions.total },
+    // 수금 — 회사 관점 채권 통합 (2026-08-03 사용자 확정, 목업 ar-collection)
+    { key: 'collection', label: '수금' },
     { key: 'sms', label: '수집함', count: summary?.sms?.total || 0 },
     { key: 'mapping', label: '매핑 관리' },
   ]
@@ -3569,6 +3576,9 @@ export default function BankCardPage() {
             onSaveClientName={saveClientName}
           />
         )}
+
+        {/* ──── 수금 탭 (회사 관점 채권 통합) ──── */}
+        {activeTab === 'collection' && <CollectionTab />}
 
         {/* ──── SMS 수집 탭 ──── */}
         {activeTab === 'sms' && (
@@ -4053,6 +4063,8 @@ export default function BankCardPage() {
                     <div style={{ color: COLORS.textSecondary, fontWeight: 600, marginBottom: 2 }}>📊 스킵 사유</div>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, color: COLORS.textSecondary }}>
                       {uploadResult.skipBreakdown.duplicate > 0 && <span>중복(엑셀끼리): {uploadResult.skipBreakdown.duplicate}건</span>}
+                      {uploadResult.skipBreakdown.duplicate_existing > 0 && <span style={{ color: '#059669', fontWeight: 600 }}>♻️ 기존 업로드와 중복(자동 skip): {uploadResult.skipBreakdown.duplicate_existing}건</span>}
+                      {uploadResult.skipBreakdown.cross_source > 0 && <span style={{ color: '#059669', fontWeight: 600 }}>🔗 연동/문자 이미 있음(자동 skip): {uploadResult.skipBreakdown.cross_source}건</span>}
                       {uploadResult.skipBreakdown.sms_already_exists > 0 && <span style={{ color: '#059669', fontWeight: 600 }}>📲 SMS 이미 있음(자동 skip): {uploadResult.skipBreakdown.sms_already_exists}건</span>}
                       {uploadResult.skipBreakdown.no_date > 0 && <span style={{ color: '#d97706' }}>날짜 없음(총합/메타 행): {uploadResult.skipBreakdown.no_date}건</span>}
                       {uploadResult.skipBreakdown.invalid_date > 0 && <span style={{ color: '#d97706' }}>날짜 형식 오류: {uploadResult.skipBreakdown.invalid_date}건</span>}

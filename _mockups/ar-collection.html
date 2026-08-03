@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>수금 통합 — 회사 관점 청구·입금 목업</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, 'Apple SD Gothic Neo', 'Pretendard', sans-serif; background: #f6f7f9; color: #1a1d23; padding: 24px; font-size: 14px; }
+  .wrap { max-width: 1240px; margin: 0 auto; }
+  h1 { font-size: 20px; letter-spacing: -0.02em; }
+  .sub { color: #667085; font-size: 13px; margin: 4px 0 18px; }
+  .loc { display: inline-block; font-size: 11px; font-weight: 700; background: #dbeafe; color: #1d4ed8; border-radius: 6px; padding: 3px 9px; margin-left: 8px; vertical-align: 3px; }
+
+  .kpis { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 18px; }
+  .kpi { background: #fff; border: 1px solid #e6e8ec; border-radius: 12px; padding: 14px 16px; box-shadow: 0 1px 2px rgba(16,24,40,0.05); }
+  .kpi .k { font-size: 12px; color: #667085; display: flex; align-items: center; gap: 6px; }
+  .kpi .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  .kpi .v { font-size: 20px; font-weight: 700; margin-top: 5px; letter-spacing: -0.02em; }
+  .kpi .s { font-size: 11px; color: #98a2b3; margin-top: 2px; }
+
+  .row2 { display: grid; grid-template-columns: 1.6fr 1fr; gap: 14px; margin-bottom: 14px; }
+  .card { background: #fff; border: 1px solid #e6e8ec; border-radius: 12px; box-shadow: 0 1px 2px rgba(16,24,40,0.05); overflow: hidden; }
+  .card .hd { padding: 13px 16px; font-size: 13.5px; font-weight: 700; border-bottom: 1px solid #f1f3f6; display: flex; align-items: center; gap: 8px; }
+  .card .hd .hint { font-size: 11.5px; font-weight: 500; color: #98a2b3; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; white-space: nowrap; }
+  th { text-align: left; font-size: 11px; font-weight: 700; color: #667085; padding: 9px 14px; border-bottom: 1.5px solid #e6e8ec; background: #fafbfc; }
+  td { padding: 9px 14px; border-bottom: 1px solid #f1f3f6; }
+  tr:last-child td { border-bottom: none; }
+  th.r, td.r { text-align: right; }
+  th.c, td.c { text-align: center; }
+  .money { font-variant-numeric: tabular-nums; font-weight: 700; }
+  .g { color: #15803d; } .p { color: #6d28d9; } .red { color: #dc2626; } .dim { color: #cbd5e1; }
+  .badge { font-size: 10.5px; font-weight: 700; padding: 2.5px 8px; border-radius: 6px; display: inline-block; }
+  .b-ride { background: #ede9fe; color: #6d28d9; }
+  .b-fmi  { background: #dbeafe; color: #1d4ed8; }
+  .b-short{ background: #fef3c7; color: #b45309; }
+  .b-long { background: #dcfce7; color: #15803d; }
+  .b-red  { background: #fee2e2; color: #b91c1c; }
+  .b-gray { background: #eef1f5; color: #667085; }
+  .bar { height: 8px; border-radius: 5px; background: #eef1f5; overflow: hidden; display: flex; }
+  .bar i { display: block; height: 100%; }
+
+  .note { margin-top: 16px; background: #fff; border: 1px solid #e6e8ec; border-radius: 12px; padding: 15px 18px; font-size: 12.5px; line-height: 1.75; color: #475467; }
+  .note b { color: #1a1d23; }
+  .step { display: inline-block; font-size: 10.5px; font-weight: 800; background: #1a1d23; color: #fff; border-radius: 5px; padding: 2px 7px; margin-right: 6px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>수금 <span class="loc">장부 › 수금 탭 (신설)</span></h1>
+  <div class="sub">회사 관점 채권 통합 — 단기·대차 청구와 장기계약 렌트료의 청구→수납→미수를 한곳에서. 업무 화면(단기·대차/장기계약)은 청구 작성과 건별 입금 확인만 남깁니다.</div>
+
+  <!-- KPI: 이번 달 회사 수금 현황 -->
+  <div class="kpis">
+    <div class="kpi"><div class="k"><span class="dot" style="background:#2563eb"></span>7월 수납 합계</div><div class="v">9,075,358원</div><div class="s">통장 907만 + 라이드 정산 (7월분 대기)</div></div>
+    <div class="kpi"><div class="k"><span class="dot" style="background:#6d28d9"></span>라이드 정산 수령</div><div class="v">23,793,264원</div><div class="s">6월 정산 · 35건 반영</div></div>
+    <div class="kpi"><div class="k"><span class="dot" style="background:#f59e0b"></span>청구완료·입금대기</div><div class="v">27건</div><div class="s">시트 플래그 기준 — 경과 14일↑ 8건</div></div>
+    <div class="kpi"><div class="k"><span class="dot" style="background:#dc2626"></span>금액 미수</div><div class="v">— 원</div><div class="s">청구액 입력 건부터 집계 (현재 0건 입력)</div></div>
+    <div class="kpi"><div class="k"><span class="dot" style="background:#16a34a"></span>장기 렌트료 (월)</div><div class="v">— 원</div><div class="s">장기계약 백필 후 자동 합류</div></div>
+  </div>
+
+  <div class="row2">
+    <!-- 월별 청구·수납 흐름 -->
+    <div class="card">
+      <div class="hd">월별 수납 흐름 <span class="hint">— 통장 vs 라이드 정산, 소속·유형 필터 적용</span></div>
+      <table>
+        <thead><tr><th>월</th><th class="r">통장 수납</th><th class="r">라이드 정산</th><th class="r">합계</th><th style="width:34%">구성</th></tr></thead>
+        <tbody>
+          <tr><td><b>2026-07</b></td><td class="r money">9,075,358</td><td class="r money p">정산 대기</td><td class="r money">9,075,358+</td>
+            <td><div class="bar"><i style="width:100%;background:#2563eb"></i></div></td></tr>
+          <tr><td><b>2026-06</b></td><td class="r money">4,973,128</td><td class="r money p">16,847,412</td><td class="r money">21,820,540</td>
+            <td><div class="bar"><i style="width:23%;background:#2563eb"></i><i style="width:77%;background:#8b5cf6"></i></div></td></tr>
+          <tr><td><b>2026-05</b></td><td class="r money">3,853,092</td><td class="r money p">5,074,354</td><td class="r money">8,927,446</td>
+            <td><div class="bar"><i style="width:43%;background:#2563eb"></i><i style="width:57%;background:#8b5cf6"></i></div></td></tr>
+          <tr><td><b>2026-04</b></td><td class="r money">9,104,000</td><td class="r money p">1,799,098</td><td class="r money">10,903,098</td>
+            <td><div class="bar"><i style="width:83%;background:#2563eb"></i><i style="width:17%;background:#8b5cf6"></i></div></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 입금 대기 리스트 (청구완료인데 입금 전) -->
+    <div class="card">
+      <div class="hd">청구완료 · 입금 대기 <span class="hint">— 경과일 순</span></div>
+      <table>
+        <thead><tr><th>건</th><th class="c">소속</th><th class="c">경과</th><th class="c">상태</th></tr></thead>
+        <tbody>
+          <tr><td><b>오승현</b> · 하나손해<br><span style="font-size:10.5px;color:#98a2b3">175허1237 · 07-28 배차</span></td>
+            <td class="c"><span class="badge b-ride">지입</span></td><td class="c"><b class="red">D+21</b></td><td class="c"><span class="badge b-red">입금대기</span></td></tr>
+          <tr><td><b>김재원</b> · DB손해<br><span style="font-size:10.5px;color:#98a2b3">47하9603 · 07-29 배차</span></td>
+            <td class="c"><span class="badge b-fmi">직접</span></td><td class="c"><b class="red">D+18</b></td><td class="c"><span class="badge b-red">입금대기</span></td></tr>
+          <tr><td><b>이미경</b> · 하나손해<br><span style="font-size:10.5px;color:#98a2b3">101허4230 · 07-19 배차</span></td>
+            <td class="c"><span class="badge b-ride">지입</span></td><td class="c">D+9</td><td class="c"><span class="badge b-gray">라이드 8월 정산 예정</span></td></tr>
+          <tr><td><b>유태규</b> · 삼성화재<br><span style="font-size:10.5px;color:#98a2b3">142호4413 · 07-28 배차</span></td>
+            <td class="c"><span class="badge b-ride">지입</span></td><td class="c">D+6</td><td class="c"><span class="badge b-gray">라이드 8월 정산 예정</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 채권 원장 (전체 리스트) -->
+  <div class="card">
+    <div class="hd">채권 원장 <span class="hint">— 유형(단기/장기) × 소속(지입/직접) 필터 · 검색</span></div>
+    <table>
+      <thead><tr>
+        <th>유형</th><th>소속</th><th>발생일</th><th>건</th><th>거래처(지급인)</th>
+        <th class="r">청구액</th><th class="r">수납액</th><th class="c">경로</th><th class="c">상태</th>
+      </tr></thead>
+      <tbody>
+        <tr>
+          <td><span class="badge b-short">단기·대차</span></td><td><span class="badge b-fmi">직접</span></td>
+          <td>07-27</td><td><b>장현오</b> · 161하9826</td><td>DB손해</td>
+          <td class="r"><span class="dim">미입력</span></td><td class="r money g">571,492</td>
+          <td class="c" style="font-size:11px;color:#667085">우리통장 07-31</td>
+          <td class="c"><span class="badge b-long">수납</span></td>
+        </tr>
+        <tr>
+          <td><span class="badge b-short">단기·대차</span></td><td><span class="badge b-ride">지입</span></td>
+          <td>06-05</td><td><b>김후균</b> · 175허1237</td><td>하나손해 → 라이드</td>
+          <td class="r"><span class="dim">미입력</span></td><td class="r money p">238,600</td>
+          <td class="c" style="font-size:11px;color:#6d28d9">라이드 6월 정산</td>
+          <td class="c"><span class="badge b-long">수납</span></td>
+        </tr>
+        <tr>
+          <td><span class="badge b-short">단기·대차</span></td><td><span class="badge b-fmi">직접</span></td>
+          <td>07-29</td><td><b>김재원</b> · 47하9603</td><td>DB손해</td>
+          <td class="r"><span class="dim">미입력</span></td><td class="r"><span class="dim">-</span></td>
+          <td class="c" style="font-size:11px;color:#667085">우리통장 대기</td>
+          <td class="c"><span class="badge b-red">입금대기</span></td>
+        </tr>
+        <tr>
+          <td><span class="badge b-long">장기계약</span></td><td><span class="badge b-fmi">직접</span></td>
+          <td>08-01</td><td><b>㈜OO물류</b> · 47하9605</td><td>㈜OO물류</td>
+          <td class="r money">1,350,000</td><td class="r"><span class="dim">-</span></td>
+          <td class="c" style="font-size:11px;color:#667085">CMS/통장</td>
+          <td class="c"><span class="badge b-red">8월분 미납</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note">
+    <b>단계 제안</b><br>
+    <span class="step">1</span><b>지금 가능</b> — 수납 흐름(통장+라이드 월별), 청구완료·입금대기 리스트(시트 17·18열 플래그 동기화 추가), 소속·유형 필터<br>
+    <span class="step">2</span><b>청구액 축</b> — 청구 작성 시 금액 입력이 쌓이면 「금액 미수」 KPI·거래처별 미수 집계가 자동으로 살아남 (시트에는 금액 컬럼이 없음 → ERP 청구 탭에서 입력)<br>
+    <span class="step">3</span><b>장기 합류</b> — 장기계약 백필 후 월 렌트료 채권이 같은 원장에 합류 (월초 자동 발생 → 입금 매칭)<br>
+    위치: <b>장부 페이지 안 「수금」 탭</b> (거래내역·수집함·매핑 옆) — 회계 영역이라 장부에 두고, 정산(지급)과 대칭 구조.
+  </div>
+</div>
+</body>
+</html>

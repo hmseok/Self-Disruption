@@ -58,6 +58,7 @@ export interface BillyeotaSyncResult {
   fetchedRows: number
   inserted: number
   returnsUpdated: number
+  flagsUpdated: number
   skippedOld: number
   insertedList: Array<{ seq: number; date: string; vehicle: string | null; customer: string }>
 }
@@ -98,9 +99,9 @@ export async function syncBillyeota(): Promise<BillyeotaSyncResult> {
     }
   }).filter(s => s.dispatch_date && s.name)
 
-  const db = await prisma.$queryRaw<Array<{ id: string; customer_name: string | null; dd: string; status: string | null; has_return: number }>>`
+  const db = await prisma.$queryRaw<Array<{ id: string; customer_name: string | null; dd: string; status: string | null; has_return: number; sheet_billed: string | null; sheet_paid: string | null }>>`
     SELECT id, customer_name, DATE_FORMAT(dispatch_date, '%Y-%m-%d') AS dd, status,
-           (actual_return_date IS NOT NULL) AS has_return
+           (actual_return_date IS NOT NULL) AS has_return, sheet_billed, sheet_paid
       FROM fmi_rentals`
   const byKey = new Map(db.map(r => [`${String(r.customer_name || '').trim()}|${r.dd}`, r]))
 
@@ -108,7 +109,7 @@ export async function syncBillyeota(): Promise<BillyeotaSyncResult> {
   const carByNo = new Map(cars.filter(c => c.number).map(c => [String(c.number).replace(/\s/g, ''), c.id]))
   const today = new Date().toISOString().slice(0, 10)
 
-  const result: BillyeotaSyncResult = { fetchedRows: sheet.length, inserted: 0, returnsUpdated: 0, skippedOld: 0, insertedList: [] }
+  const result: BillyeotaSyncResult = { fetchedRows: sheet.length, inserted: 0, returnsUpdated: 0, flagsUpdated: 0, skippedOld: 0, insertedList: [] }
 
   for (const m of sheet) {
     const key = `${m.name}|${m.dispatch_date}`
@@ -122,6 +123,15 @@ export async function syncBillyeota(): Promise<BillyeotaSyncResult> {
             WHERE id = ? AND status = 'dispatched'`,
           m.return_date, existing.id)
         result.returnsUpdated += 1
+      }
+      // 청구/입금 플래그 반영 (2026-08-03 수금 탭) — 시트 17·18열 원문이 바뀌면 갱신
+      const billed = m.billed || null
+      const paid = m.paid || null
+      if (billed !== (existing.sheet_billed || null) || paid !== (existing.sheet_paid || null)) {
+        await prisma.$executeRawUnsafe(
+          `UPDATE fmi_rentals SET sheet_billed = ?, sheet_paid = ?, updated_at = NOW() WHERE id = ?`,
+          billed, paid, existing.id)
+        result.flagsUpdated += 1
       }
       continue
     }
@@ -140,12 +150,12 @@ export async function syncBillyeota(): Promise<BillyeotaSyncResult> {
     await prisma.$executeRawUnsafe(
       `INSERT INTO fmi_rentals (id, rental_no, customer_name, customer_phone, customer_car_number, customer_car_type,
          vehicle_id, vehicle_car_number, vehicle_car_type, insurance_company, insurance_claim_no,
-         dispatch_date, actual_return_date, dispatch_location, status, notes, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+         dispatch_date, actual_return_date, dispatch_location, status, notes, sheet_billed, sheet_paid, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
       randomUUID(), `R${dd.replace(/-/g, '')}-${Math.floor(1000 + Math.random() * 9000)}`,
       m.name, m.phone, m.customer_car_number, m.customer_car_type,
       vid, m.vehicle_car_number, m.vehicle_car_type, m.insurance_company, m.claim_no,
-      dd, m.return_date, m.addr, status, notes)
+      dd, m.return_date, m.addr, status, notes, m.billed || null, m.paid || null)
     result.inserted += 1
     result.insertedList.push({ seq: m.seq, date: dd, vehicle: m.vehicle_car_number, customer: m.name! })
   }
