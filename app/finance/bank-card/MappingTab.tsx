@@ -41,12 +41,11 @@ export default function MappingTab({
   return (
     <>
       <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-        <button onClick={() => onSub('card')} style={{
+        {/* 카드 매핑 → 카드관리 페이지로 분리 (2026-08-03 사용자 확정) */}
+        <a href="/finance/card-mgmt" style={{
           padding: '8px 18px', borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: 'pointer',
-          border: `1px solid ${sub === 'card' ? 'rgba(59,110,181,0.4)' : 'rgba(0,0,0,0.06)'}`,
-          background: sub === 'card' ? 'rgba(191,219,254,0.6)' : '#ffffff',
-          color: sub === 'card' ? '#1e40af' : '#475569',
-        }}>💳 카드 매핑 ({cards.length})</button>
+          border: '1px dashed rgba(0,0,0,0.15)', background: '#fff', color: '#94a3b8', textDecoration: 'none',
+        }}>💳 카드 매핑 → 카드관리 메뉴로 이동됨</a>
         <button onClick={() => onSub('bank')} style={{
           padding: '8px 18px', borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: 'pointer',
           border: `1px solid ${sub === 'bank' ? 'rgba(5,150,105,0.4)' : 'rgba(0,0,0,0.06)'}`,

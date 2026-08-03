@@ -77,6 +77,9 @@ export const MENUS: MenuEntry[] = [
   // 견적함 — 별도 페이지 분리 (2026-08-02 사용자 확정: 임의 견적 보관 → 계약에서 불러와 연결)
   { id: 'mod-quotes',     name: '견적',    path: '/quotes',               iconKey: 'Clipboard', group: 'core', sortOrder: 3.5, requirePermission: true },
   { id: 'mod-ledger',     name: '통장/카드', displayName: '장부', path: '/finance/bank-card', iconKey: 'Ledger', group: 'core', sortOrder: 4, requirePermission: true },
+  // 카드관리·수금 — 장부에서 분리 (2026-08-03 사용자 확정)
+  { id: 'mod-card-mgmt',  name: '카드관리', path: '/finance/card-mgmt',   iconKey: 'Money',  group: 'core', sortOrder: 4.3, requirePermission: true },
+  { id: 'mod-collection', name: '수금',    path: '/finance/collection',  iconKey: 'Coin',   group: 'core', sortOrder: 4.6, requirePermission: true },
   { id: 'mod-settlement', name: '정산/수금', displayName: '정산', path: '/finance/settlement', iconKey: 'Coin',   group: 'core', sortOrder: 5, requirePermission: true },
   { id: 'mod-pnl',        name: '차량 손익', displayName: '손익', path: '/finance/fleet',      iconKey: 'Trend',  group: 'core', sortOrder: 6, requirePermission: true },
 

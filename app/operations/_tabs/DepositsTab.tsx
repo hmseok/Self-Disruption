@@ -150,7 +150,7 @@ export default function DepositsTab() {
       if (!confirm(`빌려타 ${month} 정산 — 차량 ${parsed.vehicles.length}대, 입금 ${parsed.deposits.length}건, 총 ${nf(parsed.grandTotal)}원\n저장하고 배차건과 매칭할까요? (재업로드해도 중복 저장되지 않습니다)`)) return
       const headers = { ...(await getAuthHeader()), 'Content-Type': 'application/json' }
       const res = await fetch('/api/operations/ride-settlement', {
-        method: 'POST', headers, body: JSON.stringify({ month, deposits: parsed.deposits }),
+        method: 'POST', headers, body: JSON.stringify({ month, deposits: parsed.deposits, vehicles: parsed.vehicles }),
       })
       const json = await res.json()
       if (json?.error) { alert(`업로드 실패: ${json.error}`); return }

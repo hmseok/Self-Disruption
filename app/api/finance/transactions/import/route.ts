@@ -5,6 +5,7 @@ import { createHash } from 'crypto'
 import { resolveClientName } from '@/lib/client-name-aliases'
 import { classifyByRules } from '@/lib/transaction-classifier'
 import { autoAttributeCardExpenses } from '@/lib/card-attribution'
+import { attributeFixedCosts } from '@/lib/fixed-cost-attribution'
 
 function serialize<T>(data: T): T {
   return JSON.parse(JSON.stringify(data, (_, v) => typeof v === 'bigint' ? v.toString() : v))
@@ -374,6 +375,10 @@ export async function POST(request: NextRequest) {
     let carAttributed = 0
     if (source === 'excel_card' && inserted > 0) {
       carAttributed = await autoAttributeCardExpenses()
+    }
+    // 통장: 고정비(보험료/대출/차량번호 적요) 자동 귀속 (2026-08-03 사용자 승인)
+    if (source === 'excel_bank' && inserted > 0) {
+      try { await attributeFixedCosts(false, 3) } catch (e: any) { console.warn('[import] 고정비 귀속 skip:', e?.message) }
     }
 
     return NextResponse.json({

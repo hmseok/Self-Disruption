@@ -34,8 +34,22 @@ export async function POST(request: NextRequest) {
     const body = await request.json().catch(() => ({}))
     const month: string = String(body?.month || '')
     const deposits: any[] = Array.isArray(body?.deposits) ? body.deposits : []
+    const vehicles: any[] = Array.isArray(body?.vehicles) ? body.vehicles : []
     if (!/^\d{4}-\d{2}$/.test(month)) return NextResponse.json({ error: 'month 는 YYYY-MM' }, { status: 400 })
     if (deposits.length === 0) return NextResponse.json({ error: 'deposits 비어있음' }, { status: 400 })
+
+    // 차량별 월렌트료(지입료) upsert — 정산 상계 구조라 손익의 유일한 원천 (2026-08-03)
+    let feesUpserted = 0
+    for (const v of vehicles) {
+      const fee = Number(v?.monthlyFee) || 0
+      if (!v?.vehicleNumber || fee <= 0) continue
+      await prisma.$executeRawUnsafe(
+        `INSERT INTO ride_settlement_fees (id, settle_month, vehicle_number, monthly_fee)
+         VALUES (UUID(), ?, ?, ?)
+         ON DUPLICATE KEY UPDATE monthly_fee = VALUES(monthly_fee), updated_at = NOW(3)`,
+        month, String(v.vehicleNumber), fee)
+      feesUpserted += 1
+    }
 
     // 매칭 대상 대차건 (전체 — 과거 정산분도 처리)
     const rentals = await prisma.$queryRaw<any[]>`
@@ -112,7 +126,7 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({
-      data: { month, received: deposits.length, inserted, duplicated, matched, unmatched, unmatchedList },
+      data: { month, received: deposits.length, inserted, duplicated, matched, unmatched, unmatchedList, feesUpserted },
       error: null,
     })
   } catch (e: any) {

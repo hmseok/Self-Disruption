@@ -12,7 +12,6 @@ import * as XLSX from 'xlsx'
 // 2026-07-30 개편 2단계 — 탭별 파일 분리
 import SmsTab from './SmsTab'
 import MappingTab from './MappingTab'
-import CollectionTab from './CollectionTab'
 import LedgerTab, { LedgerFilter } from './LedgerTab'
 import { SmsRow } from './_shared'
 
@@ -23,7 +22,9 @@ import { SmsRow } from './_shared'
 
 // 2026-07-30 개편 2단계 — 도달 불가 탭 5종(workflow/classify/matchreview/rules/system) 삭제
 // 거래내역(ledger) = 통장+카드 통합 리스트 (REDESIGN). 통장/카드 탭은 잔액검증·업로드 이관 전까지 병행.
-type TabKey = 'ledger' | 'collection' | 'sms' | 'mapping'
+// 2026-08-03 사용자 확정 IA: 장부 = 거래내역 + 수집함(통장/카드) + 매핑(통장·구분).
+//   수금 → /finance/collection 독립 메뉴, 카드관리(마스터·카드매핑) → /finance/card-mgmt 독립 메뉴.
+type TabKey = 'ledger' | 'sms-bank' | 'sms-card' | 'mapping'
 
 interface Transaction {
   id: string
@@ -1065,7 +1066,8 @@ export default function BankCardPage() {
   const [mappingCars, setMappingCars] = useState<any[]>([])
   const [smsAliases, setSmsAliases] = useState<any[]>([])
   const [mappingLoading, setMappingLoading] = useState(false)
-  const [mappingSub, setMappingSub] = useState<'card' | 'bank' | 'domain'>('card')
+  // 카드 매핑은 /finance/card-mgmt 로 분리 (2026-08-03) — 기본 통장
+  const [mappingSub, setMappingSub] = useState<'card' | 'bank' | 'domain'>('bank')
   const [editMapping, setEditMapping] = useState<any>(null)
 
   // ─── 데이터 로드 ─────────────────────────────────────
@@ -1239,7 +1241,7 @@ export default function BankCardPage() {
 
   // SMS 탭 전환 시 로드
   useEffect(() => {
-    if (activeTab === 'sms') loadSmsData()
+    if (activeTab === 'sms-bank' || activeTab === 'sms-card') loadSmsData()
     if (activeTab === 'mapping') loadMappings()
   }, [activeTab, loadSmsData, loadMappings])
 
@@ -3165,9 +3167,8 @@ export default function BankCardPage() {
   // REDESIGN 3탭 완성 (2026-07-30) — 통장/카드 탭은 거래내역에 흡수
   const tabs = [
     { key: 'ledger', label: '거래내역', count: summary?.transactions.total },
-    // 수금 — 회사 관점 채권 통합 (2026-08-03 사용자 확정, 목업 ar-collection)
-    { key: 'collection', label: '수금' },
-    { key: 'sms', label: '수집함', count: summary?.sms?.total || 0 },
+    { key: 'sms-bank', label: '수집함 · 통장' },
+    { key: 'sms-card', label: '수집함 · 카드' },
     { key: 'mapping', label: '매핑 관리' },
   ]
 
@@ -3577,13 +3578,13 @@ export default function BankCardPage() {
           />
         )}
 
-        {/* ──── 수금 탭 (회사 관점 채권 통합) ──── */}
-        {activeTab === 'collection' && <CollectionTab />}
-
-        {/* ──── SMS 수집 탭 ──── */}
-        {activeTab === 'sms' && (
+        {/* ──── 수집함 — 통장/카드 분리 (2026-08-03 사용자 확정) ──── */}
+        {(activeTab === 'sms-bank' || activeTab === 'sms-card') && (
           <SmsTab
-            rows={smsRows}
+            rows={smsRows.filter((r: any) => {
+              const isBank = /BANK$/i.test(String(r.card_issuer || ''))
+              return activeTab === 'sms-bank' ? isBank : !isBank
+            })}
             stats={smsStats}
             loading={smsLoading}
             statusFilter={smsStatusFilter}

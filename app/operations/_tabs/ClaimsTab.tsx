@@ -222,7 +222,7 @@ export default function ClaimsTab() {
       if (!go) { setPartnerMsg({ type: 'err', text: '업로드 취소됨' }); return }
       const headers = { ...(await getAuthHeader()), 'Content-Type': 'application/json' }
       const res = await fetch('/api/operations/ride-settlement', {
-        method: 'POST', headers, body: JSON.stringify({ month, deposits: parsed.deposits }),
+        method: 'POST', headers, body: JSON.stringify({ month, deposits: parsed.deposits, vehicles: parsed.vehicles }),
       }).then((x) => x.json())
       if (res?.error) throw new Error(res.error)
       const d = res.data

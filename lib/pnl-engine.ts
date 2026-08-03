@@ -182,6 +182,41 @@ export async function calculatePnl(from: string, to: string): Promise<PnlResult>
     }
   }
 
+  // ── 3b) 빌려타(지입) 정산 흐름 (2026-08-03 사용자 승인 — 고정비 연결 ②) ──
+  //   지입차 수입/지입료는 통장을 거치지 않는 정산 상계 구조 → 정산 테이블이 원천.
+  //   수입: ride_settlement_deposits(입금일 기준) / 비용: ride_settlement_fees(월렌트료, 정산월 기준)
+  try {
+    const digits = (s: unknown) => String(s || '').replace(/[^0-9]/g, '')
+    const carByDigits = new Map(cars.filter(c => c.number).map(c => [digits(c.number), c.id]))
+    const [rideDeposits, rideFees] = await Promise.all([
+      prisma.$queryRawUnsafe<Array<{ vehicle_number: string | null; amt: unknown }>>(
+        `SELECT vehicle_number, SUM(amount) amt FROM ride_settlement_deposits
+          WHERE deposit_date BETWEEN ? AND ? GROUP BY vehicle_number`, from, to),
+      prisma.$queryRawUnsafe<Array<{ vehicle_number: string; monthly_fee: unknown }>>(
+        `SELECT vehicle_number, SUM(monthly_fee) monthly_fee FROM ride_settlement_fees
+          WHERE STR_TO_DATE(CONCAT(settle_month,'-01'),'%Y-%m-%d') BETWEEN ? AND ?
+          GROUP BY vehicle_number`, from.slice(0, 8) + '01', to),
+    ])
+    for (const d of rideDeposits) {
+      const carId = carByDigits.get(digits(d.vehicle_number))
+      const amt = N(d.amt)
+      if (!carId || amt <= 0) { unassigned.revenue += amt; unassigned.count += 1; continue }
+      const p = ensure(carId)
+      p.revenue += amt
+      p.rentalRevenue += amt
+      p.txCount += 1
+    }
+    for (const f of rideFees) {
+      const carId = carByDigits.get(digits(f.vehicle_number))
+      const amt = N(f.monthly_fee)
+      if (!carId || amt <= 0) continue
+      const p = ensure(carId)
+      p.expense += amt
+      p.byCategory['지입료(월렌트)'] = (p.byCategory['지입료(월렌트)'] || 0) + amt
+      p.txCount += 1
+    }
+  } catch { /* 정산 테이블 미생성 — 통장 거래만으로 산출 (기존 동작) */ }
+
   // ── 4) 파생값 + 정렬 (수익률 낮은 순 — 목업 기본) ──
   const list = [...perCar.values()].map(p => {
     p.netProfit = p.revenue - p.expense - p.settlementPayout
