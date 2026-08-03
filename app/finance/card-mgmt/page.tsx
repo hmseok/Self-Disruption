@@ -1,9 +1,10 @@
 'use client'
 
 // ═══════════════════════════════════════════════════════════════
-// 카드관리 — 독립 페이지 (2026-08-03 사용자 확정: 장부 매핑에서 분리)
-//   ① 카드 원장  카드별 지출(이번달/지난달)·차량 귀속·마지막 사용
-//   ② 카드 등록  마스터 편집(카드번호 전체 표시·소속 차량·종류·상태)
+// 카드관리 — 독립 페이지 (2026-08-03 장부에서 분리)
+// 2026-08-04 사용자 확정: 사용 그룹 탭으로 재배치 — 차량운용/하이패스/직원·법인.
+//   그룹 판정: 하이패스 = 종류 '하이패스' / 차량운용 = 차량 배정 / 직원·법인 = 나머지.
+//   원장(지출)과 등록·매핑을 그룹별 한 표로 통합 (수정·삭제 포함).
 // 데이터: /api/finance/mappings (cards+cars) + /api/finance/card-stats
 // ═══════════════════════════════════════════════════════════════
 
@@ -20,9 +21,24 @@ const CARD_TYPES = ['법인신용', '법인체크', '하이패스', '주유', '�
 const STATUS_OPTS: Array<[string, string]> = [['active', '사용중'], ['suspended', '정지'], ['canceled', '해지']]
 
 type CardRow = Record<string, any>
+type Group = 'all' | 'vehicle' | 'hipass' | 'staff'
+
+// 사용 그룹 판정 — 하이패스 종류 우선, 차량 배정, 나머지는 직원·법인
+function groupOf(c: CardRow): Exclude<Group, 'all'> {
+  if (c.card_type === '하이패스') return 'hipass'
+  if (c.assigned_car_id) return 'vehicle'
+  return 'staff'
+}
+const GROUP_META: Array<[Group, string, string]> = [
+  ['all', '전체', ''],
+  ['vehicle', '차량운용', '차량 배정 — 주유·세차·충전 자동 귀속'],
+  ['hipass', '하이패스', '통행료 전용'],
+  ['staff', '직원·법인', '공용·개인 소지 법인카드'],
+]
 
 export default function CardMgmtPage() {
-  const [tab, setTab] = useState<'usage' | 'master'>('usage')
+  const [group, setGroup] = useState<Group>('all')
+  const [statusFilter, setStatusFilter] = useState<'active' | 'all' | 'canceled'>('active')
   const [cards, setCards] = useState<CardRow[]>([])
   const [cars, setCars] = useState<any[]>([])
   const [stats, setStats] = useState<Record<string, any>>({})
@@ -43,13 +59,23 @@ export default function CardMgmtPage() {
   }, [])
   useEffect(() => { load() }, [load])
 
-  const sorted = useMemo(() => {
+  const groupCounts = useMemo(() => {
+    const g = { all: cards.length, vehicle: 0, hipass: 0, staff: 0 }
+    for (const c of cards) g[groupOf(c)] += 1
+    return g
+  }, [cards])
+
+  const rows = useMemo(() => {
     const rank: Record<string, number> = { active: 0, suspended: 1, canceled: 2 }
-    return [...cards].sort((a, b) =>
+    let list = [...cards]
+    if (group !== 'all') list = list.filter((c) => groupOf(c) === group)
+    if (statusFilter === 'active') list = list.filter((c) => (c.status || 'active') !== 'canceled')
+    else if (statusFilter === 'canceled') list = list.filter((c) => c.status === 'canceled')
+    return list.sort((a, b) =>
       (rank[a.status || 'active'] - rank[b.status || 'active'])
       || String(a.card_issuer || '').localeCompare(String(b.card_issuer || ''))
       || String(a.card_alias || '').localeCompare(String(b.card_alias || '')))
-  }, [cards])
+  }, [cards, group, statusFilter])
 
   const save = useCallback(async () => {
     if (!edit) return
@@ -69,6 +95,16 @@ export default function CardMgmtPage() {
     load()
   }, [load])
 
+  // ── 그룹 요약 ──
+  const groupSummary = useMemo(() => {
+    const g = rows
+    const st = (c: CardRow) => stats[last4(c.card_number)] || null
+    const thisMonth = g.reduce((s, c) => s + (st(c)?.this_month || 0), 0)
+    const cnt6 = g.reduce((s, c) => s + (st(c)?.count || 0), 0)
+    const assigned6 = g.reduce((s, c) => s + (st(c)?.car_assigned || 0), 0)
+    return { thisMonth, cnt6, assigned6 }
+  }, [rows, stats])
+
   // ── 공용 스타일 ──
   const card: React.CSSProperties = { background: '#fff', border: `1px solid ${COLORS.borderSubtle}`, borderRadius: 12, boxShadow: '0 1px 2px rgba(16,24,40,0.05)', overflow: 'hidden' }
   const th: React.CSSProperties = { textAlign: 'left', fontSize: 11, fontWeight: 700, color: COLORS.textMuted, padding: '10px 12px', borderBottom: `1.5px solid ${COLORS.borderSubtle}`, background: '#fafbfc', whiteSpace: 'nowrap' }
@@ -82,138 +118,112 @@ export default function CardMgmtPage() {
   const statusBadge = (s: string) => s === 'canceled' ? <Badge label="해지" bg={COLORS.bgRed} fg={COLORS.danger} />
     : s === 'suspended' ? <Badge label="정지" bg={COLORS.bgAmber} fg={COLORS.warning} />
     : <Badge label="사용중" bg={COLORS.bgGreen} fg={COLORS.success} />
-
-  const totalThisMonth = useMemo(() =>
-    sorted.reduce((s, c) => s + (stats[last4(c.card_number)]?.this_month || 0), 0), [sorted, stats])
+  const typeBadge = (t: string) => (
+    <Badge label={t || '법인신용'}
+      bg={t === '하이패스' ? COLORS.bgAmber : t === '주유' ? COLORS.bgRed : t === '법인체크' ? COLORS.bgViolet : '#dbeafe'}
+      fg={t === '하이패스' ? COLORS.warning : t === '주유' ? COLORS.danger : t === '법인체크' ? '#6d28d9' : '#1d4ed8'} />
+  )
 
   return (
     <div style={{ padding: '20px 24px', maxWidth: 1280, color: COLORS.textPrimary, fontSize: 14 }}>
       <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 16 }}>
         <div>
           <h1 style={{ fontSize: 21, letterSpacing: '-0.02em', fontWeight: 700 }}>카드관리</h1>
-          <p style={{ color: COLORS.textSecondary, fontSize: 13, marginTop: 3 }}>법인카드 마스터와 카드별 지출·차량 귀속을 관리합니다</p>
+          <p style={{ color: COLORS.textSecondary, fontSize: 13, marginTop: 3 }}>사용 그룹별로 법인카드와 지출·차량 귀속을 관리합니다</p>
         </div>
-        <button onClick={() => setEdit({ status: 'active', card_type: '법인신용', card_issuer: 'KB국민' })}
+        <button onClick={() => setEdit({ status: 'active', card_type: group === 'hipass' ? '하이패스' : '법인신용', card_issuer: 'KB국민' })}
           style={{ background: COLORS.primary, color: '#fff', border: 'none', borderRadius: 9, padding: '9px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
           + 카드 등록
         </button>
       </div>
 
-      {/* 요약 */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 18 }}>
-        {[
-          { label: '등록 카드', value: `${cards.length}장`, sub: `사용중 ${cards.filter((c) => (c.status || 'active') === 'active').length}`, dot: COLORS.primary },
-          { label: '이번 달 카드 지출', value: `${nf(totalThisMonth)}원`, sub: '', dot: COLORS.danger },
-          { label: '차량 배정 카드', value: `${cards.filter((c) => c.assigned_car_id).length}장`, sub: '지출 자동 귀속 대상', dot: '#6d28d9' },
-        ].map((c, i) => (
-          <div key={i} style={{ ...card, padding: '13px 15px', overflow: 'visible' }}>
-            <div style={{ fontSize: 12, color: COLORS.textSecondary, display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ width: 8, height: 8, borderRadius: '50%', background: c.dot, display: 'inline-block' }} />{c.label}
-            </div>
-            <div style={{ fontSize: 19, fontWeight: 700, marginTop: 4 }}>{loading ? '…' : c.value}</div>
-            {c.sub && <div style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 1 }}>{c.sub}</div>}
-          </div>
-        ))}
-      </div>
-
-      {/* 탭 */}
+      {/* 사용 그룹 탭 */}
       <div style={{ display: 'flex', borderBottom: '2px solid #e6e8ec', marginBottom: 14 }}>
-        {([['usage', '카드 원장'], ['master', '카드 등록·매핑']] as const).map(([k, label]) => (
-          <button key={k} onClick={() => setTab(k)}
+        {GROUP_META.map(([k, label]) => (
+          <button key={k} onClick={() => setGroup(k)}
             style={{
               padding: '10px 18px', fontSize: 13.5, fontWeight: 600, cursor: 'pointer', background: 'none', border: 'none',
               borderBottom: '2.5px solid', marginBottom: -2,
-              borderBottomColor: tab === k ? COLORS.primary : 'transparent',
-              color: tab === k ? COLORS.textPrimary : COLORS.textMuted,
-            }}>{label}</button>
+              borderBottomColor: group === k ? COLORS.primary : 'transparent',
+              color: group === k ? COLORS.textPrimary : COLORS.textMuted,
+              display: 'flex', alignItems: 'center', gap: 6,
+            }}>
+            {label}
+            <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 10, background: group === k ? '#dbeafe' : '#eef1f5', color: group === k ? COLORS.primary : COLORS.textMuted }}>
+              {groupCounts[k]}
+            </span>
+          </button>
         ))}
+        <span style={{ flex: 1 }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, paddingBottom: 6 }}>
+          {([['active', '사용중'], ['all', '전체'], ['canceled', '해지']] as const).map(([k, label]) => (
+            <button key={k} onClick={() => setStatusFilter(k)}
+              style={{ padding: '5px 11px', fontSize: 11.5, fontWeight: 600, borderRadius: 7, cursor: 'pointer',
+                border: `1px solid ${statusFilter === k ? COLORS.primary : COLORS.borderSubtle}`,
+                background: statusFilter === k ? COLORS.bgBlue : '#fff', color: statusFilter === k ? COLORS.primary : COLORS.textSecondary }}>{label}</button>
+          ))}
+        </div>
       </div>
 
-      {/* ── 카드 원장 (지출) ── */}
-      {tab === 'usage' && (
-        <div style={card}>
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead><tr>
-                <th style={th}>카드</th><th style={th}>배정</th>
-                <th style={{ ...th, textAlign: 'right' }}>이번 달</th>
-                <th style={{ ...th, textAlign: 'right' }}>지난 달</th>
-                <th style={{ ...th, textAlign: 'right' }}>6개월 누계</th>
-                <th style={{ ...th, textAlign: 'center' }}>차량 귀속</th>
-                <th style={{ ...th, textAlign: 'center' }}>마지막 사용</th>
-                <th style={{ ...th, textAlign: 'center' }}>상태</th>
-              </tr></thead>
-              <tbody>
-                {sorted.map((c) => {
-                  const st = stats[last4(c.card_number)] || null
-                  return (
-                    <tr key={c.id}>
-                      <td style={td}>
-                        <div style={{ fontWeight: 700 }}>{c.card_alias || '—'}</div>
-                        <div style={{ fontSize: 11, color: COLORS.textMuted, fontFamily: 'ui-monospace, monospace' }}>{c.card_number || ''}</div>
-                      </td>
-                      <td style={td}>
-                        {c.car_number
-                          ? <Badge label={`🚗 ${c.car_number}`} bg="#dbeafe" fg="#1d4ed8" />
-                          : <span style={{ fontSize: 12, color: COLORS.textMuted }}>{c.holder_name || '공용'}{c.department ? ` · ${c.department}` : ''}</span>}
-                      </td>
-                      <td style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 700 }}>{st?.this_month ? nf(st.this_month) : <span style={{ color: COLORS.textDim }}>-</span>}</td>
-                      <td style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: COLORS.textSecondary }}>{st?.last_month ? nf(st.last_month) : '-'}</td>
-                      <td style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: COLORS.textSecondary }}>{st?.six_month ? nf(st.six_month) : '-'}</td>
-                      <td style={{ ...td, textAlign: 'center' }}>
-                        {st?.count
-                          ? <span style={{ fontSize: 11.5, fontWeight: 600, color: st.car_assigned > 0 ? '#6d28d9' : COLORS.textMuted }}>{st.car_assigned}/{st.count}건</span>
-                          : <span style={{ color: COLORS.textDim, fontSize: 11.5 }}>-</span>}
-                      </td>
-                      <td style={{ ...td, textAlign: 'center', fontSize: 11.5, color: COLORS.textSecondary }}>{st?.last_used ? d10(st.last_used) : '-'}</td>
-                      <td style={{ ...td, textAlign: 'center' }}>{statusBadge(c.status || 'active')}</td>
-                    </tr>
-                  )
-                })}
-                {!loading && sorted.length === 0 && <tr><td style={td} colSpan={8}>등록된 카드가 없습니다</td></tr>}
-              </tbody>
-            </table>
-          </div>
-          <div style={{ padding: '10px 16px', fontSize: 11.5, color: COLORS.textMuted, borderTop: `1px solid ${COLORS.borderFaint}` }}>
-            지출 = 카드 명세서(excel) + 승인 문자(SMS), 최근 6개월 · 차량 귀속은 배정 차량 기준 자동 (주유·하이패스·정비 → 차량 원가)
-          </div>
-        </div>
-      )}
+      {/* 그룹 안내 + 요약 */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 12, flexWrap: 'wrap' }}>
+        {group !== 'all' && (
+          <span style={{ fontSize: 12, color: COLORS.textMuted }}>{GROUP_META.find(([k]) => k === group)?.[2]}</span>
+        )}
+        <span style={{ flex: 1 }} />
+        <span style={{ fontSize: 12.5, color: COLORS.textSecondary }}>
+          이번 달 지출 <b style={{ fontVariantNumeric: 'tabular-nums' }}>{nf(groupSummary.thisMonth)}원</b>
+        </span>
+        {group === 'vehicle' && groupSummary.cnt6 > 0 && (
+          <span style={{ fontSize: 12.5, color: '#6d28d9' }}>
+            차량 귀속률 <b>{Math.round((groupSummary.assigned6 / Math.max(groupSummary.cnt6, 1)) * 100)}%</b> (6개월 {groupSummary.assigned6}/{groupSummary.cnt6}건)
+          </span>
+        )}
+      </div>
 
-      {/* ── 카드 등록·매핑 ── */}
-      {tab === 'master' && (
-        <div style={card}>
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead><tr>
-                <th style={th}>카드사</th><th style={th}>카드번호</th><th style={th}>별칭</th>
-                <th style={{ ...th, textAlign: 'center' }}>공용/지정</th><th style={th}>배정 (차량·부서)</th>
-                <th style={{ ...th, textAlign: 'center' }}>종류</th><th style={{ ...th, textAlign: 'center' }}>상태</th>
-                <th style={{ ...th, textAlign: 'center' }}>관리</th>
-              </tr></thead>
-              <tbody>
-                {sorted.map((c) => (
+      {/* 통합 테이블 — 원장 + 관리 */}
+      <div style={card}>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead><tr>
+              <th style={th}>카드</th>
+              <th style={th}>배정</th>
+              <th style={{ ...th, textAlign: 'center' }}>종류</th>
+              <th style={{ ...th, textAlign: 'right' }}>이번 달</th>
+              <th style={{ ...th, textAlign: 'right' }}>지난 달</th>
+              <th style={{ ...th, textAlign: 'right' }}>6개월</th>
+              <th style={{ ...th, textAlign: 'center' }}>차량 귀속</th>
+              <th style={{ ...th, textAlign: 'center' }}>마지막 사용</th>
+              <th style={{ ...th, textAlign: 'center' }}>상태</th>
+              <th style={{ ...th, textAlign: 'center' }}>관리</th>
+            </tr></thead>
+            <tbody>
+              {rows.map((c) => {
+                const st = stats[last4(c.card_number)] || null
+                return (
                   <tr key={c.id}>
-                    <td style={td}><Badge label={c.card_issuer || '—'} bg={COLORS.borderFaint} fg={COLORS.textSecondary} /></td>
-                    <td style={{ ...td, fontFamily: 'ui-monospace, monospace', fontSize: 12 }}>
-                      {c.card_number || '—'}
-                      {c.card_number && /[*]/.test(c.card_number) && <div style={{ fontSize: 10, color: COLORS.warning }}>원본 마스킹 — 수정에서 전체 번호 입력</div>}
-                    </td>
-                    <td style={{ ...td, fontWeight: 600 }}>{c.card_alias || '—'}</td>
-                    <td style={{ ...td, textAlign: 'center' }}>
-                      {c.assigned_car_id || c.assigned_employee_id
-                        ? <Badge label="지정" bg="#dbeafe" fg="#1d4ed8" />
-                        : <Badge label="공용" bg={COLORS.borderFaint} fg={COLORS.textSecondary} />}
+                    <td style={td}>
+                      <div style={{ fontWeight: 700 }}>{c.card_alias || '—'} <span style={{ fontWeight: 500, fontSize: 11, color: COLORS.textMuted }}>{c.card_issuer || ''}</span></div>
+                      <div style={{ fontSize: 11, color: COLORS.textMuted, fontFamily: 'ui-monospace, monospace' }}>
+                        {c.card_number || '—'}
+                        {c.card_number && /[*]/.test(c.card_number) && <span style={{ color: COLORS.warning, marginLeft: 5, fontFamily: 'inherit' }}>원본 마스킹</span>}
+                      </div>
                     </td>
                     <td style={td}>
-                      {c.car_number ? <b>{c.car_number}</b> : (c.holder_name || '—')}
-                      {c.department && <span style={{ fontSize: 11, color: COLORS.textMuted }}> · {c.department}</span>}
+                      {c.car_number
+                        ? <Badge label={`🚗 ${c.car_number}`} bg="#dbeafe" fg="#1d4ed8" />
+                        : <span style={{ fontSize: 12, color: COLORS.textSecondary }}>{c.holder_name || '공용'}{c.department ? ` · ${c.department}` : ''}</span>}
                     </td>
+                    <td style={{ ...td, textAlign: 'center' }}>{typeBadge(c.card_type)}</td>
+                    <td style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 700 }}>{st?.this_month ? nf(st.this_month) : <span style={{ color: COLORS.textDim }}>-</span>}</td>
+                    <td style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: COLORS.textSecondary }}>{st?.last_month ? nf(st.last_month) : '-'}</td>
+                    <td style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: COLORS.textSecondary }}>{st?.six_month ? nf(st.six_month) : '-'}</td>
                     <td style={{ ...td, textAlign: 'center' }}>
-                      <Badge label={c.card_type || '법인신용'}
-                        bg={c.card_type === '하이패스' ? COLORS.bgAmber : c.card_type === '주유' ? COLORS.bgRed : '#dbeafe'}
-                        fg={c.card_type === '하이패스' ? COLORS.warning : c.card_type === '주유' ? COLORS.danger : '#1d4ed8'} />
+                      {st?.count
+                        ? <span style={{ fontSize: 11.5, fontWeight: 600, color: st.car_assigned > 0 ? '#6d28d9' : COLORS.textMuted }}>{st.car_assigned}/{st.count}건</span>
+                        : <span style={{ color: COLORS.textDim, fontSize: 11.5 }}>-</span>}
                     </td>
+                    <td style={{ ...td, textAlign: 'center', fontSize: 11.5, color: COLORS.textSecondary }}>{st?.last_used ? d10(st.last_used) : '-'}</td>
                     <td style={{ ...td, textAlign: 'center' }}>{statusBadge(c.status || 'active')}</td>
                     <td style={{ ...td, textAlign: 'center' }}>
                       <button onClick={() => setEdit({ ...c })}
@@ -222,13 +232,16 @@ export default function CardMgmtPage() {
                         style={{ padding: '4px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer', background: '#fff', border: `1px solid ${COLORS.borderSubtle}`, color: COLORS.danger }}>삭제</button>
                     </td>
                   </tr>
-                ))}
-                {!loading && sorted.length === 0 && <tr><td style={td} colSpan={8}>등록된 카드가 없습니다</td></tr>}
-              </tbody>
-            </table>
-          </div>
+                )
+              })}
+              {!loading && rows.length === 0 && <tr><td style={td} colSpan={10}>이 그룹에 카드가 없습니다</td></tr>}
+            </tbody>
+          </table>
         </div>
-      )}
+        <div style={{ padding: '10px 16px', fontSize: 11.5, color: COLORS.textMuted, borderTop: `1px solid ${COLORS.borderFaint}` }}>
+          그룹 기준: 하이패스 = 종류가 하이패스 · 차량운용 = 차량 배정됨(지출 자동 귀속) · 직원·법인 = 나머지 — 수정에서 종류·배정 차량을 바꾸면 그룹이 자동으로 이동합니다
+        </div>
+      </div>
 
       {/* ═══ 카드 편집 모달 ═══ */}
       {edit && (
@@ -246,7 +259,7 @@ export default function CardMgmtPage() {
                   <select style={inputS} value={edit.card_issuer || ''} onChange={(e) => setEdit((d: any) => ({ ...d, card_issuer: e.target.value }))}>
                     <option value="">선택</option>{ISSUERS.map((i) => <option key={i} value={i}>{i}</option>)}
                   </select></div>
-                <div><label style={lblS}>종류</label>
+                <div><label style={lblS}>종류 (하이패스 그룹 구분)</label>
                   <select style={inputS} value={edit.card_type || '법인신용'} onChange={(e) => setEdit((d: any) => ({ ...d, card_type: e.target.value }))}>
                     {CARD_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
                   </select></div>
@@ -263,7 +276,7 @@ export default function CardMgmtPage() {
                     onChange={(e) => setEdit((d: any) => ({ ...d, holder_name: e.target.value }))} /></div>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                <div><label style={lblS}>배정 차량 (지출 자동 귀속)</label>
+                <div><label style={lblS}>배정 차량 (차량운용 그룹 구분)</label>
                   <select style={inputS} value={edit.assigned_car_id || ''} onChange={(e) => setEdit((d: any) => ({ ...d, assigned_car_id: e.target.value || null }))}>
                     <option value="">배정 안 함 (공용)</option>
                     {cars.map((v: any) => <option key={v.id} value={v.id}>{v.number} {[v.brand, v.model].filter(Boolean).join(' ')}</option>)}
