@@ -40,6 +40,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       'consignment_fee', 'consignment_start', 'consignment_end', 'insurance_by',
       'consignment_contract_url', 'owner_memo', 'is_commercial',
       'registration_image_url',
+      // 차량 마스터 재정리 (2026-08-03) — 서류함·만기 편집
+      'image_url', 'total_cost', 'inspection_end_date', 'vehicle_age_expiry',
     ]
 
     const updates: string[] = []

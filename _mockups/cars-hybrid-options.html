@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>차량 마스터 — C안 기반 하이브리드 3종</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, 'Apple SD Gothic Neo', 'Pretendard', sans-serif; background: #eceef1; color: #1a1d23; font-size: 14px; }
+  .option { padding: 28px 24px 40px; }
+  .opt-label { max-width: 1280px; margin: 0 auto 14px; display: flex; align-items: center; gap: 10px; }
+  .opt-label .tag { font-size: 13px; font-weight: 800; background: #2563eb; color: #fff; border-radius: 8px; padding: 5px 12px; }
+  .opt-label .desc { font-size: 12.5px; color: #667085; }
+  .inner { max-width: 1280px; margin: 0 auto; }
+  .divider { height: 10px; background: repeating-linear-gradient(-45deg, #dde1e7, #dde1e7 8px, #eceef1 8px, #eceef1 16px); }
+
+  .badge { font-size: 10px; font-weight: 800; padding: 2px 8px; border-radius: 5px; display: inline-block; white-space: nowrap; }
+  .b-ride { background: #ede9fe; color: #6d28d9; } .b-fmi { background: #dbeafe; color: #1d4ed8; }
+  .b-warn { background: #fef3c7; color: #b45309; } .b-bad { background: #fee2e2; color: #b91c1c; }
+  .b-ok { background: #dcfce7; color: #15803d; } .b-gray { background: #eef1f5; color: #667085; }
+  .num { font-variant-numeric: tabular-nums; }
+
+  .shell { display: grid; grid-template-columns: 380px 1fr; border-radius: 14px; overflow: hidden; border: 1px solid #dde1e7; box-shadow: 0 2px 12px rgba(16,24,40,0.06); }
+  .detail { background: #fff; }
+  .dhd { padding: 15px 20px; border-bottom: 1px solid #eef0f3; display: flex; align-items: center; gap: 12px; }
+  .dhd .ph { width: 78px; height: 54px; border-radius: 8px; background: linear-gradient(135deg,#e2e8f0,#cbd5e1); display: flex; align-items: center; justify-content: center; font-size: 22px; flex: none; }
+  .dhd h3 { font-size: 15.5px; }
+  .dhd .meta { font-size: 11.5px; color: #667085; margin-top: 2px; }
+  .dtabs { display: flex; padding: 0 14px; border-bottom: 1.5px solid #eef0f3; }
+  .dt { padding: 10px 15px; font-size: 12.5px; font-weight: 700; color: #667085; border-bottom: 2.5px solid transparent; margin-bottom: -1.5px; cursor: pointer; }
+  .dt.on { color: #2563eb; border-bottom-color: #2563eb; }
+  .dbody { padding: 16px 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .sec { border: 1px solid #eef1f5; border-radius: 10px; overflow: hidden; }
+  .sh { padding: 9px 13px; font-size: 12px; font-weight: 800; background: #fafbfc; border-bottom: 1px solid #f1f3f6; display: flex; align-items: center; }
+  .sh .act { margin-left: auto; font-size: 11px; color: #2563eb; cursor: pointer; }
+  .kv { display: flex; justify-content: space-between; padding: 7px 13px; font-size: 12px; border-bottom: 1px solid #f8f9fb; }
+  .kv:last-child { border-bottom: none; }
+  .kv .k { color: #667085; } .kv .v { font-weight: 700; }
+  .kv.hl { background: #f0f6ff; } .kv.hl .v { color: #1d4ed8; }
+
+  /* H1: 라이트 고밀도 리스트 */
+  .H1 .list { background: #fff; border-right: 1px solid #eef0f3; }
+  .H1 .lhead { padding: 11px 13px; border-bottom: 1px solid #eef0f3; display: flex; gap: 5px; align-items: center; }
+  .H1 .seg { display: inline-flex; border: 1px solid #d6dae1; border-radius: 7px; overflow: hidden; }
+  .H1 .seg b { padding: 4.5px 10px; font-size: 11px; font-weight: 700; color: #5a6472; border-right: 1px solid #e6e8ec; cursor: pointer; }
+  .H1 .seg b:last-child { border-right: none; }
+  .H1 .seg b.on { background: #1a1d23; color: #fff; }
+  .H1 table { width: 100%; border-collapse: collapse; font-size: 11.5px; white-space: nowrap; }
+  .H1 th { text-align: left; font-size: 10px; font-weight: 700; color: #8a93a2; padding: 7px 10px; border-bottom: 1px solid #e6e8ec; background: #f7f8fa; }
+  .H1 td { padding: 7px 10px; border-bottom: 1px solid #f4f5f7; }
+  .H1 tr.on td { background: #eef5ff; box-shadow: inset 3px 0 0 #2563eb; }
+  .H1 .vno { font-weight: 800; font-size: 12px; }
+  .H1 .m { color: #98a2b3; font-size: 10px; }
+
+  /* H2: 다크 리스트 + 사진 히어로 상세 */
+  .H2 .list { background: #171c26; }
+  .H2 .lhead { padding: 12px 14px; border-bottom: 1px solid #232a36; display: flex; gap: 6px; }
+  .H2 .ltab { font-size: 11px; font-weight: 700; color: #7d8797; padding: 5px 11px; border-radius: 7px; cursor: pointer; }
+  .H2 .ltab.on { background: #2563eb; color: #fff; }
+  .H2 .li { padding: 10px 14px; border-bottom: 1px solid #1e2530; display: flex; align-items: center; gap: 10px; cursor: pointer; }
+  .H2 .li.on { background: #202836; box-shadow: inset 3px 0 0 #2563eb; }
+  .H2 .li .thumb { width: 44px; height: 32px; border-radius: 6px; background: linear-gradient(135deg,#3b4557,#2a3342); display: flex; align-items: center; justify-content: center; font-size: 15px; flex: none; }
+  .H2 .li .vno { font-size: 12.5px; font-weight: 800; color: #e7ebf1; }
+  .H2 .li .m { font-size: 10px; color: #7d8797; margin-top: 1px; }
+  .H2 .li .tag { margin-left: auto; }
+  .H2 .hero { height: 150px; background: linear-gradient(135deg,#dbe3ee,#b9c4d4); position: relative; display: flex; align-items: flex-end; }
+  .H2 .hero .big { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 52px; }
+  .H2 .hero .over { position: relative; width: 100%; padding: 12px 20px; background: linear-gradient(transparent, rgba(13,17,25,0.72)); color: #fff; display: flex; align-items: center; gap: 10px; }
+  .H2 .hero h3 { font-size: 16px; }
+  .H2 .hero .meta { font-size: 11px; opacity: 0.85; margin-top: 1px; }
+  .H2 .docs { display: grid; grid-template-columns: repeat(5, 1fr); gap: 9px; padding: 13px; }
+  .H2 .doc { border: 1px solid #e6e8ec; border-radius: 9px; overflow: hidden; text-align: center; }
+  .H2 .doc .th { height: 56px; background: linear-gradient(135deg,#f1f5f9,#e2e8f0); display: flex; align-items: center; justify-content: center; font-size: 18px; }
+  .H2 .doc .nm { font-size: 10px; font-weight: 700; padding: 5px 4px; }
+  .H2 .doc.add { border-style: dashed; color: #98a2b3; }
+
+  /* H3: 관리 스트립 + 다크 리스트(경고 뱃지) */
+  .H3 .strip { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 12px; }
+  .H3 .chip { background: #fff; border: 1px solid #e6e8ec; border-radius: 11px; padding: 10px 13px; cursor: pointer; }
+  .H3 .chip.alert { border-color: #fcd9a0; background: #fffaf1; }
+  .H3 .chip.bad { border-color: #f5b5b5; background: #fff6f6; }
+  .H3 .chip .k { font-size: 11px; color: #667085; }
+  .H3 .chip .v { font-size: 16.5px; font-weight: 800; margin-top: 3px; letter-spacing: -0.01em; }
+  .H3 .chip.alert .v { color: #b45309; } .H3 .chip.bad .v { color: #dc2626; }
+  .H3 .list { background: #171c26; }
+  .H3 .lhead { padding: 12px 14px; border-bottom: 1px solid #232a36; display: flex; gap: 6px; }
+  .H3 .ltab { font-size: 11px; font-weight: 700; color: #7d8797; padding: 5px 11px; border-radius: 7px; cursor: pointer; }
+  .H3 .ltab.on { background: #2563eb; color: #fff; }
+  .H3 .li { padding: 10px 14px; border-bottom: 1px solid #1e2530; display: flex; align-items: center; gap: 8px; cursor: pointer; }
+  .H3 .li.on { background: #202836; box-shadow: inset 3px 0 0 #2563eb; }
+  .H3 .li .vno { font-size: 12.5px; font-weight: 800; color: #e7ebf1; }
+  .H3 .li .m { font-size: 10px; color: #7d8797; margin-top: 1px; }
+  .H3 .warns { margin-left: auto; display: flex; gap: 4px; }
+</style>
+</head>
+<body>
+
+<!-- ═══════ H1: C 스플릿 + A 고밀도 리스트 (라이트) ═══════ -->
+<div class="option H1">
+  <div class="opt-label"><span class="tag">H1 · 스플릿 + 그리드 리스트</span><span class="desc">C의 스플릿 구조인데 좌측을 A안식 라이트 미니 그리드로 — 좌측에서도 소속·지입료·만기가 숫자로 보임.</span></div>
+  <div class="inner">
+    <div class="shell">
+      <div class="list">
+        <div class="lhead">
+          <div class="seg"><b class="on">전체 18</b><b>빌려타 9</b><b>FMI 9</b></div>
+          <div class="seg" style="margin-left:auto"><b class="on">운용</b><b>대기</b></div>
+        </div>
+        <table>
+          <thead><tr><th>차량</th><th>소속</th><th style="text-align:right">취득가/지입료</th><th>보험만기</th></tr></thead>
+          <tbody>
+            <tr class="on"><td><div class="vno">47하9603</div><div class="m">Model Y LR</div></td><td><span class="badge b-fmi">FMI</span></td><td class="num" style="text-align:right">68,450,000</td><td>26-11</td></tr>
+            <tr><td><div class="vno">175허1237</div><div class="m">G80</div></td><td><span class="badge b-ride">빌려타</span></td><td class="num" style="text-align:right">월 1,502,600</td><td style="color:#b45309;font-weight:700">26-09</td></tr>
+            <tr><td><div class="vno">161하9857</div><div class="m">M2</div></td><td><span class="badge b-fmi">FMI</span></td><td class="num" style="text-align:right">83,120,000</td><td>27-01</td></tr>
+            <tr><td><div class="vno">142호4413</div><div class="m">520i</div></td><td><span class="badge b-ride">빌려타</span></td><td class="num" style="text-align:right">월 1,375,000</td><td>27-02</td></tr>
+            <tr><td><div class="vno">161하9826</div><div class="m">카니발 HEV</div></td><td><span class="badge b-fmi">FMI</span></td><td class="num" style="text-align:right">42,300,000</td><td>26-12</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="detail">
+        <div class="dhd">
+          <div class="ph">🚙</div>
+          <div><h3>47하9603 · Model Y Long Range</h3><div class="meta">2023 · 전기 · <span class="badge b-fmi">FMI 직영</span> <span class="badge b-ok">운용중</span> · 본사 주차장</div></div>
+        </div>
+        <div class="dtabs"><span class="dt on">기본·서류</span><span class="dt">원가·금융</span><span class="dt">운행·계약</span><span class="dt">손익</span></div>
+        <div class="dbody">
+          <div class="sec"><div class="sh">보험 <span class="act">+ 갱신</span></div>
+            <div class="kv"><span class="k">보험사</span><span class="v">KB손해 · 자차 60%</span></div>
+            <div class="kv"><span class="k">만기</span><span class="v">2026-11-14 <span class="badge b-warn">D-103</span></span></div>
+            <div class="kv"><span class="k">연 보험료</span><span class="v num">2,140,000원</span></div></div>
+          <div class="sec"><div class="sh">취득 원가 <span class="act">수정</span></div>
+            <div class="kv"><span class="k">차량가</span><span class="v num">63,000,000</span></div>
+            <div class="kv"><span class="k">취득세+부대</span><span class="v num">5,450,000</span></div>
+            <div class="kv hl"><span class="k">총 취득가</span><span class="v num">68,450,000</span></div></div>
+          <div class="sec" style="grid-column:1/-1"><div class="sh">서류함 <span class="act">+ 업로드</span></div>
+            <div class="kv"><span class="k">자동차 등록증 ✓ · 보험증권 ✓ · 차량사진 4</span><span class="v" style="color:#2563eb">열기</span></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- ═══════ H2: C 스플릿 + B 사진·서류 강조 ═══════ -->
+<div class="option H2">
+  <div class="opt-label"><span class="tag">H2 · 스플릿 + 사진·서류 중심</span><span class="desc">좌측 다크 리스트에 썸네일, 우측 상세는 사진 히어로 + 서류함 카드가 첫 화면 — 사진·서류 등록 업무가 잦을 때.</span></div>
+  <div class="inner">
+    <div class="shell">
+      <div class="list">
+        <div class="lhead"><span class="ltab on">전체 18</span><span class="ltab">빌려타 9</span><span class="ltab">FMI 9</span></div>
+        <div class="li on"><div class="thumb">🚙</div><div><div class="vno">47하9603</div><div class="m">Model Y LR · 운용중</div></div><span class="tag badge b-fmi">FMI</span></div>
+        <div class="li"><div class="thumb">🚗</div><div><div class="vno">175허1237</div><div class="m">G80 · 운용중</div></div><span class="tag badge b-ride">빌려타</span></div>
+        <div class="li"><div class="thumb">🏎️</div><div><div class="vno">161하9857</div><div class="m">M2 · 대기</div></div><span class="tag badge b-fmi">FMI</span></div>
+        <div class="li"><div class="thumb">🚘</div><div><div class="vno">142호4413</div><div class="m">520i · 정비중</div></div><span class="tag badge b-ride">빌려타</span></div>
+      </div>
+      <div class="detail">
+        <div class="hero">
+          <div class="big">🚙</div>
+          <div class="over">
+            <div><h3>47하9603 · Model Y Long Range</h3><div class="meta">2023 · 전기 · FMI 직영 · 운용중</div></div>
+            <span class="badge b-ok" style="margin-left:auto">등록증 ✓</span><span class="badge b-ok">보험 ✓</span>
+          </div>
+        </div>
+        <div class="dtabs"><span class="dt on">서류·사진</span><span class="dt">기본</span><span class="dt">원가·금융</span><span class="dt">운행·계약</span><span class="dt">손익</span></div>
+        <div class="docs">
+          <div class="doc"><div class="th">📄</div><div class="nm">등록증</div></div>
+          <div class="doc"><div class="th">🛡️</div><div class="nm">보험증권 '26</div></div>
+          <div class="doc"><div class="th">📷</div><div class="nm">외관 (4)</div></div>
+          <div class="doc"><div class="th">🧾</div><div class="nm">매매계약서</div></div>
+          <div class="doc add"><div class="th">＋</div><div class="nm">업로드</div></div>
+        </div>
+        <div class="dbody" style="padding-top:0">
+          <div class="sec"><div class="sh">보험</div>
+            <div class="kv"><span class="k">KB손해 · 자차60%</span><span class="v">~26-11-14 <span class="badge b-warn">D-103</span></span></div></div>
+          <div class="sec"><div class="sh">취득 원가</div>
+            <div class="kv hl"><span class="k">총 취득가</span><span class="v num">68,450,000</span></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- ═══════ H3: C 스플릿 + A 관리 스트립·경고 ═══════ -->
+<div class="option H3">
+  <div class="opt-label"><span class="tag">H3 · 스플릿 + 관리 알림</span><span class="desc">상단에 관리 KPI 스트립(클릭=필터), 좌측 리스트에 만기·서류 경고 뱃지 — "챙길 것"이 먼저 보이는 관리자형.</span></div>
+  <div class="inner">
+    <div class="strip">
+      <div class="chip"><div class="k">전체 차량</div><div class="v">18대 <span style="font-size:11px;font-weight:600;color:#667085">지입9 · 직영9</span></div></div>
+      <div class="chip"><div class="k">직영 총 취득가</div><div class="v num">4.13억</div></div>
+      <div class="chip"><div class="k">지입료 월 합계</div><div class="v num">1,124만</div></div>
+      <div class="chip alert"><div class="k">보험 만기 90일↓</div><div class="v">3대</div></div>
+      <div class="chip bad"><div class="k">서류 미비</div><div class="v">4대</div></div>
+    </div>
+    <div class="shell">
+      <div class="list">
+        <div class="lhead"><span class="ltab on">전체</span><span class="ltab">빌려타</span><span class="ltab">FMI</span><span class="ltab" style="margin-left:auto;color:#f59e0b">⚠ 챙길것 6</span></div>
+        <div class="li"><div><div class="vno">175허1237</div><div class="m">G80 · 운용중</div></div><div class="warns"><span class="badge b-bad">검사 D-17</span><span class="badge b-bad">등록증✗</span></div></div>
+        <div class="li"><div><div class="vno">125하2050</div><div class="m">E220d · 반납</div></div><div class="warns"><span class="badge b-warn">보험 D-42</span></div></div>
+        <div class="li on"><div><div class="vno">47하9603</div><div class="m">Model Y LR · 운용중</div></div><div class="warns"><span class="badge b-warn">보험 D-103</span></div></div>
+        <div class="li"><div><div class="vno">161하9857</div><div class="m">M2 · 대기</div></div><div class="warns"><span class="badge b-gray">이상없음</span></div></div>
+      </div>
+      <div class="detail">
+        <div class="dhd">
+          <div class="ph">🚙</div>
+          <div><h3>47하9603 · Model Y Long Range</h3><div class="meta">2023 · <span class="badge b-fmi">FMI 직영</span> <span class="badge b-ok">운용중</span></div></div>
+          <span class="badge b-warn" style="margin-left:auto">보험 D-103 — 갱신 준비</span>
+        </div>
+        <div class="dtabs"><span class="dt on">기본·서류</span><span class="dt">원가·금융</span><span class="dt">운행·계약</span><span class="dt">손익</span></div>
+        <div class="dbody">
+          <div class="sec"><div class="sh">챙길 것</div>
+            <div class="kv"><span class="k">보험 만기</span><span class="v">2026-11-14 <span class="badge b-warn">D-103</span></span></div>
+            <div class="kv"><span class="k">검사 만기</span><span class="v">2027-03-15 <span class="badge b-gray">여유</span></span></div>
+            <div class="kv"><span class="k">서류</span><span class="v"><span class="badge b-ok">등록증 ✓</span> <span class="badge b-ok">증권 ✓</span></span></div></div>
+          <div class="sec"><div class="sh">취득 원가</div>
+            <div class="kv"><span class="k">차량가 + 부대</span><span class="v num">63,000,000 + 5,450,000</span></div>
+            <div class="kv hl"><span class="k">총 취득가</span><span class="v num">68,450,000</span></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

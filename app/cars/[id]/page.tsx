@@ -1,8 +1,10 @@
-import CarDetail from "./CarDetail"; // 방금 만든 파일
+'use client'
 
-// 👇 상세 페이지는 ID에 따라 내용이 바뀌므로 필수입니다!
-export const dynamic = "force-dynamic";
+// 차량 상세 — 2026-08-03 4탭 재정리 (CarDetailV2). 구 CarDetail 은 9단계에서 삭제 예정.
+import { useParams } from 'next/navigation'
+import CarDetailV2 from './CarDetailV2'
 
 export default function Page() {
-  return <CarDetail />;
+  const { id } = useParams()
+  return <CarDetailV2 carId={String(id)} />
 }

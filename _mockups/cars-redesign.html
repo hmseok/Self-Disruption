@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>차량 마스터 재정리 목업 — 원장 + 상세 4탭</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, 'Apple SD Gothic Neo', 'Pretendard', sans-serif; background: #f6f7f9; color: #1a1d23; padding: 24px; font-size: 14px; }
+  .wrap { max-width: 1240px; margin: 0 auto; }
+  h1 { font-size: 20px; letter-spacing: -0.02em; }
+  h2 { font-size: 15px; margin: 30px 0 10px; color: #475467; }
+  .sub { color: #667085; font-size: 13px; margin: 4px 0 18px; }
+
+  .fleet-tabs { display: flex; border-bottom: 2px solid #e6e8ec; margin-bottom: 14px; }
+  .ft { padding: 10px 18px; font-size: 13.5px; font-weight: 600; color: #667085; cursor: pointer; border-bottom: 2.5px solid transparent; margin-bottom: -2px; display: flex; gap: 6px; align-items: center; }
+  .ft.on { color: #1a1d23; border-bottom-color: #2563eb; }
+  .cnt { font-size: 11px; font-weight: 700; background: #eef1f5; color: #667085; padding: 2px 8px; border-radius: 10px; }
+  .ft.on .cnt { background: #dbeafe; color: #2563eb; }
+
+  .card { background: #fff; border: 1px solid #e6e8ec; border-radius: 12px; box-shadow: 0 1px 2px rgba(16,24,40,0.05); overflow: hidden; }
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; white-space: nowrap; }
+  th { text-align: left; font-size: 11px; font-weight: 700; color: #667085; padding: 10px 12px; border-bottom: 1.5px solid #e6e8ec; background: #fafbfc; }
+  td { padding: 10px 12px; border-bottom: 1px solid #f1f3f6; vertical-align: middle; }
+  th.r, td.r { text-align: right; } th.c, td.c { text-align: center; }
+  tr:last-child td { border-bottom: none; }
+  .badge { font-size: 10.5px; font-weight: 700; padding: 2.5px 8px; border-radius: 6px; display: inline-block; white-space: nowrap; }
+  .b-ride { background: #ede9fe; color: #6d28d9; } .b-fmi { background: #dbeafe; color: #1d4ed8; }
+  .b-green { background: #dcfce7; color: #15803d; } .b-amber { background: #fef3c7; color: #b45309; }
+  .b-red { background: #fee2e2; color: #b91c1c; } .b-gray { background: #eef1f5; color: #667085; }
+  .money { font-variant-numeric: tabular-nums; font-weight: 700; }
+  .dim { color: #cbd5e1; } .mut { color: #98a2b3; font-size: 11px; }
+  .veh b { font-size: 13px; } .veh .m { font-size: 11px; color: #98a2b3; }
+
+  /* 상세 */
+  .dhead { display: flex; align-items: center; gap: 14px; padding: 18px; border-bottom: 1px solid #f1f3f6; }
+  .dhead .photo { width: 92px; height: 64px; border-radius: 9px; background: linear-gradient(135deg,#e2e8f0,#cbd5e1); display: flex; align-items: center; justify-content: center; font-size: 24px; }
+  .dhead h3 { font-size: 17px; } .dhead .meta { font-size: 12px; color: #667085; margin-top: 3px; }
+  .dtabs { display: flex; border-bottom: 1.5px solid #e6e8ec; padding: 0 14px; }
+  .dt { padding: 11px 16px; font-size: 13px; font-weight: 600; color: #667085; border-bottom: 2.5px solid transparent; margin-bottom: -1.5px; cursor: pointer; }
+  .dt.on { color: #2563eb; border-bottom-color: #2563eb; }
+  .dbody { padding: 18px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .sec { border: 1px solid #eef1f5; border-radius: 10px; overflow: hidden; }
+  .sec .sh { padding: 10px 14px; font-size: 12.5px; font-weight: 700; background: #fafbfc; border-bottom: 1px solid #f1f3f6; display: flex; align-items: center; }
+  .sec .sh .act { margin-left: auto; font-size: 11px; color: #2563eb; font-weight: 600; cursor: pointer; }
+  .kv { display: flex; justify-content: space-between; padding: 8px 14px; font-size: 12.5px; border-bottom: 1px solid #f8f9fb; }
+  .kv:last-child { border-bottom: none; }
+  .kv .k { color: #667085; } .kv .v { font-weight: 600; }
+  .kv.total { background: #f0f6ff; } .kv.total .v { color: #1d4ed8; font-weight: 800; }
+  .docs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; padding: 14px; }
+  .doc { border: 1px solid #e6e8ec; border-radius: 10px; overflow: hidden; text-align: center; }
+  .doc .thumb { height: 74px; background: linear-gradient(135deg,#f1f5f9,#e2e8f0); display: flex; align-items: center; justify-content: center; font-size: 22px; }
+  .doc .nm { font-size: 11px; font-weight: 600; padding: 7px 6px; }
+  .doc.add { border-style: dashed; color: #98a2b3; cursor: pointer; }
+  .note { margin-top: 18px; background: #fff; border: 1px solid #e6e8ec; border-radius: 12px; padding: 15px 18px; font-size: 12.5px; line-height: 1.75; color: #475467; }
+  .note b { color: #1a1d23; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>차량 — 원장 재정리</h1>
+  <div class="sub">소속(지입 빌려타 / 직영 FMI) 구분 · 취득원가 · 보험 · 서류를 원장과 상세에서 한 기준으로. 구조는 기존 cars 컬럼 재사용(rebuild-fresh), 화면만 백지 재작성.</div>
+
+  <!-- ① 원장: 소속 탭 + 핵심 컬럼 -->
+  <div class="fleet-tabs">
+    <div class="ft on">전체 <span class="cnt">18</span></div>
+    <div class="ft">지입 <span class="badge b-ride">빌려타</span> <span class="cnt">9</span></div>
+    <div class="ft">직영 <span class="badge b-fmi">FMI</span> <span class="cnt">9</span></div>
+  </div>
+  <div class="card">
+    <table>
+      <thead><tr>
+        <th>차량</th><th class="c">소속</th><th>명의/지입사</th>
+        <th class="r">총 취득가</th><th>보험</th><th class="c">검사만기</th><th class="c">상태</th><th class="c">서류</th>
+      </tr></thead>
+      <tbody>
+        <tr>
+          <td class="veh"><b>47하9603</b><div class="m">테슬라 Model Y LR · 2023</div></td>
+          <td class="c"><span class="badge b-fmi">FMI 직영</span></td>
+          <td>㈜에프엠아이</td>
+          <td class="r money">68,450,000<div class="mut">차량가 6,300 + 부대 545</div></td>
+          <td>KB손해 <span class="mut">~2026-11-14 · 자차60%</span></td>
+          <td class="c">2027-03</td>
+          <td class="c"><span class="badge b-green">운용중</span></td>
+          <td class="c">📄 3 <span class="badge b-gray">등록증 ✓</span></td>
+        </tr>
+        <tr>
+          <td class="veh"><b>175허1237</b><div class="m">현대 G80 · 2024</div></td>
+          <td class="c"><span class="badge b-ride">빌려타 지입</span></td>
+          <td>빌려타 <span class="mut">월 지입료 1,502,600</span></td>
+          <td class="r"><span class="dim">지입 — 해당없음</span></td>
+          <td>빌려타 부보 <span class="mut">~2026-09-02</span></td>
+          <td class="c"><span class="badge b-amber">2026-08</span></td>
+          <td class="c"><span class="badge b-green">운용중</span></td>
+          <td class="c">📄 1 <span class="badge b-red">등록증 ✗</span></td>
+        </tr>
+        <tr>
+          <td class="veh"><b>161하9857</b><div class="m">BMW M2 · 2023</div></td>
+          <td class="c"><span class="badge b-fmi">FMI 직영</span></td>
+          <td>㈜에프엠아이</td>
+          <td class="r money">83,120,000<div class="mut">중고 매입 · VAT 환급</div></td>
+          <td>현대해상 <span class="mut">~2027-01-20 · 자차100%</span></td>
+          <td class="c">2027-01</td>
+          <td class="c"><span class="badge b-gray">대기</span></td>
+          <td class="c">📄 4 <span class="badge b-gray">등록증 ✓</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ② 차량 상세 — 4탭 -->
+  <h2>차량 상세 — 4탭 (기존 8탭 통합)</h2>
+  <div class="card">
+    <div class="dhead">
+      <div class="photo">🚗</div>
+      <div>
+        <h3>47하9603 · 테슬라 Model Y Long Range</h3>
+        <div class="meta">2023년식 · 전기 · VIN 7SAYGDEE9PF*** · <span class="badge b-fmi">FMI 직영</span> <span class="badge b-green">운용중</span></div>
+      </div>
+    </div>
+    <div class="dtabs">
+      <div class="dt on">① 기본·서류</div>
+      <div class="dt">② 원가·금융</div>
+      <div class="dt">③ 운행·계약</div>
+      <div class="dt">④ 손익</div>
+    </div>
+    <div class="dbody">
+      <div class="grid2">
+        <!-- 기본 제원 -->
+        <div class="sec">
+          <div class="sh">기본 제원 <span class="act">수정</span></div>
+          <div class="kv"><span class="k">차량번호 / 연식</span><span class="v">47하9603 · 2023</span></div>
+          <div class="kv"><span class="k">소속</span><span class="v">FMI 직영 <span class="mut">(지입 전환 시 지입사·지입료 입력)</span></span></div>
+          <div class="kv"><span class="k">주행거리</span><span class="v">48,210 km</span></div>
+          <div class="kv"><span class="k">검사 만기 / 차령 만기</span><span class="v">2027-03-15 · 2033-01</span></div>
+          <div class="kv"><span class="k">위치</span><span class="v">본사 주차장</span></div>
+        </div>
+        <!-- 보험 -->
+        <div class="sec">
+          <div class="sh">보험 <span class="act">+ 갱신 등록</span></div>
+          <div class="kv"><span class="k">보험사 / 증권번호</span><span class="v">KB손해 · FA2026-****</span></div>
+          <div class="kv"><span class="k">기간</span><span class="v">2025-11-14 ~ 2026-11-14 <span class="badge b-amber">D-103</span></span></div>
+          <div class="kv"><span class="k">자차 가입</span><span class="v">60% (분담금 30만)</span></div>
+          <div class="kv"><span class="k">연 보험료</span><span class="v">2,140,000원</span></div>
+        </div>
+      </div>
+      <!-- 서류함 -->
+      <div class="sec" style="margin-top:14px">
+        <div class="sh">서류함 — 사진·문서 <span class="act">+ 업로드</span></div>
+        <div class="docs">
+          <div class="doc"><div class="thumb">📄</div><div class="nm">자동차 등록증</div></div>
+          <div class="doc"><div class="thumb">🛡️</div><div class="nm">보험 증권 (2026)</div></div>
+          <div class="doc"><div class="thumb">📷</div><div class="nm">차량 사진 (외관 4)</div></div>
+          <div class="doc add"><div class="thumb">＋</div><div class="nm">등록증·증권·계약서·사진</div></div>
+        </div>
+      </div>
+      <!-- ② 원가·금융 탭 미리보기 -->
+      <div class="grid2" style="margin-top:14px">
+        <div class="sec">
+          <div class="sh">취득 원가 구성 <span class="mut" style="margin-left:8px">— ② 원가·금융 탭</span> <span class="act">수정</span></div>
+          <div class="kv"><span class="k">차량가</span><span class="v">63,000,000</span></div>
+          <div class="kv"><span class="k">취득세 (4%)</span><span class="v">2,520,000</span></div>
+          <div class="kv"><span class="k">공채/번호판/탁송/대행</span><span class="v">2,930,000</span></div>
+          <div class="kv total"><span class="k">총 취득가</span><span class="v">68,450,000</span></div>
+          <div class="kv"><span class="k">대출 연결</span><span class="v">산은캐피탈 · 잔액 31,200,000 <span class="mut">(대출 페이지 연동)</span></span></div>
+        </div>
+        <div class="sec">
+          <div class="sh">지입 계약 <span class="mut" style="margin-left:8px">— 지입 차량일 때만 표시</span></div>
+          <div class="kv"><span class="k">지입사</span><span class="v">빌려타</span></div>
+          <div class="kv"><span class="k">월 지입료</span><span class="v">1,502,600원</span></div>
+          <div class="kv"><span class="k">계약 기간</span><span class="v">2025-06-01 ~ 2027-05-31</span></div>
+          <div class="kv"><span class="k">정산 방식</span><span class="v">월 정산 (빌려타 → 당사)</span></div>
+          <div class="kv"><span class="k">지입 계약서</span><span class="v">📄 첨부됨</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">
+    <b>탭 구성 (기존 인라인 8탭 → 4탭 통합)</b><br>
+    ① <b>기본·서류</b> — 제원·소속·보험 요약 + 서류함(등록증/보험증권/지입계약서/차량사진 업로드, 기존 registration_image_url·insurance 데이터 재사용)<br>
+    ② <b>원가·금융</b> — 취득원가 구성(기존 purchase_price~other_initial_cost 컬럼), 대출/할부 연결, 감가 기준 · 지입차는 지입 계약(지입사·월 지입료·명의자 계좌, 기존 owner_*·consignment_* 컬럼)<br>
+    ③ <b>운행·계약</b> — 배차 이력(단기)·장기계약 연결·정비/검사 일정<br>
+    ④ <b>손익</b> — 기존 PnlTab 재사용 (카드 자동귀속 반영)<br>
+    <b>소속 구분</b> — ownership_type 을 원장 탭·상세 헤더에 노출하고 수정 가능하게. 지입/직영 전환 시 관련 섹션이 자동 전환.
+  </div>
+</div>
+</body>
+</html>
