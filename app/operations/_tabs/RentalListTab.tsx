@@ -48,6 +48,7 @@ type Row = {
   status: string                       // request / new / consulting / pending / dispatched
   notes: string | null
   fleet_group: string | null
+  vehicle_class?: 'ride' | 'own' | 'unknown'  // 차량 소속 (차량 마스터 기준 — 2026-08-05)
   // PR-LIST-INFO — 청구 주요정보 리스트 표출
   claim_type?: string | null
   fault_rate?: number | null
@@ -163,6 +164,7 @@ export default function RentalListTab() {
           status: r.status || 'pending',
           notes: r.notes ?? null,
           fleet_group: r.fleet_group ?? null,
+          vehicle_class: r.vehicle_class ?? 'unknown',
           repair_factory: r.repair_factory ?? null,
           claim_type: r.claim_type ?? null,
           fault_rate: r.fault_rate ?? null,
@@ -259,16 +261,11 @@ export default function RentalListTab() {
     return new Date(r.expected_return_date) < new Date() && r.status === 'dispatched'
   }, [])
 
-  const fleetOptions = useMemo(() => {
-    const set = new Set<string>()
-    for (const r of rows || []) if (r.fleet_group) set.add(r.fleet_group)
-    return Array.from(set).sort()
-  }, [rows])
-
+  // 소속 필터 (2026-08-05) — 시트 동기화 일괄값(fleet_group)이 아닌 차량 마스터 기준
   const fleetScoped = useMemo(() => {
     if (!rows) return []
     if (fleet === 'all') return rows
-    return rows.filter((r) => (r.fleet_group || '') === fleet)
+    return rows.filter((r) => r.vehicle_class === fleet)
   }, [rows, fleet])
 
   // PR-FLOW-CONSULT v2 — 두 그룹만: 상담대기(대기+상담중) / 배차(예정+출고)
@@ -417,9 +414,16 @@ export default function RentalListTab() {
       },
     },
     {
-      key: 'fleet', label: '플릿', width: 84,
-      sortBy: (r) => r.fleet_group || '',
-      render: (r) => <span style={{ whiteSpace: 'nowrap', fontSize: 11, fontWeight: 700, color: '#4338ca' }}>{r.fleet_group || '-'}</span>,
+      // 소속 (2026-08-05 사용자 확정) — 차량 마스터 기준 빌려타 지입/FMI 직영
+      key: 'class', label: '소속', width: 92, align: 'center',
+      sortBy: (r) => r.vehicle_class || '',
+      render: (r) => r.kind !== 'rental' || !r.vehicle_car_number
+        ? <span style={{ fontSize: 11, color: '#cbd5e1' }}>-</span>
+        : r.vehicle_class === 'ride'
+          ? <span style={{ fontSize: 10.5, fontWeight: 700, padding: '2.5px 8px', borderRadius: 6, background: '#ede9fe', color: '#6d28d9', whiteSpace: 'nowrap' }}>빌려타 지입</span>
+          : r.vehicle_class === 'own'
+            ? <span style={{ fontSize: 10.5, fontWeight: 700, padding: '2.5px 8px', borderRadius: 6, background: '#dbeafe', color: '#1d4ed8', whiteSpace: 'nowrap' }}>FMI 직영</span>
+            : <span style={{ fontSize: 10.5, fontWeight: 700, padding: '2.5px 8px', borderRadius: 6, background: '#eef1f5', color: '#667085', whiteSpace: 'nowrap' }}>미지정</span>,
     },
     {
       key: 'vehicle', label: '대차차량', width: 176,
@@ -453,11 +457,19 @@ export default function RentalListTab() {
       </span>,
     },
     {
-      key: 'insurance', label: '보험사 / 업체', width: 160,
+      // 2026-08-05 사용자 확정 — 보험사·대물접수번호 별도 컬럼 (규칙 30: 1컬럼 1값)
+      key: 'insurer', label: '보험사', width: 96,
       sortBy: (r) => r.insurance_company || '',
-      render: (r) => <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: 160, fontSize: 12, color: '#475569' }}>
-        {r.insurance_company || '-'}{r.insurance_claim_no ? ` · #${r.insurance_claim_no}` : ''}
-      </span>,
+      render: (r) => r.insurance_company
+        ? <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: 96, fontSize: 12, fontWeight: 600, color: '#0f2440' }}>{r.insurance_company}</span>
+        : <span style={{ fontSize: 11, color: '#cbd5e1' }}>-</span>,
+    },
+    {
+      key: 'claim_no', label: '대물접수번호', width: 128,
+      sortBy: (r) => r.insurance_claim_no || '',
+      render: (r) => r.insurance_claim_no
+        ? <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: 128, fontSize: 11.5, color: '#475569', fontFamily: 'ui-monospace, monospace' }}>{r.insurance_claim_no}</span>
+        : <span style={{ fontSize: 11, color: '#cbd5e1' }}>미입력</span>,
     },
     {
       // PR-LIST-INFO / 규칙 30 — 1컬럼 1값
@@ -514,8 +526,8 @@ export default function RentalListTab() {
       ),
     },
   ]
-  // PR-UX-SIMPLE — 핵심 컬럼만 (플릿·입고공장·보험사는 드로어/상세에서 확인)
-  const columns = allColumns.filter((c) => !['fleet', 'repair_factory', 'insurance'].includes(String(c.key)))
+  // 2026-08-05 사용자 확정 — 소속·보험사·대물접수번호 리스트 표출 (입고공장만 상세에서)
+  const columns = allColumns.filter((c) => !['repair_factory'].includes(String(c.key)))
 
   const mobileCard: MobileCardConfig<Row> = {
     title: (r) => <span style={{ whiteSpace: 'nowrap' }}>🚗 {r.vehicle_car_number || r.customer_car_number || r.customer_name || r.id.slice(0, 12)}</span>,
@@ -566,8 +578,9 @@ export default function RentalListTab() {
               onChange={(e) => setFleet(e.target.value)}
               style={{ ...GLASS.L1, padding: '7px 10px', borderRadius: 8, fontSize: 12, color: '#1e293b', fontWeight: 700 }}
             >
-              <option value="all">🚙 플릿 전체</option>
-              {fleetOptions.map((f) => <option key={f} value={f}>{f}</option>)}
+              <option value="all">🚙 소속 전체</option>
+              <option value="ride">빌려타 지입</option>
+              <option value="own">FMI 직영</option>
             </select>
             {/* PR-V: 「상담대기」(cafe24 대차요청) 조회 기간 — 기본 오늘 */}
                 <div style={{ ...GLASS.L1, display: 'flex', alignItems: 'center', gap: 5, padding: '5px 8px', borderRadius: 8 }}>
