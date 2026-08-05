@@ -371,6 +371,27 @@ function parseHyundai(text: string): ParsedSms | null {
 function parseMyCompany(text: string): ParsedSms | null {
   const canceled = isCancelSms(text)
 
+  // 해외승인 (2026-08-05 — ANTHROPIC 구독 등 누락 발견 후 추가)
+  // 포맷(개행 구분): [MY COMPANY] 해외승인\n7109 석*민님\n07/30 18:53\nKRW 318,182.00\n\n가맹점명
+  if (/\[MY COMPANY\]\s*해외(승인|취소)/.test(text)) {
+    const cardNum = text.match(/해외(?:승인|취소)\s*\n?\s*(\d{4})/)?.[1] || null
+    const holder = text.match(/(\S+?)님/)?.[1] || null
+    const amtM = text.match(/KRW\s*([\d,]+)(?:\.\d+)?/)
+    if (!amtM) return null
+    const lines = text.split('\n').map((l) => l.trim()).filter(Boolean)
+    const merchant = lines.length > 0 ? lines[lines.length - 1] : null
+    return {
+      issuer: 'MYCOMPANY',
+      type: /해외취소/.test(text) || canceled ? 'canceled' : 'approved',
+      holder,
+      card_alias: cardNum ? `법인****${cardNum}` : null,
+      amount: Number(amtM[1].replace(/,/g, '')),
+      merchant: merchant && !/KRW/.test(merchant) ? merchant : null,
+      installment: '일시불',
+      txAt: parseDateTime(text),
+    }
+  }
+
   // 메인 — 승인/사용/결제/취소 verb 모두 처리
   const m = text.match(
     /\[MY COMPANY\]\s*(?:승인|사용|결제|취소)\s+(\d{4})\s+([^\s]+?)님?\s+([\d,]+)\s*원\s+(일시불|\d+개월)\s+(.+?)(?:\s+잔여한도|$)/
