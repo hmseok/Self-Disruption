@@ -26,6 +26,8 @@
 import { prisma } from './prisma'
 
 export const CAPITAL_CATEGORIES = new Set([
+  // 카드대금 자동이체 — 카드 지출이 건별(excel/sms)로 이미 비용 계상되어 이중 방지 (2026-08-05)
+  '카드대금 결제',
   '차량구입', '차량 구입', '차량매입', '차량매각', '차량 매각',
   '보증금', '보증금 반환', '대출실행', '대출 실행',
 ])
