@@ -14,6 +14,7 @@ import { useRouter } from 'next/navigation'
 import { useApp } from '../../context/AppContext'
 import { COLORS } from '@/app/utils/ui-tokens'
 import { useSettlementData } from './hooks/useSettlementData'
+import ContractsTab from './ContractsTab'
 import type { SettlementItem } from './lib/types'
 
 async function getAuthHeader(): Promise<Record<string, string>> {
@@ -52,7 +53,8 @@ export default function SettlementFlow() {
   const [typeFilter, setTypeFilter] = useState<'all' | 'jiip' | 'invest' | 'review'>('all')
 
   // 연도 보기 (2026-07-30 사용자 요청) — 12개월 발송/지급 현황 한눈에
-  const [view, setView] = useState<'month' | 'year'>('month')
+  // 'contracts' — 지입·투자 계약 원장 (2026-08-05 사용자 요청: 계약 페이지 복원, ContractsTab 재사용)
+  const [view, setView] = useState<'month' | 'year' | 'contracts'>('month')
   const [year, setYear] = useState(new Date().getFullYear())
   const [yearShares, setYearShares] = useState<Array<{ settlement_month: string; total_amount: number; paid_at: string | null }> | null>(null)
   const [yearLoading, setYearLoading] = useState(false)
@@ -93,6 +95,7 @@ export default function SettlementFlow() {
 
   const {
     settlementItems, shareHistory, jiips, investors, transactions,
+    allJiipContracts, allInvestContracts, contractsSettleTxs, allPaidShares,
     loading, refresh,
   } = useSettlementData(month, company?.id, role)
 
@@ -149,7 +152,7 @@ export default function SettlementFlow() {
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {/* 월/연도 보기 토글 */}
           <div style={{ display: 'inline-flex', padding: 3, borderRadius: 9, background: COLORS.borderFaint }}>
-            {([['month', '월 보기'], ['year', '연도 보기']] as const).map(([k, label]) => (
+            {([['month', '월 보기'], ['year', '연도 보기'], ['contracts', '계약']] as const).map(([k, label]) => (
               <button key={k} onClick={() => setView(k)}
                 style={{
                   padding: '5px 12px', fontSize: 12.5, fontWeight: 600, borderRadius: 7, cursor: 'pointer',
@@ -368,6 +371,17 @@ export default function SettlementFlow() {
         </div>
       )}
       </>)}
+
+      {/* ── 계약 원장 — 지입·투자 계약 (구 대시보드 ContractsTab 재사용) ── */}
+      {view === 'contracts' && (
+        <ContractsTab
+          jiipList={allJiipContracts}
+          investList={allInvestContracts}
+          settleTxs={contractsSettleTxs}
+          shareHistory={allPaidShares}
+          loading={loading}
+        />
+      )}
 
       {/* ── 연도 보기 — 12개월 발송/지급 현황 ── */}
       {view === 'year' && (
