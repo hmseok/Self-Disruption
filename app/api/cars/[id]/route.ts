@@ -42,6 +42,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       'registration_image_url',
       // 차량 마스터 재정리 (2026-08-03) — 서류함·만기 편집
       'image_url', 'total_cost', 'inspection_end_date', 'vehicle_age_expiry',
+      // 구입방식 (2026-08-05)
+      'purchase_method',
     ]
 
     const updates: string[] = []

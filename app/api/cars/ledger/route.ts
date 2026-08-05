@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
 
     const cars = await prisma.$queryRaw<any[]>`
       SELECT id, number, brand, model, trim, year, status, image_url,
-             fuel, mileage, ownership_type,
+             fuel, mileage, ownership_type, purchase_method,
              inspection_end_date, vehicle_age_expiry, registration_image_url,
              purchase_price, total_cost, registration_tax, bond_amount,
              delivery_fee, plate_fee, agency_fee, other_initial_cost, is_used,
@@ -29,6 +29,19 @@ export async function GET(request: NextRequest) {
         FROM cars
        WHERE status != 'deleted'
        ORDER BY (ownership_type = '빌려타'), number`
+
+    // 지입료 누적 (빌려타 정산서 월렌트료 합) — 차량 숫자 키 기준
+    const feeCumByDigits = new Map<string, { total: number; months: number }>()
+    try {
+      const fees = await prisma.$queryRaw<any[]>`
+        SELECT vehicle_number, SUM(monthly_fee) total, COUNT(*) months
+          FROM ride_settlement_fees GROUP BY vehicle_number`
+      for (const f of fees) {
+        feeCumByDigits.set(String(f.vehicle_number || '').replace(/[^0-9]/g, ''), {
+          total: N(f.total), months: N(f.months),
+        })
+      }
+    } catch { /* 테이블 미생성 — 누적 없이 진행 */ }
 
     // 최신 보험 계약 — car_id 직접 연결 + 차량 분담(allocations) 연결 모두 (end_date 최신 1건)
     const insByCar = new Map<string, any>()
@@ -62,9 +75,11 @@ export async function GET(request: NextRequest) {
         vehicle_class: c.ownership_type === '빌려타' ? 'ride' : c.ownership_type === 'company' ? 'own' : 'unknown',
         owner_name: c.owner_name,
         consignment_fee: N(c.consignment_fee) || null,
+        consignment_cum: feeCumByDigits.get(String(c.number || '').replace(/[^0-9]/g, '')) || null,
         total_cost: totalCost || null,
         purchase_price: N(c.purchase_price) || null,
         is_used: Boolean(c.is_used),
+        purchase_method: c.purchase_method || null,
         inspection_end_date: c.inspection_end_date,
         inspection_dday: dday(c.inspection_end_date),
         insurance: ins ? {

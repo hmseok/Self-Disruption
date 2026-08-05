@@ -57,6 +57,20 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         : Promise.resolve([]),
     ])
 
+    // 지입료 누적 (빌려타 정산서 월렌트료 합, 2026-08-05)
+    let consignmentCum: any = null
+    if (carDigits) {
+      try {
+        const fc = await prisma.$queryRawUnsafe<any[]>(`
+          SELECT SUM(monthly_fee) total, COUNT(*) months, MIN(settle_month) mn, MAX(settle_month) mx
+            FROM ride_settlement_fees
+           WHERE REGEXP_REPLACE(vehicle_number,'[^0-9]','') = ?`, carDigits)
+        if (fc[0] && Number(fc[0].total) > 0) {
+          consignmentCum = { total: Number(fc[0].total), months: Number(fc[0].months), from: fc[0].mn, to: fc[0].mx }
+        }
+      } catch { /* 테이블 미생성 */ }
+    }
+
     // 배차 통계 (전 기간)
     let rentalStats: any = null
     if (carDigits) {
@@ -70,7 +84,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     return NextResponse.json({
-      data: serialize({ car, insurance, loans, rentals, longterm, rentalStats }),
+      data: serialize({ car, insurance, loans, rentals, longterm, rentalStats, consignmentCum }),
       error: null,
     })
   } catch (e: any) {

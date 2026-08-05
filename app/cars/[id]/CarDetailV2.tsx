@@ -299,6 +299,28 @@ export default function CarDetailV2({ carId }: { carId: string }) {
                       {nf(editCost ? COST_FIELDS.reduce((s, [f]) => s + (Number(costDraft[f]) || 0), 0) : (N(car.total_cost) || costTotal))}
                     </span>
                   </div>
+                  {/* 구입 구분 (2026-08-05): 신차/중고 + 방식 */}
+                  <div style={kv}>
+                    <span style={kLabel}>구입 구분</span>
+                    <span style={{ display: 'inline-flex', gap: 6 }}>
+                      <select value={car.is_used ? '1' : '0'} disabled={busy}
+                        onChange={(e) => patchCar({ is_used: e.target.value === '1' })}
+                        style={{ padding: '4px 8px', borderRadius: 7, border: `1px solid ${COLORS.borderSubtle}`, fontSize: 12, fontWeight: 600, background: '#fff' }}>
+                        <option value="0">신차</option>
+                        <option value="1">중고</option>
+                      </select>
+                      <select value={car.purchase_method || ''} disabled={busy}
+                        onChange={(e) => patchCar({ purchase_method: e.target.value || null })}
+                        style={{ padding: '4px 8px', borderRadius: 7, border: `1px solid ${COLORS.borderSubtle}`, fontSize: 12, fontWeight: 600, background: '#fff' }}>
+                        <option value="">방식 선택</option>
+                        <option value="현금">현금</option>
+                        <option value="할부">할부</option>
+                        <option value="리스">리스</option>
+                        <option value="렌트승계">렌트승계</option>
+                        <option value="기타">기타</option>
+                      </select>
+                    </span>
+                  </div>
                   {car.is_used ? <div style={{ padding: '8px 14px', fontSize: 11.5, color: COLORS.textMuted }}>중고 매입 차량 — 부가세 환급 적용 여부는 장부에서 확인</div> : null}
                 </div>
               ) : (
@@ -306,6 +328,10 @@ export default function CarDetailV2({ carId }: { carId: string }) {
                   <div style={sh}>지입 계약 (빌려타)</div>
                   <div style={kv}><span style={kLabel}>지입사 / 명의</span><span style={vVal}>{car.owner_name || '빌려타'}</span></div>
                   <div style={{ ...kv, background: '#faf9ff' }}><span style={{ ...kLabel, fontWeight: 700 }}>월 지입료</span><span style={{ fontWeight: 800, color: '#6d28d9', fontVariantNumeric: 'tabular-nums' }}>{N(car.consignment_fee) ? `${nf(car.consignment_fee)}원` : '미입력'}</span></div>
+                  {data?.consignmentCum && (
+                    <div style={kv}><span style={kLabel}>지입료 누적 (정산서 기준)</span>
+                      <span style={vVal}>{nf(data.consignmentCum.total)}원 <span style={{ fontWeight: 500, color: COLORS.textMuted, fontSize: 11.5 }}>({data.consignmentCum.from}~{data.consignmentCum.to} · {data.consignmentCum.months}개월)</span></span></div>
+                  )}
                   <div style={kv}><span style={kLabel}>계약 기간</span><span style={vVal}>{d10(car.consignment_start)} ~ {d10(car.consignment_end)}</span></div>
                   <div style={kv}><span style={kLabel}>보험 부보</span><span style={vVal}>{car.insurance_by === 'company' ? '당사' : car.insurance_by === 'owner' ? '지입사(빌려타)' : car.insurance_by || '—'}</span></div>
                   <div style={kv}><span style={kLabel}>지입 계좌</span><span style={vVal}>{car.owner_bank ? `${car.owner_bank} ${car.owner_account || ''}` : '—'}</span></div>

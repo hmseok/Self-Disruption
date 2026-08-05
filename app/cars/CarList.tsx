@@ -33,9 +33,11 @@ type LedgerCar = {
   vehicle_class: 'ride' | 'own' | 'unknown'
   owner_name: string | null
   consignment_fee: number | null
+  consignment_cum: { total: number; months: number } | null
   total_cost: number | null
   purchase_price: number | null
   is_used: boolean
+  purchase_method: string | null
   inspection_end_date: string | null
   inspection_dday: number | null
   insurance: { company: string | null; end_date: string | null; dday: number | null; own_damage: string | null; premium: number | null; has_certificate: boolean } | null
@@ -114,24 +116,38 @@ export default function CarListPage() {
     { key: 'class', label: '소속', width: 96, align: 'center',
       sortBy: (c) => c.vehicle_class,
       render: (c) => <ClassBadge cls={c.vehicle_class} /> },
-    { key: 'owner', label: '명의/지입사', width: 150,
+    { key: 'owner', label: '명의/지입사', width: 140,
       sortBy: (c) => c.owner_name || '',
       render: (c) => c.vehicle_class === 'ride'
-        ? <div style={{ fontSize: 12.5 }}>
-            <div>{c.owner_name || '빌려타'}</div>
-            {c.consignment_fee ? <div style={{ fontSize: 11, color: COLORS.textMuted }}>월 지입료 {nf(c.consignment_fee)}</div> : <div style={{ fontSize: 11, color: COLORS.textDim }}>지입료 미입력</div>}
-          </div>
+        ? <span style={{ fontSize: 12.5 }}>{c.owner_name || '빌려타'}</span>
         : <span style={{ fontSize: 12.5 }}>{c.owner_name || '㈜에프엠아이'}</span> },
-    { key: 'cost', label: '총 취득가', width: 130, align: 'right',
-      sortBy: (c) => c.total_cost || 0,
+    { key: 'cost', label: '취득가 / 지입료', width: 150, align: 'right',
+      sortBy: (c) => c.vehicle_class === 'ride' ? (c.consignment_fee || 0) : (c.total_cost || 0),
       render: (c) => c.vehicle_class === 'ride'
-        ? <span style={{ fontSize: 11.5, color: COLORS.textDim }}>지입 — 해당없음</span>
+        ? c.consignment_fee
+          ? <div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#6d28d9', fontVariantNumeric: 'tabular-nums' }}>월 {nf(c.consignment_fee)}</div>
+              {c.consignment_cum && <div style={{ fontSize: 10.5, color: COLORS.textMuted }}>누적 {nf(c.consignment_cum.total)} ({c.consignment_cum.months}개월)</div>}
+            </div>
+          : <span style={{ fontSize: 11.5, color: COLORS.textDim }}>지입료 미입력</span>
         : c.total_cost
           ? <div>
               <div style={{ fontSize: 13, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{nf(c.total_cost)}</div>
-              {c.is_used && <div style={{ fontSize: 10.5, color: COLORS.textMuted }}>중고 매입</div>}
+              <div style={{ fontSize: 10.5, color: COLORS.textMuted }}>
+                {c.is_used ? '중고' : '신차'}{c.purchase_method ? ` · ${c.purchase_method}` : ''}
+              </div>
             </div>
           : <span style={{ fontSize: 11.5, color: COLORS.textDim }}>미입력</span> },
+    { key: 'purchase', label: '구입', width: 92, align: 'center',
+      sortBy: (c) => `${c.is_used ? '중고' : '신차'}${c.purchase_method || ''}`,
+      render: (c) => c.vehicle_class === 'ride'
+        ? <span style={{ fontSize: 11.5, color: COLORS.textDim }}>—</span>
+        : <div style={{ display: 'flex', gap: 4, justifyContent: 'center', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 10.5, fontWeight: 700, padding: '2px 7px', borderRadius: 5, background: c.is_used ? COLORS.bgAmber : COLORS.bgGreen, color: c.is_used ? COLORS.warning : COLORS.success }}>{c.is_used ? '중고' : '신차'}</span>
+            {c.purchase_method
+              ? <span style={{ fontSize: 10.5, fontWeight: 700, padding: '2px 7px', borderRadius: 5, background: COLORS.bgBlue, color: COLORS.primary }}>{c.purchase_method}</span>
+              : <span style={{ fontSize: 10.5, color: COLORS.textDim }}>방식?</span>}
+          </div> },
     { key: 'insurance', label: '보험', width: 168,
       sortBy: (c) => c.insurance?.end_date || '',
       render: (c) => c.insurance
