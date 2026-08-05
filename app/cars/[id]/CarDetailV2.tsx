@@ -171,12 +171,25 @@ export default function CarDetailV2({ carId }: { carId: string }) {
               <Badge label={CAR_STATUS[car.status] || car.status} bg={COLORS.borderFaint} fg={COLORS.textSecondary} />
             </div>
           </div>
-          <select value={car.ownership_type || 'company'} disabled={busy}
-            onChange={(e) => { if (confirm(`소속을 변경할까요? 청구·입금·손익 구분이 함께 바뀝니다.`)) patchCar({ ownership_type: e.target.value }) }}
-            style={{ marginLeft: 'auto', padding: '7px 10px', borderRadius: 8, border: `1px solid ${COLORS.borderSubtle}`, fontSize: 12, fontWeight: 600, background: '#fff', color: COLORS.textSecondary }}>
-            <option value="company">FMI 직영</option>
-            <option value="빌려타">빌려타 지입</option>
-          </select>
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+            {/* 상태 변경 (2026-08-05 사용자 요청) */}
+            <select value={car.status || 'available'} disabled={busy}
+              onChange={(e) => patchCar({ status: e.target.value })}
+              style={{ padding: '7px 10px', borderRadius: 8, border: `1px solid ${COLORS.borderSubtle}`, fontSize: 12, fontWeight: 600, background: '#fff', color: COLORS.textSecondary }}>
+              <option value="available">대기</option>
+              <option value="rented">운용중</option>
+              <option value="returned">반납/대기</option>
+              <option value="maintenance">정비</option>
+              <option value="accident">사고</option>
+              <option value="sold">매각</option>
+            </select>
+            <select value={car.ownership_type || 'company'} disabled={busy}
+              onChange={(e) => { if (confirm(`소속을 변경할까요? 청구·입금·손익 구분이 함께 바뀝니다.`)) patchCar({ ownership_type: e.target.value }) }}
+              style={{ padding: '7px 10px', borderRadius: 8, border: `1px solid ${COLORS.borderSubtle}`, fontSize: 12, fontWeight: 600, background: '#fff', color: COLORS.textSecondary }}>
+              <option value="company">FMI 직영</option>
+              <option value="빌려타">빌려타 지입</option>
+            </select>
+          </div>
         </div>
 
         {/* 탭 */}
