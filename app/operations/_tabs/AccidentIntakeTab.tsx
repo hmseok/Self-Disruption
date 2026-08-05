@@ -245,6 +245,21 @@ export default function AccidentIntakeTab() {
       render: (r) => <span style={{ fontWeight: 600, color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: 160 }}>{r.cars_user || '-'}</span>,
     },
     {
+      // 2026-08-05 사용자 확정 — 보험사·대물접수번호 리스트 컬럼
+      key: 'insurer', label: '보험사', width: 96,
+      sortBy: (r) => r.otpttobm || '',
+      render: (r) => r.otpttobm
+        ? <span style={{ fontSize: 12, fontWeight: 600, color: '#0f2440', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: 96 }}>{r.otpttobm}</span>
+        : <span style={{ fontSize: 11, color: '#cbd5e1' }}>-</span>,
+    },
+    {
+      key: 'claim_no', label: '대물접수번호', width: 128,
+      sortBy: (r) => r.otpttobn || '',
+      render: (r) => r.otpttobn
+        ? <span style={{ fontSize: 11.5, color: '#475569', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: 128, fontFamily: 'ui-monospace, monospace' }}>{r.otpttobn}</span>
+        : <span style={{ fontSize: 11, color: '#cbd5e1' }}>미입력</span>,
+    },
+    {
       key: 'otptdcyn', label: '대차', width: 100, align: 'center',
       sortBy: (r) => r.otptdcyn || '',
       render: (r) => {
