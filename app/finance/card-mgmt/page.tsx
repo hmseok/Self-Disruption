@@ -83,7 +83,7 @@ export default function CardMgmtPage() {
       (rank[a.status || 'active'] - rank[b.status || 'active'])
       || String(a.card_issuer || '').localeCompare(String(b.card_issuer || ''))
       || String(a.card_alias || '').localeCompare(String(b.card_alias || '')))
-  }, [cards, group, statusFilter])
+  }, [cards, group, statusFilter, clsFilter])
 
   const save = useCallback(async () => {
     if (!edit) return
