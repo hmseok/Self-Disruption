@@ -36,9 +36,16 @@ const GROUP_META: Array<[Group, string, string]> = [
   ['staff', '직원·법인', '공용·개인 소지 법인카드'],
 ]
 
+// 배정 차량의 소속 (cars.ownership_type — 매핑 API car_ownership)
+function carClassOf(c: CardRow): 'ride' | 'own' | null {
+  if (!c.assigned_car_id) return null
+  return c.car_ownership === '빌려타' ? 'ride' : c.car_ownership === 'company' ? 'own' : null
+}
+
 export default function CardMgmtPage() {
   const [group, setGroup] = useState<Group>('all')
   const [statusFilter, setStatusFilter] = useState<'active' | 'all' | 'canceled'>('active')
+  const [clsFilter, setClsFilter] = useState<'all' | 'ride' | 'own'>('all') // 배정 차량 소속
   const [cards, setCards] = useState<CardRow[]>([])
   const [cars, setCars] = useState<any[]>([])
   const [stats, setStats] = useState<Record<string, any>>({})
@@ -69,6 +76,7 @@ export default function CardMgmtPage() {
     const rank: Record<string, number> = { active: 0, suspended: 1, canceled: 2 }
     let list = [...cards]
     if (group !== 'all') list = list.filter((c) => groupOf(c) === group)
+    if (clsFilter !== 'all') list = list.filter((c) => carClassOf(c) === clsFilter)
     if (statusFilter === 'active') list = list.filter((c) => (c.status || 'active') !== 'canceled')
     else if (statusFilter === 'canceled') list = list.filter((c) => c.status === 'canceled')
     return list.sort((a, b) =>
@@ -95,14 +103,22 @@ export default function CardMgmtPage() {
     load()
   }, [load])
 
-  // ── 그룹 요약 ──
+  // ── 그룹 요약 — 배정 차량 소속(지입/직영) 구분 집계 (2026-08-04 사용자 확정) ──
   const groupSummary = useMemo(() => {
     const g = rows
     const st = (c: CardRow) => stats[last4(c.card_number)] || null
     const thisMonth = g.reduce((s, c) => s + (st(c)?.this_month || 0), 0)
     const cnt6 = g.reduce((s, c) => s + (st(c)?.count || 0), 0)
     const assigned6 = g.reduce((s, c) => s + (st(c)?.car_assigned || 0), 0)
-    return { thisMonth, cnt6, assigned6 }
+    const rideCards = g.filter((c) => carClassOf(c) === 'ride')
+    const ownCards = g.filter((c) => carClassOf(c) === 'own')
+    return {
+      thisMonth, cnt6, assigned6,
+      rideCount: rideCards.length,
+      rideMonth: rideCards.reduce((s, c) => s + (st(c)?.this_month || 0), 0),
+      ownCount: ownCards.length,
+      ownMonth: ownCards.reduce((s, c) => s + (st(c)?.this_month || 0), 0),
+    }
   }, [rows, stats])
 
   // ── 공용 스타일 ──
@@ -156,6 +172,13 @@ export default function CardMgmtPage() {
         ))}
         <span style={{ flex: 1 }} />
         <div style={{ display: 'flex', alignItems: 'center', gap: 4, paddingBottom: 6 }}>
+          {([['all', '소속 전체'], ['ride', '지입 빌려타'], ['own', '직영 FMI']] as const).map(([k, label]) => (
+            <button key={k} onClick={() => setClsFilter(k)}
+              style={{ padding: '5px 11px', fontSize: 11.5, fontWeight: 600, borderRadius: 7, cursor: 'pointer',
+                border: `1px solid ${clsFilter === k ? '#6d28d9' : COLORS.borderSubtle}`,
+                background: clsFilter === k ? '#ede9fe' : '#fff', color: clsFilter === k ? '#6d28d9' : COLORS.textSecondary }}>{label}</button>
+          ))}
+          <span style={{ width: 8 }} />
           {([['active', '사용중'], ['all', '전체'], ['canceled', '해지']] as const).map(([k, label]) => (
             <button key={k} onClick={() => setStatusFilter(k)}
               style={{ padding: '5px 11px', fontSize: 11.5, fontWeight: 600, borderRadius: 7, cursor: 'pointer',
@@ -174,6 +197,12 @@ export default function CardMgmtPage() {
         <span style={{ fontSize: 12.5, color: COLORS.textSecondary }}>
           이번 달 지출 <b style={{ fontVariantNumeric: 'tabular-nums' }}>{nf(groupSummary.thisMonth)}원</b>
         </span>
+        {(groupSummary.rideCount > 0 || groupSummary.ownCount > 0) && (
+          <span style={{ fontSize: 12, color: COLORS.textMuted }}>
+            — 지입 <b style={{ color: '#6d28d9' }}>{groupSummary.rideCount}장 · {nf(groupSummary.rideMonth)}원</b>
+            {' / '}직영 <b style={{ color: '#1d4ed8' }}>{groupSummary.ownCount}장 · {nf(groupSummary.ownMonth)}원</b>
+          </span>
+        )}
         {group === 'vehicle' && groupSummary.cnt6 > 0 && (
           <span style={{ fontSize: 12.5, color: '#6d28d9' }}>
             차량 귀속률 <b>{Math.round((groupSummary.assigned6 / Math.max(groupSummary.cnt6, 1)) * 100)}%</b> (6개월 {groupSummary.assigned6}/{groupSummary.cnt6}건)
@@ -187,7 +216,8 @@ export default function CardMgmtPage() {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead><tr>
               <th style={th}>카드</th>
-              <th style={th}>배정</th>
+              <th style={th}>배정 차량</th>
+              <th style={{ ...th, textAlign: 'center' }}>소속</th>
               <th style={{ ...th, textAlign: 'center' }}>종류</th>
               <th style={{ ...th, textAlign: 'right' }}>이번 달</th>
               <th style={{ ...th, textAlign: 'right' }}>지난 달</th>
@@ -211,8 +241,16 @@ export default function CardMgmtPage() {
                     </td>
                     <td style={td}>
                       {c.car_number
-                        ? <Badge label={`🚗 ${c.car_number}`} bg="#dbeafe" fg="#1d4ed8" />
+                        ? <div>
+                            <div style={{ fontWeight: 700, fontSize: 12.5 }}>{c.car_number}</div>
+                            <div style={{ fontSize: 11, color: COLORS.textMuted }}>{c.car_model || ''}</div>
+                          </div>
                         : <span style={{ fontSize: 12, color: COLORS.textSecondary }}>{c.holder_name || '공용'}{c.department ? ` · ${c.department}` : ''}</span>}
+                    </td>
+                    <td style={{ ...td, textAlign: 'center' }}>
+                      {carClassOf(c) === 'ride' ? <Badge label="빌려타 지입" bg="#ede9fe" fg="#6d28d9" />
+                        : carClassOf(c) === 'own' ? <Badge label="FMI 직영" bg="#dbeafe" fg="#1d4ed8" />
+                        : <span style={{ fontSize: 11.5, color: COLORS.textDim }}>—</span>}
                     </td>
                     <td style={{ ...td, textAlign: 'center' }}>{typeBadge(c.card_type)}</td>
                     <td style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 700 }}>{st?.this_month ? nf(st.this_month) : <span style={{ color: COLORS.textDim }}>-</span>}</td>
@@ -234,7 +272,7 @@ export default function CardMgmtPage() {
                   </tr>
                 )
               })}
-              {!loading && rows.length === 0 && <tr><td style={td} colSpan={10}>이 그룹에 카드가 없습니다</td></tr>}
+              {!loading && rows.length === 0 && <tr><td style={td} colSpan={11}>이 그룹에 카드가 없습니다</td></tr>}
             </tbody>
           </table>
         </div>

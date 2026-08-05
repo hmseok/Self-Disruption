@@ -30,7 +30,8 @@ export async function GET(req: NextRequest) {
              c.card_type, c.card_holder_type, c.valid_thru, c.issued_at, c.expires_at,
              c.payment_bank, c.payment_account, c.payment_day, c.monthly_limit,
              c.previous_card_number, c.department, c.memo,
-             car.number AS car_number, CONCAT_WS(' ', car.brand, car.model) AS car_model
+             car.number AS car_number, CONCAT_WS(' ', car.brand, car.model) AS car_model,
+             car.ownership_type AS car_ownership
       FROM corporate_cards c
       LEFT JOIN cars car ON c.assigned_car_id COLLATE utf8mb4_unicode_ci = car.id COLLATE utf8mb4_unicode_ci
       ORDER BY c.created_at DESC
