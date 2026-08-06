@@ -710,75 +710,37 @@ function AuthPage() {
   // RENDER
   // ==================================
   return (
-    <div className="flex min-h-screen w-full font-sans overflow-x-hidden">
+    // ── A안 「플랫 원카드」 (2026-08-06 목업 확정) — 내부 화면과 같은 플랫 시스템 ──
+    <div className="min-h-screen w-full font-sans flex flex-col items-center justify-center p-6 relative overflow-x-hidden bg-[#f6f7f9]">
 
-      {/* ========== LEFT PANEL - Brand (모바일 숨김) ========== */}
-      <div className="hidden lg:flex w-[480px] min-w-[480px] bg-gradient-to-br from-slate-950 via-steel-900 to-steel-800 text-white flex-col justify-between p-14 relative overflow-hidden">
+      {/* 배경 도트 패턴 */}
+      <div aria-hidden className="absolute inset-0 pointer-events-none" style={{
+        backgroundImage: 'radial-gradient(#d8dce3 1px, transparent 1px)',
+        backgroundSize: '22px 22px',
+        maskImage: 'radial-gradient(ellipse 70% 60% at 50% 45%, black 30%, transparent 75%)',
+        WebkitMaskImage: 'radial-gradient(ellipse 70% 60% at 50% 45%, black 30%, transparent 75%)',
+      }} />
 
-        {/* 배경 장식 */}
-        <div className="absolute top-0 right-0 w-96 h-96 bg-steel-600/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
-        <div className="absolute bottom-0 left-0 w-64 h-64 bg-steel-500/10 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2"></div>
-        <div className="absolute inset-0 shimmer-bg"></div>
+      <div className="relative w-full max-w-[460px] my-8 bg-white border border-[#e6e8ec] rounded-2xl px-7 py-8 lg:px-9 shadow-[0_1px_2px_rgba(16,24,40,0.05),0_12px_34px_rgba(16,24,40,0.07)]">
 
-        {/* 상단 */}
-        <div className="relative z-10">
-          <div className="flex items-center gap-3 mb-12">
-            {brand.logoWhite ? (
-              <img src={brand.logoWhite} alt={brand.name} className="h-8 w-auto" />
-            ) : (
-              <>
-                <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center">
-                  <span className="text-slate-900 font-black text-lg">S</span>
-                </div>
-                <span className="text-xl font-bold tracking-tight">{brand.publicName}</span>
-              </>
-            )}
-          </div>
-
-          <div className="space-y-6">
-            <div>
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-steel-100 rounded-full text-[11px] font-bold tracking-wider text-steel-700 border border-steel-200">
-                <span className="w-1.5 h-1.5 bg-steel-600 rounded-full animate-pulse-slow"></span>
-                업무 통합 관리 플랫폼
-              </span>
-            </div>
-            <h1 className="text-4xl font-black leading-[1.15] tracking-tight">
-              비즈니스 운영의<br/>
-              새로운 기준<span className="text-steel-400">.</span>
-            </h1>
-            <p className="text-slate-400 text-sm leading-relaxed max-w-sm">
-              사업 운영에 필요한 모든 것을 하나의 플랫폼에서.<br/>
-              자산, 계약, 재무, 고객 관리까지 통합 솔루션.
-            </p>
-          </div>
-        </div>
-
-        {/* 하단 Feature Cards */}
-        <div className="relative z-10 space-y-3">
-          {[
-            { icon: '🔐', title: '엔터프라이즈 보안', desc: 'SOC2 수준의 데이터 보호 및 암호화' },
-            { icon: '📊', title: '실시간 대시보드', desc: '매출, 자산, 운영 현황을 한눈에 파악' },
-            { icon: '🏢', title: '멀티 테넌시', desc: '회사별 독립 데이터, 역할 기반 접근 제어' },
-          ].map((item, i) => (
-            <div key={i} className="glass rounded-xl p-4 flex items-start gap-4 animate-fade-in-up" style={{ animationDelay: `${i * 0.15}s` }}>
-              <span className="text-xl mt-0.5">{item.icon}</span>
-              <div>
-                <div className="text-sm font-bold text-white">{item.title}</div>
-                <div className="text-xs text-slate-400 mt-0.5">{item.desc}</div>
+        {/* 로고 */}
+        <div className="flex items-center gap-2.5 mb-7">
+          {brand.logo ? (
+            <img src={brand.logo} alt={brand.name} className="h-8 w-auto" />
+          ) : (
+            <>
+              <div className="w-9 h-9 rounded-[9px] flex items-center justify-center" style={{ background: brand.primary }}>
+                <span className="text-white font-black text-sm">{brand.publicName.charAt(0)}</span>
               </div>
-            </div>
-          ))}
+              <div>
+                <div className="text-base font-black text-[#1a1d23] tracking-tight leading-none">{brand.publicName}</div>
+                <div className="text-[10.5px] font-semibold text-[#9aa1ad] tracking-wider mt-1">렌터카 통합 관리</div>
+              </div>
+            </>
+          )}
         </div>
 
-        {/* 하단 Copyright */}
-        <div className="relative z-10 pt-6 border-t border-black/10">
-          <p className="text-[11px] text-slate-500">&copy; 2025 {brand.publicName}. All rights reserved.</p>
-        </div>
-      </div>
-
-      {/* ========== RIGHT PANEL - Auth Form ========== */}
-      <div className="flex-1 flex flex-col justify-center items-center p-6 lg:p-12 bg-white overflow-y-auto">
-        <div className="w-full max-w-[460px]">
+        <div className="w-full">
 
           {/* ===== VERIFIED VIEW (인증 완료!) ===== */}
           {view === 'verified' ? (
@@ -962,20 +924,6 @@ function AuthPage() {
           ) : (
             /* ===== LOGIN / SIGNUP VIEW ===== */
             <div className="animate-fade-in-up">
-              {/* 모바일 로고 */}
-              <div className="lg:hidden flex items-center gap-2 mb-8">
-                {brand.logo ? (
-                  <img src={brand.logo} alt={brand.name} className="h-7 w-auto" />
-                ) : (
-                  <>
-                    <div className="w-8 h-8 bg-slate-900 rounded-lg flex items-center justify-center">
-                      <span className="text-white font-black text-sm">S</span>
-                    </div>
-                    <span className="text-lg font-bold text-slate-900">{brand.publicName}</span>
-                  </>
-                )}
-              </div>
-
               {/* 헤딩 */}
               <div className="mb-8">
                 <h2 className="text-2xl font-black text-slate-900 mb-1">
@@ -1400,7 +1348,8 @@ function AuthPage() {
                 {/* 제출 버튼 */}
                 <button
                   disabled={loading}
-                  className="w-full py-4 bg-gradient-to-r from-steel-700 to-steel-800 hover:from-steel-800 hover:to-steel-900 text-white font-bold rounded-xl text-sm shadow-lg shadow-steel-700/25 hover:shadow-steel-800/35 transition-all disabled:opacity-50 flex items-center justify-center gap-2 mt-2"
+                  className="w-full py-4 text-white font-bold rounded-xl text-sm shadow-sm hover:brightness-110 transition-all disabled:opacity-50 flex items-center justify-center gap-2 mt-2"
+                  style={{ background: brand.primary }}
                 >
                   {loading ? (
                     <><svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" className="opacity-25"/><path d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" fill="currentColor" className="opacity-75"/></svg> 처리 중...</>
@@ -1441,6 +1390,11 @@ function AuthPage() {
           )}
 
         </div>
+      </div>
+
+      {/* 카드 하단 카피 */}
+      <div className="relative text-[11px] text-[#9aa1ad]">
+        &copy; 2026 {brand.publicName}. 사고대차 · 렌터카 · 정산까지 한 곳에서
       </div>
     </div>
   )
