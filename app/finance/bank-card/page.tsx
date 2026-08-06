@@ -1235,13 +1235,16 @@ export default function BankCardPage() {
 
   useEffect(() => {
     setLoading(true)
-    Promise.all([loadSummary(), loadTransactions(), loadSettlements(), loadCars(), loadMappings(), loadDomains()])
+    Promise.all([loadSummary(), loadTransactions(), loadSettlements(), loadCars(), loadMappings(), loadDomains(), loadSmsData()])
       .finally(() => setLoading(false))
   }, [loadSummary, loadTransactions, loadSettlements, loadCars, loadMappings])
 
   // SMS 탭 전환 시 로드
   useEffect(() => {
-    if (activeTab === 'sms-bank' || activeTab === 'sms-card') loadSmsData()
+    if (activeTab === 'sms-bank' || activeTab === 'sms-card') {
+      loadSmsData()
+      setSmsIssuerFilter('')  // 탭에 안 맞는 발신처 필터 잔존 방지 (2026-08-06)
+    }
     if (activeTab === 'mapping') loadMappings()
   }, [activeTab, loadSmsData, loadMappings])
 
@@ -3165,11 +3168,14 @@ export default function BankCardPage() {
   // 2026-07-08 사용자 명시 「확실하지 않은 기능은 혼란」 — 4개만:
   //   통장·카드(원장) + SMS 수집(수집층 확인) + 매핑 관리(계좌·카드 식별 설정)
   // REDESIGN 3탭 완성 (2026-07-30) — 통장/카드 탭은 거래내역에 흡수
+  // 수집함 탭 건수 — 발신 기준 (은행 SMS vs 카드 SMS), 2026-08-06 사용자 요청
+  const bankSmsCount = smsRows.filter((r: any) => /BANK$/i.test(String(r.card_issuer || ''))).length
+  const cardSmsCount = smsRows.length - bankSmsCount
   const tabs = [
     { key: 'ledger', label: '거래내역', count: summary?.transactions.total },
-    { key: 'sms-bank', label: '수집함 · 통장' },
-    { key: 'sms-card', label: '수집함 · 카드' },
-    { key: 'mapping', label: '매핑 관리' },
+    { key: 'sms-bank', label: '수집함 · 통장', count: bankSmsCount },
+    { key: 'sms-card', label: '수집함 · 카드', count: cardSmsCount },
+    { key: 'mapping', label: '매핑 관리', count: mappingBanks.length + mappingCards.length },
   ]
 
   // ── 통계 카드 ─────────────────────────────────────────
@@ -3581,6 +3587,7 @@ export default function BankCardPage() {
         {/* ──── 수집함 — 통장/카드 분리 (2026-08-03 사용자 확정) ──── */}
         {(activeTab === 'sms-bank' || activeTab === 'sms-card') && (
           <SmsTab
+            kind={activeTab === 'sms-bank' ? 'bank' : 'card'}
             rows={smsRows.filter((r: any) => {
               const isBank = /BANK$/i.test(String(r.card_issuer || ''))
               return activeTab === 'sms-bank' ? isBank : !isBank

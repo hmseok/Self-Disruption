@@ -27,10 +27,19 @@ export default function SmsTab({
   rows, stats, loading,
   statusFilter, issuerFilter, onStatusFilter, onIssuerFilter,
   reparsing, onReparse, registeringId, onRegister,
-}: SmsTabProps) {
-  const parsed = stats.find(s => s.status === 'parsed') || { count: 0, total: 0 }
-  const failed = stats.find(s => s.status === 'failed') || { count: 0, total: 0 }
-  const total30d = stats.reduce((a, s) => a + s.count, 0)
+  kind,
+}: SmsTabProps & { kind?: 'bank' | 'card' }) {
+  // 통계·필터는 탭(통장/카드)에 들어온 rows 기준 — 전체 통계와 섞이지 않게 (2026-08-06 사용자 확정)
+  const parsedRows = rows.filter(r => r.parse_status === 'parsed')
+  const parsed = { count: parsedRows.length, total: parsedRows.reduce((a, r) => a + Number(r.amount || 0), 0) }
+  const failed = { count: rows.filter(r => r.parse_status === 'failed').length, total: 0 }
+  const total30d = rows.length
+  // 탭에 맞는 발신처 필터만 노출
+  const ISSUER_OPTIONS = kind === 'bank'
+    ? ['', 'WOORI_BANK', 'KB_BANK']
+    : kind === 'card'
+      ? ['', 'KB', 'WOORI', 'HYUNDAI', 'MYCOMPANY']
+      : ['', 'KB', 'WOORI', 'HYUNDAI', 'MYCOMPANY', 'WOORI_BANK', 'KB_BANK']
 
   return (
     <>
@@ -54,14 +63,14 @@ export default function SmsTab({
           </button>
         ))}
         <span style={{ width: 8 }} />
-        {['', 'KB', 'WOORI', 'HYUNDAI', 'MYCOMPANY', 'WOORI_BANK', 'KB_BANK'].map(i => (
+        {ISSUER_OPTIONS.map(i => (
           <button key={i || 'all'} onClick={() => onIssuerFilter(i)} style={{
             padding: '6px 14px', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: 'pointer',
             border: `1px solid ${issuerFilter === i ? 'rgba(59,110,181,0.4)' : 'rgba(0,0,0,0.06)'}`,
             background: issuerFilter === i ? 'rgba(191,219,254,0.6)' : '#ffffff',
             color: '#1e293b',
           }}>
-            {i === '' ? '카드사 전체' : ISSUER_LABEL[i]}
+            {i === '' ? (kind === 'bank' ? '은행 전체' : '카드사 전체') : ISSUER_LABEL[i]}
           </button>
         ))}
         <span style={{ flex: 1 }} />
