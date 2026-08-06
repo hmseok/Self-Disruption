@@ -11,6 +11,7 @@ import { fetchWithAuth, getAuthHeader } from '@/app/utils/finance-upload'
 import * as XLSX from 'xlsx'
 // 2026-07-30 개편 2단계 — 탭별 파일 분리
 import SmsTab from './SmsTab'
+import VerifyTab from './VerifyTab'
 import MappingTab from './MappingTab'
 import LedgerTab, { LedgerFilter } from './LedgerTab'
 import { SmsRow } from './_shared'
@@ -24,7 +25,7 @@ import { SmsRow } from './_shared'
 // 거래내역(ledger) = 통장+카드 통합 리스트 (REDESIGN). 통장/카드 탭은 잔액검증·업로드 이관 전까지 병행.
 // 2026-08-03 사용자 확정 IA: 장부 = 거래내역 + 수집함(통장/카드) + 매핑(통장·구분).
 //   수금 → /finance/collection 독립 메뉴, 카드관리(마스터·카드매핑) → /finance/card-mgmt 독립 메뉴.
-type TabKey = 'ledger' | 'sms-bank' | 'sms-card' | 'mapping'
+type TabKey = 'ledger' | 'sms-bank' | 'sms-card' | 'verify' | 'mapping'
 
 interface Transaction {
   id: string
@@ -3175,6 +3176,7 @@ export default function BankCardPage() {
     { key: 'ledger', label: '거래내역', count: summary?.transactions.total },
     { key: 'sms-bank', label: '수집함 · 통장', count: bankSmsCount },
     { key: 'sms-card', label: '수집함 · 카드', count: cardSmsCount },
+    { key: 'verify', label: '연결 검증' },
     { key: 'mapping', label: '매핑 관리', count: mappingBanks.length + mappingCards.length },
   ]
 
@@ -3604,6 +3606,9 @@ export default function BankCardPage() {
             onRegister={registerSmsToLedger}
           />
         )}
+
+        {/* ──── 연결 검증 탭 (2026-08-06) ──── */}
+        {activeTab === 'verify' && <VerifyTab />}
 
         {/* ──── 매핑 관리 탭 ──── */}
         {activeTab === 'mapping' && (
