@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
     const tempPassword = makeTempPassword()
     const hash = await bcrypt.hash(tempPassword, 12)
     await prisma.$executeRaw`
-      UPDATE profiles SET password_hash = ${hash}, updated_at = NOW() WHERE id = ${employee_id}
+      UPDATE profiles SET password_hash = ${hash}, must_change_password = 1, updated_at = NOW() WHERE id = ${employee_id}
     `
 
     console.log(`[reset-password] ${user.id} → ${target.email} 초기화`)

@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
 
     // 프로필 조회
     const profiles = await prisma.$queryRaw<any[]>`
-      SELECT id, email, name, role, is_active, is_approved, password_hash
+      SELECT id, email, name, role, is_active, is_approved, password_hash, must_change_password
       FROM profiles
       WHERE email = ${email}
       LIMIT 1
@@ -62,6 +62,7 @@ export async function POST(request: NextRequest) {
       role: profile.role,
       is_active: profile.is_active,
       is_approved: profile.is_approved,
+      must_change_password: Number(profile.must_change_password) === 1,
     }
 
     return NextResponse.json({ token, user })

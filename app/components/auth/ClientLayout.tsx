@@ -10,6 +10,8 @@ import { AIProgressProvider } from '../AIProgressFloater'
 import PageTitle from '../PageTitle'
 import QuickTxModal from '../QuickTxModal'
 import { getAuthHeader } from '@/app/utils/auth-client'
+import ForcePasswordChange from './ForcePasswordChange'
+import { getStoredUser } from '@/lib/auth-client'
 
 // ============================================
 // 아이콘 — 2026-07 개편: 라인 아이콘 통일 (stroke 1.8, 17px)
@@ -133,6 +135,8 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
   const { user, role, position, department, permissions, loading, menuRefreshKey } = useApp()
+  const [pwChangeDone, setPwChangeDone] = useState(false)
+  const pwChangeRequired = !pwChangeDone && Boolean(user) && Boolean((getStoredUser() as any)?.must_change_password)
   // 조직 브랜드 — PR-MULTI-BRAND P3+f: profiles.company_id (via /api/me/company) 기반.
   //   useMyCompanyKey() 가 sessionStorage 캐시 + 자동 fetch. 로딩 중엔 FMI 폴백.
   const companyKey = useMyCompanyKey()
@@ -276,6 +280,11 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
   // 로그아웃 상태 → 빈 화면 (useEffect에서 리디렉트 처리)
   if (!user) {
     return null
+  }
+
+  // 임시 비밀번호 로그인 → 변경 전까지 업무 화면 차단 (2026-08-07)
+  if (pwChangeRequired) {
+    return <ForcePasswordChange onDone={() => setPwChangeDone(true)} />
   }
 
   // 비즈니스 그룹별 메뉴 빌드

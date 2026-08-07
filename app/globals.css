@@ -745,6 +745,12 @@ button:not(:disabled),
 
   /* 사이드바·헤더 등 일반 텍스트 하한 */
   body { font-size: 15px; }
+
+  /* nowrap 으로 넓어진 표가 페이지를 밀지 않도록 — 표를 감싼 박스 안에서만 가로 스크롤
+     (inline style 의 overflow:hidden 을 이겨야 해서 !important) */
+  div:has(> table) { overflow-x: auto !important; }
+  /* 페이지 본문이 가로로 밀리는 것 방지 */
+  main, [class*="content"] { max-width: 100%; }
 }
 
 /* 인쇄 영역은 원래 크기 유지 */
