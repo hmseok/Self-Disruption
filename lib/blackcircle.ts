@@ -11,9 +11,11 @@ import { randomUUID, createCipheriv, createDecipheriv, randomBytes, scryptSync }
 const BASE = 'https://blackcircles.co.kr'
 const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36'
 
-// ── 자격증명 암호화 (키: JWT_SECRET 파생 — 외부 유출 없음) ──
+// ── 자격증명 암호화 (키: CRON_SECRET 파생 — dev/prod 공통, DB 공유 환경 대응) ──
+//   ※ JWT_SECRET 은 환경별로 달라 복호화 불가 사고 있었음 (2026-08-07)
 function encKey(): Buffer {
-  return scryptSync(process.env.JWT_SECRET || 'fmi-fallback', 'thebum-bc-cred-v1', 32)
+  const material = process.env.CRON_SECRET || process.env.JWT_SECRET || 'fmi-fallback'
+  return scryptSync(material, 'thebum-bc-cred-v1', 32)
 }
 export function encrypt(plain: string): string {
   const iv = randomBytes(12)
