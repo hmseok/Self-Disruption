@@ -80,6 +80,7 @@ export const MENUS: MenuEntry[] = [
   // 카드관리·수금 — 장부에서 분리 (2026-08-03 사용자 확정)
   { id: 'mod-card-mgmt',  name: '카드관리', path: '/finance/card-mgmt',   iconKey: 'Money',  group: 'core', sortOrder: 4.3, requirePermission: true },
   { id: 'mod-collection', name: '수금',    path: '/finance/collection',  iconKey: 'Coin',   group: 'core', sortOrder: 4.6, requirePermission: true },
+  { id: 'mod-tire',       name: '타이어 판매', displayName: '타이어', path: '/tire', iconKey: 'Wrench', group: 'core', sortOrder: 4.8, requirePermission: true },
   { id: 'mod-settlement', name: '정산/수금', displayName: '정산', path: '/finance/settlement', iconKey: 'Coin',   group: 'core', sortOrder: 5, requirePermission: true },
   { id: 'mod-pnl',        name: '차량 손익', displayName: '손익', path: '/finance/fleet',      iconKey: 'Trend',  group: 'core', sortOrder: 6, requirePermission: true },
 
