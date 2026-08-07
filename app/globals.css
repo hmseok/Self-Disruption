@@ -722,3 +722,32 @@ button:not(:disabled),
     min-height: auto !important;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   전역 폰트 확대 (2026-08-07 사용자 요청 — "전체적으로 좀 작다")
+   규칙: 화면 폰트를 한 단계 키우되 표는 절대 줄바꿈 금지 (nowrap + ellipsis).
+   인쇄(.quote-print-area 등)와 공개 페이지에는 영향 없음.
+   ═══════════════════════════════════════════════════════════════ */
+@media screen {
+  /* 표 — 본문 13px, 헤더 12px, 줄바꿈 금지 */
+  table td { font-size: 13px !important; white-space: nowrap !important; }
+  table th { font-size: 12px !important; white-space: nowrap !important; }
+  /* 긴 텍스트 셀은 잘라내고 … 로 (툴팁은 title 속성 유지) */
+  table td > div[style*="ellipsis"] { max-width: 420px; }
+
+  /* 입력·버튼·셀렉트 */
+  input, select, textarea, button { font-size: 13px !important; }
+  table input, table select, table button { font-size: 12px !important; }
+
+  /* 상태 배지·소형 라벨은 과하게 커지지 않도록 하한만 */
+  span[style*="font-size: 10"], span[style*="font-size:10"] { font-size: 11.5px !important; }
+  span[style*="font-size: 11px"], span[style*="font-size:11px"] { font-size: 12px !important; }
+
+  /* 사이드바·헤더 등 일반 텍스트 하한 */
+  body { font-size: 15px; }
+}
+
+/* 인쇄 영역은 원래 크기 유지 */
+@media print {
+  table td, table th, input, select, button { font-size: inherit !important; }
+}

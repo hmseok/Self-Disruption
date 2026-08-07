@@ -90,6 +90,15 @@ export default function TirePage() {
   const [custForm, setCustForm] = useState({ name: '', phone: '', memo: '' })
   const [showCustForm, setShowCustForm] = useState(false)
 
+  // ── 발주 (블랙서클) ──
+  const [orderModal, setOrderModal] = useState<any>(null)   // {sale, catalog, options}
+  const [orderLoading, setOrderLoading] = useState(false)
+  const [orderPick, setOrderPick] = useState('')
+  const [orderSubmitting, setOrderSubmitting] = useState(false)
+  const [orderDone, setOrderDone] = useState<any>(null)
+
+  const [ordersSyncing, setOrdersSyncing] = useState(false)
+
   // ── 블랙서클 연동 ──
   const [bc, setBc] = useState<any>(null)
   const [bcForm, setBcForm] = useState({ id: '', password: '' })
@@ -191,6 +200,51 @@ export default function TirePage() {
     loadInvoices(); loadSales()
   }
 
+  const openOrder = async (saleId: string) => {
+    setOrderLoading(true); setOrderModal(null); setOrderDone(null); setOrderPick('')
+    try {
+      const { ok, json } = await fetchWithAuth(`/api/tire/order?sale_id=${saleId}`)
+      if (!ok) { alert(json.error || '발주 정보 조회 실패'); return }
+      setOrderModal(json)
+      // 기본 선택: 재고 충분한 것 중 가장 싼 것
+      const need = json.sale.qty || 1
+      const avail = (json.options || []).filter((o: any) => o.stock >= need)
+      const best = avail.sort((a: any, b: any) => (a.price + a.deliveryFee) - (b.price + b.deliveryFee))[0]
+      setOrderPick(best?.code || json.options?.[0]?.code || '')
+    } finally { setOrderLoading(false) }
+  }
+
+  const submitOrder = async () => {
+    if (!orderModal || !orderPick) return
+    setOrderSubmitting(true)
+    try {
+      const { ok, json } = await fetchWithAuth('/api/tire/order', {
+        method: 'POST',
+        body: { sale_id: orderModal.sale.id, delivery_select: orderPick, qty: orderModal.sale.qty },
+      })
+      if (!ok) { alert(json.error || '발주 실패'); return }
+      setOrderDone(json)
+      loadSales()
+    } finally { setOrderSubmitting(false) }
+  }
+
+  const syncOrders = async () => {
+    setOrdersSyncing(true)
+    try {
+      const { ok, json } = await fetchWithAuth('/api/tire/orders?days=60')
+      if (!ok) { alert(json.error || '주문 상태 조회 실패'); return }
+      alert(`블랙서클 주문 ${json.orders.length}건 확인 — 신규 매칭 ${json.matched}건, 상태 갱신 ${json.statusUpdated}건`)
+      loadSales()
+    } finally { setOrdersSyncing(false) }
+  }
+
+  const cancelOrder = async (sale: any) => {
+    if (!confirm(`${sale.item_name} ${sale.spec || ''} 발주를 취소할까요?${sale.bc_od_id ? '\n블랙서클 주문도 함께 취소됩니다.' : ''}`)) return
+    const { ok, json } = await fetchWithAuth('/api/tire/orders', { method: 'POST', body: { sale_id: sale.id, action: 'cancel' } })
+    alert(ok ? (json.message || '취소되었습니다') : (json.error || '취소 실패'))
+    loadSales()
+  }
+
   const margin = useMemo(() => {
     if (!salesSummary) return null
     return salesSummary.total - salesSummary.cost
@@ -208,6 +262,100 @@ export default function TirePage() {
 
   return (
     <div style={{ padding: 20, maxWidth: 1280, margin: '0 auto' }}>
+      {/* ═══ 발주 확인 모달 ═══ */}
+      {orderModal && (
+        <div onClick={e => { if (e.target === e.currentTarget) { setOrderModal(null); setOrderDone(null) } }}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.45)', zIndex: 100, display: 'grid', placeItems: 'center', padding: 20 }}>
+          <div style={{ background: '#fff', borderRadius: 16, padding: 22, width: 460, maxWidth: '100%', boxShadow: '0 20px 50px rgba(16,24,40,0.25)' }}>
+            {!orderDone ? (
+              <>
+                <div style={{ fontSize: 16, fontWeight: 800, color: '#1a1d23', marginBottom: 4 }}>발주 확인</div>
+                <div style={{ fontSize: 12, color: '#5b626e', marginBottom: 14 }}>
+                  블랙서클 실시간 시세·재고입니다. 확인 후 발주하면 장바구니에 담깁니다.
+                </div>
+
+                <div style={{ background: '#f6f7f9', borderRadius: 10, padding: '11px 13px', marginBottom: 14, fontSize: 12.5 }}>
+                  <div style={{ fontWeight: 800, color: '#1a1d23' }}>{orderModal.catalog.brand} {orderModal.catalog.model} {orderModal.catalog.spec}</div>
+                  <div style={{ color: '#5b626e', marginTop: 3 }}>
+                    {orderModal.sale.customer_name || ''} {orderModal.sale.car_number ? `· ${orderModal.sale.car_number}` : ''} · <b>{orderModal.sale.qty}개</b>
+                  </div>
+                  {orderModal.sale.delivery_address && (
+                    <div style={{ color: '#5b626e', fontSize: 11.5, marginTop: 2 }}>🚚 {orderModal.sale.delivery_address}</div>
+                  )}
+                  <div style={{ color: '#2563eb', fontSize: 11.5, fontWeight: 700, marginTop: 4 }}>
+                    고객 청구 예정 {nf(orderModal.sale.amount)}원
+                  </div>
+                </div>
+
+                <div style={{ fontSize: 11.5, fontWeight: 700, color: '#5b626e', marginBottom: 6 }}>배송 방법 선택</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 7, marginBottom: 16 }}>
+                  {orderModal.options.map((o: any) => {
+                    const need = orderModal.sale.qty || 1
+                    const short = o.stock < need
+                    const total = o.price * need + (o.deliveryFee || 0)
+                    const profit = orderModal.sale.amount - total
+                    return (
+                      <button key={o.code} disabled={short} onClick={() => setOrderPick(o.code)}
+                        style={{
+                          display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%',
+                          padding: '10px 13px', borderRadius: 10, cursor: short ? 'not-allowed' : 'pointer',
+                          border: `1.5px solid ${orderPick === o.code ? COLORS.primary : '#e6e8ec'}`,
+                          background: orderPick === o.code ? '#eff4ff' : '#fff', opacity: short ? 0.45 : 1, textAlign: 'left',
+                        }}>
+                        <span style={{ fontSize: 12.5 }}>
+                          <b>{o.label}</b>
+                          <span style={{ color: '#94a3b8', marginLeft: 6, fontSize: 11 }}>재고 {nf(o.stock)}{short ? ' (부족)' : ''}</span>
+                        </span>
+                        <span style={{ textAlign: 'right' }}>
+                          <div style={{ fontSize: 12.5, fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>
+                            {nf(total)}원
+                            {o.deliveryFee > 0 && <span style={{ fontSize: 10.5, color: '#94a3b8', fontWeight: 500 }}> (배송비 {nf(o.deliveryFee)})</span>}
+                          </div>
+                          {orderModal.sale.amount > 0 && (
+                            <div style={{ fontSize: 10.5, fontWeight: 700, color: profit >= 0 ? COLORS.income : COLORS.expense }}>
+                              마진 {nf(profit)}원
+                            </div>
+                          )}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button onClick={submitOrder} disabled={orderSubmitting || !orderPick}
+                    style={{ flex: 1, padding: 13, borderRadius: 11, border: 'none', background: COLORS.primary, color: '#fff', fontWeight: 800, fontSize: 14, cursor: orderSubmitting ? 'wait' : 'pointer', opacity: !orderPick ? 0.5 : 1 }}>
+                    {orderSubmitting ? '발주 중...' : '🛒 발주하기'}
+                  </button>
+                  <button onClick={() => setOrderModal(null)}
+                    style={{ padding: '13px 20px', borderRadius: 11, border: '1px solid #e6e8ec', background: '#fff', color: '#5b626e', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>닫기</button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div style={{ fontSize: 34, textAlign: 'center' }}>🛒</div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: '#1a1d23', textAlign: 'center', marginTop: 8 }}>장바구니에 담겼습니다</div>
+                <div style={{ fontSize: 12.5, color: '#5b626e', textAlign: 'center', marginTop: 6, lineHeight: 1.7 }}>
+                  {orderDone.note}<br />
+                  매입 합계 <b>{nf(orderDone.cost)}원</b>
+                </div>
+                <div style={{ fontSize: 11.5, color: '#b45309', background: 'rgba(253,230,138,0.4)', borderRadius: 10, padding: '10px 13px', margin: '14px 0', lineHeight: 1.6 }}>
+                  결제(주문 확정)는 블랙서클 장바구니에서 직접 눌러주세요. 여러 건을 담아 한 번에 결제하셔도 됩니다.
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button onClick={() => window.open(orderDone.cartUrl, '_blank')}
+                    style={{ flex: 1, padding: 13, borderRadius: 11, border: 'none', background: COLORS.primary, color: '#fff', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>
+                    블랙서클 장바구니 열기 →
+                  </button>
+                  <button onClick={() => { setOrderModal(null); setOrderDone(null) }}
+                    style={{ padding: '13px 20px', borderRadius: 11, border: '1px solid #e6e8ec', background: '#fff', color: '#5b626e', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>닫기</button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginBottom: 14 }}>
         <h1 style={{ fontSize: 20, fontWeight: 800, color: '#1a1d23' }}>타이어 판매</h1>
         <span style={{ fontSize: 12, color: '#9aa1ad' }}>판매 → 청구서 발행 → KB 441501-01-516551 입금 매칭</span>
@@ -254,6 +402,11 @@ export default function TirePage() {
                 선택 {selected.size}건 청구서 발행
               </button>
             )}
+            <button onClick={syncOrders} disabled={ordersSyncing}
+              title="블랙서클 주문내역을 읽어 발주 건 상태(결제완료·상품준비중·배송중·배송완료)를 갱신합니다"
+              style={{ ...BTN.sm, background: '#fff', color: '#b45309', border: '1px solid #f3e3c8', padding: '8px 14px', fontWeight: 700, cursor: ordersSyncing ? 'wait' : 'pointer' }}>
+              {ordersSyncing ? '조회 중...' : '🔄 주문 상태'}
+            </button>
             <button onClick={() => { setForm(emptyForm); setEditingId(null); setShowAdd(v => !v) }}
               style={{ ...BTN.sm, background: showAdd ? '#f1f5f9' : '#fff', color: COLORS.primary, border: `1px solid ${COLORS.borderBlue}`, padding: '8px 16px', fontWeight: 700, cursor: 'pointer' }}>
               {showAdd ? '닫기' : '판매 등록'}
@@ -356,6 +509,22 @@ export default function TirePage() {
                         setShowAdd(true)
                         window.scrollTo({ top: 0, behavior: 'smooth' })
                       }} style={{ ...BTN.sm, padding: '3px 8px', fontSize: 11, background: '#fff', color: COLORS.primary, border: `1px solid ${COLORS.borderBlue}`, cursor: 'pointer' }}>수정</button>
+                      {!(s as any).ordered_at && (
+                        <button onClick={() => openOrder(s.id)} disabled={orderLoading}
+                          title="블랙서클 시세·재고 확인 후 발주"
+                          style={{ ...BTN.sm, padding: '3px 9px', fontSize: 11, background: '#fff', color: '#b45309', border: '1px solid #f3e3c8', cursor: orderLoading ? 'wait' : 'pointer', marginLeft: 4, fontWeight: 700 }}>
+                          🛒 발주
+                        </button>
+                      )}
+                      {(s as any).ordered_at && (
+                        <>
+                          <span title={(s as any).order_note || ''} style={{ fontSize: 11, fontWeight: 700, color: '#059669', marginLeft: 6 }}>
+                            {(s as any).bc_status || '발주완료'}
+                          </span>
+                          <button onClick={() => cancelOrder(s)} title="발주 취소"
+                            style={{ ...BTN.sm, padding: '3px 8px', fontSize: 11, background: '#fff', color: COLORS.danger, border: `1px solid ${COLORS.borderRed}`, cursor: 'pointer', marginLeft: 4 }}>취소</button>
+                        </>
+                      )}
                       {s.status === 'requested' && (
                         <button onClick={async () => {
                           if (!confirm(`${s.customer_name || ''} 신청 건을 금액 ${nf(s.amount)}원으로 확정할까요?\n(금액 조정은 「수정」에서 먼저 하세요)`)) return
@@ -510,7 +679,7 @@ export default function TirePage() {
               {bcSyncing ? '동기화 중... (2~3분)' : '🔄 지금 동기화'}
             </button>
             <div style={{ borderLeft: '1px solid #e6e8ec', paddingLeft: 12, display: 'flex', gap: 8, alignItems: 'flex-end' }}>
-              <div><div style={{ fontSize: 10.5, fontWeight: 700, color: '#5b626e', marginBottom: 4 }}>판매가 자동 마진율 % (매입가 기준)</div>
+              <div><div style={{ fontSize: 10.5, fontWeight: 700, color: '#5b626e', marginBottom: 4 }}>마진율 %(매입가)</div>
                 <input type="number" style={{ ...inputStyle, width: 70, textAlign: 'right' }} value={bcMargin} placeholder="미사용" onChange={e => setBcMargin(e.target.value)} /></div>
               <button onClick={async () => {
                 await fetchWithAuth('/api/tire/blackcircle', { method: 'POST', body: { action: 'margin', percent: bcMargin } })
@@ -562,8 +731,8 @@ export default function TirePage() {
               <thead>
                 <tr style={{ background: 'rgba(241,245,249,0.6)', color: '#475569', textAlign: 'left' }}>
                   <th style={th}>브랜드</th><th style={th}>모델</th><th style={th}>규격</th>
-                  <th style={{ ...th, textAlign: 'right' }}>소비자가(공장도)</th>
-                  <th style={{ ...th, textAlign: 'right' }}>매입가(회원가)</th>
+                  <th style={{ ...th, textAlign: 'right' }}>소비자가</th>
+                  <th style={{ ...th, textAlign: 'right' }}>매입가</th>
                   <th style={{ ...th, textAlign: 'right' }}>판매단가</th>
                   <th style={{ ...th, textAlign: 'right' }}>마진</th>
                   <th style={th}>재고·배송</th>

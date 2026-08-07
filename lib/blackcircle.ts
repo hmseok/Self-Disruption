@@ -90,6 +90,7 @@ export interface BcItem {
   brand: string; model: string; spec: string
   factory: number; member: number | null
   stock: string | null; delivery: string | null
+  ioNo: string | null; itId: string | null; caId: string | null   // 발주용 식별자
 }
 
 // ── HTML 조각 파싱 (서버 — DOM 없이 정규식) ──
@@ -108,7 +109,11 @@ export function parseListHtml(html: string): BcItem[] {
     const deliveryRaw = (sec.match(/<span class="font-size-17 color-1c6ee8[^>]*">([\s\S]*?)<\/span>\s*<\/b>/) || [])[1]
       || (sec.match(/(내일[^<]{0,20}도착|오늘[^<]{0,20}도착)/) || [])[1]
     const delivery = deliveryRaw ? deliveryRaw.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim() : null
-    if (brand && spec) out.push({ brand, model: title, spec, factory, member, stock, delivery })
+    // 발주용 식별자 (장바구니 담기 파라미터)
+    const ioNo = (sec.match(/data-io-no="(\d+)"/) || [])[1] || null
+    const itId = (sec.match(/data-it_id="(\d+)"/) || [])[1] || null
+    const caId = (sec.match(/data-ca_id="([^"]+)"/) || [])[1] || null
+    if (brand && spec) out.push({ brand, model: title, spec, factory, member, stock, delivery, ioNo, itId, caId })
   }
   return out
 }
@@ -170,23 +175,25 @@ export async function bcSyncCatalog(opts?: { maxPages?: number }): Promise<{ pag
   const flush = async () => {
     if (!values.length) return
     const r = await prisma.$executeRawUnsafe(`
-      INSERT INTO tire_catalog (id, brand, model, spec, purchase_price, consumer_price, stock_note, delivery_note, scraped_at)
+      INSERT INTO tire_catalog (id, brand, model, spec, purchase_price, consumer_price, stock_note, delivery_note, io_no, it_id, ca_id, scraped_at)
       VALUES ${values.join(',')}
       ON DUPLICATE KEY UPDATE
         purchase_price = VALUES(purchase_price),
         consumer_price = VALUES(consumer_price),
         stock_note = VALUES(stock_note),
         delivery_note = VALUES(delivery_note),
+        io_no = VALUES(io_no), it_id = VALUES(it_id), ca_id = VALUES(ca_id),
         scraped_at = VALUES(scraped_at)`, ...args)
     values = []; args = []
     return r
   }
   for (const it of seen.values()) {
     const price = it.member ?? it.factory
-    values.push('(?, ?, ?, ?, ?, ?, ?, ?, NOW())')
+    values.push('(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())')
     args.push(randomUUID(), it.brand.slice(0, 30), it.model.slice(0, 100), it.spec.slice(0, 30),
       price > 0 ? price : null, it.factory > 0 ? it.factory : null,
-      it.stock?.slice(0, 50) || null, it.delivery?.slice(0, 80) || null)
+      it.stock?.slice(0, 50) || null, it.delivery?.slice(0, 80) || null,
+      it.ioNo, it.itId, it.caId)
     if (values.length >= 400) await flush()
   }
   await flush()
@@ -200,3 +207,158 @@ export async function bcSyncCatalog(opts?: { maxPages?: number }): Promise<{ pag
   await setSetting('bc_last_result', `${seen.size} 품목 / ${page} 페이지`)
   return { pages: page, items: seen.size, updated, inserted }
 }
+
+// ═══════════════════════════════════════════════════════════════
+// 발주 — 배송옵션 조회 + 장바구니 담기
+//   결제(최종 주문 확정)는 블랙서클 화면에서 사람이 누름 (오발주 방지)
+// ═══════════════════════════════════════════════════════════════
+
+export const DELIVERY_LABEL: Record<string, string> = {
+  '1': '모닝배송', '2': '택배', '3': '퀵', '4': '방문수령',
+}
+
+export interface BcQuote {
+  ioNo: string
+  options: Array<{ code: string; label: string; price: number; stock: number; deliveryFee: number }>
+}
+
+const V = (html: string, name: string) => {
+  const m = html.match(new RegExp(`name="${name}"[^>]*value="([^"]*)"`))
+    || html.match(new RegExp(`value="([^"]*)"[^>]*name="${name}"`))
+  return m ? m[1] : ''
+}
+
+/** 품목 현재 시세·재고·배송옵션 조회 (읽기 전용) */
+export async function bcQuote(cookie: string, ioNo: string, itId: string, caId: string): Promise<BcQuote> {
+  const res = await fetch(`${BASE}/ajax_call/shop/list_order_ajax.php`, {
+    method: 'POST',
+    headers: {
+      'User-Agent': UA, 'Cookie': cookie,
+      'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+      'X-Requested-With': 'XMLHttpRequest',
+      'Referer': `${BASE}/shop/list.php?srch_type=tire`,
+    },
+    body: new URLSearchParams({ io_no: ioNo, it_id: itId, ca_id: caId, srch_delivery: '' }).toString(),
+  })
+  const html = await res.text()
+  const n = (s: string) => Number(String(s).replace(/[^0-9]/g, '')) || 0
+
+  const options: BcQuote['options'] = []
+  const push = (code: string, price: string, stock: string, fee: number) => {
+    const p = n(price), s = n(stock)
+    if (p > 0) options.push({ code, label: DELIVERY_LABEL[code] || code, price: p, stock: s, deliveryFee: fee })
+  }
+  push('1', V(html, 'morning_price'), V(html, 'morning_stock'), 0)
+  push('2', V(html, 'io_price'), V(html, 'delivery_stock'), n(V(html, 'delivery_price1')))
+  push('3', V(html, 'quick_price'), V(html, 'quick_stock'), n(V(html, 'quick_delivery_price')))
+  push('4', V(html, 'visit_price'), V(html, 'visit_stock'), 0)
+
+  return { ioNo, options }
+}
+
+/** 장바구니 담기 — 결제 전 단계 */
+export async function bcAddToCart(cookie: string, p: {
+  ioNo: string; itId: string; caId: string; qty: number; deliverySelect: string; saleDelivery?: string
+}): Promise<{ ok: boolean; code: string; message: string }> {
+  const res = await fetch(`${BASE}/ajax_call/shop/cart_add_ajax.php`, {
+    method: 'POST',
+    headers: {
+      'User-Agent': UA, 'Cookie': cookie,
+      'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+      'X-Requested-With': 'XMLHttpRequest',
+      'Referer': `${BASE}/shop/list.php?srch_type=tire`,
+    },
+    body: new URLSearchParams({
+      io_no: p.ioNo, it_id: p.itId, ca_id: p.caId,
+      ct_qty: String(p.qty), delivery_select: p.deliverySelect,
+      sale_delivery: p.saleDelivery || '',
+    }).toString(),
+  })
+  const text = await res.text()
+  let json: any = {}
+  try { json = JSON.parse(text) } catch { /* HTML 응답 = 세션 만료 등 */ }
+  const code = json.result_code || ''
+  return {
+    ok: code === '0000',
+    code,
+    message: json.result_message || json.message || (code ? '' : '응답을 해석할 수 없습니다 (로그인 세션 확인 필요)'),
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 주문내역 조회 · 주문취소
+//   목록: /shop/orderinquiry.php?od_status=&fr_date=&to_date=
+//   취소: /shop/order_change_status.php?ct_id={ct_id}&act=cancel
+// ═══════════════════════════════════════════════════════════════
+
+export interface BcOrder {
+  date: string; odId: string; ctId: string | null
+  status: string | null; spec: string | null; qty: number; total: number | null
+  itemName: string | null
+}
+
+/** 블랙서클 상태 → ERP 이행상태 */
+export const BC_STATUS_TO_FULFILL: Record<string, string> = {
+  '입금대기': 'ordered', '결제완료': 'ordered', '상품준비중': 'ordered',
+  '배송중': 'shipping', '배송완료': 'done', '구매확정': 'done',
+}
+
+export function parseOrdersHtml(html: string): BcOrder[] {
+  const flat = html.replace(/\s+/g, ' ')
+  const parts = flat.split(/(?=\d{4}-\d{2}-\d{2} \/ \d{14,})/)
+  const out: BcOrder[] = []
+  for (const p of parts.slice(1)) {
+    const head = p.match(/^(\d{4}-\d{2}-\d{2}) \/ (\d{14,})/)
+    if (!head) continue
+    const n = (s?: string | null) => (s ? Number(s.replace(/[^0-9]/g, '')) : 0)
+    out.push({
+      date: head[1],
+      odId: head[2],
+      ctId: (p.match(/order_change_status\.php\?ct_id=(\d+)/) || [])[1] || null,
+      status: (p.match(/>\s*(입금대기|결제완료|상품준비중|배송중|배송완료|구매확정|취소완료|반품요청|반품완료)\s*</) || [])[1] || null,
+      spec: (p.match(/(\d{3}\/\d{2}R\d{2})/) || [])[1] || null,
+      qty: n((p.match(/([\d,]+)\s*개/) || [])[1]) || 1,
+      total: n((p.match(/최종[\s\S]{0,60}?결제금액[\s\S]{0,300}?([\d,]{4,})/) || [])[1]) || null,
+      itemName: (p.match(/<div class="[^"]*title[^"]*"[^>]*>\s*([^<]{2,60}?)\s*</) || [])[1]?.trim() || null,
+    })
+  }
+  return out
+}
+
+export async function bcFetchOrders(cookie: string, from: string, to: string): Promise<BcOrder[]> {
+  // 목록은 AJAX(orderinquiry_more.php)로 페이지 단위 로드 — 껍데기 HTML 에는 주문이 없음
+  const out: BcOrder[] = []
+  const seen = new Set<string>()
+  for (let pg = 1; pg <= 10; pg++) {
+    const res = await fetch(`${BASE}/ajax_call/shop/orderinquiry_more.php`, {
+      method: 'POST',
+      headers: {
+        'User-Agent': UA, 'Cookie': cookie,
+        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+        'X-Requested-With': 'XMLHttpRequest',
+        'Referer': `${BASE}/shop/orderinquiry.php`,
+      },
+      body: new URLSearchParams({ pg: String(pg), od_status: '', fr_date: from, to_date: to }).toString(),
+    })
+    const items = parseOrdersHtml(await res.text())
+    let fresh = 0
+    for (const it of items) if (!seen.has(it.odId)) { seen.add(it.odId); out.push(it); fresh++ }
+    if (fresh === 0) break
+  }
+  return out
+}
+
+/** 주문 취소 — 블랙서클에서 취소 가능한 상태(결제완료/상품준비중)일 때만 ct_id 가 존재 */
+export async function bcCancelOrder(cookie: string, ctId: string): Promise<{ ok: boolean; message: string }> {
+  const res = await fetch(`${BASE}/shop/order_change_status.php?ct_id=${encodeURIComponent(ctId)}&act=cancel`, {
+    headers: { 'User-Agent': UA, 'Cookie': cookie, 'Referer': `${BASE}/shop/orderinquiry.php` },
+    redirect: 'follow',
+  })
+  const text = await res.text()
+  const ok = res.ok && !/오류|실패|불가/.test(text.slice(0, 3000))
+  const msg = (text.match(/alert\('([^']{2,80})'/) || [])[1] || (ok ? '취소 요청 완료' : '취소에 실패했습니다')
+  return { ok, message: msg }
+}
+
+export { bcLogin as bcSession }
+

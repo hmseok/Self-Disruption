@@ -24,6 +24,7 @@ export async function POST(req: NextRequest) {
     let itemName = S(b.item_name, 200)
     let spec = S(b.spec, 100)
     let unitPrice = 0
+    let catalogId: string | null = null
     if (b.catalog_id) {
       const cat = await prisma.$queryRawUnsafe<any[]>(
         `SELECT brand, model, spec, sale_price FROM tire_catalog WHERE id = ? AND active = 1`, S(b.catalog_id, 36))
@@ -31,15 +32,16 @@ export async function POST(req: NextRequest) {
         itemName = `${cat[0].brand} ${cat[0].model}`
         spec = cat[0].spec
         unitPrice = N(cat[0].sale_price)
+        catalogId = S(b.catalog_id, 36)
       }
     }
 
     const id = randomUUID()
     await prisma.$executeRawUnsafe(
-      `INSERT INTO tire_sales (id, sale_date, customer_name, customer_phone, car_number, delivery_address, item_name, spec, qty, unit_price, amount, status, source, memo)
-       VALUES (?, CURDATE(), ?, ?, ?, ?, ?, ?, ?, ?, ?, 'requested', 'apply', ?)`,
+      `INSERT INTO tire_sales (id, sale_date, customer_name, customer_phone, car_number, delivery_address, item_name, spec, catalog_id, qty, unit_price, amount, status, fulfill_status, source, memo)
+       VALUES (?, CURDATE(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'requested', 'received', 'apply', ?)`,
       id, name, phone, S(b.car_number, 30) || null, S(b.delivery_address, 300) || null,
-      itemName || null, spec || null, qty, unitPrice, unitPrice * qty,
+      itemName || null, spec || null, catalogId, qty, unitPrice, unitPrice * qty,
       S(b.memo, 500) || null)
 
     return NextResponse.json({ ok: true, id })

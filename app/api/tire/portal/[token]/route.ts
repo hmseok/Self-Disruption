@@ -89,6 +89,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
     let itemName = S(b.item_name, 200)
     let spec = S(b.spec, 100)
     let unitPrice = 0
+    let catalogId: string | null = null
     if (b.catalog_id) {
       const cat = await prisma.$queryRawUnsafe<any[]>(
         `SELECT brand, model, spec, sale_price FROM tire_catalog WHERE id = ? AND active = 1`, S(b.catalog_id, 36))
@@ -96,6 +97,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
         itemName = `${cat[0].brand} ${cat[0].model}`
         spec = cat[0].spec
         unitPrice = N(cat[0].sale_price)
+        catalogId = S(b.catalog_id, 36)
       }
     }
     if (!itemName) return NextResponse.json({ error: '타이어를 선택해주세요' }, { status: 400 })
@@ -110,11 +112,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
 
     const id = randomUUID()
     await prisma.$executeRawUnsafe(
-      `INSERT INTO tire_sales (id, sale_date, customer_id, customer_name, customer_phone, car_number, delivery_address, item_name, spec, qty, unit_price, amount, status, fulfill_status, source, memo)
-       VALUES (?, CURDATE(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'requested', 'received', 'portal', ?)`,
+      `INSERT INTO tire_sales (id, sale_date, customer_id, customer_name, customer_phone, car_number, delivery_address, item_name, spec, catalog_id, qty, unit_price, amount, status, fulfill_status, source, memo)
+       VALUES (?, CURDATE(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'requested', 'received', 'portal', ?)`,
       id, customer.id, customer.name, customer.phone || null,
       S(b.car_number, 30) || null, deliveryAddress,
-      itemName, spec || null, qty, unitPrice, unitPrice * qty,
+      itemName, spec || null, catalogId, qty, unitPrice, unitPrice * qty,
       S(b.memo, 500) || null)
     return NextResponse.json({ ok: true, id })
   }
