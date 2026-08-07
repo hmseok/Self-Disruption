@@ -21,6 +21,7 @@ const labelStyle: React.CSSProperties = { fontSize: 12, fontWeight: 700, color: 
 export default function TireApplyPage() {
   const [catalog, setCatalog] = useState<CatalogItem[]>([])
   const [q, setQ] = useState('')
+  const [listOpen, setListOpen] = useState(false)
   const [picked, setPicked] = useState<CatalogItem | null>(null)
   const [customItem, setCustomItem] = useState(false)
   const [form, setForm] = useState({
@@ -138,13 +139,15 @@ export default function TireApplyPage() {
 
             {!customItem ? (
               <>
-                <input style={inputStyle} value={q} onChange={e => { setQ(e.target.value); setPicked(null) }}
-                  placeholder="브랜드·모델·규격 검색 (예: 245/40R20, 피제로)" />
-                {q.trim() && !picked && (
+                <input style={inputStyle} value={q}
+                  onChange={e => { setQ(e.target.value); setPicked(null); setListOpen(true) }}
+                  onFocus={() => setListOpen(true)}
+                  placeholder="클릭하면 목록이 열립니다 — 브랜드·모델·규격 검색" />
+                {listOpen && !picked && (
                   <div style={{ border: '1px solid #e6e8ec', borderRadius: 10, marginTop: 6, maxHeight: 220, overflowY: 'auto' }}>
                     {filtered.length === 0 && <div style={{ padding: 14, fontSize: 12.5, color: '#9aa1ad' }}>검색 결과가 없습니다 — "직접 입력"을 이용해주세요</div>}
-                    {filtered.slice(0, 30).map(c => (
-                      <button key={c.id} type="button" onClick={() => { setPicked(c); setQ(`${c.brand} ${c.model} ${c.spec}`) }}
+                    {filtered.slice(0, 60).map(c => (
+                      <button key={c.id} type="button" onClick={() => { setPicked(c); setQ(`${c.brand} ${c.model} ${c.spec}`); setListOpen(false) }}
                         style={{ display: 'flex', justifyContent: 'space-between', width: '100%', padding: '10px 14px', border: 'none', borderBottom: '1px solid #f0f1f4', background: '#fff', cursor: 'pointer', textAlign: 'left' }}>
                         <span style={{ fontSize: 13, color: '#1a1d23' }}>
                           <b>{c.brand}</b> {c.model} <span style={{ color: '#5b626e' }}>{c.spec}</span>
