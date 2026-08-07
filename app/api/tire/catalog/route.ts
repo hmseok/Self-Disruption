@@ -41,9 +41,10 @@ export async function GET(req: NextRequest) {
     const like = `%${q}%`
     args.push(like, like, like)
   }
+  // 매입 이력 많은(우리가 실제 취급한) 품목 우선 노출
   const rows = await prisma.$queryRawUnsafe<any[]>(
     `SELECT id, brand, model, spec, sale_price FROM tire_catalog
-     WHERE ${conds.join(' AND ')} ORDER BY brand, model, spec LIMIT 200`, ...args)
+     WHERE ${conds.join(' AND ')} ORDER BY times_purchased DESC, brand, model, spec LIMIT 200`, ...args)
   return NextResponse.json({
     rows: rows.map(r => ({ ...r, sale_price: r.sale_price == null ? null : N(r.sale_price) })),
   })

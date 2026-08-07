@@ -6,7 +6,7 @@
 // 가격은 참고가 — "실제 금액은 변동될 수 있습니다" 고지
 // ═══════════════════════════════════════════════════════════════
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 
 const nf = (n: number) => (Number(n) || 0).toLocaleString()
 
@@ -32,15 +32,16 @@ export default function TireApplyPage() {
   const [done, setDone] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // 서버 검색 (카탈로그 6,000품목 — 2026-08-07 블랙서클 수집) — 300ms 디바운스
   useEffect(() => {
-    fetch('/api/tire/catalog').then(r => r.json()).then(d => setCatalog(d.rows || [])).catch(() => {})
-  }, [])
+    const t = setTimeout(() => {
+      fetch(`/api/tire/catalog?q=${encodeURIComponent(q.trim())}`)
+        .then(r => r.json()).then(d => setCatalog(d.rows || [])).catch(() => {})
+    }, q.trim() ? 300 : 0)
+    return () => clearTimeout(t)
+  }, [q])
 
-  const filtered = useMemo(() => {
-    if (!q.trim()) return catalog
-    const t = q.trim().toLowerCase().replace(/\s/g, '')
-    return catalog.filter(c => `${c.brand}${c.model}${c.spec}`.toLowerCase().replace(/\s/g, '').includes(t))
-  }, [catalog, q])
+  const filtered = catalog
 
   const qty = Math.max(1, Number(form.qty) || 1)
   const refTotal = picked?.sale_price ? picked.sale_price * qty : null
