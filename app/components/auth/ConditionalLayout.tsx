@@ -20,6 +20,7 @@ export default function ConditionalLayout({ children }: { children: React.ReactN
     || pathname.startsWith('/settlement/view')                            // 정산 내역 공유
     || pathname.startsWith('/e-contract/')                                // 전자계약 서명
     || pathname.startsWith('/invite/')                                    // 초대 수락
+    || pathname.startsWith('/tire/apply')                                 // 타이어 주문 신청 (더범, 2026-08-07)
 
   if (isGuestRoute) {
     return <>{children}</>

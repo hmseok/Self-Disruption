@@ -66,9 +66,9 @@ export async function POST(req: NextRequest) {
   const amount = b.amount != null && N(b.amount) > 0 ? N(b.amount) : qty * unitPrice
   const id = randomUUID()
   await prisma.$executeRawUnsafe(
-    `INSERT INTO tire_sales (id, sale_date, customer_name, customer_phone, car_number, item_name, spec, qty, unit_price, amount, purchase_cost, source, memo)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    id, b.sale_date, b.customer_name || null, b.customer_phone || null, b.car_number || null,
+    `INSERT INTO tire_sales (id, sale_date, customer_name, customer_phone, car_number, delivery_address, item_name, spec, qty, unit_price, amount, purchase_cost, source, memo)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    id, b.sale_date, b.customer_name || null, b.customer_phone || null, b.car_number || null, b.delivery_address || null,
     b.item_name || null, b.spec || null, qty, unitPrice, amount,
     b.purchase_cost != null && b.purchase_cost !== '' ? N(b.purchase_cost) : null,
     b.source || 'manual', b.memo || null)
@@ -82,7 +82,7 @@ export async function PATCH(req: NextRequest) {
   const b = await req.json()
   if (!b.id) return NextResponse.json({ error: 'id 누락' }, { status: 400 })
 
-  const ALLOWED = ['sale_date', 'customer_name', 'customer_phone', 'car_number', 'item_name', 'spec', 'qty', 'unit_price', 'amount', 'purchase_cost', 'status', 'memo']
+  const ALLOWED = ['sale_date', 'customer_name', 'customer_phone', 'car_number', 'delivery_address', 'item_name', 'spec', 'qty', 'unit_price', 'amount', 'purchase_cost', 'status', 'memo']
   const sets: string[] = []
   const args: unknown[] = []
   for (const k of ALLOWED) {

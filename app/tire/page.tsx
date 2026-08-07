@@ -12,7 +12,7 @@ import { COLORS, GLASS, BTN } from '@/app/utils/ui-tokens'
 import { fetchWithAuth } from '@/app/utils/finance-upload'
 
 const nf = (n: number) => (Number(n) || 0).toLocaleString()
-type TabKey = 'sales' | 'invoices' | 'deposits'
+type TabKey = 'sales' | 'invoices' | 'deposits' | 'catalog'
 
 interface SaleRow {
   id: string; sale_date: string; customer_name: string | null; customer_phone: string | null
@@ -28,6 +28,7 @@ interface InvoiceRow {
 }
 
 const STATUS_LABEL: Record<string, { label: string; bg: string; color: string }> = {
+  requested: { label: '신청', bg: 'rgba(191,219,254,0.6)', color: '#2563eb' },
   unbilled: { label: '미청구', bg: 'rgba(254,202,202,0.5)', color: '#dc2626' },
   billed:   { label: '청구됨', bg: 'rgba(253,230,138,0.5)', color: '#b45309' },
   paid:     { label: '입금완료', bg: 'rgba(167,243,208,0.5)', color: '#059669' },
@@ -59,7 +60,7 @@ export default function TirePage() {
   const [q, setQ] = useState('')
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [showAdd, setShowAdd] = useState(false)
-  const emptyForm = { sale_date: new Date().toISOString().slice(0, 10), customer_name: '', customer_phone: '', car_number: '', item_name: '', spec: '', qty: '1', unit_price: '', amount: '', purchase_cost: '', memo: '' }
+  const emptyForm = { sale_date: new Date().toISOString().slice(0, 10), customer_name: '', customer_phone: '', car_number: '', delivery_address: '', item_name: '', spec: '', qty: '1', unit_price: '', amount: '', purchase_cost: '', memo: '' }
   const [form, setForm] = useState(emptyForm)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -70,6 +71,10 @@ export default function TirePage() {
   // ── 입금확인 ──
   const [deposits, setDeposits] = useState<any[]>([])
   const [waiting, setWaiting] = useState<any[]>([])
+
+  // ── 카탈로그 ──
+  const [catalog, setCatalog] = useState<any[]>([])
+  const [catQ, setCatQ] = useState('')
 
   const loadSales = useCallback(async () => {
     setLoading(true)
@@ -92,11 +97,17 @@ export default function TirePage() {
     if (ok) { setDeposits(json.rows || []); setWaiting(json.waiting || []) }
   }, [])
 
+  const loadCatalog = useCallback(async () => {
+    const { ok, json } = await fetchWithAuth('/api/tire/catalog?admin=1')
+    if (ok) setCatalog(json.rows || [])
+  }, [])
+
   useEffect(() => { loadSales() }, [loadSales])
   useEffect(() => {
     if (tab === 'invoices') loadInvoices()
     if (tab === 'deposits') { loadDeposits(); loadInvoices() }
-  }, [tab, loadInvoices, loadDeposits])
+    if (tab === 'catalog') loadCatalog()
+  }, [tab, loadInvoices, loadDeposits, loadCatalog])
 
   const saveSale = async () => {
     if (!form.sale_date) { alert('판매일을 입력하세요'); return }
@@ -175,6 +186,12 @@ export default function TirePage() {
         {tabBtn('sales', '판매내역', salesSummary?.cnt)}
         {tabBtn('invoices', '청구서', invoices.length || undefined)}
         {tabBtn('deposits', '입금확인')}
+        {tabBtn('catalog', '품목·단가', catalog.length || undefined)}
+        <span style={{ flex: 1 }} />
+        <button onClick={() => { navigator.clipboard?.writeText(`${location.origin}/tire/apply`); alert('신청 페이지 주소가 복사되었습니다.\n고객에게 전달하세요: ' + location.origin + '/tire/apply') }}
+          style={{ padding: '8px 16px', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: 'pointer', border: `1px solid ${COLORS.borderBlue}`, background: '#fff', color: COLORS.primary }}>
+          🔗 신청 페이지 링크 복사
+        </button>
       </div>
 
       {/* ═══ 판매내역 탭 ═══ */}
@@ -189,7 +206,7 @@ export default function TirePage() {
           ]} />
 
           <div style={{ display: 'flex', gap: 8, margin: '10px 0 12px', flexWrap: 'wrap', alignItems: 'center' }}>
-            {['', 'unbilled', 'billed', 'paid'].map(s => (
+            {['', 'requested', 'unbilled', 'billed', 'paid'].map(s => (
               <button key={s || 'all'} onClick={() => setStatusFilter(s)} style={{
                 padding: '6px 14px', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: 'pointer',
                 border: `1px solid ${statusFilter === s ? 'rgba(59,110,181,0.4)' : 'rgba(0,0,0,0.06)'}`,
@@ -215,7 +232,7 @@ export default function TirePage() {
             <div style={{ ...GLASS.L4, borderRadius: 14, padding: 16, marginBottom: 14, display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'flex-end' }}>
               {([
                 ['sale_date', '판매일', 'date', 130], ['customer_name', '고객명', 'text', 110],
-                ['customer_phone', '연락처', 'text', 120], ['car_number', '차량번호', 'text', 100],
+                ['customer_phone', '연락처', 'text', 120], ['car_number', '차량번호', 'text', 100], ['delivery_address', '배송지', 'text', 180],
                 ['item_name', '상품명', 'text', 170], ['spec', '규격', 'text', 110],
                 ['qty', '수량', 'number', 60], ['unit_price', '단가', 'number', 100],
                 ['amount', '금액(자동)', 'number', 100], ['purchase_cost', '매입원가', 'number', 100],
@@ -276,7 +293,7 @@ export default function TirePage() {
                       )}
                     </td>
                     <td style={{ ...td, whiteSpace: 'nowrap' }}>{String(s.sale_date).slice(0, 10)}</td>
-                    <td style={td}>{s.customer_name || '—'}{s.customer_phone && <span style={{ color: '#94a3b8', fontSize: 11, marginLeft: 5 }}>{s.customer_phone}</span>}</td>
+                    <td style={td}>{s.customer_name || '—'}{s.customer_phone && <span style={{ color: '#94a3b8', fontSize: 11, marginLeft: 5 }}>{s.customer_phone}</span>}{(s as any).delivery_address && <div style={{ color: '#94a3b8', fontSize: 10.5 }}>🚚 {(s as any).delivery_address}</div>}</td>
                     <td style={{ ...td, fontWeight: 600 }}>{s.car_number || '—'}</td>
                     <td style={td}>{s.item_name || '—'}</td>
                     <td style={td}>{s.spec || '—'}</td>
@@ -290,14 +307,21 @@ export default function TirePage() {
                         setForm({
                           sale_date: String(s.sale_date).slice(0, 10),
                           customer_name: s.customer_name || '', customer_phone: s.customer_phone || '',
-                          car_number: s.car_number || '', item_name: s.item_name || '', spec: s.spec || '',
+                          car_number: s.car_number || '', delivery_address: (s as any).delivery_address || '', item_name: s.item_name || '', spec: s.spec || '',
                           qty: String(s.qty), unit_price: String(s.unit_price), amount: String(s.amount),
                           purchase_cost: s.purchase_cost == null ? '' : String(s.purchase_cost), memo: s.memo || '',
                         })
                         setShowAdd(true)
                         window.scrollTo({ top: 0, behavior: 'smooth' })
                       }} style={{ ...BTN.sm, padding: '3px 8px', fontSize: 11, background: '#fff', color: COLORS.primary, border: `1px solid ${COLORS.borderBlue}`, cursor: 'pointer' }}>수정</button>
-                      {s.status === 'unbilled' && (
+                      {s.status === 'requested' && (
+                        <button onClick={async () => {
+                          if (!confirm(`${s.customer_name || ''} 신청 건을 금액 ${nf(s.amount)}원으로 확정할까요?\n(금액 조정은 「수정」에서 먼저 하세요)`)) return
+                          await fetchWithAuth('/api/tire/sales', { method: 'PATCH', body: { id: s.id, status: 'unbilled' } })
+                          loadSales()
+                        }} style={{ ...BTN.sm, padding: '3px 8px', fontSize: 11, background: COLORS.primary, color: '#fff', border: 'none', cursor: 'pointer', marginLeft: 4 }}>확정</button>
+                      )}
+                      {(s.status === 'unbilled' || s.status === 'requested') && (
                         <button onClick={() => deleteSale(s.id)} style={{ ...BTN.sm, padding: '3px 8px', fontSize: 11, background: '#fff', color: COLORS.danger, border: `1px solid ${COLORS.borderRed}`, cursor: 'pointer', marginLeft: 4 }}>삭제</button>
                       )}
                     </td>
@@ -409,6 +433,68 @@ export default function TirePage() {
                     </td>
                   </tr>
                 ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+
+      {/* ═══ 품목·단가(카탈로그) 탭 ═══ */}
+      {tab === 'catalog' && (
+        <>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 12, alignItems: 'center' }}>
+            <input value={catQ} onChange={e => setCatQ(e.target.value)} placeholder="브랜드·모델·규격 검색" style={{ ...inputStyle, width: 240 }} />
+            <span style={{ fontSize: 11, color: '#94a3b8' }}>
+              매입단가는 거래명세서에서 자동 축적 · <b>판매단가</b>를 입력하면 신청 페이지에 참고가로 노출됩니다 (매입가는 비공개)
+            </span>
+          </div>
+          <div style={{ ...GLASS.L4, borderRadius: 16, overflow: 'auto', boxShadow: '0 1px 2px rgba(16,24,40,0.05)' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+              <thead>
+                <tr style={{ background: 'rgba(241,245,249,0.6)', color: '#475569', textAlign: 'left' }}>
+                  <th style={th}>브랜드</th><th style={th}>모델</th><th style={th}>규격</th>
+                  <th style={{ ...th, textAlign: 'right' }}>최근 매입가</th>
+                  <th style={{ ...th, textAlign: 'right' }}>판매단가</th>
+                  <th style={{ ...th, textAlign: 'right' }}>마진</th>
+                  <th style={{ ...th, textAlign: 'right' }}>누적 매입</th>
+                  <th style={th}>최근 매입일</th>
+                  <th style={th}>신청 노출</th>
+                </tr>
+              </thead>
+              <tbody>
+                {catalog
+                  .filter(c => !catQ.trim() || `${c.brand}${c.model}${c.spec}`.toLowerCase().replace(/\s/g, '').includes(catQ.trim().toLowerCase().replace(/\s/g, '')))
+                  .map(c => (
+                    <tr key={c.id} style={{ borderTop: '1px solid rgba(0,0,0,0.05)', opacity: c.active ? 1 : 0.45 }}>
+                      <td style={{ ...td, fontWeight: 700 }}>{c.brand}</td>
+                      <td style={td}>{c.model}</td>
+                      <td style={{ ...td, fontVariantNumeric: 'tabular-nums' }}>{c.spec}</td>
+                      <td style={num}>{c.purchase_price != null ? nf(c.purchase_price) : '—'}</td>
+                      <td style={{ ...num, whiteSpace: 'nowrap' }}>
+                        <input type="number" defaultValue={c.sale_price ?? ''} placeholder="미설정"
+                          onBlur={async e => {
+                            const v = e.target.value
+                            if (String(c.sale_price ?? '') === v) return
+                            await fetchWithAuth('/api/tire/catalog', { method: 'PATCH', body: { id: c.id, sale_price: v } })
+                            loadCatalog()
+                          }}
+                          style={{ ...inputStyle, width: 90, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }} />
+                      </td>
+                      <td style={{ ...num, fontWeight: 700, color: c.sale_price && c.purchase_price ? (c.sale_price - c.purchase_price >= 0 ? COLORS.income : COLORS.expense) : '#cbd5e1' }}>
+                        {c.sale_price && c.purchase_price ? nf(c.sale_price - c.purchase_price) : '—'}
+                      </td>
+                      <td style={num}>{nf(c.times_purchased)}</td>
+                      <td style={{ ...td, whiteSpace: 'nowrap', color: '#64748b', fontSize: 11 }}>{c.last_purchased_at ? String(c.last_purchased_at).slice(0, 10) : '—'}</td>
+                      <td style={td}>
+                        <button onClick={async () => {
+                          await fetchWithAuth('/api/tire/catalog', { method: 'PATCH', body: { id: c.id, active: c.active ? 0 : 1 } })
+                          loadCatalog()
+                        }} style={{ ...BTN.sm, padding: '3px 10px', fontSize: 11, cursor: 'pointer', background: c.active ? 'rgba(167,243,208,0.5)' : '#f1f5f9', color: c.active ? '#059669' : '#94a3b8', border: 'none', fontWeight: 700 }}>
+                          {c.active ? '노출' : '숨김'}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
               </tbody>
             </table>
           </div>
