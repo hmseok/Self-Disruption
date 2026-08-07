@@ -295,6 +295,7 @@ export interface BcOrder {
   date: string; odId: string; ctId: string | null
   status: string | null; spec: string | null; qty: number; total: number | null
   itemName: string | null
+  text: string            // 상품 설명 원문 (카탈로그 매칭용)
 }
 
 /** 블랙서클 상태 → ERP 이행상태 */
@@ -311,9 +312,11 @@ export function parseOrdersHtml(html: string): BcOrder[] {
     const head = p.match(/^(\d{4}-\d{2}-\d{2}) \/ (\d{14,})/)
     if (!head) continue
     const n = (s?: string | null) => (s ? Number(s.replace(/[^0-9]/g, '')) : 0)
+    const plain = p.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim()
     out.push({
       date: head[1],
       odId: head[2],
+      text: plain.slice(head[0].length).replace(/^[\s|]*/, '').slice(0, 160),
       ctId: (p.match(/order_change_status\.php\?ct_id=(\d+)/) || [])[1] || null,
       status: (p.match(/>\s*(입금대기|결제완료|상품준비중|배송중|배송완료|구매확정|취소완료|반품요청|반품완료)\s*</) || [])[1] || null,
       spec: (p.match(/(\d{3}\/\d{2}R\d{2})/) || [])[1] || null,

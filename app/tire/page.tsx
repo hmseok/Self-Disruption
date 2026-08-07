@@ -12,7 +12,7 @@ import { COLORS, GLASS, BTN } from '@/app/utils/ui-tokens'
 import { fetchWithAuth } from '@/app/utils/finance-upload'
 
 const nf = (n: number) => (Number(n) || 0).toLocaleString()
-type TabKey = 'sales' | 'invoices' | 'deposits' | 'catalog' | 'customers'
+type TabKey = 'sales' | 'invoices' | 'deposits' | 'catalog' | 'customers' | 'bcorders'
 
 const FULFILL_OPTIONS = [
   ['', '—'], ['received', '접수'], ['confirmed', '확정'],
@@ -98,6 +98,10 @@ export default function TirePage() {
   const [orderDone, setOrderDone] = useState<any>(null)
 
   const [ordersSyncing, setOrdersSyncing] = useState(false)
+  const [bcOrders, setBcOrders] = useState<any[]>([])
+  const [bcCounts, setBcCounts] = useState<any>(null)
+  const [bcFilter, setBcFilter] = useState<'unlinked' | 'linked' | 'canceled' | ''>('unlinked')
+  const [importing, setImporting] = useState('')
 
   // ── 블랙서클 연동 ──
   const [bc, setBc] = useState<any>(null)
@@ -147,6 +151,7 @@ export default function TirePage() {
     if (tab === 'deposits') { loadDeposits(); loadInvoices() }
     if (tab === 'catalog') { loadCatalog(); loadBc() }
     if (tab === 'customers') loadCustomers()
+    if (tab === 'bcorders' && bcOrders.length === 0) syncOrders()
   }, [tab, loadInvoices, loadDeposits, loadCatalog, loadCustomers, loadBc])
 
   const saveSale = async () => {
@@ -231,9 +236,10 @@ export default function TirePage() {
   const syncOrders = async () => {
     setOrdersSyncing(true)
     try {
-      const { ok, json } = await fetchWithAuth('/api/tire/orders?days=60')
+      const { ok, json } = await fetchWithAuth('/api/tire/orders?days=90')
       if (!ok) { alert(json.error || '주문 상태 조회 실패'); return }
-      alert(`블랙서클 주문 ${json.orders.length}건 확인 — 신규 매칭 ${json.matched}건, 상태 갱신 ${json.statusUpdated}건`)
+      setBcOrders(json.orders || []); setBcCounts(json.counts || null)
+      if (tab !== 'bcorders') alert(`블랙서클 주문 ${json.orders.length}건 확인 — 신규 매칭 ${json.matched}건, 상태 갱신 ${json.statusUpdated}건`)
       loadSales()
     } finally { setOrdersSyncing(false) }
   }
@@ -367,6 +373,7 @@ export default function TirePage() {
         {tabBtn('deposits', '입금확인')}
         {tabBtn('catalog', '품목·단가', catalog.length || undefined)}
         {tabBtn('customers', '거래처', customers.length || undefined)}
+        {tabBtn('bcorders', '주문내역', bcCounts?.total)}
         <span style={{ flex: 1 }} />
         <button onClick={() => { navigator.clipboard?.writeText(`${location.origin}/tire/apply`); alert('신청 페이지 주소가 복사되었습니다.\n고객에게 전달하세요: ' + location.origin + '/tire/apply') }}
           style={{ padding: '8px 16px', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: 'pointer', border: `1px solid ${COLORS.borderBlue}`, background: '#fff', color: COLORS.primary }}>
@@ -800,6 +807,111 @@ export default function TirePage() {
                     )
                   })
                 })()}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+
+
+      {/* ═══ 주문내역(블랙서클) 탭 ═══ */}
+      {tab === 'bcorders' && (
+        <>
+          <DcStatStrip stats={[
+            { label: '전체 주문', value: nf(bcCounts?.total || 0), tint: 'blue' as const, icon: '📦' },
+            { label: '판매건 연결됨', value: nf(bcCounts?.linked || 0), tint: 'green' as const, icon: '🔗' },
+            { label: '미등록 (청구 누락 위험)', value: nf(bcCounts?.unlinked || 0), tint: 'red' as const, icon: '⚠️' },
+            { label: '취소', value: nf(bcCounts?.canceled || 0), tint: 'gray' as const, icon: '🚫' },
+          ]} />
+
+          <div style={{ display: 'flex', gap: 8, margin: '10px 0 12px', alignItems: 'center', flexWrap: 'wrap' }}>
+            {([['unlinked', '미등록'], ['linked', '연결됨'], ['canceled', '취소'], ['', '전체']] as const).map(([k, label]) => (
+              <button key={k || 'all'} onClick={() => setBcFilter(k as any)} style={{
+                padding: '6px 14px', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                border: `1px solid ${bcFilter === k ? 'rgba(59,110,181,0.4)' : 'rgba(0,0,0,0.06)'}`,
+                background: bcFilter === k ? 'rgba(191,219,254,0.6)' : '#ffffff', color: '#1e293b',
+              }}>{label}</button>
+            ))}
+            <button onClick={syncOrders} disabled={ordersSyncing}
+              style={{ ...BTN.sm, background: '#fff', color: '#b45309', border: '1px solid #f3e3c8', padding: '7px 14px', fontWeight: 700, cursor: ordersSyncing ? 'wait' : 'pointer' }}>
+              {ordersSyncing ? '조회 중...' : '🔄 새로고침'}
+            </button>
+            <span style={{ fontSize: 11, color: '#94a3b8' }}>
+              블랙서클에서 직접 주문한 건은 「판매건 등록」을 눌러야 청구·손익에 반영됩니다
+            </span>
+          </div>
+
+          <div style={{ ...GLASS.L4, borderRadius: 16, overflow: 'auto', boxShadow: '0 1px 2px rgba(16,24,40,0.05)' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+              <thead>
+                <tr style={{ background: 'rgba(241,245,249,0.6)', color: '#475569', textAlign: 'left' }}>
+                  <th style={th}>주문일</th><th style={th}>주문번호</th><th style={th}>상품</th>
+                  <th style={th}>규격</th>
+                  <th style={{ ...th, textAlign: 'right' }}>수량</th>
+                  <th style={{ ...th, textAlign: 'right' }}>매입액</th>
+                  <th style={th}>상태</th><th style={th}>판매건</th><th style={th}></th>
+                </tr>
+              </thead>
+              <tbody>
+                {bcOrders.length === 0 && (
+                  <tr><td colSpan={9} style={{ padding: 36, textAlign: 'center', color: '#94a3b8' }}>
+                    {ordersSyncing ? '블랙서클에서 주문내역을 불러오는 중...' : '주문내역이 없습니다.'}
+                  </td></tr>
+                )}
+                {bcOrders
+                  .filter(o => bcFilter === '' ? true
+                    : bcFilter === 'canceled' ? o.canceled
+                    : bcFilter === 'linked' ? Boolean(o.sale)
+                    : !o.sale && !o.canceled)
+                  .map(o => (
+                    <tr key={o.odId} style={{ borderTop: '1px solid rgba(0,0,0,0.05)', opacity: o.canceled ? 0.5 : 1 }}>
+                      <td style={{ ...td, whiteSpace: 'nowrap' }}>{o.date}</td>
+                      <td style={{ ...td, color: '#64748b', fontSize: 11 }}>{o.odId}</td>
+                      <td style={{ ...td, maxWidth: 320 }}>
+                        <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={o.text}>
+                          {o.sale?.item_name || o.text || '—'}
+                        </div>
+                      </td>
+                      <td style={{ ...td, fontVariantNumeric: 'tabular-nums' }}>{o.spec || '—'}</td>
+                      <td style={num}>{nf(o.qty)}</td>
+                      <td style={{ ...num, fontWeight: 700 }}>{o.total ? nf(o.total) : '—'}</td>
+                      <td style={td}>
+                        <span style={{ padding: '2px 9px', borderRadius: 6, fontSize: 11, fontWeight: 700,
+                          background: o.canceled ? 'rgba(226,232,240,0.7)' : o.status === '배송완료' || o.status === '구매확정' ? 'rgba(167,243,208,0.6)' : 'rgba(253,230,138,0.6)',
+                          color: o.canceled ? '#94a3b8' : o.status === '배송완료' || o.status === '구매확정' ? '#059669' : '#b45309' }}>
+                          {o.status || '—'}
+                        </span>
+                      </td>
+                      <td style={td}>
+                        {o.sale ? (
+                          <span style={{ fontSize: 11.5 }}>
+                            <b>{o.sale.customer_name || '고객 미입력'}</b>
+                            {o.sale.car_number && <span style={{ color: '#94a3b8', marginLeft: 5 }}>{o.sale.car_number}</span>}
+                            {o.sale.amount > 0 && <span style={{ color: '#2563eb', marginLeft: 6, fontWeight: 700 }}>{nf(o.sale.amount)}원</span>}
+                          </span>
+                        ) : o.canceled ? <span style={{ color: '#cbd5e1' }}>—</span>
+                          : <span style={{ color: '#dc2626', fontWeight: 700, fontSize: 11.5 }}>미등록</span>}
+                      </td>
+                      <td style={{ ...td, whiteSpace: 'nowrap' }}>
+                        {!o.sale && !o.canceled && (
+                          <button disabled={importing === o.odId} onClick={async () => {
+                            setImporting(o.odId)
+                            try {
+                              const { ok, json } = await fetchWithAuth('/api/tire/orders', {
+                                method: 'POST',
+                                body: { action: 'import', od_id: o.odId, date: o.date, spec: o.spec, qty: o.qty, total: o.total, status: o.status, text: o.text },
+                              })
+                              if (!ok) { alert(json.error || '등록 실패'); return }
+                              alert(`판매건으로 등록했습니다 — ${json.item_name}\n판매내역 탭에서 고객·차량번호·판매금액을 입력해주세요.`)
+                              syncOrders()
+                            } finally { setImporting('') }
+                          }} style={{ ...BTN.sm, padding: '3px 10px', fontSize: 11, background: COLORS.primary, color: '#fff', border: 'none', cursor: importing === o.odId ? 'wait' : 'pointer', fontWeight: 700 }}>
+                            {importing === o.odId ? '등록 중...' : '판매건 등록'}
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
               </tbody>
             </table>
           </div>

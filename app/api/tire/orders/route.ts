@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verifyUser } from '@/lib/auth-server'
 import { bcSession, bcFetchOrders, bcCancelOrder, BC_STATUS_TO_FULFILL } from '@/lib/blackcircle'
+import { randomUUID } from 'crypto'
 
 export const maxDuration = 120
 
@@ -60,7 +61,35 @@ export async function GET(req: NextRequest) {
       statusUpdated += 1
     }
 
-    return NextResponse.json({ ok: true, orders, matched, statusUpdated })
+    // 주문 ↔ 판매건 연결 현황 (미등록 주문 구분용)
+    const linked = await prisma.$queryRawUnsafe<any[]>(
+      `SELECT id, bc_od_id, customer_name, car_number, item_name, spec, amount, status
+       FROM tire_sales WHERE bc_od_id IS NOT NULL`)
+    const byOd = new Map(linked.map(l => [l.bc_od_id, l]))
+
+    const enriched = orders.map(o => {
+      const s = byOd.get(o.odId)
+      return {
+        ...o,
+        canceled: o.status === '취소완료',
+        sale: s ? {
+          id: s.id, customer_name: s.customer_name, car_number: s.car_number,
+          item_name: s.item_name, amount: N(s.amount), status: s.status,
+        } : null,
+      }
+    })
+
+    return NextResponse.json({
+      ok: true,
+      orders: enriched,
+      matched, statusUpdated,
+      counts: {
+        total: enriched.length,
+        linked: enriched.filter(o => o.sale).length,
+        unlinked: enriched.filter(o => !o.sale && !o.canceled).length,
+        canceled: enriched.filter(o => o.canceled).length,
+      },
+    })
   } catch (e: any) {
     console.error('[tire/orders] 실패:', e)
     return NextResponse.json({ error: e.message || '주문내역 조회 실패' }, { status: 500 })
@@ -72,6 +101,44 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const b = await req.json()
+
+  // ── 블랙서클 직접 주문 → 판매건으로 등록 ──
+  if (b.action === 'import') {
+    const odId = String(b.od_id || '')
+    if (!odId) return NextResponse.json({ error: '주문번호 누락' }, { status: 400 })
+    const dup = await prisma.$queryRawUnsafe<any[]>(`SELECT id FROM tire_sales WHERE bc_od_id = ?`, odId)
+    if (dup[0]) return NextResponse.json({ error: '이미 등록된 주문입니다' }, { status: 400 })
+
+    const spec = String(b.spec || '').trim()
+    const qty = Math.max(1, N(b.qty) || 1)
+    const cost = N(b.total) || null
+    const text = String(b.text || '')
+
+    // 카탈로그에서 품목 찾기 (규격 일치 + 설명에 모델명 포함)
+    let itemName: string | null = null
+    let catalogId: string | null = null
+    if (spec) {
+      const cands = await prisma.$queryRawUnsafe<any[]>(
+        `SELECT id, brand, model FROM tire_catalog WHERE spec = ? ORDER BY times_purchased DESC LIMIT 60`, spec)
+      const hit = cands.find(c => text.replace(/\s/g, '').includes(String(c.model).replace(/\s/g, '')))
+      if (hit) { itemName = `${hit.brand} ${hit.model}`; catalogId = hit.id }
+    }
+    if (!itemName) itemName = text.slice(0, 80) || '(품목 미상)'
+
+    const fulfill = b.status === '취소완료' ? null : (BC_STATUS_TO_FULFILL[String(b.status || '')] || 'ordered')
+    const id = randomUUID()
+    await prisma.$executeRawUnsafe(
+      `INSERT INTO tire_sales (id, sale_date, item_name, spec, catalog_id, qty, unit_price, amount, purchase_cost,
+         status, fulfill_status, source, ordered_at, order_note, bc_od_id, bc_status, memo)
+       VALUES (?, ?, ?, ?, ?, ?, 0, 0, ?, 'unbilled', ?, 'bc_order', ?, ?, ?, ?, ?)`,
+      id, b.date || new Date(), itemName, spec || null, catalogId, qty, cost,
+      fulfill, b.date ? new Date(String(b.date) + 'T00:00:00') : new Date(),
+      `블랙서클 직접 주문 ${odId}`, odId, b.status || null,
+      String(b.memo || '').slice(0, 500) || null)
+
+    return NextResponse.json({ ok: true, id, item_name: itemName, matchedCatalog: Boolean(catalogId) })
+  }
+
   if (b.action !== 'cancel') return NextResponse.json({ error: '지원하지 않는 action' }, { status: 400 })
 
   const rows = await prisma.$queryRawUnsafe<any[]>(`SELECT * FROM tire_sales WHERE id = ?`, String(b.sale_id || ''))
