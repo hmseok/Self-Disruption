@@ -36,17 +36,42 @@ export async function GET(req: NextRequest) {
   // 공개 조회 — 매입가 제외
   const conds = ['active = 1']
   const args: unknown[] = []
+  const brand = (sp.get('brand') || '').trim()
+  const spec = (sp.get('spec') || '').trim()
+  if (brand) { conds.push('brand = ?'); args.push(brand) }
+  if (spec) { conds.push('spec = ?'); args.push(spec) }
   if (q) {
-    conds.push('(brand LIKE ? OR model LIKE ? OR spec LIKE ?)')
-    const like = `%${q}%`
-    args.push(like, like, like)
+    // 숫자만 입력해도 규격 검색되게 (2454519 → 245/45R19)
+    const dm = q.replace(/[^0-9]/g, '')
+    if (dm.length === 7) {
+      conds.push('(spec = ? OR brand LIKE ? OR model LIKE ?)')
+      args.push(`${dm.slice(0, 3)}/${dm.slice(3, 5)}R${dm.slice(5, 7)}`, `%${q}%`, `%${q}%`)
+    } else {
+      conds.push('(brand LIKE ? OR model LIKE ? OR spec LIKE ?)')
+      const like = `%${q}%`
+      args.push(like, like, like)
+    }
   }
   // 매입 이력 많은(우리가 실제 취급한) 품목 우선 노출
   const rows = await prisma.$queryRawUnsafe<any[]>(
-    `SELECT id, brand, model, spec, sale_price FROM tire_catalog
+    `SELECT id, brand, model, spec, sale_price, purchase_price, stock_note, delivery_note FROM tire_catalog
      WHERE ${conds.join(' AND ')} ORDER BY times_purchased DESC, brand, model, spec LIMIT 200`, ...args)
+
+  // 판매가 자동 마진율 모드 — 수동 sale_price 우선, 없으면 매입가×(1+마진%) 천원 올림
+  const marginRow = await prisma.$queryRawUnsafe<any[]>(
+    `SELECT setting_value FROM tire_settings WHERE setting_key = 'sale_margin_percent'`)
+  const margin = Number(marginRow[0]?.setting_value)
+  const auto = (p: unknown) => {
+    const cost = N(p)
+    if (!cost || !Number.isFinite(margin) || margin <= 0) return null
+    return Math.ceil(cost * (1 + margin / 100) / 1000) * 1000
+  }
   return NextResponse.json({
-    rows: rows.map(r => ({ ...r, sale_price: r.sale_price == null ? null : N(r.sale_price) })),
+    rows: rows.map(r => {
+      const manual = r.sale_price == null ? null : N(r.sale_price)
+      const { purchase_price, ...pub } = r
+      return { ...pub, sale_price: manual ?? auto(purchase_price) }
+    }),
   })
 }
 

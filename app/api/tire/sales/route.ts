@@ -82,7 +82,7 @@ export async function PATCH(req: NextRequest) {
   const b = await req.json()
   if (!b.id) return NextResponse.json({ error: 'id 누락' }, { status: 400 })
 
-  const ALLOWED = ['sale_date', 'customer_name', 'customer_phone', 'car_number', 'delivery_address', 'item_name', 'spec', 'qty', 'unit_price', 'amount', 'purchase_cost', 'status', 'memo']
+  const ALLOWED = ['sale_date', 'customer_name', 'customer_phone', 'car_number', 'delivery_address', 'item_name', 'spec', 'qty', 'unit_price', 'amount', 'purchase_cost', 'status', 'fulfill_status', 'memo']
   const sets: string[] = []
   const args: unknown[] = []
   for (const k of ALLOWED) {

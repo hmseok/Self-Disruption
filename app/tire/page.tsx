@@ -12,7 +12,12 @@ import { COLORS, GLASS, BTN } from '@/app/utils/ui-tokens'
 import { fetchWithAuth } from '@/app/utils/finance-upload'
 
 const nf = (n: number) => (Number(n) || 0).toLocaleString()
-type TabKey = 'sales' | 'invoices' | 'deposits' | 'catalog'
+type TabKey = 'sales' | 'invoices' | 'deposits' | 'catalog' | 'customers'
+
+const FULFILL_OPTIONS = [
+  ['', '—'], ['received', '접수'], ['confirmed', '확정'],
+  ['ordered', '주문완료'], ['shipping', '배송중'], ['done', '완료'],
+] as const
 
 interface SaleRow {
   id: string; sale_date: string; customer_name: string | null; customer_phone: string | null
@@ -76,6 +81,17 @@ export default function TirePage() {
   const [catalog, setCatalog] = useState<any[]>([])
   const [catQ, setCatQ] = useState('')
 
+  // ── 거래처 ──
+  const [customers, setCustomers] = useState<any[]>([])
+  const [custForm, setCustForm] = useState({ name: '', phone: '', memo: '' })
+  const [showCustForm, setShowCustForm] = useState(false)
+
+  // ── 블랙서클 연동 ──
+  const [bc, setBc] = useState<any>(null)
+  const [bcForm, setBcForm] = useState({ id: '', password: '' })
+  const [bcMargin, setBcMargin] = useState('')
+  const [bcSyncing, setBcSyncing] = useState(false)
+
   const loadSales = useCallback(async () => {
     setLoading(true)
     try {
@@ -102,12 +118,23 @@ export default function TirePage() {
     if (ok) setCatalog(json.rows || [])
   }, [])
 
+  const loadCustomers = useCallback(async () => {
+    const { ok, json } = await fetchWithAuth('/api/tire/customers')
+    if (ok) setCustomers(json.rows || [])
+  }, [])
+
+  const loadBc = useCallback(async () => {
+    const { ok, json } = await fetchWithAuth('/api/tire/blackcircle')
+    if (ok) { setBc(json); setBcForm(f => ({ ...f, id: json.id || '' })); setBcMargin(json.marginPercent || '') }
+  }, [])
+
   useEffect(() => { loadSales() }, [loadSales])
   useEffect(() => {
     if (tab === 'invoices') loadInvoices()
     if (tab === 'deposits') { loadDeposits(); loadInvoices() }
-    if (tab === 'catalog') loadCatalog()
-  }, [tab, loadInvoices, loadDeposits, loadCatalog])
+    if (tab === 'catalog') { loadCatalog(); loadBc() }
+    if (tab === 'customers') loadCustomers()
+  }, [tab, loadInvoices, loadDeposits, loadCatalog, loadCustomers, loadBc])
 
   const saveSale = async () => {
     if (!form.sale_date) { alert('판매일을 입력하세요'); return }
@@ -187,6 +214,7 @@ export default function TirePage() {
         {tabBtn('invoices', '청구서', invoices.length || undefined)}
         {tabBtn('deposits', '입금확인')}
         {tabBtn('catalog', '품목·단가', catalog.length || undefined)}
+        {tabBtn('customers', '거래처', customers.length || undefined)}
         <span style={{ flex: 1 }} />
         <button onClick={() => { navigator.clipboard?.writeText(`${location.origin}/tire/apply`); alert('신청 페이지 주소가 복사되었습니다.\n고객에게 전달하세요: ' + location.origin + '/tire/apply') }}
           style={{ padding: '8px 16px', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: 'pointer', border: `1px solid ${COLORS.borderBlue}`, background: '#fff', color: COLORS.primary }}>
@@ -300,7 +328,17 @@ export default function TirePage() {
                     <td style={num}>{nf(s.qty)}</td>
                     <td style={num}>{nf(s.unit_price)}</td>
                     <td style={{ ...num, fontWeight: 700 }}>{nf(s.amount)}</td>
-                    <td style={td}><StatusBadge s={s.status} /></td>
+                    <td style={{ ...td, whiteSpace: 'nowrap' }}>
+                      <StatusBadge s={s.status} />
+                      <select value={(s as any).fulfill_status || ''} title="이행 상태 (고객 화면에 표시)"
+                        onChange={async e => {
+                          await fetchWithAuth('/api/tire/sales', { method: 'PATCH', body: { id: s.id, fulfill_status: e.target.value || null } })
+                          loadSales()
+                        }}
+                        style={{ ...inputStyle, padding: '3px 6px', fontSize: 11, marginLeft: 5, width: 86 }}>
+                        {FULFILL_OPTIONS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                      </select>
+                    </td>
                     <td style={{ ...td, whiteSpace: 'nowrap' }}>
                       <button onClick={() => {
                         setEditingId(s.id)
@@ -442,6 +480,47 @@ export default function TirePage() {
       {/* ═══ 품목·단가(카탈로그) 탭 ═══ */}
       {tab === 'catalog' && (
         <>
+          {/* 블랙서클 연동 설정 */}
+          <div style={{ ...GLASS.L4, borderRadius: 14, padding: 16, marginBottom: 14, display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+            <div style={{ fontSize: 13, fontWeight: 800, color: '#334155', alignSelf: 'center', marginRight: 4 }}>⚙️ 블랙서클 연동</div>
+            <div><div style={{ fontSize: 10.5, fontWeight: 700, color: '#5b626e', marginBottom: 4 }}>아이디</div>
+              <input style={{ ...inputStyle, width: 140 }} value={bcForm.id} onChange={e => setBcForm(f => ({ ...f, id: e.target.value }))} /></div>
+            <div><div style={{ fontSize: 10.5, fontWeight: 700, color: '#5b626e', marginBottom: 4 }}>비밀번호 {bc?.configured && <span style={{ color: '#059669' }}>(저장됨)</span>}</div>
+              <input type="password" style={{ ...inputStyle, width: 140 }} value={bcForm.password} placeholder={bc?.configured ? '변경 시에만 입력' : ''} onChange={e => setBcForm(f => ({ ...f, password: e.target.value }))} /></div>
+            <button onClick={async () => {
+              if (!bcForm.id || !bcForm.password) { alert('아이디와 비밀번호를 입력하세요'); return }
+              const { ok, json } = await fetchWithAuth('/api/tire/blackcircle', { method: 'POST', body: { action: 'save', id: bcForm.id, password: bcForm.password } })
+              if (!ok) { alert(json.error || '저장 실패'); return }
+              setBcForm(f => ({ ...f, password: '' }))
+              loadBc()
+            }} style={{ ...BTN.sm, background: '#fff', color: COLORS.primary, border: `1px solid ${COLORS.borderBlue}`, padding: '8px 14px', fontWeight: 700, cursor: 'pointer' }}>저장</button>
+            <button disabled={bcSyncing || !bc?.configured} onClick={async () => {
+              setBcSyncing(true)
+              try {
+                const { ok, json } = await fetchWithAuth('/api/tire/blackcircle', { method: 'POST', body: { action: 'sync' } })
+                if (!ok) alert(json.error || '동기화 실패')
+                else alert(`동기화 완료 — ${json.items}품목 (${json.pages}페이지)`)
+                loadBc(); loadCatalog()
+              } finally { setBcSyncing(false) }
+            }} style={{ ...BTN.sm, background: COLORS.primary, color: '#fff', border: 'none', padding: '8px 16px', fontWeight: 700, cursor: bcSyncing ? 'wait' : 'pointer', opacity: !bc?.configured ? 0.5 : 1 }}>
+              {bcSyncing ? '동기화 중... (2~3분)' : '🔄 지금 동기화'}
+            </button>
+            <div style={{ borderLeft: '1px solid #e6e8ec', paddingLeft: 12, display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+              <div><div style={{ fontSize: 10.5, fontWeight: 700, color: '#5b626e', marginBottom: 4 }}>판매가 자동 마진율 %</div>
+                <input type="number" style={{ ...inputStyle, width: 70, textAlign: 'right' }} value={bcMargin} placeholder="미사용" onChange={e => setBcMargin(e.target.value)} /></div>
+              <button onClick={async () => {
+                await fetchWithAuth('/api/tire/blackcircle', { method: 'POST', body: { action: 'margin', percent: bcMargin } })
+                loadBc()
+                alert(bcMargin ? `마진율 ${bcMargin}% 저장 — 판매단가 미입력 품목은 매입가×${(1 + Number(bcMargin) / 100).toFixed(2)} (천원 올림)로 자동 노출됩니다` : '자동 마진율 해제')
+              }} style={{ ...BTN.sm, background: '#fff', color: COLORS.primary, border: `1px solid ${COLORS.borderBlue}`, padding: '8px 12px', fontWeight: 700, cursor: 'pointer' }}>적용</button>
+            </div>
+            {bc?.lastSync && (
+              <div style={{ fontSize: 11, color: '#94a3b8', width: '100%' }}>
+                마지막 동기화: {String(bc.lastSync).slice(0, 16).replace('T', ' ')} — {bc.lastResult || ''} · 매일 새벽 5:30 자동 실행
+              </div>
+            )}
+          </div>
+
           <div style={{ display: 'flex', gap: 8, marginBottom: 12, alignItems: 'center' }}>
             <input value={catQ} onChange={e => setCatQ(e.target.value)} placeholder="브랜드·모델·규격 검색" style={{ ...inputStyle, width: 240 }} />
             <span style={{ fontSize: 11, color: '#94a3b8' }}>
@@ -495,6 +574,83 @@ export default function TirePage() {
                       </td>
                     </tr>
                   ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+
+      {/* ═══ 거래처 탭 ═══ */}
+      {tab === 'customers' && (
+        <>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 12, alignItems: 'center' }}>
+            <span style={{ fontSize: 11, color: '#94a3b8' }}>
+              거래처를 등록하면 <b>전용 링크</b>가 생성됩니다 — 링크를 카톡으로 보내면 그 거래처만의 신청·배송지·내역 화면이 열립니다
+            </span>
+            <span style={{ flex: 1 }} />
+            <button onClick={() => setShowCustForm(v => !v)}
+              style={{ ...BTN.sm, background: showCustForm ? '#f1f5f9' : '#fff', color: COLORS.primary, border: `1px solid ${COLORS.borderBlue}`, padding: '8px 16px', fontWeight: 700, cursor: 'pointer' }}>
+              {showCustForm ? '닫기' : '거래처 등록'}
+            </button>
+          </div>
+
+          {showCustForm && (
+            <div style={{ ...GLASS.L4, borderRadius: 14, padding: 16, marginBottom: 14, display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+              <div><div style={{ fontSize: 10.5, fontWeight: 700, color: '#5b626e', marginBottom: 4 }}>거래처명 *</div>
+                <input style={{ ...inputStyle, width: 160 }} value={custForm.name} onChange={e => setCustForm(f => ({ ...f, name: e.target.value }))} placeholder="우리모터스" /></div>
+              <div><div style={{ fontSize: 10.5, fontWeight: 700, color: '#5b626e', marginBottom: 4 }}>연락처</div>
+                <input style={{ ...inputStyle, width: 140 }} value={custForm.phone} onChange={e => setCustForm(f => ({ ...f, phone: e.target.value }))} placeholder="010-0000-0000" /></div>
+              <div><div style={{ fontSize: 10.5, fontWeight: 700, color: '#5b626e', marginBottom: 4 }}>메모</div>
+                <input style={{ ...inputStyle, width: 200 }} value={custForm.memo} onChange={e => setCustForm(f => ({ ...f, memo: e.target.value }))} /></div>
+              <button onClick={async () => {
+                if (!custForm.name.trim()) { alert('거래처명을 입력하세요'); return }
+                const { ok, json } = await fetchWithAuth('/api/tire/customers', { method: 'POST', body: custForm })
+                if (!ok) { alert(json.error || '등록 실패'); return }
+                setCustForm({ name: '', phone: '', memo: '' }); setShowCustForm(false)
+                loadCustomers()
+              }} style={{ ...BTN.sm, background: COLORS.primary, color: '#fff', border: 'none', padding: '8px 18px', fontWeight: 700, cursor: 'pointer' }}>등록</button>
+            </div>
+          )}
+
+          <div style={{ ...GLASS.L4, borderRadius: 16, overflow: 'auto', boxShadow: '0 1px 2px rgba(16,24,40,0.05)' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+              <thead>
+                <tr style={{ background: 'rgba(241,245,249,0.6)', color: '#475569', textAlign: 'left' }}>
+                  <th style={th}>거래처</th><th style={th}>연락처</th>
+                  <th style={{ ...th, textAlign: 'right' }}>신청 건수</th>
+                  <th style={th}>최근 신청</th><th style={th}>전용 링크</th><th style={th}>상태</th>
+                </tr>
+              </thead>
+              <tbody>
+                {customers.length === 0 && (
+                  <tr><td colSpan={6} style={{ padding: 36, textAlign: 'center', color: '#94a3b8' }}>등록된 거래처가 없습니다. 「거래처 등록」으로 시작하세요.</td></tr>
+                )}
+                {customers.map(c => (
+                  <tr key={c.id} style={{ borderTop: '1px solid rgba(0,0,0,0.05)', opacity: c.status === 'active' ? 1 : 0.5 }}>
+                    <td style={{ ...td, fontWeight: 700 }}>{c.name}{c.memo && <span style={{ color: '#94a3b8', fontSize: 11, marginLeft: 6 }}>{c.memo}</span>}</td>
+                    <td style={td}>{c.phone || '—'}</td>
+                    <td style={num}>{nf(c.order_cnt)}</td>
+                    <td style={{ ...td, whiteSpace: 'nowrap', color: '#64748b', fontSize: 11 }}>{c.last_order_at ? String(c.last_order_at).slice(0, 10) : '—'}</td>
+                    <td style={{ ...td, whiteSpace: 'nowrap' }}>
+                      <code style={{ fontSize: 11, color: '#475569', background: '#f1f5f9', borderRadius: 6, padding: '2px 7px' }}>/t/{c.token}</code>
+                      <button onClick={() => {
+                        const url = `${location.origin}/t/${c.token}`
+                        navigator.clipboard?.writeText(url)
+                        alert(`${c.name} 전용 링크가 복사되었습니다.\n${url}`)
+                      }} style={{ ...BTN.sm, padding: '3px 9px', fontSize: 11, marginLeft: 5, background: '#fff', color: COLORS.primary, border: `1px solid ${COLORS.borderBlue}`, cursor: 'pointer' }}>🔗 복사</button>
+                      <button onClick={() => window.open(`/t/${c.token}`, '_blank')}
+                        style={{ ...BTN.sm, padding: '3px 9px', fontSize: 11, marginLeft: 4, background: '#fff', color: '#475569', border: '1px solid #e6e8ec', cursor: 'pointer' }}>미리보기</button>
+                    </td>
+                    <td style={td}>
+                      <button onClick={async () => {
+                        await fetchWithAuth('/api/tire/customers', { method: 'PATCH', body: { id: c.id, status: c.status === 'active' ? 'disabled' : 'active' } })
+                        loadCustomers()
+                      }} style={{ ...BTN.sm, padding: '3px 10px', fontSize: 11, cursor: 'pointer', background: c.status === 'active' ? 'rgba(167,243,208,0.5)' : '#f1f5f9', color: c.status === 'active' ? '#059669' : '#94a3b8', border: 'none', fontWeight: 700 }}>
+                        {c.status === 'active' ? '활성' : '중지'}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
