@@ -80,6 +80,10 @@ export default function TirePage() {
   // ── 카탈로그 ──
   const [catalog, setCatalog] = useState<any[]>([])
   const [catQ, setCatQ] = useState('')
+  const [catBrand, setCatBrand] = useState('')
+  const [catW, setCatW] = useState('')
+  const [catR, setCatR] = useState('')
+  const [catRim, setCatRim] = useState('')
 
   // ── 거래처 ──
   const [customers, setCustomers] = useState<any[]>([])
@@ -506,7 +510,7 @@ export default function TirePage() {
               {bcSyncing ? '동기화 중... (2~3분)' : '🔄 지금 동기화'}
             </button>
             <div style={{ borderLeft: '1px solid #e6e8ec', paddingLeft: 12, display: 'flex', gap: 8, alignItems: 'flex-end' }}>
-              <div><div style={{ fontSize: 10.5, fontWeight: 700, color: '#5b626e', marginBottom: 4 }}>판매가 자동 마진율 %</div>
+              <div><div style={{ fontSize: 10.5, fontWeight: 700, color: '#5b626e', marginBottom: 4 }}>판매가 자동 마진율 % (매입가 기준)</div>
                 <input type="number" style={{ ...inputStyle, width: 70, textAlign: 'right' }} value={bcMargin} placeholder="미사용" onChange={e => setBcMargin(e.target.value)} /></div>
               <button onClick={async () => {
                 await fetchWithAuth('/api/tire/blackcircle', { method: 'POST', body: { action: 'margin', percent: bcMargin } })
@@ -521,10 +525,36 @@ export default function TirePage() {
             )}
           </div>
 
-          <div style={{ display: 'flex', gap: 8, marginBottom: 12, alignItems: 'center' }}>
-            <input value={catQ} onChange={e => setCatQ(e.target.value)} placeholder="브랜드·모델·규격 검색" style={{ ...inputStyle, width: 240 }} />
+          {/* 필터: 브랜드 칩 + 사이즈 3구분 + 검색 */}
+          <div style={{ display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap' }}>
+            {['', ...[...new Set(catalog.map(c => c.brand))]].map(b => (
+              <button key={b || 'all'} onClick={() => setCatBrand(b)} style={{
+                padding: '5px 12px', borderRadius: 16, fontSize: 11.5, fontWeight: 700, cursor: 'pointer',
+                border: `1px solid ${catBrand === b ? COLORS.primary : 'rgba(0,0,0,0.08)'}`,
+                background: catBrand === b ? COLORS.primary : '#fff',
+                color: catBrand === b ? '#fff' : '#5b626e',
+              }}>{b || '전체'}</button>
+            ))}
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+            {([
+              [catW, setCatW, '폭', (s: string) => s.match(/^(\d{3})\//)?.[1]],
+              [catR, setCatR, '편평비', (s: string) => s.match(/^\d{3}\/(\d{2})R/)?.[1]],
+              [catRim, setCatRim, '인치', (s: string) => s.match(/R(\d{2})$/)?.[1]],
+            ] as const).map(([val, setter, label, extract], i) => (
+              <select key={i} value={val as string} onChange={e => (setter as any)(e.target.value)} style={{ ...inputStyle, width: 90 }}>
+                <option value="">{label as string}</option>
+                {[...new Set(catalog.map(c => (extract as any)(c.spec)).filter(Boolean))].sort((a: any, b: any) => Number(a) - Number(b))
+                  .map((v: any) => <option key={v} value={v}>{v}</option>)}
+              </select>
+            ))}
+            <input value={catQ} onChange={e => setCatQ(e.target.value)} placeholder="모델·규격 검색 (2454519)" style={{ ...inputStyle, width: 200 }} />
+            {(catBrand || catW || catR || catRim || catQ) && (
+              <button onClick={() => { setCatBrand(''); setCatW(''); setCatR(''); setCatRim(''); setCatQ('') }}
+                style={{ ...BTN.sm, padding: '6px 12px', fontSize: 11, background: '#fff', color: '#5b626e', border: '1px solid #e6e8ec', cursor: 'pointer' }}>필터 초기화</button>
+            )}
             <span style={{ fontSize: 11, color: '#94a3b8' }}>
-              매입단가는 거래명세서에서 자동 축적 · <b>판매단가</b>를 입력하면 신청 페이지에 참고가로 노출됩니다 (매입가는 비공개)
+              판매단가 미입력 시 마진율 자동가(매입가 기준)가 적용됩니다 · 매입가·소비자가는 외부 비공개
             </span>
           </div>
           <div style={{ ...GLASS.L4, borderRadius: 16, overflow: 'auto', boxShadow: '0 1px 2px rgba(16,24,40,0.05)' }}>
@@ -532,48 +562,75 @@ export default function TirePage() {
               <thead>
                 <tr style={{ background: 'rgba(241,245,249,0.6)', color: '#475569', textAlign: 'left' }}>
                   <th style={th}>브랜드</th><th style={th}>모델</th><th style={th}>규격</th>
-                  <th style={{ ...th, textAlign: 'right' }}>최근 매입가</th>
+                  <th style={{ ...th, textAlign: 'right' }}>소비자가(공장도)</th>
+                  <th style={{ ...th, textAlign: 'right' }}>매입가(회원가)</th>
                   <th style={{ ...th, textAlign: 'right' }}>판매단가</th>
                   <th style={{ ...th, textAlign: 'right' }}>마진</th>
-                  <th style={{ ...th, textAlign: 'right' }}>누적 매입</th>
-                  <th style={th}>최근 매입일</th>
+                  <th style={th}>재고·배송</th>
                   <th style={th}>신청 노출</th>
                 </tr>
               </thead>
               <tbody>
-                {catalog
-                  .filter(c => !catQ.trim() || `${c.brand}${c.model}${c.spec}`.toLowerCase().replace(/\s/g, '').includes(catQ.trim().toLowerCase().replace(/\s/g, '')))
-                  .map(c => (
-                    <tr key={c.id} style={{ borderTop: '1px solid rgba(0,0,0,0.05)', opacity: c.active ? 1 : 0.45 }}>
-                      <td style={{ ...td, fontWeight: 700 }}>{c.brand}</td>
-                      <td style={td}>{c.model}</td>
-                      <td style={{ ...td, fontVariantNumeric: 'tabular-nums' }}>{c.spec}</td>
-                      <td style={num}>{c.purchase_price != null ? nf(c.purchase_price) : '—'}</td>
-                      <td style={{ ...num, whiteSpace: 'nowrap' }}>
-                        <input type="number" defaultValue={c.sale_price ?? ''} placeholder="미설정"
-                          onBlur={async e => {
-                            const v = e.target.value
-                            if (String(c.sale_price ?? '') === v) return
-                            await fetchWithAuth('/api/tire/catalog', { method: 'PATCH', body: { id: c.id, sale_price: v } })
+                {(() => {
+                  const digitsQ = catQ.trim().toLowerCase().replace(/\s/g, '')
+                  const specQ = digitsQ.replace(/[^0-9]/g, '')
+                  const filtered = catalog.filter(c => {
+                    if (catBrand && c.brand !== catBrand) return false
+                    const m = String(c.spec || '').match(/^(\d{3})\/(\d{2})R(\d{2})$/)
+                    if (catW && m?.[1] !== catW) return false
+                    if (catR && m?.[2] !== catR) return false
+                    if (catRim && m?.[3] !== catRim) return false
+                    if (digitsQ) {
+                      const hay = `${c.brand}${c.model}${c.spec}`.toLowerCase().replace(/\s/g, '')
+                      const specDigits = String(c.spec || '').replace(/[^0-9]/g, '')
+                      if (!hay.includes(digitsQ) && !(specQ.length >= 4 && specDigits.includes(specQ))) return false
+                    }
+                    return true
+                  })
+                  const marginPct = Number(bcMargin)
+                  const autoOf = (c: any) => (c.purchase_price && marginPct > 0)
+                    ? Math.ceil(c.purchase_price * (1 + marginPct / 100) / 1000) * 1000 : null
+                  return filtered.slice(0, 300).map(c => {
+                    const auto = autoOf(c)
+                    const effective = c.sale_price ?? auto
+                    return (
+                      <tr key={c.id} style={{ borderTop: '1px solid rgba(0,0,0,0.05)', opacity: c.active ? 1 : 0.45 }}>
+                        <td style={{ ...td, fontWeight: 700 }}>{c.brand}</td>
+                        <td style={td}>{c.model}</td>
+                        <td style={{ ...td, fontVariantNumeric: 'tabular-nums' }}>{c.spec}</td>
+                        <td style={{ ...num, color: '#64748b' }}>{c.consumer_price != null ? nf(c.consumer_price) : '—'}</td>
+                        <td style={num}>{c.purchase_price != null ? nf(c.purchase_price) : '—'}</td>
+                        <td style={{ ...num, whiteSpace: 'nowrap' }}>
+                          <input type="number" defaultValue={c.sale_price ?? ''}
+                            placeholder={auto ? `자동 ${nf(auto)}` : '미설정'}
+                            title={auto ? `마진율 자동가 ${nf(auto)}원 — 직접 입력하면 우선 적용` : ''}
+                            onBlur={async e => {
+                              const v = e.target.value
+                              if (String(c.sale_price ?? '') === v) return
+                              await fetchWithAuth('/api/tire/catalog', { method: 'PATCH', body: { id: c.id, sale_price: v } })
+                              loadCatalog()
+                            }}
+                            style={{ ...inputStyle, width: 100, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }} />
+                        </td>
+                        <td style={{ ...num, fontWeight: 700, color: effective && c.purchase_price ? (effective - c.purchase_price >= 0 ? COLORS.income : COLORS.expense) : '#cbd5e1' }}>
+                          {effective && c.purchase_price ? nf(effective - c.purchase_price) : '—'}
+                        </td>
+                        <td style={{ ...td, fontSize: 11, color: '#64748b', whiteSpace: 'nowrap' }}>
+                          {c.stock_note ? `재고 ${c.stock_note}` : ''}{c.stock_note && c.delivery_note ? ' · ' : ''}{c.delivery_note ? String(c.delivery_note).slice(0, 18) : ''}
+                          {!c.stock_note && !c.delivery_note && '—'}
+                        </td>
+                        <td style={td}>
+                          <button onClick={async () => {
+                            await fetchWithAuth('/api/tire/catalog', { method: 'PATCH', body: { id: c.id, active: c.active ? 0 : 1 } })
                             loadCatalog()
-                          }}
-                          style={{ ...inputStyle, width: 90, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }} />
-                      </td>
-                      <td style={{ ...num, fontWeight: 700, color: c.sale_price && c.purchase_price ? (c.sale_price - c.purchase_price >= 0 ? COLORS.income : COLORS.expense) : '#cbd5e1' }}>
-                        {c.sale_price && c.purchase_price ? nf(c.sale_price - c.purchase_price) : '—'}
-                      </td>
-                      <td style={num}>{nf(c.times_purchased)}</td>
-                      <td style={{ ...td, whiteSpace: 'nowrap', color: '#64748b', fontSize: 11 }}>{c.last_purchased_at ? String(c.last_purchased_at).slice(0, 10) : '—'}</td>
-                      <td style={td}>
-                        <button onClick={async () => {
-                          await fetchWithAuth('/api/tire/catalog', { method: 'PATCH', body: { id: c.id, active: c.active ? 0 : 1 } })
-                          loadCatalog()
-                        }} style={{ ...BTN.sm, padding: '3px 10px', fontSize: 11, cursor: 'pointer', background: c.active ? 'rgba(167,243,208,0.5)' : '#f1f5f9', color: c.active ? '#059669' : '#94a3b8', border: 'none', fontWeight: 700 }}>
-                          {c.active ? '노출' : '숨김'}
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                          }} style={{ ...BTN.sm, padding: '3px 10px', fontSize: 11, cursor: 'pointer', background: c.active ? 'rgba(167,243,208,0.5)' : '#f1f5f9', color: c.active ? '#059669' : '#94a3b8', border: 'none', fontWeight: 700 }}>
+                            {c.active ? '노출' : '숨김'}
+                          </button>
+                        </td>
+                      </tr>
+                    )
+                  })
+                })()}
               </tbody>
             </table>
           </div>

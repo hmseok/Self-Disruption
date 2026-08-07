@@ -168,10 +168,11 @@ export async function bcSyncCatalog(opts?: { maxPages?: number }): Promise<{ pag
   const flush = async () => {
     if (!values.length) return
     const r = await prisma.$executeRawUnsafe(`
-      INSERT INTO tire_catalog (id, brand, model, spec, purchase_price, stock_note, delivery_note, scraped_at)
+      INSERT INTO tire_catalog (id, brand, model, spec, purchase_price, consumer_price, stock_note, delivery_note, scraped_at)
       VALUES ${values.join(',')}
       ON DUPLICATE KEY UPDATE
         purchase_price = VALUES(purchase_price),
+        consumer_price = VALUES(consumer_price),
         stock_note = VALUES(stock_note),
         delivery_note = VALUES(delivery_note),
         scraped_at = VALUES(scraped_at)`, ...args)
@@ -180,9 +181,10 @@ export async function bcSyncCatalog(opts?: { maxPages?: number }): Promise<{ pag
   }
   for (const it of seen.values()) {
     const price = it.member ?? it.factory
-    values.push('(?, ?, ?, ?, ?, ?, ?, NOW())')
+    values.push('(?, ?, ?, ?, ?, ?, ?, ?, NOW())')
     args.push(randomUUID(), it.brand.slice(0, 30), it.model.slice(0, 100), it.spec.slice(0, 30),
-      price > 0 ? price : null, it.stock?.slice(0, 50) || null, it.delivery?.slice(0, 80) || null)
+      price > 0 ? price : null, it.factory > 0 ? it.factory : null,
+      it.stock?.slice(0, 50) || null, it.delivery?.slice(0, 80) || null)
     if (values.length >= 400) await flush()
   }
   await flush()

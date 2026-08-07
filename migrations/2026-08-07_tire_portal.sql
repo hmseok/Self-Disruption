@@ -35,3 +35,6 @@ ALTER TABLE tire_sales ADD COLUMN fulfill_status VARCHAR(20) NULL AFTER status;
 ALTER TABLE tire_catalog ADD COLUMN stock_note VARCHAR(50) NULL AFTER sale_price;
 ALTER TABLE tire_catalog ADD COLUMN delivery_note VARCHAR(80) NULL AFTER stock_note;
 ALTER TABLE tire_catalog ADD COLUMN scraped_at DATETIME NULL AFTER delivery_note;
+
+-- 소비자가(공장도가) — 블랙서클 동기화 시 저장 (2026-08-07 추가)
+ALTER TABLE tire_catalog ADD COLUMN consumer_price DECIMAL(12,0) NULL AFTER purchase_price;

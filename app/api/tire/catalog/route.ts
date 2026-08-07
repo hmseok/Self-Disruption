@@ -27,6 +27,7 @@ export async function GET(req: NextRequest) {
       rows: rows.map(r => ({
         ...r,
         purchase_price: r.purchase_price == null ? null : N(r.purchase_price),
+        consumer_price: r.consumer_price == null ? null : N(r.consumer_price),
         sale_price: r.sale_price == null ? null : N(r.sale_price),
         times_purchased: N(r.times_purchased),
       })),
