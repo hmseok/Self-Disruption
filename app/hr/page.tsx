@@ -203,6 +203,8 @@ export default function HRMasterPage() {
   const [loadingInvitations, setLoadingInvitations] = useState(false)
   const [cancelingId, setCancelingId] = useState<string | null>(null)
   const [withdrawing, setWithdrawing] = useState(false)
+  const [resettingPw, setResettingPw] = useState(false)
+  const [tempPwResult, setTempPwResult] = useState<{ name: string; email: string; password: string } | null>(null)
   const [newPositionName, setNewPositionName] = useState('')
   const [newPositionLevel, setNewPositionLevel] = useState(4)
   const [newDeptName, setNewDeptName] = useState('')
@@ -821,7 +823,7 @@ export default function HRMasterPage() {
     }
     setShowAddAllowance(false)
   }
-  const closeEditModal = () => { setEditingEmp(null); setEditForm({}); setSavingEdit(false); setEditSection('profile') }
+  const closeEditModal = () => { setEditingEmp(null); setEditForm({}); setSavingEdit(false); setEditSection('profile'); setTempPwResult(null) }
 
   // ===== 급여 설정 저장 =====
   const saveSalary = async () => {
@@ -899,6 +901,27 @@ export default function HRMasterPage() {
   //   실제 동작은 UPDATE is_active=0 + 부서/직급 해제 + withdrawn_at 기록 (soft delete).
   //   거래/계약/회의록 등 FK 참조 데이터의 감사 추적 보존을 위해 진짜 DELETE 안 함.
   //   퇴사 직원은 「퇴사」 필터에서 보관함처럼 조회 가능.
+  // ===== 비밀번호 초기화 (2026-08-07) =====
+  const resetPassword = async () => {
+    if (!editingEmp) return
+    const name = editingEmp.employee_name || editingEmp.name || '직원'
+    if (!confirm(`${name}의 비밀번호를 초기화할까요?\n\n• 임시 비밀번호가 발급됩니다 (기존 비밀번호는 즉시 사용 불가)\n• 발급된 비밀번호를 직원에게 전달해주세요`)) return
+    setResettingPw(true)
+    setTempPwResult(null)
+    try {
+      const res = await fetch('/api/employees/reset-password', {
+        method: 'POST',
+        headers: { ...(await getAuthHeader()), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ employee_id: editingEmp.id }),
+      })
+      const json = await res.json()
+      if (!res.ok) { alert(json.error || '초기화 실패'); return }
+      setTempPwResult({ name: json.name || name, email: json.email, password: json.temp_password })
+    } catch {
+      alert('네트워크 오류가 발생했습니다.')
+    } finally { setResettingPw(false) }
+  }
+
   const withdrawEmployee = async (deleteAuth: boolean) => {
     if (!editingEmp) return
     const name = editingEmp.display_name || editingEmp.employee_name || editingEmp.email
@@ -2455,6 +2478,38 @@ export default function HRMasterPage() {
             })()}
 
             </div>
+
+            {/* 계정 관리 — 비밀번호 초기화 (2026-08-07) */}
+            {editSection === 'profile' && editingEmp.id !== user?.uid && (
+              <div style={{ padding: '12px 24px', borderTop: '1px solid rgba(0,0,0,0.06)', background: 'rgba(248,250,252,0.8)', flexShrink: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                  <div>
+                    <p style={{ fontSize: 12, fontWeight: 600, color: '#334155', margin: 0 }}>비밀번호 초기화</p>
+                    <p style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>임시 비밀번호를 발급합니다. 직원에게 전달 후 로그인하여 변경하도록 안내해주세요.</p>
+                  </div>
+                  <button onClick={resetPassword} disabled={resettingPw}
+                    style={{ padding: '6px 14px', fontSize: 12, fontWeight: 600, color: '#2563eb', border: '1px solid rgba(37,99,235,0.3)', background: '#fff', borderRadius: 8, cursor: resettingPw ? 'wait' : 'pointer', whiteSpace: 'nowrap', opacity: resettingPw ? 0.6 : 1 }}>
+                    {resettingPw ? '발급 중...' : '🔑 초기화'}
+                  </button>
+                </div>
+                {tempPwResult && (
+                  <div style={{ marginTop: 10, padding: '12px 14px', borderRadius: 10, background: '#eff4ff', border: '1px solid #c9dbfa' }}>
+                    <div style={{ fontSize: 11.5, color: '#5b626e', marginBottom: 6 }}>
+                      <b>{tempPwResult.name}</b> ({tempPwResult.email}) 임시 비밀번호 — 이 화면을 닫으면 다시 볼 수 없습니다
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <code style={{ flex: 1, fontSize: 16, fontWeight: 800, letterSpacing: '0.08em', color: '#1a1d23', background: '#fff', border: '1px solid #c9dbfa', borderRadius: 8, padding: '8px 12px', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>
+                        {tempPwResult.password}
+                      </code>
+                      <button onClick={() => { navigator.clipboard?.writeText(tempPwResult.password); alert('임시 비밀번호가 복사되었습니다.') }}
+                        style={{ padding: '8px 14px', fontSize: 12, fontWeight: 700, color: '#fff', background: '#2563eb', border: 'none', borderRadius: 8, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                        복사
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* 직원 탈퇴 — § 기본정보 탭에서만 노출 */}
             {/* PR-HR-12 (2026-05-27) — 「완전 삭제」 라벨 정확화:
