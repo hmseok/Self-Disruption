@@ -6,7 +6,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
-export const revalidate = 3600
+export const dynamic = 'force-dynamic'
 
 export async function GET() {
   const rows = await prisma.$queryRawUnsafe<Array<{ brand: string; spec: string }>>(
