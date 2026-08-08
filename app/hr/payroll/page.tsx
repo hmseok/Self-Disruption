@@ -1,20 +1,24 @@
 'use client'
 
-import { useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+// ═══════════════════════════════════════════════════════════════
+// 급여 운영 — 독립 페이지 (2026-08-08 인사 마스터 재작성과 함께 분리)
+// 기존: /hr?tab=payroll 임베드 → 신규: /hr/payroll 전용 페이지
+// 내용은 기존 PayrollOps 컴포넌트 그대로 사용
+// ═══════════════════════════════════════════════════════════════
 
-// /hr/payroll → /hr 5번째 탭 (inline) 으로 통합 (PR-B7, 2026-05-06)
-// 컴포넌트 자체는 app/hr/_components/PayrollOps.tsx
-export default function PayrollPageRedirect() {
-  const router = useRouter()
-  useEffect(() => { router.replace('/hr?tab=payroll') }, [router])
+import { COLORS } from '@/app/utils/ui-tokens'
+import PayrollOps from '../_components/PayrollOps'
+
+export default function PayrollPage() {
   return (
-    <div style={{ minHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ textAlign: 'center' }}>
-        <div style={{ width: 32, height: 32, border: '3px solid rgba(0,0,0,0.06)', borderTopColor: '#3b82f6', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 12px' }} />
-        <p style={{ fontSize: 13, color: '#94a3b8' }}>인사 마스터 → 급여 운영 으로 이동 중...</p>
-        <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+    <div style={{ padding: '20px 24px', maxWidth: 1280, color: COLORS.textPrimary, fontSize: 14 }}>
+      <div style={{ marginBottom: 16 }}>
+        <h1 style={{ fontSize: 21, letterSpacing: '-0.02em', fontWeight: 700 }}>급여 운영</h1>
+        <p style={{ color: COLORS.textSecondary, fontSize: 13, marginTop: 3 }}>
+          급여 대장 생성과 식대·프리랜서 지급을 관리합니다 — 지급 기준은 인사 마스터의 직원별 급여 설정을 따릅니다
+        </p>
       </div>
+      <PayrollOps />
     </div>
   )
 }
