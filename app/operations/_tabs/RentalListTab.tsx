@@ -7,6 +7,7 @@ import DcToolbar, { FilterItem } from '@/app/components/DcToolbar'
 import NeuDataTable, { TableColumn, MobileCardConfig } from '@/app/components/NeuDataTable'
 import { GLASS } from '@/app/utils/ui-tokens'
 import RentalDrawer from '@/app/components/RentalDrawer'
+import ConsultDrawer, { ConsultTarget } from '@/app/components/ConsultDrawer'
 
 // ═══════════════════════════════════════════════════════════════════
 // RentalListTab — 대차리스트 (대차 업무 전 구간: 상담미진행 → 배차완료)
@@ -118,6 +119,7 @@ export default function RentalListTab() {
 
   // 배차 드로어 (PR-UX-DRAWER) — 행 클릭 시 페이지 이동 없이 상담·일정 입력
   const [drawerId, setDrawerId] = useState<string | null>(null)
+  const [consultTarget, setConsultTarget] = useState<ConsultTarget | null>(null)
 
   // 반납 처리 모달
   const [returnModal, setReturnModal] = useState<Row | null>(null)
@@ -389,10 +391,18 @@ export default function RentalListTab() {
       setDrawerId(r.id)
       return
     }
+    // 상담대기 — 드로어 (2026-08-07 사용자 요청: 상세 페이지 이동 대신)
     if ((r.kind === 'request' || r.kind === 'order') && r.cafe24_idno && r.cafe24_mddt && r.cafe24_srno != null) {
-      router.push(`/operations/dispatch/${r.cafe24_idno}/${r.cafe24_mddt}/${r.cafe24_srno}?mode=schedule`)
+      setConsultTarget({
+        idno: String(r.cafe24_idno), mddt: String(r.cafe24_mddt), srno: r.cafe24_srno as any,
+        preview: {
+          otptcanm: (r as any).customer_name, otptcahp: (r as any).customer_phone,
+          cars_no: (r as any).accident_car_no, otpttobm: (r as any).insurer,
+          otpttobn: (r as any).claim_no, otptrgdt: (r as any).dispatch_date,
+        },
+      })
     }
-  }, [router])
+  }, [])
 
   const allColumns: TableColumn<Row>[] = [
     {
@@ -640,6 +650,11 @@ export default function RentalListTab() {
       </div>
 
       {/* 배차 드로어 — PR-UX-DRAWER */}
+      <ConsultDrawer
+        target={consultTarget}
+        onClose={() => setConsultTarget(null)}
+        onChanged={refresh}
+      />
       <RentalDrawer
         rentalId={drawerId}
         onClose={() => setDrawerId(null)}
