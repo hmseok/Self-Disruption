@@ -53,10 +53,15 @@ export interface MenuGroup {
 
 // ─── 그룹 정의 ───────────────────────────────────────────
 export const GROUPS: MenuGroup[] = [
-  // 새 IA (2026-07-30) — 핵심 업무 / 세부 화면 / 역할별 업무
-  { id: 'core',            label: '업무',        section: 'business',        sortOrder: 1 },
-  { id: 'detail',          label: '세부 화면',    section: 'business',        sortOrder: 2 },
-  { id: 'roles',           label: '역할별 업무',  section: 'business',        sortOrder: 3 },
+  // 2026-08-08 사용자 확정 — 「차량관리 / 렌터카 / 타이어 / 경리부 업무」 4그룹 분리
+  { id: 'g-cars',       label: '차량관리',    section: 'business', sortOrder: 1 },
+  { id: 'g-rental',     label: '렌터카',      section: 'business', sortOrder: 2 },
+  { id: 'g-tire',       label: '타이어',      section: 'business', sortOrder: 3 },
+  { id: 'g-accounting', label: '경리부 업무',  section: 'business', sortOrder: 4 },
+  // legacy 그룹 (sidebarHidden 세부 화면들)
+  { id: 'core',            label: '업무',        section: 'business',        sortOrder: 5 },
+  { id: 'detail',          label: '세부 화면',    section: 'business',        sortOrder: 6 },
+  { id: 'roles',           label: '역할별 업무',  section: 'business',        sortOrder: 7 },
   // 직장인필수 — 사이드바 섹션 제거 (2026-07-30 사용자 확정). 권한 페이지 라벨용으로 보존.
   { id: 'work-essentials', label: '직장인필수',   section: 'work-essentials', sortOrder: 10 },
   // 설정 (admin 전용 — 사이드바 별도 섹션)
@@ -71,18 +76,18 @@ export const MENUS: MenuEntry[] = [
   { id: 'mod-home', name: '홈', path: '/home', iconKey: 'Home', group: 'core', sortOrder: 0, requirePermission: false, sidebarHidden: true },
 
   // ── 핵심 업무 (core) — 새 IA (계약은 A안 확정: 장기계약 / 단기·대차 — 2026-07-30)
-  { id: 'mod-cars',       name: '차량',    path: '/cars',                 iconKey: 'Car',    group: 'core', sortOrder: 1, requirePermission: true },
-  { id: 'mod-long-term',  name: '장기렌트', displayName: '장기계약', path: '/long-term-rentals', iconKey: 'Doc', group: 'core', sortOrder: 2, requirePermission: true },
-  { id: 'mod-ops',        name: '사고대차', displayName: '단기·대차', path: '/operations',       iconKey: 'Key', group: 'core', sortOrder: 3, requirePermission: true },
+  { id: 'mod-cars',       name: '차량',    path: '/cars',                 iconKey: 'Car',    group: 'g-cars', sortOrder: 1, requirePermission: true },
+  { id: 'mod-long-term',  name: '장기렌트', displayName: '장기계약', path: '/long-term-rentals', iconKey: 'Doc', group: 'g-rental', sortOrder: 1, requirePermission: true },
+  { id: 'mod-ops',        name: '사고대차', displayName: '단기·대차', path: '/operations',       iconKey: 'Key', group: 'g-rental', sortOrder: 2, requirePermission: true },
   // 견적함 — 별도 페이지 분리 (2026-08-02 사용자 확정: 임의 견적 보관 → 계약에서 불러와 연결)
-  { id: 'mod-quotes',     name: '견적',    path: '/quotes',               iconKey: 'Clipboard', group: 'core', sortOrder: 3.5, requirePermission: true },
-  { id: 'mod-ledger',     name: '통장/카드', displayName: '장부', path: '/finance/bank-card', iconKey: 'Ledger', group: 'core', sortOrder: 4, requirePermission: true },
+  { id: 'mod-quotes',     name: '견적',    path: '/quotes',               iconKey: 'Clipboard', group: 'g-rental', sortOrder: 3, requirePermission: true },
+  { id: 'mod-ledger',     name: '통장/카드', displayName: '장부', path: '/finance/bank-card', iconKey: 'Ledger', group: 'g-accounting', sortOrder: 1, requirePermission: true },
   // 카드관리·수금 — 장부에서 분리 (2026-08-03 사용자 확정)
-  { id: 'mod-card-mgmt',  name: '카드관리', path: '/finance/card-mgmt',   iconKey: 'Money',  group: 'core', sortOrder: 4.3, requirePermission: true },
-  { id: 'mod-collection', name: '수금',    path: '/finance/collection',  iconKey: 'Coin',   group: 'core', sortOrder: 4.6, requirePermission: true },
-  { id: 'mod-tire',       name: '타이어 판매', displayName: '타이어', path: '/tire', iconKey: 'Wrench', group: 'core', sortOrder: 4.8, requirePermission: true },
-  { id: 'mod-settlement', name: '정산/수금', displayName: '정산', path: '/finance/settlement', iconKey: 'Coin',   group: 'core', sortOrder: 5, requirePermission: true },
-  { id: 'mod-pnl',        name: '차량 손익', displayName: '손익', path: '/finance/fleet',      iconKey: 'Trend',  group: 'core', sortOrder: 6, requirePermission: true },
+  { id: 'mod-card-mgmt',  name: '카드관리', path: '/finance/card-mgmt',   iconKey: 'Money',  group: 'g-accounting', sortOrder: 2, requirePermission: true },
+  { id: 'mod-collection', name: '수금',    path: '/finance/collection',  iconKey: 'Coin',   group: 'g-accounting', sortOrder: 3, requirePermission: true },
+  { id: 'mod-tire',       name: '타이어 판매', displayName: '타이어', path: '/tire', iconKey: 'Wrench', group: 'g-tire', sortOrder: 1, requirePermission: true },
+  { id: 'mod-settlement', name: '정산/수금', displayName: '정산', path: '/finance/settlement', iconKey: 'Coin',   group: 'g-accounting', sortOrder: 4, requirePermission: true },
+  { id: 'mod-pnl',        name: '차량 손익', displayName: '손익', path: '/finance/fleet',      iconKey: 'Trend',  group: 'g-cars', sortOrder: 2, requirePermission: true },
 
   // ── 세부 화면 (detail) — 2026-07-30 사용자 확정 「사이드바 전부 걷어내고 목업처럼」:
   //    전 항목 sidebarHidden — URL·권한 유지, 각 개편 단계에서 core 화면에 흡수 후 9단계에 코드 삭제.
@@ -202,6 +207,6 @@ export function getDisplayName(menu: MenuEntry): string {
 
 // ─── 헬퍼: path → group ID 매핑 (legacy PATH_TO_GROUP 호환) ───
 export const PATH_TO_GROUP: Record<string, string> = Object.fromEntries(
-  MENUS.filter(m => !m.hidden && ['core', 'detail', 'roles'].includes(m.group))
+  MENUS.filter(m => !m.hidden && ['g-cars', 'g-rental', 'g-tire', 'g-accounting', 'core', 'detail', 'roles'].includes(m.group))
     .map(m => [m.path, m.group])
 )

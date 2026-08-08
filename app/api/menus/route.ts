@@ -30,7 +30,7 @@ import { MENUS, GROUPS, type MenuEntry } from '@/lib/menu-registry'
 //   · 그 외: 비즈니스 그룹 (core/detail/roles — 2026-07-30 개편) 은 기본 권한 대상
 function isPermissionMenu(menu: MenuEntry): boolean {
   if (typeof menu.requirePermission === 'boolean') return menu.requirePermission
-  return ['core', 'detail', 'roles'].includes(menu.group)
+  return ['g-cars', 'g-rental', 'g-tire', 'g-accounting', 'core', 'detail', 'roles'].includes(menu.group)
 }
 
 export async function GET(request: NextRequest) {
