@@ -98,7 +98,8 @@ export default function DcStatStrip({ stats, actions, fullWidth, defaultTint = '
       {/* ── 글래스 스탯 카드 그리드 ── */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: `repeat(${stats.length}, minmax(0, 1fr))`,
+        // 반응형 — 좁은 화면에서 자동 줄바꿈 (2026-08-08)
+        gridTemplateColumns: `repeat(auto-fit, minmax(150px, 1fr))`,
         gap: 10,
       }}>
         {stats.map((s, i) => {
