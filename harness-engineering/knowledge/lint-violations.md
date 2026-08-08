@@ -5185,3 +5185,143 @@
 - sql-fn-lint: total=0
 - api-trace: broken=25, newBroken=0
 - ui-coverage: warnings=0
+
+## 2026-07-30 11:32:30
+- sql-lint: total=48, new=0, known=48
+- sql-fn-lint: total=0
+- api-trace: broken=25, newBroken=0
+- ui-coverage: warnings=0
+
+## 2026-08-08 05:30:41
+- sql-lint: total=54, new=6, known=48
+- sql-fn-lint: total=5
+- api-trace: broken=19, newBroken=0
+- ui-coverage: warnings=0
+  - **새 SQL 컬럼 위반**:
+    - `app/api/finance/ar/route.ts:45` related_type (unprefixed) (table `fmi_rentals` 에 `related_type` 없음)
+    - `app/api/finance/ar/route.ts:45` type (unprefixed) (table `fmi_rentals` 에 `type` 없음)
+    - `app/api/finance/ar/route.ts:45` deleted_at (unprefixed) (table `fmi_rentals` 에 `deleted_at` 없음)
+    - `app/api/finance/ar/route.ts:45` rental_id (unprefixed) (table `fmi_rentals` 에 `rental_id` 없음)
+    - `app/api/finance/card-stats/route.ts:18` c4 (unprefixed) (table `transaction_assignments` 에 `c4` 없음)
+    - `app/api/tire/deposits/route.ts:22` bank_name (unprefixed) (table `transactions` 에 `bank_name` 없음)
+  - **회색 함수 사용**:
+    - `app/api/cars/[id]/overview/route.ts:44` `REGEXP_REPLACE`
+    - `app/api/cars/[id]/overview/route.ts:52` `REGEXP_REPLACE`
+    - `app/api/cars/[id]/overview/route.ts:64` `REGEXP_REPLACE`
+    - `app/api/cars/[id]/overview/route.ts:78` `REGEXP_REPLACE`
+    - `app/api/finance/sms-webhook/route.ts:275` `REGEXP_REPLACE`
+
+## 2026-08-08 05:34:03
+- sql-lint: total=54, new=6, known=48
+- sql-fn-lint: total=5
+- api-trace: broken=19, newBroken=0
+- ui-coverage: warnings=22
+  - **새 SQL 컬럼 위반**:
+    - `app/api/finance/ar/route.ts:45` related_type (unprefixed) (table `fmi_rentals` 에 `related_type` 없음)
+    - `app/api/finance/ar/route.ts:45` type (unprefixed) (table `fmi_rentals` 에 `type` 없음)
+    - `app/api/finance/ar/route.ts:45` deleted_at (unprefixed) (table `fmi_rentals` 에 `deleted_at` 없음)
+    - `app/api/finance/ar/route.ts:45` rental_id (unprefixed) (table `fmi_rentals` 에 `rental_id` 없음)
+    - `app/api/finance/card-stats/route.ts:18` c4 (unprefixed) (table `transaction_assignments` 에 `c4` 없음)
+    - `app/api/tire/deposits/route.ts:22` bank_name (unprefixed) (table `transactions` 에 `bank_name` 없음)
+  - **회색 함수 사용**:
+    - `app/api/cars/[id]/overview/route.ts:44` `REGEXP_REPLACE`
+    - `app/api/cars/[id]/overview/route.ts:52` `REGEXP_REPLACE`
+    - `app/api/cars/[id]/overview/route.ts:64` `REGEXP_REPLACE`
+    - `app/api/cars/[id]/overview/route.ts:78` `REGEXP_REPLACE`
+    - `app/api/finance/sms-webhook/route.ts:275` `REGEXP_REPLACE`
+
+## 2026-08-08 05:34:22
+- sql-lint: total=54, new=0, known=54
+- sql-fn-lint: total=5
+- api-trace: broken=19, newBroken=0
+- ui-coverage: warnings=0
+  - **회색 함수 사용**:
+    - `app/api/cars/[id]/overview/route.ts:44` `REGEXP_REPLACE`
+    - `app/api/cars/[id]/overview/route.ts:52` `REGEXP_REPLACE`
+    - `app/api/cars/[id]/overview/route.ts:64` `REGEXP_REPLACE`
+    - `app/api/cars/[id]/overview/route.ts:78` `REGEXP_REPLACE`
+    - `app/api/finance/sms-webhook/route.ts:275` `REGEXP_REPLACE`
+
+## 2026-08-08 05:37:01
+- sql-lint: total=54, new=0, known=54
+- sql-fn-lint: total=5
+- api-trace: broken=19, newBroken=0
+- ui-coverage: warnings=22
+  - **회색 함수 사용**:
+    - `app/api/cars/[id]/overview/route.ts:44` `REGEXP_REPLACE`
+    - `app/api/cars/[id]/overview/route.ts:52` `REGEXP_REPLACE`
+    - `app/api/cars/[id]/overview/route.ts:64` `REGEXP_REPLACE`
+    - `app/api/cars/[id]/overview/route.ts:78` `REGEXP_REPLACE`
+    - `app/api/finance/sms-webhook/route.ts:275` `REGEXP_REPLACE`
+
+## 2026-08-08 05:41:10
+- sql-lint: total=54, new=0, known=54
+- sql-fn-lint: total=5
+- api-trace: broken=19, newBroken=0
+- ui-coverage: warnings=0
+  - **회색 함수 사용**:
+    - `app/api/cars/[id]/overview/route.ts:44` `REGEXP_REPLACE`
+    - `app/api/cars/[id]/overview/route.ts:52` `REGEXP_REPLACE`
+    - `app/api/cars/[id]/overview/route.ts:64` `REGEXP_REPLACE`
+    - `app/api/cars/[id]/overview/route.ts:78` `REGEXP_REPLACE`
+    - `app/api/finance/sms-webhook/route.ts:275` `REGEXP_REPLACE`
+
+## 2026-08-08 05:54:39
+- sql-lint: total=54, new=0, known=54
+- sql-fn-lint: total=0
+- api-trace: broken=19, newBroken=0
+- ui-coverage: warnings=22
+
+## 2026-08-08 05:55:06
+- sql-lint: total=54, new=0, known=54
+- sql-fn-lint: total=0
+- api-trace: broken=19, newBroken=0
+- ui-coverage: warnings=0
+
+## 2026-08-08 06:43:56
+- sql-lint: total=54, new=0, known=54
+- sql-fn-lint: total=0
+- api-trace: broken=19, newBroken=0
+- ui-coverage: warnings=0
+
+## 2026-08-08 06:53:37
+- sql-lint: total=54, new=0, known=54
+- sql-fn-lint: total=0
+- api-trace: broken=19, newBroken=0
+- ui-coverage: warnings=0
+
+## 2026-08-08 06:54:57
+- sql-lint: total=54, new=0, known=54
+- sql-fn-lint: total=0
+- api-trace: broken=19, newBroken=0
+- ui-coverage: warnings=0
+
+## 2026-08-08 06:55:40
+- sql-lint: total=54, new=0, known=54
+- sql-fn-lint: total=0
+- api-trace: broken=19, newBroken=0
+- ui-coverage: warnings=0
+
+## 2026-08-08 07:03:16
+- sql-lint: total=54, new=0, known=54
+- sql-fn-lint: total=0
+- api-trace: broken=19, newBroken=0
+- ui-coverage: warnings=0
+
+## 2026-08-08 07:04:29
+- sql-lint: total=54, new=0, known=54
+- sql-fn-lint: total=0
+- api-trace: broken=19, newBroken=0
+- ui-coverage: warnings=0
+
+## 2026-08-08 07:23:35
+- sql-lint: total=54, new=0, known=54
+- sql-fn-lint: total=0
+- api-trace: broken=19, newBroken=0
+- ui-coverage: warnings=0
+
+## 2026-08-08 07:27:16
+- sql-lint: total=54, new=0, known=54
+- sql-fn-lint: total=0
+- api-trace: broken=19, newBroken=0
+- ui-coverage: warnings=0

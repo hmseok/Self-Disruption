@@ -1,4 +1,15 @@
 {
-  "violations": [],
-  "generatedAt": "2026-06-28T07:59:54.208Z"
+  "violations": [
+    {
+      "file": "app/api/finance/ar/route.ts",
+      "line": 36,
+      "alias": "m"
+    },
+    {
+      "file": "app/api/finance/ar/route.ts",
+      "line": 43,
+      "alias": "m"
+    }
+  ],
+  "generatedAt": "2026-08-08T05:34:03.898Z"
 }

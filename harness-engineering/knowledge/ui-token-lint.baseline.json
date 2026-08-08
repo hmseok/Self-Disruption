@@ -161,94 +161,6 @@
       "snippet": "background: 'rgba(255,255,255,0.7)', color: COLORS.textPrimary,"
     },
     {
-      "file": "app/admin/market-prices/MarketPricesManager.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "8ea3e1ff3235",
-      "occ": 0,
-      "line": 100,
-      "snippet": "<div className=\"rounded-2xl overflow-hidden\" style={{ background: 'rgba(255,255,255,0.72)', border: '1px solid rgba(0,0,"
-    },
-    {
-      "file": "app/cars/CarList.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "3dd1208727af",
-      "occ": 0,
-      "line": 297,
-      "snippet": "background: 'rgba(255,255,255,0.72)',"
-    },
-    {
-      "file": "app/cars/CarList.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "b5be36070a8e",
-      "occ": 0,
-      "line": 300,
-      "snippet": "boxShadow: '6px 6px 18px rgba(140,170,210,0.14), -6px -6px 18px rgba(255,255,255,0.47)',"
-    },
-    {
-      "file": "app/cars/CarList.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "3dd1208727af",
-      "occ": 1,
-      "line": 325,
-      "snippet": "background: 'rgba(255,255,255,0.72)',"
-    },
-    {
-      "file": "app/cars/CarList.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "57009abf3352",
-      "occ": 0,
-      "line": 330,
-      "snippet": "boxShadow: '4px 4px 12px rgba(140,170,210,0.14), -4px -4px 12px rgba(255,255,255,0.47)',"
-    },
-    {
-      "file": "app/cars/CarList.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "044594d2e12e",
-      "occ": 0,
-      "line": 344,
-      "snippet": "background: 'rgba(255,255,255,0.60)',"
-    },
-    {
-      "file": "app/cars/CarList.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "7d158ed6eac9",
-      "occ": 0,
-      "line": 351,
-      "snippet": "boxShadow: '2px 2px 6px rgba(140,170,210,0.08), -2px -2px 6px rgba(255,255,255,0.35)',"
-    },
-    {
-      "file": "app/cars/CarList.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "3dd1208727af",
-      "occ": 2,
-      "line": 381,
-      "snippet": "background: 'rgba(255,255,255,0.72)',"
-    },
-    {
-      "file": "app/cars/CarList.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "57009abf3352",
-      "occ": 1,
-      "line": 386,
-      "snippet": "boxShadow: '4px 4px 12px rgba(140,170,210,0.14), -4px -4px 12px rgba(255,255,255,0.47)',"
-    },
-    {
-      "file": "app/cars/CarList.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "044594d2e12e",
-      "occ": 1,
-      "line": 400,
-      "snippet": "background: 'rgba(255,255,255,0.60)',"
-    },
-    {
-      "file": "app/cars/CarList.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "7d158ed6eac9",
-      "occ": 1,
-      "line": 407,
-      "snippet": "boxShadow: '2px 2px 6px rgba(140,170,210,0.08), -2px -2px 6px rgba(255,255,255,0.35)',"
-    },
-    {
       "file": "app/cars/[id]/CarDetail.tsx",
       "label": "glass-bg-hardcode",
       "hash": "4c8b546ff896",
@@ -267,22 +179,6 @@
     {
       "file": "app/components/DarkHeader.tsx",
       "label": "glass-bg-hardcode",
-      "hash": "e85618606388",
-      "occ": 0,
-      "line": 42,
-      "snippet": "boxShadow: '3px 3px 8px rgba(140,170,210,0.19), -1px -1px 4px rgba(255,255,255,0.47)',"
-    },
-    {
-      "file": "app/components/DarkHeader.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "044594d2e12e",
-      "occ": 0,
-      "line": 45,
-      "snippet": "background: 'rgba(255,255,255,0.60)',"
-    },
-    {
-      "file": "app/components/DarkHeader.tsx",
-      "label": "glass-bg-hardcode",
       "hash": "a1c95b1b8753",
       "occ": 0,
       "line": 47,
@@ -291,34 +187,10 @@
     {
       "file": "app/components/DarkHeader.tsx",
       "label": "glass-bg-hardcode",
-      "hash": "7420a48c17e6",
-      "occ": 0,
-      "line": 48,
-      "snippet": "boxShadow: '2px 2px 6px rgba(140,170,210,0.19), -2px -2px 6px rgba(255,255,255,0.47)',"
-    },
-    {
-      "file": "app/components/DarkHeader.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "c27c03238d06",
+      "hash": "cb2e21bf917d",
       "occ": 0,
       "line": 60,
-      "snippet": "white: { color: '#1e293b', bgColor: 'rgba(255,255,255,0.60)', borderColor: 'rgba(255,255,255,0.30)', labelColor: '#64748"
-    },
-    {
-      "file": "app/components/DarkHeader.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "e169538be243",
-      "occ": 0,
-      "line": 77,
-      "snippet": "boxShadow: '8px 8px 20px rgba(140,170,210,0.19), -8px -8px 20px rgba(255,255,255,0.47)',"
-    },
-    {
-      "file": "app/components/DarkHeader.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "3dd1208727af",
-      "occ": 0,
-      "line": 82,
-      "snippet": "background: 'rgba(255,255,255,0.72)',"
+      "snippet": "white: { color: '#1e293b', bgColor: '#ffffff', borderColor: 'rgba(255,255,255,0.30)', labelColor: '#64748b' },"
     },
     {
       "file": "app/components/DarkHeader.tsx",
@@ -327,38 +199,6 @@
       "occ": 1,
       "line": 85,
       "snippet": "border: '1px solid rgba(255,255,255,0.30)',"
-    },
-    {
-      "file": "app/components/DarkHeader.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "1549a2dd3f99",
-      "occ": 0,
-      "line": 122,
-      "snippet": "boxShadow: '4px 4px 12px rgba(140,170,210,0.19), -4px -4px 12px rgba(255,255,255,0.47)',"
-    },
-    {
-      "file": "app/components/DarkHeader.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "8cbf51290d2e",
-      "occ": 0,
-      "line": 127,
-      "snippet": ";(e.currentTarget as HTMLDivElement).style.boxShadow = '6px 6px 16px rgba(140,170,210,0.25), -6px -6px 16px rgba(255,255"
-    },
-    {
-      "file": "app/components/DarkHeader.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "264ed9234806",
-      "occ": 0,
-      "line": 131,
-      "snippet": ";(e.currentTarget as HTMLDivElement).style.boxShadow = '4px 4px 12px rgba(140,170,210,0.19), -4px -4px 12px rgba(255,255"
-    },
-    {
-      "file": "app/components/DarkHeader.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "044594d2e12e",
-      "occ": 1,
-      "line": 146,
-      "snippet": "background: 'rgba(255,255,255,0.60)',"
     },
     {
       "file": "app/components/DarkHeader.tsx",
@@ -395,22 +235,6 @@
     {
       "file": "app/components/DarkHeader.tsx",
       "label": "glass-bg-hardcode",
-      "hash": "1b28bfff9c95",
-      "occ": 0,
-      "line": 182,
-      "snippet": "boxShadow: 'inset 2px 2px 6px rgba(140,170,210,0.12), inset -2px -2px 6px rgba(255,255,255,0.35)',"
-    },
-    {
-      "file": "app/components/DarkHeader.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "eb405d3c87ad",
-      "occ": 0,
-      "line": 206,
-      "snippet": "color: active ? 'rgba(255,255,255,0.8)' : '#8aabc7',"
-    },
-    {
-      "file": "app/components/DarkHeader.tsx",
-      "label": "glass-bg-hardcode",
       "hash": "c82639000141",
       "occ": 0,
       "line": 246,
@@ -419,10 +243,10 @@
     {
       "file": "app/components/DarkHeader.tsx",
       "label": "glass-bg-hardcode",
-      "hash": "f4d9490e10bb",
+      "hash": "9d95c7cb3d83",
       "occ": 0,
       "line": 254,
-      "snippet": "background: active ? 'linear-gradient(135deg, #3b6eb5, #5a8fd4)' : 'rgba(255,255,255,0.50)',"
+      "snippet": "background: active ? '#2563eb' : 'rgba(255,255,255,0.50)',"
     },
     {
       "file": "app/components/DarkHeader.tsx",
@@ -431,14 +255,6 @@
       "occ": 0,
       "line": 256,
       "snippet": "border: active ? 'none' : '1px solid rgba(255,255,255,0.30)',"
-    },
-    {
-      "file": "app/components/DarkHeader.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "596ff504f7d4",
-      "occ": 0,
-      "line": 259,
-      "snippet": ": '2px 2px 6px rgba(140,170,210,0.12), -2px -2px 6px rgba(255,255,255,0.30)',"
     },
     {
       "file": "app/components/DarkHeader.tsx",
@@ -459,22 +275,6 @@
     {
       "file": "app/components/DarkHeader.tsx",
       "label": "glass-bg-hardcode",
-      "hash": "c66b2a53f52e",
-      "occ": 0,
-      "line": 309,
-      "snippet": "<span style={{ fontSize: 12, color: 'rgba(255,255,255,0.85)' }}>"
-    },
-    {
-      "file": "app/components/DarkHeader.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "6a7d07964eaf",
-      "occ": 0,
-      "line": 325,
-      "snippet": "background: 'rgba(255,255,255,0.95)', color: '#3b6eb5', border: 'none', fontWeight: 800,"
-    },
-    {
-      "file": "app/components/DarkHeader.tsx",
-      "label": "glass-bg-hardcode",
       "hash": "8c76c767fb31",
       "occ": 0,
       "line": 329,
@@ -489,172 +289,12 @@
       "snippet": "border: '1px solid rgba(255,255,255,0.2)',"
     },
     {
-      "file": "app/components/DcStatStrip.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "70f59c52b412",
-      "occ": 0,
-      "line": 125,
-      "snippet": ": '6px 6px 16px rgba(140,170,210,0.12), -2px -2px 8px rgba(255,255,255,0.6)',"
-    },
-    {
-      "file": "app/components/DcStatStrip.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "c72162d132f3",
-      "occ": 0,
-      "line": 215,
-      "snippet": ": 'rgba(255,255,255,0.72)',"
-    },
-    {
-      "file": "app/components/DcStatStrip.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "a168c952badc",
-      "occ": 0,
-      "line": 226,
-      "snippet": "? '4px 4px 12px rgba(59,110,181,0.25), -2px -2px 6px rgba(255,255,255,0.3)'"
-    },
-    {
-      "file": "app/components/DcStatStrip.tsx",
-      "label": "primary-hardcode",
-      "hash": "a168c952badc",
-      "occ": 0,
-      "line": 226,
-      "snippet": "? '4px 4px 12px rgba(59,110,181,0.25), -2px -2px 6px rgba(255,255,255,0.3)'"
-    },
-    {
-      "file": "app/components/DcStatStrip.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "55afb614b29c",
-      "occ": 0,
-      "line": 227,
-      "snippet": ": '4px 4px 10px rgba(140,170,210,0.15), -2px -2px 6px rgba(255,255,255,0.6)',"
-    },
-    {
       "file": "app/components/DcToolbar.tsx",
       "label": "glass-bg-hardcode",
-      "hash": "3dd1208727af",
+      "hash": "8f92fc9c7c37",
       "occ": 0,
-      "line": 45,
-      "snippet": "background: 'rgba(255,255,255,0.72)',"
-    },
-    {
-      "file": "app/components/DcToolbar.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "101465e02e00",
-      "occ": 0,
-      "line": 48,
-      "snippet": "boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -4px -4px 12px rgba(255,255,255,0.5)',"
-    },
-    {
-      "file": "app/components/DcToolbar.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "f5713e5ae899",
-      "occ": 0,
-      "line": 111,
-      "snippet": "background: activeFilter === f.key ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.06)',"
-    },
-    {
-      "file": "app/components/DcToolbar.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "fe18f17d6a28",
-      "occ": 0,
-      "line": 112,
-      "snippet": "color: activeFilter === f.key ? 'rgba(255,255,255,0.8)' : '#8aabc7',"
-    },
-    {
-      "file": "app/components/NeuDataTable.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "3dd1208727af",
-      "occ": 0,
-      "line": 106,
-      "snippet": "background: 'rgba(255,255,255,0.72)',"
-    },
-    {
-      "file": "app/components/NeuDataTable.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "b5be36070a8e",
-      "occ": 0,
-      "line": 109,
-      "snippet": "boxShadow: '6px 6px 18px rgba(140,170,210,0.14), -6px -6px 18px rgba(255,255,255,0.47)',"
-    },
-    {
-      "file": "app/components/NeuDataTable.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "3dd1208727af",
-      "occ": 1,
-      "line": 123,
-      "snippet": "background: 'rgba(255,255,255,0.72)',"
-    },
-    {
-      "file": "app/components/NeuDataTable.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "b5be36070a8e",
-      "occ": 1,
-      "line": 126,
-      "snippet": "boxShadow: '6px 6px 18px rgba(140,170,210,0.14), -6px -6px 18px rgba(255,255,255,0.47)',"
-    },
-    {
-      "file": "app/components/NeuDataTable.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "3dd1208727af",
-      "occ": 2,
-      "line": 138,
-      "snippet": "background: 'rgba(255,255,255,0.72)',"
-    },
-    {
-      "file": "app/components/NeuDataTable.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "b5be36070a8e",
-      "occ": 2,
-      "line": 141,
-      "snippet": "boxShadow: '6px 6px 18px rgba(140,170,210,0.14), -6px -6px 18px rgba(255,255,255,0.47)',"
-    },
-    {
-      "file": "app/components/NeuDataTable.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "bd0488806939",
-      "occ": 0,
-      "line": 168,
-      "snippet": "background: 'rgba(255,255,255,0.40)',"
-    },
-    {
-      "file": "app/components/NeuDataTable.tsx",
-      "label": "primary-hardcode",
-      "hash": "2ea058e6ffe4",
-      "occ": 0,
-      "line": 201,
-      "snippet": "if (onRowClick) e.currentTarget.style.background = 'rgba(59,110,181,0.03)'"
-    },
-    {
-      "file": "app/components/NeuFilterTabs.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "bd0488806939",
-      "occ": 0,
-      "line": 31,
-      "snippet": "background: 'rgba(255,255,255,0.40)',"
-    },
-    {
-      "file": "app/components/NeuFilterTabs.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "49d2e5abbe65",
-      "occ": 0,
-      "line": 34,
-      "snippet": "boxShadow: 'inset 2px 2px 5px rgba(140,170,210,0.10), inset -2px -2px 5px rgba(255,255,255,0.30)',"
-    },
-    {
-      "file": "app/components/NeuFilterTabs.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "b3d7a8ca67de",
-      "occ": 0,
-      "line": 60,
-      "snippet": "boxShadow: '2px 2px 6px rgba(140,170,210,0.22), -1px -1px 4px rgba(255,255,255,0.40)',"
-    },
-    {
-      "file": "app/components/NeuFilterTabs.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "5a16325defa8",
-      "occ": 0,
-      "line": 75,
-      "snippet": "background: 'rgba(255,255,255,0.25)',"
+      "line": 116,
+      "snippet": "background: on ? 'rgba(255,255,255,0.2)' : '#f0f1f4',"
     },
     {
       "file": "app/components/NeuSearchBar.tsx",
@@ -663,70 +303,6 @@
       "occ": 0,
       "line": 72,
       "snippet": "background: 'rgba(255,255,255,0.40)',"
-    },
-    {
-      "file": "app/components/NeuSearchBar.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "d8137842e1a5",
-      "occ": 0,
-      "line": 76,
-      "snippet": "boxShadow: 'inset 2px 2px 4px rgba(140,170,210,0.12), inset -2px -2px 4px rgba(255,255,255,0.35)',"
-    },
-    {
-      "file": "app/components/NeuSearchBar.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "c41b269acd50",
-      "occ": 0,
-      "line": 79,
-      "snippet": "onFocus={e => { e.currentTarget.style.boxShadow = 'inset 2px 2px 4px rgba(140,170,210,0.12), inset -2px -2px 4px rgba(25"
-    },
-    {
-      "file": "app/components/NeuSearchBar.tsx",
-      "label": "primary-hardcode",
-      "hash": "c41b269acd50",
-      "occ": 0,
-      "line": 79,
-      "snippet": "onFocus={e => { e.currentTarget.style.boxShadow = 'inset 2px 2px 4px rgba(140,170,210,0.12), inset -2px -2px 4px rgba(25"
-    },
-    {
-      "file": "app/components/NeuSearchBar.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "8ee1950e2763",
-      "occ": 0,
-      "line": 80,
-      "snippet": "onBlur={e => { e.currentTarget.style.boxShadow = 'inset 2px 2px 4px rgba(140,170,210,0.12), inset -2px -2px 4px rgba(255"
-    },
-    {
-      "file": "app/components/NeuSearchBar.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "e85618606388",
-      "occ": 0,
-      "line": 117,
-      "snippet": "boxShadow: '3px 3px 8px rgba(140,170,210,0.19), -1px -1px 4px rgba(255,255,255,0.47)',"
-    },
-    {
-      "file": "app/components/NeuSearchBar.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "044594d2e12e",
-      "occ": 0,
-      "line": 122,
-      "snippet": "background: 'rgba(255,255,255,0.60)',"
-    },
-    {
-      "file": "app/components/NeuSearchBar.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "c6a9de703575",
-      "occ": 0,
-      "line": 125,
-      "snippet": "boxShadow: '2px 2px 6px rgba(140,170,210,0.10), -2px -2px 6px rgba(255,255,255,0.40)',"
-    },
-    {
-      "file": "app/components/NeuStatCards.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "3dd1208727af",
-      "occ": 0,
-      "line": 79,
-      "snippet": "background: 'rgba(255,255,255,0.72)',"
     },
     {
       "file": "app/components/NeuStatCards.tsx",
@@ -745,123 +321,27 @@
       "snippet": "? `6px 6px 16px ${tint.shadow}, -4px -4px 12px rgba(255,255,255,0.47), inset 0 0 0 1px ${tint.border}`"
     },
     {
-      "file": "app/components/NeuStatCards.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "d800170ed41e",
-      "occ": 0,
-      "line": 90,
-      "snippet": "? '6px 6px 16px rgba(140,170,210,0.22), -4px -4px 12px rgba(255,255,255,0.5)'"
-    },
-    {
-      "file": "app/components/NeuStatCards.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "64e23c42aa77",
-      "occ": 0,
-      "line": 91,
-      "snippet": ": '4px 4px 12px rgba(140,170,210,0.14), -4px -4px 12px rgba(255,255,255,0.47)',"
-    },
-    {
       "file": "app/components/QuickTxModal.tsx",
       "label": "glass-bg-hardcode",
       "hash": "896fde69dba2",
       "occ": 0,
-      "line": 216,
+      "line": 214,
       "snippet": "background: 'rgba(255,255,255,0.55)',"
-    },
-    {
-      "file": "app/components/QuickTxModal.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "571339bf6813",
-      "occ": 0,
-      "line": 231,
-      "snippet": "background: active ? 'rgba(255,255,255,0.95)' : 'transparent',"
     },
     {
       "file": "app/components/QuickTxModal.tsx",
       "label": "primary-hardcode",
       "hash": "3c6f373af874",
       "occ": 0,
-      "line": 403,
+      "line": 401,
       "snippet": "boxShadow: '0 4px 12px rgba(59,110,181,0.25)',"
-    },
-    {
-      "file": "app/components/auth/ClientLayout.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "e85618606388",
-      "occ": 0,
-      "line": 107,
-      "snippet": "boxShadow: '3px 3px 8px rgba(140,170,210,0.19), -1px -1px 4px rgba(255,255,255,0.47)',"
-    },
-    {
-      "file": "app/components/auth/ClientLayout.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "a48895ab13ce",
-      "occ": 0,
-      "line": 299,
-      "snippet": "<div className=\"fixed top-0 left-0 right-0 z-30 safe-top\" style={{ background: 'rgba(255,255,255,0.85)', backdropFilter:"
-    },
-    {
-      "file": "app/components/auth/ClientLayout.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "8e26b31a8f62",
-      "occ": 0,
-      "line": 327,
-      "snippet": "<aside className={`${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} w-60 transition-transform duration-300 overf"
-    },
-    {
-      "file": "app/components/auth/ClientLayout.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "798a926214bf",
-      "occ": 0,
-      "line": 342,
-      "snippet": "<div className=\"rounded-lg px-3 py-3\" style={{ background: 'rgba(0,0,0,0.02)', border: '1px solid rgba(0,0,0,0.06)', box"
-    },
-    {
-      "file": "app/components/auth/ClientLayout.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "e85618606388",
-      "occ": 1,
-      "line": 388,
-      "snippet": "boxShadow: '3px 3px 8px rgba(140,170,210,0.19), -1px -1px 4px rgba(255,255,255,0.47)',"
-    },
-    {
-      "file": "app/components/auth/ClientLayout.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "77d288765500",
-      "occ": 0,
-      "line": 406,
-      "snippet": "boxShadow: '3px 3px 8px rgba(16,185,129,0.22), -1px -1px 4px rgba(255,255,255,0.47)',"
-    },
-    {
-      "file": "app/components/auth/ClientLayout.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "b44153c4de72",
-      "occ": 0,
-      "line": 413,
-      "snippet": "'4px 4px 12px rgba(16,185,129,0.30), -1px -1px 4px rgba(255,255,255,0.55)'"
-    },
-    {
-      "file": "app/components/auth/ClientLayout.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "6e2f29a0b50b",
-      "occ": 0,
-      "line": 418,
-      "snippet": "'3px 3px 8px rgba(16,185,129,0.22), -1px -1px 4px rgba(255,255,255,0.47)'"
-    },
-    {
-      "file": "app/components/auth/ClientLayout.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "45ec62a1c8c5",
-      "occ": 0,
-      "line": 528,
-      "snippet": "boxShadow: '12px 12px 30px rgba(140,170,210,0.25), -8px -8px 20px rgba(255,255,255,0.5)',"
     },
     {
       "file": "app/components/auth/ClientLayout.tsx",
       "label": "glass-bg-hardcode",
       "hash": "3a2d3fd06b93",
       "occ": 0,
-      "line": 621,
+      "line": 579,
       "snippet": "<div style={{ width: 14, height: 14, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '5"
     },
     {
@@ -869,7 +349,7 @@
       "label": "glass-bg-hardcode",
       "hash": "97ebe2a9bf9d",
       "occ": 0,
-      "line": 639,
+      "line": 597,
       "snippet": "background: 'rgba(22,32,54,0.97)', backdropFilter: 'blur(16px)', boxShadow: '0 8px 32px rgba(0,0,0,0.4), 0 0 0 1px rgba("
     },
     {
@@ -877,7 +357,7 @@
       "label": "glass-bg-hardcode",
       "hash": "53e54badd5eb",
       "occ": 0,
-      "line": 653,
+      "line": 611,
       "snippet": "<div style={{ width: 16, height: 16, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '5"
     },
     {
@@ -885,7 +365,7 @@
       "label": "glass-bg-hardcode",
       "hash": "13629b69e033",
       "occ": 0,
-      "line": 663,
+      "line": 621,
       "snippet": "<span style={{ fontSize: 11, fontWeight: 700, color: '#fff', background: 'rgba(255,255,255,0.2)', padding: '2px 8px', bo"
     },
     {
@@ -893,7 +373,7 @@
       "label": "glass-bg-hardcode",
       "hash": "c33f4fd939c1",
       "occ": 0,
-      "line": 668,
+      "line": 626,
       "snippet": "<span style={{ fontSize: 11, fontWeight: 700, color: '#fff', background: 'rgba(255,255,255,0.25)', padding: '2px 8px', b"
     },
     {
@@ -901,7 +381,7 @@
       "label": "glass-bg-hardcode",
       "hash": "0d11243732f8",
       "occ": 0,
-      "line": 673,
+      "line": 631,
       "snippet": "style={{ background: 'rgba(255,255,255,0.15)', border: 'none', cursor: 'pointer', borderRadius: 6, padding: '2px 6px', c"
     },
     {
@@ -909,7 +389,7 @@
       "label": "glass-bg-hardcode",
       "hash": "0d11243732f8",
       "occ": 1,
-      "line": 679,
+      "line": 637,
       "snippet": "style={{ background: 'rgba(255,255,255,0.15)', border: 'none', cursor: 'pointer', borderRadius: 6, padding: '2px 6px', c"
     },
     {
@@ -917,24 +397,8 @@
       "label": "glass-bg-hardcode",
       "hash": "bbe2a9a5821b",
       "occ": 0,
-      "line": 691,
+      "line": 649,
       "snippet": "<div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 6, height: 5, overflow: 'hidden', marginBottom: 8 }}>"
-    },
-    {
-      "file": "app/contracts/ContractListMain.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "3dd1208727af",
-      "occ": 0,
-      "line": 357,
-      "snippet": "background: 'rgba(255,255,255,0.72)',"
-    },
-    {
-      "file": "app/contracts/ContractListMain.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "b5be36070a8e",
-      "occ": 0,
-      "line": 360,
-      "snippet": "boxShadow: '6px 6px 18px rgba(140,170,210,0.14), -6px -6px 18px rgba(255,255,255,0.47)',"
     },
     {
       "file": "app/contracts/page.tsx",
@@ -943,30 +407,6 @@
       "occ": 0,
       "line": 28,
       "snippet": "background: 'rgba(255,255,255,0.50)',"
-    },
-    {
-      "file": "app/contracts/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "978ade96df63",
-      "occ": 0,
-      "line": 49,
-      "snippet": "? '6px 6px 16px rgba(140,170,210,0.12), -4px -4px 12px rgba(255,255,255,0.5)'"
-    },
-    {
-      "file": "app/customers/CustomerList.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "3dd1208727af",
-      "occ": 0,
-      "line": 675,
-      "snippet": "background: 'rgba(255,255,255,0.72)',"
-    },
-    {
-      "file": "app/customers/CustomerList.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "b5be36070a8e",
-      "occ": 0,
-      "line": 678,
-      "snippet": "boxShadow: '6px 6px 18px rgba(140,170,210,0.14), -6px -6px 18px rgba(255,255,255,0.47)',"
     },
     {
       "file": "app/customers/CustomerList.tsx",
@@ -978,27 +418,11 @@
     },
     {
       "file": "app/customers/CustomerList.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "705adb30758c",
-      "occ": 0,
-      "line": 937,
-      "snippet": "background: 'rgba(255,255,255,0.60)', color: '#1e293b',"
-    },
-    {
-      "file": "app/customers/CustomerList.tsx",
       "label": "primary-hardcode",
       "hash": "ec56a1b501d8",
       "occ": 0,
       "line": 962,
       "snippet": "<div style={{ padding: 12, background: 'rgba(59,110,181,0.05)', borderRadius: 8, marginBottom: 12 }}>"
-    },
-    {
-      "file": "app/customers/CustomerList.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "705adb30758c",
-      "occ": 1,
-      "line": 984,
-      "snippet": "background: 'rgba(255,255,255,0.60)', color: '#1e293b',"
     },
     {
       "file": "app/customers/CustomerList.tsx",
@@ -1019,14 +443,6 @@
     {
       "file": "app/customers/CustomerList.tsx",
       "label": "glass-bg-hardcode",
-      "hash": "705adb30758c",
-      "occ": 2,
-      "line": 1053,
-      "snippet": "background: 'rgba(255,255,255,0.60)', color: '#1e293b',"
-    },
-    {
-      "file": "app/customers/CustomerList.tsx",
-      "label": "glass-bg-hardcode",
       "hash": "0c02d59dfd68",
       "occ": 1,
       "line": 1065,
@@ -1039,494 +455,6 @@
       "occ": 2,
       "line": 1134,
       "snippet": "padding: 12, background: 'rgba(255,255,255,0.40)', borderRadius: 8,"
-    },
-    {
-      "file": "app/customers/CustomerList.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "705adb30758c",
-      "occ": 3,
-      "line": 1288,
-      "snippet": "background: 'rgba(255,255,255,0.60)', color: '#1e293b',"
-    },
-    {
-      "file": "app/dashboard/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "ea4351c15cce",
-      "occ": 0,
-      "line": 218,
-      "snippet": "<div className=\"si-card rounded-2xl p-5 border border-black/[0.06]\" style={{ background: 'linear-gradient(135deg, rgba(2"
-    },
-    {
-      "file": "app/dashboard/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "ea4351c15cce",
-      "occ": 1,
-      "line": 279,
-      "snippet": "<div className=\"si-card rounded-2xl p-5 border border-black/[0.06]\" style={{ background: 'linear-gradient(135deg, rgba(2"
-    },
-    {
-      "file": "app/dashboard/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "ea4351c15cce",
-      "occ": 2,
-      "line": 306,
-      "snippet": "<div className=\"si-card rounded-2xl p-5 border border-black/[0.06]\" style={{ background: 'linear-gradient(135deg, rgba(2"
-    },
-    {
-      "file": "app/dashboard/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "96a17717ff11",
-      "occ": 0,
-      "line": 350,
-      "snippet": "<div className=\"si-card rounded-2xl p-5 border border-red-500/20\" style={{ background: 'linear-gradient(135deg, rgba(255"
-    },
-    {
-      "file": "app/dashboard/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "cb6169ee3dce",
-      "occ": 0,
-      "line": 369,
-      "snippet": "<div className=\"si-card rounded-2xl p-5 border border-emerald-500/20\" style={{ background: 'linear-gradient(135deg, rgba"
-    },
-    {
-      "file": "app/dashboard/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "b7f2014a825d",
-      "occ": 0,
-      "line": 379,
-      "snippet": "<div className=\"si-card rounded-2xl p-6 border border-black/[0.06] text-center\" style={{ background: 'linear-gradient(13"
-    },
-    {
-      "file": "app/db/lotte/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "33ca266e1bcc",
-      "occ": 0,
-      "line": 359,
-      "snippet": "style={{ padding: '6px 10px', fontSize: 12, fontWeight: 600, borderRadius: 8, border: '1px solid rgba(0,0,0,0.06)', back"
-    },
-    {
-      "file": "app/db/lotte/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "33ca266e1bcc",
-      "occ": 1,
-      "line": 364,
-      "snippet": "style={{ padding: '6px 10px', fontSize: 12, fontWeight: 600, borderRadius: 8, border: '1px solid rgba(0,0,0,0.06)', back"
-    },
-    {
-      "file": "app/db/pricing-standards/BusinessRulesTab.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "3dd1208727af",
-      "occ": 0,
-      "line": 191,
-      "snippet": "background: 'rgba(255,255,255,0.72)',"
-    },
-    {
-      "file": "app/db/pricing-standards/BusinessRulesTab.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "101465e02e00",
-      "occ": 0,
-      "line": 195,
-      "snippet": "boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -4px -4px 12px rgba(255,255,255,0.5)',"
-    },
-    {
-      "file": "app/db/pricing-standards/BusinessRulesTab.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "2c8e6569e673",
-      "occ": 0,
-      "line": 234,
-      "snippet": "background: 'rgba(255,255,255,0.6)',"
-    },
-    {
-      "file": "app/db/pricing-standards/BusinessRulesTab.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "3dd1208727af",
-      "occ": 1,
-      "line": 267,
-      "snippet": "background: 'rgba(255,255,255,0.72)',"
-    },
-    {
-      "file": "app/db/pricing-standards/BusinessRulesTab.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "2b7285799f49",
-      "occ": 0,
-      "line": 270,
-      "snippet": "boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.9)',"
-    },
-    {
-      "file": "app/db/pricing-standards/BusinessRulesTab.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "c38aa8e8cb8e",
-      "occ": 0,
-      "line": 367,
-      "snippet": "background: 'rgba(255,255,255,0.95)',"
-    },
-    {
-      "file": "app/db/pricing-standards/BusinessRulesTab.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "c38aa8e8cb8e",
-      "occ": 1,
-      "line": 383,
-      "snippet": "background: 'rgba(255,255,255,0.95)',"
-    },
-    {
-      "file": "app/db/pricing-standards/BusinessRulesTab.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "c38aa8e8cb8e",
-      "occ": 2,
-      "line": 401,
-      "snippet": "background: 'rgba(255,255,255,0.95)',"
-    },
-    {
-      "file": "app/db/pricing-standards/BusinessRulesTab.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "3dd1208727af",
-      "occ": 2,
-      "line": 432,
-      "snippet": "background: 'rgba(255,255,255,0.72)',"
-    },
-    {
-      "file": "app/db/pricing-standards/BusinessRulesTab.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "ab53b954a883",
-      "occ": 0,
-      "line": 436,
-      "snippet": "boxShadow: '8px 8px 20px rgba(140,170,210,0.14), -4px -4px 14px rgba(255,255,255,0.6)',"
-    },
-    {
-      "file": "app/db/pricing-standards/BusinessRulesTab.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "044594d2e12e",
-      "occ": 0,
-      "line": 450,
-      "snippet": "background: 'rgba(255,255,255,0.60)',"
-    },
-    {
-      "file": "app/db/pricing-standards/BusinessRulesTab.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "044594d2e12e",
-      "occ": 1,
-      "line": 464,
-      "snippet": "background: 'rgba(255,255,255,0.60)',"
-    },
-    {
-      "file": "app/db/pricing-standards/BusinessRulesTab.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "044594d2e12e",
-      "occ": 2,
-      "line": 478,
-      "snippet": "background: 'rgba(255,255,255,0.60)',"
-    },
-    {
-      "file": "app/db/pricing-standards/BusinessRulesTab.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "c82639000141",
-      "occ": 0,
-      "line": 492,
-      "snippet": "background: 'rgba(255,255,255,0.50)',"
-    },
-    {
-      "file": "app/db/pricing-standards/BusinessRulesTab.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "bd0488806939",
-      "occ": 0,
-      "line": 526,
-      "snippet": "background: 'rgba(255,255,255,0.40)',"
-    },
-    {
-      "file": "app/db/pricing-standards/CostStandardsTab.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "b337e74249f8",
-      "occ": 0,
-      "line": 180,
-      "snippet": "background: 'rgba(255,255,255,0.72)', borderRadius: 14,"
-    },
-    {
-      "file": "app/db/pricing-standards/CostStandardsTab.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "101465e02e00",
-      "occ": 0,
-      "line": 182,
-      "snippet": "boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -4px -4px 12px rgba(255,255,255,0.5)',"
-    },
-    {
-      "file": "app/db/pricing-standards/CostStandardsTab.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "45c2fc4ef49e",
-      "occ": 0,
-      "line": 194,
-      "snippet": "background: filter === f ? 'rgba(59,130,246,0.15)' : 'rgba(255,255,255,0.4)',"
-    },
-    {
-      "file": "app/db/pricing-standards/CostStandardsTab.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "c4a224a8b539",
-      "occ": 0,
-      "line": 209,
-      "snippet": "border: '1px solid rgba(0,0,0,0.05)', background: 'rgba(255,255,255,0.4)',"
-    },
-    {
-      "file": "app/db/pricing-standards/CostStandardsTab.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "b222c9ac2d35",
-      "occ": 0,
-      "line": 249,
-      "snippet": "background: selectedId === s.id ? 'rgba(59,130,246,0.08)' : 'rgba(255,255,255,0.35)',"
-    },
-    {
-      "file": "app/db/pricing-standards/CostStandardsTab.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "5b5f4b1729aa",
-      "occ": 0,
-      "line": 273,
-      "snippet": "background: 'rgba(255,255,255,0.72)', borderRadius: 14, padding: 40,"
-    },
-    {
-      "file": "app/db/pricing-standards/CostStandardsTab.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "0a6ec56ffcfe",
-      "occ": 0,
-      "line": 283,
-      "snippet": "background: 'rgba(255,255,255,0.72)', borderRadius: 14, padding: 20,"
-    },
-    {
-      "file": "app/db/pricing-standards/CostStandardsTab.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "101465e02e00",
-      "occ": 1,
-      "line": 285,
-      "snippet": "boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -4px -4px 12px rgba(255,255,255,0.5)',"
-    },
-    {
-      "file": "app/db/pricing-standards/CostStandardsTab.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "8fa4270788cd",
-      "occ": 0,
-      "line": 330,
-      "snippet": "background: 'rgba(255,255,255,0.45)',"
-    },
-    {
-      "file": "app/db/pricing-standards/CostStandardsTab.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "2e054de194f2",
-      "occ": 0,
-      "line": 409,
-      "snippet": "background: 'rgba(255,255,255,0.5)', border: '1px solid rgba(0,0,0,0.05)',"
-    },
-    {
-      "file": "app/db/pricing-standards/EvidenceDrawer.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "2dec511128d1",
-      "occ": 0,
-      "line": 204,
-      "snippet": "background: 'rgba(255,255,255,0.82)',"
-    },
-    {
-      "file": "app/db/pricing-standards/EvidenceDrawer.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "d036f8ee59f3",
-      "occ": 0,
-      "line": 232,
-      "snippet": "background: 'rgba(255,255,255,0.6)', cursor: 'pointer',"
-    },
-    {
-      "file": "app/db/pricing-standards/EvidenceDrawer.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "896fde69dba2",
-      "occ": 0,
-      "line": 370,
-      "snippet": "background: 'rgba(255,255,255,0.55)',"
-    },
-    {
-      "file": "app/db/pricing-standards/EvidenceDrawer.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "3dd1208727af",
-      "occ": 0,
-      "line": 486,
-      "snippet": "background: 'rgba(255,255,255,0.72)',"
-    },
-    {
-      "file": "app/db/pricing-standards/EvidenceDrawer.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "a17c4f7513ed",
-      "occ": 0,
-      "line": 490,
-      "snippet": "boxShadow: '6px 6px 14px rgba(140,170,210,0.10), -4px -4px 10px rgba(255,255,255,0.45)',"
-    },
-    {
-      "file": "app/db/pricing-standards/EvidenceDrawer.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "3dd1208727af",
-      "occ": 1,
-      "line": 504,
-      "snippet": "background: 'rgba(255,255,255,0.72)',"
-    },
-    {
-      "file": "app/db/pricing-standards/MarketPriceTab.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "a75ec9b48c64",
-      "occ": 0,
-      "line": 53,
-      "snippet": "level4: { background: 'rgba(255,255,255,0.72)', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 16, boxShadow: '6px "
-    },
-    {
-      "file": "app/db/pricing-standards/MarketPriceTab.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "b4cb35d54eeb",
-      "occ": 0,
-      "line": 54,
-      "snippet": "level3Blue:   { background: 'rgba(255,255,255,0.60)', border: '1px solid rgba(191,219,254,0.80)',  borderRadius: 14 },"
-    },
-    {
-      "file": "app/db/pricing-standards/MarketPriceTab.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "858b59e47fb5",
-      "occ": 0,
-      "line": 55,
-      "snippet": "level3Green:  { background: 'rgba(255,255,255,0.60)', border: '1px solid rgba(187,247,208,0.80)',  borderRadius: 14 },"
-    },
-    {
-      "file": "app/db/pricing-standards/MarketPriceTab.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "b10aa7146e3d",
-      "occ": 0,
-      "line": 56,
-      "snippet": "level3Violet: { background: 'rgba(255,255,255,0.60)', border: '1px solid rgba(221,214,254,0.80)',  borderRadius: 14 },"
-    },
-    {
-      "file": "app/db/pricing-standards/MarketPriceTab.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "1e84c161b908",
-      "occ": 0,
-      "line": 57,
-      "snippet": "level3Amber:  { background: 'rgba(255,255,255,0.60)', border: '1px solid rgba(253,230,138,0.80)',  borderRadius: 14 },"
-    },
-    {
-      "file": "app/db/pricing-standards/MarketPriceTab.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "bd0488806939",
-      "occ": 0,
-      "line": 59,
-      "snippet": "background: 'rgba(255,255,255,0.40)',"
-    },
-    {
-      "file": "app/db/pricing-standards/MarketPriceTab.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "b1331680fb6a",
-      "occ": 0,
-      "line": 61,
-      "snippet": "boxShadow: 'inset 2px 2px 4px rgba(140,170,210,0.08), inset -1px -1px 2px rgba(255,255,255,0.5)',"
-    },
-    {
-      "file": "app/db/pricing-standards/MarketPriceTab.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "4352cdb7412e",
-      "occ": 0,
-      "line": 215,
-      "snippet": "background: 'rgba(255,255,255,0.95)', borderRadius: 12, padding: 6,"
-    },
-    {
-      "file": "app/db/pricing-standards/MarketPriceTab.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "f75b74087aa9",
-      "occ": 0,
-      "line": 444,
-      "snippet": "style={{ width: 120, padding: '4px 8px', border: '1px solid rgba(59,130,246,0.4)', borderRadius: 6, fontSize: 12, backgr"
-    },
-    {
-      "file": "app/db/pricing-standards/MarketPriceTab.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "f418b8fe0ac8",
-      "occ": 0,
-      "line": 506,
-      "snippet": "border: '1px solid rgba(0,0,0,0.08)', background: 'rgba(255,255,255,0.6)', color: '#475569',"
-    },
-    {
-      "file": "app/db/pricing-standards/PresetsTab.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "e78a5676e00c",
-      "occ": 0,
-      "line": 181,
-      "snippet": "style={{ background: 'rgba(255,255,255,0.72)', borderColor: 'rgba(0,0,0,0.06)' }}"
-    },
-    {
-      "file": "app/db/pricing-standards/PresetsTab.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "3dd1208727af",
-      "occ": 0,
-      "line": 193,
-      "snippet": "background: 'rgba(255,255,255,0.72)',"
-    },
-    {
-      "file": "app/db/pricing-standards/PresetsTab.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "101465e02e00",
-      "occ": 0,
-      "line": 195,
-      "snippet": "boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -4px -4px 12px rgba(255,255,255,0.5)',"
-    },
-    {
-      "file": "app/db/pricing-standards/PresetsTab.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "cd15e606458b",
-      "occ": 0,
-      "line": 240,
-      "snippet": "style={{ background: 'rgba(255,255,255,0.60)', borderColor: 'rgba(0,0,0,0.06)' }}"
-    },
-    {
-      "file": "app/db/pricing-standards/PresetsTab.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "3dd1208727af",
-      "occ": 1,
-      "line": 255,
-      "snippet": "background: 'rgba(255,255,255,0.72)',"
-    },
-    {
-      "file": "app/db/pricing-standards/PresetsTab.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "101465e02e00",
-      "occ": 1,
-      "line": 257,
-      "snippet": "boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -4px -4px 12px rgba(255,255,255,0.5)',"
-    },
-    {
-      "file": "app/db/pricing-standards/PresetsTab.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "c8b2c93ff788",
-      "occ": 0,
-      "line": 321,
-      "snippet": "background: 'rgba(255,255,255,0.75)',"
-    },
-    {
-      "file": "app/db/pricing-standards/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "cc1d6e9f362f",
-      "occ": 0,
-      "line": 74,
-      "snippet": "background: showSimulation ? 'rgba(59,130,246,0.1)' : 'rgba(255,255,255,0.6)',"
-    },
-    {
-      "file": "app/db/pricing-standards/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "b8fe79151035",
-      "occ": 0,
-      "line": 86,
-      "snippet": "border: '1px solid rgba(0,0,0,0.06)', background: 'rgba(255,255,255,0.6)',"
-    },
-    {
-      "file": "app/db/pricing-standards/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "3dd1208727af",
-      "occ": 0,
-      "line": 100,
-      "snippet": "background: 'rgba(255,255,255,0.72)',"
-    },
-    {
-      "file": "app/db/pricing-standards/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "101465e02e00",
-      "occ": 0,
-      "line": 105,
-      "snippet": "boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -4px -4px 12px rgba(255,255,255,0.5)',"
     },
     {
       "file": "app/e-contract/EContractListMain.tsx",
@@ -1561,212 +489,36 @@
       "snippet": "flex: 1, padding: '7px 14px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8,"
     },
     {
-      "file": "app/finance/bank-card/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "74e2573a841e",
-      "occ": 0,
-      "line": 3514,
-      "snippet": "background: 'linear-gradient(90deg, rgba(245,243,255,0.97), rgba(255,255,255,0.97))',"
-    },
-    {
-      "file": "app/finance/bank-card/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "fec3f4d1974b",
-      "occ": 0,
-      "line": 3778,
-      "snippet": "background: 'linear-gradient(180deg, rgba(245,243,255,0.6), rgba(255,255,255,0.4))',"
-    },
-    {
-      "file": "app/finance/bank-card/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "5ee1638b2280",
-      "occ": 0,
-      "line": 3797,
-      "snippet": "background: r.ok ? (r.applied > 0 ? 'rgba(240,253,244,0.5)' : 'rgba(255,255,255,0.4)') : 'rgba(254,226,226,0.4)',"
-    },
-    {
-      "file": "app/finance/bank-card/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "47bf08c26f9a",
-      "occ": 0,
-      "line": 3821,
-      "snippet": "background: ai.error ? 'rgba(254,226,226,0.4)' : ai.applied > 0 ? 'rgba(240,253,244,0.5)' : 'rgba(255,255,255,0.4)',"
-    },
-    {
-      "file": "app/finance/bank-card/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "b32e6a4d6b5f",
-      "occ": 0,
-      "line": 3864,
-      "snippet": "background: 'linear-gradient(180deg, rgba(250,245,255,0.6), rgba(255,255,255,0.4))',"
-    },
-    {
-      "file": "app/finance/bank-card/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "cfaf82adbe1c",
-      "occ": 0,
-      "line": 4574,
-      "snippet": "background: allSelected ? 'rgba(245,243,255,0.6)' : 'rgba(255,255,255,0.5)',"
-    },
-    {
-      "file": "app/finance/bank-card/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "2cb9c3d69b3d",
-      "occ": 0,
-      "line": 4601,
-      "snippet": "<thead style={{ position: 'sticky', top: 0, background: 'rgba(255,255,255,0.95)', zIndex: 1 }}>"
-    },
-    {
-      "file": "app/finance/bank-card/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "15a87b21a7f1",
-      "occ": 0,
-      "line": 6146,
-      "snippet": "<div style={{ fontSize: 11, padding: '6px 8px', background: 'rgba(255,255,255,0.6)', borderRadius: 6 }}>"
-    },
-    {
-      "file": "app/finance/bank-card/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "e2f59fd37a40",
-      "occ": 0,
-      "line": 6276,
-      "snippet": "<div style={{ fontSize: 11, padding: '6px 8px', background: 'rgba(255,255,255,0.6)', borderRadius: 6 }}>후보 거래 <b>{invest"
-    },
-    {
-      "file": "app/finance/bank-card/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "a396d3802170",
-      "occ": 0,
-      "line": 6365,
-      "snippet": "<div style={{ fontSize: 11, padding: '6px 8px', background: 'rgba(255,255,255,0.6)', borderRadius: 6 }}>후보 거래 <b>{employ"
-    },
-    {
-      "file": "app/finance/bank-card/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "5cee9071e5d3",
-      "occ": 0,
-      "line": 6460,
-      "snippet": "<div style={{ fontSize: 11, padding: '6px 8px', background: 'rgba(255,255,255,0.6)', borderRadius: 6 }}>후보 거래 <b>{freela"
-    },
-    {
-      "file": "app/finance/bank-card/page.tsx",
+      "file": "app/finance/bank-card/SmsTab.tsx",
       "label": "primary-hardcode",
-      "hash": "d6f5769d7293",
+      "hash": "0a1ec8f8cbc0",
       "occ": 0,
-      "line": 6709,
-      "snippet": "border: `1px solid ${smsStatusFilter === s ? 'rgba(59,110,181,0.4)' : 'rgba(0,0,0,0.06)'}`,"
+      "line": 58,
+      "snippet": "border: `1px solid ${statusFilter === s ? 'rgba(59,110,181,0.4)' : 'rgba(0,0,0,0.06)'}`,"
     },
     {
-      "file": "app/finance/bank-card/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "b23037424ca7",
-      "occ": 0,
-      "line": 6710,
-      "snippet": "background: smsStatusFilter === s ? 'rgba(191,219,254,0.6)' : 'rgba(255,255,255,0.72)',"
-    },
-    {
-      "file": "app/finance/bank-card/page.tsx",
+      "file": "app/finance/bank-card/SmsTab.tsx",
       "label": "primary-hardcode",
-      "hash": "97bd37760e15",
+      "hash": "3884f5598d28",
       "occ": 0,
-      "line": 6720,
-      "snippet": "border: `1px solid ${smsIssuerFilter === i ? 'rgba(59,110,181,0.4)' : 'rgba(0,0,0,0.06)'}`,"
+      "line": 69,
+      "snippet": "border: `1px solid ${issuerFilter === i ? 'rgba(59,110,181,0.4)' : 'rgba(0,0,0,0.06)'}`,"
     },
     {
-      "file": "app/finance/bank-card/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "6b41fe65271f",
-      "occ": 0,
-      "line": 6721,
-      "snippet": "background: smsIssuerFilter === i ? 'rgba(191,219,254,0.6)' : 'rgba(255,255,255,0.72)',"
-    },
-    {
-      "file": "app/finance/bank-card/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "e7e2c2f8302f",
-      "occ": 0,
-      "line": 6742,
-      "snippet": "boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -2px -2px 8px rgba(255,255,255,0.6)',"
-    },
-    {
-      "file": "app/finance/bank-card/page.tsx",
+      "file": "app/finance/bank-card/VerifyTab.tsx",
       "label": "primary-hardcode",
-      "hash": "3907c9c278dd",
+      "hash": "0419882804bc",
       "occ": 0,
-      "line": 6806,
-      "snippet": "border: `1px solid ${mappingSub === 'card' ? 'rgba(59,110,181,0.4)' : 'rgba(0,0,0,0.06)'}`,"
-    },
-    {
-      "file": "app/finance/bank-card/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "defec012d85d",
-      "occ": 0,
-      "line": 6807,
-      "snippet": "background: mappingSub === 'card' ? 'rgba(191,219,254,0.6)' : 'rgba(255,255,255,0.72)',"
-    },
-    {
-      "file": "app/finance/bank-card/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "db7b0b7bf2f9",
-      "occ": 0,
-      "line": 6813,
-      "snippet": "background: mappingSub === 'bank' ? 'rgba(167,243,208,0.4)' : 'rgba(255,255,255,0.72)',"
-    },
-    {
-      "file": "app/finance/bank-card/page.tsx",
-      "label": "primary-hardcode",
-      "hash": "904a944bd644",
-      "occ": 0,
-      "line": 7093,
-      "snippet": "border: `1px solid ${ruleFilter === f ? 'rgba(59,110,181,0.4)' : 'rgba(0,0,0,0.06)'}`,"
-    },
-    {
-      "file": "app/finance/bank-card/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "0eb6a34edbf5",
-      "occ": 0,
-      "line": 7094,
-      "snippet": "background: ruleFilter === f ? 'rgba(191,219,254,0.5)' : 'rgba(255,255,255,0.72)',"
-    },
-    {
-      "file": "app/finance/bank-card/page.tsx",
-      "label": "primary-hardcode",
-      "hash": "a09aa692de5f",
-      "occ": 0,
-      "line": 7173,
-      "snippet": "background: 'rgba(191,219,254,0.5)', border: '1px solid rgba(59,110,181,0.2)', color: '#1e40af', marginRight: 4 }}"
-    },
-    {
-      "file": "app/finance/bank-card/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "53cab07da551",
-      "occ": 0,
-      "line": 7726,
-      "snippet": "background: i === currentFileIndex ? COLORS.primary : 'rgba(255,255,255,0.6)',"
+      "line": 196,
+      "snippet": "border: `1px solid ${days === d ? 'rgba(59,110,181,0.4)' : 'rgba(0,0,0,0.06)'}`,"
     },
     {
       "file": "app/finance/bank-card/page.tsx",
       "label": "glass-bg-hardcode",
       "hash": "a15f927e4c2d",
       "occ": 0,
-      "line": 7858,
+      "line": 4075,
       "snippet": "<div style={{ marginTop: 6, padding: '6px 8px', background: 'rgba(255,255,255,0.5)', borderRadius: 6, fontSize: 12 }}>"
-    },
-    {
-      "file": "app/finance/cost-analysis/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "b337e74249f8",
-      "occ": 0,
-      "line": 141,
-      "snippet": "background: 'rgba(255,255,255,0.72)', borderRadius: 14,"
-    },
-    {
-      "file": "app/finance/cost-analysis/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "101465e02e00",
-      "occ": 0,
-      "line": 143,
-      "snippet": "boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -4px -4px 12px rgba(255,255,255,0.5)',"
     },
     {
       "file": "app/finance/cost-analysis/page.tsx",
@@ -1785,108 +537,12 @@
       "snippet": "background: 'rgba(255,255,255,0.5)', outline: 'none',"
     },
     {
-      "file": "app/finance/cost-analysis/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "b337e74249f8",
-      "occ": 1,
-      "line": 182,
-      "snippet": "background: 'rgba(255,255,255,0.72)', borderRadius: 14,"
-    },
-    {
-      "file": "app/finance/cost-analysis/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "b337e74249f8",
-      "occ": 2,
-      "line": 219,
-      "snippet": "background: 'rgba(255,255,255,0.72)', borderRadius: 14,"
-    },
-    {
-      "file": "app/finance/cost-analysis/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "f530c78a9e33",
-      "occ": 0,
-      "line": 284,
-      "snippet": "marginTop: 16, background: 'rgba(255,255,255,0.72)', borderRadius: 14,"
-    },
-    {
-      "file": "app/finance/cost-analysis/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "254093d252a6",
-      "occ": 0,
-      "line": 324,
-      "snippet": "background: 'rgba(255,255,255,0.72)', borderRadius: 14, padding: 60,"
-    },
-    {
-      "file": "app/finance/fleet/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "0308a2d84c85",
-      "occ": 0,
-      "line": 405,
-      "snippet": "style={{ padding: '6px 10px', fontSize: 12, fontWeight: 600, borderRadius: 8, border: '1px solid rgba(0,0,0,0.06)', back"
-    },
-    {
-      "file": "app/finance/fleet/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "33ca266e1bcc",
-      "occ": 0,
-      "line": 407,
-      "snippet": "style={{ padding: '6px 10px', fontSize: 12, fontWeight: 600, borderRadius: 8, border: '1px solid rgba(0,0,0,0.06)', back"
-    },
-    {
-      "file": "app/finance/fleet/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "121f75814fba",
-      "occ": 0,
-      "line": 420,
-      "snippet": "<div style={{ background: 'rgba(255,255,255,0.72)', borderRadius: 16, border: '1px solid rgba(0,0,0,0.05)', overflow: 'h"
-    },
-    {
-      "file": "app/finance/settlement/ContractsTab.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "044594d2e12e",
-      "occ": 0,
-      "line": 358,
-      "snippet": "background: 'rgba(255,255,255,0.60)',"
-    },
-    {
       "file": "app/finance/settlement/ContractsTab.tsx",
       "label": "primary-hardcode",
       "hash": "29591f2e52b8",
       "occ": 0,
       "line": 360,
       "snippet": ": k.tint === 'blue' ? 'rgba(59,110,181,0.25)'"
-    },
-    {
-      "file": "app/finance/settlement/ContractsTab.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "101465e02e00",
-      "occ": 0,
-      "line": 363,
-      "snippet": "boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -4px -4px 12px rgba(255,255,255,0.5)',"
-    },
-    {
-      "file": "app/finance/settlement/SettlementDashboard.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "6bb444670eeb",
-      "occ": 0,
-      "line": 1006,
-      "snippet": "style={{ padding: '5px 10px', fontSize: 12, fontWeight: 700, borderRadius: 8, border: '1px solid rgba(0,0,0,0.06)', back"
-    },
-    {
-      "file": "app/finance/settlement/SettlementDashboard.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "f1909e923824",
-      "occ": 0,
-      "line": 1008,
-      "snippet": "style={{ padding: '5px 12px', fontSize: 11, fontWeight: 600, borderRadius: 8, border: '1px solid rgba(0,0,0,0.06)', back"
-    },
-    {
-      "file": "app/finance/settlement/SettlementDashboard.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "5668b4e62206",
-      "occ": 0,
-      "line": 1020,
-      "snippet": "<div style={{ background: 'rgba(255,255,255,0.72)', borderRadius: 16, border: '1px solid rgba(0,0,0,0.05)', boxShadow: '"
     },
     {
       "file": "app/finance/settlement/SettlementDashboard.tsx",
@@ -1938,18 +594,10 @@
     },
     {
       "file": "app/finance/settlement/statement/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "e8a9c5745f06",
-      "occ": 0,
-      "line": 165,
-      "snippet": "background: 'rgba(255,255,255,0.95)', borderBottom: '1px solid #e2e8f0',"
-    },
-    {
-      "file": "app/finance/settlement/statement/page.tsx",
       "label": "primary-hardcode",
       "hash": "c3445c32fd78",
       "occ": 0,
-      "line": 431,
+      "line": 430,
       "snippet": "boxShadow: '0 2px 8px rgba(59,110,181,0.25)',"
     },
     {
@@ -1962,571 +610,11 @@
     },
     {
       "file": "app/finance/sms/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "80cca862b4f2",
-      "occ": 0,
-      "line": 128,
-      "snippet": "background: statusFilter === s ? 'rgba(191,219,254,0.6)' : 'rgba(255,255,255,0.72)',"
-    },
-    {
-      "file": "app/finance/sms/page.tsx",
       "label": "primary-hardcode",
       "hash": "3884f5598d28",
       "occ": 0,
       "line": 146,
       "snippet": "border: `1px solid ${issuerFilter === i ? 'rgba(59,110,181,0.4)' : 'rgba(0,0,0,0.06)'}`,"
-    },
-    {
-      "file": "app/finance/sms/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "b20f33f8bc09",
-      "occ": 0,
-      "line": 147,
-      "snippet": "background: issuerFilter === i ? 'rgba(191,219,254,0.6)' : 'rgba(255,255,255,0.72)',"
-    },
-    {
-      "file": "app/finance/sms/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "3dd1208727af",
-      "occ": 0,
-      "line": 161,
-      "snippet": "background: 'rgba(255,255,255,0.72)',"
-    },
-    {
-      "file": "app/finance/sms/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "e7e2c2f8302f",
-      "occ": 0,
-      "line": 167,
-      "snippet": "boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -2px -2px 8px rgba(255,255,255,0.6)',"
-    },
-    {
-      "file": "app/finance/tax/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "04f1b9c2436c",
-      "occ": 0,
-      "line": 506,
-      "snippet": "<button onClick={() => changeMonth(-1)} style={{ padding: '5px 10px', border: '1px solid rgba(0,0,0,0.06)', borderRadius"
-    },
-    {
-      "file": "app/finance/tax/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "6980773ebf2e",
-      "occ": 0,
-      "line": 510,
-      "snippet": "<button onClick={() => changeMonth(1)} style={{ padding: '5px 10px', border: '1px solid rgba(0,0,0,0.06)', borderRadius:"
-    },
-    {
-      "file": "app/hr/_components/PayrollOps.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "1f4496164088",
-      "occ": 0,
-      "line": 625,
-      "snippet": "<div style={{ background: 'rgba(255,255,255,0.72)', borderRadius: 16, border: '1px solid rgba(0,0,0,0.06)', padding: '48"
-    },
-    {
-      "file": "app/hr/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "3dd1208727af",
-      "occ": 0,
-      "line": 1237,
-      "snippet": "background: 'rgba(255,255,255,0.72)',"
-    },
-    {
-      "file": "app/hr/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "b5be36070a8e",
-      "occ": 0,
-      "line": 1240,
-      "snippet": "boxShadow: '6px 6px 18px rgba(140,170,210,0.14), -6px -6px 18px rgba(255,255,255,0.47)',"
-    },
-    {
-      "file": "app/hr/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "bd0488806939",
-      "occ": 0,
-      "line": 1247,
-      "snippet": "background: 'rgba(255,255,255,0.40)',"
-    },
-    {
-      "file": "app/hr/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "9a3b09670f64",
-      "occ": 0,
-      "line": 1447,
-      "snippet": "background: isDragging ? 'rgba(59,130,246,0.05)' : aiParsing ? 'rgba(34,197,94,0.04)' : 'rgba(255,255,255,0.4)',"
-    },
-    {
-      "file": "app/hr/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "8cee720663dc",
-      "occ": 0,
-      "line": 1471,
-      "snippet": "<div style={{ background: 'rgba(255,255,255,0.6)', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 10, padding: 12, "
-    },
-    {
-      "file": "app/hr/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "76f34d8f68c5",
-      "occ": 0,
-      "line": 1663,
-      "snippet": "style={{ width: '100%', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, padding: '8px 12px', fontSize: 13, outli"
-    },
-    {
-      "file": "app/hr/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "3c7bd37fea71",
-      "occ": 0,
-      "line": 1669,
-      "snippet": "style={{ width: '100%', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, padding: '8px 12px', fontSize: 13, outli"
-    },
-    {
-      "file": "app/hr/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "d76940608471",
-      "occ": 0,
-      "line": 1675,
-      "snippet": "<div style={{ padding: '10px 16px', borderBottom: '1px solid rgba(0,0,0,0.06)', background: 'rgba(255,255,255,0.40)' }}>"
-    },
-    {
-      "file": "app/hr/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "b92b50880bc4",
-      "occ": 0,
-      "line": 1718,
-      "snippet": "style={{ width: '100%', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, padding: '8px 12px', fontSize: 13, outli"
-    },
-    {
-      "file": "app/hr/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "d76940608471",
-      "occ": 1,
-      "line": 1724,
-      "snippet": "<div style={{ padding: '10px 16px', borderBottom: '1px solid rgba(0,0,0,0.06)', background: 'rgba(255,255,255,0.40)' }}>"
-    },
-    {
-      "file": "app/hr/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "fda20ea83daa",
-      "occ": 0,
-      "line": 1898,
-      "snippet": "<div style={{ padding: '10px 16px', background: 'rgba(255,255,255,0.40)', borderBottom: '1px solid rgba(0,0,0,0.06)', po"
-    },
-    {
-      "file": "app/hr/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "25daf2d078b9",
-      "occ": 0,
-      "line": 1932,
-      "snippet": "style={{ fontSize: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 6, padding: '2px 6px', background: 'rgba(255,"
-    },
-    {
-      "file": "app/hr/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "a86ad253eda8",
-      "occ": 0,
-      "line": 1976,
-      "snippet": "style={{ background: 'rgba(255,255,255,0.92)', borderRadius: 20, width: '100%', maxWidth: 560, boxShadow: '0 25px 50px r"
-    },
-    {
-      "file": "app/hr/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "1ddb36809ba3",
-      "occ": 0,
-      "line": 1977,
-      "snippet": "<div style={{ padding: '20px 24px', borderBottom: '1px solid rgba(0,0,0,0.06)', background: 'rgba(255,255,255,0.40)', di"
-    },
-    {
-      "file": "app/hr/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "ff3f338a412e",
-      "occ": 0,
-      "line": 1989,
-      "snippet": "style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none"
-    },
-    {
-      "file": "app/hr/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "ff3f338a412e",
-      "occ": 1,
-      "line": 1995,
-      "snippet": "style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none"
-    },
-    {
-      "file": "app/hr/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "ff3f338a412e",
-      "occ": 2,
-      "line": 2002,
-      "snippet": "style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none"
-    },
-    {
-      "file": "app/hr/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "ff3f338a412e",
-      "occ": 3,
-      "line": 2007,
-      "snippet": "style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none"
-    },
-    {
-      "file": "app/hr/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "456bc9bed16f",
-      "occ": 0,
-      "line": 2014,
-      "snippet": "style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none"
-    },
-    {
-      "file": "app/hr/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "456bc9bed16f",
-      "occ": 1,
-      "line": 2021,
-      "snippet": "style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none"
-    },
-    {
-      "file": "app/hr/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "456bc9bed16f",
-      "occ": 2,
-      "line": 2032,
-      "snippet": "style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none"
-    },
-    {
-      "file": "app/hr/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "ff3f338a412e",
-      "occ": 4,
-      "line": 2039,
-      "snippet": "style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none"
-    },
-    {
-      "file": "app/hr/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "ff3f338a412e",
-      "occ": 5,
-      "line": 2045,
-      "snippet": "style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none"
-    },
-    {
-      "file": "app/hr/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "456bc9bed16f",
-      "occ": 3,
-      "line": 2055,
-      "snippet": "style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none"
-    },
-    {
-      "file": "app/hr/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "c99a02e1088c",
-      "occ": 0,
-      "line": 2068,
-      "snippet": "style={{ width: '100%', padding: 10, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none"
-    },
-    {
-      "file": "app/hr/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "d04dc81df5cb",
-      "occ": 0,
-      "line": 2071,
-      "snippet": "<div style={{ padding: '14px 20px', borderTop: '1px solid rgba(0,0,0,0.06)', background: 'rgba(255,255,255,0.40)', displ"
-    },
-    {
-      "file": "app/hr/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "6020ba79df25",
-      "occ": 0,
-      "line": 2073,
-      "snippet": "style={{ flex: 1, padding: '10px 0', border: '1px solid rgba(0,0,0,0.08)', background: 'rgba(255,255,255,0.8)', color: '"
-    },
-    {
-      "file": "app/hr/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "797b7ebcd146",
-      "occ": 0,
-      "line": 2090,
-      "snippet": "style={{ background: 'rgba(255,255,255,0.92)', borderRadius: 20, width: '100%', maxWidth: 880, boxShadow: '0 25px 50px r"
-    },
-    {
-      "file": "app/hr/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "1ddb36809ba3",
-      "occ": 1,
-      "line": 2093,
-      "snippet": "<div style={{ padding: '20px 24px', borderBottom: '1px solid rgba(0,0,0,0.06)', background: 'rgba(255,255,255,0.40)', di"
-    },
-    {
-      "file": "app/hr/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "fbcdea437a7c",
-      "occ": 0,
-      "line": 2112,
-      "snippet": "<div style={{ display: 'flex', borderBottom: '1px solid rgba(0,0,0,0.06)', background: 'rgba(255,255,255,0.30)', flexShr"
-    },
-    {
-      "file": "app/hr/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "2c0d77434752",
-      "occ": 0,
-      "line": 2139,
-      "snippet": "style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, outline: 'non"
-    },
-    {
-      "file": "app/hr/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "fc91e66dd923",
-      "occ": 0,
-      "line": 2144,
-      "snippet": "style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, outline: 'non"
-    },
-    {
-      "file": "app/hr/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "395b3c9f3c02",
-      "occ": 0,
-      "line": 2150,
-      "snippet": "style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, background: '"
-    },
-    {
-      "file": "app/hr/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "395b3c9f3c02",
-      "occ": 1,
-      "line": 2159,
-      "snippet": "style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, background: '"
-    },
-    {
-      "file": "app/hr/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "395b3c9f3c02",
-      "occ": 2,
-      "line": 2170,
-      "snippet": "style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, background: '"
-    },
-    {
-      "file": "app/hr/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "395b3c9f3c02",
-      "occ": 3,
-      "line": 2178,
-      "snippet": "style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, background: '"
-    },
-    {
-      "file": "app/hr/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "66ef0fed0143",
-      "occ": 0,
-      "line": 2194,
-      "snippet": "style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, outline: 'non"
-    },
-    {
-      "file": "app/hr/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "395b3c9f3c02",
-      "occ": 4,
-      "line": 2208,
-      "snippet": "style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, background: '"
-    },
-    {
-      "file": "app/hr/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "5df15be31152",
-      "occ": 0,
-      "line": 2222,
-      "snippet": "style={{ width: '100%', padding: 10, border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, fontSize: 13, outline: 'n"
-    },
-    {
-      "file": "app/hr/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "5df15be31152",
-      "occ": 1,
-      "line": 2229,
-      "snippet": "style={{ width: '100%', padding: 10, border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, fontSize: 13, outline: 'n"
-    },
-    {
-      "file": "app/hr/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "9a015f050b3c",
-      "occ": 0,
-      "line": 2239,
-      "snippet": "<div style={{ background: 'rgba(255,255,255,0.40)', borderRadius: 10, padding: 12, border: '1px solid rgba(0,0,0,0.05)',"
-    },
-    {
-      "file": "app/hr/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "ae27ae0e0a76",
-      "occ": 0,
-      "line": 2264,
-      "snippet": "style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, outline: 'non"
-    },
-    {
-      "file": "app/hr/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "ae27ae0e0a76",
-      "occ": 1,
-      "line": 2279,
-      "snippet": "style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, outline: 'non"
-    },
-    {
-      "file": "app/hr/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "fbf625b14a4d",
-      "occ": 0,
-      "line": 2305,
-      "snippet": "<div key={k} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, padding: 8, background: 'rgba(255,"
-    },
-    {
-      "file": "app/hr/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "d3637894a242",
-      "occ": 0,
-      "line": 2313,
-      "snippet": "style={{ width: 130, padding: 8, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: 13, outline: 'none', b"
-    },
-    {
-      "file": "app/hr/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "395b3c9f3c02",
-      "occ": 5,
-      "line": 2357,
-      "snippet": "style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, background: '"
-    },
-    {
-      "file": "app/hr/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "66ef0fed0143",
-      "occ": 1,
-      "line": 2369,
-      "snippet": "style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, outline: 'non"
-    },
-    {
-      "file": "app/hr/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "66ef0fed0143",
-      "occ": 2,
-      "line": 2376,
-      "snippet": "style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, outline: 'non"
-    },
-    {
-      "file": "app/hr/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "ae27ae0e0a76",
-      "occ": 2,
-      "line": 2384,
-      "snippet": "style={{ width: '100%', padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 14, outline: 'non"
-    },
-    {
-      "file": "app/hr/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "fec8e93769dc",
-      "occ": 0,
-      "line": 2409,
-      "snippet": "<div style={{ padding: '8px 14px', background: 'rgba(255,255,255,0.40)', borderBottom: '1px solid rgba(0,0,0,0.06)', pos"
-    },
-    {
-      "file": "app/hr/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "f6fb6571e1ac",
-      "occ": 0,
-      "line": 2442,
-      "snippet": "style={{ fontSize: 11, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 6, padding: '2px 6px', background: 'rgba(255,"
-    },
-    {
-      "file": "app/hr/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "579ced093e3c",
-      "occ": 0,
-      "line": 2474,
-      "snippet": "style={{ padding: '6px 12px', fontSize: 12, fontWeight: 600, color: '#dc2626', border: '1px solid rgba(239,68,68,0.3)', "
-    },
-    {
-      "file": "app/hr/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "16377be50be0",
-      "occ": 0,
-      "line": 2488,
-      "snippet": "<div style={{ padding: '16px 24px', borderTop: '1px solid rgba(0,0,0,0.06)', background: 'rgba(255,255,255,0.40)', displ"
-    },
-    {
-      "file": "app/hr/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "4b77fc8b0c1e",
-      "occ": 0,
-      "line": 2490,
-      "snippet": "style={{ flex: 1, padding: '10px 0', border: '1px solid rgba(0,0,0,0.08)', background: 'rgba(255,255,255,0.8)', color: '"
-    },
-    {
-      "file": "app/insurance/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "2c8e6569e673",
-      "occ": 0,
-      "line": 943,
-      "snippet": "background: 'rgba(255,255,255,0.6)',"
-    },
-    {
-      "file": "app/loans/backtrace/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "e78a5676e00c",
-      "occ": 0,
-      "line": 206,
-      "snippet": "style={{ background: 'rgba(255,255,255,0.72)', borderColor: 'rgba(0,0,0,0.06)' }}"
-    },
-    {
-      "file": "app/loans/backtrace/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "c07cceb539fa",
-      "occ": 0,
-      "line": 279,
-      "snippet": "style={{ background: 'rgba(255,255,255,0.60)', borderColor: 'rgba(191,219,254,0.80)' }}>"
-    },
-    {
-      "file": "app/loans/backtrace/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "c44dc7511cbf",
-      "occ": 0,
-      "line": 284,
-      "snippet": "style={{ background: 'rgba(255,255,255,0.60)', borderColor: 'rgba(187,247,208,0.80)' }}>"
-    },
-    {
-      "file": "app/loans/backtrace/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "a1910bc6c71b",
-      "occ": 0,
-      "line": 292,
-      "snippet": "style={{ background: 'rgba(255,255,255,0.60)', borderColor: 'rgba(221,214,254,0.80)' }}>"
-    },
-    {
-      "file": "app/loans/backtrace/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "21ff53a368da",
-      "occ": 0,
-      "line": 299,
-      "snippet": "style={{ background: 'rgba(255,255,255,0.60)', borderColor: 'rgba(253,230,138,0.80)' }}>"
-    },
-    {
-      "file": "app/loans/backtrace/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "e78a5676e00c",
-      "occ": 1,
-      "line": 311,
-      "snippet": "style={{ background: 'rgba(255,255,255,0.72)', borderColor: 'rgba(0,0,0,0.06)' }}"
-    },
-    {
-      "file": "app/loans/backtrace/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "e78a5676e00c",
-      "occ": 2,
-      "line": 392,
-      "snippet": "style={{ background: 'rgba(255,255,255,0.72)', borderColor: 'rgba(0,0,0,0.06)' }}"
-    },
-    {
-      "file": "app/loans-out/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "044594d2e12e",
-      "occ": 0,
-      "line": 104,
-      "snippet": "background: 'rgba(255,255,255,0.60)',"
     },
     {
       "file": "app/loans-out/page.tsx",
@@ -2537,36 +625,12 @@
       "snippet": "k.tint === 'blue' ? 'rgba(59,110,181,0.25)' :"
     },
     {
-      "file": "app/loans-out/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "101465e02e00",
-      "occ": 0,
-      "line": 111,
-      "snippet": "boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -4px -4px 12px rgba(255,255,255,0.5)',"
-    },
-    {
       "file": "app/long-term-rentals/catalog/new/page.tsx",
       "label": "primary-hardcode",
       "hash": "d7309087015a",
       "occ": 0,
-      "line": 252,
+      "line": 251,
       "snippet": "<div style={{ ...GLASS.L3, padding: 12, borderRadius: 10, border: '1px solid rgba(59,110,181,0.25)' }}>"
-    },
-    {
-      "file": "app/maintenance/MaintenanceMain.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "e85618606388",
-      "occ": 0,
-      "line": 582,
-      "snippet": "boxShadow: '3px 3px 8px rgba(140,170,210,0.19), -1px -1px 4px rgba(255,255,255,0.47)',"
-    },
-    {
-      "file": "app/maintenance/MaintenanceMain.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "e85618606388",
-      "occ": 1,
-      "line": 601,
-      "snippet": "boxShadow: '3px 3px 8px rgba(140,170,210,0.19), -1px -1px 4px rgba(255,255,255,0.47)',"
     },
     {
       "file": "app/maintenance/MaintenanceMain.tsx",
@@ -2617,14 +681,6 @@
       "snippet": "background: 'rgba(255,255,255,0.7)', minWidth: 200,"
     },
     {
-      "file": "app/operations/OperationsMain.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "044594d2e12e",
-      "occ": 0,
-      "line": 684,
-      "snippet": "background: 'rgba(255,255,255,0.60)',"
-    },
-    {
       "file": "app/operations/TransportRequestModal.tsx",
       "label": "glass-bg-hardcode",
       "hash": "4c8b546ff896",
@@ -2645,7 +701,7 @@
       "label": "primary-hardcode",
       "hash": "90e2b35c1542",
       "occ": 0,
-      "line": 640,
+      "line": 1013,
       "snippet": "<div style={{ ...GLASS.L2, padding: 11, borderRadius: 10, border: '1px solid rgba(59,110,181,0.18)' }}>"
     },
     {
@@ -2653,7 +709,7 @@
       "label": "primary-hardcode",
       "hash": "48e82bbf81f0",
       "occ": 0,
-      "line": 1609,
+      "line": 1672,
       "snippet": "<button onClick={() => searchAddr(setDeliveryOrigin)} style={{ padding: '7px 10px', borderRadius: 7, border: '1px solid "
     },
     {
@@ -2661,7 +717,7 @@
       "label": "primary-hardcode",
       "hash": "9eb68cbc825e",
       "occ": 0,
-      "line": 1614,
+      "line": 1677,
       "snippet": "<button onClick={() => searchAddr((v) => setDeliveryWaypoints((ws) => ws.map((x, j) => j === i ? { ...x, addr: v } : x))"
     },
     {
@@ -2669,7 +725,7 @@
       "label": "primary-hardcode",
       "hash": "23eacc36fea8",
       "occ": 0,
-      "line": 1619,
+      "line": 1682,
       "snippet": "<button onClick={() => setDeliveryWaypoints((ws) => [...ws, { addr: '', memo: '' }])} style={{ alignSelf: 'flex-start', "
     },
     {
@@ -2677,39 +733,23 @@
       "label": "primary-hardcode",
       "hash": "ab76692a113c",
       "occ": 0,
-      "line": 1622,
+      "line": 1685,
       "snippet": "<button onClick={() => searchAddr(setDeliveryDest)} style={{ padding: '7px 10px', borderRadius: 7, border: '1px solid rg"
     },
     {
       "file": "app/operations/page.tsx",
-      "label": "primary-hardcode",
-      "hash": "4e16ed828ba6",
-      "occ": 0,
-      "line": 69,
-      "snippet": "boxShadow: active ? '0 6px 16px rgba(59,110,181,0.3)' : 'none', transition: 'all 0.2s',"
-    },
-    {
-      "file": "app/operations/page.tsx",
       "label": "glass-bg-hardcode",
-      "hash": "4631d594b959",
+      "hash": "5321886a4fad",
       "occ": 0,
-      "line": 71,
-      "snippet": "<span style={{ width: 22, height: 22, borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent:"
-    },
-    {
-      "file": "app/operations/page.tsx",
-      "label": "primary-hardcode",
-      "hash": "4631d594b959",
-      "occ": 0,
-      "line": 71,
-      "snippet": "<span style={{ width: 22, height: 22, borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent:"
+      "line": 83,
+      "snippet": "<span style={{ width: 20, height: 20, borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent:"
     },
     {
       "file": "app/operations/rentals/[id]/page.tsx",
       "label": "primary-hardcode",
       "hash": "a53876492e1c",
       "occ": 0,
-      "line": 100,
+      "line": 107,
       "snippet": "<div style={{ fontSize: 11, fontWeight: 700, color: '#1d4ed8', background: 'rgba(59,110,181,0.1)', padding: '3px 10px', "
     },
     {
@@ -2717,32 +757,40 @@
       "label": "primary-hardcode",
       "hash": "a23c86597e38",
       "occ": 0,
-      "line": 160,
+      "line": 167,
       "snippet": "<div style={{ ...card, border: '1px solid rgba(59,110,181,0.25)' }}>"
     },
     {
-      "file": "app/report/ReportDashboard.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "92c788930a0b",
+      "file": "app/tire/page.tsx",
+      "label": "primary-hardcode",
+      "hash": "0dda8dae3ef6",
       "occ": 0,
-      "line": 264,
-      "snippet": "background: periodMonths === m ? '#3b6eb5' : 'rgba(255,255,255,0.6)',"
+      "line": 262,
+      "snippet": "border: `1px solid ${tab === k ? 'rgba(59,110,181,0.4)' : 'rgba(0,0,0,0.06)'}`,"
     },
     {
-      "file": "app/work-essentials/receipts/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "3dd1208727af",
+      "file": "app/tire/page.tsx",
+      "label": "primary-hardcode",
+      "hash": "0a1ec8f8cbc0",
       "occ": 0,
-      "line": 1068,
-      "snippet": "background: 'rgba(255,255,255,0.72)',"
+      "line": 399,
+      "snippet": "border: `1px solid ${statusFilter === s ? 'rgba(59,110,181,0.4)' : 'rgba(0,0,0,0.06)'}`,"
     },
     {
-      "file": "app/work-essentials/receipts/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "101465e02e00",
+      "file": "app/tire/page.tsx",
+      "label": "primary-hardcode",
+      "hash": "3b148375cd0d",
       "occ": 0,
-      "line": 1073,
-      "snippet": "boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -4px -4px 12px rgba(255,255,255,0.5)',"
+      "line": 831,
+      "snippet": "border: `1px solid ${bcFilter === k ? 'rgba(59,110,181,0.4)' : 'rgba(0,0,0,0.06)'}`,"
+    },
+    {
+      "file": "app/violations/page.tsx",
+      "label": "primary-hardcode",
+      "hash": "0a1ec8f8cbc0",
+      "occ": 0,
+      "line": 100,
+      "snippet": "border: `1px solid ${statusFilter === s ? 'rgba(59,110,181,0.4)' : 'rgba(0,0,0,0.06)'}`,"
     },
     {
       "file": "app/work-essentials/receipts/page.tsx",
@@ -2771,23 +819,15 @@
     {
       "file": "app/work-essentials/receipts/page.tsx",
       "label": "glass-bg-hardcode",
-      "hash": "e1fe44512a83",
-      "occ": 0,
-      "line": 1251,
-      "snippet": "background: 'rgba(255,255,255,0.72)', color: '#1e293b', borderRadius: isMobile ? '16px 16px 0 0' : 16,"
-    },
-    {
-      "file": "app/work-essentials/receipts/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "00ca0232af07",
+      "hash": "1b5ce105012b",
       "occ": 0,
       "line": 1253,
-      "snippet": "border: '1px solid rgba(255,255,255,0.30)', boxShadow: '8px 8px 20px rgba(140,170,210,0.19), -8px -8px 20px rgba(255,255"
+      "snippet": "border: '1px solid rgba(255,255,255,0.30)', boxShadow: '0 1px 2px rgba(16,24,40,0.05)', zIndex: 50, flexWrap: isMobile ?"
     },
     {
       "file": "app/work-essentials/receipts/page.tsx",
       "label": "glass-bg-hardcode",
-      "hash": "c1b77747e757",
+      "hash": "215ab87cb84e",
       "occ": 0,
       "line": 1271,
       "snippet": "style={{ padding: '7px 8px', borderRadius: 8, border: '1px solid rgba(0,0,0,0.06)', background: 'rgba(255,255,255,0.40)'"
@@ -2795,7 +835,7 @@
     {
       "file": "app/work-essentials/receipts/page.tsx",
       "label": "glass-bg-hardcode",
-      "hash": "e185695366bb",
+      "hash": "539d8f91f5ee",
       "occ": 0,
       "line": 1283,
       "snippet": "style={{ padding: '7px 10px', borderRadius: 8, border: '1px solid rgba(0,0,0,0.06)', background: 'rgba(255,255,255,0.40)"
@@ -2803,60 +843,12 @@
     {
       "file": "app/work-essentials/receipts/page.tsx",
       "label": "glass-bg-hardcode",
-      "hash": "34b127bc82f0",
+      "hash": "4ba020122019",
       "occ": 0,
       "line": 1289,
       "snippet": "style={{ padding: '7px 10px', borderRadius: 8, border: '1px solid rgba(0,0,0,0.06)', background: 'rgba(255,255,255,0.40)"
-    },
-    {
-      "file": "app/work-essentials/receipts/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "3dd1208727af",
-      "occ": 1,
-      "line": 1340,
-      "snippet": "background: 'rgba(255,255,255,0.72)',"
-    },
-    {
-      "file": "app/work-essentials/receipts/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "b5be36070a8e",
-      "occ": 0,
-      "line": 1343,
-      "snippet": "boxShadow: '6px 6px 18px rgba(140,170,210,0.14), -6px -6px 18px rgba(255,255,255,0.47)',"
-    },
-    {
-      "file": "app/work-essentials/receipts/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "3dd1208727af",
-      "occ": 2,
-      "line": 1348,
-      "snippet": "background: 'rgba(255,255,255,0.72)',"
-    },
-    {
-      "file": "app/work-essentials/receipts/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "b5be36070a8e",
-      "occ": 1,
-      "line": 1351,
-      "snippet": "boxShadow: '6px 6px 18px rgba(140,170,210,0.14), -6px -6px 18px rgba(255,255,255,0.47)',"
-    },
-    {
-      "file": "app/work-essentials/receipts/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "3dd1208727af",
-      "occ": 3,
-      "line": 1388,
-      "snippet": "background: 'rgba(255,255,255,0.72)',"
-    },
-    {
-      "file": "app/work-essentials/receipts/page.tsx",
-      "label": "glass-bg-hardcode",
-      "hash": "b5be36070a8e",
-      "occ": 2,
-      "line": 1391,
-      "snippet": "boxShadow: '6px 6px 18px rgba(140,170,210,0.14), -6px -6px 18px rgba(255,255,255,0.47)',"
     }
   ],
-  "generatedAt": "2026-06-28T07:59:38.766Z",
+  "generatedAt": "2026-08-08T05:33:45.114Z",
   "note": "UI 토큰 hardcode (inline rgba). baseline 키 = file:label:contentHash:occurrence (line 번호 비의존 — PR-COORD-7 2026-05-22). 기존 위반 동결, 새 위반만 차단."
 }
