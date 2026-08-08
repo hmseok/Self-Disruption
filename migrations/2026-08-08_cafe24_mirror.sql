@@ -27,3 +27,10 @@ CREATE TABLE IF NOT EXISTS cafe24_accidents_mirror (
   KEY idx_c24m_cars (cars_no),
   KEY idx_c24m_canm (otptcanm)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 범용 앱 설정 KV (2026-08-08) — 메뉴 트리 레이아웃 등
+CREATE TABLE IF NOT EXISTS app_settings (
+  setting_key   VARCHAR(60) NOT NULL PRIMARY KEY,
+  setting_value LONGTEXT NULL,
+  updated_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

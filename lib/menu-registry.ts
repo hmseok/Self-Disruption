@@ -118,6 +118,7 @@ export const MENUS: MenuEntry[] = [
   { id: 'mod-hr-master',         name: '인사 마스터',    path: '/hr',                      iconKey: 'Users',     group: 'settings', sortOrder: 71, requirePermission: true },
   { id: 'mod-payroll-ops',       name: '급여 운영',      path: '/hr/payroll',              iconKey: 'Money',     group: 'settings', sortOrder: 72, requirePermission: true, sidebarHidden: true },
   { id: 'mod-contract-terms',    name: '계약 약관 관리', path: '/admin/contract-terms',    iconKey: 'Doc',       group: 'settings', sortOrder: 73, requirePermission: true },
+  { id: 'mod-menu-layout',       name: '메뉴 구성',      path: '/admin/menu-layout',       iconKey: 'Setting',   group: 'settings', sortOrder: 74, requirePermission: true },
   { id: 'mod-message-templates', name: '메시지 센터',    path: '/admin/message-templates', iconKey: 'Clipboard', group: 'settings', sortOrder: 74, requirePermission: true },
 ]
 

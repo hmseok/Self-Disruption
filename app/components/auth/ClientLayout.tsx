@@ -144,6 +144,8 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
   const { hasPageAccess } = usePermission()
 
   const [dynamicMenus, setDynamicMenus] = useState<any[]>([])
+  // 메뉴 트리 레이아웃 (설정 페이지 저장본) — null 이면 registry 기본 (2026-08-08)
+  const [menuLayout, setMenuLayout] = useState<{ groups: { id: string; label: string }[]; items: Record<string, string> } | null>(null)
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   // Phase I (#85) — 전역 "빠른 입력" 모달 상태
   const [quickOpen, setQuickOpen] = useState(false)
@@ -249,8 +251,18 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
         console.error('Failed to load menus:', error)
       }
     }
+    const fetchLayout = async () => {
+      try {
+        const res = await fetch('/api/menu-layout', { headers: await getAuthHeader() })
+        if (res.ok) {
+          const j = await res.json()
+          if (j.layout?.groups?.length) setMenuLayout(j.layout)
+        }
+      } catch { /* 기본 레이아웃 사용 */ }
+    }
     if (!loading) {
       fetchMenus()
+      fetchLayout()
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, role, menuRefreshKey])
@@ -288,14 +300,25 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
   }
 
   // 비즈니스 그룹별 메뉴 빌드
-  const businessGroups = BUSINESS_GROUPS
-    .map(group => ({
-      ...group,
-      items: dynamicMenus
-        .filter(m => PATH_TO_GROUP[m.path] === group.id)
-        .map(m => ({ name: m.name, path: m.path, iconKey: m.iconKey })),
-    }))
-    .filter(g => g.items.length > 0)
+  const businessGroups = menuLayout
+    ? menuLayout.groups
+        .map(group => ({
+          id: group.id, label: group.label, section: 'business' as const, sortOrder: 0,
+          items: Object.entries(menuLayout.items)
+            .filter(([, gid]) => gid === group.id)
+            .map(([path]) => dynamicMenus.find(m => m.path === path))
+            .filter(Boolean)
+            .map((m: any) => ({ name: m.name, path: m.path, iconKey: m.iconKey })),
+        }))
+        .filter(g => g.items.length > 0)
+    : BUSINESS_GROUPS
+        .map(group => ({
+          ...group,
+          items: dynamicMenus
+            .filter(m => PATH_TO_GROUP[m.path] === group.id)
+            .map(m => ({ name: m.name, path: m.path, iconKey: m.iconKey })),
+        }))
+        .filter(g => g.items.length > 0)
 
   // 모든 메뉴 경로 (longest match 계산용)
   const allMenuPaths = dynamicMenus.map(m => m.path)
