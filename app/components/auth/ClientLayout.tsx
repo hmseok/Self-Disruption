@@ -150,11 +150,7 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
   // Phase I (#85) — 전역 "빠른 입력" 모달 상태
   const [quickOpen, setQuickOpen] = useState(false)
 
-  // 데스크톱에서는 사이드바 기본 열림
-  useEffect(() => {
-    const isDesktop = window.innerWidth >= 1024
-    setIsSidebarOpen(isDesktop)
-  }, [])
+  // 2026-08-08 사용자 확정 — 사이드바 자동숨김: 모든 화면에서 기본 닫힘 (햄버거로 열기)
 
   // ★ 앱 셸 활성화 시 body에 클래스 추가 (로그인 페이지 제외)
   const isGuestPage = pathname.startsWith('/sign')
@@ -328,8 +324,8 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
   return (
     <div className="print:!h-auto print:!overflow-visible print:!block" style={{ display: 'flex', height: '100dvh', background: '#f6f7f9', overflowX: 'hidden', overflowY: 'hidden' }}>
       {/* 상단 고정 바 — 사이드바 닫혔을 때 (햄버거 + 로고) */}
-      {!isSidebarOpen && (
-        <div className="fixed top-0 left-0 right-0 z-30 safe-top" style={{ background: '#fff', borderBottom: '1px solid #e6e8ec' }}>
+      {(
+        <div className="fixed top-0 left-0 right-0 z-10 safe-top" style={{ background: '#fff', borderBottom: '1px solid #e6e8ec' }}>
           <div className="flex items-center gap-3 px-4 py-2.5" style={{ paddingTop: 'max(0.625rem, env(safe-area-inset-top))' }}>
             {/* 햄버거 */}
             <button
@@ -352,12 +348,12 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
 
       {/* 모바일 오버레이 (사이드바 열릴 때) */}
       <div
-        className={`sidebar-overlay lg:hidden ${isSidebarOpen ? 'active' : ''}`}
+        className={`sidebar-overlay ${isSidebarOpen ? 'active' : ''}`}
         onClick={() => setIsSidebarOpen(false)}
       />
 
       {/* 사이드바 — 2026-07 개편: 플랫 화이트 (목업 fmi-erp-redesign.html 기준) */}
-      <aside className={`${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} w-60 transition-transform duration-300 overflow-hidden flex flex-col fixed h-full z-20`} style={{ background: '#fff', borderRight: '1px solid #e6e8ec', color: '#1a1d23' }}>
+      <aside onClick={(e) => { if ((e.target as HTMLElement).closest('a')) setIsSidebarOpen(false) }} className={`${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} w-60 transition-transform duration-300 overflow-hidden flex flex-col fixed h-full z-20`} style={{ background: '#fff', borderRight: '1px solid #e6e8ec', color: '#1a1d23', boxShadow: isSidebarOpen ? '8px 0 32px rgba(16,24,40,0.14)' : 'none' }}>
         <div className="w-60 flex flex-col h-full">
 
           {/* 로고 */}
@@ -465,9 +461,9 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
         style={{
           height: '100dvh',
           overflow: 'hidden',
-          width: isSidebarOpen ? 'calc(100% - 240px)' : '100%',
+          width: '100%',
           minWidth: 0,
-          marginLeft: isSidebarOpen ? 240 : 0,
+          marginLeft: 0,
         }}
       >
         <div
@@ -478,7 +474,7 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
             overflowX: 'hidden',
             overscrollBehavior: 'none',
             maxWidth: '100%',
-            paddingTop: isSidebarOpen ? 0 : 48,
+            paddingTop: 48,
             paddingBottom: 24,
             WebkitOverflowScrolling: 'touch',
           }}

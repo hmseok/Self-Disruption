@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import DcStatStrip, { StatItem, ActionButton } from '@/app/components/DcStatStrip'
+import DcStatStrip, { StatItem } from '@/app/components/DcStatStrip'
 import DcToolbar, { FilterItem } from '@/app/components/DcToolbar'
 import NeuDataTable, { TableColumn, MobileCardConfig } from '@/app/components/NeuDataTable'
 import { GLASS } from '@/app/utils/ui-tokens'
@@ -206,23 +206,14 @@ export default function AccidentIntakeTab() {
     closed: data.closed.length,
   }
 
+  // 2026-08-08 사용자 확정 — 요약 카드가 곧 필터 탭 (클릭 시 해당 조회) · 새로고침 버튼 제거
   const statItems: StatItem[] = [
-    { label: '📋 전체 (활성)', value: counts.all, unit: '건', tint: 'blue' },
-    { label: '🚗 대차요청', value: counts.dcyn_y, unit: '건', tint: 'red' },
-    { label: '🚙 대차미요청', value: counts.dcyn_n, unit: '건', tint: 'amber' },
-    { label: '✅ 종결', value: counts.closed, unit: '건', tint: 'green' },
+    { label: '📋 전체 (활성)', value: counts.all, unit: '건', tint: 'blue', onClick: () => setFilter('all'), active: filter === 'all' },
+    { label: '🚗 대차요청', value: counts.dcyn_y, unit: '건', tint: 'red', onClick: () => setFilter('dcyn_y'), active: filter === 'dcyn_y' },
+    { label: '🚙 대차미요청', value: counts.dcyn_n, unit: '건', tint: 'amber', onClick: () => setFilter('dcyn_n'), active: filter === 'dcyn_n' },
+    { label: '✅ 종결', value: counts.closed, unit: '건', tint: 'green', onClick: () => setFilter('closed'), active: filter === 'closed' },
     { label: '🔍 검색결과', value: filtered.length, unit: '건', tint: 'purple' },
   ]
-  const statActions: ActionButton[] = [
-    { label: '새로고침', onClick: refresh, variant: 'secondary', icon: '🔄' },
-  ]
-  // PR-Y1.2 (2026-05-24) — 사용자 명시: 「사고접수전체, 대차요청 두 개 탭만」
-  //   → 필터칩 2개로 단순화 (미요청/종결 건수는 stat strip 으로 확인)
-  const filterItems: FilterItem[] = [
-    { key: 'all', label: '📋 사고접수 전체', count: counts.all },
-    { key: 'dcyn_y', label: '🚗 대차요청', count: counts.dcyn_y },
-  ]
-
   const columns: TableColumn<DispatchRequestRow>[] = [
     {
       key: 'date', label: '접수일시', width: 130,
@@ -321,12 +312,12 @@ export default function AccidentIntakeTab() {
 
   return (
     <div>
-      <DcStatStrip stats={statItems} actions={statActions} />
+      <DcStatStrip stats={statItems} fullWidth />
       <DcToolbar
         search={search}
         onSearchChange={setSearch}
         placeholder="차량번호 / 통보자 / 운전자 / 고객 / 대차업체 / 배정공장 / 사고내용 검색…"
-        filters={filterItems}
+        filters={[]}
         activeFilter={filter}
         onFilterChange={(k) => setFilter(k as FilterKey)}
         trailing={
