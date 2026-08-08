@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { getAuthHeader } from '@/app/utils/pricing-standards'
+import { getAuthHeader } from '@/app/utils/finance-upload'
 
 // ============================================================
 // 차량별 통합 원가 분석 — 시장/우리/실제/편차 한 화면

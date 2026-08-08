@@ -25,12 +25,10 @@ const PATH_TO_GROUP: Record<string, string> = {
   //   (장기렌트 견적은 /long-term-rentals 안 견적 탭으로 이전)
   '/contracts': 'sales', '/customers': 'sales',
   '/finance/collections': 'sales', '/finance/settlement': 'sales',
-  '/db/pricing-standards': 'sales',
   // ── 재무/경영 ──
   '/finance': 'finance', '/finance/fleet': 'finance', '/finance/tax': 'finance',
   '/finance/upload': 'finance', '/finance/cards': 'finance', '/finance/codef': 'finance',
   '/admin/payroll': 'finance', '/report': 'finance', '/loans': 'finance',
-  '/db/lotte': 'finance',
   // ── 기타 ──
   '/work-essentials/my-info': 'work',
   '/work-essentials/receipts': 'work',
@@ -73,7 +71,6 @@ const PAGE_NAMES: Record<string, string> = {
   '/customers': '고객 관리',
   '/finance/collections': '수금/회수',
   '/finance/settlement': '정산 관리',
-  '/db/pricing-standards': '요금 기준표',
   // 재무/경영
   '/finance': '재무 대시보드',
   '/finance/fleet': '차량 수익',
@@ -90,7 +87,6 @@ const PAGE_NAMES: Record<string, string> = {
   '/admin/payroll': '급여 관리',
   '/report': '보고서',
   '/loans': '대출 관리',
-  '/db/lotte': '경쟁사 벤치마크',
   // 직장인필수
   '/work-essentials/my-info': '내 정보',
   '/work-essentials/receipts': '영수증제출',

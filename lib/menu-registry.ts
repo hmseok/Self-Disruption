@@ -114,7 +114,6 @@ export const MENUS: MenuEntry[] = [
   // ── 설정 (settings) ── admin 전용 (사이드바 별도 섹션)
   { id: 'mod-company-info',      name: '회사 정보',      path: '/db/codes',                iconKey: 'Setting',   group: 'settings', sortOrder: 70, requirePermission: true },
   // 요금 기준표 — REDESIGN: 설정 하위 (인사/요금 기준표/회사 정보/권한)
-  { id: 'mod-pricing-standards', name: '요금 기준표',    path: '/db/pricing-standards',    iconKey: 'Chart',     group: 'settings', sortOrder: 70.5, requirePermission: true },
   { id: 'mod-hr-master',         name: '인사 마스터',    path: '/hr',                      iconKey: 'Users',     group: 'settings', sortOrder: 71, requirePermission: true },
   { id: 'mod-payroll-ops',       name: '급여 운영',      path: '/hr/payroll',              iconKey: 'Money',     group: 'settings', sortOrder: 72, requirePermission: true, sidebarHidden: true },
   { id: 'mod-contract-terms',    name: '계약 약관 관리', path: '/admin/contract-terms',    iconKey: 'Doc',       group: 'settings', sortOrder: 73, requirePermission: true },
@@ -144,7 +143,7 @@ export const HIDDEN_PATHS = new Set<string>([
   '/finance/upload', '/finance/uploads',
   '/finance/codef', '/finance/cards',
   '/finance/openbanking',
-  '/db/lotte', '/admin/code-master',
+  '/admin/code-master',
   // ── 통합/축소 ──
   '/finance/tax', '/report',
   // ── 미사용/불필요 ──
