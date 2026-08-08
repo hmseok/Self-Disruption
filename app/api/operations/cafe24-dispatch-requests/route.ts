@@ -341,6 +341,27 @@ export async function GET(request: Request) {
   } catch (e) {
     const err = e as { code?: string; message?: string }
     console.error('[/api/operations/cafe24-dispatch-requests] error:', err.code, err.message)
+
+    // 카페24 장애 → 미러 폴백 (2026-08-08 사용자 확정: 우리 DB 미러 구성)
+    try {
+      const { queryMirror } = await import('@/lib/cafe24-mirror')
+      const rows = await queryMirror({ rgst, dcyn, from, to, q, limit, offset })
+      return NextResponse.json({
+        success: true,
+        data: rows,
+        meta: {
+          fetched_at: new Date().toISOString(),
+          source: 'mirror',            // ← 카페24 원본이 아닌 미러 데이터
+          cafe24_error: err.code || 'no-code',
+          limit, offset,
+          filters: { from, to, q, dcyn, rgst },
+          row_count: rows.length,
+        },
+      })
+    } catch (me) {
+      console.error('[cafe24-dispatch-requests] 미러 폴백도 실패:', me)
+    }
+
     return NextResponse.json(
       {
         success: false,
