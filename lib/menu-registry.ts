@@ -88,6 +88,7 @@ export const MENUS: MenuEntry[] = [
   { id: 'mod-tire',       name: '타이어 판매', displayName: '타이어', path: '/tire', iconKey: 'Wrench', group: 'g-tire', sortOrder: 1, requirePermission: true },
   { id: 'mod-settlement', name: '정산/수금', displayName: '정산', path: '/finance/settlement', iconKey: 'Coin',   group: 'g-accounting', sortOrder: 4, requirePermission: true },
   { id: 'mod-pnl',        name: '차량 손익', displayName: '손익', path: '/finance/fleet',      iconKey: 'Trend',  group: 'g-cars', sortOrder: 2, requirePermission: true },
+  { id: 'mod-violations',  name: '과태료·미납', path: '/violations', iconKey: 'Shield', group: 'g-cars', sortOrder: 3, requirePermission: true },
 
   // ── 세부 화면 (detail) — 2026-07-30 사용자 확정 「사이드바 전부 걷어내고 목업처럼」:
   //    전 항목 sidebarHidden — URL·권한 유지, 각 개편 단계에서 core 화면에 흡수 후 9단계에 코드 삭제.
