@@ -272,6 +272,7 @@ export async function POST(req: NextRequest) {
       //   (국민 6168: 2025-08-29 법정검사비용지급통장으로 인계 — FMI 장부 대상 아님)
       if (acctLast4 && importedFrom === 'sms_bank') {
         try {
+          // sql-fn-lint-allow: REGEXP_REPLACE — 운영 DB MySQL 8 (Cloud SQL)
           const stopped = await prisma.$queryRaw<Array<{ id: string }>>`
             SELECT id FROM bank_account_mappings
              WHERE purpose LIKE '%수집중단%'
