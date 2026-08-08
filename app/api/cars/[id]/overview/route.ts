@@ -41,6 +41,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
                monthly_payment, start_date, end_date, status
           FROM loans WHERE car_id = ${id} ORDER BY start_date DESC LIMIT 5`.catch(() => []),
       carDigits
+        // sql-fn-lint-allow: REGEXP_REPLACE — 운영 DB MySQL 8 (Cloud SQL)
         ? prisma.$queryRawUnsafe<any[]>(`
             SELECT id, customer_name, customer_car_number, insurance_company,
                    dispatch_date, actual_return_date, status
@@ -49,6 +50,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
              ORDER BY dispatch_date DESC LIMIT 20`, carDigits).catch(() => [])
         : Promise.resolve([]),
       carDigits
+        // sql-fn-lint-allow: REGEXP_REPLACE — 운영 DB MySQL 8 (Cloud SQL)
         ? prisma.$queryRawUnsafe<any[]>(`
             SELECT id, customer_name, start_date, end_date, monthly_fee, status
               FROM long_term_rentals
@@ -61,6 +63,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     let consignmentCum: any = null
     if (carDigits) {
       try {
+        // sql-fn-lint-allow: REGEXP_REPLACE — 운영 DB MySQL 8 (Cloud SQL)
         const fc = await prisma.$queryRawUnsafe<any[]>(`
           SELECT SUM(monthly_fee) total, COUNT(*) months, MIN(settle_month) mn, MAX(settle_month) mx
             FROM ride_settlement_fees
@@ -75,6 +78,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     let rentalStats: any = null
     if (carDigits) {
       try {
+        // sql-fn-lint-allow: REGEXP_REPLACE — 운영 DB MySQL 8 (Cloud SQL)
         const rs = await prisma.$queryRawUnsafe<any[]>(`
           SELECT COUNT(*) c, MIN(dispatch_date) first_d, MAX(dispatch_date) last_d
             FROM fmi_rentals
