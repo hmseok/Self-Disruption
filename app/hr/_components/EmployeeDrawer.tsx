@@ -35,15 +35,17 @@ type Props = {
   showToast: (text: string, tone?: 'success' | 'error') => void
 }
 
-const PAGE_NAME: Record<string, string> = Object.fromEntries(
-  REGISTRY_MENUS.filter(m => !m.hidden).map(m => [m.path, m.displayName || m.name])
-)
-const PAGE_GROUP: Record<string, string> = Object.fromEntries(
-  REGISTRY_MENUS.filter(m => !m.hidden).map(m => {
-    const g = REGISTRY_GROUPS.find(gr => gr.id === m.group)
-    return [m.path, g?.label || '기타']
-  })
-)
+// 권한 부여 대상 페이지의 폴백 목록 — /api/menus 실패 시에만 사용 (registry 직접)
+function registryFallbackModules() {
+  const sortedGroups = [...REGISTRY_GROUPS].sort((a, b) => a.sortOrder - b.sortOrder)
+  const out: { path: string; name: string; group: string }[] = []
+  for (const g of sortedGroups) {
+    for (const m of REGISTRY_MENUS.filter(m => !m.hidden && m.group === g.id).sort((a, b) => a.sortOrder - b.sortOrder)) {
+      out.push({ path: m.path, name: m.displayName || m.name, group: g.label })
+    }
+  }
+  return out
+}
 
 export default function EmployeeDrawer({ emp, meId, companyId, departments, positions, onClose, onSaved, showToast }: Props) {
   const isSelf = meId === emp.id
@@ -245,24 +247,27 @@ export default function EmployeeDrawer({ emp, meId, companyId, departments, posi
     if (!showPermTab || tab !== 'perm' || permsLoaded) return
     ;(async () => {
       const headers = await getAuthHeader()
-      // 권한 대상 페이지 목록 — system_modules 우선, 비면 menu-registry 폴백
+      // 권한 대상 페이지 목록 — /api/menus?for=permission (menu-registry 단일 소스,
+      // 역할 템플릿·초대 모달과 동일). 구 system_modules 테이블은 낡은 스냅숏이라 사용 금지.
       try {
-        const res = await fetch('/api/system_modules', { headers })
+        const res = await fetch('/api/menus?for=permission', { headers })
         const json = await res.json().catch(() => ({}))
-        const data = Array.isArray(json) ? json : (json.data || [])
-        if (data.length > 0) {
-          setModules(data.filter((m: any) => m.path).map((m: any) => ({
-            path: m.path, name: PAGE_NAME[m.path] || m.name, group: PAGE_GROUP[m.path] || '기타',
-          })))
-        } else { throw new Error('empty') }
+        const groups: any[] = json.data?.groups || []
+        const menus: any[] = json.data?.menus || []
+        if (menus.length === 0) throw new Error('empty')
+        const sortedGroups = [...groups].sort((a, b) => a.sortOrder - b.sortOrder)
+        const out: { path: string; name: string; group: string }[] = []
+        for (const g of sortedGroups) {
+          for (const m of menus.filter(m => m.group === g.id).sort((a, b) => a.sortOrder - b.sortOrder)) {
+            out.push({ path: m.path, name: m.displayName || m.name, group: g.label || '기타' })
+          }
+        }
+        for (const m of menus.filter(m => !sortedGroups.some(g => g.id === m.group))) {
+          out.push({ path: m.path, name: m.displayName || m.name, group: '기타' })
+        }
+        setModules(out)
       } catch {
-        setModules(REGISTRY_MENUS
-          .filter(m => !m.hidden)
-          .filter(m => ['asset', 'operation', 'finance', 'sales', 'hr', 'admin'].includes(m.group))
-          .map(m => ({
-            path: m.path, name: m.displayName || m.name,
-            group: REGISTRY_GROUPS.find(g => g.id === m.group)?.label || '기타',
-          })))
+        setModules(registryFallbackModules())
       }
       // 이 직원의 현재 권한
       try {
