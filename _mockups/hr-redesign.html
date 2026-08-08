@@ -1,0 +1,403 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>인사 마스터 재설계 시안 — 2026-08</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Pretendard',sans-serif; background:#f6f7f9; color:#1a1d23; font-size:14px; }
+  .frame { max-width:1280px; margin:0 auto; padding:20px 24px 60px; }
+  .crumb { font-size:12px; color:#9aa1ad; margin-bottom:14px; }
+  .crumb b { color:#5b626e; font-weight:600; }
+
+  /* 제목줄 */
+  .titlebar { display:flex; align-items:flex-end; justify-content:space-between; margin-bottom:16px; }
+  h1 { font-size:21px; letter-spacing:-0.02em; font-weight:700; }
+  .sub { color:#5b626e; font-size:13px; margin-top:3px; }
+  .btn-primary { background:#2563eb; color:#fff; border:none; border-radius:9px; padding:9px 16px; font-size:13px; font-weight:600; cursor:pointer; }
+  .btn-ghost { background:#fff; color:#5b626e; border:1px solid #e6e8ec; border-radius:9px; padding:8px 14px; font-size:13px; font-weight:600; cursor:pointer; }
+
+  /* 언더라인 탭 */
+  .tabs { display:flex; border-bottom:2px solid #e6e8ec; margin-bottom:16px; }
+  .tab { padding:10px 18px; font-size:13.5px; font-weight:600; cursor:pointer; background:none; border:none; border-bottom:2.5px solid transparent; margin-bottom:-2px; color:#9aa1ad; display:flex; align-items:center; gap:6px; }
+  .tab.on { border-bottom-color:#2563eb; color:#1a1d23; }
+  .tab .cnt { font-size:11px; font-weight:700; padding:2px 8px; border-radius:10px; background:#eef1f5; color:#9aa1ad; }
+  .tab.on .cnt { background:#dbeafe; color:#2563eb; }
+  .tab .adm { font-size:10px; font-weight:700; padding:2px 6px; border-radius:5px; background:#f5f3ff; color:#7c3aed; border:1px solid #ddd6fe; }
+
+  /* 요약 카드 */
+  .stats { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:14px; }
+  .stat { background:#fff; border:1px solid #e6e8ec; border-radius:12px; padding:14px 16px; box-shadow:0 1px 2px rgba(16,24,40,.05); }
+  .stat .k { font-size:12px; color:#5b626e; font-weight:600; }
+  .stat .v { font-size:22px; font-weight:700; margin-top:4px; font-variant-numeric:tabular-nums; }
+  .stat .v small { font-size:12px; color:#9aa1ad; font-weight:600; margin-left:2px; }
+
+  /* 툴바 */
+  .toolbar { display:flex; align-items:center; gap:10px; margin-bottom:12px; flex-wrap:wrap; }
+  .search { flex:0 0 260px; background:#fff; border:1px solid #e6e8ec; border-radius:9px; padding:8px 12px; font-size:13px; color:#9aa1ad; }
+  .chips { display:flex; gap:6px; }
+  .chip { padding:6px 12px; border-radius:16px; font-size:12px; font-weight:600; border:1px solid #e6e8ec; background:#fff; color:#5b626e; cursor:pointer; }
+  .chip.on { background:#eff4ff; border-color:#c9dbfa; color:#2563eb; }
+
+  /* 카드/테이블 */
+  .card { background:#fff; border:1px solid #e6e8ec; border-radius:12px; box-shadow:0 1px 2px rgba(16,24,40,.05); overflow:hidden; }
+  table { width:100%; border-collapse:collapse; }
+  th { text-align:left; font-size:11px; font-weight:700; color:#9aa1ad; padding:10px 12px; border-bottom:1.5px solid #e6e8ec; background:#fafbfc; white-space:nowrap; }
+  td { padding:10px 12px; border-bottom:1px solid #f0f1f4; font-size:12.5px; vertical-align:middle; }
+  tr.click { cursor:pointer; }
+  tr.click:hover td { background:#fafbff; }
+  tr:last-child td { border-bottom:none; }
+  .n1 { font-size:13.5px; font-weight:700; }
+  .n2 { font-size:11.5px; color:#9aa1ad; margin-top:1px; }
+  .badge { font-size:10.5px; font-weight:700; padding:2.5px 8px; border-radius:6px; white-space:nowrap; display:inline-block; }
+  .b-green { background:#effaf3; color:#16a34a; }
+  .b-gray  { background:#f0f1f4; color:#5b626e; }
+  .b-dim   { background:#f0f1f4; color:#cbd5e1; }
+  .b-amber { background:#fdf6ec; color:#d97706; }
+  .b-blue  { background:#eff4ff; color:#2563eb; }
+  .b-violet{ background:#f5f3ff; color:#7c3aed; }
+  .b-red   { background:#fdf0f0; color:#dc2626; }
+  .dim { color:#cbd5e1; font-size:11.5px; }
+  .muted { color:#9aa1ad; }
+
+  /* 우측 드로어 */
+  .overlay { position:fixed; inset:0; background:rgba(16,24,40,.24); z-index:200; display:none; }
+  .overlay.open { display:block; }
+  .drawer { position:fixed; top:0; right:0; bottom:0; width:560px; max-width:96vw; background:#fff; z-index:201; box-shadow:-8px 0 32px rgba(16,24,40,.12); transform:translateX(100%); transition:transform .22s ease; display:flex; flex-direction:column; }
+  .drawer.open { transform:translateX(0); }
+  .d-head { padding:18px 22px 0; border-bottom:1.5px solid #e6e8ec; }
+  .d-title { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px; }
+  .d-close { border:none; background:#f0f1f4; border-radius:8px; width:30px; height:30px; font-size:15px; color:#5b626e; cursor:pointer; }
+  .d-tabs { display:flex; gap:2px; }
+  .d-tab { padding:9px 14px; font-size:13px; font-weight:600; background:none; border:none; border-bottom:2.5px solid transparent; margin-bottom:-1.5px; color:#9aa1ad; cursor:pointer; }
+  .d-tab.on { border-bottom-color:#2563eb; color:#1a1d23; }
+  .d-body { flex:1; overflow-y:auto; padding:18px 22px; }
+  .d-foot { border-top:1px solid #e6e8ec; padding:14px 22px; display:flex; justify-content:space-between; align-items:center; gap:10px; background:#fafbfc; }
+  .fgrid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .f1 { grid-column:1 / -1; }
+  label { font-size:12px; font-weight:600; color:#5b626e; margin-bottom:4px; display:block; }
+  .inp { width:100%; padding:8px 10px; border-radius:8px; border:1px solid #e6e8ec; font-size:13px; background:#f6f7f9; color:#1a1d23; }
+  .ro { background:#fafbfc; color:#9aa1ad; }
+  .sect { font-size:12px; font-weight:700; color:#9aa1ad; margin:18px 0 8px; letter-spacing:.02em; }
+  .note { font-size:12px; color:#5b626e; background:#eff4ff; border:1px solid #c9dbfa; border-radius:8px; padding:8px 12px; margin-bottom:12px; }
+  .danger-zone { border:1px solid #f3c6c6; background:#fdf0f0; border-radius:10px; padding:12px 14px; margin-top:20px; }
+  .danger-zone .t { font-size:12.5px; font-weight:700; color:#dc2626; margin-bottom:6px; }
+  .danger-zone p { font-size:12px; color:#5b626e; margin-bottom:8px; }
+  .btn-danger-line { background:#fff; color:#dc2626; border:1px solid #f3c6c6; border-radius:8px; padding:7px 12px; font-size:12.5px; font-weight:600; cursor:pointer; }
+  .pw-box { background:#fafbfc; border:1px dashed #c9dbfa; border-radius:10px; padding:12px 14px; margin-top:12px; }
+  .pw-box code { font-size:15px; font-weight:700; letter-spacing:.08em; color:#1d4fd7; background:#eff4ff; padding:3px 10px; border-radius:6px; }
+
+  /* 권한 매트릭스 */
+  .perm-group { font-size:11.5px; font-weight:700; color:#9aa1ad; background:#fafbfc; padding:8px 12px; border-bottom:1px solid #f0f1f4; }
+  .perm-row { display:flex; align-items:center; gap:10px; padding:8px 12px; border-bottom:1px solid #f0f1f4; font-size:12.5px; }
+  .perm-row .nm { flex:1; font-weight:600; }
+  .sw { width:34px; height:19px; border-radius:10px; background:#2563eb; position:relative; flex:none; }
+  .sw::after { content:''; position:absolute; top:2px; right:2px; width:15px; height:15px; border-radius:50%; background:#fff; }
+  .sw.off { background:#e6e8ec; }
+  .sw.off::after { right:auto; left:2px; }
+  .ck { display:flex; align-items:center; gap:3px; font-size:11.5px; color:#5b626e; }
+  .ck input { width:15px; height:15px; accent-color:#2563eb; }
+  .scope { font-size:11.5px; padding:4px 8px; border-radius:7px; border:1px solid #e6e8ec; background:#fff; color:#5b626e; }
+
+  /* 부서·직급 2열 */
+  .two { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  .card h3 { font-size:14px; font-weight:700; padding:14px 16px 0; }
+  .card .hint { font-size:12px; color:#9aa1ad; padding:2px 16px 12px; }
+  .addrow { display:flex; gap:8px; padding:0 16px 12px; }
+  .addrow .inp { flex:1; }
+  .lv { font-size:10.5px; font-weight:700; color:#2563eb; background:#eff4ff; border-radius:5px; padding:2px 7px; }
+  .dept-dot { width:9px; height:9px; border-radius:50%; display:inline-block; margin-right:7px; }
+  .rowline { display:flex; align-items:center; justify-content:space-between; padding:9px 16px; border-bottom:1px solid #f0f1f4; font-size:13px; }
+  .rowline:last-child { border-bottom:none; }
+  .rowline .ops { display:flex; gap:6px; opacity:.75; }
+  .mini { font-size:11.5px; color:#9aa1ad; background:none; border:none; cursor:pointer; }
+  .mini.red { color:#dc2626; }
+
+  .empty { text-align:center; padding:44px 0; color:#9aa1ad; font-size:13px; }
+  .pane { display:none; }
+  .pane.on { display:block; }
+  .dp { display:none; }
+  .dp.on { display:block; }
+  .foot-note { margin-top:26px; font-size:12px; color:#9aa1ad; line-height:1.8; border-top:1px solid #e6e8ec; padding-top:14px; }
+</style>
+</head>
+<body>
+<div class="frame">
+  <div class="crumb">시안 · 설정 › <b>인사 마스터</b> — 2026-08 재설계 (플랫 디자인 / FMI 단독)</div>
+
+  <div class="titlebar">
+    <div>
+      <h1>인사 마스터</h1>
+      <p class="sub">직원 계정과 부서·직급, 초대, 페이지 권한을 한곳에서 관리합니다</p>
+    </div>
+    <div style="display:flex; gap:8px;">
+      <button class="btn-ghost">급여 운영 열기</button>
+      <button class="btn-primary">+ 직원 초대</button>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab on" data-p="emp">직원 <span class="cnt">4</span></button>
+    <button class="tab" data-p="org">부서·직급 <span class="cnt">3 · 8</span></button>
+    <button class="tab" data-p="inv">초대 <span class="cnt">0</span></button>
+    <button class="tab" data-p="fre">프리랜서 <span class="cnt">2</span></button>
+    <button class="tab" data-p="rol">역할 템플릿 <span class="adm">관리자</span></button>
+  </div>
+
+  <!-- ═══ 탭 1: 직원 ═══ -->
+  <div class="pane on" id="p-emp">
+    <div class="stats">
+      <div class="stat"><div class="k">재직</div><div class="v">4<small>명</small></div></div>
+      <div class="stat"><div class="k">휴직</div><div class="v">0<small>명</small></div></div>
+      <div class="stat"><div class="k">퇴사</div><div class="v">2<small>명</small></div></div>
+      <div class="stat"><div class="k">부서 미지정</div><div class="v" style="color:#d97706;">1<small>명</small></div></div>
+    </div>
+
+    <div class="toolbar">
+      <div class="search">이름 · 이메일 · 연락처 검색</div>
+      <div class="chips">
+        <span class="chip on">전체</span><span class="chip">재직</span><span class="chip">휴직</span><span class="chip">퇴사</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <table>
+        <thead><tr>
+          <th style="width:26%;">직원</th><th style="width:90px;">권한</th><th>직급</th><th>부서</th>
+          <th style="width:84px;">재직 상태</th><th style="width:110px;">입사일</th><th style="width:84px;">계정</th>
+        </tr></thead>
+        <tbody>
+          <tr class="click" onclick="openDrawer()">
+            <td><div class="n1">석호민</div><div class="n2">sukhomin87@gmail.com</div></td>
+            <td><span class="badge b-violet">최고 관리자</span></td>
+            <td>부장</td>
+            <td><span class="dept-dot" style="background:#16a34a;"></span>경영지원</td>
+            <td><span class="badge b-green">재직</span></td>
+            <td>2024-03-01</td>
+            <td><span class="badge b-blue">활성</span></td>
+          </tr>
+          <tr class="click" onclick="openDrawer()">
+            <td><div class="n1">김준수</div><div class="n2">kzs7179@gmail.com</div></td>
+            <td><span class="badge b-gray">직원</span></td>
+            <td>과장</td>
+            <td><span class="dept-dot" style="background:#2563eb;"></span>렌터카</td>
+            <td><span class="badge b-green">재직</span></td>
+            <td>2025-01-02</td>
+            <td><span class="badge b-blue">활성</span></td>
+          </tr>
+          <tr class="click" onclick="openDrawer()">
+            <td><div class="n1">전소현</div><div class="n2">shjeon@rideoffice.kr</div></td>
+            <td><span class="badge b-gray">직원</span></td>
+            <td>차장</td>
+            <td><span class="dept-dot" style="background:#2563eb;"></span>렌터카</td>
+            <td><span class="badge b-green">재직</span></td>
+            <td>2024-07-15</td>
+            <td><span class="badge b-blue">활성</span></td>
+          </tr>
+          <tr class="click" onclick="openDrawer()">
+            <td><div class="n1">고윤지</div><div class="n2">yjko@rideoffice.kr</div></td>
+            <td><span class="badge b-gray">직원</span></td>
+            <td><span class="dim">미지정</span></td>
+            <td><span class="badge b-amber">부서 미지정</span></td>
+            <td><span class="badge b-green">재직</span></td>
+            <td><span class="dim">미입력</span></td>
+            <td><span class="badge b-blue">활성</span></td>
+          </tr>
+          <tr class="click" style="opacity:.55;">
+            <td><div class="n1">김경필</div><div class="n2">퇴사자 — 계정 차단</div></td>
+            <td><span class="badge b-gray">직원</span></td>
+            <td><span class="dim">—</span></td>
+            <td><span class="dim">—</span></td>
+            <td><span class="badge b-dim">퇴사</span></td>
+            <td>2026-08-08 퇴사</td>
+            <td><span class="badge b-red">차단</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ═══ 탭 2: 부서·직급 ═══ -->
+  <div class="pane" id="p-org">
+    <div class="two">
+      <div class="card">
+        <h3>부서</h3>
+        <div class="hint">부서를 추가하고 색상으로 구분합니다 · 드래그로 순서 변경</div>
+        <div class="addrow"><div class="inp" style="color:#9aa1ad;">새 부서 이름</div><button class="btn-primary" style="padding:8px 14px;">추가</button></div>
+        <div class="rowline"><span><span class="dept-dot" style="background:#2563eb;"></span>렌터카 <span class="muted" style="font-size:11.5px;">· 직원 2명</span></span><span class="ops"><button class="mini">수정</button><button class="mini red">삭제</button></span></div>
+        <div class="rowline"><span><span class="dept-dot" style="background:#d97706;"></span>타이어 <span class="muted" style="font-size:11.5px;">· 직원 0명</span></span><span class="ops"><button class="mini">수정</button><button class="mini red">삭제</button></span></div>
+        <div class="rowline"><span><span class="dept-dot" style="background:#16a34a;"></span>경영지원 <span class="muted" style="font-size:11.5px;">· 직원 1명</span></span><span class="ops"><button class="mini">수정</button><button class="mini red">삭제</button></span></div>
+      </div>
+      <div class="card">
+        <h3>직급</h3>
+        <div class="hint">순위가 낮을수록 상위 직급입니다</div>
+        <div class="addrow"><div class="inp" style="color:#9aa1ad;">새 직급 이름</div><button class="btn-primary" style="padding:8px 14px;">추가</button></div>
+        <div class="rowline"><span><span class="lv">1</span>&nbsp; 대표</span><span class="ops"><button class="mini">수정</button><button class="mini red">삭제</button></span></div>
+        <div class="rowline"><span><span class="lv">2</span>&nbsp; 이사</span><span class="ops"><button class="mini">수정</button><button class="mini red">삭제</button></span></div>
+        <div class="rowline"><span><span class="lv">3</span>&nbsp; 부장 <span class="muted" style="font-size:11.5px;">· 1명</span></span><span class="ops"><button class="mini">수정</button><button class="mini red">삭제</button></span></div>
+        <div class="rowline"><span><span class="lv">4</span>&nbsp; 차장 <span class="muted" style="font-size:11.5px;">· 1명</span></span><span class="ops"><button class="mini">수정</button><button class="mini red">삭제</button></span></div>
+        <div class="rowline"><span><span class="lv">5</span>&nbsp; 과장 <span class="muted" style="font-size:11.5px;">· 1명</span></span><span class="ops"><button class="mini">수정</button><button class="mini red">삭제</button></span></div>
+        <div class="rowline"><span><span class="lv">6</span>&nbsp; 대리</span><span class="ops"><button class="mini">수정</button><button class="mini red">삭제</button></span></div>
+        <div class="rowline"><span><span class="lv">7</span>&nbsp; 주임</span><span class="ops"><button class="mini">수정</button><button class="mini red">삭제</button></span></div>
+        <div class="rowline"><span><span class="lv">8</span>&nbsp; 사원</span><span class="ops"><button class="mini">수정</button><button class="mini red">삭제</button></span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ 탭 3: 초대 ═══ -->
+  <div class="pane" id="p-inv">
+    <div class="card">
+      <table>
+        <thead><tr><th>이메일</th><th>부서 · 직급</th><th>권한</th><th>보낸 날짜</th><th>상태</th><th style="width:120px;"></th></tr></thead>
+        <tbody><tr><td colspan="6"><div class="empty">대기 중인 초대가 없습니다 — 우측 상단 「+ 직원 초대」로 새 직원을 초대하세요</div></td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ═══ 탭 4: 프리랜서 ═══ -->
+  <div class="pane" id="p-fre">
+    <div class="toolbar">
+      <div class="search">이름 · 연락처 검색</div>
+      <span style="flex:1;"></span>
+      <button class="btn-ghost">파일로 일괄 등록</button>
+      <button class="btn-primary">+ 프리랜서 등록</button>
+    </div>
+    <div class="card">
+      <table>
+        <thead><tr><th>이름</th><th>업무</th><th>연락처</th><th>계좌</th><th style="width:84px;">상태</th></tr></thead>
+        <tbody>
+          <tr class="click"><td><div class="n1">예시 프리랜서</div><div class="n2">3.3% 사업소득</div></td><td>탁송</td><td>010-0000-0000</td><td>국민 000000-00-000000</td><td><span class="badge b-green">활성</span></td></tr>
+          <tr class="click"><td><div class="n1">예시 프리랜서 2</div><div class="n2">3.3% 사업소득</div></td><td>정비</td><td>010-0000-0000</td><td><span class="dim">미입력</span></td><td><span class="badge b-gray">비활성</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ═══ 탭 5: 역할 템플릿 ═══ -->
+  <div class="pane" id="p-rol">
+    <div class="note">기존 역할 템플릿 화면을 새 탭 아래로 옮겨 그대로 사용합니다 (권한 묶음 만들기 → 직원에게 일괄 적용)</div>
+    <div class="card"><div class="empty">역할 템플릿 목록 — 기존 화면 재사용</div></div>
+  </div>
+
+  <div class="foot-note">
+    <b>구버전에서 달라지는 것</b><br>
+    · 회사 토글(FMI/RIDE/공통) 삭제 — 단일 회사 기준 탭 1단 구조 &nbsp;·&nbsp; 이모지 아이콘 제거 &nbsp;·&nbsp; 「GOD ADMIN」 → 「최고 관리자」<br>
+    · 직원 클릭 시 모달 대신 <b>우측 드로어</b> (기본정보 / 급여 설정 / 페이지 권한 3탭 + 비밀번호 초기화 + 퇴사 처리 그대로 승계)<br>
+    · 회사 마스터 탭 제거 (단일 회사 — 필요 시 관리자 메뉴로 이전) &nbsp;·&nbsp; 급여 운영은 별도 페이지(/hr/payroll)로 분리 유지<br>
+    · 결과 알림은 상단 토스트로 통일 (브라우저 알림창 제거)
+  </div>
+</div>
+
+<!-- ═══ 우측 드로어 (직원 클릭) ═══ -->
+<div class="overlay" id="ov" onclick="closeDrawer()"></div>
+<div class="drawer" id="dw">
+  <div class="d-head">
+    <div class="d-title">
+      <div>
+        <div style="font-size:16px; font-weight:700;">김준수 <span class="badge b-gray" style="margin-left:6px;">직원</span></div>
+        <div style="font-size:12px; color:#9aa1ad; margin-top:2px;">kzs7179@gmail.com · 2025-01-02 입사</div>
+      </div>
+      <button class="d-close" onclick="closeDrawer()">×</button>
+    </div>
+    <div class="d-tabs">
+      <button class="d-tab on" data-d="base">기본정보</button>
+      <button class="d-tab" data-d="pay">급여 설정</button>
+      <button class="d-tab" data-d="perm">페이지 권한</button>
+    </div>
+  </div>
+
+  <div class="d-body">
+    <!-- 기본정보 -->
+    <div class="dp on" id="d-base">
+      <div class="fgrid">
+        <div><label>이름</label><div class="inp">김준수</div></div>
+        <div><label>연락처</label><div class="inp">010-0000-0000</div></div>
+        <div><label>권한</label><div class="inp">직원 ▾</div></div>
+        <div><label>계정</label><div class="inp">로그인 가능 ▾</div></div>
+        <div><label>직급</label><div class="inp">과장 ▾</div></div>
+        <div><label>부서</label><div class="inp">렌터카 ▾</div></div>
+        <div><label>입사일</label><div class="inp">2025-01-02</div></div>
+        <div><label>재직 상태</label><div class="inp">재직 ▾</div></div>
+        <div class="f1"><label>이메일 · 가입일 (읽기 전용)</label><div class="inp ro">kzs7179@gmail.com · 2025-01-02 가입</div></div>
+      </div>
+
+      <div class="sect">비밀번호</div>
+      <button class="btn-ghost">임시 비밀번호 발급</button>
+      <div class="pw-box">
+        <div style="font-size:12px; color:#5b626e; margin-bottom:6px;">임시 비밀번호가 발급되었습니다 — 이 화면을 닫으면 다시 볼 수 없습니다</div>
+        <code>Kx7mRp2Wq9</code> <button class="btn-ghost" style="padding:5px 10px; font-size:12px; margin-left:8px;">복사</button>
+      </div>
+
+      <div class="danger-zone">
+        <div class="t">퇴사 처리</div>
+        <p>계정을 차단하고 부서·직급 배정을 해제합니다. 기록은 보존됩니다.</p>
+        <button class="btn-danger-line">퇴사 처리</button>
+      </div>
+    </div>
+
+    <!-- 급여 설정 -->
+    <div class="dp" id="d-pay">
+      <div class="note">4대보험·소득세 정밀 계산은 세무사 영역입니다 — 여기서는 지급 기준만 관리합니다</div>
+      <div class="fgrid">
+        <div><label>기본급 (월)</label><div class="inp">3,200,000</div></div>
+        <div><label>식대 수당 (월 · 비과세 한도 20만원)</label><div class="inp">200,000</div></div>
+        <div class="f1"><label>추가 수당</label>
+          <div class="inp" style="display:flex; justify-content:space-between; margin-bottom:6px;"><span>자가운전보조금</span><span>200,000 &nbsp;×</span></div>
+          <button class="btn-ghost" style="font-size:12px; padding:6px 10px;">+ 수당 추가</button>
+        </div>
+        <div><label>지급일</label><div class="inp">25일 ▾</div></div>
+        <div><label>은행</label><div class="inp">국민은행</div></div>
+        <div><label>예금주</label><div class="inp">김준수</div></div>
+        <div><label>계좌번호</label><div class="inp">000000-00-000000</div></div>
+      </div>
+    </div>
+
+    <!-- 페이지 권한 -->
+    <div class="dp" id="d-perm">
+      <div class="note">권한을 켠 페이지만 사이드바에 나타납니다 · 역할 템플릿으로 일괄 적용할 수도 있습니다</div>
+      <div class="card" style="box-shadow:none;">
+        <div class="perm-group">차량관리</div>
+        <div class="perm-row"><span class="nm">차량 원장</span><span class="sw"></span>
+          <span class="ck"><input type="checkbox" checked>조회</span><span class="ck"><input type="checkbox" checked>생성</span>
+          <span class="ck"><input type="checkbox" checked>수정</span><span class="ck"><input type="checkbox">삭제</span>
+          <span class="scope">전체 데이터 ▾</span></div>
+        <div class="perm-group">렌터카</div>
+        <div class="perm-row"><span class="nm">장기계약</span><span class="sw"></span>
+          <span class="ck"><input type="checkbox" checked>조회</span><span class="ck"><input type="checkbox" checked>생성</span>
+          <span class="ck"><input type="checkbox" checked>수정</span><span class="ck"><input type="checkbox">삭제</span>
+          <span class="scope">부서만 ▾</span></div>
+        <div class="perm-row"><span class="nm">수금</span><span class="sw off"></span><span class="dim">꺼짐</span></div>
+        <div class="perm-group">경리부 업무</div>
+        <div class="perm-row"><span class="nm">장부</span><span class="sw off"></span><span class="dim">꺼짐</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="d-foot">
+    <span style="font-size:12px; color:#9aa1ad;">변경 사항은 탭별로 저장됩니다</span>
+    <div style="display:flex; gap:8px;">
+      <button class="btn-ghost" onclick="closeDrawer()">닫기</button>
+      <button class="btn-primary">저장</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(x => x.classList.remove('on'));
+    document.querySelectorAll('.pane').forEach(x => x.classList.remove('on'));
+    t.classList.add('on');
+    document.getElementById('p-' + t.dataset.p).classList.add('on');
+  }));
+  document.querySelectorAll('.d-tab').forEach(t => t.addEventListener('click', () => {
+    document.querySelectorAll('.d-tab').forEach(x => x.classList.remove('on'));
+    document.querySelectorAll('.dp').forEach(x => x.classList.remove('on'));
+    t.classList.add('on');
+    document.getElementById('d-' + t.dataset.d).classList.add('on');
+  }));
+  function openDrawer(){ document.getElementById('ov').classList.add('open'); document.getElementById('dw').classList.add('open'); }
+  function closeDrawer(){ document.getElementById('ov').classList.remove('open'); document.getElementById('dw').classList.remove('open'); }
+</script>
+</body>
+</html>
