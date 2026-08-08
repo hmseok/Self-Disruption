@@ -19,6 +19,7 @@ export async function autoAttributeCardExpenses(): Promise<number> {
       SELECT UUID(), t.id, 'car', cc.assigned_car_id, 100.00,
              CONCAT('카드 자동귀속 ', cc.card_alias), 'auto', NOW(), NOW()
         FROM transactions t
+        -- helper-coverage-allow: INSERT…SELECT 원문 유지 — JSON card_last4 폴백 포함 자동귀속 전용 매칭
         JOIN corporate_cards cc
           ON RIGHT(REPLACE(cc.card_number,'-',''),4) = COALESCE(JSON_UNQUOTE(JSON_EXTRACT(t.raw_data,'$.card_last4')), t.account_last4)
        WHERE t.deleted_at IS NULL AND t.type='expense'
